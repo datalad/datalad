@@ -5,6 +5,8 @@
 #
 # Changelog
 # ---------
+# 0.12.0rc4-239-gba66d1c9f
+#  - Update to get a fresh build of master
 # 0.11.1
 #  - Update to get a fresh build, also with fixed up git-annex
 # 0.10.2

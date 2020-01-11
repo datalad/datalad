@@ -11,6 +11,7 @@ import os
 from ..path import (
     abspath,
     curdir,
+    get_parent_paths,
     robust_abspath,
     split_ext,
 )
@@ -56,3 +57,32 @@ def test_split_ext():
     eq_(split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
 
     eq_(split_ext("file.a.b..c"), ("file", ".a.b..c"))
+
+
+def test_get_parent_paths():
+    gpp = get_parent_paths
+
+    # sanity/border checks
+    eq_(gpp([], []), [])
+    eq_(gpp([], ['a']), [])
+    eq_(gpp(['a'], ['a']), ['a'])
+    assert_raises(ValueError, gpp, '/a', ['a'])
+
+    paths = ['a', 'a/b', 'a/b/file', 'c', 'd/sub/123']
+
+    eq_(gpp(paths, []), paths)
+    eq_(gpp(paths, [], True), [])
+
+    # actually a tricky one!  we should check in descending lengths etc
+    eq_(gpp(paths, paths), paths)
+    # every path is also its own parent
+    eq_(gpp(paths, paths, True), paths)
+
+    # subdatasets not for every path -- multiple paths hitting the same parent,
+    # and we will be getting only a single entry
+    # to mimic how git ls-tree operates
+    eq_(gpp(paths, ['a']), ['a', 'c', 'd/sub/123'])
+    eq_(gpp(paths, ['a'], True), ['a'])
+
+    # and we get the deepest parent
+    eq_(gpp(['a/b/file', 'a/b/file2'], ['a', 'a/b']), ['a/b'])

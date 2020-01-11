@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """High-level interface for adding dataset components
 
+Note: This module is obsolete. Use core.local.save instead.
 """
 
 import logging
@@ -20,7 +21,6 @@ from os.path import normpath
 from os.path import pardir
 from os.path import relpath
 
-from six import text_type
 
 from datalad.utils import assure_unicode
 from datalad.utils import unique
@@ -101,6 +101,10 @@ def _discover_subdatasets_recursively(
 @build_doc
 class Add(Interface):
     """Add files/directories to an existing dataset.
+
+
+    *Note*: This is an obsolete interface. Use datalad.api.save or Dataset.save
+     instead.
 
     Typically, files and directories to be added to a dataset would be placed
     into a directory of a dataset, and subsequently this command can be used to
@@ -294,7 +298,7 @@ class Add(Interface):
             discovered = {}
             discover_dataset_trace_to_targets(
                 # from here
-                dataset.path,
+                dataset.path if isinstance(dataset, Dataset) else dataset,
                 # to any dataset we are aware of
                 subds_to_add.keys(),
                 [],
@@ -377,7 +381,7 @@ class Add(Interface):
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         ds=subds, status='error',
-                        message=getattr(e, 'stderr', None) or text_type(e),
+                        message=getattr(e, 'stderr', None) or str(e),
                         **dict(common_report, **ap))
                     continue
                 # queue for saving using the updated annotated path

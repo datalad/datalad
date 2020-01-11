@@ -20,10 +20,16 @@ from distutils.version import LooseVersion
 
 import re
 import os
-from os.path import join as opj, exists
-from os.path import getmtime
-from os.path import abspath
+from os.path import (
+    join as opj,
+    exists,
+    getmtime,
+    abspath,
+)
 from time import time
+
+import logging
+lgr = logging.getLogger('datalad.config')
 
 cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
@@ -31,12 +37,14 @@ cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
 
 _where_reload_doc = """
-        where : {'dataset', 'local', 'global'}, optional
+        where : {'dataset', 'local', 'global', 'override'}, optional
           Indicator which configuration file to modify. 'dataset' indicates the
           persistent configuration in .datalad/config of a dataset; 'local'
           the configuration of a dataset's Git repository in .git/config;
           'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig).
+          a single repository (usually in $USER/.gitconfig); 'override'
+          limits the modification to the ConfigManager instance, and the
+          assigned value overrides any setting from any other source.
         reload : bool
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
@@ -157,19 +165,39 @@ class ConfigManager(object):
       directory. Moreover, any modifications are, by default, directed to
       this dataset's configuration file (which will be created on demand)
     dataset_only : bool
-      If True, configuration items are only read from a datasets persistent
-      configuration file, if any present (the one in ``.datalad/config``, not
-      ``.git/config``).
+      Legacy option, do not use.
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
+    source : {'any', 'local', 'dataset'}, optional
+      Which sources of configuration setting to consider. If 'dataset',
+      configuration items are only read from a dataset's persistent
+      configuration file, if any is present (the one in ``.datalad/config``, not
+      ``.git/config``); if 'local' any non-committed source is considered
+      (local and global configuration in Git config's terminology); if 'any'
+      all possible sources of configuration are considered.
     """
-    def __init__(self, dataset=None, dataset_only=False, overrides=None):
+
+    _checked_git_identity = False
+
+    def __init__(self, dataset=None, dataset_only=False, overrides=None, source='any'):
+        if source not in ('any', 'local', 'dataset'):
+            raise ValueError(
+                'Unkown ConfigManager(source=) setting: {}'.format(source))
+            # legacy compat
+        if dataset_only:
+            if source != 'any':
+                raise ValueError('Refuse to combine legacy dataset_only flag, with '
+                                 'source setting')
+            source = 'dataset'
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
         self._store = {}
         self._cfgfiles = set()
         self._cfgmtimes = None
+        self._dataset_path = None
+        self._dataset_cfgfname = None
+        self._repo_cfgfname = None
         # public dict to store variables that always override any setting
         # read from a file
         # `hasattr()` is needed because `datalad.cfg` is generated upon first module
@@ -179,15 +207,18 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            self._dataset_path = None
-            self._dataset_cfgfname = None
-            self._repo_cfgfname = None
+            if source == 'dataset':
+                raise ValueError(
+                    'ConfigManager configured to read dataset only, '
+                    'but no dataset given')
         else:
             self._dataset_path = dataset.path
-            self._dataset_cfgfname = opj(self._dataset_path, DATASET_CONFIG_FILE)
-            if not dataset_only:
+            if source != 'local':
+                self._dataset_cfgfname = opj(self._dataset_path,
+                                             DATASET_CONFIG_FILE)
+            if source != 'dataset':
                 self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
-        self._dataset_only = dataset_only
+        self._src_mode = source
         # Since configs could contain sensitive information, to prevent
         # any "facilitated" leakage -- just disable logging of outputs for
         # this runner
@@ -200,7 +231,7 @@ class ConfigManager(object):
         try:
             self._gitconfig_has_showorgin = \
                 LooseVersion(get_git_version(self._runner)) >= '2.8.0'
-        except:
+        except Exception:
             # no git something else broken, assume git is present anyway
             # to not delay this, but assume it is old
             self._gitconfig_has_showorgin = False
@@ -254,8 +285,8 @@ class ConfigManager(object):
                 self._store, self._cfgfiles = _parse_gitconfig_dump(
                     stdout, self._store, self._cfgfiles, replace=False)
 
-        if self._dataset_only:
-            # superimpose overrides
+        if self._src_mode == 'dataset':
+            # superimpose overrides, and stop early
             self._store.update(self.overrides)
             return
 
@@ -274,6 +305,19 @@ class ConfigManager(object):
 
         # override with environment variables
         self._store = _parse_env(self._store)
+
+        if not ConfigManager._checked_git_identity:
+            for cfg, envs in (
+                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
+                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
+                if cfg not in self._store \
+                        and not any(e in os.environ for e in envs):
+                    lgr.warning(
+                        "It is highly recommended to configure Git before using "
+                        "DataLad. Set both 'user.name' and 'user.email' "
+                        "configuration variables."
+                    )
+            ConfigManager._checked_git_identity = True
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
@@ -409,6 +453,12 @@ class ConfigManager(object):
             self.add(var, '{}'.format(_value), where=where, reload=reload)
         return value
 
+    def __str__(self):
+        return "ConfigManager({}{})".format(
+            self._cfgfiles,
+            '+ overrides' if self.overrides else '',
+        )
+
     #
     # Compatibility with dict API
     #
@@ -535,7 +585,7 @@ class ConfigManager(object):
     def _get_location_args(self, where, args=None):
         if args is None:
             args = []
-        cfg_labels = ('dataset', 'local', 'global')
+        cfg_labels = ('dataset', 'local', 'global', 'override')
         if where not in cfg_labels:
             raise ValueError(
                 "unknown configuration label '{}' (not in {})".format(
@@ -547,7 +597,7 @@ class ConfigManager(object):
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset_path,  DATALAD_DOTDIR)
+            dscfg_dirname = opj(self._dataset_path, DATALAD_DOTDIR)
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
             if not exists(self._dataset_cfgfname):
@@ -571,6 +621,15 @@ class ConfigManager(object):
         value : str
           Variable value
         %s"""
+        if where == 'override':
+            from datalad.utils import assure_list
+            val = assure_list(self.overrides.pop(var, None))
+            val.append(value)
+            self.overrides[var] = val[0] if len(val) == 1 else val
+            if reload:
+                self.reload(force=True)
+            return
+
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
 
     @_where_reload
@@ -592,6 +651,12 @@ class ConfigManager(object):
           given `value`. Otherwise raise if multiple entries for `var` exist
           already
         %s"""
+        if where == 'override':
+            self.overrides[var] = value
+            if reload:
+                self.reload(force=True)
+            return
+
         from datalad.support.gitrepo import to_options
 
         self._run(to_options(replace_all=force) + [var, value],
@@ -608,6 +673,15 @@ class ConfigManager(object):
         new : str
           Name of the section to rename to.
         %s"""
+        if where == 'override':
+            self.overrides = {
+                (new + k[len(old):]) if k.startswith(old + '.') else k: v
+                for k, v in self.overrides.items()
+            }
+            if reload:
+                self.reload(force=True)
+            return
+
         self._run(['--rename-section', old, new], where=where, reload=reload)
 
     @_where_reload
@@ -619,6 +693,16 @@ class ConfigManager(object):
         sec : str
           Name of the section to remove.
         %s"""
+        if where == 'override':
+            self.overrides = {
+                k: v
+                for k, v in self.overrides.items()
+                if not k.startswith(sec + '.')
+            }
+            if reload:
+                self.reload(force=True)
+            return
+
         self._run(['--remove-section', sec], where=where, reload=reload)
 
     @_where_reload
@@ -630,5 +714,11 @@ class ConfigManager(object):
         var : str
           Name of the variable to remove
         %s"""
+        if where == 'override':
+            self.overrides.pop(var, None)
+            if reload:
+                self.reload(force=True)
+            return
+
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)

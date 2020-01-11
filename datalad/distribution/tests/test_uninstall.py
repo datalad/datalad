@@ -9,9 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
-
-
 import os
 from os.path import join as opj, split as psplit
 from os.path import exists, lexists
@@ -24,7 +21,6 @@ from datalad.api import drop
 from datalad.api import remove
 from datalad.api import install
 from datalad.api import create
-from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -43,8 +39,11 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import usecase
+from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import chpwd
 from datalad.utils import _path_
+from datalad.utils import Path
 from datalad.support.external_versions import external_versions
 
 from ..dataset import Dataset
@@ -61,6 +60,11 @@ def test_safetynet(path):
                 assert_status(
                     ('error', 'impossible'),
                     uninstall(path=target, on_failure='ignore'))
+    sub = ds.create('sub')
+    subsub = sub.create('subsub')
+    for p in (sub.path, subsub.path):
+        with chpwd(p):
+            assert_status('error', uninstall(on_failure='ignore'))
 
 
 @with_tempfile()
@@ -69,12 +73,11 @@ def test_uninstall_uninstalled(path):
     # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
     assert_status('error', ds.drop(on_failure="ignore"))
-    assert_status('error', ds.uninstall(on_failure='ignore'))
+    assert_raises(ValueError, ds.uninstall)
     assert_status('notneeded', ds.remove())
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
@@ -95,7 +98,6 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
     # and now again, but this time remove something that is not installed
     ds.create('three')
-    ds.save()
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ds.uninstall('two')
     ok_clean_git(ds.path)
@@ -110,17 +112,21 @@ def test_clean_subds_removal(path):
     eq_(res, [subds2, ds])
 
 
-@with_testrepos('.*basic.*', flavors=['clone'])
+@with_tempfile()
 def test_uninstall_invalid(path):
     ds = Dataset(path).create(force=True)
-    for method in (uninstall, remove, drop):
-        assert_raises(InsufficientArgumentsError, method)
+    # no longer a uniform API for uninstall, drop, and remove
+    for method in (uninstall,): #  remove, drop):
+        with chpwd(ds.path):
+            assert_status('error', method(on_failure='ignore'))
         # refuse to touch stuff outside the dataset
         assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
         # same if it doesn't exist, for consistency
         assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:489
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_uninstall_annex_file(path):
     ds = Dataset(path)
@@ -166,10 +172,8 @@ def test_uninstall_git_file(path):
         message="no annex'ed content")
 
     res = ds.uninstall(path="INFO.txt", on_failure='ignore')
-    assert_result_count(
-        res, 1,
-        status='impossible',
-        message='can only uninstall datasets (consider the `drop` command)')
+    # no matching subdataset
+    assert_result_count(res, 0)
 
     # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
@@ -179,6 +183,8 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:509
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
@@ -209,7 +215,16 @@ def test_uninstall_subdataset(src, dst):
             raise SkipTest(
                 "Known problem with GitPython. See "
                 "https://github.com/gitpython-developers/GitPython/pull/521")
-        res = ds.uninstall(path=subds.path, result_xfm='datasets')
+        # simulate a cmdline invocation pointing to the subdataset
+        # with a relative path from outside the superdataset to catch
+        # https://github.com/datalad/datalad/issues/4001
+        pwd = Path(dst).parent
+        with chpwd(str(pwd)):
+            res = uninstall(
+                dataset=ds.path,
+                path=str(subds.pathobj.relative_to(pwd)),
+                result_xfm='datasets',
+            )
         eq_(res[0], subds)
         ok_(not subds.is_installed())
         # just a deinit must not remove the subdataset registration
@@ -218,21 +233,21 @@ def test_uninstall_subdataset(src, dst):
         ok_(exists(subds.path))
 
 
+@known_failure_githubci_win
 @with_tree({
     'deep': {
         'dir': {
             'keep': 'keep1', 'kill': 'kill1'}},
     'keep': 'keep2',
     'kill': 'kill2'})
-@known_failure_direct_mode  #FIXME
 def test_uninstall_multiple_paths(path):
-    ds = Dataset(path).create(force=True, save=False)
+    ds = Dataset(path).create(force=True)
     subds = ds.create('deep', force=True)
-    subds.add('.', recursive=True)
+    subds.save(recursive=True)
     ok_clean_git(subds.path)
     # needs to be able to add a combination of staged files, modified submodule,
     # and untracked files
-    ds.add('.', recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     # drop content of all 'kill' files
     topfile = 'kill'
@@ -273,11 +288,11 @@ def test_uninstall_dataset(path):
     ok_(not exists(ds.path))
 
 
+@known_failure_githubci_win
 @with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
-@known_failure_direct_mode  #FIXME
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
-    ds.add(os.curdir)
+    ds.save()
     ok_clean_git(ds.path)
     # make sure there is any key
     ok_(len(ds.repo.get_file_key('one')))
@@ -290,7 +305,7 @@ def test_remove_file_handle_only(path):
     ok_(exists(path_two))
     # remove one handle, should not affect the other
     ds.remove('two', check=False, message="custom msg")
-    eq_(ds.repo.repo.head.commit.message.rstrip(), "custom msg")
+    eq_(ds.repo.format_commit("%B").rstrip(), "custom msg")
     eq_(rpath_one, realpath(opj(ds.path, 'one')))
     ok_(exists(rpath_one))
     ok_(not exists(path_two))
@@ -300,17 +315,17 @@ def test_remove_file_handle_only(path):
         ok_(not exists("one"))
     # and we should be able to remove without saving
     ds.remove('three', check=False, save=False)
-    ok_(ds.repo.is_dirty())
+    ok_(ds.repo.dirty)
 
 
+@known_failure_githubci_win
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
-@known_failure_direct_mode  #FIXME
 def test_uninstall_recursive(path):
     ds = Dataset(path).create(force=True)
     subds = ds.create('deep', force=True)
     # we add one file, but we get a response for the requested
     # directory too
-    res = subds.add('.')
+    res = subds.save()
     assert_result_count(res, 1, action='add', status='ok', type='file')
     assert_result_count(res, 1, action='save', status='ok', type='dataset')
     # save all -> all clean
@@ -362,14 +377,13 @@ def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
     ok_clean_git(ds.path)
-    remove(ds.path, recursive=True)
+    remove(dataset=ds.path, recursive=True)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_careless_subdataset_uninstall(path):
     # nested datasets
     ds = Dataset(path).create()
@@ -394,7 +408,7 @@ def test_kill(path):
     testfile = opj(ds.path, "file.dat")
     with open(testfile, 'w') as f:
         f.write("load")
-    ds.add("file.dat")
+    ds.save("file.dat")
     subds = ds.create('deep1')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1'])
     ok_clean_git(ds.path)
@@ -464,12 +478,12 @@ def test_remove_recursive_2(tdir):
     # fails in some cases https://github.com/datalad/datalad/issues/1573
     with chpwd(tdir):
         install('///labs')
-        install('labs/tarr/face_place')
-        remove('labs', recursive=True)
+        with chpwd('labs'):
+            install('tarr/face_place')
+        remove(dataset='labs', recursive=True)
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_failon_nodrop(path):
     # test to make sure that we do not wipe out data when checks are enabled
     # despite the general error behavior mode
@@ -478,7 +492,7 @@ def test_failon_nodrop(path):
     # of top-level datasets
     sub = ds.create('sub')
     create_tree(sub.path, {'test': 'content'})
-    ds.add(opj('sub', 'test'))
+    ds.save(opj('sub', 'test'))
     ok_clean_git(ds.path)
     eq_(['test'], sub.repo.get_annexed_files(with_content_only=True))
     # we put one file into the dataset's annex, no redundant copies
@@ -507,7 +521,8 @@ def test_uninstall_without_super(path):
     # it should be possible to uninstall the proper subdataset, even without
     # explicitly calling the uninstall methods of the parent -- things should
     # be figured out by datalad
-    uninstall(sub.path)
+    with chpwd(parent.path):
+        uninstall(sub.path)
     assert not sub.is_installed()
     # no present subdatasets anymore
     subreport = parent.subdatasets()
@@ -515,7 +530,8 @@ def test_uninstall_without_super(path):
     assert_result_count(subreport, 1, path=sub.path, state='absent')
     assert_result_count(subreport, 0, path=nosub.path)
     # but we should fail on an attempt to uninstall the non-subdataset
-    res = uninstall(nosub.path, on_failure='ignore')
+    with chpwd(nosub.path):
+        res = uninstall(on_failure='ignore')
     assert_result_count(
         res, 1, path=nosub.path, status='error',
         message="will not uninstall top-level dataset (consider `remove` command)")
@@ -531,11 +547,10 @@ def test_drop_nocrash_absent_subds(path):
         assert_status('notneeded', drop('.', recursive=True))
 
 
-@known_failure_direct_mode  #FIXME
 @with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
 def test_remove_more_than_one(path):
     ds = Dataset(path).create(force=True)
-    ds.add('.')
+    ds.save()
     ok_clean_git(path)
     # ensure #1912 stays resolved
     ds.remove(['one', 'two'], check=False)

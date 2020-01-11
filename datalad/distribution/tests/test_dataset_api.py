@@ -23,7 +23,7 @@ from ...tests.utils import (
 def test_datasetmethod_bound(path):
     ds = Dataset(path)
     # should be automagically imported/picked up if not bound already
-    assert ds.add  # simplest, intfspec only 2 entries
+    assert ds.create  # simplest, intfspec only 2 entries
     assert ds.download_url  # 3 entries, with dash
     assert ds.create_sibling_github  # 3 entries, 2 dashes
     assert ds.aggregate_metadata  # module name is called "aggregate"

@@ -7,11 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import known_failure_direct_mode
 
-import git
 import os
 
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import integration
 from datalad.tests.utils import usecase
 from .utils import eq_, ok_, with_testrepos, with_tempfile
@@ -23,12 +22,12 @@ from .utils_testdatasets import make_studyforrest_mockup
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_having_annex(path):
     ok_(os.path.exists(os.path.join(path, '.git')))
-    repo = git.Repo(path)
+    repo = GitRepo(path)
     # might not necessarily be present upon initial submodule init
     #branches = [r.name for r in repo.branches]
     #ok_('git-annex' in branches, msg="Didn't find git-annex among %s" % branches)
     # look for it among remote refs
-    refs = [_.name for _ in repo.remote().refs]
+    refs = repo.get_remote_branches()
     ok_('origin/git-annex' in refs, msg="Didn't find git-annex among refs %s"
                                         % refs)
 
@@ -56,7 +55,6 @@ def test_clone(src, tempdir):
 
 @usecase
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_make_studyforrest_mockup(path):
     # smoke test
     make_studyforrest_mockup(path)

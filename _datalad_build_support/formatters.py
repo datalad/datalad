@@ -171,7 +171,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                     parts.append('%s %s' % (self._bold(option_string),
                                             args_string))
 
-            return ', '.join(parts)
+            return ', '.join(p.replace('--', '-\\\\-') for p in parts)
 
 
 class RSTManPageFormatter(ManPageFormatter):
@@ -270,7 +270,7 @@ class RSTManPageFormatter(ManPageFormatter):
 
 def cmdline_example_to_rst(src, out=None, ref=None):
     if out is None:
-        from six.moves import StringIO
+        from io import StringIO
         out = StringIO()
 
     # place header

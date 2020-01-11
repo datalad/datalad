@@ -13,6 +13,7 @@ import re
 from os import linesep
 
 
+
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
@@ -135,6 +136,17 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not under control of the repository at all.
     """
     pass
+
+
+class InvalidGitReferenceError(ValueError):
+    """Thrown if provided git reference is invalid
+    """
+    def __init__(self, ref, *args, **kwargs):
+        super(InvalidGitReferenceError, self).__init__(*args, **kwargs)
+        self.ref = ref
+
+    def __str__(self):
+        return u"Git reference '{}' invalid".format(self.ref)
 
 
 class GitIgnoreError(CommandError):
@@ -277,6 +289,21 @@ class InvalidAnnexRepositoryError(RuntimeError):
     without init=True"""
 
 
+class DirectModeNoLongerSupportedError(NotImplementedError):
+    """direct mode is no longer supported"""
+
+    def __init__(self, repo, msg=None):
+        super(DirectModeNoLongerSupportedError, self).__init__(
+            ((" " + msg + ", but ") if msg else '')
+            +
+             "direct mode of operation is being deprecated in git-annex and "
+             "no longer supported by DataLad. "
+             "Please use 'git annex upgrade' under %s to upgrade your direct "
+             "mode repository to annex v6 (or later)." % repo.path
+            )
+        self.repo = repo  # might come handy
+
+
 class IncompleteResultsError(RuntimeError):
     """Exception to be raised whenever results are incomplete.
 
@@ -304,6 +331,9 @@ class InstallFailedError(CommandError):
     pass
 
 
+class ConnectionOpenFailedError(CommandError):
+    """Exception to raise whenever opening a network connection fails"""
+    pass
 #
 # Downloaders
 #

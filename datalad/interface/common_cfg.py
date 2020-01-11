@@ -192,6 +192,17 @@ definitions = {
             'title': 'Used for control the verbosity of logs printed to '
                      'stdout while running datalad commands/debugging'}),
     },
+    'datalad.log.result-level': {
+        'ui': ('question', {
+               'title': 'Log level for command result messages',
+               'text': "Overrides the default behavior of logging 'impossible' "
+                       "results as a warning, 'error' results as errors, and "
+                       "everything else as 'debug' with a single alternative "
+                       "log level"}),
+        'type': EnsureChoice('debug', 'info', 'warning', 'error'),
+        # None keeps the default behavior
+        'default': 'None',
+    },
     'datalad.log.name': {
         'ui': ('question', {
             'title': 'Include name of the log target in the log line'}),
@@ -231,6 +242,12 @@ definitions = {
                'title': "If set, pass this file as ssh's -i option."}),
         'destination': 'global',
         'default': None,
+    },
+    'datalad.repo.backend': {
+        'ui': ('question', {
+               'title': 'git-annex backend',
+               'text': 'Backend to use when creating git-annex repositories'}),
+        'default': 'MD5E',
     },
     'datalad.repo.direct': {
         'ui': ('yesno', {
@@ -319,5 +336,16 @@ definitions = {
             'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
+    },
+    'datalad.install.inherit-local-origin': {
+        'ui': ('question', {
+            'title': 'Inherit local origin of dataset source',
+            'text': "If enabled, a local 'origin' remote of a local dataset "
+                    "clone source is configured as an 'origin-2' remote "
+                    "to make its annex automatically available. The process "
+                    "is repeated recursively for any further qualifying "
+                    "'origin' dataset thereof."}),
+        'default': True,
+        'type': EnsureBool(),
     },
 }

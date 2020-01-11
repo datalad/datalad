@@ -12,7 +12,6 @@
 
 import io
 import codecs
-from six import PY2
 from os.path import (
     dirname,
     exists,
@@ -50,21 +49,50 @@ from ..log import lgr
 from ..dochelpers import exc_str
 
 
-def dump(obj, fname):
+def dump(obj, fname, compressed=False):
+    """Dump a JSON-serializable objects into a file
+
+    Parameters
+    ----------
+    obj : object
+      Structure to serialize.
+    fname : str
+      Name of the file to dump into.
+    compressed : bool
+      Flag whether to use LZMA compression for file content.
+    """
+
+    _open = LZMAFile if compressed else io.open
+
     indir = dirname(fname)
     if not exists(indir):
         makedirs(indir)
     if lexists(fname):
         os.unlink(fname)
-    with io.open(fname, 'wb') as f:
-        return dump2fileobj(obj, f)
+    with _open(fname, 'wb') as f:
+        return dump2fileobj(
+            obj,
+            f,
+            **(compressed_json_dump_kwargs if compressed else json_dump_kwargs)
+        )
 
 
-def dump2fileobj(obj, fileobj):
+def dump2fileobj(obj, fileobj, **kwargs):
+    """Dump a JSON-serializable objects into a file-like
+
+    Parameters
+    ----------
+    obj : object
+      Structure to serialize.
+    fileobj : file
+      Writeable file-like object to dump into.
+    **kwargs
+      Keyword arguments to be passed on to simplejson.dump()
+    """
     return jsondump(
         obj,
         codecs.getwriter('utf-8')(fileobj),
-        **json_dump_kwargs)
+        **kwargs)
 
 
 def LZMAFile(*args, **kwargs):
@@ -74,7 +102,7 @@ def LZMAFile(*args, **kwargs):
     calling dir() helps to avoid AttributeError __exit__
     see https://bugs.launchpad.net/pyliblzma/+bug/1219296
     """
-    from .lzma import lzma
+    import lzma
     lzmafile = lzma.LZMAFile(*args, **kwargs)
     dir(lzmafile)
     return lzmafile
@@ -101,12 +129,26 @@ def dump2xzstream(obj, fname):
     dump2stream(obj, fname, compressed=True)
 
 
-def load_stream(fname, compressed=False):
+def load_stream(fname, compressed=None):
+    _open = LZMAFile \
+        if compressed or compressed is None and fname.endswith('.xz') \
+        else io.open
 
-    _open = LZMAFile if compressed else open
-    with _open(fname, mode='r') as f:
-        for line in f:
-            yield loads(line)
+    with _open(fname, mode='rb') as f:
+        jreader = codecs.getreader('utf-8')(f)
+        cont_line = u''
+        for line in jreader:
+            if not line.endswith('\n'):
+                cont_line += line
+                continue
+            if cont_line:
+                cont_line += line
+            else:
+                cont_line = line
+            yield loads(cont_line)
+            cont_line = u''
+        if cont_line:  # The last line didn't end with a new line.
+            yield cont_line
 
 
 def load_xzstream(fname):
@@ -126,7 +168,7 @@ def loads(s, *args, **kwargs):
         raise
 
 
-def load(fname, fixup=True, **kw):
+def load(fname, fixup=True, compressed=None, **kw):
     """Load JSON from a file, possibly fixing it up if initial load attempt fails
 
     Parameters
@@ -134,12 +176,21 @@ def load(fname, fixup=True, **kw):
     fixup : bool
       In case of failed load, apply a set of fixups with hope to resolve issues
       in JSON
+    compressed : bool or None
+      Flag whether to treat the file as XZ compressed. If None, this decision
+      is made automatically based on the presence of a '.xz' extension in the
+      filename
     **kw
       Passed into the load (and loads after fixups) function
     """
-    with io.open(fname, 'r', encoding='utf-8') as f:
+    _open = LZMAFile \
+        if compressed or compressed is None and fname.endswith('.xz') \
+        else io.open
+
+    with _open(fname, 'rb') as f:
         try:
-            return jsonload(f, **kw)
+            jreader = codecs.getreader('utf-8')(f)
+            return jsonload(jreader, **kw)
         except JSONDecodeError as exc:
             if not fixup:
                 raise
@@ -148,8 +199,8 @@ def load(fname, fixup=True, **kw):
             # Load entire content and replace common "abusers" which break JSON
             # comprehension but in general
             # are Ok
-            with io.open(fname, 'r', encoding='utf-8') as f:
-                s_orig = s = f.read()
+            with _open(fname,'rb') as f:
+                s_orig = s = codecs.getreader('utf-8')(f).read()
 
             for o, r in {
                 u"\xa0": " ",  # non-breaking space

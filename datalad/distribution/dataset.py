@@ -10,17 +10,15 @@
 """
 
 import logging
-from os.path import curdir
-from os.path import exists
-from os.path import join as opj
-from os.path import normpath, isabs
-from os.path import pardir
-from os.path import realpath
-from os.path import relpath
+from os.path import (
+    curdir,
+    exists,
+    join as opj,
+    normpath, isabs,
+    pardir,
+    realpath,
+)
 from weakref import WeakValueDictionary
-from six import PY2
-from six import string_types
-from six import add_metaclass
 import wrapt
 
 from datalad import cfg
@@ -32,55 +30,35 @@ from datalad.support.constraints import Constraint
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.external_versions import external_versions
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import NoSuchPathError
-from datalad.support.repo import Flyweight
+from datalad.support.gitrepo import (
+    GitRepo,
+    InvalidGitRepositoryError,
+    NoSuchPathError
+)
+from datalad.support.repo import PathBasedFlyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
+from datalad.support import path as op
 
-from datalad.utils import assure_unicode
-from datalad.utils import getpwd
-from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import get_dataset_root
-from datalad.utils import dlabspath
+import datalad.utils as ut
+from datalad.utils import (
+    getpwd,
+    optional_args,
+    get_dataset_root,
+    # TODO remove after a while, when external consumers have adjusted
+    # to use get_dataset_root()
+    get_dataset_root as rev_get_dataset_root,
+    Path,
+    PurePath,
+    assure_list,
+)
 
 
 lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
 
 
-# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
-#       (see normalize_path)
-def resolve_path(path, ds=None):
-    """Resolve a path specification (against a Dataset location)
-
-    Any explicit path (absolute or relative) is returned as an absolute path.
-    In case of an explicit relative path, the current working directory is
-    used as a reference. Any non-explicit relative path is resolved against
-    as dataset location, i.e. considered relative to the location of the
-    dataset. If no dataset is provided, the current working directory is
-    used.
-
-    Returns
-    -------
-    Absolute path
-    """
-    path = expandpath(path, force_absolute=False)
-    if is_explicit_path(path):
-        # normalize path consistently between two (explicit and implicit) cases
-        return dlabspath(path, norm=True)
-
-    # no dataset given, use CWD as reference
-    # note: abspath would disregard symlink in CWD
-    top_path = getpwd() \
-        if ds is None else ds.path if isinstance(ds, Dataset) else ds
-    return normpath(opj(top_path, path))
-
-
-@add_metaclass(Flyweight)
-class Dataset(object):
+class Dataset(object, metaclass=PathBasedFlyweight):
     """Representation of a DataLad dataset/repository
 
     This is the core data type of DataLad: a representation of a dataset.
@@ -104,65 +82,73 @@ class Dataset(object):
     _unique_instances = WeakValueDictionary()
 
     @classmethod
-    def _flyweight_id_from_args(cls, *args, **kwargs):
-
-        if args:
-            # to a certain degree we need to simulate an actual call to __init__
-            # and make sure, passed arguments are fitting:
-            # TODO: Figure out, whether there is a cleaner way to do this in a
-            # generic fashion
-            assert('path' not in kwargs)
-            path = args[0]
-            args = args[1:]
-        elif 'path' in kwargs:
-            path = kwargs.pop('path')
-        else:
-            raise TypeError("__init__() requires argument `path`")
-
-        if path is None:
-            raise AttributeError
-
-        # Custom handling for few special abbreviations
+    def _flyweight_preproc_path(cls, path):
+        """Custom handling for few special abbreviations for datasets"""
         path_ = path
         if path == '^':
             # get the topmost dataset from current location. Note that 'zsh'
             # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(curdir).get_superdataset(topmost=True).path
+            path_ = Dataset(get_dataset_root(curdir)).get_superdataset(
+                topmost=True).path
+        elif path == '^.':
+            # get the dataset containing current directory
+            path_ = get_dataset_root(curdir)
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?
             path_ = cfg.obtain('datalad.locations.default-dataset')
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
+        return path_
 
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path_ = RI(path_).localpath
-
+    @classmethod
+    def _flyweight_postproc_path(cls, path):
         # we want an absolute path, but no resolved symlinks
-        if not isabs(path_):
-            path_ = opj(getpwd(), path_)
+        if not op.isabs(path):
+            path = op.join(op.getpwd(), path)
 
         # use canonical paths only:
-        path_ = normpath(path_)
-        kwargs['path'] = path_
-        return path_, args, kwargs
+        return op.normpath(path)
+
+    def _flyweight_invalid(self):
+        """Invalidation of Flyweight instance
+
+        Dataset doesn't need to be invalidated during its lifetime at all. Instead the underlying *Repo instances are.
+        Dataset itself can represent a not yet existing path.
+        """
+        return False
     # End Flyweight
+
+    def __hash__(self):
+        # the flyweight key is already determining unique instances
+        # add the class name to distinguish from strings of a path
+        return hash((self.__class__.__name__, self.__weakref__.key))
 
     def __init__(self, path):
         """
         Parameters
         ----------
-        path : str
+        path : str or Path
           Path to the dataset location. This location may or may not exist
           yet.
         """
+        self._pathobj = path if isinstance(path, ut.Path) else None
+        if isinstance(path, ut.PurePath):
+            path = str(path)
         self._path = path
         self._repo = None
         self._id = None
         self._cfg = None
         self._cfg_bound = None
+
+    @property
+    def pathobj(self):
+        """pathobj for the dataset"""
+        # XXX this relies on the assumption that self._path as managed
+        # by the base class is always a native path
+        if not self._pathobj:
+            self._pathobj = ut.Path(self._path)
+        return self._pathobj
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -250,18 +236,24 @@ class Dataset(object):
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
+                # Here we do the same validation that Flyweight would do beforehand if there was a call to AnnexRepo()
                 if self._repo is AnnexRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        AnnexRepo.is_valid_repo(self._repo.path,
-                                                allow_noninitialized=True):
+                        self._repo.path, None) and not self._repo._flyweight_invalid():
                     # it's still the object registered as flyweight and it's a
                     # valid annex repo
                     return self._repo
             elif isinstance(self._repo, GitRepo):
                 # it's supposed to be a plain git
+                # same kind of checks as for AnnexRepo above, but additionally check whether it was changed to have an
+                # annex now.
+                # TODO: Instead of is_with_annex, we might want the cheaper check for an actually initialized annex.
+                #       However, that's not completely clear. On the one hand, if it really changed to be an annex
+                #       it seems likely that this happened locally and it would also be an initialized annex. On the
+                #       other hand, we could have added (and fetched) a remote with an annex, which would turn it into
+                #       our current notion of an uninitialized annex. Question is whether or not such a change really
+                #       need to be detected. For now stay on the safe side and detect it.
                 if self._repo is GitRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        GitRepo.is_valid_repo(self._repo.path) and not \
+                        self._repo.path, None) and not self._repo._flyweight_invalid() and not \
                         self._repo.is_with_annex():
                     # it's still the object registered as flyweight, it's a
                     # valid git repo and it hasn't turned into an annex
@@ -275,8 +267,7 @@ class Dataset(object):
         # actually new instance. This is unnecessarily costly.
         valid = False
         for cls, ckw, kw in (
-                # TODO: Do we really want to allow_noninitialized=True here?
-                # And if so, leave a proper comment!
+                # Non-initialized is okay. We want to figure the correct instance to represent what's there - that's it.
                 (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
                 (GitRepo, {}, {})
         ):
@@ -301,6 +292,8 @@ class Dataset(object):
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
         elif due.active:
+            # TODO: Figure out, when exactly this is needed. Don't think it makes sense to do this for every dataset,
+            #       no matter what => we want .repo to be as cheap as it gets.
             # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
 
@@ -360,32 +353,6 @@ class Dataset(object):
 
         return self._cfg
 
-    def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                        recursive=False, recursion_limit=None, edges=False):
-        """DEPRECATED: use `subdatasets()`"""
-        # TODO wipe this function out completely once we are comfortable
-        # with it. Internally we don't need or use it anymore.
-        import inspect
-        lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
-        from datalad.coreapi import subdatasets
-        if edges:
-            return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
-                     r['path'] if absolute else relpath(r['path'], start=self.path))
-                    for r in subdatasets(
-                        dataset=self,
-                        fulfilled=fulfilled,
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        bottomup=True)]
-        else:
-            return subdatasets(
-                dataset=self,
-                fulfilled=fulfilled,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                bottomup=True,
-                result_xfm='{}paths'.format('' if absolute else 'rel'))
-
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired
@@ -434,10 +401,19 @@ class Dataset(object):
         Dataset or None
         """
         from datalad.coreapi import subdatasets
-        # TODO: return only if self is subdataset of the superdataset
-        #       (meaning: registered as submodule)?
         path = self.path
         sds_path = path if topmost else None
+
+        def res_filter(res):
+            return res.get('status') == 'ok' and res.get('type') == 'dataset'
+
+        def subds_contains_path(ds, path):
+            return path in sds.subdatasets(recursive=False,
+                                           contains=path,
+                                           result_filter=res_filter,
+                                           on_failure='ignore',
+                                           result_xfm='paths')
+
         while path:
             # normalize the path after adding .. so we guaranteed to not
             # follow into original directory if path itself is a symlink
@@ -453,10 +429,7 @@ class Dataset(object):
                 if not sds.id:
                     break
             if registered_only:
-                if path not in sds.subdatasets(
-                        recursive=False,
-                        contains=path,
-                        result_xfm='paths'):
+                if not subds_contains_path(sds, path):
                     break
 
             # That was a good candidate
@@ -490,7 +463,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     The decorator has no effect on the actual function decorated with it.
     """
     if not name:
-        name = f.func_name if PY2 else f.__name__
+        name = f.__name__
 
     @wrapt.decorator
     def apply_func(wrapped, instance, args, kwargs):
@@ -534,12 +507,22 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
+    """Despite its name, this constraint does not actually ensure that the
+    argument is a valid dataset, because for procedural reasons this would
+    typically duplicate subsequent checks and processing. However, it can
+    be used to achieve uniform documentation of `dataset` arguments."""
 
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
-        elif isinstance(value, string_types):
-            return Dataset(path=value)
+        elif isinstance(value, str):
+            # we cannot convert to a Dataset class right here
+            # - duplicates require_dataset() later on
+            # - we need to be able to distinguish between a bound
+            #   dataset method call and a standalone call for
+            #   relative path argument disambiguation
+            #return Dataset(path=value)
+            return value
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
@@ -578,8 +561,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        # assure_unicode() can be dropped once we drop PY2.
-        dspath = assure_unicode(get_dataset_root(getpwd()))
+        dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
@@ -594,6 +576,126 @@ def require_dataset(dataset, check_installed=True, purpose=None):
                          u"{0}.".format(dataset.path))
 
     return dataset
+
+
+# New helpers, courtesy of datalad-revolution.
+
+
+def resolve_path(path, ds=None):
+    """Resolve a path specification (against a Dataset location)
+
+    Any path is returned as an absolute path. If, and only if, a dataset
+    object instance is given as `ds`, relative paths are interpreted as
+    relative to the given dataset. In all other cases, relative paths are
+    treated as relative to the current working directory.
+
+    Note however, that this function is not able to resolve arbitrarily
+    obfuscated path specifications. All operations are purely lexical, and no
+    actual path resolution against the filesystem content is performed.
+    Consequently, common relative path arguments like '../something' (relative
+    to PWD) can be handled properly, but things like 'down/../under' cannot, as
+    resolving this path properly depends on the actual target of any
+    (potential) symlink leading up to '..'.
+
+    Parameters
+    ----------
+    path : str or PathLike or list
+      Platform-specific path specific path specification. Multiple path
+      specifications can be given as a list
+    ds : Dataset or None
+      Dataset instance to resolve relative paths against.
+
+    Returns
+    -------
+    `pathlib.Path` object or list(Path)
+      When a list was given as input a list is returned, a Path instance
+      otherwise.
+    """
+    got_ds_instance = isinstance(ds, Dataset)
+    if ds is not None and not got_ds_instance:
+        ds = require_dataset(
+            ds, check_installed=False, purpose='path resolution')
+    out = []
+    for p in assure_list(path):
+        if ds is None or not got_ds_instance:
+            # no dataset at all or no instance provided -> CWD is always the reference
+            # nothing needs to be done here. Path-conversion and absolutification
+            # are done next
+            pass
+        # we have a given datasets instance
+        elif not Path(p).is_absolute():
+            # we have a dataset and no abspath nor an explicit relative path ->
+            # resolve it against the dataset
+            p = ds.pathobj / p
+
+        p = ut.Path(p)
+
+        # make sure we return an absolute path, but without actually
+        # resolving anything
+        if not p.is_absolute():
+            # in general it is almost impossible to use resolve() when
+            # we can have symlinks in the root path of a dataset
+            # (that we don't want to resolve here), symlinks to annex'ed
+            # files (that we never want to resolve), and other within-repo
+            # symlinks that we (sometimes) want to resolve (i.e. symlinked
+            # paths for addressing content vs adding content)
+            # CONCEPT: do the minimal thing to catch most real-world inputs
+            # ASSUMPTION: the only sane relative path input that needs
+            # handling and can be handled are upward references like
+            # '../../some/that', wherease stuff like 'down/../someotherdown'
+            # are intellectual excercises
+            # ALGORITHM: match any number of leading '..' path components
+            # and shorten the PWD by that number
+            # NOT using ut.Path.cwd(), because it has symlinks resolved!!
+            pwd_parts = ut.Path(getpwd()).parts
+            path_parts = p.parts
+            leading_parents = 0
+            for pp in p.parts:
+                if pp == op.pardir:
+                    leading_parents += 1
+                    path_parts = path_parts[1:]
+                elif pp == op.curdir:
+                    # we want to discard that, but without stripping
+                    # a corresponding parent
+                    path_parts = path_parts[1:]
+                else:
+                    break
+            p = ut.Path(
+                op.join(
+                    *(pwd_parts[:-leading_parents if leading_parents else None]
+                      + path_parts)))
+        # note that we will not "normpath()" the result, check the
+        # pathlib docs for why this is the only sane choice in the
+        # face of the possibility of symlinks in the path
+        out.append(p)
+    return out[0] if isinstance(path, (str, PurePath)) else out
+
+# TODO keep this around for a while so that extensions can be updated
+rev_resolve_path = resolve_path
+
+
+def path_under_rev_dataset(ds, path):
+    ds_path = ds.pathobj
+    try:
+        rpath = str(ut.Path(path).relative_to(ds_path))
+        if not rpath.startswith(op.pardir):
+            # path is already underneath the dataset
+            return path
+    except Exception:
+        # whatever went wrong, we gotta play save
+        pass
+
+    root = get_dataset_root(str(path))
+    while root is not None and not ds_path.samefile(root):
+        # path and therefore root could be relative paths,
+        # hence in the next round we cannot use dirname()
+        # to jump in the the next directory up, but we have
+        # to use ./.. and get_dataset_root() will handle
+        # the rest just fine
+        root = get_dataset_root(op.join(root, op.pardir))
+    if root is None:
+        return None
+    return ds_path / op.relpath(str(path), root)
 
 
 lgr.log(5, "Done importing dataset")

@@ -14,7 +14,7 @@ from datalad.api import Dataset
 from datalad.utils import on_osx
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import known_failure_githubci_win
 
 from nose import SkipTest
 from nose.tools import assert_equal
@@ -23,7 +23,7 @@ from nose.tools import assert_equal
 @with_tree(tree={'file.dat': ''})
 def check_api(no_annex, path):
     ds = Dataset(path).create(force=True, no_annex=no_annex)
-    ds.add('.')
+    ds.save()
     ok_clean_git(ds.path)
 
     processed_extractors, skipped_extractors = [], []
@@ -73,10 +73,12 @@ def check_api(no_annex, path):
             " to load:\n%s" % ("\n".join(skipped_extractors)))
 
 
+@known_failure_githubci_win
 def test_api_git():
     # should tollerate both pure git and annex repos
     yield check_api, True
 
 
+@known_failure_githubci_win
 def test_api_annex():
     yield check_api, False

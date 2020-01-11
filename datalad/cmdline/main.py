@@ -22,7 +22,6 @@ import sys
 import textwrap
 import os
 
-from six import text_type
 
 import datalad
 
@@ -43,7 +42,7 @@ from ..dochelpers import exc_str
 
 def _license_info():
     return """\
-Copyright (c) 2013-2018 DataLad developers
+Copyright (c) 2013-2019 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -88,12 +87,17 @@ class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
 def setup_parser(
         cmdlineargs,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        return_subparsers=False):
+        return_subparsers=False,
+        # prevent loading of extension entrypoints when --help is requested
+        # this is enabled when building docs to avoid pollution of generated
+        # manpages with extensions commands (that should appear in their own
+        # docs, but not in the core datalad package docs)
+        help_ignore_extensions=False):
     lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
         get_cmdline_command_name, alter_interface_docs_for_cmdline, \
-        load_interface, get_cmd_doc
+        load_interface, get_cmd_doc, get_cmd_ex
     # setup cmdline args parser
     parts = {}
     # main parser
@@ -172,29 +176,11 @@ def setup_parser(
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.""")
     parser.add_argument(
-        '--proc-pre', dest='common_proc_pre',
-        nargs='+',
-        action='append',
-        metavar=('<PROCEDURE NAME>', 'ARGS'),
-        help="""Dataset procedure to run before the main command (see run-procedure
-        command for details). This option can be given more than once to run
-        multiple procedures in the order in which they were given.
-        It is important to specify the target dataset via the --dataset argument
-        of the main command."""),
-    parser.add_argument(
-        '--proc-post', dest='common_proc_post',
-        nargs='+',
-        action='append',
-        metavar=('<PROCEDURE NAME>', 'ARGS'),
-        help="""Like --proc-pre, but procedures are executed after the main command
-        has finished."""),
-    parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
-        command line options before the subcommand label. Options like
-        --proc-pre can take an arbitrary number of arguments and may require
-        to be followed by a single --cmd in order to enable identification
-        of the subcommand.""")
+        command line options before the subcommand label. Options taking
+        an arbitrary number of arguments may require to be followed by a single
+        --cmd in order to enable identification of the subcommand.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -236,7 +222,8 @@ def setup_parser(
     if need_single_subparser is not None \
             or unparsed_arg in ('--help', '--help-np', '-h'):
         need_single_subparser = False
-        add_entrypoints_to_interface_groups(interface_groups)
+        if not help_ignore_extensions:
+            add_entrypoints_to_interface_groups(interface_groups)
     elif unparsed_arg.startswith('-'):  # unknown option
         fail_with_short_help(parser,
                              msg="unrecognized argument %s" % unparsed_arg,
@@ -299,6 +286,9 @@ def setup_parser(
                 intf_doc = get_cmd_doc(_intf)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
                     intf_doc)
+                if hasattr(_intf, '_examples_'):
+                    intf_ex = alter_interface_docs_for_cmdline(get_cmd_ex(_intf))
+                    parser_args['description'] += intf_ex
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
@@ -412,6 +402,11 @@ def add_entrypoints_to_interface_groups(interface_groups):
             ep.name)
         try:
             spec = ep.load()
+            if len(spec) < 2 or not spec[1]:
+                lgr.debug(
+                    'Extension does not provide a command suite: %s',
+                    ep.name)
+                continue
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
@@ -464,6 +459,24 @@ def main(args=None):
     args_ = args or sys.argv
 
     if cmdlineargs.cfg_overrides is not None:
+        import re
+        # this expression is deliberately loose as gitconfig offers
+        # quite some flexibility -- this is just meant to catch stupid
+        # errors: we need a section, a variable, and a value at minimum
+        # otherwise we break our own config parsing helpers
+        # https://github.com/datalad/datalad/issues/3451
+        noassign_expr = re.compile(r'[^\s]+\.[^\s]+=[\S]+')
+        noassign = [
+            o
+            for o in cmdlineargs.cfg_overrides
+            if not noassign_expr.match(o)
+        ]
+        if noassign:
+            lgr.error(
+                "Configuration override without section/variable "
+                "or value assignment (must be 'section.variable=value'): %s",
+                noassign)
+            sys.exit(3)
         overrides = dict([
             (o.split('=')[0], '='.join(o.split('=')[1:]))
             for o in cmdlineargs.cfg_overrides])
@@ -518,12 +531,12 @@ def main(args=None):
                 # exit code as is
                 exc_msg = str(exc)
                 if exc_msg:
-                    msg = exc_msg.encode() if isinstance(exc_msg, text_type) else exc_msg
+                    msg = exc_msg.encode() if isinstance(exc_msg, str) else exc_msg
                     os.write(2, msg + b"\n")
                 if exc.stdout:
-                    os.write(1, exc.stdout.encode() if isinstance(exc.stdout, text_type) else exc.stdout)
+                    os.write(1, exc.stdout.encode() if isinstance(exc.stdout, str) else exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr.encode() if isinstance(exc.stderr, text_type) else exc.stderr)
+                    os.write(2, exc.stderr.encode() if isinstance(exc.stderr, str) else exc.stderr)
                 # We must not exit with 0 code if any exception got here but
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)

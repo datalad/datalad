@@ -10,7 +10,7 @@
 import collections
 import hashlib
 import re
-import six.moves.builtins as __builtin__
+import builtins
 import time
 
 try:
@@ -50,18 +50,13 @@ from os.path import dirname
 from os.path import split as psplit
 import posixpath
 
-
-from six import PY2, text_type, binary_type, string_types
-from six.moves import shlex_quote
+from shlex import quote as shlex_quote
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 
 
-if PY2:
-    unicode_srctypes = string_types
-else:
-    unicode_srctypes = string_types + (bytes,)
+unicode_srctypes = str, bytes
 
 
 lgr = logging.getLogger("datalad.utils")
@@ -173,7 +168,7 @@ def get_func_kwargs_doc(func):
 
 def any_re_search(regexes, value):
     """Return if any of regexes (list or str) searches succesfully for value"""
-    for regex in assure_tuple_or_list(regexes):
+    for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
             return True
     return False
@@ -360,6 +355,16 @@ def is_explicit_path(path):
         or path.startswith(os.pardir + os.sep)
 
 
+# handle this dance once, and import pathlib from here
+# in all other places
+
+from pathlib import (
+    Path,
+    PurePath,
+    PurePosixPath,
+)
+
+
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
 
@@ -539,7 +544,7 @@ def escape_filename(filename):
 def encode_filename(filename):
     """Encode unicode filename
     """
-    if isinstance(filename, text_type):
+    if isinstance(filename, str):
         return filename.encode(sys.getfilesystemencoding())
     else:
         return filename
@@ -552,7 +557,7 @@ def decode_input(s):
     If fails -- issue warning and decode allowing for errors
     being replaced
     """
-    if isinstance(s, text_type):
+    if isinstance(s, str):
         return s
     else:
         encoding = sys.stdin.encoding or 'UTF-8'
@@ -595,7 +600,7 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
-def assure_tuple_or_list(obj):
+def ensure_tuple_or_list(obj):
     """Given an object, wrap into a tuple if not list or tuple
     """
     if isinstance(obj, (list, tuple)):
@@ -603,24 +608,24 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
-def assure_iter(s, cls, copy=False, iterate=True):
+def ensure_iter(s, cls, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
     ----------
     s: list or anything
     cls: class
-      Which iterable class to assure
+      Which iterable class to ensure
     copy: bool, optional
       If correct iterable is passed, it would generate its shallow copy
     iterate: bool, optional
-      If it is not a list, but something iterable (but not a text_type)
+      If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
 
     if isinstance(s, cls):
         return s if not copy else shallow_copy(s)
-    elif isinstance(s, text_type):
+    elif isinstance(s, str):
         return cls((s,))
     elif iterate and hasattr(s, '__iter__'):
         return cls(s)
@@ -630,7 +635,7 @@ def assure_iter(s, cls, copy=False, iterate=True):
         return cls((s,))
 
 
-def assure_list(s, copy=False, iterate=True):
+def ensure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -639,13 +644,13 @@ def assure_list(s, copy=False, iterate=True):
     copy: bool, optional
       If list is passed, it would generate a shallow copy of the list
     iterate: bool, optional
-      If it is not a list, but something iterable (but not a text_type)
+      If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
-    return assure_iter(s, list, copy=copy, iterate=iterate)
+    return ensure_iter(s, list, copy=copy, iterate=iterate)
 
 
-def assure_list_from_str(s, sep='\n'):
+def ensure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
     Parameters
@@ -661,7 +666,7 @@ def assure_list_from_str(s, sep='\n'):
     return s.split(sep)
 
 
-def assure_dict_from_str(s, **kwargs):
+def ensure_dict_from_str(s, **kwargs):
     """Given a multiline string with key=value items convert it to a dictionary
 
     Parameters
@@ -678,7 +683,7 @@ def assure_dict_from_str(s, **kwargs):
         return s
 
     out = {}
-    for value_str in assure_list_from_str(s, **kwargs):
+    for value_str in ensure_list_from_str(s, **kwargs):
         if '=' not in value_str:
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)
@@ -689,21 +694,25 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
-def assure_bytes(s, encoding='utf-8'):
-    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'text_type'
+def ensure_bytes(s, encoding='utf-8'):
+    """Convert/encode unicode string to bytes.
+
+    If `s` isn't a string, return it as is.
 
     Parameters
     ----------
     encoding: str, optional
       Encoding to use.  "utf-8" is the default
     """
-    if not isinstance(s, text_type):
+    if not isinstance(s, str):
         return s
     return s.encode(encoding)
 
 
-def assure_unicode(s, encoding=None, confidence=None):
-    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
+def ensure_unicode(s, encoding=None, confidence=None):
+    """Convert/decode bytestring to unicode.
+
+    If `s` isn't a bytestring, return it as is.
 
     Parameters
     ----------
@@ -714,7 +723,7 @@ def assure_unicode(s, encoding=None, confidence=None):
       A value between 0 and 1, so if guessing of encoding is of lower than
       specified confidence, ValueError is raised
     """
-    if not isinstance(s, binary_type):
+    if not isinstance(s, bytes):
         return s
     if encoding is None:
         # Figure out encoding, defaulting to 'utf-8' which is our common
@@ -746,12 +755,12 @@ def assure_unicode(s, encoding=None, confidence=None):
         return s.decode(encoding)
 
 
-def assure_bool(s):
+def ensure_bool(s):
     """Convert value into boolean following convention for strings
 
     to recognize on,True,yes as True, off,False,no as False
     """
-    if isinstance(s, string_types):
+    if isinstance(s, str):
         if s.isdigit():
             return bool(int(s))
         sl = s.lower()
@@ -768,7 +777,7 @@ def as_unicode(val, cast_types=object):
     """Given an arbitrary value, would try to obtain unicode value of it
     
     For unicode it would return original value, for python2 str or python3
-    bytes it would use assure_unicode, for None - an empty (unicode) string,
+    bytes it would use ensure_unicode, for None - an empty (unicode) string,
     and for any other type (see `cast_types`) - would apply the unicode 
     constructor.  If value is not an instance of `cast_types`, TypeError
     is thrown
@@ -780,12 +789,12 @@ def as_unicode(val, cast_types=object):
     """
     if val is None:
         return u''
-    elif isinstance(val, text_type):
+    elif isinstance(val, str):
         return val
     elif isinstance(val, unicode_srctypes):
-        return assure_unicode(val)
+        return ensure_unicode(val)
     elif isinstance(val, cast_types):
-        return text_type(val)
+        return str(val)
     else:
         raise TypeError(
             "Value %r is not of any of known or provided %s types"
@@ -855,7 +864,7 @@ def map_items(func, v):
     No type checking of values passed to func is done, so `func`
     should be resilient to values which it should not handle
 
-    Initial usecase - apply_recursive(url_fragment, assure_unicode)
+    Initial usecase - apply_recursive(url_fragment, ensure_unicode)
     """
     # map all elements within item
     return v.__class__(
@@ -909,8 +918,8 @@ def generate_file_chunks(files, cmd=None):
     cmd: str or list of str, optional
       Command to account for as well
     """
-    files = assure_list(files)
-    cmd = assure_list(cmd)
+    files = ensure_list(files)
+    cmd = ensure_list(cmd)
 
     maxl = max(map(len, files)) if files else 0
     chunk_size = max(
@@ -1151,7 +1160,7 @@ def swallow_outputs():
 
     from .ui import ui
     # preserve -- they could have been mocked already
-    oldprint = getattr(__builtin__, 'print')
+    oldprint = getattr(builtins, 'print')
     oldout, olderr = sys.stdout, sys.stderr
     olduiout = ui.out
     adapter = StringIOAdapter()
@@ -1159,12 +1168,12 @@ def swallow_outputs():
     try:
         sys.stdout, sys.stderr = adapter.handles
         ui.out = adapter.handles[0]
-        setattr(__builtin__, 'print', fake_print)
+        setattr(builtins, 'print', fake_print)
 
         yield adapter
     finally:
         sys.stdout, sys.stderr, ui.out = oldout, olderr, olduiout
-        setattr(__builtin__, 'print',  oldprint)
+        setattr(builtins, 'print',  oldprint)
         adapter.cleanup()
 
 
@@ -1290,7 +1299,8 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         # TODO: if file_ and there was an exception -- most probably worth logging it?
         # although ideally it should be the next log outside added to that file_ ... oh well
     finally:
-        lgr.handlers, lgr.level = old_handlers, old_level
+        lgr.handlers = old_handlers
+        lgr.setLevel(old_level)
         adapter.cleanup()
 
 
@@ -1358,7 +1368,7 @@ def setup_exceptionhook(ipython=False):
         sys.excepthook = _datalad_pdb_excepthook
 
 
-def assure_dir(*args):
+def ensure_dir(*args):
     """Make sure directory exists.
 
     Joins the list of arguments to an os-specific path to the desired
@@ -1488,6 +1498,8 @@ class chpwd(object):
     def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
+            # PY35 has no auto-conversion of Path to str
+            path = str(path)
             pwd = getpwd()
             self._prev_pwd = pwd
         else:
@@ -1503,7 +1515,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = assure_bytes(path) if PY2 else path
+        os.environ['PWD'] = path
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1661,7 +1673,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     filename = realpath(filename)
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
             f.write(content)
 
     if __debug__:
@@ -1718,7 +1730,7 @@ def get_logfilename(dspath, cmd='datalad'):
     """
     assert(exists(dspath))
     assert(isdir(dspath))
-    ds_logdir = assure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
+    ds_logdir = ensure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
     return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
@@ -1784,53 +1796,33 @@ def get_dataset_root(path):
     The root path is returned in the same absolute or relative form
     as the input argument. If no associated dataset exists, or the
     input path doesn't exist, None is returned.
+
+    If `path` is a symlink or something other than a directory, its
+    the root dataset containing its parent directory will be reported.
+    If none can be found, at a symlink at `path` is pointing to a
+    dataset, `path` itself will be reported as the root.
     """
     suffix = '.git'
-    if not isdir(path):
-        path = dirname(path)
-    apath = abspath(path)
+    altered = None
+    if op.islink(path) or not op.isdir(path):
+        altered = path
+        path = op.dirname(path)
+    apath = op.abspath(path)
     # while we can still go up
-    while psplit(apath)[1]:
-        if exists(opj(path, suffix)):
+    while op.split(apath)[1]:
+        if op.exists(op.join(path, suffix)):
             return path
         # new test path in the format we got it
-        path = normpath(opj(path, os.pardir))
+        path = op.normpath(op.join(path, os.pardir))
         # no luck, next round
-        apath = abspath(path)
+        apath = op.abspath(path)
+    # if we applied dirname() at the top, we give it another go with
+    # the actual path, if it was itself a symlink, it could be the
+    # top-level dataset itself
+    if altered and op.exists(op.join(altered, suffix)):
+        return altered
+
     return None
-
-
-def get_dataset_pwds(dataset):
-    """Return the current directory for the dataset.
-
-    Parameters
-    ----------
-    dataset : Dataset
-
-    Returns
-    -------
-    A tuple, where the first item is the absolute path of the pwd and the
-    second is the pwd relative to the dataset's path.
-    """
-    if dataset:
-        pwd = dataset.path
-        rel_pwd = curdir
-    else:
-        # act on the whole dataset if nothing else was specified
-
-        # Follow our generic semantic that if dataset is specified,
-        # paths are relative to it, if not -- relative to pwd
-        pwd = getpwd()
-        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
-        # repos whose leading paths have a symlinked directory (see the
-        # TMPDIR="/var/tmp/sym link" test case).
-        dataset = get_dataset_root(pwd)
-
-        if dataset:
-            rel_pwd = relpath(pwd, dataset)
-        else:
-            rel_pwd = pwd  # and leave handling to caller
-    return pwd, rel_pwd
 
 
 # ATM used in datalad_crawler extension, so do not remove yet
@@ -1942,7 +1934,7 @@ def slash_join(base, extension):
 def safe_print(s):
     """Print with protection against UTF-8 encoding errors"""
     # A little bit of dance to be able to test this code
-    print_f = getattr(__builtin__, "print")
+    print_f = getattr(builtins, "print")
     try:
         print_f(s)
     except UnicodeEncodeError:
@@ -2013,8 +2005,8 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 )
                 dialect = 'excel-tab'
 
-    kw = {} if PY2 else dict(encoding='utf-8')
-    with open(fname, 'rb' if PY2 else 'r', **kw) as tsvfile:
+    kw = dict(encoding='utf-8')
+    with open(fname, 'r', **kw) as tsvfile:
         # csv.py doesn't do Unicode; encode temporarily as UTF-8:
         csv_reader = csv.reader(
             tsvfile,
@@ -2024,7 +2016,7 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
         header = None
         for row in csv_reader:
             # decode UTF-8 back to Unicode, cell by cell:
-            row_unicode = map(assure_unicode, row)
+            row_unicode = map(ensure_unicode, row)
             if header is None:
                 header = list(row_unicode)
             else:
@@ -2256,7 +2248,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             if full_name.endswith('.gz'):
                 open_func = gzip.open
             with open_func(full_name, "wb") as f:
-                f.write(assure_bytes(load, 'utf-8'))
+                f.write(ensure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
@@ -2266,7 +2258,7 @@ def get_suggestions_msg(values, known, sep="\n        "):
     """
     import difflib
     suggestions = []
-    for value in assure_list(values):  # might not want to do it if we change presentation below
+    for value in ensure_list(values):  # might not want to do it if we change presentation below
         suggestions += difflib.get_close_matches(value, known)
     suggestions = unique(suggestions)
     msg = "Did you mean any of these?"
@@ -2280,6 +2272,47 @@ def get_suggestions_msg(values, known, sep="\n        "):
     return ''
 
 
+def bytes2human(n, format='%(value).1f %(symbol)sB'):
+    """
+    Convert n bytes into a human readable string based on format.
+    symbols can be either "customary", "customary_ext", "iec" or "iec_ext",
+    see: http://goo.gl/kTQMs
+
+      >>> from datalad.utils import bytes2human
+      >>> bytes2human(1)
+      '1.0 B'
+      >>> bytes2human(1024)
+      '1.0 KB'
+      >>> bytes2human(1048576)
+      '1.0 MB'
+      >>> bytes2human(1099511627776127398123789121)
+      '909.5 YB'
+
+      >>> bytes2human(10000, "%(value).1f %(symbol)s/sec")
+      '9.8 K/sec'
+
+      >>> # precision can be adjusted by playing with %f operator
+      >>> bytes2human(10000, format="%(value).5f %(symbol)s")
+      '9.76562 K'
+
+    Taken from: http://goo.gl/kTQMs and subsequently simplified
+    Original Author: Giampaolo Rodola' <g.rodola [AT] gmail [DOT] com>
+    License: MIT
+    """
+    n = int(n)
+    if n < 0:
+        raise ValueError("n < 0")
+    symbols = ('', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    prefix = {}
+    for i, s in enumerate(symbols[1:]):
+        prefix[s] = 1 << (i + 1) * 10
+    for symbol in reversed(symbols[1:]):
+        if n >= prefix[symbol]:
+            value = float(n) / prefix[symbol]
+            return format % locals()
+    return format % dict(symbol=symbols[0], value=n)
+
+
 def maybe_shlex_quote(val):
     """
     shlex_quote() a value if the command is not run on a Windows
@@ -2287,6 +2320,27 @@ def maybe_shlex_quote(val):
     """
 
     return val if on_windows else shlex_quote(val)
+
+
+def get_wrapped_class(wrapped):
+    """Determine the command class a wrapped __call__ belongs to"""
+    mod = sys.modules[wrapped.__module__]
+    command_class_name = wrapped.__qualname__.split('.')[-2]
+    _func_class = mod.__dict__[command_class_name]
+    lgr.debug("Determined class of decorated function: %s", _func_class)
+    return _func_class
+
+
+# TODO whenever we feel ready for English kill the compat block below
+assure_tuple_or_list = ensure_tuple_or_list
+assure_iter = ensure_iter
+assure_list = ensure_list
+assure_list_from_str = ensure_list_from_str
+assure_dict_from_str = ensure_dict_from_str
+assure_bytes = ensure_bytes
+assure_unicode = ensure_unicode
+assure_bool = ensure_bool
+assure_dir = ensure_dir
 
 
 lgr.log(5, "Done importing datalad.utils")

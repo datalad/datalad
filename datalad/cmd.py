@@ -22,13 +22,6 @@ import functools
 import tempfile
 
 from collections import OrderedDict
-from six import (
-    PY3,
-    PY2,
-    string_types,
-    binary_type,
-    text_type,
-)
 from .support import path as op
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
@@ -44,6 +37,7 @@ from .utils import (
     assure_unicode,
     assure_bytes,
     unlink,
+    auto_repr,
 )
 from .dochelpers import borrowdoc
 
@@ -58,13 +52,7 @@ _TEMP_std = sys.stdout, sys.stderr
 # which might be created outside and passed into Runner
 _MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
-if PY2:
-    # TODO apparently there is a recommended substitution for Python2
-    # which is a backported implementation of python3 subprocess
-    # https://pypi.python.org/pypi/subprocess32/
-    file_class = file
-else:
-    from io import IOBase as file_class
+from io import IOBase as file_class
 
 
 def _decide_to_log(v):
@@ -193,7 +181,7 @@ class Runner(object):
           if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, string_types) or isinstance(cmd, list):
+        if isinstance(cmd, str) or isinstance(cmd, list):
             return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
@@ -286,7 +274,7 @@ class Runner(object):
         -------
 
         """
-        stdout, stderr = binary_type(), binary_type()
+        stdout, stderr = bytes(), bytes()
 
         log_stdout_ = _decide_to_log(log_stdout)
         log_stderr_ = _decide_to_log(log_stderr)
@@ -340,7 +328,7 @@ class Runner(object):
     def _process_remaining_output(self, stream, out_, *pargs):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
-        out = binary_type()
+        out = bytes()
         if isinstance(stream, file_class) and \
                 _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
@@ -352,7 +340,7 @@ class Runner(object):
         else:
             if out_:
                 # resolving a once in a while failing test #2185
-                if isinstance(out_, text_type):
+                if isinstance(out_, str):
                     out_ = out_.encode('utf-8')
                 for line in out_.split(linesep_bytes):
                     out += self._process_one_line(
@@ -376,13 +364,13 @@ class Runner(object):
             if out_type == 'stdout':
                 self._log_out(assure_unicode(line))
             elif out_type == 'stderr':
-                self._log_err(line.decode('utf-8') if PY3 else line,
+                self._log_err(line.decode('utf-8'),
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")
             return (line + suf) if suf else line
         # it was output already directly but for code to work, return ""
-        return binary_type()
+        return bytes()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
@@ -458,8 +446,6 @@ class Runner(object):
 
         popen_env = env or self.env
         popen_cwd = cwd or self.cwd
-        if PY2:
-            popen_cwd = assure_bytes(popen_cwd)
 
         if popen_cwd and popen_env and 'PWD' in popen_env:
             # we must have inherited PWD, but cwd was provided, so we must
@@ -496,13 +482,13 @@ class Runner(object):
         if self.protocol.do_execute_ext_commands:
 
             if shell is None:
-                shell = isinstance(cmd, string_types)
+                shell = isinstance(cmd, str)
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
                 prot_id = self.protocol.start_section(
                     shlex.split(cmd, posix=not on_windows)
-                    if isinstance(cmd, string_types)
+                    if isinstance(cmd, str)
                     else cmd)
             try:
                 proc = subprocess.Popen(cmd,
@@ -533,12 +519,10 @@ class Runner(object):
                 else:
                     out = proc.communicate()
 
-                if PY3:
-                    # Decoding was delayed to this point
-                    def decode_if_not_None(x):
-                        return "" if x is None else binary_type.decode(x)
-                    # TODO: check if we can avoid PY3 specific here
-                    out = tuple(map(decode_if_not_None, out))
+                # Decoding was delayed to this point
+                def decode_if_not_None(x):
+                    return "" if x is None else bytes.decode(x)
+                out = tuple(map(decode_if_not_None, out))
 
                 status = proc.poll()
 
@@ -557,13 +541,36 @@ class Runner(object):
                            "" if log_online else " out=%s" % out[0],
                            "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
-                    raise CommandError(text_type(cmd), msg, status, out[0], out[1])
+                    raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
+
+            except CommandError:
+                # do not bother with reacting to "regular" CommandError
+                # exceptions.  Somehow if we also terminate here for them
+                # some processes elsewhere might stall:
+                # see https://github.com/datalad/datalad/pull/3794
+                raise
+
+            except BaseException as exc:
+                exc_info = sys.exc_info()
+                # KeyboardInterrupt is subclass of BaseException
+                lgr.debug("Terminating process for %s upon exception: %s",
+                          cmd, exc_str(exc))
+                try:
+                    # there are still possible (although unlikely) cases when
+                    # we fail to interrupt but we
+                    # should not crash if we fail to terminate the process
+                    proc.terminate()
+                except BaseException as exc2:
+                    lgr.warning("Failed to terminate process for %s: %s",
+                                cmd, exc_str(exc2))
+                raise exc_info[1]
+
             finally:
                 # Those streams are for us to close if we asked for a PIPE
-                # TODO -- assure closing the files import pdb; pdb.set_trace()
+                # TODO -- assure closing the files
                 _cleanup_output(outputstream, proc.stdout)
                 _cleanup_output(errstream, proc.stderr)
 
@@ -571,7 +578,7 @@ class Runner(object):
             if self.protocol.records_ext_commands:
                 self.protocol.add_section(shlex.split(cmd,
                                                       posix=not on_windows)
-                                          if isinstance(cmd, string_types)
+                                          if isinstance(cmd, str)
                                           else cmd, None)
             out = ("DRY", "DRY")
 
@@ -706,3 +713,173 @@ class GitRunner(Runner):
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
         return assure_unicode(out), assure_unicode(err)
+
+
+def readline_rstripped(stdout):
+    #return iter(stdout.readline, b'').next().rstrip()
+    return stdout.readline().rstrip()
+
+
+class SafeDelCloseMixin(object):
+    """A helper class to use where __del__ would call .close() which might
+    fail if "too late in GC game"
+    """
+    def __del__(self):
+        try:
+            self.close()
+        except TypeError:
+            if os.fdopen is None or lgr.debug is None:
+                # if we are late in the game and things already gc'ed in py3,
+                # it is Ok
+                return
+            raise
+
+
+@auto_repr
+class BatchedCommand(SafeDelCloseMixin):
+    """Container for a process which would allow for persistent communication
+    """
+
+    def __init__(self, cmd, path=None, output_proc=None):
+        if not isinstance(cmd, list):
+            cmd = [cmd]
+        self.cmd = cmd
+        self.path = path
+        self.output_proc = output_proc if output_proc else readline_rstripped
+        self._process = None
+        self._stderr_out = None
+        self._stderr_out_fname = None
+
+    def _initialize(self):
+        lgr.debug("Initiating a new process for %s" % repr(self))
+        lgr.log(5, "Command: %s" % self.cmd)
+        # according to the internet wisdom there is no easy way with subprocess
+        # while avoid deadlocks etc.  We would need to start a thread/subprocess
+        # to timeout etc
+        # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
+        self._stderr_out, self._stderr_out_fname = tempfile.mkstemp()
+        self._process = subprocess.Popen(
+            self.cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=self._stderr_out,
+            env=GitRunner.get_git_environ_adjusted(),
+            cwd=self.path,
+            bufsize=1,
+            universal_newlines=True  # **kwargs
+        )
+
+    def _check_process(self, restart=False):
+        """Check if the process was terminated and restart if restart
+
+        Returns
+        -------
+        bool
+          True if process was alive.
+        str
+          stderr if any recorded if was terminated
+        """
+        process = self._process
+        ret = True
+        ret_stderr = None
+        if process and process.poll():
+            lgr.warning("Process %s was terminated with returncode %s" % (process, process.returncode))
+            ret_stderr = self.close(return_stderr=True)
+            ret = False
+        if self._process is None and restart:
+            lgr.warning("Restarting the process due to previous failure")
+            self._initialize()
+        return ret, ret_stderr
+
+    def __call__(self, cmds):
+        """
+
+        Parameters
+        ----------
+        cmds : str or tuple or list of (str or tuple)
+
+        Returns
+        -------
+        str or list
+          Output received from process.  list in case if cmds was a list
+        """
+        input_multiple = isinstance(cmds, list)
+        if not input_multiple:
+            cmds = [cmds]
+
+        output = [o for o in self.yield_(cmds)]
+        return output if input_multiple else output[0]
+
+    def yield_(self, cmds):
+        """Same as __call__, but requires `cmds` to be an iterable
+
+        and yields results for each item."""
+        for entry in cmds:
+            if not isinstance(entry, str):
+                entry = ' '.join(entry)
+            yield self.proc1(entry)
+
+    def proc1(self, arg):
+        """Same as __call__, but only takes a single command argument
+
+        and returns a single result.
+        """
+        # TODO: add checks -- may be process died off and needs to be reinitiated
+        if not self._process:
+            self._initialize()
+
+        entry = arg + '\n'
+        lgr.log(5, "Sending %r to batched command %s" % (entry, self))
+        # apparently communicate is just a one time show
+        # stdout, stderr = self._process.communicate(entry)
+        # according to the internet wisdom there is no easy way with subprocess
+        self._check_process(restart=True)
+        process = self._process  # _check_process might have restarted it
+        process.stdin.write(entry)
+        process.stdin.flush()
+        lgr.log(5, "Done sending.")
+        still_alive, stderr = self._check_process(restart=False)
+        # TODO: we might want to handle still_alive, e.g. to allow for
+        #       a number of restarts/resends, but it should be per command
+        #       since for some we cannot just resend the same query. But if
+        #       it is just a "get"er - we could resend it few times
+        # The default output_proc expects a single line output.
+        # TODO: timeouts etc
+        stdout = assure_unicode(self.output_proc(process.stdout)) \
+            if not process.stdout.closed else None
+        if stderr:
+            lgr.warning("Received output in stderr: %r", stderr)
+        lgr.log(5, "Received output: %r" % stdout)
+        return stdout
+
+    def close(self, return_stderr=False):
+        """Close communication and wait for process to terminate
+
+        Returns
+        -------
+        str
+          stderr output if return_stderr and stderr file was there.
+          None otherwise
+        """
+        ret = None
+        if self._stderr_out:
+            # close possibly still open fd
+            os.fdopen(self._stderr_out).close()
+            self._stderr_out = None
+        if self._process:
+            process = self._process
+            lgr.debug(
+                "Closing stdin of %s and waiting process to finish", process)
+            process.stdin.close()
+            process.stdout.close()
+            process.wait()
+            self._process = None
+            lgr.debug("Process %s has finished", process)
+        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            if return_stderr:
+                with open(self._stderr_out_fname, 'r') as f:
+                    ret = f.read()
+            # remove the file where we kept dumping stderr
+            unlink(self._stderr_out_fname)
+            self._stderr_out_fname = None
+        return ret

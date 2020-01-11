@@ -19,12 +19,12 @@ from datalad.cmd import Runner
 from datalad.utils import chpwd
 from datalad.utils import maybe_shlex_quote
 from datalad.utils import swallow_outputs
-from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in_results
@@ -32,7 +32,6 @@ from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import on_windows
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import skip_if_on_windows
 from datalad.distribution.dataset import Dataset
@@ -58,63 +57,19 @@ def test_invalid_call(path):
         assert_in_results(res, status="impossible")
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
-@known_failure_direct_mode  #FIXME
-@with_tree(tree={
-    'code': {'datalad_test_proc.py': """\
-import sys
-import os.path as op
-from datalad.api import add, Dataset
-
-with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
-    f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-"""}})
-@with_tempfile
-def test_basics(path, super_path):
+@known_failure_windows  #FIXME
+@with_tree(tree={'README.md': 'dirty'})
+def test_dirty(path):
     ds = Dataset(path).create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
-    ok_clean_git(ds.path)
-    assert_false(ds.repo.is_under_annex("README.md"))
-    # configure dataset to look for procedures in its code folder
-    ds.config.add(
-        'datalad.locations.dataset-procedures',
-        'code',
-        where='dataset')
-    # commit this procedure config for later use in a clone:
-    ds.add(op.join('.datalad', 'config'))
-    # configure dataset to run the demo procedure prior to the clean command
-    ds.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='dataset')
-    # run command that should trigger the demo procedure
-    ds.clean()
-    # look for traces
-    ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
-
-    # make a fresh dataset:
-    super = Dataset(super_path).create()
-    # configure dataset to run the demo procedure prior to the clean command
-    super.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='dataset')
-    # 'super' doesn't know any procedures but should get to know one by
-    # installing the above as a subdataset
-    super.install('sub', source=ds.path)
-    # run command that should trigger the demo procedure
-    super.clean()
-    # look for traces
-    ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
+    # must fail, because README.md is to be modified, but already dirty
+    assert_raises(CommandError, ds.run_procedure, 'cfg_yoda')
+    # make sure that was the issue
+    # save to git explicitly to keep the test simple and avoid unlocking...
+    ds.save('README.md', to_git=True)
+    ds.run_procedure('cfg_yoda')
+    assert_repo_status(ds.path)
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -125,7 +80,10 @@ from datalad.api import add, Dataset
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
 add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-"""}})
+""",
+             'testdir': {}
+
+             }})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
     with chpwd(path):
@@ -145,19 +103,13 @@ def test_procedure_discovery(path, super_path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
-    ok_clean_git(ds.path)
+    ds.run_procedure('cfg_yoda')
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
         'code',
         where='dataset')
-    # configure dataset to run the demo procedure prior to the clean command
-    ds.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='dataset')
-    ds.add(op.join('.datalad', 'config'))
+    ds.save(op.join('.datalad', 'config'))
 
     # run discovery on the dataset:
     ps = ds.run_procedure(discover=True)
@@ -173,8 +125,12 @@ def test_procedure_discovery(path, super_path):
         len(ps))
     # dataset's procedure needs to be in the results
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
+    # a subdir shouldn't be considered a procedure just because it's "executable"
+    assert_not_in_results(ps, path=op.join(ds.path, 'code', 'testdir'))
 
     # make it a subdataset and try again:
+    # first we need to save the beast to make install work
+    ds.save()
     super = Dataset(super_path).create()
     super.install('sub', source=ds.path)
 
@@ -210,29 +166,29 @@ def test_procedure_discovery(path, super_path):
         assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                            'broken_link_proc.py'),
                           state='absent')
-        assert_not_in_results(ps, path=op.join(super.path, 'sub', 'code',
-                                               'unknwon_broken_link'))
+        assert_in_results(
+            ps,
+            path=op.join(super.path, 'sub', 'code',
+                         'unknwon_broken_link'),
+            state='absent')
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('{}\\n'.format(sys.argv[2]))
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
-    ok_clean_git(ds.path)
+    ds.run_procedure('cfg_yoda')
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -310,8 +266,7 @@ def test_spaces(path):
     Test whether args with spaces are correctly parsed.
     """
     ds = Dataset(path).create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
-    ok_clean_git(ds.path)
+    ds.run_procedure('cfg_yoda')
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -349,17 +304,51 @@ def test_quoting(path):
         with assert_raises(CommandError):
             runner.run("datalad run-procedure just2args 'still-one arg'")
 
+
 @skip_if_on_windows
-@with_tempfile
-def test_text2git_empty(path):
-    """
-    Tests that empty files are not annexed in a ds configured with text2git.
-    """
+@with_tree(tree={
+    # "TEXT" ones
+    'empty': '',  # we have special rule to treat empty ones as text
+    # check various structured files - libmagic might change its decisions which
+    # can effect git-annex. https://github.com/datalad/datalad/issues/3361
+    'JSON': """\
+{
+    "name": "John Smith",
+    "age": 33
+}
+""",
+    'YAML': """\
+--- # The Smiths
+- {name: John Smith, age: 33}
+- name: Mary Smith
+  age: 27
+""",
+    'MARKDOWN': """\
+# Title
+
+## Section1
+
+When the earth was flat
+
+## Section2
+""",
+    # BINARY ones
+    '0blob': '\x00',
+    'emptyline': '\n',  # libmagic: "binary" "application/octet-stream"
+})
+def test_text2git(path):
+    # Test if files being correctly annexed in a ds configured with text2git.
+    TEXT_FILES = ('JSON', 'YAML', 'MARKDOWN', 'empty')
+    BINARY_FILES = ('0blob', 'emptyline')
+
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_text2git')
-    ok_clean_git(ds.path)
-    # create an empty file, no extension
-    open(op.join(path, 'emptyfile'), 'a').close()
-    ds.save(message="add empty file")
-    # check that it's not annexed
-    assert_false(ds.repo.is_under_annex("emptyfile"))
+    ds.save(path=TEXT_FILES + BINARY_FILES, message="added all files")
+    assert_repo_status(ds.path)
+
+    # check that text files are not annexed
+    for f in TEXT_FILES:
+        assert_false(ds.repo.is_under_annex(f))
+    # and trivial binaries - annexed
+    for f in BINARY_FILES:
+        assert_true(ds.repo.is_under_annex(f))

@@ -20,8 +20,8 @@ from os.path import curdir, isfile, islink, isdir, realpath
 from os.path import relpath
 from os import lstat
 
-from six.moves.urllib.request import urlopen, Request
-from six.moves.urllib.error import HTTPError
+from urllib.request import urlopen, Request
+from urllib.error import HTTPError
 
 from ..utils import auto_repr
 from .base import Interface

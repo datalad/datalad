@@ -152,7 +152,12 @@ class ExportToFigshare(Interface):
     from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
     from datalad.distribution.dataset import EnsureDataset
-    from datalad.support.constraints import EnsureNone, EnsureInt, EnsureStr
+    from datalad.support.constraints import (
+        EnsureChoice,
+        EnsureInt,
+        EnsureNone,
+        EnsureStr,
+    )
 
     _params_ = dict(
         dataset=Parameter(
@@ -179,7 +184,6 @@ class ExportToFigshare(Interface):
             disables this behavior."""),
         missing_content=Parameter(
             args=("--missing-content",),
-            metavar="error|continue|ignore",
             doc="""By default, any discovered file with missing content will
             result in an error and the plugin is aborted. Setting this to
             'continue' will issue warnings instead of failing on error. The
@@ -187,7 +191,7 @@ class ExportToFigshare(Interface):
             level. The latter two can be helpful when generating a TAR archive
             from a dataset where some file content is not available
             locally.""",
-            constraints=EnsureStr()),
+            constraints=EnsureChoice("error", "continue", "ignore")),
         # article_id=Parameter(
         #     args=("--project-id",),
         #     metavar="ID",
@@ -227,7 +231,7 @@ class ExportToFigshare(Interface):
                 % dataset
             )
 
-        if dataset.repo.is_dirty():
+        if dataset.repo.dirty:
             raise RuntimeError(
                 "Paranoid authors of DataLad refuse to proceed in a dirty repository"
             )

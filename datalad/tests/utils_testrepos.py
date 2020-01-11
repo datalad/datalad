@@ -11,16 +11,15 @@ import os
 import tempfile
 
 from abc import ABCMeta, abstractmethod
-from six import add_metaclass
-from os.path import dirname, join as opj, exists, pardir
+from os.path import join as opj, exists
 
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
-from ..cmd import Runner
 from ..support.network import get_local_file_url
 from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
+from ..utils import on_windows
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
@@ -40,8 +39,7 @@ with open(remote_file_path, "w") as f:
 os.close(remote_file_fd)
 
 
-@add_metaclass(ABCMeta)
-class TestRepo(object):
+class TestRepo(object, metaclass=ABCMeta):
 
     REPO_CLASS = None  # Assign to the class to be used in the subclass
 
@@ -69,7 +67,7 @@ class TestRepo(object):
 
     @property
     def url(self):
-        return get_local_file_url(self.path)
+        return get_local_file_url(self.path, compatibility='git')
 
     def create_file(self, name, content, add=True, annex=False):
         filename = opj(self.path, name)
@@ -107,8 +105,7 @@ class BasicAnnexTestRepo(TestRepo):
         self.create_file('test.dat', '123\n', annex=False)
         self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
-        from .utils import on_windows
-        fileurl = get_local_file_url(remote_file_path)
+        fileurl = get_local_file_url(remote_file_path, compatibility='git-annex')
         # Note:
         # The line above used to be conditional:
         # if not on_windows \
@@ -208,7 +205,7 @@ class InnerSubmodule(object):
 
     @property
     def url(self):
-        return get_local_file_url(self.path)
+        return get_local_file_url(self.path, compatibility='git')
 
     def create(self):
         self._ds.create()

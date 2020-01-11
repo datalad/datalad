@@ -12,7 +12,7 @@ Last-Update: 2018-06-05
 
 --- a/datalad/tests/test_cmd.py
 +++ b/datalad/tests/test_cmd.py
-@@ -55,7 +55,7 @@ def test_runner_dry(tempfile):
+@@ -57,7 +57,7 @@
      runner = Runner(protocol=dry)
  
      # test dry command call
@@ -21,7 +21,7 @@ Last-Update: 2018-06-05
      with swallow_logs(new_level=9) as cml:
          ret = runner.run(cmd)
          cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
-@@ -78,7 +78,7 @@ def test_runner(tempfile):
+@@ -81,7 +81,7 @@
  
      # test non-dry command call
      runner = Runner()
@@ -30,7 +30,7 @@ Last-Update: 2018-06-05
      cmd = 'echo %s > %r' % (content, tempfile)
      ret = runner.run(cmd)
      assert_equal(ret, ('', ''))  # no out or err
-@@ -180,7 +180,7 @@ def test_runner_log_stdout():
+@@ -185,7 +185,7 @@
      # assertion yet.
  
      runner = Runner(log_outputs=True)
@@ -39,7 +39,7 @@ Last-Update: 2018-06-05
      for cmd in [cmd_, ' '.join(cmd_)]:
          # should be identical runs, either as a string or as a list
          kw = {}
-@@ -193,16 +193,16 @@ def test_runner_log_stdout():
+@@ -198,16 +198,16 @@
              if not on_windows:
                  # we can just count on sanity
                  cm.assert_logged("stdout| stdout-"
@@ -60,7 +60,7 @@ Last-Update: 2018-06-05
              eq_(cml.out, "")
  
  
-@@ -277,7 +277,7 @@ def test_runner_failure_unicode(path):
+@@ -282,7 +282,7 @@
      # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
      runner = Runner()
      with assert_raises(CommandError), swallow_logs():
@@ -71,7 +71,7 @@ Last-Update: 2018-06-05
  @skip_if_on_windows  # likely would fail
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -39,7 +39,7 @@ user = name=Jane Doe
+@@ -45,7 +45,7 @@
  user = email=jd@example.com
  myint = 3
  
@@ -80,7 +80,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -66,16 +66,16 @@ def test_something(path, new_home):
+@@ -71,16 +71,16 @@
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -100,7 +100,7 @@ Last-Update: 2018-06-05
           ('something.myint', '3'),
           ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
      assert_equal(
-@@ -88,7 +88,7 @@ def test_something(path, new_home):
+@@ -93,7 +93,7 @@
          cfg.get('something.user'),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -109,7 +109,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
-@@ -101,8 +101,8 @@ def test_something(path, new_home):
+@@ -106,8 +106,8 @@
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -122,7 +122,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_section('unheard.of'))
 --- a/datalad/distribution/tests/test_add.py
 +++ b/datalad/distribution/tests/test_add.py
-@@ -70,10 +70,10 @@ def test_add_message_file(path):
+@@ -71,10 +71,10 @@
          ds.add("blah", message="me", message_file="and me")
  
      create_tree(path, {"foo": "x",
@@ -135,58 +135,60 @@ Last-Update: 2018-06-05
  
  
  tree_arg = dict(tree={'test.txt': 'some',
---- a/datalad/interface/tests/test_run.py
-+++ b/datalad/interface/tests/test_run.py
-@@ -140,23 +140,23 @@ def test_py2_unicode_command(path):
+--- a/datalad/core/local/tests/test_run.py
++++ b/datalad/core/local/tests/test_run.py
+@@ -149,25 +149,25 @@
      touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
      cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                          touch_cmd,
 -                                        u"bβ0.dat")
 +                                        u"bB0.dat")
      ds.run(cmd_str)
-     ok_clean_git(ds.path)
+     assert_repo_status(ds.path)
 -    ok_exists(op.join(path, u"bβ0.dat"))
 +    ok_exists(op.join(path, u"bB0.dat"))
  
--    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
-+    ds.run([sys.executable, "-c", touch_cmd, u"bB1.dat"])
-     ok_clean_git(ds.path)
--    ok_exists(op.join(path, u"bβ1.dat"))
-+    ok_exists(op.join(path, u"bB1.dat"))
+     if not on_windows:  # FIXME
+-        ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
++        ds.run([sys.executable, "-c", touch_cmd, u"bB1.dat"])
+         assert_repo_status(ds.path)
+-        ok_exists(op.join(path, u"bβ1.dat"))
++        ok_exists(op.join(path, u"bB1.dat"))
  
-     # Send in a list of byte-strings to mimic a py2 command-line invocation.
-     ds.run([s.encode("utf-8")
--            for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
-+            for s in [sys.executable, "-c", touch_cmd, u" B1 "]])
-     ok_clean_git(ds.path)
--    ok_exists(op.join(path, u" β1 "))
-+    ok_exists(op.join(path, u" B1 "))
+         # Send in a list of byte-strings to mimic a py2 command-line
+         # invocation.
+         ds.run([s.encode("utf-8")
+-                for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
++                for s in [sys.executable, "-c", touch_cmd, u" B1 "]])
+         assert_repo_status(ds.path)
+-        ok_exists(op.join(path, u" β1 "))
++        ok_exists(op.join(path, u" B1 "))
  
      with assert_raises(CommandError), swallow_outputs():
 -        ds.run(u"bβ2.dat")
 +        ds.run(u"bB2.dat")
  
  
- @known_failure_windows
+ @with_tempfile(mkdir=True)
 --- a/datalad/interface/tests/test_save.py
 +++ b/datalad/interface/tests/test_save.py
-@@ -274,11 +274,11 @@ def test_save_message_file(path):
-         ds.save("blah", message="me", message_file="and me")
+@@ -277,11 +277,11 @@
+         ds._save("blah", message="me", message_file="and me")
  
      create_tree(path, {"foo": "x",
 -                       "msg": u"add β"})
 +                       "msg": u"add B"})
      ds.add("foo", save=False)
-     ds.save(message_file=opj(ds.path, "msg"))
+     ds._save(message_file=opj(ds.path, "msg"))
      assert_equal(ds.repo.format_commit("%s"),
 -                 u"add β")
 +                 u"add B")
  
  
- def test_renamed_file():
+ @known_failure_githubci_win
 --- a/datalad/support/tests/test_globbedpaths.py
 +++ b/datalad/support/tests/test_globbedpaths.py
-@@ -51,7 +51,7 @@ def test_globbedpaths_get_sub_patterns()
+@@ -53,7 +53,7 @@
                   "2.dat": "",
                   "3.txt": "",
                   # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
@@ -195,7 +197,7 @@ Last-Update: 2018-06-05
                   "subdir": {"1.txt": "", "2.txt": ""}})
  def test_globbedpaths(path):
      dotdir = op.curdir + op.sep
-@@ -59,9 +59,9 @@ def test_globbedpaths(path):
+@@ -61,9 +61,9 @@
      for patterns, expected in [
              (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
              ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
@@ -207,7 +209,7 @@ Last-Update: 2018-06-05
              (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
              ([dotdir + "subdir/*.txt"],
               {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
-@@ -87,12 +87,12 @@ def test_globbedpaths(path):
+@@ -89,12 +89,12 @@
  
      # Full patterns still get returned as relative to pwd.
      gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
@@ -223,7 +225,7 @@ Last-Update: 2018-06-05
      gp = GlobbedPaths(["."], pwd=path, expand=False)
      eq_(gp.expand(), ["."])
      eq_(gp.paths, ["."])
-@@ -105,7 +105,7 @@ def test_globbedpaths(path):
+@@ -107,7 +107,7 @@
          eq_(gp.expand(), ["z", "b", "d", "x"])
  
      # glob expansion for paths property is determined by expand argument.
@@ -234,7 +236,7 @@ Last-Update: 2018-06-05
          eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1425,7 +1425,9 @@ OBSCURE_FILENAMES = (
+@@ -1436,7 +1436,9 @@
      u" ab .datc ",
      u"ab .datc ",  # they all should at least support spaces and dots
  )

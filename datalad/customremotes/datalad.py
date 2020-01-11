@@ -18,7 +18,7 @@ from .base import AnnexCustomRemote
 from ..dochelpers import exc_str
 
 from ..downloaders.providers import Providers
-from ..downloaders.base import TargetFileAbsent
+from ..support.exceptions import TargetFileAbsent
 from .main import main as super_main
 
 

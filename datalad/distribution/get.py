@@ -12,92 +12,164 @@
 
 import logging
 
-from os.path import join as opj
-from os.path import relpath
+import os.path as op
 
 from datalad.interface.base import Interface
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.interface.results import results_from_paths
-from datalad.interface.results import annexjson2result
-from datalad.interface.results import count_results
-from datalad.interface.results import success_status_map
-from datalad.interface.results import results_from_annex_noinfo
-from datalad.interface.common_opts import recursion_flag
-# from datalad.interface.common_opts import git_opts
-# from datalad.interface.common_opts import annex_opts
-# from datalad.interface.common_opts import annex_get_opts
-from datalad.interface.common_opts import location_description
-from datalad.interface.common_opts import jobs_opt
-from datalad.interface.common_opts import reckless_opt
-from datalad.interface.common_opts import verbose
-from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
+from datalad.interface.results import (
+    get_status_dict,
+    results_from_paths,
+    annexjson2result,
+    count_results,
+    success_status_map,
+    results_from_annex_noinfo,
+)
+from datalad.interface.common_opts import (
+    recursion_flag,
+    location_description,
+    jobs_opt,
+    reckless_opt,
+)
+from datalad.interface.results import is_ok_dataset
+from datalad.support.constraints import (
+    EnsureInt,
+    EnsureChoice,
+    EnsureStr,
+    EnsureNone,
+)
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import (
     GitRepo,
     _fixup_submodule_dotgit_setup,
 )
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
-from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.network import URL
-from datalad.support.network import RI
-from datalad.support.network import urlquote
-from datalad.dochelpers import exc_str
-from datalad.dochelpers import single_or_plural
-from datalad.utils import get_dataset_root
-from datalad.utils import with_pathsep as _with_sep
-from datalad.utils import unique
-from datalad.utils import path_startswith
-from datalad.utils import path_is_subpath
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+)
+from datalad.support.network import (
+    URL,
+    RI,
+    urlquote,
+)
+from datalad.dochelpers import (
+    single_or_plural,
+)
+from datalad.utils import (
+    unique,
+    Path,
+    get_dataset_root,
+)
 
-from .dataset import Dataset
-from .dataset import EnsureDataset
-from .dataset import datasetmethod
-from .clone import Clone
-from .utils import _get_flexible_source_candidates
-from .utils import _get_tracking_source
+from datalad.local.subdatasets import Subdatasets
+
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
+from datalad.core.distributed.clone import clone_dataset
+from datalad.distribution.utils import _get_flexible_source_candidates
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
-    """Retrieve candidates from where to install the submodule
+def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
+    """Traverse all branches of the remote and check if commit in any of their ancestry
 
-    Even if url for submodule is provided explicitly -- first tries urls under
-    parent's module tracking branch remote.
+    It is a generator yielding names of the remotes
     """
+    remote_branches = [
+        b['refname:strip=2']
+        for b in repo.for_each_ref_(
+            fields='refname:strip=2',
+            pattern='refs/remotes',
+            contains=commit_hexsha)]
+    return [
+        remote
+        for remote in repo.get_remotes(with_urls_only=with_urls_only)
+        if any(rb.startswith(remote + '/') for rb in remote_branches)
+    ]
+
+
+def _get_flexible_source_candidates_for_submodule(ds, sm):
+    """Assemble candidates from where to install a submodule
+
+    Even if a URL for submodule is provided explicitly -- first tries urls under
+    parent's module tracking branch remote.
+
+    Additional candidate URLs can be generated based on templates specified as
+    configuration variables with the pattern
+
+      `datalad.get.subdataset-source-candidate-<name>`
+
+    where `name` is an arbitrary identifier.
+
+    A template string assigned to such a variable can utilize the Python format
+    mini language and may reference a number of properties that are inferred
+    from the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respective .gitmodules
+    record. For convenience, an existing `datalad-id` record is made available
+    under the shortened name `id`.
+
+    Additionally, the URL of any configured remote that contains the respective
+    submodule commit is available as `remote-<name>` properties, where `name`
+    is the configured remote name.
+
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of to-be-installed subdataset.
+    sm : dict
+      Submodule record as produced by `subdatasets()`.
+
+    Returns
+    -------
+    list of tuples
+      Where each tuples consists of a name and a URL. Names are not unique
+      and either derived from the name of the respective remote, template
+      configuration variable, or 'origin' for the candidate URL that was
+      obtained from the .gitmodule record.
+    """
+    # short cuts
+    ds_repo = ds.repo
+    sm_url = sm.get('gitmodule_url', None)
+    sm_path = op.relpath(sm['path'], start=sm['parentds'])
+
     clone_urls = []
 
-    # should be our first candidate
-    tracking_remote, tracking_branch = ds.repo.get_tracking_branch()
+    # CANDIDATE: tracking remote of the current branch
+    tracking_remote, tracking_branch = ds_repo.get_tracking_branch()
     candidate_remotes = [tracking_remote] if tracking_remote else []
 
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
-    try:
-        last_commit = next(ds.repo._get_files_history(sm_path)).hexsha
+    last_commit = ds_repo.get_last_commit_hexsha(sm_path)
+    if last_commit:
+        # CANDIDATE: any remote that has the commit when the submodule was
+        # last modified
+
         # ideally should also give preference to the remotes which have
         # the same branch checked out I guess
-        candidate_remotes += list(ds.repo._get_remotes_having_commit(last_commit))
-    except StopIteration:
-        # no commit for it known yet, ... oh well
-        pass
+        candidate_remotes += list(_get_remotes_having_commit(ds_repo, last_commit))
+
+    # prepare a dict to generate URL candidates from templates
+    sm_candidate_props = {
+        k[10:].replace('datalad-id', 'id'): v
+        for k, v in sm.items()
+        if k.startswith('gitmodule_')
+    }
 
     for remote in unique(candidate_remotes):
-        remote_url = ds.repo.get_remote_url(remote, push=False)
+        remote_url = ds_repo.get_remote_url(remote, push=False)
 
         # Directly on parent's ds url
         if remote_url:
+            # make remotes and their URLs available to template rendering
+            sm_candidate_props['remoteurl-{}'.format(remote)] = remote_url
             # attempt: submodule checkout at parent remote URL
             # We might need to quote sm_path portion, e.g. for spaces etc
             if isinstance(RI(remote_url), URL):
@@ -106,126 +178,103 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                _get_flexible_source_candidates(
+                (remote, url)
+                for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
-                    sm_path_url, remote_url, alternate_suffix=False))
+                    sm_path_url, remote_url, alternate_suffix=False)
+            )
 
             # attempt: provided (configured?) submodule URL
             # TODO: consider supporting DataLadRI here?  or would confuse
             #  git and we wouldn't want that (i.e. not allow pure git clone
             #  --recursive)
             if sm_url:
-                clone_urls += _get_flexible_source_candidates(
-                    sm_url,
-                    remote_url,
-                    alternate_suffix=False
+                clone_urls.extend(
+                    (remote, url)
+                    for url in _get_flexible_source_candidates(
+                        sm_url,
+                        remote_url,
+                        alternate_suffix=False)
                 )
 
-    # Do based on the ds.path as the last resort
+        for name, tmpl in [(c[40:], ds_repo.config[c])
+                           for c in ds_repo.config.keys()
+                           if c.startswith(
+                               'datalad.get.subdataset-source-candidate-')]:
+            url = tmpl.format(**sm_candidate_props)
+            # we don't want "flexible_source_candidates" here, this is
+            # configuration that can be made arbitrarily precise from the
+            # outside. Additional guesswork can only make it slower
+            clone_urls.append((name, url))
+
+    # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
-        clone_urls += _get_flexible_source_candidates(
-            sm_url,
-            ds.path,
-            alternate_suffix=False)
+        clone_urls.extend(
+            ('local', url)
+            for url in _get_flexible_source_candidates(
+                sm_url,
+                ds.path,
+                alternate_suffix=False)
+        )
 
-    return unique(clone_urls)
+    return unique(clone_urls, lambda x: x[1])
 
 
-def _install_subds_from_flexible_source(
-        ds, sm_path, sm_url, reckless, description=None):
-    """Tries to obtain a given subdataset from several meaningful locations"""
-    # TODO remove this assertion eventually, for now it assures intented
-    # usage of this helper function
-    assert(sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'))
+def _install_subds_from_flexible_source(ds, sm, **kwargs):
+    """Tries to obtain a given subdataset from several meaningful locations
 
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of to-be-installed subdataset.
+    sm : dict
+      Submodule record as produced by `subdatasets()`.
+    **kwargs
+      Passed onto clone()
+    """
+    sm_path = op.relpath(sm['path'], start=sm['parentds'])
     # compose a list of candidate clone URLs
-    clone_urls = _get_flexible_source_candidates_for_submodule(
-        ds, sm_path, sm_url)
+    clone_urls = _get_flexible_source_candidates_for_submodule(ds, sm)
 
     # prevent inevitable exception from `clone`
-    dest_path = opj(ds.path, sm_path)
-    clone_urls = [src for src in clone_urls if src != dest_path]
+    dest_path = op.join(ds.path, sm_path)
+    clone_urls = [src for name, src in clone_urls if src != dest_path]
 
     if not clone_urls:
-        raise InstallFailedError(
-            msg="Have got no candidates to install subdataset {} from".format(
-                sm_path))
+        # yield error
+        yield get_status_dict(
+            action='install',
+            ds=ds,
+            status='error',
+            message=(
+                "Have got no candidates to install subdataset %s from.",
+                sm_path),
+            logger=lgr,
+        )
+        return
 
-    # now loop over all candidates and try to clone
-    subds = None
-    try:
-        subds = Clone.__call__(
-            clone_urls[0],
-            path=dest_path,
-            # pretend no parent -- we don't want clone to add to ds
-            # because this is a submodule already!
-            dataset=None,
-            reckless=reckless,
-            # if we have more than one source, pass as alternatives
-            alt_sources=clone_urls[1:],
-            description=description,
-            result_xfm='datasets',
-            # not really need, but should protect against future RF
-            on_failure='stop',
-            result_renderer='disabled',
-            return_type='item-or-list')
-        # failure will raise an exception, hence if we got here we can
-        # leave the loop and have a successful clone
-    except IncompleteResultsError:
-        # details of the failure are logged already by common code
-        pass
-    except Exception as exc:
-        lgr.warning("Something went wrong while installing %s: %s",
-                    sm_path, exc_str(exc))
-    if subds is None:
-        raise InstallFailedError(
-            msg="Failed to install dataset from{}: {}".format(
-                ' any of' if len(clone_urls) > 1 else '',
-                clone_urls))
+    for res in clone_dataset(
+            clone_urls,
+            Dataset(dest_path),
+            **kwargs):
+        # make sure to fix a detached HEAD before yielding the install success
+        # result. The resetting of the branch would undo any change done
+        # to the repo by processing in response to the result
+        if res.get('action', None) == 'install' and \
+                res.get('status', None) == 'ok' and \
+                res.get('type', None) == 'dataset' and \
+                res.get('path', None) == dest_path:
+            _fixup_submodule_dotgit_setup(ds, sm_path)
 
-    assert(subds.is_installed())
-    _fixup_submodule_dotgit_setup(ds, sm_path)
+            # do fancy update
+            lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
+            ds.repo.update_submodule(sm_path, init=True)
+        yield res
 
-    # do fancy update
-    lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-    # TODO: move all of that into update_submodule ??
-    # TODO: direct mode ramifications?
-    # track branch originally cloned
-    subrepo = subds.repo
-    branch = subrepo.get_active_branch()
-    branch_hexsha = subrepo.get_hexsha(branch)
-    ds.repo.update_submodule(sm_path, init=True)
-    updated_branch = subrepo.get_active_branch()
-    if branch and not updated_branch:
-        # got into 'detached' mode
-        # trace if current state is a predecessor of the branch_hexsha
-        lgr.debug(
-            "Detected detached HEAD after updating submodule %s which was "
-            "in %s branch before", subds.path, branch)
-        detached_hexsha = subrepo.get_hexsha()
-        if subrepo.get_merge_base(
-                [branch_hexsha, detached_hexsha]) == detached_hexsha:
-            # TODO: config option?
-            # in all likely event it is of the same branch since
-            # it is an ancestor -- so we could update that original branch
-            # to point to the state desired by the submodule, and update
-            # HEAD to point to that location
-            lgr.info(
-                "Submodule HEAD got detached. Resetting branch %s to point "
-                "to %s. Original location was %s",
-                branch, detached_hexsha[:8], branch_hexsha[:8]
-            )
-            branch_ref = 'refs/heads/%s' % branch
-            subrepo.update_ref(branch_ref, detached_hexsha)
-            assert(subrepo.get_hexsha(branch) == detached_hexsha)
-            subrepo.update_ref('HEAD', branch_ref, symbolic=True)
-            assert(subrepo.get_active_branch() == branch)
-        else:
-            lgr.warning(
-                "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
-                subrepo.path, branch, detached_hexsha[:8]
-            )
-    return subds
+    subds = Dataset(dest_path)
+    if not subds.is_installed():
+        lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
+        return
 
 
 def _install_necessary_subdatasets(
@@ -247,7 +296,9 @@ def _install_necessary_subdatasets(
     """
     # figuring out what dataset to start with, --contains limits --recursive
     # to visit only subdataset on the trajectory to the target path
-    subds_trail = ds.subdatasets(contains=path, recursive=True)
+    subds_trail = ds.subdatasets(contains=path, recursive=True,
+                                 on_failure="ignore",
+                                 result_filter=is_ok_dataset)
     if not subds_trail:
         # there is not a single known subdataset (installed or not)
         # for this path -- job done
@@ -258,30 +309,33 @@ def _install_necessary_subdatasets(
     while not GitRepo.is_valid_repo(cur_subds['path']):
         # install using helper that give some flexibility regarding where to
         # get the module from
-        try:
-            sd = _install_subds_from_flexible_source(
+        for res in _install_subds_from_flexible_source(
                 Dataset(cur_subds['parentds']),
-                relpath(cur_subds['path'], start=cur_subds['parentds']),
-                cur_subds['gitmodule_url'],
-                reckless,
-                description=description)
-        except Exception as e:
-            # skip all of downstairs, if we didn't manage to install subdataset
-            yield get_status_dict(
-                'install', path=cur_subds['path'], type='dataset',
-                status='error', logger=lgr, refds=refds_path,
-                message=("Installation of subdatasets %s failed with exception: %s",
-                         cur_subds['path'], exc_str(e)))
-            return
-
-        # report installation, whether it helped or not
-        yield get_status_dict(
-            'install', ds=sd, status='ok', logger=lgr, refds=refds_path,
-            message=("Installed subdataset in order to get %s", path))
+                cur_subds,
+                reckless=reckless,
+                description=description):
+            if res.get('action', None) == 'install':
+                if res['status'] == 'ok':
+                    # report installation, whether it helped or not
+                    res['message'] = (
+                        "Installed subdataset in order to get %s",
+                        str(path))
+                    # next subdataset candidate
+                    sd = Dataset(res['path'])
+                    yield res
+                elif res['status'] in ('impossible', 'error'):
+                    yield res
+                    # we cannot go deeper, we need to stop
+                    return
+                else:
+                    # report unconditionally to caller
+                    yield res
 
         # now check whether the just installed subds brought us any closer to
         # the target path
-        subds_trail = sd.subdatasets(contains=path, recursive=False)
+        subds_trail = sd.subdatasets(contains=path, recursive=False,
+                                     on_failure='ignore',
+                                     result_filter=is_ok_dataset)
         if not subds_trail:
             # no (newly available) subdataset get's us any closer
             return
@@ -295,16 +349,16 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         return
     # install using helper that give some flexibility regarding where to
     # get the module from
+
     for sub in ds.subdatasets(
-            return_type='generator', result_renderer='disabled'):
+            path=start,
+            return_type='generator',
+            result_renderer='disabled'):
         subds = Dataset(sub['path'])
         if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
             lgr.debug(
                 "subdataset %s is configured to be skipped on recursive installation",
                 sub['path'])
-            continue
-        if start is not None and not path_is_subpath(subds.path, start):
-            # this one we can ignore, not underneath the start path
             continue
         if sub.get('state', None) != 'absent':
             # dataset was already found to exist
@@ -315,24 +369,21 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
             # does not imply that everything below it does too
         else:
             # try to get this dataset
-            try:
-                subds = _install_subds_from_flexible_source(
+            for res in _install_subds_from_flexible_source(
                     ds,
-                    relpath(sub['path'], start=ds.path),
-                    sub['gitmodule_url'],
-                    reckless,
-                    description=description)
-                yield get_status_dict(
-                    'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
-                    message=("Installed subdataset %s", subds), parentds=ds.path)
-            except Exception as e:
-                # skip all of downstairs, if we didn't manage to install subdataset
-                yield get_status_dict(
-                    'install', ds=subds, status='error', logger=lgr, refds=refds_path,
-                    message=("Installation of subdatasets %s failed with exception: %s",
-                             subds, exc_str(e)))
-                continue
-        # otherwise recurse
+                    sub,
+                    reckless=reckless,
+                    description=description):
+                # yield everything to let the caller decide how to deal with
+                # errors
+                yield res
+        if not subds.is_installed():
+            # an error result was emitted, and the external consumer can decide
+            # what to do with it, but there is no point in recursing into
+            # something that should be there, but isn't
+            lgr.debug('Subdataset %s could not be installed, skipped', subds)
+            continue
+        # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
                 subds,
@@ -340,6 +391,155 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 reckless=reckless,
                 refds_path=refds_path):
             yield res
+
+
+def _install_targetpath(
+        ds,
+        target_path,
+        recursive,
+        recursion_limit,
+        reckless,
+        refds_path,
+        description):
+    """Helper to install as many subdatasets as needed to verify existence
+    of a target path
+
+    Parameters
+    ==========
+    ds : Dataset
+      Locally available dataset that contains the target path
+    target_path : Path
+    """
+    # if it is an empty dir, it could still be a subdataset that is missing
+    if (target_path.is_dir() and any(target_path.iterdir())) or \
+            (not target_path.is_dir()
+             and (target_path.is_symlink() or target_path.exists())):
+        yield dict(
+            action='get',
+            type='dataset',
+            # this cannot just be the dataset path, as the original
+            # situation of datasets avail on disk can have changed due
+            # to subdataset installation. It has to be actual subdataset
+            # it resides in, because this value is used to determine which
+            # dataset to call `annex-get` on
+            # TODO stringification is a PY35 compatibility kludge
+            path=get_dataset_root(str(target_path)),
+            status='notneeded',
+            contains=[target_path],
+            refds=refds_path,
+        )
+    else:
+        # we don't have it yet. is it in a subdataset?
+        for res in _install_necessary_subdatasets(
+                ds, target_path, reckless, refds_path, description=description):
+            if (target_path.is_symlink() or target_path.exists()):
+                # this dataset brought the path, mark for annex
+                # processing outside
+                res['contains'] = [target_path]
+            # just spit it out
+            yield res
+        if not (target_path.is_symlink() or target_path.exists()):
+            # looking for subdatasets did not help -> all hope is lost
+            yield dict(
+                action='get',
+                path=str(target_path),
+                status='impossible',
+                refds=refds_path,
+                message='path does not exist',
+            )
+            return
+    # we have the target path
+    if not (recursive
+            #and not recursion_limit == 'existing' \
+            and target_path.is_dir()):
+        # obtain any subdatasets underneath the paths given
+        # a non-directory cannot have content underneath
+        return
+    if recursion_limit == 'existing':
+        for res in ds.subdatasets(
+                fulfilled=True,
+                path=target_path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                return_type='generator'):
+            res.update(
+                contains=[Path(res['path'])],
+                action='get',
+                status='notneeded',
+            )
+            yield res
+        return
+    lgr.info(
+        "Installing %s%s recursively",
+        ds,
+        (" underneath %s" % target_path
+         if ds.path != target_path
+         else ""))
+    for res in _recursive_install_subds_underneath(
+            ds,
+            # target_path was explicitly given as input
+            # we count recursions from the input, hence we
+            # can start with the full number
+            recursion_limit,
+            reckless,
+            # TODO keep Path when RF is done
+            start=str(target_path),
+            refds_path=refds_path,
+            description=description):
+        # yield immediately so errors could be acted upon
+        # outside, before we continue
+        res.update(
+            # do not override reported action, could be anything
+            #action='get',
+            contains=[Path(res['path'])],
+        )
+        yield res
+
+
+def _get_targetpaths(ds, content, refds_path, source, jobs):
+    # not ready for Path instances...
+    content = [str(c) for c in content]
+    # hand over to git-annex, get files content,
+    # report files in git as 'notneeded' to get
+    ds_repo = ds.repo
+    # needs to be an annex to get content
+    if not isinstance(ds_repo, AnnexRepo):
+        for r in results_from_paths(
+                content, status='notneeded',
+                message="no dataset annex, content already present",
+                action='get', logger=lgr,
+                refds=refds_path):
+            yield r
+        return
+    respath_by_status = {}
+    for res in ds_repo.get(
+            content,
+            options=['--from=%s' % source] if source else [],
+            jobs=jobs):
+        res = annexjson2result(res, ds, type='file', logger=lgr,
+                               refds=refds_path)
+        success = success_status_map[res['status']]
+        # TODO: in case of some failed commands (e.g. get) there might
+        # be no path in the record.  yoh has only vague idea of logic
+        # here so just checks for having 'path', but according to
+        # results_from_annex_noinfo, then it would be assumed that
+        # `content` was acquired successfully, which is not the case
+        if 'path' in res:
+            respath_by_status[success] = \
+                respath_by_status.get(success, []) + [res['path']]
+        yield res
+
+    for r in results_from_annex_noinfo(
+            ds,
+            content,
+            respath_by_status,
+            dir_fail_msg='could not get some content in %s %s',
+            noinfo_dir_msg='nothing to get from %s',
+            noinfo_file_msg='already present',
+            action='get',
+            logger=lgr,
+            refds=refds_path):
+        yield r
 
 
 @build_doc
@@ -364,6 +564,17 @@ class Get(Interface):
       Power-user info: This command uses :command:`git annex get` to fulfill
       file handles.
     """
+    _examples_ = [
+        dict(text="Get a single file",
+             code_py="get('path/to/file')",
+             code_cmd="datalad get <path/to/file>"),
+        dict(text="Get contents of a directory",
+             code_py="get('path/to/dir/')",
+             code_cmd="datalad get <path/to/dir/>"),
+        dict(text="Get all contents of the current dataset and its subdatasets",
+             code_py="get(dataset='.', recursive=True)",
+             code_cmd="datalad get . --recursive"),
+    ]
 
     _params_ = dict(
         dataset=Parameter(
@@ -407,15 +618,7 @@ class Get(Interface):
             for file handles from being obtained CMD]"""),
         description=location_description,
         reckless=reckless_opt,
-        # git_opts=git_opts,
-        # annex_opts=annex_opts,
-        # annex_get_opts=annex_get_opts,
-        jobs=jobs_opt,
-        verbose=verbose)
-
-    # Note: May be use 'git annex find --not --in here' to have a list of all
-    # files to actually get and give kind of a progress in terms of number
-    # files processed ...
+        jobs=jobs_opt)
 
     @staticmethod
     @datasetmethod(name='get')
@@ -428,22 +631,9 @@ class Get(Interface):
             recursion_limit=None,
             get_data=True,
             description=None,
-            reckless=False,
-            #git_opts=None,
-            #annex_opts=None,
-            #annex_get_opts=None,
+            reckless=None,
             jobs='auto',
-            verbose=False,
     ):
-        # IMPLEMENTATION CONCEPT:
-        #
-        # 1. Sort the world into existing handles and the rest
-        # 2. Try locate missing handles (obtain subdatasets along the way)
-        # 3. Expand into subdatasets with recursion enables (potentially
-        #    obtain even more subdatasets
-        # 4. Shoot info of which handles to get in each subdataset to,
-        #    git-annex, once at the very end
-
         refds_path = Interface.get_refds_path(dataset)
         if not (dataset or path):
             raise InsufficientArgumentsError(
@@ -452,199 +642,119 @@ class Get(Interface):
             # act on the whole dataset if nothing else was specified
             path = refds_path
 
-        # remember which results we already reported, to avoid duplicates
-        yielded_ds = []
-        to_get = []
-        unavailable_paths = []
-        for ap in AnnotatePaths.__call__(
-                path=path,
-                dataset=refds_path,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                action='get',
-                # NOTE: Do not act upon unavailable paths yet! Done below after
-                # testing which ones could be obtained
-                unavailable_path_status='',
-                nondataset_path_status='impossible',
+        # we have to have a single dataset to operate on
+        refds = require_dataset(
+            dataset, check_installed=True, purpose='get content')
+
+        content_by_ds = {}
+        # use subdatasets() to discover any relevant content that is not
+        # already present in the root dataset (refds)
+        for sdsres in Subdatasets.__call__(
+                contains=path,
+                # maintain path argument semantics and pass in dataset arg
+                # as is
+                dataset=dataset,
+                # always come from the top to get sensible generator behavior
+                bottomup=False,
+                # when paths are given, they will constrain the recursion
+                # automatically, and we need to enable recursion so we can
+                # location path in subdatasets several levels down
+                recursive=True if path else recursive,
+                recursion_limit=None if path else recursion_limit,
                 return_type='generator',
                 on_failure='ignore'):
-            if ap.get('status', None):
-                # we know what to report already
-                yield ap
+            if sdsres.get('type', None) != 'dataset':
+                # if it is not about a 'dataset' it is likely content in
+                # the root dataset
+                if sdsres.get('status', None) == 'impossible' and \
+                        sdsres.get('message', None) == \
+                        'path not contained in any matching subdataset':
+                    target_path = Path(sdsres['path'])
+                    if refds.pathobj != target_path and \
+                            refds.pathobj not in target_path.parents:
+                        yield dict(
+                            action='get',
+                            path=str(target_path),
+                            status='error',
+                            message=('path not associated with dataset %s',
+                                     refds),
+                        )
+                        continue
+                    # check if we need to obtain anything underneath this path
+                    # the subdataset() call above will only look _until_ it
+                    # hits the targetpath
+                    for res in _install_targetpath(
+                            refds,
+                            Path(sdsres['path']),
+                            recursive,
+                            recursion_limit,
+                            reckless,
+                            refds_path,
+                            description):
+                        # fish out the datasets that 'contains' a targetpath
+                        # and store them for later
+                        if res.get('status', None) in ('ok', 'notneeded') and \
+                                'contains' in res:
+                            dsrec = content_by_ds.get(res['path'], set())
+                            dsrec.update(res['contains'])
+                            content_by_ds[res['path']] = dsrec
+                        if res.get('status', None) != 'notneeded':
+                            # all those messages on not having installed anything
+                            # are a bit pointless
+                            # "notneeded" for annex get comes below
+                            yield res
+                else:
+                    # dunno what this is, send upstairs
+                    yield sdsres
+                # must continue for both conditional branches above
+                # the rest is about stuff in real subdatasets
                 continue
-            if ap.get('state', None) == 'absent' and ap.get('raw_input', False):
-                # if this wasn't found, but directly requested, queue for further
-                # exploration
-                unavailable_paths.append(ap)
-                continue
-            if ap.get('type', None) == 'dataset' and \
-                    GitRepo.is_valid_repo(ap['path']) and \
-                    not ap['path'] == refds_path:
-                # do not report what hasn't arived yet
-                # also do not report the base dataset that is already
-                # present -- no surprise
-                yield dict(ap, status='notneeded', logger=lgr,
-                           message='already installed')
-                yielded_ds.append(ap['path'])
-                ap['process_content'] = get_data
-            to_get.append(ap)
-
-        # explore the unknown
-        for ap in sorted(unavailable_paths, key=lambda x: x['path']):
-            lgr.debug("Investigate yet unavailable path %s", ap)
-            # how close can we get?
-            dspath = ap.get('parentds', get_dataset_root(ap['path']))
-            if dspath is None:
-                # nothing we can do for this path
-                continue
-            lgr.debug("Found containing dataset %s for path %s", dspath, ap['path'])
-            ds = Dataset(dspath)
-            # now actually obtain whatever is necessary to get to this path
-            containing_ds = [dspath]
-            for res in _install_necessary_subdatasets(
-                    ds, ap['path'], reckless, refds_path, description=description):
-                # yield immediately so errors could be acted upon outside, before
-                # we continue
-                if not (res['type'] == 'dataset' and res['path'] in yielded_ds):
-                    # unless we reported on this dataset before
-                    if res['type'] == 'dataset':
-                        # make a record, recursive below might now want to report
-                        # a 'notneeded'
-                        yielded_ds.append(res['path'])
-                    yield res
-                # update to the current innermost dataset
-                containing_ds.append(res['path'])
-
-            if len(containing_ds) < 2:
-                # no subdataset was installed, hence if the path was unavailable
-                # before it still is, no need to bother git annex
-                ap.update(status='impossible',
-                          message='path does not exist')
-                yield ap
-                continue
-            # important to only do the next for the innermost subdataset
-            # as the `recursive` logic below relies on that!
-            # set the correct parent, for a dataset this would be the second-last
-            # reported subdataset
-            ap.update(parentds=containing_ds[-1])
-            if containing_ds[-1] == ap['path']:
-                # the path actually refers to the last installed dataset
-                ap.update(parentds=containing_ds[-2],
-                          process_content=get_data,
-                          type='dataset')
-            to_get.append(ap)
-
-        # results of recursive installation of yet undiscovered datasets
-        rec_get = []
-        if recursive and not recursion_limit == 'existing':
-            # obtain any subdatasets underneath the paths given inside the
-            # subdatasets that we know already exist
-            # unless we do not want recursion into not-yet-installed datasets
-            for ap in sorted(to_get, key=lambda x: x['path']):
-                if ap['type'] not in ('dataset', 'directory') or not ap.get('raw_input', False):
-                    # a non-directory cannot have content underneath
-                    # also we do NOT want to recurse into anything that was specifically
-                    # requested, to avoid duplication
-                    continue
-                subds = Dataset(ap['path'] if ap['type'] == 'dataset' else ap['parentds'])
-                lgr.info(
-                    "Installing %s%s recursively",
-                    subds,
-                    (" underneath %s" % ap['path']
-                     if subds.path != ap['path']
-                     else ""))
-                for res in _recursive_install_subds_underneath(
-                        subds,
-                        # `ap['path']` was explicitly given as input
-                        # we count recursions from the input, hence we
-                        # can start with the full number
+            # instance of the closest existing dataset for this result
+            ds = Dataset(sdsres['parentds']
+                         if sdsres.get('state', None) == 'absent'
+                         else sdsres['path'])
+            assert 'contains' in sdsres
+            # explore the unknown
+            for target_path in sdsres.get('contains', []):
+                # essentially the same as done above for paths in the root
+                # dataset, but here we are starting from the closest
+                # discovered subdataset
+                for res in _install_targetpath(
+                        ds,
+                        Path(target_path),
+                        recursive,
                         recursion_limit,
                         reckless,
-                        start=ap['path'],
-                        refds_path=refds_path,
-                        description=description):
-                    # yield immediately so errors could be acted upon
-                    # outside, before we continue
-                    if not (res['type'] == 'dataset' and res['path'] in yielded_ds):
-                        # unless we reported on this dataset before
-                        if res['type'] == 'dataset':
-                            # make a record
-                            yielded_ds.append(res['path'])
-                    yield res
-                    if not (res['status'] == 'ok' and res['type'] == 'dataset'):
-                        # not a dataset that was just installed, we just reported it
-                        # upstairs, and can ignore it from now on
-                        continue
-                    # paranoia, so popular these days...
-                    assert GitRepo.is_valid_repo(res['path'])
-                    # keep a copy of the install record for `get` later on
-                    get_ap = {k: v for k, v in res.items()
-                              if not k == 'status'}
-                    get_ap['process_content'] = get_data
-                    rec_get.append(get_ap)
+                        refds_path,
+                        description):
+                    known_ds = res['path'] in content_by_ds
+                    if res.get('status', None) in ('ok', 'notneeded') and \
+                            'contains' in res:
+                        dsrec = content_by_ds.get(res['path'], set())
+                        dsrec.update(res['contains'])
+                        content_by_ds[res['path']] = dsrec
+                    # prevent double-reporting of datasets that have been
+                    # installed by explorative installation to get to target
+                    # paths, prior in this loop
+                    if res.get('status', None) != 'notneeded' or not known_ds:
+                        yield res
 
         if not get_data:
             # done already
             return
 
-        # merge the two AP lists
-        to_get.extend(rec_get)
-
-        # sort into datasets
-        content_by_ds, ds_props, completed, nondataset_paths = \
-            annotated2content_by_ds(
-                to_get,
-                refds_path=refds_path)
-        assert(not completed)
-
-        # hand over to git-annex, get files content,
-        # report files in git as 'notneeded' to get
-        for ds_path in sorted(content_by_ds.keys()):
-            ds = Dataset(ds_path)
-            # grab content, ignore subdataset entries
-            content = [ap['path'] for ap in content_by_ds[ds_path]
-                       if ap.get('type', None) != 'dataset' or ap['path'] == ds.path]
-            if not content:
-                # cut this short should there be nothing
-                continue
-            # needs to be an annex to get content
-            if not isinstance(ds.repo, AnnexRepo):
-                for r in results_from_paths(
-                        content, status='notneeded',
-                        message="no dataset annex, content already present",
-                        action='get', logger=lgr,
-                        refds=refds_path):
-                    yield r
-                continue
-            respath_by_status = {}
-            for res in ds.repo.get(
+        # and now annex-get, this could all be done in parallel now
+        for ds, content in content_by_ds.items():
+            for res in _get_targetpaths(
+                    Dataset(ds),
                     content,
-                    options=['--from=%s' % source] if source else [],
-                    jobs=jobs):
-                res = annexjson2result(res, ds, type='file', logger=lgr,
-                                       refds=refds_path)
-                success = success_status_map[res['status']]
-                # TODO: in case of some failed commands (e.g. get) there might
-                # be no path in the record.  yoh has only vague idea of logic
-                # here so just checks for having 'path', but according to
-                # results_from_annex_noinfo, then it would be assumed that
-                # `content` was acquired successfully, which is not the case
-                if 'path' in res:
-                    respath_by_status[success] = \
-                        respath_by_status.get(success, []) + [res['path']]
-                yield res
-
-            for r in results_from_annex_noinfo(
-                    ds,
-                    content,
-                    respath_by_status,
-                    dir_fail_msg='could not get some content in %s %s',
-                    noinfo_dir_msg='nothing to get from %s',
-                    noinfo_file_msg='already present',
-                    action='get',
-                    logger=lgr,
-                    refds=refds_path):
-                yield r
+                    refds.path,
+                    source,
+                    jobs):
+                if res['path'] not in content_by_ds:
+                    # we had reports on datasets and subdatasets already
+                    # before the annex stage
+                    yield res
 
     @staticmethod
     def custom_result_summary_renderer(res):

@@ -10,7 +10,6 @@
 """
 
 from abc import ABCMeta, abstractmethod, abstractproperty
-from six import add_metaclass
 from os import linesep
 import logging
 import time
@@ -18,8 +17,7 @@ import time
 lgr = logging.getLogger('datalad.protocol')
 
 
-@add_metaclass(ABCMeta)
-class ProtocolInterface(object):
+class ProtocolInterface(object, metaclass=ABCMeta):
     """Interface class for protocols used by the Runner.
 
     Implementations of this interface are supposed to store one section per

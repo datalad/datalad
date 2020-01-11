@@ -25,14 +25,16 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
-from six import iteritems
 
 from ..ui import ui
 from ..dochelpers import exc_str
 
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
-from datalad.support.constraints import EnsureKeyChoice
+from datalad.support.constraints import (
+    EnsureKeyChoice,
+    EnsureChoice,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.plugin import _get_plugins
@@ -176,6 +178,19 @@ def get_cmd_doc(interface):
         # expand docs
         intf_doc = intf_doc.format(**interface._docs_)
     return intf_doc
+
+
+def get_cmd_ex(interface):
+    """Return the examples for the command defined by 'interface'.
+
+    Parameters
+    ----------
+    interface : subclass of Interface
+    """
+    intf_ex = "\n\n*Examples*\n\n"
+    for example in interface._examples_:
+        intf_ex += build_example(example, api='cmdline')
+    return intf_ex
 
 
 def dedent_docstring(text):
@@ -358,6 +373,67 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     return func
 
 
+def build_example(example, api='python'):
+    """Build a code example.
+
+    Take a dict from a classes _example_ specification (list of dicts) and
+    build a string with an api or cmd example (for use in cmd help or
+    docstring).
+
+    Parameters
+    ----------
+    api : {'python', 'cmdline'}
+        If 'python', build Python example for docstring. If 'cmdline', build
+        cmd example.
+
+    Returns
+    -------
+    ex : str
+        Concatenated examples for the given class.
+    """
+    if api == 'python' :
+        code_field='code_py'
+        indicator='>'
+    elif api == 'cmdline':
+        code_field='code_cmd'
+        indicator='%'
+    else:
+        raise ValueError("unknown API selection: {}".format(api))
+    description = dedent_docstring(example.get('text'))
+    # this indent the code snippet to get it properly rendered as code
+    # we are not using textwrap.fill(), because it would not acknowledge
+    # any meaningful structure/formatting of code snippets. Instead, we
+    # maintain line content as is.
+    code = dedent_docstring(example.get(code_field))
+    code = textwrap.indent(code, '     ').lstrip()
+
+    ex = """{}::\n\n   {} {}\n\n""".format(description,
+                                           indicator,
+                                           code)
+    return ex
+
+
+def update_docstring_with_examples(cls_doc, ex):
+    """Update a commands docstring with examples.
+
+    Take _examples_ of a command, build the Python examples, and append
+    them to the docstring.
+
+    cls_doc: docstring
+    ex: list
+        list of dicts with examples
+    """
+    from textwrap import indent
+    if len(cls_doc):
+        cls_doc += "\n"
+    cls_doc += "    Examples\n    --------\n"
+    # loop though provided examples
+    for example in ex:
+        cls_doc += indent(build_example(example, api='python'), ' '*4)
+
+    return cls_doc
+
+
 def build_doc(cls, **kwargs):
     """Decorator to build docstrings for datalad commands
 
@@ -390,7 +466,9 @@ def build_doc(cls, **kwargs):
     if hasattr(cls, '_docs_'):
         # expand docs
         cls_doc = cls_doc.format(**cls._docs_)
-
+    # get examples
+    ex = getattr(cls, '_examples_', [])
+    cls_doc = update_docstring_with_examples(cls_doc, ex)
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
@@ -496,7 +574,7 @@ class DefaultOutputRenderer(object):
         if isinstance(v, list):
             return [cls._dict_to_nadict(x) for x in v]
         elif isinstance(v, dict):
-            return nadict((k, cls._dict_to_nadict(x)) for k, x in iteritems(v))
+            return nadict((k, cls._dict_to_nadict(x)) for k, x in v.items())
         else:
             return v
 
@@ -569,6 +647,23 @@ class Interface(object):
                 if cdoc[0] == '(' and cdoc[-1] == ')':
                     cdoc = cdoc[1:-1]
                 help += '  Constraints: %s' % cdoc
+                if 'metavar' not in parser_kwargs and \
+                        isinstance(param.constraints, EnsureChoice):
+                    parser_kwargs['metavar'] = \
+                        '{%s}' % '|'.join(
+                            # don't use short_description(), because
+                            # it also needs to give valid output for
+                            # Python syntax (quotes...), but here we
+                            # can simplify to shell syntax where everything
+                            # is a string
+                            p for p in param.constraints._allowed
+                            # in the cmdline None pretty much means
+                            # don't give the options, so listing it
+                            # doesn't make sense. Moreover, any non-string
+                            # value cannot be given and very likely only
+                            # serves a special purpose in the Python API
+                            # or implementation details
+                            if isinstance(p, str))
             if defaults_idx >= 0:
                 help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
@@ -589,7 +684,7 @@ class Interface(object):
             # XXX define or better get from elsewhere
             common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
                            'help', 'log_level', 'logger', 'pbs_runner',
-                           'result_renderer', 'proc_pre', 'proc_post', 'subparser')
+                           'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
@@ -620,8 +715,6 @@ class Interface(object):
                 # eval_results can't distinguish between --report-{status,type}
                 # not specified via the CLI and None passed via the Python API.
                 kwargs['result_filter'] = res_filter
-            kwargs['proc_pre'] = args.common_proc_pre
-            kwargs['proc_post'] = args.common_proc_post
         try:
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):
@@ -667,7 +760,7 @@ class Interface(object):
         refds_path = dataset.path if isinstance(dataset, Dataset) \
             else Dataset(dataset).path
         if refds_path:
-            refds_path = resolve_path(refds_path)
+            refds_path = str(resolve_path(refds_path))
         return refds_path
 
 

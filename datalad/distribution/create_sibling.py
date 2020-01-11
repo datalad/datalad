@@ -11,7 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six import text_type
 from distutils.version import LooseVersion
 from glob import glob
 import logging
@@ -25,7 +24,6 @@ from datalad.consts import TIMESTAMP_FMT
 from datalad.dochelpers import exc_str
 from datalad.distribution.siblings import Siblings
 from datalad.distribution.siblings import _DelayedSuper
-from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -153,7 +151,7 @@ def _create_dataset_sibling(
                 try:
                     # ds_name is unicode which makes _msg unicode so we must be
                     # unicode-ready
-                    err_str = text_type(e.stderr)
+                    err_str = str(e.stderr)
                 except UnicodeDecodeError:
                     err_str = e.stderr.decode(errors='replace')
                 _msg += " And it fails to rmdir (%s)." % (err_str.strip(),)
@@ -218,7 +216,7 @@ def _create_dataset_sibling(
         # Either repository existed before or a new directory was created for it,
         # set its group to a desired one if was provided with the same chgrp
         ssh("chgrp -R {} {}".format(
-            sh_quote(text_type(group)),
+            sh_quote(str(group)),
             sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
@@ -392,7 +390,7 @@ class CreateSibling(Interface):
         inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
-            metavar='false|true|umask|group|all|world|everybody|0xxx',
+            metavar='{false|true|umask|group|all|world|everybody|0xxx}',
             doc="""if given, configures the access permissions on the server
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
@@ -408,7 +406,7 @@ class CreateSibling(Interface):
         ),
         ui=Parameter(
             args=("--ui",),
-            metavar='false|true|html_filename',
+            metavar='{false|true|html_filename}',
             doc="""publish a web interface for the dataset with an
             optional user-specified name for the html at publication
             target. defaults to `index.html` at dataset root""",
@@ -824,7 +822,7 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
         with make_tempfile(content=hook_content) as tempf:
             # create post_update hook script
             # upload hook to dataset
-            ssh.copy(tempf, hook_remote_target)
+            ssh.put(tempf, hook_remote_target)
         # and make it executable
         ssh('chmod +x {}'.format(sh_quote(hook_remote_target)))
 
@@ -840,13 +838,13 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
         html_target = opj(path, html_targetname)
 
         # upload ui html to target
-        ssh.copy(html_local, html_target)
+        ssh.put(html_local, html_target)
 
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, WEB_HTML_DIR)
         ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
-        ssh.copy(webresources_local, webresources_remote, recursive=True)
+        ssh.put(webresources_local, webresources_remote, recursive=True)
 
         # minimize and upload js assets
         for js_file in glob(opj(webresources_local, 'js', '*.js')):
@@ -861,7 +859,7 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
                     minified = asset.read()                             # no minify available
                 with make_tempfile(content=minified) as tempf:          # write minified to tempfile
                     js_name = js_file.split('/')[-1]
-                    ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
+                    ssh.put(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
 
         # explicitly make web+metadata dir of dataset world-readable, if shared set to 'all'
         mode = None

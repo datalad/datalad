@@ -10,11 +10,12 @@
 import os
 from os.path import join as opj, exists
 
-from mock import patch
+from unittest.mock import patch
 from .utils import (
     assert_true, assert_false, eq_,
     with_tree, with_tempfile, swallow_outputs, on_windows,
     ok_file_has_content,
+    known_failure_githubci_win,
 )
 from .utils import assert_equal
 
@@ -96,6 +97,7 @@ def check_decompress_file(leading_directories, path):
         eq_(f.read(), '3 load')
 
 
+@known_failure_githubci_win
 def test_decompress_file():
     yield check_decompress_file, None
     yield check_decompress_file, 'strip'
@@ -120,6 +122,7 @@ def check_compress_dir(ext, path, name):
     assert_true(exists(opj(name_extracted, 'd1', 'd2', 'f1')))
 
 
+@known_failure_githubci_win
 def test_compress_dir():
     yield check_compress_dir, '.tar.gz'
     yield check_compress_dir, '.tar'
@@ -158,11 +161,13 @@ def check_compress_file(ext, annex, path, name):
     ok_file_has_content(_filepath, 'content')
 
 
+@known_failure_githubci_win
 def test_compress_file():
     for annex in True, False:
         yield check_compress_file, '.gz', annex
 
 
+@known_failure_githubci_win
 @with_tree(**tree_simplearchive)
 def test_ExtractedArchive(path):
     archive = opj(path, fn_archive_obscure_ext)

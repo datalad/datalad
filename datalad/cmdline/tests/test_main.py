@@ -8,14 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import on_windows
 
 
 import re
 import sys
-from six.moves import StringIO
-from mock import patch
+from io import StringIO
+from unittest.mock import patch
 
 import datalad
 from ..main import (
@@ -238,6 +237,13 @@ def test_cfg_override(path):
         # cmdline arg
         out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
         assert_in('datalad.dummy: this', out)
+
+
+def test_incorrect_cfg_override():
+    run_main(['-c', 'some', 'wtf'], exit_code=3)
+    run_main(['-c', 'some=', 'wtf'], exit_code=3)
+    run_main(['-c', 'some.var', 'wtf'], exit_code=3)
+    run_main(['-c', 'some.var=', 'wtf'], exit_code=3)
 
 
 def test_fail_with_short_help():

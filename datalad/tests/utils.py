@@ -22,19 +22,15 @@ import multiprocessing
 import logging
 import random
 import socket
-from six import PY2, text_type, iteritems
-from six import binary_type
-from six import string_types
+import warnings
 from fnmatch import fnmatch
 import time
 from difflib import unified_diff
 from contextlib import contextmanager
-from mock import patch
+from unittest.mock import patch
 
-from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
-from six.moves.BaseHTTPServer import HTTPServer
-from six import reraise
-from six.moves import map
+from http.server import SimpleHTTPRequestHandler
+from http.server import HTTPServer
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
@@ -50,9 +46,16 @@ from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
 from nose import SkipTest
 
+import datalad.utils as ut
+# TODO this must go
+from ..utils import *
+from datalad.utils import (
+    Path,
+    ensure_unicode,
+)
+
 from ..cmd import Runner
 from .. import utils
-from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
@@ -111,15 +114,140 @@ def skip_if_url_is_not_available(url, regex=None):
         raise SkipTest("%s failed to download" % url)
 
 
+def check_not_generatorfunction(func):
+    """Internal helper to verify that we are not decorating generator tests"""
+    if inspect.isgeneratorfunction(func):
+        raise RuntimeError("{}: must not be decorated, is a generator test"
+                           .format(func.__name__))
+
+
+def skip_if_no_network(func=None):
+    """Skip test completely in NONETWORK settings
+
+    If not used as a decorator, and just a function, could be used at the module level
+    """
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest("Skipping since no network settings")
+
+    if func:
+        @wraps(func)
+        @attr('network')
+        @attr('skip_if_no_network')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
+
+
+def skip_if_on_windows(func=None):
+    """Skip test completely under Windows
+    """
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
+        if on_windows:
+            raise SkipTest("Skipping on Windows")
+
+    if func:
+        @wraps(func)
+        @attr('skip_if_on_windows')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
+
+
+@optional_args
+def skip_if(func, cond=True, msg=None, method='raise'):
+    """Skip test for specific condition
+
+    Parameters
+    ----------
+    cond: bool
+      condition on which to skip
+    msg: str
+      message to print if skipping
+    method: str
+      either 'raise' or 'pass'. Whether to skip by raising `SkipTest` or by
+      just proceeding and simply not calling the decorated function.
+      This is particularly meant to be used, when decorating single assertions
+      in a test with method='pass' in order to not skip the entire test, but
+      just that assertion.
+    """
+
+    check_not_generatorfunction(func)
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if cond:
+            if method == 'raise':
+                raise SkipTest(msg if msg else "condition was True")
+            elif method == 'pass':
+                print(msg if msg else "condition was True")
+                return
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_ssh(func):
+    """Skips SSH tests if on windows or if environment variable
+    DATALAD_TESTS_SSH was not set
+    """
+
+    check_not_generatorfunction(func)
+
+    @wraps(func)
+    @attr('skip_ssh')
+    def newfunc(*args, **kwargs):
+        from datalad import cfg
+        test_ssh = cfg.get("datalad.tests.ssh", '')
+        if not test_ssh or test_ssh in ('0', 'false', 'no'):
+            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+@optional_args
+def skip_v6_or_later(func, method='raise'):
+    """Skip tests if v6 or later will be used as the default repo version.
+
+    The default repository version is controlled by the configured value of
+    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
+    installed git-annex.
+    """
+
+    from datalad import cfg
+    from datalad.support.annexrepo import AnnexRepo
+
+    version = cfg.obtain("datalad.repo.version")
+    info = AnnexRepo.check_repository_versions()
+
+    @skip_if(version >= 6 or 5 not in info["supported"],
+             msg="Skip test in v6+ test run", method=method)
+    @wraps(func)
+    @attr('skip_v6_or_later')
+    @attr('v6_or_later')
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
 #
 # Addition "checkers"
 #
 
 import git
 import os
-from os.path import exists, join
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
+from datalad.distribution.dataset import Dataset
 from ..utils import chpwd, getpwd
 
 
@@ -185,39 +313,27 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     eq_(sorted(r.untracked_files), sorted(untracked))
 
-    if annex and r.is_direct_mode():
-        if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not supported "
-                        "for direct mode repositories!")
+    repo = r.repo
+
+    if repo.index.entries.keys():
+        ok_(repo.head.is_valid())
+
+        if not head_modified and not index_modified:
+            # get string representations of diffs with index to ease
+            # troubleshooting
+            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+            index_diffs = [str(d) for d in repo.index.diff(None)]
+            eq_(head_diffs, [])
+            eq_(index_diffs, [])
         else:
-            test_untracked = not untracked
-            test_submodules = not ignore_submodules
-            ok_(not r.is_dirty(untracked_files=test_untracked,
-                               submodules=test_submodules),
-                msg="Repo unexpectedly dirty (tested for: untracked({}), submodules({})".format(
-                    test_untracked, test_submodules))
-    else:
-        repo = r.repo
-
-        if repo.index.entries.keys():
-            ok_(repo.head.is_valid())
-
-            if not head_modified and not index_modified:
-                # get string representations of diffs with index to ease
-                # troubleshooting
-                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-                index_diffs = [str(d) for d in repo.index.diff(None)]
-                eq_(head_diffs, [])
-                eq_(index_diffs, [])
-            else:
-                # TODO: These names are confusing/non-descriptive.  REDO
-                if head_modified:
-                    # we did ask for interrogating changes
-                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(sorted(head_modified_), sorted(head_modified))
-                if index_modified:
-                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(sorted(index_modified_), sorted(index_modified))
+            # TODO: These names are confusing/non-descriptive.  REDO
+            if head_modified:
+                # we did ask for interrogating changes
+                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                eq_(sorted(head_modified_), sorted(head_modified))
+            if index_modified:
+                index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -389,26 +505,27 @@ def ok_archives_caches(repopath, n=1, persistent=None):
 
 
 def ok_exists(path):
-    assert exists(path), 'path %s does not exist' % path
+    assert Path(path).exists(), 'path %s does not exist (or dangling symlink)' % path
 
 
 def ok_file_has_content(path, content, strip=False, re_=False,
                         decompress=False, **kwargs):
     """Verify that file exists and has expected content"""
+    path = Path(path)
     ok_exists(path)
     if decompress:
-        if path.endswith('.gz'):
+        if path.suffix == '.gz':
             open_func = gzip.open
         else:
             raise NotImplementedError("Don't know how to decompress %s" % path)
     else:
         open_func = open
 
-    with open_func(path, 'rb') as f:
+    with open_func(str(path), 'rb') as f:
         file_content = f.read()
 
-    if isinstance(content, text_type):
-        file_content = assure_unicode(file_content)
+    if isinstance(content, str):
+        file_content = ensure_unicode(file_content)
 
     if os.linesep != '\n':
         # for consistent comparisons etc. Apparently when reading in `b` mode
@@ -617,311 +734,6 @@ def with_tempfile(t, **tkwargs):
     return newfunc
 
 
-def _get_resolved_flavors(flavors):
-    #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
-    #           if flavors == 'auto' else flavors
-    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
-                else ['network', 'network-clone']) \
-               if flavors == 'auto' else flavors
-
-    if not isinstance(flavors_, list):
-        flavors_ = [flavors_]
-
-    if os.environ.get('DATALAD_TESTS_NONETWORK'):
-        flavors_ = [x for x in flavors_ if not x.startswith('network')]
-    return flavors_
-
-def _get_repo_url(path):
-    """Return ultimate URL for this repo"""
-
-    if path.startswith('http') or path.startswith('git'):
-        # We were given a URL, so let's just return it
-        return path
-
-    if not exists(opj(path, '.git')):
-        # do the dummiest check so we know it is not git.Repo's fault
-        raise AssertionError("Path %s does not point to a git repository "
-                             "-- missing .git" % path)
-    repo = git.Repo(path)
-    if len(repo.remotes) == 1:
-        remote = repo.remotes[0]
-    else:
-        remote = repo.remotes.origin
-    return remote.config_reader.get('url')
-
-
-def clone_url(url):
-    # delay import of our code until needed for certain
-    from ..cmd import Runner
-    runner = Runner()
-    tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
-    _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-    if GitRepo(tdir).is_with_annex():
-        AnnexRepo(tdir, init=True)
-    _TEMP_PATHS_CLONES.add(tdir)
-    return tdir
-
-
-if not on_windows:
-    local_testrepo_flavors = ['local'] # 'local-url'
-else:
-    local_testrepo_flavors = ['network-clone']
-
-_TESTREPOS = None
-
-def _get_testrepos_uris(regex, flavors):
-    global _TESTREPOS
-    # we should instantiate those whenever test repos actually asked for
-    # TODO: just absorb all this lazy construction within some class
-    if not _TESTREPOS:
-        from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
-            SubmoduleDataset, NestedDataset, InnerSubmodule
-
-        _basic_annex_test_repo = BasicAnnexTestRepo()
-        _basic_git_test_repo = BasicGitTestRepo()
-        _submodule_annex_test_repo = SubmoduleDataset()
-        _nested_submodule_annex_test_repo = NestedDataset()
-        _inner_submodule_annex_test_repo = InnerSubmodule()
-        _TESTREPOS = {'basic_annex':
-                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
-                         'local': _basic_annex_test_repo.path,
-                         'local-url': _basic_annex_test_repo.url},
-                      'basic_git':
-                        {'local': _basic_git_test_repo.path,
-                         'local-url': _basic_git_test_repo.url},
-                      'submodule_annex':
-                        {'local': _submodule_annex_test_repo.path,
-                         'local-url': _submodule_annex_test_repo.url},
-                      'nested_submodule_annex':
-                        {'local': _nested_submodule_annex_test_repo.path,
-                         'local-url': _nested_submodule_annex_test_repo.url},
-                      # TODO: append 'annex' to the name:
-                      # Currently doesn't work with some annex tests, despite
-                      # working manually. So, figure out how the tests' setup
-                      # messes things up with this one.
-                      'inner_submodule':
-                        {'local': _inner_submodule_annex_test_repo.path,
-                         'local-url': _inner_submodule_annex_test_repo.url}
-                      }
-        # assure that now we do have those test repos created -- delayed
-        # their creation until actually used
-        if not on_windows:
-            _basic_annex_test_repo.create()
-            _basic_git_test_repo.create()
-            _submodule_annex_test_repo.create()
-            _nested_submodule_annex_test_repo.create()
-            _inner_submodule_annex_test_repo.create()
-    uris = []
-    for name, spec in iteritems(_TESTREPOS):
-        if not re.match(regex, name):
-            continue
-        uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
-
-        # additional flavors which might have not been
-        if 'clone' in flavors and 'clone' not in spec:
-            uris.append(clone_url(spec['local']))
-
-        if 'network-clone' in flavors and 'network-clone' not in spec:
-            uris.append(clone_url(spec['network']))
-
-    return uris
-
-
-@optional_args
-def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
-    """Decorator to provide a local/remote test repository
-
-    All tests under datalad/tests/testrepos are stored in two-level hierarchy,
-    where top-level name describes nature/identifier of the test repository,
-    and there could be multiple instances (e.g. generated differently) of the
-    same "content"
-
-    Parameters
-    ----------
-    regex : string, optional
-      Regex to select which test repos to use
-    flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
-      What URIs to provide.  E.g. 'local' would just provide path to the
-      repository, while 'network' would provide url of the remote location
-      available on Internet containing the test repository.  'clone' would
-      clone repository first to a temporary location. 'network-clone' would
-      first clone from the network location. 'auto' would include the list of
-      appropriate ones (e.g., no 'network*' flavors if network tests are
-      "forbidden").
-    count: int, optional
-      If specified, only up to that number of repositories to test with
-
-    Examples
-    --------
-
-    >>> from datalad.tests.utils import with_testrepos
-    >>> @with_testrepos('basic_annex')
-    ... def test_write(repo):
-    ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
-
-    """
-    @wraps(t)
-    @attr('with_testrepos')
-    def newfunc(*arg, **kw):
-        if on_windows:
-            raise SkipTest("Testrepo setup is broken on Windows")
-
-        # TODO: would need to either avoid this "decorator" approach for
-        # parametric tests or again aggregate failures like sweepargs does
-        flavors_ = _get_resolved_flavors(flavors)
-
-        testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        # we should always have at least one repo to test on, unless explicitly only
-        # network was requested by we are running without networked tests
-        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
-            assert(testrepos_uris)
-        else:
-            if not testrepos_uris:
-                raise SkipTest("No non-networked repos to test on")
-
-        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
-        ntested = 0
-        for uri in testrepos_uris:
-            if count and ntested >= count:
-                break
-            ntested += 1
-            if __debug__:
-                lgr.debug('Running %s on %s' % (t.__name__, uri))
-            try:
-                t(*(arg + (uri,)), **kw)
-            finally:
-                # The is_explicit_path check is needed because it may be a URL,
-                # but check_dates needs a local path or GitRepo object.
-                if fake_dates and is_explicit_path(uri):
-                    from ..support.repodates import check_dates
-                    assert_false(
-                        check_dates(uri, annex="tree")["objects"])
-                if uri in _TEMP_PATHS_CLONES:
-                    _TEMP_PATHS_CLONES.discard(uri)
-                    rmtemp(uri)
-                pass  # might need to provide additional handling so, handle
-    return newfunc
-with_testrepos.__test__ = False
-
-
-@optional_args
-def with_fake_cookies_db(func, cookies={}):
-    """mock original cookies db with a fake one for the duration of the test
-    """
-    from ..support.cookies import cookies_db
-
-    @wraps(func)
-    @attr('with_fake_cookies_db')
-    def newfunc(*args, **kwargs):
-        try:
-            orig_cookies_db = cookies_db._cookies_db
-            cookies_db._cookies_db = cookies.copy()
-            return func(*args, **kwargs)
-        finally:
-            cookies_db._cookies_db = orig_cookies_db
-    return newfunc
-
-
-def check_not_generatorfunction(func):
-    """Internal helper to verify that we are not decorating generator tests"""
-    if inspect.isgeneratorfunction(func):
-        raise RuntimeError("{}: must not be decorated, is a generator test"
-                           .format(func.__name__))
-
-
-def skip_if_no_network(func=None):
-    """Skip test completely in NONETWORK settings
-
-    If not used as a decorator, and just a function, could be used at the module level
-    """
-    check_not_generatorfunction(func)
-
-    def check_and_raise():
-        if os.environ.get('DATALAD_TESTS_NONETWORK'):
-            raise SkipTest("Skipping since no network settings")
-
-    if func:
-        @wraps(func)
-        @attr('network')
-        @attr('skip_if_no_network')
-        def newfunc(*args, **kwargs):
-            check_and_raise()
-            return func(*args, **kwargs)
-        return newfunc
-    else:
-        check_and_raise()
-
-
-def skip_if_on_windows(func=None):
-    """Skip test completely under Windows
-    """
-    check_not_generatorfunction(func)
-
-    def check_and_raise():
-        if on_windows:
-            raise SkipTest("Skipping on Windows")
-
-    if func:
-        @wraps(func)
-        @attr('skip_if_on_windows')
-        def newfunc(*args, **kwargs):
-            check_and_raise()
-            return func(*args, **kwargs)
-        return newfunc
-    else:
-        check_and_raise()
-
-
-@optional_args
-def skip_if(func, cond=True, msg=None, method='raise'):
-    """Skip test for specific condition
-
-    Parameters
-    ----------
-    cond: bool
-      condition on which to skip
-    msg: str
-      message to print if skipping
-    method: str
-      either 'raise' or 'pass'. Whether to skip by raising `SkipTest` or by
-      just proceeding and simply not calling the decorated function.
-      This is particularly meant to be used, when decorating single assertions
-      in a test with method='pass' in order to not skip the entire test, but
-      just that assertion.
-    """
-
-    check_not_generatorfunction(func)
-
-    @wraps(func)
-    def newfunc(*args, **kwargs):
-        if cond:
-            if method == 'raise':
-                raise SkipTest(msg if msg else "condition was True")
-            elif method == 'pass':
-                print(msg if msg else "condition was True")
-                return
-        return func(*args, **kwargs)
-    return newfunc
-
-
-def skip_ssh(func):
-    """Skips SSH tests if on windows or if environment variable
-    DATALAD_TESTS_SSH was not set
-    """
-
-    check_not_generatorfunction(func)
-
-    @wraps(func)
-    @attr('skip_ssh')
-    def newfunc(*args, **kwargs):
-        from datalad import cfg
-        test_ssh = cfg.get("datalad.tests.ssh", '')
-        if not test_ssh or test_ssh in ('0', 'false', 'no'):
-            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
-        return func(*args, **kwargs)
-    return newfunc
-
-
 # ### ###
 # START known failure decorators
 # ### ###
@@ -1019,26 +831,22 @@ known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
-    """Test decorator marking a test as known to fail in a direct mode test run
+    """DEPRECATED.  Stop using.  Does nothing
+
+    Test decorator marking a test as known to fail in a direct mode test run
 
     If datalad.repo.direct is set to True behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
     """
-
-    from datalad import cfg
-
-    direct = cfg.obtain("datalad.repo.direct") or on_windows
-    if direct:
-
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_direct_mode')
-        @attr('direct_mode')
-        def dm_func(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return dm_func
-
+    # TODO: consider adopting   nibabel/deprecated.py  nibabel/deprecator.py
+    # mechanism to consistently deprecate functionality and ensure they are
+    # displayed.
+    # Since 2.7 Deprecation warnings aren't displayed by default
+    # and thus kinda pointless to issue a warning here, so we will just log
+    msg = "Direct mode support is deprecated, so no point in using " \
+          "@known_failure_direct_mode for %r since glorious future " \
+          "DataLad 0.12" % func.__name__
+    lgr.warning(msg)
     return func
 
 
@@ -1060,76 +868,285 @@ def known_failure_windows(func):
         return dm_func
     return func
 
+
+def known_failure_appveyor(func):
+    """Test decorator marking a test as known to fail on AppVeyor.
+    """
+    if 'APPVEYOR' in os.environ:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_appveyor')
+        @attr('appveyor')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
+def known_failure_githubci_win(func):
+    """Test decorator for a known test failure on Github's Windows CI
+    """
+    if 'GITHUB_WORKFLOW' in os.environ and on_windows:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_githubci_win')
+        @attr('githubci_win')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
 # ### ###
 # END known failure decorators
 # ### ###
 
 
+def _get_resolved_flavors(flavors):
+    #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
+    #           if flavors == 'auto' else flavors
+    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
+                else ['network', 'network-clone']) \
+               if flavors == 'auto' else flavors
+
+    if not isinstance(flavors_, list):
+        flavors_ = [flavors_]
+
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        flavors_ = [x for x in flavors_ if not x.startswith('network')]
+    return flavors_
+
+def _get_repo_url(path):
+    """Return ultimate URL for this repo"""
+
+    if path.startswith('http') or path.startswith('git'):
+        # We were given a URL, so let's just return it
+        return path
+
+    if not exists(opj(path, '.git')):
+        # do the dummiest check so we know it is not git.Repo's fault
+        raise AssertionError("Path %s does not point to a git repository "
+                             "-- missing .git" % path)
+    repo = git.Repo(path)
+    if len(repo.remotes) == 1:
+        remote = repo.remotes[0]
+    else:
+        remote = repo.remotes.origin
+    return remote.config_reader.get('url')
+
+
+def clone_url(url):
+    # delay import of our code until needed for certain
+    from ..cmd import Runner
+    runner = Runner()
+    tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
+    _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    if GitRepo(tdir).is_with_annex():
+        AnnexRepo(tdir, init=True)
+    _TEMP_PATHS_CLONES.add(tdir)
+    return tdir
+
+
+if not on_windows:
+    local_testrepo_flavors = ['local'] # 'local-url'
+else:
+    local_testrepo_flavors = ['network-clone']
+
+_TESTREPOS = None
+
+def _get_testrepos_uris(regex, flavors):
+    global _TESTREPOS
+    # we should instantiate those whenever test repos actually asked for
+    # TODO: just absorb all this lazy construction within some class
+    if not _TESTREPOS:
+        from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+            SubmoduleDataset, NestedDataset, InnerSubmodule
+
+        _basic_annex_test_repo = BasicAnnexTestRepo()
+        _basic_git_test_repo = BasicGitTestRepo()
+        _submodule_annex_test_repo = SubmoduleDataset()
+        _nested_submodule_annex_test_repo = NestedDataset()
+        _inner_submodule_annex_test_repo = InnerSubmodule()
+        _TESTREPOS = {'basic_annex':
+                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                         'local': _basic_annex_test_repo.path,
+                         'local-url': _basic_annex_test_repo.url},
+                      'basic_git':
+                        {'local': _basic_git_test_repo.path,
+                         'local-url': _basic_git_test_repo.url},
+                      'submodule_annex':
+                        {'local': _submodule_annex_test_repo.path,
+                         'local-url': _submodule_annex_test_repo.url},
+                      'nested_submodule_annex':
+                        {'local': _nested_submodule_annex_test_repo.path,
+                         'local-url': _nested_submodule_annex_test_repo.url},
+                      # TODO: append 'annex' to the name:
+                      # Currently doesn't work with some annex tests, despite
+                      # working manually. So, figure out how the tests' setup
+                      # messes things up with this one.
+                      'inner_submodule':
+                        {'local': _inner_submodule_annex_test_repo.path,
+                         'local-url': _inner_submodule_annex_test_repo.url}
+                      }
+        # assure that now we do have those test repos created -- delayed
+        # their creation until actually used
+        _basic_annex_test_repo.create()
+        _basic_git_test_repo.create()
+        _submodule_annex_test_repo.create()
+        _nested_submodule_annex_test_repo.create()
+        _inner_submodule_annex_test_repo.create()
+    uris = []
+    for name, spec in _TESTREPOS.items():
+        if not re.match(regex, name):
+            continue
+        uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
+
+        # additional flavors which might have not been
+        if 'clone' in flavors and 'clone' not in spec:
+            uris.append(clone_url(spec['local']))
+
+        if 'network-clone' in flavors \
+                and 'network' in spec \
+                and 'network-clone' not in spec:
+            uris.append(clone_url(spec['network']))
+
+    return uris
+
+
+# addurls with our generated file:// URLs doesn't work on appveyor
+# https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
+@known_failure_appveyor
 @optional_args
-def skip_v6_or_later(func, method='raise'):
-    """Skip tests if v6 or later will be used as the default repo version.
+def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
+    """Decorator to provide a local/remote test repository
 
-    The default repository version is controlled by the configured value of
-    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
-    installed git-annex.
-    """
-
-    from datalad import cfg
-    from datalad.support.annexrepo import AnnexRepo
-
-    version = cfg.obtain("datalad.repo.version")
-    info = AnnexRepo.check_repository_versions()
-
-    @skip_if(version >= 6 or 5 not in info["supported"],
-             msg="Skip test in v6+ test run", method=method)
-    @wraps(func)
-    @attr('skip_v6_or_later')
-    @attr('v6_or_later')
-    def newfunc(*args, **kwargs):
-        return func(*args, **kwargs)
-    return newfunc
-
-
-@optional_args
-def skip_direct_mode(func, method='raise'):
-    """Skips tests if datalad is configured to use direct mode
-    (set DATALAD_REPO_DIRECT)
-    """
-
-    from datalad import cfg
-
-    @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run",
-             method=method)
-    @wraps(func)
-    @attr('skip_direct_mode')
-    @attr('direct_mode')
-    def newfunc(*args, **kwargs):
-        return func(*args, **kwargs)
-    return newfunc
-
-
-@optional_args
-def skip_if_no_direct_mode(func, other_cond=True, method='raise'):
-    """Skip test if git-annex version does not support direct mode.
+    All tests under datalad/tests/testrepos are stored in two-level hierarchy,
+    where top-level name describes nature/identifier of the test repository,
+    and there could be multiple instances (e.g. generated differently) of the
+    same "content"
 
     Parameters
     ----------
-    func : function
-    other_cond : bool, optional
-        Skip if annex does not support direct mode AND this value is true.
-    method : str, optional
-        Passed to `skip_if`.
+    regex : string, optional
+      Regex to select which test repos to use
+    flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
+      What URIs to provide.  E.g. 'local' would just provide path to the
+      repository, while 'network' would provide url of the remote location
+      available on Internet containing the test repository.  'clone' would
+      clone repository first to a temporary location. 'network-clone' would
+      first clone from the network location. 'auto' would include the list of
+      appropriate ones (e.g., no 'network*' flavors if network tests are
+      "forbidden").
+    count: int, optional
+      If specified, only up to that number of repositories to test with
+
+    Examples
+    --------
+
+    >>> from datalad.tests.utils import with_testrepos
+    >>> @with_testrepos('basic_annex')
+    ... def test_write(repo):
+    ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
+
+    """
+    @wraps(t)
+    @attr('with_testrepos')
+    def newfunc(*arg, **kw):
+        # TODO: would need to either avoid this "decorator" approach for
+        # parametric tests or again aggregate failures like sweepargs does
+        flavors_ = _get_resolved_flavors(flavors)
+
+        testrepos_uris = _get_testrepos_uris(regex, flavors_)
+        # we should always have at least one repo to test on, unless explicitly only
+        # network was requested by we are running without networked tests
+        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+            assert(testrepos_uris)
+        else:
+            if not testrepos_uris:
+                raise SkipTest("No non-networked repos to test on")
+
+        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
+        ntested = 0
+        for uri in testrepos_uris:
+            if count and ntested >= count:
+                break
+            ntested += 1
+            if __debug__:
+                lgr.debug('Running %s on %s' % (t.__name__, uri))
+            try:
+                t(*(arg + (uri,)), **kw)
+            finally:
+                # The is_explicit_path check is needed because it may be a URL,
+                # but check_dates needs a local path or GitRepo object.
+                if fake_dates and is_explicit_path(uri):
+                    from ..support.repodates import check_dates
+                    assert_false(
+                        check_dates(uri, annex="tree")["objects"])
+                if uri in _TEMP_PATHS_CLONES:
+                    _TEMP_PATHS_CLONES.discard(uri)
+                    rmtemp(uri)
+                pass  # might need to provide additional handling so, handle
+    return newfunc
+with_testrepos.__test__ = False
+
+
+@optional_args
+def with_sameas_remote(func, autoenabled=False):
+    """Provide a repository with a git-annex sameas remote configured.
+
+    The repository will have two special remotes: r_dir (type=directory) and
+    r_rsync (type=rsync). The rsync remote will be configured with
+    --sameas=r_dir, and autoenabled if `autoenabled` is true.
     """
     from datalad.support.annexrepo import AnnexRepo
-    unsupported = not AnnexRepo.check_direct_mode_support()
+    from datalad.support.exceptions import CommandError
 
-    @skip_if(unsupported and other_cond,
-             msg="Direct mode unsupported by git-annex version",
-             method=method)
     @wraps(func)
+    @attr('with_sameas_remotes')
+    @skip_if_on_windows
+    @skip_ssh
+    @with_tempfile(mkdir=True)
+    @with_tempfile(mkdir=True)
     def newfunc(*args, **kwargs):
-        return func(*args, **kwargs)
+        sr_path, repo_path = args[-2:]
+        fn_args = args[:-2]
+        repo = AnnexRepo(repo_path)
+        repo.init_remote("r_dir",
+                         options=["type=directory",
+                                  "encryption=none",
+                                  "directory=" + sr_path])
+        options = ["type=rsync",
+                   "rsyncurl=datalad-test:" + sr_path]
+        if autoenabled:
+            options.append("autoenable=true")
+        options.append("--sameas=r_dir")
+
+        try:
+            repo.init_remote("r_rsync", options=options)
+        except CommandError:
+            if repo.git_annex_version < "7.20191017":
+                raise SkipTest("git-annex lacks --sameas support")
+            # This should have --sameas support.
+            raise
+        return func(*(fn_args + (repo,)), **kwargs)
+    return newfunc
+
+
+@optional_args
+def with_fake_cookies_db(func, cookies={}):
+    """mock original cookies db with a fake one for the duration of the test
+    """
+    from ..support.cookies import cookies_db
+
+    @wraps(func)
+    @attr('with_fake_cookies_db')
+    def newfunc(*args, **kwargs):
+        try:
+            orig_cookies_db = cookies_db._cookies_db
+            cookies_db._cookies_db = cookies.copy()
+            return func(*args, **kwargs)
+        finally:
+            cookies_db._cookies_db = orig_cookies_db
     return newfunc
 
 
@@ -1180,7 +1197,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            reraise(*exc_info)
+            raise exc_info[1]
 
         return ret
 
@@ -1238,7 +1255,7 @@ def assert_dict_equal(d1, d2):
     for k in set(d1).intersection(d2):
         same = True
         try:
-            if isinstance(d1[k], string_types):
+            if isinstance(d1[k], str):
                 # do not compare types for string types to avoid all the hassle
                 # with the distinction of str and unicode in PY3, and simple
                 # test for equality
@@ -1396,14 +1413,13 @@ def skip_httpretty_on_problematic_pythons(func):
 
 
 @optional_args
-def with_batch_direct(t):
+def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
     """
     @wraps(t)
     def newfunc():
         for batch in (False, True):
-            for direct in (False, True) if not on_windows else (True,):
-                yield t, batch, direct
+                yield t, batch
 
     return newfunc
 
@@ -1433,6 +1449,9 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+    if on_windows:
+        # TODO: really figure out unicode handling on windows
+        UNICODE_FILENAME = ''
     # Prepend the list with unicode names first
     OBSCURE_FILENAMES = tuple(
         f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
@@ -1492,29 +1511,6 @@ def with_testsui(t, responses=None, interactive=True):
 with_testsui.__test__ = False
 
 
-@optional_args
-def with_direct(func):
-    """To test functions under both direct and indirect mode
-
-    Unlike fancy generators would just fail on the first failure
-    """
-    @wraps(func)
-    @attr('direct_mode')
-    def newfunc(*args, **kwargs):
-        if on_windows or on_travis:
-            # since on windows would become indirect anyways
-            # on travis -- we have a dedicated matrix run
-            # which would select one or another based on config
-            # if we specify None
-            directs = [None]
-        else:
-            # otherwise we assume that we have to test both modes
-            directs = [True, False]
-        for direct in directs:
-            func(*(args + (direct,)), **kwargs)
-    return newfunc
-
-
 def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
@@ -1555,6 +1551,329 @@ def get_datasets_topdir():
     """Delayed parsing so it could be monkey patched etc"""
     from datalad.consts import DATASETS_TOPURL
     return RI(DATASETS_TOPURL).hostname
+
+
+def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
+    """Compare a repo status against (optional) exceptions.
+
+    Anything file/directory that is not explicitly indicated must have
+    state 'clean', i.e. no modifications and recorded in Git.
+
+    This is an alternative to the traditional `ok_clean_git` helper.
+
+    Parameters
+    ----------
+    path: str or Repo
+      in case of a str: path to the repository's base dir;
+      Note, that passing a Repo instance prevents detecting annex. This might
+      be useful in case of a non-initialized annex, a GitRepo is pointing to.
+    annex: bool or None
+      explicitly set to True or False to indicate, that an annex is (not)
+      expected; set to None to autodetect, whether there is an annex.
+      Default: None.
+    untracked_mode: {'no', 'normal', 'all'}
+      If and how untracked content is reported. The specification of untracked
+      files that are OK to be found must match this mode. See `Repo.status()`
+    **kwargs
+      Files/directories that are OK to not be in 'clean' state. Each argument
+      must be one of 'added', 'untracked', 'deleted', 'modified' and each
+      value must be a list of filenames (relative to the root of the
+      repository, in POSIX convention).
+    """
+    r = None
+    if isinstance(path, AnnexRepo):
+        if annex is None:
+            annex = True
+        # if `annex` was set to False, but we find an annex => fail
+        assert_is(annex, True)
+        r = path
+    elif isinstance(path, GitRepo):
+        if annex is None:
+            annex = False
+        # explicitly given GitRepo instance doesn't make sense with
+        # 'annex' True
+        assert_is(annex, False)
+        r = path
+    else:
+        # 'path' is an actual path
+        try:
+            r = AnnexRepo(path, init=False, create=False)
+            if annex is None:
+                annex = True
+            # if `annex` was set to False, but we find an annex => fail
+            assert_is(annex, True)
+        except Exception:
+            # Instantiation failed => no annex
+            try:
+                r = GitRepo(path, init=False, create=False)
+            except Exception:
+                raise AssertionError("Couldn't find an annex or a git "
+                                     "repository at {}.".format(path))
+            if annex is None:
+                annex = False
+            # explicitly given GitRepo instance doesn't make sense with
+            # 'annex' True
+            assert_is(annex, False)
+
+    status = r.status(untracked=untracked_mode)
+    # for any file state that indicates some kind of change (all but 'clean)
+    for state in ('added', 'untracked', 'deleted', 'modified'):
+        oktobefound = sorted(r.pathobj.joinpath(ut.PurePosixPath(p))
+                             for p in kwargs.get(state, []))
+        state_files = sorted(k for k, v in status.items()
+                             if v.get('state', None) == state)
+        eq_(state_files, oktobefound,
+            'unexpected content of state "%s": %r != %r'
+            % (state, state_files, oktobefound))
+
+
+def get_convoluted_situation(path, repocls=AnnexRepo):
+    from datalad.api import create
+
+    if 'APPVEYOR' in os.environ:
+        # issue only happens on appveyor, Python itself implodes
+        # cannot be reproduced on a real windows box
+        raise SkipTest(
+            'get_convoluted_situation() causes appveyor to crash, '
+            'reason unknown')
+    repo = repocls(path, create=True)
+    # use create(force) to get an ID and config into the empty repo
+    ds = Dataset(path).create(force=True)
+    # base content
+    create_tree(
+        ds.path,
+        {
+            '.gitignore': '*.ignored',
+            'subdir': {
+                'file_clean': 'file_clean',
+                'file_deleted': 'file_deleted',
+                'file_modified': 'file_clean',
+            },
+            'subdir-only-ignored': {
+                '1.ignored': '',
+            },
+            'file_clean': 'file_clean',
+            'file_deleted': 'file_deleted',
+            'file_staged_deleted': 'file_staged_deleted',
+            'file_modified': 'file_clean',
+        }
+    )
+    if isinstance(ds.repo, AnnexRepo):
+        create_tree(
+            ds.path,
+            {
+                'subdir': {
+                    'file_dropped_clean': 'file_dropped_clean',
+                },
+                'file_dropped_clean': 'file_dropped_clean',
+            }
+        )
+    ds.save()
+    if isinstance(ds.repo, AnnexRepo):
+        # some files straight in git
+        create_tree(
+            ds.path,
+            {
+                'subdir': {
+                    'file_ingit_clean': 'file_ingit_clean',
+                    'file_ingit_modified': 'file_ingit_clean',
+                },
+                'file_ingit_clean': 'file_ingit_clean',
+                'file_ingit_modified': 'file_ingit_clean',
+            }
+        )
+        ds.save(to_git=True)
+        ds.drop([
+            'file_dropped_clean',
+            op.join('subdir', 'file_dropped_clean')],
+            check=False)
+    # clean and proper subdatasets
+    ds.create('subds_clean')
+    ds.create(op.join('subdir', 'subds_clean'))
+    ds.create('subds_unavailable_clean')
+    ds.create(op.join('subdir', 'subds_unavailable_clean'))
+    # uninstall some subdatasets (still clean)
+    ds.uninstall([
+        'subds_unavailable_clean',
+        op.join('subdir', 'subds_unavailable_clean')],
+        check=False)
+    assert_repo_status(ds.path)
+    # make a dirty subdataset
+    ds.create('subds_modified')
+    ds.create(op.join('subds_modified', 'someds'))
+    ds.create(op.join('subds_modified', 'someds', 'dirtyds'))
+    # make a subdataset with additional commits
+    ds.create(op.join('subdir', 'subds_modified'))
+    pdspath = op.join(ds.path, 'subdir', 'subds_modified', 'progressedds')
+    ds.create(pdspath)
+    create_tree(
+        pdspath,
+        {'file_clean': 'file_ingit_clean'}
+    )
+    Dataset(pdspath).save()
+    assert_repo_status(pdspath)
+    # staged subds, and files
+    create(op.join(ds.path, 'subds_added'))
+    ds.repo.add_submodule('subds_added')
+    create(op.join(ds.path, 'subdir', 'subds_added'))
+    ds.repo.add_submodule(op.join('subdir', 'subds_added'))
+    # some more untracked files
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_untracked': 'file_untracked',
+                'file_added': 'file_added',
+            },
+            'file_untracked': 'file_untracked',
+            'file_added': 'file_added',
+            'dir_untracked': {
+                'file_untracked': 'file_untracked',
+            },
+            'subds_modified': {
+                'someds': {
+                    "dirtyds": {
+                        'file_untracked': 'file_untracked',
+                    },
+                },
+            },
+        }
+    )
+    ds.repo.add(['file_added', op.join('subdir', 'file_added')])
+    # untracked subdatasets
+    create(op.join(ds.path, 'subds_untracked'))
+    create(op.join(ds.path, 'subdir', 'subds_untracked'))
+    # deleted files
+    os.remove(op.join(ds.path, 'file_deleted'))
+    os.remove(op.join(ds.path, 'subdir', 'file_deleted'))
+    # staged deletion
+    ds.repo.remove('file_staged_deleted')
+    # modified files
+    if isinstance(ds.repo, AnnexRepo):
+        ds.repo.unlock(['file_modified', op.join('subdir', 'file_modified')])
+        create_tree(
+            ds.path,
+            {
+                'subdir': {
+                    'file_ingit_modified': 'file_ingit_modified',
+                },
+                'file_ingit_modified': 'file_ingit_modified',
+            }
+        )
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_modified': 'file_modified',
+            },
+            'file_modified': 'file_modified',
+        }
+    )
+    return ds
+
+
+def get_deeply_nested_structure(path):
+    """ Here is what this does (assuming UNIX, locked):
+    |  .
+    |  ├── directory_untracked
+    |  │   └── link2dir -> ../subdir
+    |  ├── OBSCURE_FILENAME_file_modified
+    |  ├── link2dir -> subdir
+    |  ├── link2subdsdir -> subds_modified/subdir
+    |  ├── link2subdsroot -> subds_modified
+    |  ├── subdir
+    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
+    |  │   ├── file_modified
+    |  │   ├── git_file.txt
+    |  │   └── link2annex_files.txt -> annexed_file.txt
+    |  └── subds_modified
+    |      ├── link2superdsdir -> ../subdir
+    |      ├── subdir
+    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
+    |      └── subds_lvl1_modified
+    |          └── OBSCURE_FILENAME_directory_untracked
+    |              └── untracked_file
+
+    When a system has no symlink support, the link2... components are not
+    included.
+    """
+    ds = Dataset(path).create()
+    (ds.pathobj / 'subdir').mkdir()
+    (ds.pathobj / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
+    ds.save()
+    (ds.pathobj / 'subdir' / 'git_file.txt').write_text(u'dummy')
+    ds.save(to_git=True)
+    # a subtree of datasets
+    subds = ds.create('subds_modified')
+    # another dataset, plus an additional dir in it
+    ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_modified': 'file_modified',
+            },
+            OBSCURE_FILENAME + u'file_modified_': 'file_modified',
+        }
+    )
+    create_tree(
+        str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
+        {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
+    )
+    (ut.Path(subds.path) / 'subdir').mkdir()
+    (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
+    subds.save()
+    (ds.pathobj / 'directory_untracked').mkdir()
+
+    if not has_symlink_capability():
+        return ds
+
+    # symlink farm #1
+    # symlink to annexed file
+    (ds.pathobj / 'subdir' / 'link2annex_files.txt').symlink_to(
+        'annexed_file.txt')
+    # symlink to directory within the dataset
+    (ds.pathobj / 'link2dir').symlink_to('subdir')
+    # upwards pointing symlink to directory within the same dataset
+    (ds.pathobj / 'directory_untracked' / 'link2dir').symlink_to(
+        op.join('..', 'subdir'))
+    # symlink pointing to a subdataset mount in the same dataset
+    (ds.pathobj / 'link2subdsroot').symlink_to('subds_modified')
+    # symlink to a dir in a subdataset (across dataset boundaries)
+    (ds.pathobj / 'link2subdsdir').symlink_to(
+        op.join('subds_modified', 'subdir'))
+    # symlink to a dir in a superdataset (across dataset boundaries)
+    (ut.Path(subds.path) / 'link2superdsdir').symlink_to(
+        op.join('..', 'subdir'))
+    return ds
+
+
+def has_symlink_capability():
+    try:
+        wdir = ut.Path(tempfile.mkdtemp())
+        (wdir / 'target').touch()
+        (wdir / 'link').symlink_to(wdir / 'target')
+        return True
+    except Exception:
+        return False
+    finally:
+        shutil.rmtree(str(wdir))
+
+
+def skip_wo_symlink_capability(func):
+    """Skip test when environment does not support symlinks
+
+    Perform a behavioral test instead of top-down logic, as on
+    windows this could be on or off on a case-by-case basis.
+    """
+    @wraps(func)
+    @attr('skip_wo_symlink_capability')
+    def newfunc(*args, **kwargs):
+        if not has_symlink_capability():
+            raise SkipTest("no symlink capabilities")
+        return func(*args, **kwargs)
+    return newfunc
+
 
 #
 # Context Managers

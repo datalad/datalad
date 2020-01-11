@@ -76,8 +76,7 @@ def _push(ds, remote, things2push, force=False):
         return 'ok', ('pushed to %s: %s', remote, successes)
 
 
-def has_diff(ds, refspec, remote, paths):
-    """Return bool if a dataset was modified wrt to a given remote state"""
+def _get_remote_branch(ds, refspec=None):
     if refspec:
         remote_branch_name = refspec[11:] \
             if refspec.startswith('refs/heads/') \
@@ -85,7 +84,11 @@ def has_diff(ds, refspec, remote, paths):
     else:
         # there was no tracking branch, check the push target
         remote_branch_name = ds.repo.get_active_branch()
+    return remote_branch_name
 
+
+def has_diff(ds, remote_branch_name, remote, paths):
+    """Return bool if a dataset was modified wrt to a given remote state"""
     remote_ref = '/'.join((remote, remote_branch_name))
     if remote_ref not in ds.repo.get_remote_branches():
         lgr.debug("Remote '%s' has no branch matching %r. Will publish",
@@ -96,7 +99,7 @@ def has_diff(ds, refspec, remote, paths):
     lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
               remote_branch_name, remote)
     current_commit = ds.repo.get_hexsha()
-    within_ds_paths = [p for p in paths if p['path'] != ds.path]
+    within_ds_paths = [p['path'] for p in paths if p['path'] != ds.path]
     commit_differ = current_commit != ds.repo.get_hexsha(remote_ref)
     # yoh: not sure what "logic" was intended here for comparing only
     # some files.  By now we get a list of files, if any were changed,
@@ -110,13 +113,11 @@ def has_diff(ds, refspec, remote, paths):
         # in which case we can do the same muuuch cheaper (see below)
         # if there were custom paths, we will look at the diff
         lgr.debug("Since paths provided, looking at diff")
-        return any(ds.diff(
-            path=within_ds_paths,
-            revision=remote_ref,
-            # only commited changes in this dataset
-            staged=False,
-            # consider only commited changes in subdataset
-            ignore_subdatasets='dirty')) > 0
+        return any(r["state"] != "clean"
+                   for r in ds.diff(path=within_ds_paths,
+                                    fr="HEAD",
+                                    to=remote_ref,
+                                    untracked="no"))
     else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
@@ -260,6 +261,17 @@ def _check_and_update_remote_server_info(ds, remote):
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
                      transfer_data='auto', **kwargs):
+    remote_branch_name = _get_remote_branch(ds, refspec)
+    if not remote_branch_name:
+        yield get_status_dict(
+            ds=ds,
+            status='impossible',
+            message=(
+                'Cannot determine remote branch name from %s',
+                'HEAD' if not refspec else refspec,
+            ),
+            **kwargs)
+        return
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
@@ -306,7 +318,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # dizzy in the forehead....
 
     # if forced -- we push regardless if there are differences or not
-    diff = True if force else has_diff(ds, refspec, remote, paths)
+    diff = True if force else has_diff(ds, remote_branch_name, remote, paths)
 
     # We might have got new information in git-annex branch although no other
     # changes
@@ -670,10 +682,10 @@ class Publish(Interface):
         #    # act on the whole dataset if nothing else was specified
         #    path = dataset.path if isinstance(dataset, Dataset) else dataset
 
-        if not dataset and not path:
+        if not (isinstance(dataset, Dataset) or (dataset is None and path)):
             # try to find a dataset in PWD
             dataset = require_dataset(
-                None, check_installed=True, purpose='publishing')
+                dataset, check_installed=True, purpose='publishing')
 
         if since and not dataset:
             raise InsufficientArgumentsError(

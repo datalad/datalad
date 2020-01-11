@@ -25,19 +25,18 @@ from ...tests.utils import (
     swallow_logs,
 )
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import (
     assert_true, assert_false,
     assert_equal, assert_greater_equal, assert_greater,
     assert_raises, assert_in
 )
 from nose import SkipTest
-from six import PY3
 
-if PY3:
-    # just to ease testing
-    def cmp(a, b):
-        return (a > b) - (a < b)
+
+# just to ease testing
+def cmp(a, b):
+    return (a > b) - (a < b)
 
 
 def test_external_versions_basic():

@@ -34,12 +34,11 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_direct_mode
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
@@ -97,7 +96,7 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
-@known_failure_direct_mode  #FIXME
+@known_failure_githubci_win
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
@@ -117,7 +116,7 @@ def test_aggregation(path):
     subsubds = subds.create('subsub', force=True)
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                         where='dataset')
-    ds.add('.', recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
@@ -221,7 +220,7 @@ def test_ignore_nondatasets(path):
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either
-        ds.add(subpath)
+        ds.save(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         n_subm += 1
@@ -240,19 +239,18 @@ def test_get_aggregates_fails(path):
 @with_tempfile(mkdir=True)
 def test_bf2458(src, dst):
     ds = Dataset(src).create(force=True)
-    ds.add('.', to_git=False)
+    ds.save(to_git=False)
 
     # no clone (empty) into new dst
     clone = install(source=ds.path, path=dst)
-    # XXX whereis says nothing in direct mode
     # content is not here
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
     # check that plain metadata access does not `get` stuff
     clone.metadata('.', on_failure='ignore')
-    # XXX whereis says nothing in direct mode
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
 
 
+@known_failure_githubci_win
 def test_get_containingds_from_agginfo():
     eq_(None, _get_containingds_from_agginfo({}, 'any'))
     # direct hit returns itself

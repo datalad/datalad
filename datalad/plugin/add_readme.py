@@ -26,7 +26,11 @@ class AddReadme(Interface):
     from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
     from datalad.distribution.dataset import EnsureDataset
-    from datalad.support.constraints import EnsureNone, EnsureStr
+    from datalad.support.constraints import (
+        EnsureChoice,
+        EnsureNone,
+        EnsureStr,
+    )
 
     _params_ = dict(
         dataset=Parameter(
@@ -43,11 +47,10 @@ class AddReadme(Interface):
             constraints=EnsureStr()),
         existing=Parameter(
             args=("--existing",),
-            metavar="skip|append|replace",
             doc="""How to react if a file with the target name already exists:
             'skip': do nothing; 'append': append information to the existing
             file; 'replace': replace the existing file with new content.""",
-            constraints=EnsureStr()),
+            constraints=EnsureChoice("skip", "append", "replace")),
     )
 
     @staticmethod
@@ -141,7 +144,7 @@ see the DataLad documentation at: http://docs.datalad.org
                 type='file',
                 action='add_readme')
 
-        for r in dataset.add(
+        for r in dataset.save(
                 filename,
                 message='[DATALAD] added README',
                 result_filter=None,

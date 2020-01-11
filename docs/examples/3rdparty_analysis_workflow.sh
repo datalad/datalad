@@ -43,7 +43,7 @@ git config --global --add user.email bob@example.com
 # :term:`dataset`.
 #%
 
-datalad create myanalysis --description "my phd in a day"
+datalad create --description "my phd in a day" myanalysis
 cd myanalysis
 
 #%

@@ -3,7 +3,6 @@
 language: python
 
 python:
-  - 2.7
   - 3.5
 ##1  - 3.6
 
@@ -24,7 +23,6 @@ env:
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
   matrix:
-    - DATALAD_REPO_DIRECT=yes
 ##1    - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
 
@@ -165,57 +163,6 @@ matrix:
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
 #    - _DL_CRON=1
-  - python: 3.5
-    # test whether known direct mode failures still fail
-    env:
-    - DATALAD_REPO_DIRECT=yes
-    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-    - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
-
-  - python: 3.5
-    # test with extension datalad-crawler
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-crawler
-    - TESTS_TO_PERFORM=datalad_crawler
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
-
-  - python: 3.5
-    # test with extension datalad-neuroimaging
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-neuroimaging
-    - TESTS_TO_PERFORM=datalad_neuroimaging
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
-
-  - python: 3.5
-    # test with extension datalad-container
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-container
-    - TESTS_TO_PERFORM=datalad_container
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
-
-  # Run benchmark comparison against current master
-  - python: 3.6
-    env: _DL_BENCHMARK=1
-
-# Requires current master (0.12.x) so cannot be tested against 0.11.x
-#
-#  - python: 3.5
-#    # test with extension datalad-revolution
-#    env:
-#    - BUILD_DATALAD_EXTENSION=datalad-revolution
-#    - DATALAD_REPO_VERSION=6
-#    - TESTS_TO_PERFORM=datalad_revolution
-#    # Use a selector that will always be true.
-#    - NOSE_SELECTION_OP=not
-#    - NOSE_SELECTION=
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -230,13 +177,6 @@ matrix:
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
 #    - _DL_CRON=1
-  # test whether known direct mode failures still fail
-  - env:
-    - DATALAD_REPO_DIRECT=yes
-    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-    - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -296,13 +236,10 @@ install:
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit@>=3.0.1
-  - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
 script:
-  - if [ ! -z "${_DL_BENCHMARK:-}" ]; then tools/ci/benchmark-travis-pr.sh; exit $?; fi
   # Test installation system-wide
   - sudo pip install .
-  - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
@@ -315,18 +252,12 @@ script:
       --logging-level=INFO
       $TESTS_TO_PERFORM
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  # Also: don't run it in extension builds
-  - if [ ${DATALAD_TESTS_SSH:-0} != 1 -o -n "${BUILD_DATALAD_EXTENSION:-}" ] || echo "${TMPDIR:-}" | grep -q ' '; then
+  - if [ ${DATALAD_TESTS_SSH:-0} != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
       echo "Testing examples is disabled by configuration";
     else
       $NOSE_WRAPPER ../tools/testing/run_doc_examples;
     fi
   - cd ..
-  # Generate documentation and run doctests
-  # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
-  - if [ "${DATALAD_LOG_LEVEL:-}" != 2 -a -z "${BUILD_DATALAD_EXTENSION:-}" ]; then
-       PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest;
-    fi
   # Run javascript tests
   - grunt test --verbose
   # Report WTF information using system wide installed version

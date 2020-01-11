@@ -16,13 +16,11 @@ import os.path as op
 from functools import partial
 from collections import OrderedDict
 
-from six import PY2
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
     assure_unicode,
-    assure_bytes,
     getpwd,
     unlink,
 )
@@ -139,6 +137,14 @@ def _describe_environment():
     return get_envvars_info()
 
 
+def _describe_python():
+    import platform
+    return {
+        'version': platform.python_version(),
+        'implementation': platform.python_implementation(),
+    }
+
+
 def _describe_configuration(cfg, sensitive):
     if not cfg:
         return _HIDDEN
@@ -228,6 +234,7 @@ def _describe_dataset(ds, sensitive):
         infos = {
             'path': ds.path,
             'repo': ds.repo.__class__.__name__ if ds.repo else None,
+            'id': ds.id,
         }
         if not sensitive:
             infos['metadata'] = _HIDDEN
@@ -259,6 +266,7 @@ def _describe_location(res):
 # the context
 SECTION_CALLABLES = {
     'datalad': _describe_datalad,
+    'python': _describe_python,
     'git-annex': _describe_annex,
     'system': _describe_system,
     'environment': _describe_environment,
@@ -296,7 +304,7 @@ class WTF(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         sensitive=Parameter(
             args=("-s", "--sensitive",),
-            constraints=EnsureChoice('some', 'all') | EnsureNone(),
+            constraints=EnsureChoice(None, 'some', 'all'),
             doc="""if set to 'some' or 'all', it will display sections such as 
             config and metadata which could potentially contain sensitive 
             information (credentials, names, etc.).  If 'some', the fields
@@ -395,7 +403,7 @@ class WTF(Interface):
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
         out = _render_report(res)
-        ui.message(assure_bytes(out) if PY2 else out)
+        ui.message(out)
 
 
 def _render_report(res):
@@ -403,7 +411,7 @@ def _render_report(res):
 
     def _unwind(text, val, top):
         if isinstance(val, dict):
-            for k in val:
+            for k in sorted(val):
                 text += u'\n{}{} {}{} '.format(
                     '##' if not top else top,
                     '-' if top else '',

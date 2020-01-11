@@ -20,8 +20,8 @@ from ..datalad import DataladAnnexCustomRemote
 
 @with_tempfile()
 @skip_if_no_network
-def check_basic_scenario(direct, url, d):
-    annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
+def check_basic_scenario(url, d):
+    annex = AnnexRepo(d, runner=_get_custom_runner(d))
     annex.init_remote(
         DATALAD_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,
@@ -37,11 +37,6 @@ def check_basic_scenario(direct, url, d):
         whereis1 = annex.whereis('3versions_allversioned.txt', output='full')
         eq_(len(whereis1), 2)  # here and datalad
         annex.drop('3versions_allversioned.txt')
-        if PY2:
-            pass  # stopped appearing within the test  TODO
-            #assert_in('100%', cmo.err)  # we do provide our progress indicator
-        else:
-            pass  # TODO:  not sure what happened but started to fail for me on my laptop under tox
     whereis2 = annex.whereis('3versions_allversioned.txt', output='full')
     eq_(len(whereis2), 1)  # datalad
 
@@ -58,16 +53,14 @@ def check_basic_scenario(direct, url, d):
 
 # unfortunately with_tree etc decorators aren't generators friendly thus
 # this little adapters to test both on local and s3 urls
-@with_direct
 @with_tree(tree={'3versions-allversioned.txt': "somefile"})
 @serve_path_via_http
-def test_basic_scenario_local_url(direct, p, local_url):
-    check_basic_scenario(direct, "%s3versions-allversioned.txt" % local_url)
+def test_basic_scenario_local_url(p, local_url):
+    check_basic_scenario("%s3versions-allversioned.txt" % local_url)
 
 
-@with_direct
-def test_basic_scenario_s3(direct):
-    check_basic_scenario(direct, 's3://datalad-test0-versioned/3versions-allversioned.txt')
+def test_basic_scenario_s3():
+    check_basic_scenario('s3://datalad-test0-versioned/3versions-allversioned.txt')
 
 
 

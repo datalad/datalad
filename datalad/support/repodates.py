@@ -14,12 +14,42 @@ import operator
 import re
 import time
 
-from six import string_types
 
 from datalad.log import log_progress
-from datalad.support.gitrepo import GitRepo, GitCommandError
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
 
 lgr = logging.getLogger('datalad.repodates')
+
+
+def _cat_blob(repo, obj, bad_ok=False):
+    """Call `git cat-file blob OBJ`.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    obj : str
+        Blob object.
+    bad_ok : boolean, optional
+        Don't fail if `obj` doesn't name a known blob.
+
+    Returns
+    -------
+    Blob's content (str) or None if `obj` is not and `bad_ok` is true.
+    """
+    if bad_ok:
+        kwds = {"expect_fail": True, "expect_stderr": True}
+    else:
+        kwds = {}
+
+    try:
+        out_cat = repo.call_git(["cat-file", "blob", obj], **kwds)
+    except CommandError as exc:
+        if bad_ok and "bad file" in exc.stderr:
+            out_cat = None
+        else:
+            raise
+    return out_cat
 
 
 def branch_blobs(repo, branch):
@@ -36,10 +66,9 @@ def branch_blobs(repo, branch):
     in `branch`.  Note: By design a blob isn't tied to a particular file name;
     the returned file name matches what is returned by 'git rev-list'.
     """
-    git = repo.repo.git
     # Note: This might be nicer with rev-list's --filter and
     # --filter-print-omitted, but those aren't available until Git v2.16.
-    lines = git.rev_list(branch, objects=True).splitlines()
+    lines = repo.call_git_items_(["rev-list", "--objects"] + [branch])
     # Trees and blobs have an associated path printed.
     objects = (ln.split() for ln in lines)
     blob_trees = [obj for obj in objects if len(obj) == 2]
@@ -55,10 +84,9 @@ def branch_blobs(repo, branch):
         log_progress(lgr.info, "repodates_branch_blobs",
                      "Checking %s", obj,
                      increment=True, update=1)
-        try:
-            yield obj, git.cat_file("blob", obj), fname
-        except GitCommandError:  # The object was a tree.
-            continue
+        content = _cat_blob(repo, obj, bad_ok=True)
+        if content:
+            yield obj, content, fname
     log_progress(lgr.info, "repodates_branch_blobs",
                  "Finished checking %d objects", num_objects)
 
@@ -79,10 +107,9 @@ def branch_blobs_in_tree(repo, branch):
     entry per blob is yielded).
     """
     seen_blobs = set()
-    git = repo.repo.git
-    out = git.ls_tree(branch, z=True, r=True)
-    if out:
-        lines = out.strip("\0").split("\0")
+    lines = list(repo.call_git_items_(["ls-tree", "-z", "-r", branch],
+                                      sep="\0"))
+    if lines:
         num_lines = len(lines)
         log_progress(lgr.info,
                      "repodates_blobs_in_tree",
@@ -90,12 +117,14 @@ def branch_blobs_in_tree(repo, branch):
                      label="Checking objects", total=num_lines,
                      unit=" objects")
         for line in lines:
+            if not line:
+                continue
             _, obj_type, obj, fname = line.split()
             log_progress(lgr.info, "repodates_blobs_in_tree",
                          "Checking %s", obj,
                          increment=True, update=1)
             if obj_type == "blob" and obj not in seen_blobs:
-                yield obj, git.cat_file("blob", obj), fname
+                yield obj, _cat_blob(repo, obj), fname
             seen_blobs.add(obj)
         log_progress(lgr.info, "repodates_blobs_in_tree",
                      "Finished checking %d blobs", num_lines)
@@ -162,15 +191,13 @@ def tag_dates(repo, pattern=""):
     -------
     A generator object that returns a tuple with the tag hexsha and timestamp.
     """
-    lines = repo.repo.git.for_each_ref(
-        "refs/tags/" + pattern,
-        format="%(objectname) %(taggerdate:raw)").splitlines()
-    for line in lines:
-        fields = line.split()
-        if len(fields) != 3:
+    for rec in repo.for_each_ref_(
+            fields=['objectname', 'taggerdate:raw'],
+            pattern='refs/tags/' + pattern):
+        if not rec['taggerdate:raw']:
             # There's not a tagger date. It's not an annotated tag.
             continue
-        yield fields[0], int(fields[1])
+        yield rec['objectname'], int(rec['taggerdate:raw'].split()[0])
 
 
 def log_dates(repo, revs=None):
@@ -188,12 +215,12 @@ def log_dates(repo, revs=None):
     A generator object that returns a tuple with the commit hexsha, author
     timestamp, and committer timestamp.
     """
-    revs = revs or ["--branches"]
+    opts = [] if revs else ["--branches"]
     try:
-        for line in repo.repo.git.log(*revs, format="%H %at %ct").splitlines():
+        for line in repo.get_revisions(revs, fmt="%H %at %ct", options=opts):
             hexsha, author_timestamp, committer_timestamp = line.split()
             yield hexsha, int(author_timestamp), int(committer_timestamp)
-    except GitCommandError as e:
+    except CommandError as e:
         # With some Git versions, calling `git log --{all,branches,remotes}` in
         # a repo with no commits may signal an error.
         if "does not have any commits yet" not in e.stderr:
@@ -230,7 +257,7 @@ def check_dates(repo, timestamp=None, which="newer", revs=None,
     -------
     A dict that reports newer timestamps.
     """
-    if isinstance(repo, string_types):
+    if isinstance(repo, str):
         repo = GitRepo(repo, create=False)
 
     if timestamp is None:

@@ -12,7 +12,10 @@
 
 import logging
 
-from.exceptions import InvalidInstanceRequestError
+from .exceptions import InvalidInstanceRequestError
+from . import path as op
+from .network import RI
+from .. import utils as ut
 
 lgr = logging.getLogger('datalad.repo')
 
@@ -43,10 +46,8 @@ class Flyweight(type):
     Example:
 
     from weakref import WeakValueDictionary
-    from six import add_metaclass
 
-    @add_metaclass(Flyweight)
-    class MyFlyweightClass(object):
+    class MyFlyweightClass(object, metaclass=Flyweight):
 
         _unique_instances = WeakValueDictionary()
 
@@ -88,28 +89,32 @@ class Flyweight(type):
         hashable, args, kwargs
           id, optionally manipulated args and kwargs to be passed to __init__
         """
-        pass
+        raise NotImplementedError
 
-    def _flyweight_invalid(cls, id):
-        """determines whether or not an instance with `id` became invalid and
-        therefore has to be instantiated again.
-
-        Subclasses can implement this method to provide an additional condition
-        on when to create a new instance besides there is none yet.
-
-        Parameter
-        ---------
-        id: hashable
-          ID of the requested instance
-
-        Returns
-        -------
-        bool
-          whether to consider an existing instance with that ID invalid and
-          therefore create a new instance. Default implementation always returns
-          False.
-        """
-        return False
+    #       TODO: - We might want to remove the classmethod from Flyweight altogether and replace by an
+    #             requirement to implement an actual method, since the purpose of it is actually about a
+    #             particular, existing instance
+    #             - Done. But update docs!
+    # def _flyweight_invalid(cls, id):
+    #     """determines whether or not an instance with `id` became invalid and
+    #     therefore has to be instantiated again.
+    #
+    #     Subclasses can implement this method to provide an additional condition
+    #     on when to create a new instance besides there is none yet.
+    #
+    #     Parameter
+    #     ---------
+    #     id: hashable
+    #       ID of the requested instance
+    #
+    #     Returns
+    #     -------
+    #     bool
+    #       whether to consider an existing instance with that ID invalid and
+    #       therefore create a new instance. Default implementation always returns
+    #       False.
+    #     """
+    #     return False
 
     def _flyweight_reject(cls, id, *args, **kwargs):
         """decides whether to reject a request for an instance
@@ -140,7 +145,7 @@ class Flyweight(type):
         id_, new_args, new_kwargs = cls._flyweight_id_from_args(*args, **kwargs)
         instance = cls._unique_instances.get(id_, None)
 
-        if instance is None or cls._flyweight_invalid(id_):
+        if instance is None or instance._flyweight_invalid():
             # we have no such instance yet or the existing one is invalidated,
             # so we instantiate:
             instance = type.__call__(cls, *new_args, **new_kwargs)
@@ -162,6 +167,65 @@ class Flyweight(type):
                 raise InvalidInstanceRequestError(id_, msg)
 
         return instance
+
+
+class PathBasedFlyweight(Flyweight):
+
+    def _flyweight_preproc_path(cls, path):
+        """perform any desired path preprocessing (e.g., aliases)
+
+        By default nothing is done
+        """
+        return path
+
+    def _flyweight_postproc_path(cls, path):
+        """perform any desired path post-processing (e.g., dereferencing etc)
+
+        By default - realpath to guarantee reuse. Derived classes (e.g.,
+        Dataset) could override to allow for symlinked datasets to have
+        individual instances for multiple symlinks
+        """
+        # resolve symlinks to make sure we have exactly one instance per
+        # physical repository at a time
+        return op.realpath(path)
+
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            lgr.debug("path is None. args: %s, kwargs: %s", args, kwargs)
+            raise ValueError("path must not be None")
+
+        # Custom handling for few special abbreviations if defined by the class
+        path_ = cls._flyweight_preproc_path(path)
+
+        # mirror what is happening in __init__
+        if isinstance(path, ut.PurePath):
+            path = str(path)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        localpath = RI(path_).localpath
+
+        path_postproc = cls._flyweight_postproc_path(localpath)
+
+        kwargs['path'] = path_postproc
+        return path_postproc, args, kwargs
+    # End Flyweight
+
 
 
 # TODO: see issue #1100

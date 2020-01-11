@@ -10,7 +10,7 @@ ds = require_dataset(
     check_installed=True,
     purpose='configuration')
 
-annex_largefiles = '(not(mimetype=text/*)and(largerthan=0))'
+annex_largefiles = '((mimeencoding=binary)and(largerthan=0))'
 attrs = ds.repo.get_gitattributes('*')
 if not attrs.get('*', {}).get(
         'annex.largefiles', None) == annex_largefiles:
@@ -18,9 +18,7 @@ if not attrs.get('*', {}).get(
         ('*', {'annex.largefiles': annex_largefiles})])
 
 git_attributes_file = op.join(ds.path, '.gitattributes')
-ds.add([dict(
-    path=git_attributes_file,
-    type='file',
-    parentds=ds.path)],
+ds.save(
+    git_attributes_file,
     message="Instruct annex to add text files to Git",
 )

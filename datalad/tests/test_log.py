@@ -17,7 +17,7 @@ from logging import makeLogRecord
 from nose.tools import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.log import LoggerHelper
 from datalad.log import TraceBack
@@ -32,6 +32,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import ok_endswith
 from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import known_failure_githubci_win
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -140,6 +141,7 @@ def test_traceback():
     ok_endswith(tb1, "...>test_log:%s" % (",".join([str(tb_line)]*100)))
 
 
+@known_failure_githubci_win
 def test_color_formatter():
 
     # want to make sure that coloring doesn't get "stuck"

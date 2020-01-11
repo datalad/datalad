@@ -13,12 +13,13 @@ import io
 import os
 from os.path import join as opj, dirname
 
-from mock import patch
+from unittest.mock import patch
 
-from six.moves import StringIO
+from io import StringIO
 from .utils import with_testrepos
 from .utils import assert_raises, eq_, ok_, assert_false, assert_true
 from .utils import swallow_outputs
+from datalad.tests.utils import known_failure_githubci_win
 
 from ..auto import AutomagicIO
 
@@ -26,6 +27,7 @@ from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
 from .utils import chpwd
+from .utils import known_failure_windows
 from datalad.support.json_py import LZMAFile
 
 try:
@@ -39,8 +41,11 @@ try:
 except ImportError:
     nib = None
 
+
 # somewhat superseeded by test_proxying_open_regular but still does
 # some additional testing, e.g. non-context manager style of invocation
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789030#step:8:398
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):
     TEST_CONTENT = "content to be annex-addurl'd"
@@ -187,6 +192,7 @@ def test_proxying_open_h5py():
     yield _test_proxying_open, generate_hdf5, verify_hdf5
 
 
+@known_failure_githubci_win
 def test_proxying_open_regular():
     def generate_dat(f):
         with open(f, "w") as f:
@@ -199,6 +205,7 @@ def test_proxying_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
+@known_failure_githubci_win
 def test_proxying_io_open_regular():
 
     def generate_dat(f):
@@ -212,13 +219,8 @@ def test_proxying_io_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
-from datalad.tests.utils import skip_if_no_module
-
-
+@known_failure_githubci_win
 def test_proxying_lzma_LZMAFile():
-    skip_if_no_module('datalad.support.lzma')
-    from datalad.support.lzma import lzma
-
     def generate_dat(f):
         with LZMAFile(f, "w") as f:
             f.write("123".encode('utf-8'))
@@ -251,6 +253,7 @@ def test_proxying_open_nibabel():
     yield _test_proxying_open, generate_nii, verify_nii
 
 
+@known_failure_githubci_win
 def test_proxying_os_stat():
     from os.path import exists
     def generate_dat(f):

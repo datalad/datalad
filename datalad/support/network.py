@@ -27,24 +27,25 @@ from os.path import join as opj
 from os.path import dirname
 from ntpath import splitdrive as win_splitdrive
 
-from six import string_types
-from six import iteritems
-from six.moves.urllib.parse import urlsplit
-from six.moves.urllib.request import Request
-from six.moves.urllib.parse import unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
-from six.moves.urllib.parse import parse_qsl
-from six.moves.urllib.parse import urlencode
-from six.moves.urllib.error import URLError
+from urllib.parse import urlsplit
+from urllib.request import Request
+from urllib.parse import unquote as urlunquote
+from urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
+from urllib.parse import parse_qsl
+from urllib.parse import urlencode
+from urllib.error import URLError
 
 from datalad.dochelpers import exc_str
-from datalad.utils import on_windows
+from datalad.utils import (
+    on_windows,
+    PurePath,
+    Path,
+)
 from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
 from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
 
-# TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
@@ -52,9 +53,9 @@ from datalad.support.cache import lru_cache
 # strings. "~" is now included in the set of reserved characters.
 # For consistency we will provide urlquote
 if sys.version_info >= (3, 7):
-    from six.moves.urllib.parse import quote as urlquote
+    from urllib.parse import quote as urlquote
 else:
-    from six.moves.urllib.parse import quote as _urlquote
+    from urllib.parse import quote as _urlquote
 
     def urlquote(url, safe='/', **kwargs):
         safe += '~'
@@ -244,9 +245,9 @@ def same_website(url_rec, u_rec):
     u_rec: ParseResult
       record for new url
     """
-    if isinstance(url_rec, string_types):
+    if isinstance(url_rec, str):
         url_rec = urlparse(url_rec)
-    if isinstance(u_rec, string_types):
+    if isinstance(u_rec, str):
         u_rec = urlparse(u_rec)
     return (url_rec.netloc == u_rec.netloc)
     # todo: collect more of sample cases.
@@ -321,6 +322,9 @@ def _guess_ri_cls(ri):
         'file': PathRI,
         'datalad': DataLadRI
     }
+    if isinstance(ri, PurePath):
+        lgr.log(5, "Detected file ri")
+        return TYPES['file']
     if is_windows_path(ri):
         # OMG we got something from windows
         lgr.log(5, "Detected file ri")
@@ -415,7 +419,7 @@ class RI(object):
 
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
-        ri_obj._str = ri
+        ri_obj._str = str(ri) if isinstance(ri, PurePath) else ri
         return ri_obj
 
     def __init__(self, ri=None, **fields):
@@ -495,12 +499,9 @@ class RI(object):
     # location
     #
 
-    def __nonzero__(self):
+    def __bool__(self):
         fields = self._fields
         return any(fields.values())
-
-    # for PY3
-    __bool__ = __nonzero__
 
     #
     # Helpers to deal with internal structures and conversions
@@ -699,7 +700,8 @@ class PathRI(RI):
 
     @classmethod
     def _str_to_fields(cls, url_str):
-        return dict(path=url_str)
+        # str() to be compatible with pathlib objects
+        return dict(path=str(url_str))
 
     @property
     def localpath(self):
@@ -736,7 +738,7 @@ class RegexBasedURLMixin(object):
                    " Did you intent to use '///'?" if url_str.startswith('//') else '')
             )
         fields = cls._get_blank_fields()
-        fields.update({k: v for k, v in iteritems(re_match.groupdict()) if v})
+        fields.update({k: v for k, v in re_match.groupdict().items() if v})
         cls._normalize_fields(fields)
         return fields
 
@@ -899,24 +901,32 @@ def is_ssh(ri):
         or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
+def get_local_file_url(fname, compatibility='git-annex'):
     """Return OS specific URL pointing to a local file
 
     Parameters
     ----------
     fname : string
         Filename.  If not absolute, abspath is used
+    compatibility : {'git', 'git-annex'}, optional
+        On Windows, and only on that platform, file:// URLs may need to look
+        different depending on the use case or consuming application. This
+        switch selects different compatibility modes: 'git' for use with
+        Git commands (e.g. `clone` or `submodule add`); 'git-annex` for
+        Git-annex command input (e.g. `addurl`). On any other platform this
+        setting has no effect.
     """
-    fname = fname if isabs(fname) else abspath(fname)
+    path = Path(fname).absolute()
     if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % urlquote(fname_rep)
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+        path = path.as_posix()
+        furl = 'file://{}{}'.format(
+            '/' if compatibility == 'git' else '',
+            urlquote(
+                re.sub(r'([a-zA-Z]):', r'\1', path)
+            ))
     else:
         # TODO:  need to fix for all the encoding etc
-        furl = str(URL(scheme='file', path=fname))
+        furl = str(URL(scheme='file', path=str(path)))
     return furl
 
 

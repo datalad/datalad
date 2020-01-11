@@ -65,7 +65,8 @@ def test__version__():
                 assert_not_in('will be better than ever', regd['codename'])
                 assert_equal(__hardcoded_version__, changelog_version)
                 if __hardcoded_version__ != san__version__:
-                    # It was not tagged yet!
+                    # It was not tagged yet and Changelog should have its
+                    # template record for the next release
                     assert_greater(lv_changelog_version, lv__version__)
                     assert_in('.dev', san__version__)
                 else:

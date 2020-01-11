@@ -26,8 +26,8 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_githubci_win
 
 
 def _assert_metadata_empty(meta):
@@ -55,15 +55,17 @@ _dataset_hierarchy_template = {
 }"""}}}}
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-@known_failure_direct_mode  #FIXME
 def test_basic_aggregate(path):
     # TODO give datasets some more metadata to actually aggregate stuff
     base = Dataset(opj(path, 'origin')).create(force=True)
     sub = base.create('sub', force=True)
     #base.metadata(sub.path, init=dict(homepage='this'), apply2global=True)
     subsub = base.create(opj('sub', 'subsub'), force=True)
-    base.add('.', recursive=True)
+    base.save(recursive=True)
     ok_clean_git(base.path)
     # we will first aggregate the middle dataset on its own, this will
     # serve as a smoke test for the reuse of metadata objects later on
@@ -94,6 +96,7 @@ def test_basic_aggregate(path):
 
 
 # tree puts aggregate metadata structures on two levels inside a dataset
+@known_failure_githubci_win
 @with_tree(tree={
     '.datalad': {
         'metadata': {
@@ -145,8 +148,8 @@ def test_aggregate_query(path):
 
 
 # this is for gh-1971
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-@known_failure_direct_mode  #FIXME
 def test_reaggregate_with_unavailable_objects(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
@@ -155,7 +158,7 @@ def test_reaggregate_with_unavailable_objects(path):
             '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
     sub = base.create('sub', force=True)
     subsub = base.create(opj('sub', 'subsub'), force=True)
-    base.add('.', recursive=True)
+    base.save(recursive=True)
     ok_clean_git(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
@@ -179,9 +182,9 @@ def test_reaggregate_with_unavailable_objects(path):
     )
 
 
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_aggregate_with_unavailable_objects_from_subds(path, target):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
@@ -190,7 +193,7 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
             '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
     sub = base.create('sub', force=True)
     subsub = base.create(opj('sub', 'subsub'), force=True)
-    base.add('.', recursive=True)
+    base.save(recursive=True)
     ok_clean_git(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
@@ -217,7 +220,6 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree=_dataset_hierarchy_template)
-@known_failure_direct_mode  #FIXME
 def test_publish_aggregated(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
@@ -225,7 +227,7 @@ def test_publish_aggregated(path):
         f.write(
             '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
     base.create('sub', force=True)
-    base.add('.', recursive=True)
+    base.save(recursive=True)
     ok_clean_git(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
@@ -264,7 +266,6 @@ def _get_referenced_objs(ds):
 
 
 @with_tree(tree=_dataset_hierarchy_template)
-@known_failure_direct_mode  #FIXME
 def test_aggregate_removal(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
@@ -273,7 +274,7 @@ def test_aggregate_removal(path):
             '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
     sub = base.create('sub', force=True)
     subsub = sub.create(opj('subsub'), force=True)
-    base.add('.', recursive=True)
+    base.save(recursive=True)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     res = base.metadata(get_aggregates=True)
@@ -299,8 +300,10 @@ def test_aggregate_removal(path):
     assert_result_count(res, 1)
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
-@known_failure_direct_mode  #FIXME
 def test_update_strategy(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
@@ -309,7 +312,7 @@ def test_update_strategy(path):
             '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
     sub = base.create('sub', force=True)
     subsub = sub.create(opj('subsub'), force=True)
-    base.add('.', recursive=True)
+    base.save(recursive=True)
     ok_clean_git(base.path)
     # we start clean
     for ds in base, sub, subsub:
@@ -355,8 +358,6 @@ def test_update_strategy(path):
     eq_(target_meta, base.metadata(return_type='list'))
 
 
-# needs two subdatasets, no possible in direct mode
-@known_failure_direct_mode  #FIXME
 @with_tree({
     'this': 'that',
     'sub1': {'here': 'there'},
@@ -365,7 +366,7 @@ def test_partial_aggregation(path):
     ds = Dataset(path).create(force=True)
     sub1 = ds.create('sub1', force=True)
     sub2 = ds.create('sub2', force=True)
-    ds.add('.', recursive=True)
+    ds.save(recursive=True)
 
     # if we aggregate a path(s) and say to recurse, we must not recurse into
     # the dataset itself and aggregate others

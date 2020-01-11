@@ -22,7 +22,7 @@ _group_dataset = (
     [
         # source module, source object[, dest. cmdline name[, dest python name]]
         # src module can be relative, but has to be relative to the main 'datalad' package
-        ('datalad.distribution.create', 'Create'),
+        ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
         ('datalad.distribution.add', 'Add'),
@@ -39,8 +39,11 @@ _group_dataset = (
         ('datalad.distribution.create_sibling_github',
          'CreateSiblingGithub',
          'create-sibling-github'),
+        ('datalad.distributed.create_sibling_gitlab',
+         'CreateSiblingGitlab',
+         'create-sibling-gitlab'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
-        ('datalad.interface.save', 'Save', 'save'),
+        ('datalad.core.local.save', 'Save', 'save'),
     ])
 
 _group_metadata = (
@@ -66,7 +69,7 @@ _group_misc = (
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
-        ('datalad.interface.run', 'Run', 'run'),
+        ('datalad.core.local.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
         ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
     ])
@@ -75,14 +78,16 @@ _group_plumbing = (
     'Plumbing commands',
     [
         ('datalad.interface.annotate_paths', 'AnnotatePaths', 'annotate-paths'),
-        ('datalad.distribution.clone', 'Clone'),
+        ('datalad.core.distributed.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
-        ('datalad.interface.diff', 'Diff', 'diff'),
+        ('datalad.core.local.status', 'Status', 'status'),
+        ('datalad.core.local.diff', 'Diff', 'diff'),
         ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
-        ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
+        ('datalad.local.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
+
 
 # Some known extensions and their commands to suggest whenever lookup fails
 _known_extension_commands = {

@@ -24,9 +24,9 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.run import run_command
-from datalad.interface.run import format_command
-from datalad.interface.run import _format_cmd_shorty
+from datalad.core.local.run import run_command
+from datalad.core.local.run import format_command
+from datalad.core.local.run import _format_cmd_shorty
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
@@ -60,10 +60,10 @@ class Rerun(Interface):
     << REFLOW ||
 
       - run: the revision has a recorded command that would be re-executed
-      - skip: the revision does not have a recorded command and would be
-        skipped
-      - pick: the revision does not have a recorded command and would be cherry
-        picked
+      - skip-or-pick: the revision does not have a recorded command and would
+        be either skipped or cherry picked
+      - merge: the revision is a merge commit and a corresponding merge would
+        be made
 
     The decision to skip rather than cherry pick a revision is based on whether
     the revision would be reachable from HEAD at the time of execution.
@@ -135,8 +135,8 @@ class Rerun(Interface):
             an alternative start point, which will be checked out with the
             branch name specified by [CMD: --branch CMD][PY: `branch` PY] or in
             a detached state otherwise. As a special case, an empty value for
-            this option means to use the commit specified by [CMD: --since
-            CMD][PY: `since` PY].""",
+            this option means the parent of the first run commit in the
+            specified revision list.""",
             constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
             args=("-m", "--message",),
@@ -203,8 +203,9 @@ class Rerun(Interface):
                 'run',
                 ds=ds,
                 status='impossible',
-                message=('unsaved modifications present, '
-                         'cannot detect changes by command'))
+                message=(
+                    'clean dataset required to detect changes from command; '
+                    'use `datalad status` to inspect unsaved changes'))
             return
 
         if not ds.repo.get_hexsha():
@@ -231,12 +232,6 @@ class Rerun(Interface):
         else:
             revrange = "{}..{}".format(since, revision)
 
-        if ds.repo.repo.git.rev_list("--merges", revrange, "--"):
-            yield get_status_dict(
-                "run", ds=ds, status="error",
-                message="cannot rerun history with merge commits")
-            return
-
         results = _rerun_as_results(ds, revrange, since, branch, onto, message)
         if script:
             handler = _get_script_handler(script, since, revision)
@@ -249,9 +244,19 @@ class Rerun(Interface):
             yield res
 
 
-def _revs_as_results(dset, revs):
-    for rev in revs:
-        res = get_status_dict("run", ds=dset, commit=rev)
+def _revrange_as_results(dset, revrange):
+    rev_lines = dset.repo.get_revisions(
+        revrange, fmt="%H %P", options=["--reverse", "--topo-order"])
+    if not rev_lines:
+        return
+
+    for rev_line in rev_lines:
+        # The strip() below is necessary because, with the format above, a
+        # commit without any parent has a trailing space. (We could also use a
+        # custom `rev-list --parents ...` call to avoid this.)
+        fields = rev_line.strip().split(" ")
+        rev, parents = fields[0], fields[1:]
+        res = get_status_dict("run", ds=dset, commit=rev, parents=parents)
         full_msg = dset.repo.format_commit("%B", rev)
         try:
             msg, info = get_run_info(dset, full_msg)
@@ -261,6 +266,13 @@ def _revs_as_results(dset, revs):
                 "Error on {}'s message: {}".format(rev, exc_str(exc)))
 
         if info is not None:
+            if len(parents) != 1:
+                lgr.warning(
+                    "%s has run information but is a %s commit; "
+                    "it will not be re-executed",
+                    rev,
+                    "merge" if len(parents) > 1 else "root")
+                continue
             res["run_info"] = info
             res["run_message"] = msg
         yield dict(res, status="ok")
@@ -272,43 +284,26 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     In the standard case, the information in these results will be used to
     actually re-execute the commands.
     """
-    revs = dset.repo.repo.git.rev_list("--reverse", revrange, "--").split()
+
     try:
-        results = _revs_as_results(dset, revs)
+        results = _revrange_as_results(dset, revrange)
     except ValueError as exc:
         yield get_status_dict("run", status="error", message=exc_str(exc))
         return
 
-    if since is not None and since.strip() == "":
-        # For --since='', drop any leading commits that don't have
-        # a run command.
-        results = list(dropwhile(lambda r: "run_info" not in r, results))
-        if not results:
-            yield get_status_dict(
-                "run", status="impossible", ds=dset,
-                message=("No run commits found in history of %s", revrange))
-            return
-    else:
-        results = list(results)
-        if not results:
-            yield get_status_dict(
-                "run", status="impossible", ds=dset,
-                message=("No commits found in %s", revrange))
-            return
+    # Drop any leading commits that don't have a run command. These would be
+    # skipped anyways.
+    results = list(dropwhile(lambda r: "run_info" not in r, results))
+    if not results:
+        yield get_status_dict(
+            "run", status="impossible", ds=dset,
+            message=("No run commits found in range %s", revrange))
+        return
 
     if onto is not None and onto.strip() == "":
-        # Special case: --onto='' is the value of --since. Because we're
-        # currently aborting if the revision list contains merges, we know
-        # that, regardless of if and how --since is specified, the effective
-        # value for --since is the parent of the first revision.
         onto = results[0]["commit"] + "^"
 
     if onto and not dset.repo.commit_exists(onto):
-        # This happens either because the user specifies a value that doesn't
-        # exists or the results first parent doesn't exist. The latter is
-        # unlikely to happen in the wild because it means that the first commit
-        # is a datalad run commit. Just abort rather than trying to checkout an
-        # orphan branch or something like that.
         yield get_status_dict(
             "run", ds=dset, status="error",
             message=("Revision specified for --onto (%s) does not exist.",
@@ -320,24 +315,19 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         yield get_status_dict(
             "run",
             ds=dset,
-            commit=start_point,
+            # Resolve this to the full hexsha so downstream code gets a
+            # predictable form.
+            commit=dset.repo.get_hexsha(start_point),
             branch=branch,
             rerun_action="checkout",
             status="ok")
 
-    def rev_is_ancestor(rev):
-        return dset.repo.is_ancestor(rev, start_point)
-
-    # We want to skip revs before the starting point and pick those after.
-    to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
-
     def skip_or_pick(hexsha, result, msg):
-        pick = hexsha in to_pick
-        result["rerun_action"] = "pick" if pick else "skip"
+        result["rerun_action"] = "skip-or-pick"
         shortrev = dset.repo.get_hexsha(hexsha, short=True)
         result["message"] = (
             "%s %s; %s",
-            shortrev, msg, "cherry picking" if pick else "skipping")
+            shortrev, msg, "skipping or cherry picking")
 
     for res in results:
         hexsha = res["commit"]
@@ -352,36 +342,123 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
                 # This is the overriding message, if any, passed to this rerun.
                 res["rerun_message"] = message
         else:
-            skip_or_pick(hexsha, res, "does not have a command")
+            if len(res["parents"]) > 1:
+                res["rerun_action"] = "merge"
+            else:
+                skip_or_pick(hexsha, res, "does not have a command")
         yield res
 
 
+def _mark_nonrun_result(result, which):
+    msg = dict(skip="skipping", pick="cherry picking")[which]
+    result["rerun_action"] = which
+    result["message"] = result["message"][:-1] + (msg,)
+    return result
+
+
 def _rerun(dset, results, explicit=False):
+    # Keep a map from an original hexsha to a new hexsha created by the rerun
+    # (i.e. a reran, cherry-picked, or merged commit).
+    new_bases = {}  # original hexsha => reran hexsha
+    branch_to_restore = dset.repo.get_active_branch()
+    head = onto = dset.repo.get_hexsha()
     for res in results:
         rerun_action = res.get("rerun_action")
         if not rerun_action:
             yield res
-        elif rerun_action == "skip":
-            yield res
-        elif rerun_action == "checkout":
+            continue
+
+        res_hexsha = res["commit"]
+        if rerun_action == "checkout":
             if res.get("branch"):
-                checkout_options = ["-b", res["branch"]]
+                branch = res["branch"]
+                checkout_options = ["-b", branch]
+                branch_to_restore = branch
             else:
                 checkout_options = ["--detach"]
-            dset.repo.checkout(res["commit"],
+                branch_to_restore = None
+            dset.repo.checkout(res_hexsha,
                                options=checkout_options)
-        elif rerun_action == "pick":
-            dset.repo.cherry_pick(res["commit"])
-            yield res
-        elif rerun_action == "run":
-            hexsha = res["commit"]
-            run_info = res["run_info"]
+            head = onto = res_hexsha
+            continue
 
+        # First handle the two cases that don't require additional steps to
+        # identify the base, a root commit or a merge commit.
+
+        if not res["parents"]:
+            _mark_nonrun_result(res, "skip")
+            yield res
+            continue
+
+        if rerun_action == "merge":
+            old_parents = res["parents"]
+            new_parents = [new_bases.get(p, p) for p in old_parents]
+            if old_parents == new_parents:
+                if not dset.repo.is_ancestor(res_hexsha, head):
+                    dset.repo.checkout(res_hexsha)
+            elif res_hexsha != head:
+                if dset.repo.is_ancestor(res_hexsha, onto):
+                    new_parents = [p for p in new_parents
+                                   if not dset.repo.is_ancestor(p, onto)]
+                if new_parents:
+                    if new_parents[0] != head:
+                        # Keep the direction of the original merge.
+                        dset.repo.checkout(new_parents[0])
+                    if len(new_parents) > 1:
+                        msg = dset.repo.format_commit("%B", res_hexsha)
+                        dset.repo.call_git(
+                            ["merge", "-m", msg,
+                             "--no-ff", "--allow-unrelated-histories"] +
+                            new_parents[1:])
+                    head = dset.repo.get_hexsha()
+                    new_bases[res_hexsha] = head
+            yield res
+            continue
+
+        # For all the remaining actions, first make sure we're on the
+        # appropriate base.
+
+        parent = res["parents"][0]
+        new_base = new_bases.get(parent)
+        head_to_restore = None  # ... to find our way back if we skip.
+
+        if new_base:
+            if new_base != head:
+                dset.repo.checkout(new_base)
+                head_to_restore, head = head, new_base
+        elif parent != head and dset.repo.is_ancestor(onto, parent):
+            if rerun_action == "run":
+                dset.repo.checkout(parent)
+                head = parent
+            else:
+                _mark_nonrun_result(res, "skip")
+                yield res
+                continue
+        else:
+            if parent != head:
+                new_bases[parent] = head
+
+        # We've adjusted base. Now skip, pick, or run the commit.
+
+        if rerun_action == "skip-or-pick":
+            if dset.repo.is_ancestor(res_hexsha, head):
+                _mark_nonrun_result(res, "skip")
+                if head_to_restore:
+                    dset.repo.checkout(head_to_restore)
+                    head, head_to_restore = head_to_restore, None
+                yield res
+                continue
+            else:
+                dset.repo.cherry_pick(res_hexsha)
+                _mark_nonrun_result(res, "pick")
+                yield res
+        elif rerun_action == "run":
+            run_info = res["run_info"]
             # Keep a "rerun" trail.
             if "chain" in run_info:
-                run_info["chain"].append(hexsha)
+                run_info["chain"].append(res_hexsha)
             else:
-                run_info["chain"] = [hexsha]
+                run_info["chain"] = [res_hexsha]
 
             # now we have to find out what was modified during the last run,
             # and enable re-modification ideally, we would bring back the
@@ -405,6 +482,17 @@ def _rerun(dset, results, explicit=False):
                                  message=message,
                                  rerun_info=run_info):
                 yield r
+        new_head = dset.repo.get_hexsha()
+        if new_head not in [head, res_hexsha]:
+            new_bases[res_hexsha] = new_head
+        head = new_head
+
+    if branch_to_restore:
+        # The user asked us to replay the sequence onto a branch, but the
+        # history had merges, so we're in a detached state.
+        dset.repo.update_ref("refs/heads/" + branch_to_restore,
+                             "HEAD")
+        dset.repo.checkout(branch_to_restore)
 
 
 def _report(dset, results):
@@ -545,13 +633,18 @@ def diff_revision(dataset, revision="HEAD"):
     Generator that yields AnnotatePaths instances
     """
     if dataset.repo.commit_exists(revision + "^"):
-        revrange = "{rev}^..{rev}".format(rev=revision)
+        fr = revision + "^"
     else:
         # No other commits are reachable from this revision.  Diff
         # with an empty tree instead.
-        revrange = "{}..{}".format(PRE_INIT_COMMIT_SHA, revision)
+        fr = PRE_INIT_COMMIT_SHA
+
+    def changed(res):
+        return res.get("action") == "diff" and res.get("state") != "clean"
+
     diff = dataset.diff(recursive=True,
-                        revision=revrange,
+                        fr=fr, to=revision,
+                        result_filter=changed,
                         return_type='generator', result_renderer=None)
     for r in diff:
         yield r

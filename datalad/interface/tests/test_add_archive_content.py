@@ -28,6 +28,7 @@ from ...tests.utils import ok_archives_caches
 from ...tests.utils import slow
 from ...tests.utils import assert_re_in
 from datalad.tests.utils import assert_result_values_cond
+from datalad.tests.utils import known_failure_githubci_win
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
@@ -70,6 +71,7 @@ treeargs = dict(
 )
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**treeargs)
 @serve_path_via_http()
@@ -78,7 +80,7 @@ def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     with chpwd(repo_path):
         # create annex repo
-        repo = AnnexRepo(repo_path, create=True, direct=False)
+        repo = AnnexRepo(repo_path, create=True)
 
         # add archive to the repo so we could test
         with swallow_outputs():
@@ -160,6 +162,7 @@ tree4uargs = dict(
 )
 
 
+@known_failure_githubci_win
 @slow  # 29.4293s
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
@@ -167,13 +170,12 @@ tree4uargs = dict(
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 def test_add_archive_content(path_orig, url, repo_path):
-    direct = False  # TODO: test on undirect, but too long ATM
     with chpwd(repo_path):
         # TODO we need to be able to pass path into add_archive_content
         # We could mock but I mean for the API
         assert_raises(RuntimeError, add_archive_content, "nonexisting.tar.gz") # no repo yet
 
-        repo = AnnexRepo(repo_path, create=True, direct=direct)
+        repo = AnnexRepo(repo_path, create=True)
         assert_raises(ValueError, add_archive_content, "nonexisting.tar.gz")
         # we can't add a file from outside the repo ATM
         assert_raises(FileNotInRepositoryError, add_archive_content, opj(path_orig, '1.tar.gz'))
@@ -300,15 +302,15 @@ def test_add_archive_content(path_orig, url, repo_path):
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
+@known_failure_githubci_win
 @integration
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
-    direct = False  # TODO: test on undirect, but too long ATM
     with chpwd(repo_path):
-        repo = AnnexRepo(repo_path, create=True, direct=direct)
+        repo = AnnexRepo(repo_path, create=True)
 
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
@@ -322,6 +324,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
         ok_archives_caches(repo.path, 0)
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
 def test_add_archive_content_zip(repo_path):
@@ -336,6 +339,7 @@ def test_add_archive_content_zip(repo_path):
         ok_archives_caches(repo.path, 0)
 
 
+@known_failure_githubci_win
 @with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
@@ -355,11 +359,11 @@ def test_add_archive_content_absolute_path(path):
                             annex=repo)
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
-    direct = False  # TODO: test on undirect, but too long ATM
-    repo = AnnexRepo(repo_path, create=True, direct=direct)
+    repo = AnnexRepo(repo_path, create=True)
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
@@ -398,8 +402,7 @@ class TestAddArchiveOptions():
                delete=False)
     def setup(self, repo_path):
         self.pwd = getpwd()
-        direct = False  # TODO: test on undirect, but too long ATM
-        self.annex = annex = AnnexRepo(repo_path, create=True, direct=direct)
+        self.annex = annex = AnnexRepo(repo_path, create=True)
         # Let's add first archive to the annex so we could test
         annex.add('1.tar')
         annex.commit(msg="added 1.tar")
@@ -409,11 +412,13 @@ class TestAddArchiveOptions():
         self.annex.precommit()  # so we close any outstanding batch process etc
         rmtemp(self.annex.path)
 
+    @known_failure_githubci_win
     def test_add_delete(self):
         # To test that .tar gets removed
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete=True)
         assert_false(lexists(opj(self.annex.path, '1.tar')))
 
+    @known_failure_githubci_win
     def test_add_archive_leading_dir(self):
         import os
         os.mkdir(opj(self.annex.path, 'sub'))
@@ -430,6 +435,7 @@ class TestAddArchiveOptions():
         )
         ok_file_under_git(self.annex.path, opj('sub', '123', 'file.txt'), annexed=True)
 
+    @known_failure_githubci_win
     def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed
         # but that new stuff was added to annex repo.  We know the key since default
@@ -465,11 +471,11 @@ class TestAddArchiveOptions():
         # there should be no .datalad temporary files hanging around
         self.assert_no_trash_left_behind()
 
+    @known_failure_githubci_win
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
-        mv_out = self.annex._git_custom_command(
-            [],
-            ['git', 'mv', '1.tar', 'subdir']
+        mv_out = self.annex.call_git(
+            ['mv', '1.tar', 'subdir']
         )
         self.annex.commit("moved into subdir")
         with chpwd(self.annex.path):
@@ -517,6 +523,7 @@ class TestAddArchiveOptions():
             []
         )
 
+    @known_failure_githubci_win
     def test_override_existing_under_git(self):
         create_tree(self.annex.path, {'1.dat': 'load2'})
         self.annex.add('1.dat', git=True)
