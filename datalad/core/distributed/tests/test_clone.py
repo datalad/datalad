@@ -18,10 +18,6 @@ from datalad.tests.utils import (
 
 import logging
 import os
-from os import (
-    mkdir,
-    chmod,
-)
 import os.path as op
 
 from unittest.mock import patch
@@ -29,10 +25,11 @@ from unittest.mock import patch
 from datalad.api import (
     create,
     clone,
+    remove,
 )
 from datalad.utils import (
     chpwd,
-    _path_,
+    Path,
     on_windows,
 )
 from datalad.support.exceptions import IncompleteResultsError
@@ -56,17 +53,17 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_result_values_equal,
     ok_startswith,
-    ok_clean_git,
+    assert_repo_status,
     serve_path_via_http,
     swallow_logs,
     use_cassette,
     skip_if_no_network,
     skip_if,
     with_sameas_remote,
+    known_failure,
     known_failure_appveyor,
-    known_failure_windows,
 )
-from datalad.distribution.clone import _get_installationpath_from_url
+from datalad.core.distributed.clone import _get_installationpath_from_url
 from datalad.distribution.dataset import Dataset
 
 
@@ -97,7 +94,7 @@ def test_invalid_args(path, otherpath, alienpath):
     ds = create(path)
     assert_raises(IncompleteResultsError, ds.clone, '/higherup.', 'Zoidberg')
     # make real dataset, try to install outside
-    ds_target = create(op.join(otherpath, 'target'))
+    ds_target = create(Path(otherpath) / 'target')
     assert_raises(ValueError, ds_target.clone, ds.path, path=ds.path)
     assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
@@ -109,14 +106,15 @@ def test_invalid_args(path, otherpath, alienpath):
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir, ds_path):
     with chpwd(tdir):
-        res = clone('///', path="all-nonrecursive", on_failure='ignore')
+        res = clone('///', path="all-nonrecursive", on_failure='ignore',
+                    result_xfm=None, return_type='list')
         assert_status('ok', res)
 
     # again, but into existing dataset:
     ds = create(ds_path)
     crcns = ds.clone("///crcns", result_xfm='datasets', return_type='item-or-list')
     ok_(crcns.is_installed())
-    eq_(crcns.path, op.join(ds_path, "crcns"))
+    eq_(crcns.pathobj, ds.pathobj / "crcns")
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
@@ -125,21 +123,21 @@ def test_clone_crcns(tdir, ds_path):
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir):
+    tdir = Path(tdir)
     with chpwd(tdir):
-        ds = clone("///", result_xfm='datasets', return_type='item-or-list')
+        ds = clone("///")
         ok_(ds.is_installed())
-        eq_(ds.path, op.join(tdir, get_datasets_topdir()))
+        eq_(ds.pathobj, tdir / get_datasets_topdir())
 
         # do it a second time:
-        res = clone("///", on_failure='ignore')
+        res = clone("///", on_failure='ignore', result_xfm=None, return_type='list')
         assert_message(
             "dataset %s was already cloned from '%s'",
             res)
         assert_status('notneeded', res)
 
         # and a third time into an existing something, that is not a dataset:
-        with open(op.join(tdir, 'sub', 'a_file.txt'), 'w') as f:
-            f.write("something")
+        (tdir / 'sub' / 'a_file.txt').write_text("something")
 
         res = clone('///', path="sub", on_failure='ignore')
         assert_message(
@@ -148,8 +146,6 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:258
-@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_clone_simple_local(src, path):
@@ -169,21 +165,21 @@ def test_clone_simple_local(src, path):
         ok_(GitRepo.is_valid_repo(ds.path))
         eq_(set(ds.repo.get_indexed_files()),
             {'test.dat', 'INFO.txt'})
-        ok_clean_git(path, annex=False)
+        assert_repo_status(path, annex=False)
     else:
         # must be an annex
         ok_(isinstance(ds.repo, AnnexRepo))
         ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
         eq_(set(ds.repo.get_indexed_files()),
             {'test.dat', 'INFO.txt', 'test-annex.dat'})
-        ok_clean_git(path, annex=True)
+        assert_repo_status(path, annex=True)
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
-    res = clone(src, path)
+    res = clone(src, path, result_xfm=None, return_type='list')
     assert_result_values_equal(res, 'source_url', [src])
     assert_status('notneeded', res)
     assert_message("dataset %s was already cloned from '%s'", res)
@@ -192,8 +188,6 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:216
-@known_failure_windows
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -203,10 +197,13 @@ def test_clone_dataset_from_just_source(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+# test fails randomly, likely a bug in one of the employed test helpers
+# https://github.com/datalad/datalad/pull/3966#issuecomment-571267932
+@known_failure
 @with_tree(tree={
     'ds': {'test.txt': 'some'},
     })
@@ -214,7 +211,7 @@ def test_clone_dataset_from_just_source(url, path):
 @with_tempfile(mkdir=True)
 def test_clone_dataladri(src, topurl, path):
     # make plain git repo
-    ds_path = op.join(src, 'ds')
+    ds_path = Path(src) / 'ds'
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
@@ -223,12 +220,10 @@ def test_clone_dataladri(src, topurl, path):
     with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
-    ok_clean_git(path, annex=False)
-    ok_file_has_content(op.join(path, 'test.txt'), 'some')
+    assert_repo_status(path, annex=False)
+    ok_file_has_content(ds.pathobj / 'test.txt', 'some')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:236
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -243,7 +238,6 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
         {'subm 1', '2'})
 
 
-
 @slow  # 23.1478s
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
@@ -254,31 +248,29 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 def test_clone_into_dataset(source, top_path):
 
     ds = create(top_path)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
-    ok_(op.isdir(op.join(subds.path, '.git')))
+    ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # sub is clean:
-    ok_clean_git(subds.path, annex=None)
+    assert_repo_status(subds.path, annex=None)
     # top is clean:
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
     # Create a dummy change
     create_tree(ds.path, {'dummy.txt': 'buga'})
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
     subds_ = ds.clone(source, "sub2",
                       result_xfm='datasets', return_type='item-or-list')
-    eq_(subds_.path, op.join(ds.path, "sub2"))  # for paranoid yoh ;)
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    eq_(subds_.pathobj, ds.pathobj / "sub2")  # for paranoid yoh ;)
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:278
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_notclone_known_subdataset(src, path):
@@ -287,7 +279,7 @@ def test_notclone_known_subdataset(src, path):
                result_xfm='datasets', return_type='item-or-list')
 
     # subdataset not installed:
-    subds = Dataset(op.join(path, 'subm 1'))
+    subds = Dataset(ds.pathobj / 'subm 1')
     assert_false(subds.is_installed())
     assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
@@ -331,9 +323,10 @@ def test_reckless(path, top_path):
 @with_tempfile
 @with_tempfile
 def test_install_source_relpath(src, dest):
+    src = Path(src)
     create(src)
-    src_ = op.basename(src)
-    with chpwd(op.dirname(src)):
+    src_ = src.name
+    with chpwd(src.parent):
         clone(src_, dest)
 
 
@@ -358,10 +351,10 @@ def test_clone_isnt_a_smartass(origin_path, path):
 @skip_if(on_windows or not os.geteuid(), "Will fail under super-user")
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
-    pdir = _path_(tdir, 'protected')
-    mkdir(pdir)
+    pdir = Path(tdir) / 'protected'
+    pdir.mkdir()
     # make it read-only
-    chmod(pdir, 0o555)
+    pdir.chmod(0o555)
     with chpwd(pdir):
         res = clone('///', result_xfm=None, return_type='list', on_failure='ignore')
         assert_status('error', res)
@@ -381,7 +374,7 @@ def test_autoenabled_remote_msg(path):
     # whenever the remote we clone is the  type=git special remote, so the name
     # of the remote might not match
     with swallow_logs(new_level=logging.INFO) as cml:
-        res = clone('///repronim/containers', path)
+        res = clone('///repronim/containers', path, result_xfm=None, return_type='list')
         assert_status('ok', res)
         assert_not_in("not auto-enabled", cml.out)
 
@@ -404,15 +397,25 @@ def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
 
 
 def test_installationpath_from_url():
-    for p in ('lastbit',
-              'lastbit/',
-              '/lastbit',
-              'lastbit.git',
-              'lastbit.git/',
-              'http://example.com/lastbit',
-              'http://example.com/lastbit.git',
-              'http://lastbit:8000'
-              ):
+    cases = (
+        'http://example.com/lastbit',
+        'http://example.com/lastbit.git',
+        'http://lastbit:8000',
+    ) + (
+        'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit',
+        'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit\\',
+        'Temp\\lastbit',
+        'Temp\\lastbit\\',
+        'lastbit.git',
+        'lastbit.git\\',
+    ) if on_windows else (
+        'lastbit',
+        'lastbit/',
+        '/lastbit',
+        'lastbit.git',
+        'lastbit.git/',
+    )
+    for p in cases:
         eq_(_get_installationpath_from_url(p), 'lastbit')
     # we need to deal with quoted urls
     for url in (
@@ -427,3 +430,72 @@ def test_installationpath_from_url():
     # and the hostname alone
     eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
     eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
+
+
+# https://github.com/datalad/datalad/issues/3958
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_expanduser(srcpath, destpath):
+    src = Dataset(Path(srcpath) / 'src').create()
+    dest = Dataset(Path(destpath) / 'dest').create()
+
+    with chpwd(destpath), patch.dict('os.environ', {'HOME': srcpath}):
+        res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
+                    on_failure='ignore')
+        assert_result_count(res, 1)
+        assert_result_count(
+            res, 1, action='install', status='error', path=dest.path,
+            message='target path already exists and not empty, refuse to '
+            'clone into target path')
+        # wipe out destination, and try again
+        assert_status('ok', remove(dataset=dest, check=False))
+        # now it should do it, and clone the right one
+        cloneds = clone(op.join('~', 'src'), 'dest')
+        eq_(cloneds.pathobj, Path(destpath) / 'dest')
+        eq_(src.id, cloneds.id)
+        # and it shouldn't fail when doing it again, because it detects
+        # the re-clone
+        cloneds = clone(op.join('~', 'src'), 'dest')
+        eq_(cloneds.pathobj, Path(destpath) / 'dest')
+
+
+@with_tempfile(mkdir=True)
+def test_cfg_originorigin(path):
+    path = Path(path)
+    origin = Dataset(path / 'origin').create()
+    (origin.pathobj / 'file1.txt').write_text('content')
+    origin.save()
+    clone_direct = clone(origin, path / 'clone_direct')
+    clone_clone = clone(clone_direct, path / 'clone_clone')
+    # the goal is to be able to get file content from origin without
+    # the need to configure it manually
+    assert_result_count(
+        clone_clone.get('file1.txt', on_failure='ignore'),
+        1,
+        action='get',
+        status='ok',
+        path=str(clone_clone.pathobj / 'file1.txt'),
+    )
+    eq_((clone_clone.pathobj / 'file1.txt').read_text(), 'content')
+    eq_(
+        Path(clone_clone.siblings(
+            'query',
+            name='origin-2',
+            return_type='item-or-list')['url']),
+        origin.pathobj
+    )
+
+
+# test fix for gh-2601/gh-3538
+@with_tempfile()
+def test_relative_submodule_url(path):
+    Dataset(op.join(path, 'origin')).create()
+    ds = Dataset(op.join(path, 'ds')).create()
+    with chpwd(ds.path):
+        ds.clone(
+            source=op.join(op.pardir, 'origin'),
+            path='sources')
+    subinfo = ds.subdatasets(return_type='item-or-list')
+    eq_(subinfo['gitmodule_url'],
+        # must be a relative URL, not platform-specific relpath!
+        '{}/{}'.format(op.pardir, 'origin'))

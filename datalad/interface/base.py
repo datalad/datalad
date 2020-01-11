@@ -659,8 +659,11 @@ class Interface(object):
                             p for p in param.constraints._allowed
                             # in the cmdline None pretty much means
                             # don't give the options, so listing it
-                            # doesn't make sense
-                            if p is not None)
+                            # doesn't make sense. Moreover, any non-string
+                            # value cannot be given and very likely only
+                            # serves a special purpose in the Python API
+                            # or implementation details
+                            if isinstance(p, str))
             if defaults_idx >= 0:
                 help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
