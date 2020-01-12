@@ -174,7 +174,9 @@ class Update(Interface):
             res['status'] = 'ok'
             yield res
             save_paths.append(ds.path)
-        if recursive:
+        # we need to save updated states only if merge was requested -- otherwise
+        # it was a pure fetch
+        if merge and recursive:
             if path and not saw_subds:
                 lgr.warning(
                     'path constraints did not match an installed subdataset: %s',
