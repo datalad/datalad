@@ -16,6 +16,7 @@ from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
 
+from datalad import cfg as dlcfg
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -673,6 +674,18 @@ def decode_source_spec(spec):
         props['giturl'] = source_ri.as_git_url()
     elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
         # parse a RIA URI
+        # check for store related configuration for SSH access
+        if source_ri.scheme == 'ria+ssh':
+            hostname = dlcfg.get(
+                'annex.ria-remote.{}.ssh-host'.format(source_ri.hostname),
+                source_ri.hostname)
+            basepath = dlcfg.get(
+                'annex.ria-remote.{}.base-path'.format(source_ri.hostname),
+                '')
+        else:
+            hostname = source_ri.hostname
+            basepath = ''
+
         dsid, version = source_ri.fragment.split('@', maxsplit=1) \
             if '@' in source_ri.fragment else (source_ri.fragment, None)
         uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
@@ -680,12 +693,13 @@ def decode_source_spec(spec):
             raise ValueError('RIA URI does not contain a valid dataset ID: {}'.format(spec))
         props.update(
             type='ria',
-            giturl='{}://{}{}{}/{}'.format(
-                source_ri.scheme[4:],
-                source_ri.hostname,
-                ':' if source_ri.scheme == 'ria+ssh' else '/',
-                dsid[:3],
-                dsid[3:]),
+            giturl='{proto}://{host}{delim}{basepath}{id1}/{id2}'.format(
+                proto=source_ri.scheme[4:],
+                host=hostname,
+                delim=':' if source_ri.scheme == 'ria+ssh' else '/',
+                basepath=basepath,
+                id1=dsid[:3],
+                id2=dsid[3:]),
             version=version
         )
     else:
