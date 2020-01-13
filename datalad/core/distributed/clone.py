@@ -675,6 +675,9 @@ def decode_source_spec(spec):
         # parse a RIA URI
         dsid, version = source_ri.fragment.split('@', maxsplit=1) \
             if '@' in source_ri.fragment else (source_ri.fragment, None)
+        uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+        if not re.match(uuid_regex, dsid):
+            raise ValueError('RIA URI does not contain a valid dataset ID: {}'.format(spec))
         props.update(
             type='ria',
             giturl='{}://{}{}{}/{}'.format(

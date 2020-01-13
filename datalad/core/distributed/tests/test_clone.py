@@ -550,3 +550,5 @@ def test_decode_source_spec():
                 version=version,
                 type='ria')
         )
+    # not a dataset UUID
+    assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
