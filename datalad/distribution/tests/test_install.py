@@ -71,7 +71,7 @@ from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_git_url_from_source
+from datalad.core.distributed.clone import _get_git_url_from_source
 
 ###############
 # Test helpers:

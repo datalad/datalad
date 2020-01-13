@@ -62,7 +62,6 @@ from datalad.distribution.dataset import (
     EnsureDataset,
 )
 from datalad.distribution.utils import (
-    _get_git_url_from_source,
     _get_flexible_source_candidates,
 )
 
@@ -636,3 +635,22 @@ def _get_installationpath_from_url(url):
     if path.endswith('.git'):
         path = path[:-4]
     return path
+
+
+def _get_git_url_from_source(source):
+    """Return URL for cloning associated with a source specification
+
+    For now just resolves DataLadRIs
+    """
+    # TODO: Probably RF this into RI.as_git_url(), that would be overridden
+    # by subclasses or sth. like that
+    if not isinstance(source, RI):
+        source_ri = RI(source)
+    else:
+        source_ri = source
+    if isinstance(source_ri, DataLadRI):
+        # we have got our DataLadRI as the source, so expand it
+        source = source_ri.as_git_url()
+    else:
+        source = str(source_ri)
+    return source
