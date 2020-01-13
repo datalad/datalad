@@ -22,6 +22,7 @@ import os.path as op
 
 from unittest.mock import patch
 
+from datalad import consts
 from datalad.api import (
     create,
     clone,
@@ -63,7 +64,10 @@ from datalad.tests.utils import (
     known_failure,
     known_failure_appveyor,
 )
-from datalad.core.distributed.clone import _get_installationpath_from_url
+from datalad.core.distributed.clone import (
+    decode_source_spec,
+    _get_installationpath_from_url,
+)
 from datalad.distribution.dataset import Dataset
 
 
@@ -499,3 +503,24 @@ def test_relative_submodule_url(path):
     eq_(subinfo['gitmodule_url'],
         # must be a relative URL, not platform-specific relpath!
         '{}/{}'.format(op.pardir, 'origin'))
+
+
+def test_decode_source_spec():
+    # resolves datalad RIs:
+    eq_(decode_source_spec('///subds'),
+        dict(source='///subds', giturl=consts.DATASETS_TOPURL + 'subds', version=None,
+             type='dataladri'))
+    assert_raises(NotImplementedError, decode_source_spec,
+                  '//custom/subds')
+
+    # doesn't harm others:
+    for url in (
+            'http://example.com',
+            '/absolute/path',
+            'file://localhost/some',
+            'localhost/another/path',
+            'user@someho.st/mydir',
+            'ssh://somewhe.re/else',
+            'git://github.com/datalad/testrepo--basic--r1',
+    ):
+        eq_(decode_source_spec(url), dict(source=url, version=None, giturl=url, type='giturl'))

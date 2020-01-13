@@ -193,8 +193,7 @@ class Clone(Interface):
         # Possibly do conversion from source into a git-friendly url
         # luckily GitRepo will undo any fancy file:/// url to make use of Git's
         # optimization for local clones....
-        source_url = source
-        source_ = _get_git_url_from_source(source)
+        source_ = decode_source_spec(source)
         lgr.debug("Resolved clone source from '%s' to '%s'",
                   source, source_)
         source = source_
@@ -203,7 +202,7 @@ class Clone(Interface):
         if path is None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source and continue
-            path = _get_installationpath_from_url(source)
+            path = _get_installationpath_from_url(source['giturl'])
             # since this is a relative `path`, resolve it:
             path = resolve_path(path, dataset)
             lgr.debug("Determined clone target path from source")
@@ -216,7 +215,7 @@ class Clone(Interface):
             action='install',
             logger=lgr,
             refds=refds_path,
-            source_url=source_url)
+            source_url=source['giturl'])
 
         try:
             # this will implicitly cause pathlib to run a bunch of checks
@@ -246,12 +245,15 @@ class Clone(Interface):
 
         # perform the actual cloning operation
         yield from clone_dataset(
-            [source],
+            [source['giturl']],
             destination_dataset,
             reckless,
             description,
             result_props,
         )
+
+        # TODO handle any 'version' property handling and verification using a dedicated
+        # public helper
 
         if ds is not None:
             # we created a dataset in another dataset
@@ -637,20 +639,44 @@ def _get_installationpath_from_url(url):
     return path
 
 
-def _get_git_url_from_source(source):
-    """Return URL for cloning associated with a source specification
+def decode_source_spec(spec):
+    """Decode information from a clone source specification
 
-    For now just resolves DataLadRIs
+    Parameters
+    ----------
+    spec : str
+      Any supported clone source specification
+
+    Returns
+    -------
+    dict
+      The value of each decoded property is stored under its own key in this
+      dict. By default the following keys are return: 'type', a specification
+      type label {'giturl', 'dataladri', 'ria'}; 'source' the original
+      source specification; 'giturl' a URL for the source that is a suitable
+      source argument for git-clone; 'version' a version-identifer, if present
+      (None else).
     """
-    # TODO: Probably RF this into RI.as_git_url(), that would be overridden
-    # by subclasses or sth. like that
-    if not isinstance(source, RI):
-        source_ri = RI(source)
-    else:
-        source_ri = source
+    # standard property dict composition
+    props = dict(
+        source=spec,
+        version=None,
+    )
+    # common starting point is a RI instance, support for accepting an RI
+    # instance is kept for backward-compatibility reasons
+    source_ri = RI(spec) if not isinstance(spec, RI) else spec
+
+    # scenario switch, each case must set 'giturl' at the very minimum
     if isinstance(source_ri, DataLadRI):
         # we have got our DataLadRI as the source, so expand it
-        source = source_ri.as_git_url()
+        props['type'] = 'dataladri'
+        props['giturl'] = source_ri.as_git_url()
     else:
-        source = str(source_ri)
-    return source
+        # let's assume that anything else is a URI that Git can handle
+        # TODO are there any advantages of going through a URL-reconversion
+        # by the RI instance, instead of using the original input right away?
+        # it feels like we could only accumulate bugs. Keeping how it was,
+        # for now...
+        props['type'] = 'giturl'
+        props['giturl'] = str(source_ri)
+    return props
