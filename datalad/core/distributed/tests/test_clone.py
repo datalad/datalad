@@ -524,3 +524,29 @@ def test_decode_source_spec():
             'git://github.com/datalad/testrepo--basic--r1',
     ):
         eq_(decode_source_spec(url), dict(source=url, version=None, giturl=url, type='giturl'))
+
+    # RIA URIs with and without version specification
+    dsid = '6d69ca68-7e85-11e6-904c-002590f97d84'
+    for proto, loc, version in (
+            ('http', 'example.com', None),
+            ('http', 'example.com', 'v1.0'),
+            ('http', 'example.com', 'some_with@in_it'),
+            ('ssh', 'example.com', 'some_with@in_it'),
+    ):
+        spec = 'ria+{}://{}{}{}'.format(
+            proto,
+            loc,
+            '#{}'.format(dsid),
+            '@{}'.format(version) if version else '')
+        eq_(decode_source_spec(spec),
+            dict(
+                source=spec,
+                giturl='{}://{}{}{}/{}'.format(
+                    proto,
+                    loc,
+                    ':' if proto == 'ssh' else '/',
+                    dsid[:3],
+                    dsid[3:]),
+                version=version,
+                type='ria')
+        )

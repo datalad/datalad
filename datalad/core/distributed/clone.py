@@ -671,6 +671,20 @@ def decode_source_spec(spec):
         # we have got our DataLadRI as the source, so expand it
         props['type'] = 'dataladri'
         props['giturl'] = source_ri.as_git_url()
+    elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
+        # parse a RIA URI
+        dsid, version = source_ri.fragment.split('@', maxsplit=1) \
+            if '@' in source_ri.fragment else (source_ri.fragment, None)
+        props.update(
+            type='ria',
+            giturl='{}://{}{}{}/{}'.format(
+                source_ri.scheme[4:],
+                source_ri.hostname,
+                ':' if source_ri.scheme == 'ria+ssh' else '/',
+                dsid[:3],
+                dsid[3:]),
+            version=version
+        )
     else:
         # let's assume that anything else is a URI that Git can handle
         # TODO are there any advantages of going through a URL-reconversion
