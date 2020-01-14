@@ -509,7 +509,7 @@ def test_decode_source_spec():
     # resolves datalad RIs:
     eq_(decode_source_spec('///subds'),
         dict(source='///subds', giturl=consts.DATASETS_TOPURL + 'subds', version=None,
-             type='dataladri'))
+             type='dataladri', default_destpath='subds'))
     assert_raises(NotImplementedError, decode_source_spec,
                   '//custom/subds')
 
@@ -523,7 +523,9 @@ def test_decode_source_spec():
             'ssh://somewhe.re/else',
             'git://github.com/datalad/testrepo--basic--r1',
     ):
-        eq_(decode_source_spec(url), dict(source=url, version=None, giturl=url, type='giturl'))
+        props = decode_source_spec(url)
+        dest = props.pop('default_destpath')
+        eq_(props, dict(source=url, version=None, giturl=url, type='giturl'))
 
     # RIA URIs with and without version specification
     dsid = '6d69ca68-7e85-11e6-904c-002590f97d84'
@@ -548,6 +550,7 @@ def test_decode_source_spec():
                     dsid[:3],
                     dsid[3:]),
                 version=version,
+                default_destpath=dsid,
                 type='ria')
         )
     # not a dataset UUID

@@ -203,9 +203,8 @@ class Clone(Interface):
         if path is None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source and continue
-            path = _get_installationpath_from_url(source['giturl'])
             # since this is a relative `path`, resolve it:
-            path = resolve_path(path, dataset)
+            path = resolve_path(source['default_destpath'], dataset)
             lgr.debug("Determined clone target path from source")
         lgr.debug("Resolved clone target path to: '%s'", path)
 
@@ -656,7 +655,8 @@ def decode_source_spec(spec):
       type label {'giturl', 'dataladri', 'ria'}; 'source' the original
       source specification; 'giturl' a URL for the source that is a suitable
       source argument for git-clone; 'version' a version-identifer, if present
-      (None else).
+      (None else); 'default_destpath' a relative path that that can be used as
+      a clone destination.
     """
     # standard property dict composition
     props = dict(
@@ -700,7 +700,8 @@ def decode_source_spec(spec):
                 basepath=basepath,
                 id1=dsid[:3],
                 id2=dsid[3:]),
-            version=version
+            version=version,
+            default_destpath=dsid,
         )
     else:
         # let's assume that anything else is a URI that Git can handle
@@ -710,4 +711,11 @@ def decode_source_spec(spec):
         # for now...
         props['type'] = 'giturl'
         props['giturl'] = str(source_ri)
+
+    if 'default_destpath' not in props:
+        # if we still have no good idea on where a dataset could be cloned to if no
+        # path was given, do something similar to git clone and derive the path from
+        # the source
+        props['default_destpath'] = _get_installationpath_from_url(props['giturl'])
+
     return props
