@@ -16,7 +16,6 @@ from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
 
-from datalad import cfg as dlcfg
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -194,7 +193,7 @@ class Clone(Interface):
         # Possibly do conversion from source into a git-friendly url
         # luckily GitRepo will undo any fancy file:/// url to make use of Git's
         # optimization for local clones....
-        source_ = decode_source_spec(source)
+        source_ = decode_source_spec(source, cfg=None if ds is None else ds.config)
         lgr.debug("Resolved clone source from '%s' to '%s'",
                   source, source_)
         source = source_
@@ -639,13 +638,17 @@ def _get_installationpath_from_url(url):
     return path
 
 
-def decode_source_spec(spec):
+def decode_source_spec(spec, cfg=None):
     """Decode information from a clone source specification
 
     Parameters
     ----------
     spec : str
       Any supported clone source specification
+    cfg : ConfigManager, optional
+      Configuration will be queried from the instance (i.e. from a particular
+      dataset). If None is given, the global DataLad configuration will be
+      queried.
 
     Returns
     -------
@@ -658,6 +661,8 @@ def decode_source_spec(spec):
       (None else); 'default_destpath' a relative path that that can be used as
       a clone destination.
     """
+    if cfg is None:
+        from datalad import cfg
     # standard property dict composition
     props = dict(
         source=spec,
@@ -676,10 +681,10 @@ def decode_source_spec(spec):
         # parse a RIA URI
         # check for store related configuration for SSH access
         if source_ri.scheme == 'ria+ssh':
-            hostname = dlcfg.get(
+            hostname = cfg.get(
                 'annex.ria-remote.{}.ssh-host'.format(source_ri.hostname),
                 source_ri.hostname)
-            basepath = dlcfg.get(
+            basepath = cfg.get(
                 'annex.ria-remote.{}.base-path'.format(source_ri.hostname),
                 '')
         else:
