@@ -70,6 +70,9 @@ from datalad.core.distributed.clone import (
 )
 from datalad.distribution.dataset import Dataset
 
+# this is the dataset ID of our test dataset in the main datalad RIA store
+datalad_store_testds_id = '76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561'
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -555,3 +558,12 @@ def test_decode_source_spec():
         )
     # not a dataset UUID
     assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
+
+
+@skip_if_no_network
+@with_tempfile()
+def test_ria_http(path):
+    # can we clone from the store w/o any dedicated config
+    ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
+    ok_(ds.is_installed())
+    eq_(ds.id, datalad_store_testds_id)
