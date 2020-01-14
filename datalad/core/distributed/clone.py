@@ -693,11 +693,12 @@ def decode_source_spec(spec):
             raise ValueError('RIA URI does not contain a valid dataset ID: {}'.format(spec))
         props.update(
             type='ria',
-            giturl='{proto}://{host}{delim}{basepath}{id1}/{id2}'.format(
+            giturl='{proto}://{host}{delim}{basepath}{pathdelim}{id1}/{id2}'.format(
                 proto=source_ri.scheme[4:],
                 host=hostname,
                 delim=':' if source_ri.scheme == 'ria+ssh' else '/',
                 basepath=basepath,
+                pathdelim='/' if basepath else '',
                 id1=dsid[:3],
                 id2=dsid[3:]),
             version=version,
