@@ -214,7 +214,7 @@ class Clone(Interface):
             action='install',
             logger=lgr,
             refds=refds_path,
-            source_url=source['giturl'])
+            source_url=source['source'])
 
         try:
             # this will implicitly cause pathlib to run a bunch of checks
