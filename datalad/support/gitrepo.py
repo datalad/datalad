@@ -361,14 +361,13 @@ def _remove_empty_items(list_):
     return [file_ for file_ in list_ if file_]
 
 
-if external_versions["cmd:git"] >= "2.24.0":
+if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
     # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
     # into untracked submodules when multiple pathspecs are given, returning
     # repositories that are deeper than the first level. This helper filters
     # these deeper levels out so that save_() doesn't fail trying to add them.
     #
-    # TODO: Once an upstream release includes a fix, either set a ceiling on
-    # the Git version above or remove _prune_deeper_repos() entirely.
+    # This regression fixed with upstream's 072a231016 (2019-12-10).
     def _prune_deeper_repos(repos):
         firstlevel_repos = []
         prev = None
