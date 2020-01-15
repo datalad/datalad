@@ -560,29 +560,53 @@ def test_decode_source_spec():
 
 
 @with_tree(tree={
-    'ds': {'test.txt': 'some'},
+    'ds': {
+        'test.txt': 'some',
+        'subdir': {
+            'subds': {'testsub.txt': 'somemore'},
+        },
+    },
 })
 @with_tempfile(mkdir=True)
 @serve_path_via_http
 def test_ria_http(lcl, storepath, url):
-    # create a local dataset
+    # create a local dataset with a subdataset
     lcl = Path(lcl)
     storepath = Path(storepath)
+    subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
+    subds.save()
     ds = Dataset(lcl / 'ds').create(force=True)
     ds.save()
-    # make a bare clone of it into a local that matches the organization
-    # of a ria dataset store
-    storeds_loc = str(storepath / ds.id[:3] / ds.id[3:])
-    ds.repo.call_git(['clone', '--bare', ds.path, storeds_loc])
-    Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
+    assert_repo_status(ds.path)
+    for d in (ds, subds):
+        # make a bare clone of it into a local that matches the organization
+        # of a ria dataset store
+        storeds_loc = str(storepath / d.id[:3] / d.id[3:])
+        ds.repo.call_git(['clone', '--bare', d.path, storeds_loc])
+        Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
     # now we should be able to clone from a ria+http url
+    # the super
     riaclone = clone(
         'ria+{}#{}'.format(url, ds.id),
         lcl / 'clone',
     )
-    # we get what we put in
-    eq_(ds.id, riaclone.id)
-    eq_(ds.repo.get_hexsha(), riaclone.repo.get_hexsha())
+
+    # due to default configuration, clone() should automatically look for the
+    # subdataset in the store, too -- if not the following would fail, because
+    # we never configured a proper submodule URL
+    riaclonesub = riaclone.get(
+        op.join('subdir', 'subds'), get_data=False,
+        result_xfm='datasets', return_type='item-or-list')
+
+    # both datasets came from the store and must be set up in an identical
+    # fashion
+    for origds, cloneds in ((ds, riaclone), (subds, riaclonesub)):
+        eq_(origds.id, cloneds.id)
+        eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
+        ok_(cloneds.config.get('remote.origin.url').startswith(url))
+        eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
+        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
+            'ria+%s#{id}' % url)
 
 
 @skip_if_no_network

@@ -420,8 +420,10 @@ def clone_dataset(
             # next candidate
             continue
 
-        # TODO perform any post-processing that needs to know details of the clone
+        # perform any post-processing that needs to know details of the clone
         # source
+        if cand['type'] == 'ria':
+            yield from postclonecfg_ria(destds, cand)
 
         # do not bother with other sources if succeeded
         break
@@ -470,6 +472,38 @@ def clone_dataset(
     # subdataset clone down below will not alter the Git-state of the
     # parent
     yield get_status_dict(status='ok', **result_props)
+
+
+def postclonecfg_ria(ds, props):
+    """Configure a dataset freshly cloned from a RIA store"""
+    # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
+    # ssh) would make it see a bare repo and establish a hashdir lower annex object
+    # tree.
+    # Moreover, we want the RIA remote to receive all data for the store, so its
+    # objects could be moved into archives (the main point of a RIA store).
+    ds.config.set(
+        'remote.origin.annex-ignore', 'true',
+        where='local')
+
+    # chances are that if this dataset came from a RIA store, its subdatasets may live
+    # there too. Place a subdataset source candidate config that makes get probe this
+    # RIA store when obtaining subdatasets
+    ds.config.set(
+        # we use the label 'origin' for this candidate in order to not have to
+        # generate a complicated name from the actual source specification
+        'datalad.get.subdataset-source-candidate-origin',
+        # use the entire original URL, up to the fragment + plus dataset ID
+        # placeholder, this should make things work with any store setup we
+        # support (paths, ports, ...)
+        props['source'].split('#', maxsplit=1)[0] + '#{id}',
+        where='local')
+
+    # TODO setup publication dependency, if a corresponding special remote exists
+    # and was enabled (there could be RIA stores that actually only have repos)
+    # make this function be a generator even though it doesn't actually yield
+    # anything yet
+    if None:
+        yield None
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None):
@@ -702,6 +736,8 @@ def decode_source_spec(spec, cfg=None):
         # parse a RIA URI
         # check for store related configuration for SSH access
         if source_ri.scheme == 'ria+ssh':
+            # we support the scenario were hostname is just a label for a config
+            # not an actual hostname
             hostname = cfg.get(
                 'annex.ria-remote.{}.ssh-host'.format(source_ri.hostname),
                 source_ri.hostname)
