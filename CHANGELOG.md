@@ -2009,6 +2009,8 @@ publishing
 
 [#1350]: https://github.com/datalad/datalad/issues/1350
 [#1651]: https://github.com/datalad/datalad/issues/1651
+[#2534]: https://github.com/datalad/datalad/issues/2534
+[#2566]: https://github.com/datalad/datalad/issues/2566
 [#2692]: https://github.com/datalad/datalad/issues/2692
 [#2702]: https://github.com/datalad/datalad/issues/2702
 [#2703]: https://github.com/datalad/datalad/issues/2703
