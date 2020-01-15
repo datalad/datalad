@@ -559,9 +559,35 @@ def test_decode_source_spec():
     assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
 
 
+@with_tree(tree={
+    'ds': {'test.txt': 'some'},
+})
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_ria_http(lcl, storepath, url):
+    # create a local dataset
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    ds = Dataset(lcl / 'ds').create(force=True)
+    ds.save()
+    # make a bare clone of it into a local that matches the organization
+    # of a ria dataset store
+    storeds_loc = str(storepath / ds.id[:3] / ds.id[3:])
+    ds.repo.call_git(['clone', '--bare', ds.path, storeds_loc])
+    Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
+    # now we should be able to clone from a ria+http url
+    riaclone = clone(
+        'ria+{}#{}'.format(url, ds.id),
+        lcl / 'clone',
+    )
+    # we get what we put in
+    eq_(ds.id, riaclone.id)
+    eq_(ds.repo.get_hexsha(), riaclone.repo.get_hexsha())
+
+
 @skip_if_no_network
 @with_tempfile()
-def test_ria_http(path):
+def test_ria_http_storedataladorg(path):
     # can we clone from the store w/o any dedicated config
     ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
     ok_(ds.is_installed())
