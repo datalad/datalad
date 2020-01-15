@@ -937,6 +937,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # make sure that Git doesn't mangle relative path specification into
         # mildly obscure absolute paths
         # https://github.com/datalad/datalad/issues/3538
+        # Note, that POSIX is required even on windows, since it's an URL!
         if isinstance(url_ri, PathRI):
             path = Path(url)
             if not path.is_absolute():
@@ -945,12 +946,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # Note: Not sure, whether there are circumstances where this is relative already
                 if op.isabs(git_url):
                     # ... and make it a relative one
-                    # Note: Using os.path here, since pathlib's relative_to isn't what you'd expect
-                    git_url = op.relpath(git_url, gr.path)
-                path = Path(git_url)
-                # always in POSIX even on windows
-                path = path.as_posix()
-                gr.config.set('remote.origin.url', path,
+                    # Note: Using posixpath here, since pathlib's relative_to isn't what you'd expect
+                    git_url = posixpath.relpath(git_url, gr.pathobj.as_posix())
+                gr.config.set('remote.origin.url', git_url,
                               where='local', force=True)
         return gr
 
