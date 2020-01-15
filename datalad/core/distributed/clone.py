@@ -717,16 +717,23 @@ def decode_source_spec(spec, cfg=None):
         uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
         if not re.match(uuid_regex, dsid):
             raise ValueError('RIA URI does not contain a valid dataset ID: {}'.format(spec))
+        # now we cancel the fragment in the original URL, but keep everthing else
+        # in order to be able to support the various combinations of ports, paths,
+        # and everything else
+        source_ri.fragment = ''
+        # strip the custom protocol and go with standard one
+        source_ri.scheme = source_ri.scheme[4:]
+        # take any existing path, and add trace to dataset within the store
+        source_ri.path = '{urlpath}{urldelim}{basepath}{basedelim}{trace}'.format(
+            urlpath=source_ri.path if source_ri.path else '',
+            urldelim='' if not source_ri.path or source_ri.path.endswith('/') else '/',
+            basepath=basepath,
+            basedelim='' if not basepath or basepath.endswith('/') else '/',
+            trace='{}/{}'.format(dsid[:3], dsid[3:]),
+        )
         props.update(
             type='ria',
-            giturl='{proto}://{host}{delim}{basepath}{pathdelim}{id1}/{id2}'.format(
-                proto=source_ri.scheme[4:],
-                host=hostname,
-                delim=':' if source_ri.scheme == 'ria+ssh' else '/',
-                basepath=basepath,
-                pathdelim='/' if basepath else '',
-                id1=dsid[:3],
-                id2=dsid[3:]),
+            giturl=str(source_ri),
             version=version,
             default_destpath=dsid,
         )

@@ -546,10 +546,9 @@ def test_decode_source_spec():
         eq_(decode_source_spec(spec),
             dict(
                 source=spec,
-                giturl='{}://{}{}{}/{}'.format(
+                giturl='{}://{}/{}/{}'.format(
                     proto,
                     loc,
-                    ':' if proto == 'ssh' else '/',
                     dsid[:3],
                     dsid[3:]),
                 version=version,
