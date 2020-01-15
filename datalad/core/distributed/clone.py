@@ -190,20 +190,18 @@ class Clone(Interface):
         if path is not None:
             path = resolve_path(path, dataset)
 
-        # Possibly do conversion from source into a git-friendly url
-        # luckily GitRepo will undo any fancy file:/// url to make use of Git's
-        # optimization for local clones....
-        source_ = decode_source_spec(source, cfg=None if ds is None else ds.config)
-        lgr.debug("Resolved clone source from '%s' to '%s'",
-                  source, source_)
-        source = source_
-
         # derive target from source:
         if path is None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source and continue
             # since this is a relative `path`, resolve it:
-            path = resolve_path(source['default_destpath'], dataset)
+            # we are not going to reuse the decoded URL, as this is done for
+            # all source candidates in clone_dataset(), we just use to determine
+            # a destination path here in order to perform a bunch of additional
+            # checks that shall not pollute the helper function
+            source_ = decode_source_spec(
+                source, cfg=None if ds is None else ds.config)
+            path = resolve_path(source_['default_destpath'], dataset)
             lgr.debug("Determined clone target path from source")
         lgr.debug("Resolved clone target path to: '%s'", path)
 
@@ -214,7 +212,7 @@ class Clone(Interface):
             action='install',
             logger=lgr,
             refds=refds_path,
-            source_url=source['source'])
+            source_url=source)
 
         try:
             # this will implicitly cause pathlib to run a bunch of checks
@@ -244,11 +242,12 @@ class Clone(Interface):
 
         # perform the actual cloning operation
         yield from clone_dataset(
-            [source['giturl']],
+            [source],
             destination_dataset,
             reckless,
             description,
             result_props,
+            cfg=None if ds is None else ds.config,
         )
 
         # TODO handle any 'version' property handling and verification using a dedicated
@@ -271,7 +270,8 @@ def clone_dataset(
         destds,
         reckless=None,
         description=None,
-        result_props=None):
+        result_props=None,
+        cfg=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -290,6 +290,10 @@ def clone_dataset(
       Location description for the annex of the dataset clone (if there is any).
     result_props : dict, optional
       Default properties for any yielded result, passed on to get_status_dict().
+    cfg : ConfigManager, optional
+      Configuration will be queried from this instance (i.e. from a particular
+      dataset). If None is given, the global DataLad configuration will be
+      queried.
 
     Yields
     ------
@@ -307,11 +311,16 @@ def clone_dataset(
 
     dest_path = destds.pathobj
 
-    # generate candidate URLs from source argument to overcome a few corner cases
-    # and hopefully be more robust than git clone
+    # decode all source candidate specifications
+    candidate_sources = [decode_source_spec(s, cfg=cfg) for s in srcs]
+
+    # now expand the candidate sources with additional variants of the decoded
+    # giturl, while duplicating the other properties in the additional records
+    # for simplicity. The hope is to overcome a few corner cases and be more
+    # robust than git clone
     candidate_sources = [
-        s for src in srcs
-        for s in _get_flexible_source_candidates(src)
+        dict(props, giturl=s) for props in candidate_sources
+        for s in _get_flexible_source_candidates(props['giturl'])
     ]
 
     # important test! based on this `rmtree` will happen below after failed clone
@@ -334,7 +343,8 @@ def clone_dataset(
                 # pathlib behavior changes
                 lgr.debug("Unexpected behavior of pathlib!")
                 track_path = None
-            for src in candidate_sources:
+            for cand in candidate_sources:
+                src = cand['giturl']
                 if track_url == src \
                         or get_local_file_url(track_url, compatibility='git') == src \
                         or track_path == expanduser(src):
@@ -361,22 +371,22 @@ def clone_dataset(
         unit=' Candidate locations',
     )
     error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
-    for isource_, source_ in enumerate(candidate_sources):
+    for cand in candidate_sources:
         try:
             log_progress(
                 lgr.info,
                 'cloneds',
-                'Attempting to clone from %s to %s', source_, dest_path,
+                'Attempting to clone from %s to %s', cand['giturl'], dest_path,
                 update=1,
                 increment=True)
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
             # doesn't make it happen seemlessly
-            GitRepo.clone(path=str(dest_path), url=source_, create=True)
-            break  # do not bother with other sources if succeeded
+            GitRepo.clone(path=str(dest_path), url=cand['giturl'], create=True)
+
         except GitCommandError as e:
-            error_msgs[source_] = e
+            error_msgs[cand['giturl']] = e
             lgr.debug("Failed to clone from URL: %s (%s)",
-                      source_, exc_str(e))
+                      cand['giturl'], exc_str(e))
             if dest_path.exists():
                 lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                           dest_path)
@@ -407,6 +417,15 @@ def clone_dataset(
                     message=re_match.group(1) if re_match else "stderr: " + e_stderr,
                     **result_props)
                 return
+            # next candidate
+            continue
+
+        # TODO perform any post-processing that needs to know details of the clone
+        # source
+
+        # do not bother with other sources if succeeded
+        break
+
     log_progress(
         lgr.info,
         'cloneds',
@@ -435,14 +454,14 @@ def clone_dataset(
                         "Although no errors were encountered, target " \
                         "dataset at %s seems to be not fully installed. " \
                         "The 'succesful' source was: %s"
-            error_args = (destds.path, source_)
+            error_args = (destds.path, cand['giturl'])
         yield get_status_dict(
             status='error',
             message=(error_msg, error_args),
             **result_props)
         return
 
-    yield from _handle_possible_annex_dataset(
+    yield from postclonecfg_annexdataset(
         destds,
         reckless,
         description)
@@ -453,7 +472,7 @@ def clone_dataset(
     yield get_status_dict(status='ok', **result_props)
 
 
-def _handle_possible_annex_dataset(ds, reckless, description=None):
+def postclonecfg_annexdataset(ds, reckless, description=None):
     """If ds "knows annex" -- annex init it, set into reckless etc
 
     Provides additional tune up to a possibly an annex repo, e.g.
@@ -550,6 +569,8 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
             ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
+
+_handle_possible_annex_dataset = postclonecfg_annexdataset
 
 
 def configure_origins(cfgds, probeds, label=None):
