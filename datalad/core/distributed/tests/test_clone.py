@@ -487,15 +487,37 @@ def test_cfg_originorigin(path):
 
 
 # test fix for gh-2601/gh-3538
+@known_failure
 @with_tempfile()
 def test_relative_submodule_url(path):
     Dataset(op.join(path, 'origin')).create()
     ds = Dataset(op.join(path, 'ds')).create()
     with chpwd(ds.path):
-        ds.clone(
+        ds_cloned = ds.clone(
             source=op.join(op.pardir, 'origin'),
             path='sources')
+
+    # Check that a simple fetch call does not fail.
+    ds_cloned.repo.fetch()
+
     subinfo = ds.subdatasets(return_type='item-or-list')
     eq_(subinfo['gitmodule_url'],
         # must be a relative URL, not platform-specific relpath!
-        '{}/{}'.format(op.pardir, 'origin'))
+        '../../origin')
+
+
+@with_tree(tree={"subdir": {}})
+@with_tempfile(mkdir=True)
+def test_local_url_with_fetch(path, path_other):
+    path = Path(path)
+    path_other = Path(path_other)
+    Dataset(path / "source").create()
+
+    for where, source, path in [
+            (path, "source", "a"),
+            (path / "subdir", op.join(op.pardir, "source"), "a"),
+            (path, "source", path_other / "a")]:
+        with chpwd(where):
+            ds_cloned = clone(source=source, path=path)
+            # Perform a fetch to check that the URL points to a valid location.
+            ds_cloned.repo.fetch()
