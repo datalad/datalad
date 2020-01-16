@@ -734,20 +734,6 @@ def decode_source_spec(spec, cfg=None):
         props['giturl'] = source_ri.as_git_url()
     elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
         # parse a RIA URI
-        # check for store related configuration for SSH access
-        if source_ri.scheme == 'ria+ssh':
-            # we support the scenario were hostname is just a label for a config
-            # not an actual hostname
-            hostname = cfg.get(
-                'annex.ria-remote.{}.ssh-host'.format(source_ri.hostname),
-                source_ri.hostname)
-            basepath = cfg.get(
-                'annex.ria-remote.{}.base-path'.format(source_ri.hostname),
-                '')
-        else:
-            hostname = source_ri.hostname
-            basepath = ''
-
         dsid, version = source_ri.fragment.split('@', maxsplit=1) \
             if '@' in source_ri.fragment else (source_ri.fragment, None)
         uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
@@ -760,11 +746,9 @@ def decode_source_spec(spec, cfg=None):
         # strip the custom protocol and go with standard one
         source_ri.scheme = source_ri.scheme[4:]
         # take any existing path, and add trace to dataset within the store
-        source_ri.path = '{urlpath}{urldelim}{basepath}{basedelim}{trace}'.format(
+        source_ri.path = '{urlpath}{urldelim}{trace}'.format(
             urlpath=source_ri.path if source_ri.path else '',
             urldelim='' if not source_ri.path or source_ri.path.endswith('/') else '/',
-            basepath=basepath,
-            basedelim='' if not basepath or basepath.endswith('/') else '/',
             trace='{}/{}'.format(dsid[:3], dsid[3:]),
         )
         props.update(
