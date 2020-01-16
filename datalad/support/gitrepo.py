@@ -74,6 +74,7 @@ from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
     Path,
+    PurePath,
     PurePosixPath,
     assure_list,
     optional_args,
@@ -937,17 +938,18 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # make sure that Git doesn't mangle relative path specification into
         # mildly obscure absolute paths
         # https://github.com/datalad/datalad/issues/3538
-        # Note, that git reports POSIX paths even on windows. It's an URL after all. Don't mix in native paths.
+        # Note, that git reports POSIX paths ( '/' instead of `\`) even on windows. It's an URL after all. Don't mix in
+        # native paths.
         if isinstance(url_ri, PathRI):
             url_path = Path(url)
             if not url_path.is_absolute():
                 # get git-created path
-                git_url = gr.config.get('remote.origin.url')
+                git_url = PurePath(gr.config.get('remote.origin.url'))
                 # Note: Not sure, whether there are circumstances where this is relative already
-                if posixpath.isabs(git_url):
+                if git_url.is_absolute():
                     # ... and make it a relative one
                     # Note: Using posixpath here, since pathlib's relative_to isn't what you'd expect
-                    git_url_rel = posixpath.relpath(git_url, gr.pathobj.as_posix())
+                    git_url_rel = posixpath.relpath(git_url.as_posix(), gr.pathobj.as_posix())
                     lgr.debug("Remap origin url from %s to %s", git_url, git_url_rel)
                     gr.config.set('remote.origin.url', git_url_rel, where='local', force=True)
         return gr

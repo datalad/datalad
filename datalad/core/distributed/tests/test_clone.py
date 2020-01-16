@@ -500,9 +500,27 @@ def test_relative_submodule_url(path):
     ds_cloned.repo.fetch()
 
     subinfo = ds.subdatasets(return_type='item-or-list')
+
+    from datalad.support.network import RI
     eq_(subinfo['gitmodule_url'],
         # must be a relative URL, not platform-specific relpath!
-        '../../origin')
+        '../../origin',
+        msg="XXXXXXXXXXX:\n"
+            "submodule pathobj: %s\n"
+            "submodule path: %s\n"
+            "super pathobj: %s\n"
+            "super path: %s\n"
+            "\n"
+            "original ds path: %s\n"
+            "RI(path).localpath: %s\n"
+            "realpath(path): %s\n" %
+            (str(Dataset(op.join(path, 'ds', 'sources')).repo.pathobj),
+             Dataset(op.join(path, 'ds', 'sources')).repo.path,
+             str(ds.repo.pathobj),
+             ds.repo.path,
+             op.join(path, 'origin'),
+             RI(op.join(path, 'origin')).localpath,
+             op.realpath(RI(op.join(path, 'origin')).localpath)))
 
 
 @with_tree(tree={"subdir": {}})
