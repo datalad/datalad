@@ -944,7 +944,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # get git-created path
                 git_url = gr.config.get('remote.origin.url')
                 # Note: Not sure, whether there are circumstances where this is relative already
-                if op.isabs(git_url):
+                if posixpath.isabs(git_url):
                     # ... and make it a relative one
                     # Note: Using posixpath here, since pathlib's relative_to isn't what you'd expect
                     git_url_rel = posixpath.relpath(git_url, gr.pathobj.as_posix())
