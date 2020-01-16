@@ -665,7 +665,13 @@ class Interface(object):
                             # or implementation details
                             if isinstance(p, str))
             if defaults_idx >= 0:
-                help += " [Default: %r]" % (defaults[defaults_idx],)
+                # if it is a flag, in commandline it makes little sense to show
+                # showing the Default: (likely boolean).
+                #   See https://github.com/datalad/datalad/issues/3203
+                if not parser_kwargs.get('action', '').startswith('store_'):
+                    # [Default: None] also makes little sense for cmdline
+                    if defaults[defaults_idx] is not None:
+                        help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
             # conversion
             parser.add_argument(*parser_args, help=help,
