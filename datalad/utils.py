@@ -280,8 +280,11 @@ def sorted_files(dout):
                        for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
-_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
-_DATALAD_REGEX = r'%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
+_encoded_dirsep = r'\\'  if on_windows else r'/'
+_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (
+    _encoded_dirsep, _encoded_dirsep)
+_DATALAD_REGEX = r'%s\.(?:datalad)(?:%s|$)' % (
+    _encoded_dirsep, _encoded_dirsep)
 
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
@@ -303,7 +306,6 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     dirs: bool, optional
       Whether to match directories as well as files
     """
-
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
         # TODO: might want to uniformize on windows to use '/'

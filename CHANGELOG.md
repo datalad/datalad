@@ -9,6 +9,17 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.12.1 (Jan 15, 2020) -- Small bump after big bang
+
+Fix some fallout after major release.
+
+### Fixes
+
+- Revert incorrect relative path adjustment to URLs in [clone][]. ([#3538][])
+
+- Various small fixes to internal helpers and test to run on Windows
+  ([#2566][]) ([#2534][])
+
 ## 0.12.0 (Jan 11, 2020) -- Krakatoa
 
 This release is the result of more than a year of development that includes
