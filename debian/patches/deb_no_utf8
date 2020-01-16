@@ -12,7 +12,7 @@ Last-Update: 2018-06-05
 
 --- a/datalad/tests/test_cmd.py
 +++ b/datalad/tests/test_cmd.py
-@@ -57,7 +57,7 @@
+@@ -57,7 +57,7 @@ def test_runner_dry(tempfile):
      runner = Runner(protocol=dry)
  
      # test dry command call
@@ -21,7 +21,7 @@ Last-Update: 2018-06-05
      with swallow_logs(new_level=9) as cml:
          ret = runner.run(cmd)
          cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
-@@ -81,7 +81,7 @@
+@@ -81,7 +81,7 @@ def test_runner(tempfile):
  
      # test non-dry command call
      runner = Runner()
@@ -30,7 +30,7 @@ Last-Update: 2018-06-05
      cmd = 'echo %s > %r' % (content, tempfile)
      ret = runner.run(cmd)
      assert_equal(ret, ('', ''))  # no out or err
-@@ -185,7 +185,7 @@
+@@ -185,7 +185,7 @@ def test_runner_log_stdout():
      # assertion yet.
  
      runner = Runner(log_outputs=True)
@@ -39,7 +39,7 @@ Last-Update: 2018-06-05
      for cmd in [cmd_, ' '.join(cmd_)]:
          # should be identical runs, either as a string or as a list
          kw = {}
-@@ -198,16 +198,16 @@
+@@ -198,16 +198,16 @@ def test_runner_log_stdout():
              if not on_windows:
                  # we can just count on sanity
                  cm.assert_logged("stdout| stdout-"
@@ -60,7 +60,7 @@ Last-Update: 2018-06-05
              eq_(cml.out, "")
  
  
-@@ -282,7 +282,7 @@
+@@ -282,7 +282,7 @@ def test_runner_failure_unicode(path):
      # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
      runner = Runner()
      with assert_raises(CommandError), swallow_logs():
@@ -71,7 +71,7 @@ Last-Update: 2018-06-05
  @skip_if_on_windows  # likely would fail
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -45,7 +45,7 @@
+@@ -45,7 +45,7 @@ user = name=Jane Doe
  user = email=jd@example.com
  myint = 3
  
@@ -80,7 +80,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -71,16 +71,16 @@
+@@ -71,16 +71,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -100,7 +100,7 @@ Last-Update: 2018-06-05
           ('something.myint', '3'),
           ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
      assert_equal(
-@@ -93,7 +93,7 @@
+@@ -93,7 +93,7 @@ def test_something(path, new_home):
          cfg.get('something.user'),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -109,7 +109,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
-@@ -106,8 +106,8 @@
+@@ -106,8 +106,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -122,7 +122,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_section('unheard.of'))
 --- a/datalad/distribution/tests/test_add.py
 +++ b/datalad/distribution/tests/test_add.py
-@@ -71,10 +71,10 @@
+@@ -71,10 +71,10 @@ def test_add_message_file(path):
          ds.add("blah", message="me", message_file="and me")
  
      create_tree(path, {"foo": "x",
@@ -137,7 +137,7 @@ Last-Update: 2018-06-05
  tree_arg = dict(tree={'test.txt': 'some',
 --- a/datalad/core/local/tests/test_run.py
 +++ b/datalad/core/local/tests/test_run.py
-@@ -149,25 +149,25 @@
+@@ -149,25 +149,25 @@ def test_py2_unicode_command(path):
      touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
      cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                          touch_cmd,
@@ -172,7 +172,7 @@ Last-Update: 2018-06-05
  @with_tempfile(mkdir=True)
 --- a/datalad/interface/tests/test_save.py
 +++ b/datalad/interface/tests/test_save.py
-@@ -277,11 +277,11 @@
+@@ -277,11 +277,11 @@ def test_save_message_file(path):
          ds._save("blah", message="me", message_file="and me")
  
      create_tree(path, {"foo": "x",
@@ -188,7 +188,7 @@ Last-Update: 2018-06-05
  @known_failure_githubci_win
 --- a/datalad/support/tests/test_globbedpaths.py
 +++ b/datalad/support/tests/test_globbedpaths.py
-@@ -53,7 +53,7 @@
+@@ -53,7 +53,7 @@ def test_globbedpaths_get_sub_patterns()
                   "2.dat": "",
                   "3.txt": "",
                   # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
@@ -197,7 +197,7 @@ Last-Update: 2018-06-05
                   "subdir": {"1.txt": "", "2.txt": ""}})
  def test_globbedpaths(path):
      dotdir = op.curdir + op.sep
-@@ -61,9 +61,9 @@
+@@ -61,9 +61,9 @@ def test_globbedpaths(path):
      for patterns, expected in [
              (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
              ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
@@ -209,7 +209,7 @@ Last-Update: 2018-06-05
              (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
              ([dotdir + "subdir/*.txt"],
               {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
-@@ -89,12 +89,12 @@
+@@ -89,12 +89,12 @@ def test_globbedpaths(path):
  
      # Full patterns still get returned as relative to pwd.
      gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
@@ -225,7 +225,7 @@ Last-Update: 2018-06-05
      gp = GlobbedPaths(["."], pwd=path, expand=False)
      eq_(gp.expand(), ["."])
      eq_(gp.paths, ["."])
-@@ -107,7 +107,7 @@
+@@ -107,7 +107,7 @@ def test_globbedpaths(path):
          eq_(gp.expand(), ["z", "b", "d", "x"])
  
      # glob expansion for paths property is determined by expand argument.
@@ -236,7 +236,7 @@ Last-Update: 2018-06-05
          eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1436,7 +1436,9 @@
+@@ -1441,7 +1441,9 @@ OBSCURE_FILENAMES = (
      u" ab .datc ",
      u"ab .datc ",  # they all should at least support spaces and dots
  )
@@ -247,3 +247,19 @@ Last-Update: 2018-06-05
  # OSX is exciting -- some I guess FS might be encoding differently from decoding
  # so Й might get recoded
  # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
+--- a/datalad/core/local/tests/test_diff.py
++++ b/datalad/core/local/tests/test_diff.py
+@@ -475,9 +475,12 @@ def test_diff_rsync_syntax(path):
+ 
+ @with_tempfile(mkdir=True)
+ def test_diff_nonexistent_ref_unicode(path):
++    # Unicode testing fails with pythons < 3.7 during debian build
++	# https://github.com/datalad/datalad/issues/4016
++    import sys
+     ds = Dataset(path).create()
+     assert_result_count(
+-        ds.diff(fr="HEAD", to=u"β", on_failure="ignore"),
++        ds.diff(fr="HEAD", to=u"β" if sys.version_info[:2] >= (3, 7) else "b", on_failure="ignore"),
+         1,
+         path=ds.path,
+         status="impossible")

@@ -1,3 +1,11 @@
+datalad (0.12.1-1) unstable; urgency=medium
+
+  * Fresh upstream bugfix release
+  * debian/patches/deb_no_utf8 updated to not test unicode when python < 3.7
+    (see https://github.com/datalad/datalad/issues/4016)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 15 Jan 2020 21:32:28 -0500
+
 datalad (0.12.0-1) unstable; urgency=medium
 
   [ Michael Hanke ]
