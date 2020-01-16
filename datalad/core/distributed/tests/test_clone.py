@@ -487,7 +487,6 @@ def test_cfg_originorigin(path):
 
 
 # test fix for gh-2601/gh-3538
-@known_failure
 @with_tempfile()
 def test_relative_submodule_url(path):
     Dataset(op.join(path, 'origin')).create()
