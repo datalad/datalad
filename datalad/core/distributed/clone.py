@@ -759,12 +759,9 @@ def decode_source_spec(spec, cfg=None):
         )
     else:
         # let's assume that anything else is a URI that Git can handle
-        # TODO are there any advantages of going through a URL-reconversion
-        # by the RI instance, instead of using the original input right away?
-        # it feels like we could only accumulate bugs. Keeping how it was,
-        # for now...
         props['type'] = 'giturl'
-        props['giturl'] = str(source_ri)
+        # use original input verbatim
+        props['giturl'] = spec
 
     if 'default_destpath' not in props:
         # if we still have no good idea on where a dataset could be cloned to if no
