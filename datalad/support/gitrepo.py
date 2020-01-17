@@ -890,7 +890,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         # tailored list of "multi options" to make a future
                         # non-GitPy based implementation easier. Do conversion
                         # here
-                        multi_options=to_options(**clone_options),
+                        multi_options=to_options(**clone_options) if clone_options else None,
                         odbt=default_git_odbt,
                         progress=git_progress
                     )
