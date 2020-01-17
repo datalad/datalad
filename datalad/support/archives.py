@@ -43,11 +43,19 @@ from datalad.utils import (
     rmtree,
     get_tempfile_kwargs,
 )
-from datalad.support.archive_utils_patool import (
-    decompress_file as _decompress_file,
-    # other code expects this to be here
-    compress_files
-)
+from datalad import cfg
+if cfg.get('datalad.runtime.use-patool', False):
+    from datalad.support.archive_utils_patool import (
+        decompress_file as _decompress_file,
+        # other code expects this to be here
+        compress_files
+    )
+else:
+    from datalad.support.archive_utils_7z import (
+        decompress_file as _decompress_file,
+        # other code expects this to be here
+        compress_files
+    )
 
 lgr = logging.getLogger('datalad.support.archives')
 
