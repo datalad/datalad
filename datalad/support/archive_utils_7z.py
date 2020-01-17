@@ -72,5 +72,5 @@ def compress_files(files, archive, path=None, overwrite=True):
             quote_filename(str(apath)),
         )
     else:
-        cmd = ['7z', 'u', quote_filename(str(apath))] + files
+        cmd = ['7z', 'u', str(apath), '--'] + files
     runner.run(cmd)

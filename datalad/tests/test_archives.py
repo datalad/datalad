@@ -20,7 +20,6 @@ from datalad.tests.utils import (
     on_windows,
     ok_file_has_content,
     ok_generator,
-    known_failure_githubci_win,
     OBSCURE_FILENAME,
     SkipTest,
 )
@@ -96,7 +95,6 @@ def check_decompress_file(leading_directories, path):
         eq_(f.read(), '3 load')
 
 
-@known_failure_githubci_win
 def test_decompress_file():
     yield check_decompress_file, None
     yield check_decompress_file, 'strip'
@@ -121,11 +119,12 @@ def check_compress_dir(ext, path, name):
     assert_true(op.exists(op.join(name_extracted, 'd1', 'd2', 'f1')))
 
 
-@known_failure_githubci_win
 def test_compress_dir():
+    yield check_compress_dir, '.tar.xz'
     yield check_compress_dir, '.tar.gz'
     yield check_compress_dir, '.tar'
     yield check_compress_dir, '.zip'
+    yield check_compress_dir, '.7z'
 
 
 # space in the filename to test for correct quotations etc
@@ -135,7 +134,12 @@ _filename = 'fi le.dat'
 @with_tree(((_filename, 'content'),))
 @with_tempfile()
 def check_compress_file(ext, annex, path, name):
-    archive = name + ext
+    # we base the archive name on the filename, in order to also
+    # be able to properly test compressors where the corresponding
+    # archive format has no capability of storing a filename
+    # (i.e. where the archive name itself determines the filename
+    # of the decompressed file, like .xz)
+    archive = op.join(name, _filename + ext)
     compress_files([_filename], archive,
                    path=path)
     assert_true(op.exists(archive))
@@ -154,19 +158,17 @@ def check_compress_file(ext, annex, path, name):
         raise SkipTest(exc_str(exc))
     _filepath = op.join(dir_extracted, _filename)
 
-    import glob
-    print(dir_extracted)
-    print(glob.glob(dir_extracted + '/*'))
     ok_file_has_content(_filepath, 'content')
 
 
-@known_failure_githubci_win
 def test_compress_file():
     for annex in True, False:
+        yield check_compress_file, '.xz', annex
         yield check_compress_file, '.gz', annex
+        yield check_compress_file, '.zip', annex
+        yield check_compress_file, '.7z', annex
 
 
-@known_failure_githubci_win
 @with_tree(**tree_simplearchive)
 def test_ExtractedArchive(path):
     archive = op.join(path, fn_archive_obscure_ext)
