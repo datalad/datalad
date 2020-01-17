@@ -44,7 +44,9 @@ from datalad.utils import (
     get_tempfile_kwargs,
 )
 from datalad import cfg
-if cfg.get('datalad.runtime.use-patool', False):
+from datalad.config import anything2bool
+if cfg.obtain('datalad.runtime.use-patool', default=False,
+              valtype=anything2bool):
     from datalad.support.archive_utils_patool import (
         decompress_file as _decompress_file,
         # other code expects this to be here
