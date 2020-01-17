@@ -320,11 +320,18 @@ def test_failed_clone(dspath):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_reckless(path, top_path):
-    ds = clone(path, top_path, reckless=True,
+def test_reckless(src, top_path):
+    ds = clone(src, top_path, reckless=True,
                result_xfm='datasets', return_type='item-or-list')
     eq_(ds.config.get('annex.hardlink', None), 'true')
+    # actual value is 'auto', because True is a legacy value and we map it
+    eq_(ds.config.get('datalad.clone.reckless', None), 'auto')
     eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+    # now, if we clone another repo into this one, it will inherit the setting
+    # without having to provide it explicitly
+    sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
+    eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
+    eq_(sub.config.get('annex.hardlink', None), 'true')
 
 
 @with_tempfile
