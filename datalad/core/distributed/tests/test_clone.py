@@ -472,25 +472,37 @@ def test_cfg_originorigin(path):
     origin = Dataset(path / 'origin').create()
     (origin.pathobj / 'file1.txt').write_text('content')
     origin.save()
-    clone_direct = clone(origin, path / 'clone_direct')
-    clone_clone = clone(clone_direct, path / 'clone_clone')
+    clone_lev1 = clone(origin, path / 'clone_lev1')
+    clone_lev2 = clone(clone_lev1, path / 'clone_lev2')
     # the goal is to be able to get file content from origin without
     # the need to configure it manually
     assert_result_count(
-        clone_clone.get('file1.txt', on_failure='ignore'),
+        clone_lev2.get('file1.txt', on_failure='ignore'),
         1,
         action='get',
         status='ok',
-        path=str(clone_clone.pathobj / 'file1.txt'),
+        path=str(clone_lev2.pathobj / 'file1.txt'),
     )
-    eq_((clone_clone.pathobj / 'file1.txt').read_text(), 'content')
+    eq_((clone_lev2.pathobj / 'file1.txt').read_text(), 'content')
     eq_(
-        Path(clone_clone.siblings(
+        Path(clone_lev2.siblings(
             'query',
             name='origin-2',
             return_type='item-or-list')['url']),
         origin.pathobj
     )
+
+    # Clone another level, this time with a relative path. Drop content from
+    # lev2 so that origin is the only place that the file is available from.
+    clone_lev2.drop("file1.txt")
+    with chpwd(path):
+        clone_lev3 = clone('clone_lev2', 'clone_lev3')
+    assert_result_count(
+        clone_lev3.get('file1.txt', on_failure='ignore'),
+        1,
+        action='get',
+        status='ok',
+        path=str(clone_lev3.pathobj / 'file1.txt'))
 
 
 # test fix for gh-2601/gh-3538
