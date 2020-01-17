@@ -22,6 +22,7 @@ import os.path as op
 
 from unittest.mock import patch
 
+from datalad import consts
 from datalad.api import (
     create,
     clone,
@@ -63,8 +64,14 @@ from datalad.tests.utils import (
     known_failure,
     known_failure_appveyor,
 )
-from datalad.core.distributed.clone import _get_installationpath_from_url
+from datalad.core.distributed.clone import (
+    decode_source_spec,
+    _get_installationpath_from_url,
+)
 from datalad.distribution.dataset import Dataset
+
+# this is the dataset ID of our test dataset in the main datalad RIA store
+datalad_store_testds_id = '76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561'
 
 
 @with_tempfile(mkdir=True)
@@ -521,3 +528,114 @@ def test_local_url_with_fetch(path, path_other):
             ds_cloned = clone(source=source, path=path)
             # Perform a fetch to check that the URL points to a valid location.
             ds_cloned.repo.fetch()
+
+
+def test_decode_source_spec():
+    # resolves datalad RIs:
+    eq_(decode_source_spec('///subds'),
+        dict(source='///subds', giturl=consts.DATASETS_TOPURL + 'subds', version=None,
+             type='dataladri', default_destpath='subds'))
+    assert_raises(NotImplementedError, decode_source_spec,
+                  '//custom/subds')
+
+    # doesn't harm others:
+    for url in (
+            'http://example.com',
+            '/absolute/path',
+            'file://localhost/some',
+            'localhost/another/path',
+            'user@someho.st/mydir',
+            'ssh://somewhe.re/else',
+            'git://github.com/datalad/testrepo--basic--r1',
+    ):
+        props = decode_source_spec(url)
+        dest = props.pop('default_destpath')
+        eq_(props, dict(source=url, version=None, giturl=url, type='giturl'))
+
+    # RIA URIs with and without version specification
+    dsid = '6d69ca68-7e85-11e6-904c-002590f97d84'
+    for proto, loc, version in (
+            ('http', 'example.com', None),
+            ('http', 'example.com', 'v1.0'),
+            ('http', 'example.com', 'some_with@in_it'),
+            ('ssh', 'example.com', 'some_with@in_it'),
+    ):
+        spec = 'ria+{}://{}{}{}'.format(
+            proto,
+            loc,
+            '#{}'.format(dsid),
+            '@{}'.format(version) if version else '')
+        eq_(decode_source_spec(spec),
+            dict(
+                source=spec,
+                giturl='{}://{}/{}/{}'.format(
+                    proto,
+                    loc,
+                    dsid[:3],
+                    dsid[3:]),
+                version=version,
+                default_destpath=dsid,
+                type='ria')
+        )
+    # not a dataset UUID
+    assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
+
+
+@with_tree(tree={
+    'ds': {
+        'test.txt': 'some',
+        'subdir': {
+            'subds': {'testsub.txt': 'somemore'},
+        },
+    },
+})
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_ria_http(lcl, storepath, url):
+    # create a local dataset with a subdataset
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
+    subds.save()
+    ds = Dataset(lcl / 'ds').create(force=True)
+    ds.save()
+    assert_repo_status(ds.path)
+    for d in (ds, subds):
+        # make a bare clone of it into a local that matches the organization
+        # of a ria dataset store
+        storeds_loc = str(storepath / d.id[:3] / d.id[3:])
+        ds.repo.call_git(['clone', '--bare', d.path, storeds_loc])
+        Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
+    # now we should be able to clone from a ria+http url
+    # the super
+    riaclone = clone(
+        'ria+{}#{}'.format(url, ds.id),
+        lcl / 'clone',
+    )
+
+    # due to default configuration, clone() should automatically look for the
+    # subdataset in the store, too -- if not the following would fail, because
+    # we never configured a proper submodule URL
+    riaclonesub = riaclone.get(
+        op.join('subdir', 'subds'), get_data=False,
+        result_xfm='datasets', return_type='item-or-list')
+
+    # both datasets came from the store and must be set up in an identical
+    # fashion
+    for origds, cloneds in ((ds, riaclone), (subds, riaclonesub)):
+        eq_(origds.id, cloneds.id)
+        eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
+        ok_(cloneds.config.get('remote.origin.url').startswith(url))
+        eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
+        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
+            'ria+%s#{id}' % url)
+
+
+@skip_if_no_network
+@with_tempfile()
+def test_ria_http_storedataladorg(path):
+    # can we clone from the store w/o any dedicated config
+    ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
+    ok_(ds.is_installed())
+    eq_(ds.id, datalad_store_testds_id)
+

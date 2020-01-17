@@ -26,7 +26,6 @@ from datalad.utils import getpwd
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
-from datalad import consts
 from datalad.utils import chpwd
 from datalad.utils import on_windows
 from datalad.support import path as op
@@ -71,33 +70,10 @@ from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_git_url_from_source
 
 ###############
 # Test helpers:
 ###############
-
-
-def test_get_git_url_from_source():
-
-    # resolves datalad RIs:
-    eq_(_get_git_url_from_source('///subds'), consts.DATASETS_TOPURL + 'subds')
-    assert_raises(NotImplementedError, _get_git_url_from_source,
-                  '//custom/subds')
-
-    # doesn't harm others:
-    eq_(_get_git_url_from_source('http://example.com'), 'http://example.com')
-    eq_(_get_git_url_from_source('/absolute/path'), '/absolute/path')
-    eq_(_get_git_url_from_source('file://localhost/some'),
-        'file://localhost/some')
-    eq_(_get_git_url_from_source('localhost/another/path'),
-        'localhost/another/path')
-    eq_(_get_git_url_from_source('user@someho.st/mydir'),
-        'user@someho.st/mydir')
-    eq_(_get_git_url_from_source('ssh://somewhe.re/else'),
-        'ssh://somewhe.re/else')
-    eq_(_get_git_url_from_source('git://github.com/datalad/testrepo--basic--r1'),
-        'git://github.com/datalad/testrepo--basic--r1')
 
 
 @with_tree(tree={'file.txt': '123'})
