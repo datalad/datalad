@@ -157,7 +157,7 @@ class ArchivesCache(object):
                 lgr.debug("Cache initialized")
             except Exception as e:
                 lgr.error("Failed to initialize cached under %s" % path)
-                raise e
+                raise
         else:
             lgr.debug("Not initiating existing cache for the archives under %s" % self.path)
             self._made_path = False
