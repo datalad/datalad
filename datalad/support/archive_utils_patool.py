@@ -121,22 +121,14 @@ def unixify_path(path):
         return path
 
 
-def decompress_file(archive, dir_, leading_directories='strip'):
+def decompress_file(archive, dir_):
     """Decompress `archive` into a directory `dir_`
 
     Parameters
     ----------
     archive: str
     dir_: str
-    leading_directories: {'strip', None}
-      If `strip`, and archive contains a single leading directory under which
-      all content is stored, all the content will be moved one directory up
-      and that leading directory will be removed.
     """
-    if not exists(dir_):
-        lgr.debug("Creating directory %s to extract archive into" % dir_)
-        os.makedirs(dir_)
-
     with swallow_outputs() as cmo:
         archive = assure_bytes(archive)
         dir_ = assure_bytes(dir_)
@@ -191,21 +183,6 @@ def decompress_file(archive, dir_, leading_directories='strip'):
                 os.chmod(subdir,
                          os.stat(subdir).st_mode |
                          os.path.stat.S_IEXEC)
-
-    if leading_directories == 'strip':
-        _, dirs, files = next(os.walk(dir_))
-        if not len(files) and len(dirs) == 1:
-            # move all the content under dirs[0] up 1 level
-            widow_dir = opj(dir_, dirs[0])
-            lgr.debug("Moving content within %s upstairs" % widow_dir)
-            subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
-            for f in subdirs_ + files_:
-                os.rename(opj(subdir, f), opj(dir_, f))
-            rmdir(widow_dir)
-    elif leading_directories is None:
-        pass   # really do nothing
-    else:
-        raise NotImplementedError("Not supported %s" % leading_directories)
 
 
 def compress_files(files, archive, path=None, overwrite=True):

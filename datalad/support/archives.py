@@ -30,6 +30,7 @@ from ..utils import (
     any_re_search,
     assure_bytes,
     unlink,
+    rmdir,
 )
 
 import logging
@@ -42,10 +43,44 @@ from ..utils import get_tempfile_kwargs
 from ..utils import assure_unicode
 
 from datalad.support.archive_utils_patool import (
-    decompress_file,
+    decompress_file as _decompress_file,
     # other code expects this to be here
-    compress_files,
+    compress_files
 )
+
+
+def decompress_file(archive, dir_, leading_directories='strip'):
+    """Decompress `archive` into a directory `dir_`
+
+    Parameters
+    ----------
+    archive: str
+    dir_: str
+    leading_directories: {'strip', None}
+      If `strip`, and archive contains a single leading directory under which
+      all content is stored, all the content will be moved one directory up
+      and that leading directory will be removed.
+    """
+    if not exists(dir_):
+        lgr.debug("Creating directory %s to extract archive into" % dir_)
+        os.makedirs(dir_)
+
+    _decompress_file(archive, dir_)
+
+    if leading_directories == 'strip':
+        _, dirs, files = next(os.walk(dir_))
+        if not len(files) and len(dirs) == 1:
+            # move all the content under dirs[0] up 1 level
+            widow_dir = opj(dir_, dirs[0])
+            lgr.debug("Moving content within %s upstairs" % widow_dir)
+            subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
+            for f in subdirs_ + files_:
+                os.rename(opj(subdir, f), opj(dir_, f))
+            rmdir(widow_dir)
+    elif leading_directories is None:
+        pass   # really do nothing
+    else:
+        raise NotImplementedError("Not supported %s" % leading_directories)
 
 
 def _get_cached_filename(archive):
