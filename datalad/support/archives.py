@@ -42,7 +42,8 @@ from ..utils import rmtree
 from ..utils import get_tempfile_kwargs
 from ..utils import assure_unicode
 
-from datalad.support.archive_utils_patool import (
+#from datalad.support.archive_utils_patool import (
+from datalad.support.archive_utils_7z import (
     decompress_file as _decompress_file,
     # other code expects this to be here
     compress_files
