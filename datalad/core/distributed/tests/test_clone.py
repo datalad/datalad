@@ -629,7 +629,9 @@ def test_ria_http(lcl, storepath, url):
     # fashion
     for origds, cloneds in ((ds, riaclone), (subds, riaclonesub)):
         eq_(origds.id, cloneds.id)
-        eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
+        if not ds.repo.is_managed_branch():
+            # test logic cannot handle adjusted branches
+            eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
         ok_(cloneds.config.get('remote.origin.url').startswith(url))
         eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
         eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
@@ -650,11 +652,13 @@ def test_ria_http(lcl, storepath, url):
         'ria+{}#{}@{}'.format(url, ds.id, 'original'),
         lcl / 'clone_orig',
     )
-    # we got the precise version we wanted
-    eq_(riaclone.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
-    # and not the latest
-    eq_(riaclone2.repo.get_hexsha(), ds.repo.get_hexsha())
-    neq_(riaclone2.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
+    if not ds.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        # we got the precise version we wanted
+        eq_(riaclone.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
+        # and not the latest
+        eq_(riaclone2.repo.get_hexsha(), ds.repo.get_hexsha())
+        neq_(riaclone2.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
 
 
 @skip_if_no_network
