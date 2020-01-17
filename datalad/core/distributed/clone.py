@@ -645,7 +645,7 @@ def configure_origins(cfgds, probeds, label=None):
         # given the clone source is a local dataset, we can have a
         # cheap look at it, and configure its own 'origin' as a remote
         # (if there is any), and benefit from additional annex availability
-        originorigin_ds = Dataset(origin_url)
+        originorigin_ds = Dataset(probeds.pathobj / origin_url)
         originorigin_url = originorigin_ds.config.get('remote.origin.url')
         if originorigin_url:
             yield from cfgds.siblings(

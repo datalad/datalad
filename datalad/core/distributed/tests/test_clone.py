@@ -492,6 +492,18 @@ def test_cfg_originorigin(path):
         origin.pathobj
     )
 
+    # Clone another level, this time with a relative path. Drop content from
+    # lev2 so that origin is the only place that the file is available from.
+    clone_lev2.drop("file1.txt")
+    with chpwd(path):
+        clone_lev3 = clone('clone_lev2', 'clone_lev3')
+    assert_result_count(
+        clone_lev3.get('file1.txt', on_failure='ignore'),
+        1,
+        action='get',
+        status='ok',
+        path=str(clone_lev3.pathobj / 'file1.txt'))
+
 
 # test fix for gh-2601/gh-3538
 @known_failure
