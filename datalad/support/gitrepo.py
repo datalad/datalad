@@ -804,7 +804,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return self._repo
 
     @classmethod
-    def clone(cls, url, path, *args, **kwargs):
+    def clone(cls, url, path, *args, clone_options=None, **kwargs):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -814,6 +814,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ----------
         url : str
         path : str
+        clone_options : dict
+          Key/value pairs of arbitrary options that will be passed on to the
+          underlying call to `git-clone`.
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
@@ -883,6 +886,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     repo = gitpy.Repo.clone_from(
                         url, path,
                         env=env,
+                        # we accept a plain dict with options, and not a gitpy
+                        # tailored list of "multi options" to make a future
+                        # non-GitPy based implementation easier. Do conversion
+                        # here
+                        multi_options=to_options(**clone_options) if clone_options else None,
                         odbt=default_git_odbt,
                         progress=git_progress
                     )

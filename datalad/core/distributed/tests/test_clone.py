@@ -44,6 +44,7 @@ from datalad.tests.utils import (
     with_tree,
     with_testrepos,
     eq_,
+    neq_,
     ok_,
     assert_false,
     ok_file_has_content,
@@ -610,14 +611,18 @@ def test_ria_http(lcl, storepath, url):
     subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
     subds.save()
     ds = Dataset(lcl / 'ds').create(force=True)
-    ds.save()
+    ds.save(version_tag='original')
     assert_repo_status(ds.path)
     for d in (ds, subds):
         # make a bare clone of it into a local that matches the organization
         # of a ria dataset store
-        storeds_loc = str(storepath / d.id[:3] / d.id[3:])
-        ds.repo.call_git(['clone', '--bare', d.path, storeds_loc])
-        Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
+        store_loc = str(storepath / d.id[:3] / d.id[3:])
+        ds.repo.call_git(['clone', '--bare', d.path, store_loc])
+        d.siblings('configure', name='store', url=str(store_loc),
+                   result_renderer='disabled')
+        Runner(cwd=store_loc).run(['git', 'update-server-info'])
+    # location of superds in store
+    storeds_loc = str(storepath / ds.id[:3] / ds.id[3:])
     # now we should be able to clone from a ria+http url
     # the super
     riaclone = clone(
@@ -636,11 +641,48 @@ def test_ria_http(lcl, storepath, url):
     # fashion
     for origds, cloneds in ((ds, riaclone), (subds, riaclonesub)):
         eq_(origds.id, cloneds.id)
-        eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
+        if not ds.repo.is_managed_branch():
+            # test logic cannot handle adjusted branches
+            eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
         ok_(cloneds.config.get('remote.origin.url').startswith(url))
         eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
         eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
             'ria+%s#{id}' % url)
+
+    # now advance the source dataset
+    (ds.pathobj / 'newfile.txt').write_text('new')
+    ds.save()
+    ds.publish(to='store')
+    Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
+    # re-clone as before
+    riaclone2 = clone(
+        'ria+{}#{}'.format(url, ds.id),
+        lcl / 'clone2',
+    )
+    # and now clone a specific version, here given be the tag name
+    riaclone_orig = clone(
+        'ria+{}#{}@{}'.format(url, ds.id, 'original'),
+        lcl / 'clone_orig',
+    )
+    if not ds.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        # we got the precise version we wanted
+        eq_(riaclone.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
+        # and not the latest
+        eq_(riaclone2.repo.get_hexsha(), ds.repo.get_hexsha())
+        neq_(riaclone2.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
+
+    # attempt to clone a version that doesn't exist
+    res = clone(
+        'ria+{}#{}@impossible'.format(url, ds.id),
+        lcl / 'clone_failed',
+        on_failure='ignore',
+        result_xfm=None,
+        return_type='list',
+    )
+    # ATM we have no meaningful error messages, see
+    # https://github.com/datalad/datalad/pull/4036#issue-364002705
+    assert_status('error', res)
 
 
 @skip_if_no_network

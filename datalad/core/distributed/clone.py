@@ -385,16 +385,25 @@ def clone_dataset(
     )
     error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
     for cand in candidate_sources:
+        log_progress(
+            lgr.info,
+            'cloneds',
+            'Attempting to clone from %s to %s', cand['giturl'], dest_path,
+            update=1,
+            increment=True)
+
+        clone_opts = {}
+
+        if cand.get('version', None):
+            clone_opts['branch'] = cand['version']
         try:
-            log_progress(
-                lgr.info,
-                'cloneds',
-                'Attempting to clone from %s to %s', cand['giturl'], dest_path,
-                update=1,
-                increment=True)
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
             # doesn't make it happen seemlessly
-            GitRepo.clone(path=str(dest_path), url=cand['giturl'], create=True)
+            GitRepo.clone(
+                path=str(dest_path),
+                url=cand['giturl'],
+                clone_options=clone_opts,
+                create=True)
 
         except GitCommandError as e:
             error_msgs[cand['giturl']] = e
