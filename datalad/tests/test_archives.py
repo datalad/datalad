@@ -25,8 +25,8 @@ from ..support.archives import (
     compress_files,
     decompress_file,
     ExtractedArchive,
-    unixify_path,
 )
+from datalad.support.archive_utils_patool import unixify_path
 from ..support.exceptions import MissingExternalDependency
 from ..support import path as op
 
