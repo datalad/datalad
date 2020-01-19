@@ -17,7 +17,18 @@
 #        "Setting the config flag 'datalad.runtime.use-patool' enabled an "
 #        "alternative implementation that may no need 7z.")
 
-from shlex import quote as quote_filename
+# TODO make common helper
+# https://github.com/datalad/datalad/issues/4048
+from datalad.utils import on_windows
+if not on_windows:
+    from shlex import quote as quote_filename
+else:
+    def quote_filename(name):
+        # https://stackoverflow.com/a/15262019
+        return '"{}"'.format(
+            name.replace('"', '""')
+        )
+
 from datalad.utils import (
     Path,
 )
