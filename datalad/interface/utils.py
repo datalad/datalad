@@ -17,7 +17,6 @@ import logging
 import wrapt
 import sys
 import re
-import shlex
 from os import curdir
 from os import pardir
 from os import listdir
