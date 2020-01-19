@@ -9,13 +9,12 @@
 """7-zip based implementation for datalad.support.archives utilities"""
 
 
-# TODO Disabled for now due to https://github.com/datalad/datalad/issues/4047
-#from datalad.support.external_versions import external_versions
-#external_versions.check(
-#    "cmd:7z",
-#    msg='The 7z binary (7-Zip) is required for archive handling, but is missing. '
-#        "Setting the config flag 'datalad.runtime.use-patool' enabled an "
-#        "alternative implementation that may no need 7z.")
+from datalad.support.external_versions import external_versions
+external_versions.check(
+    "cmd:7z",
+    msg='The 7z binary (7-Zip) is required for archive handling, but is missing. '
+        "Setting the config flag 'datalad.runtime.use-patool' enabled an "
+        "alternative implementation that may no need 7z.")
 
 # TODO make common helper
 # https://github.com/datalad/datalad/issues/4048

@@ -104,6 +104,27 @@ def _get_system_ssh_version():
         return None
 
 
+def _get_system_7z_version():
+    """Return version of 7-Zip"""
+    try:
+        out, err = _runner.run(
+            ['7z'], expect_fail=True, expect_stderr=True,
+        )
+        # reporting in variable order across platforms
+        # Linux: 7-Zip [64] 16.02
+        # Windows: 7-Zip 19.00 (x86)
+        pieces = out.strip().split(':', maxsplit=1)[0].strip().split()
+        for p in pieces:
+            # the one with the dot is the version
+            if '.' in p:
+                return p
+        lgr.debug("Could not determine version of 7z: %s", exc_str(exc))
+        return None
+    except CommandError as exc:
+        lgr.debug("Could not determine version of 7z: %s", exc_str(exc))
+        return None
+
+
 class ExternalVersions(object):
     """Helper to figure out/use versions of the externals (modules, cmdline tools, etc).
 
@@ -126,6 +147,7 @@ class ExternalVersions(object):
         'cmd:bundled-git': _get_bundled_git_version,
         'cmd:system-git': _get_system_git_version,
         'cmd:system-ssh': _get_system_ssh_version,
+        'cmd:7z': _get_system_7z_version,
     }
     INTERESTING = (
         'appdirs',
@@ -140,6 +162,7 @@ class ExternalVersions(object):
         'msgpack',
         'mutagen',
         'patool',
+        'cmd:7z',
         'requests',
         'scrapy',
         'wrapt',
