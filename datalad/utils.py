@@ -2315,13 +2315,12 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
     return format % dict(symbol=symbols[0], value=n)
 
 
-def maybe_shlex_quote(val):
-    """
-    shlex_quote() a value if the command is not run on a Windows
-    machine.
-    """
-
-    return val if on_windows else shlex_quote(val)
+def quote_cmdlinearg(arg):
+    """Perform platform-appropriate argument quoting"""
+    # https://stackoverflow.com/a/15262019
+    return '"{}"'.format(
+        arg.replace('"', '""')
+    ) if on_windows else shlex_quote(arg)
 
 
 def get_wrapped_class(wrapped):
