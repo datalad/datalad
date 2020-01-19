@@ -86,7 +86,7 @@ def compress_files(files, archive, path=None, overwrite=True):
                     apath)
             )
     if len(apath.suffixes) > 1 and apath.suffixes[-2] == '.tar':
-        cmd = '7z u .tar -so -- {} | 7z u -si {}'.format(
+        cmd = '7z u .tar -so -- {} | 7z u -si -- {}'.format(
             ' '.join(quote_filename(f) for f in files),
             quote_filename(str(apath)),
         )
