@@ -32,6 +32,7 @@ from datalad.support.path import (
 )
 
 from datalad.support.locking import lock_if_check_fails
+from datalad.support.external_versions import external_versions
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.utils import (
     any_re_search,
@@ -42,11 +43,17 @@ from datalad.utils import (
     rmtemp,
     rmtree,
     get_tempfile_kwargs,
+    on_windows,
 )
 from datalad import cfg
 from datalad.config import anything2bool
-if cfg.obtain('datalad.runtime.use-patool', default=False,
-              valtype=anything2bool):
+
+# fall back on patool, if a functional implementation is available
+# (i.e. not on windows), it is requested, or 7z is not found
+if not on_windows and (
+        cfg.obtain(
+            'datalad.runtime.use-patool', default=False,
+            valtype=anything2bool) or not external_versions['cmd:7z']):
     from datalad.support.archive_utils_patool import (
         decompress_file as _decompress_file,
         # other code expects this to be here
