@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""patool based implementation for datalad.support.archives utilities"""
+"""7-zip based implementation for datalad.support.archives utilities"""
 
 
 # TODO Disabled for now due to https://github.com/datalad/datalad/issues/4047
