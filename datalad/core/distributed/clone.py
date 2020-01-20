@@ -549,14 +549,13 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
-        if reckless:
-            # store the reckless setting in the dataset to make it
-            # known to later clones of subdatasets via get()
-            ds.config.set(
-                'datalad.clone.reckless', reckless,
-                where='local',
-                # delay reload until all config IO is done
-                reload=False)
+        # store the reckless setting in the dataset to make it
+        # known to later clones of subdatasets via get()
+        ds.config.set(
+            'datalad.clone.reckless', reckless,
+            where='local',
+            # delay reload until all config IO is done
+            reload=False)
         ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
 
