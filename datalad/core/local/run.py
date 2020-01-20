@@ -22,8 +22,6 @@ from os.path import normpath
 from os.path import relpath
 from tempfile import mkdtemp
 
-from shlex import quote as shlex_quote
-
 from datalad.core.local.save import Save
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
@@ -57,6 +55,7 @@ from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
 from datalad.utils import SequenceFormatter
+from datalad.utils import quote_cmdlinearg
 
 lgr = logging.getLogger('datalad.core.local.run')
 
@@ -411,7 +410,7 @@ def normalize_command(command):
                 # Strip disambiguation marker. Note: "running from Python API"
                 # FIXME from below applies to this too.
                 command = command[1:]
-            command = " ".join(shlex_quote(c) for c in command)
+            command = " ".join(quote_cmdlinearg(c) for c in command)
     else:
         command = assure_unicode(command)
     return command
@@ -444,7 +443,7 @@ def format_command(dset, command, **kwds):
         io_val = kwds.pop(name, None)
         if not isinstance(io_val, GlobbedPaths):
             io_val = GlobbedPaths(io_val, pwd=kwds.get("pwd"))
-        kwds[name] = list(map(shlex_quote, io_val.expand(dot=False)))
+        kwds[name] = list(map(quote_cmdlinearg, io_val.expand(dot=False)))
     return sfmt.format(command, **kwds)
 
 

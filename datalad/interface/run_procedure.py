@@ -34,7 +34,7 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.utils import maybe_shlex_quote
+from datalad.utils import quote_cmdlinearg
 
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
@@ -181,7 +181,7 @@ def _guess_exec(script_file):
                 'template': u'bash {script} {ds} {args}',
                 'state': 'executable'}
     elif script_file.endswith('.py'):
-        ex = maybe_shlex_quote(sys.executable)
+        ex = quote_cmdlinearg(sys.executable)
         return {'type': u'python_script',
                 'template': u'%s {script} {ds} {args}' % ex,
                 'state': 'executable'}
@@ -362,6 +362,7 @@ class RunProcedure(Interface):
 
         if not isinstance(spec, (tuple, list)):
             # maybe coming from config
+            # TODO likely causing issues on Windows
             import shlex
             spec = shlex.split(spec)
         name = spec[0]
@@ -425,9 +426,9 @@ class RunProcedure(Interface):
                              "Missing 'execute' permissions?" % procedure_file)
 
         cmd = ex['template'].format(
-            script=maybe_shlex_quote(procedure_file),
-            ds=maybe_shlex_quote(ds.path) if ds else '',
-            args=(u' '.join(maybe_shlex_quote(a) for a in args) if args else ''))
+            script=quote_cmdlinearg(procedure_file),
+            ds=quote_cmdlinearg(ds.path) if ds else '',
+            args=(u' '.join(quote_cmdlinearg(a) for a in args) if args else ''))
         lgr.info(u"Running procedure %s", name)
         lgr.debug(u'Full procedure command: %r', cmd)
         for r in Run.__call__(
