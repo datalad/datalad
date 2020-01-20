@@ -174,11 +174,6 @@ class Clone(Interface):
             dataset=None,
             description=None,
             reckless=None):
-        # legacy compatibility
-        if reckless is True:
-            # so that we can forget about how things used to be
-            reckless = 'auto'
-
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
@@ -186,6 +181,16 @@ class Clone(Interface):
             dataset, check_installed=True, purpose='cloning') \
             if dataset is not None else dataset
         refds_path = ds.path if ds else None
+
+        # legacy compatibility
+        if reckless is True:
+            # so that we can forget about how things used to be
+            reckless = 'auto'
+        if reckless is None and ds:
+            # if reckless is not explicitly given, but we operate on a
+            # superdataset, query whether it has been instructed to operate
+            # in a reckless mode, and inherit it for the coming clone
+            reckless = ds.config.get('datalad.clone.reckless', None)
 
         if isinstance(source, Dataset):
             source = source.path
@@ -544,7 +549,15 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
-        ds.config.add(
+        if reckless:
+            # store the reckless setting in the dataset to make it
+            # known to later clones of subdatasets via get()
+            ds.config.set(
+                'datalad.clone.reckless', reckless,
+                where='local',
+                # delay reload until all config IO is done
+                reload=False)
+        ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
 
     # we have just cloned the repo, so it has 'origin', configure any
