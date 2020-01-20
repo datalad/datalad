@@ -16,7 +16,6 @@ from os.path import (
     join as opj,
     isdir,
     exists,
-    realpath,
     basename,
     dirname,
 )
@@ -32,6 +31,7 @@ from datalad.utils import (
     getpwd,
     _path_,
     rmtree,
+    Path,
 )
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
@@ -101,7 +101,7 @@ def _test_guess_dot_git(annex, path, url, tdir):
     with swallow_logs() as cml:
         installed = install(tdir, source=url)
         assert_not_in("Failed to get annex.uuid", cml.out)
-    eq_(realpath(installed.path), realpath(tdir))
+    eq_(installed.pathobj.resolve(), Path(tdir).resolve())
     ok_(exists(tdir))
     assert_repo_status(tdir, annex=annex)
 

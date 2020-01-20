@@ -13,10 +13,10 @@ import logging
 
 from functools import wraps
 from os.path import isabs
-from os.path import realpath
 from contextlib import contextmanager
 
 from datalad.dochelpers import exc_str
+from datalad.utils import Path
 
 lgr = logging.getLogger("datalad.support.vcr")
 
@@ -100,6 +100,6 @@ def externals_use_cassette(name):
     but want to minimize their network traffic by using vcr.py
     """
     from unittest.mock import patch
-    cassette_path = realpath(_get_cassette_path(name))  # realpath OK
+    cassette_path = str(Path(_get_cassette_path(name)).resolve())  # realpath OK
     with patch.dict('os.environ', {'DATALAD_TESTS_USECASSETTE': cassette_path}):
         yield

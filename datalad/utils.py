@@ -41,7 +41,7 @@ from itertools import tee
 import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix
-from os.path import curdir, basename, exists, realpath, islink, join as opj
+from os.path import curdir, basename, exists, islink, join as opj
 from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
@@ -490,7 +490,7 @@ def get_open_files(path, log_open=False):
     files = {}
     # since the ones returned by psutil would not be aware of symlinks in the
     # path we should also get realpath for path
-    path = realpath(path)
+    path = str(Path(path).resolve())
     for proc in psutil.process_iter():
         try:
             open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
@@ -619,14 +619,15 @@ else:
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
         Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
-        rfilepath = realpath(filepath)
-        if islink(filepath) and exists(rfilepath):
+        filepath = Path(filepath)
+        rfilepath = filepath.resolve()
+        if filepath.is_symlink() and rfilepath.exists():
             # trust noone - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
                     rfilepath, mtime)
-            os.utime(rfilepath, (time.time(), mtime))
+            os.utime(str(rfilepath), (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
@@ -1489,7 +1490,7 @@ def getpwd():
                 raise
         try:
             pwd = os.environ['PWD']
-            pwd_real = op.realpath(pwd)
+            pwd_real = str(Path(pwd).resolve())
             # This logic would fail to catch the case where chdir did happen
             # to the directory where current PWD is pointing to, e.g.
             # $> ls -ld $PWD
@@ -1701,11 +1702,15 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-    filename = realpath(filename)
+    filename = Path(filename).resolve()
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
-            f.write(content)
+        (filename.write_bytes
+         if isinstance(content, bytes)
+         else filename.write_text)(content)
+
+    # TODO globbing below can also be done with pathlib
+    filename = str(filename)
 
     if __debug__:
         # TODO mkdir

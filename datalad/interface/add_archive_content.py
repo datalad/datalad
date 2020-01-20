@@ -18,7 +18,7 @@ import re
 import os
 import tempfile
 
-from os.path import join as opj, realpath, curdir, exists, lexists, relpath, basename
+from os.path import join as opj, curdir, exists, lexists, relpath, basename
 from os.path import commonprefix
 from os.path import sep as opsep
 from os.path import islink
@@ -39,6 +39,7 @@ from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
+from ..utils import Path
 from ..utils import assure_tuple_or_list
 from ..utils import get_dataset_root
 from ..utils import split_cmdline
@@ -216,7 +217,9 @@ class AddArchiveContent(Interface):
             annex = get_repo_instance(pwd, class_=AnnexRepo)
             if not isabs(archive):
                 # if not absolute -- relative to wd and thus
-                archive_path = normpath(opj(realpath(pwd), archive))
+                # normpath() use here is likely problematic (backtracks symlinks
+                # improperly)
+                archive_path = normpath(str(Path(pwd).resolve() / archive))
                 # abspath(archive) is not "good" since dereferences links in the path
                 # archive_path = abspath(archive)
         elif not isabs(archive):
@@ -336,7 +339,7 @@ class AddArchiveContent(Interface):
                 extracted_path = opj(earchive.path, extracted_file)
 
                 if islink(extracted_path):
-                    link_path = realpath(extracted_path)
+                    link_path = str(Path(extracted_path).resolve())
                     if not exists(link_path):  # TODO: config  addarchive.symlink-broken='skip'
                         lgr.warning("Path %s points to non-existing file %s" % (extracted_path, link_path))
                         stats.skipped += 1

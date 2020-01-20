@@ -26,7 +26,6 @@ from os.path import (
     join as opj,
     exists,
     islink,
-    realpath,
     lexists,
     isdir,
     isabs,
@@ -49,9 +48,10 @@ from datalad.utils import (
     auto_repr,
     ensure_list,
     linux_distribution_name,
-    make_tempfile,
     on_windows,
     partition,
+    Path,
+    PurePosixPath,
     quote_cmdlinearg,
     split_cmdline,
     unlink,
@@ -753,19 +753,19 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # we got the git-dir. Assuming the root dir we are looking for is
             # one level up:
-            toppath = realpath(normpath(opj(toppath, pardir)))
+            toppath = Path(toppath, pardir).resolve()
 
             if follow_up:
                 path_ = path
                 path_prev = ""
                 while path_ and path_ != path_prev:  # on top /.. = /
-                    if realpath(path_) == toppath:
+                    if Path(path_).resolve() == toppath:
                         toppath = path_
                         break
                     path_prev = path_
                     path_ = dirname(path_)
 
-        return toppath
+        return str(toppath) if toppath else toppath
 
     def is_initialized(self):
         """quick check whether this appears to be an annex-init'ed repo
@@ -1736,16 +1736,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: Also provide option to look for key instead of path
 
         def quick_check(filename):
-            filepath = opj(self.path, filename)
-            if islink(filepath):                    # if symlink
+            filepath = self.pathobj / filename
+            if filepath.is_symlink():                    # if symlink
                 # find abspath of node pointed to by symlink
-                target_path = realpath(filepath)  # realpath OK
+                target_path = filepath.resolve()  # realpath OK
                 # TODO: checks for being not outside of this repository
                 # Note: ben removed '.git/' from '.git/annex/objects',
                 # since it is not true for submodules, whose '.git' is a
                 # symlink and being resolved to some
                 # '.git/modules/.../annex/objects'
-                return exists(target_path) and 'annex/objects' in str(target_path)
+                return target_path.exists() and 'annex/objects' in str(target_path)
             return False
 
         return self._check_files(self.find, quick_check,
@@ -1783,16 +1783,17 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self.info([f for f in files if not isdir(f)],
                              fast=True, **kwargs)
 
+        # XXX near duplicate to helper in file_has_content()
         def quick_check(filename):
-            filepath = opj(self.path, filename)
+            filepath = self.pathobj / filename
             # todo checks for being not outside of this repository
             # Note: ben removed '.git/' from '.git/annex/objects',
             # since it is not true for submodules, whose '.git' is a
             # symlink and being resolved to some
             # '.git/modules/.../annex/objects'
             return (
-                islink(filepath)
-                and 'annex/objects' in str(realpath(filepath))  # realpath OK
+                filepath.is_symlink()
+                and 'annex/objects' in str(filepath.resolve())  # realpath OK
             )
 
         return self._check_files(check, quick_check,
@@ -2427,7 +2428,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
             return {
-                j['key' if (key or '--all' in options) else 'file']
+                j['key']
+                if (key or '--all' in options)
+                # report is always POSIX, but normalize_paths wants to match against
+                # the native representation
+                else str(Path(PurePosixPath(j['file'])))
+                if on_windows else j['file']
                 : self._whereis_json_to_dict(j)
                 for j in json_objects
                 if not j.get('key').endswith('.this-is-a-test-key')

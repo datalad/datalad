@@ -14,9 +14,8 @@ from os.path import (
     curdir,
     exists,
     join as opj,
-    normpath, isabs,
+    normpath,
     pardir,
-    realpath,
 )
 from weakref import WeakValueDictionary
 import wrapt
@@ -156,9 +155,13 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        if not hasattr(other, 'path'):
+        if not hasattr(other, 'pathobj'):
             return False
-        return realpath(self.path) == realpath(other.path)
+        # XXX This is strange, why do we need to resolve the paths
+        # isn't the purpose of the Repo instance to be based
+        # on the realpath, while multiple _different_ dataset
+        # instances could point to the same repo?
+        return self.pathobj.resolve() == other.pathobj.resolve()
 
     def __getattr__(self, attr):
         # Assure that we are not just missing some late binding
@@ -234,7 +237,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # Also note, that this could be forged into a single big condition, but
         # that is hard to read and we should be well aware of the actual
         # criteria here:
-        if self._repo is not None and realpath(self.path) == self._repo.path:
+        if self._repo is not None and self.pathobj.resolve() == self._repo.pathobj:
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex

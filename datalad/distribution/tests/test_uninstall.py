@@ -15,7 +15,6 @@ from os.path import (
     split as psplit,
     exists,
     lexists,
-    realpath,
     isdir,
 )
 from glob import glob
@@ -303,16 +302,16 @@ def test_remove_file_handle_only(path):
     # both files link to the same key
     eq_(ds.repo.get_file_key('one'),
         ds.repo.get_file_key('two'))
-    rpath_one = realpath(opj(ds.path, 'one'))
-    eq_(rpath_one, realpath(opj(ds.path, 'two')))
-    path_two = opj(ds.path, 'two')
-    ok_(exists(path_two))
+    rpath_one = (ds.pathobj / 'one').resolve()
+    eq_(rpath_one, (ds.pathobj / 'two').resolve())
+    path_two = ds.pathobj / 'two'
+    ok_(path_two.exists())
     # remove one handle, should not affect the other
     ds.remove('two', check=False, message="custom msg")
     eq_(ds.repo.format_commit("%B").rstrip(), "custom msg")
-    eq_(rpath_one, realpath(opj(ds.path, 'one')))
-    ok_(exists(rpath_one))
-    ok_(not exists(path_two))
+    eq_(rpath_one, (ds.pathobj / 'one').resolve())
+    ok_(rpath_one.exists())
+    ok_(not path_two.exists())
     # remove file without specifying the dataset -- shouldn't fail
     with chpwd(path):
         remove('one', check=False)

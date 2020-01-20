@@ -482,7 +482,7 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
 @with_tempfile(mkdir=True)
 def test_resolve_path(path):
-    if op.realpath(path) != path:
+    if str(Path(path).resolve()) != path:
         raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
     opath = op.join(path, "origin")

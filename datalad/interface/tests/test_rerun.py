@@ -24,6 +24,7 @@ from unittest.mock import patch
 from datalad.utils import (
     chpwd,
     on_windows,
+    Path,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -473,7 +474,7 @@ def test_rerun_subdir(path):
     # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
     # in the TMPDIR="/var/tmp/sym link" test case. Temporarily call realpath.
     def ok_file_under_git_kludge(path, basename):
-        ok_file_under_git(op.join(op.realpath(path), basename), annexed=True)
+        ok_file_under_git(op.join(str(Path(path).resolve()), basename), annexed=True)
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
