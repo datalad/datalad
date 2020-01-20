@@ -411,6 +411,16 @@ def clone_dataset(
                 create=True)
 
         except GitCommandError as e:
+            # Whenever progress reporting is enabled, as it is now,
+            # we end up without e.stderr since it is "processed" out by
+            # GitPython/our progress handler.
+            e_stderr = e.stderr
+            from datalad.support.gitrepo import GitPythonProgressBar
+            if not e_stderr and GitPythonProgressBar._last_error_lines:
+                e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
+                # Mimic format set in GitCommandError.__init__().
+                e.stderr = "{}  stderr: {}".format(os.linesep, e_stderr)
+
             error_msgs[cand['giturl']] = e
             lgr.debug("Failed to clone from URL: %s (%s)",
                       cand['giturl'], exc_str(e))
@@ -422,13 +432,7 @@ def clone_dataset(
                 # TODO stringification can be removed once patlib compatible
                 # or if PY35 is no longer supported
                 rmtree(str(dest_path), children_only=dest_path_existed)
-            # Whenever progress reporting is enabled, as it is now,
-            # we end up without e.stderr since it is "processed" out by
-            # GitPython/our progress handler.
-            e_stderr = e.stderr
-            from datalad.support.gitrepo import GitPythonProgressBar
-            if not e_stderr and GitPythonProgressBar._last_error_lines:
-                e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
+
             if 'could not create work tree' in e_stderr.lower():
                 # this cannot be fixed by trying another URL
                 re_match = re.match(r".*fatal: (.*)$", e_stderr,

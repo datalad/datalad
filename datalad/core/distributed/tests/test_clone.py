@@ -684,8 +684,7 @@ def test_ria_http(lcl, storepath, url):
         with assert_raises(IncompleteResultsError) as cme:
             clone('ria+{}#{}@impossible'.format(url, ds.id),
                   lcl / 'clone_failed')
-    # ATM we have no meaningful error messages, see
-    # https://github.com/datalad/datalad/pull/4036#issue-364002705
+        assert_in("not found in upstream", str(cme.exception))
 
 
 @skip_if_no_network
