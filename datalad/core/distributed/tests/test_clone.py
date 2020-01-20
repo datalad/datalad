@@ -680,16 +680,12 @@ def test_ria_http(lcl, storepath, url):
         neq_(riaclone2.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
 
     # attempt to clone a version that doesn't exist
-    res = clone(
-        'ria+{}#{}@impossible'.format(url, ds.id),
-        lcl / 'clone_failed',
-        on_failure='ignore',
-        result_xfm=None,
-        return_type='list',
-    )
+    with swallow_logs():
+        with assert_raises(IncompleteResultsError) as cme:
+            clone('ria+{}#{}@impossible'.format(url, ds.id),
+                  lcl / 'clone_failed')
     # ATM we have no meaningful error messages, see
     # https://github.com/datalad/datalad/pull/4036#issue-364002705
-    assert_status('error', res)
 
 
 @skip_if_no_network
