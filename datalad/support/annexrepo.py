@@ -18,7 +18,6 @@ import logging
 import math
 import os
 import re
-import shlex
 
 from itertools import chain
 from os import linesep
@@ -54,7 +53,9 @@ from datalad.utils import (
     assure_list,
     make_tempfile,
     partition,
-    unlink
+    unlink,
+    quote_cmdlinearg,
+    split_cmdline,
 )
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
@@ -2776,7 +2777,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         stdout, stderr
         """
-        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
+        cmd = split_cmdline(
+            cmd_str + " " + " ".join(quote_cmdlinearg(f) for f in files)) \
             if isinstance(cmd_str, str) \
             else cmd_str + files
 
@@ -2965,7 +2967,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         annex_options = ['--to=%s' % remote]
         if options:
-            annex_options.extend(shlex.split(options))
+            annex_options.extend(split_cmdline(options))
 
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones

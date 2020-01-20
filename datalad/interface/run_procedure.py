@@ -34,7 +34,10 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.utils import quote_cmdlinearg
+from datalad.utils import (
+    quote_cmdlinearg,
+    split_cmdline,
+)
 
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
@@ -362,9 +365,7 @@ class RunProcedure(Interface):
 
         if not isinstance(spec, (tuple, list)):
             # maybe coming from config
-            # TODO likely causing issues on Windows
-            import shlex
-            spec = shlex.split(spec)
+            spec = split_cmdline(spec)
         name = spec[0]
         args = spec[1:]
 
