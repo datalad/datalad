@@ -23,6 +23,7 @@ import tempfile
 from datalad.support.param import Parameter
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.utils import split_cmdline
 
 from datalad import ssh_manager
 
@@ -88,16 +89,15 @@ class SSHRun(Interface):
         if cmd.startswith("'") and cmd.endswith("'"):
             lgr.debug(
                 "Detected additional level of quotations in %r so performing "
-                "shlex split", cmd
+                "command line splitting", cmd
             )
             # there is an additional layer of quotes
-            # Let's strip them off using shlex
-            import shlex
-            cmd_ = shlex.split(cmd)
+            # Let's strip them off by splitting the command
+            cmd_ = split_cmdline(cmd)
             if len(cmd_) != 1:
                 raise RuntimeError(
-                    "Obtained more or less than a single argument upon shlex "
-                    "split: %s" % repr(cmd_))
+                    "Obtained more or less than a single argument after "
+                    "command line splitting: %s" % repr(cmd_))
             cmd = cmd_[0]
         sshurl = 'ssh://{}{}'.format(
             login,

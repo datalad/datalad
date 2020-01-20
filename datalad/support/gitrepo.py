@@ -13,7 +13,6 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import re
-import shlex
 import time
 import os
 import os.path as op
@@ -82,7 +81,8 @@ from datalad.utils import (
     posix_relpath,
     assure_dir,
     generate_file_chunks,
-    assure_unicode
+    assure_unicode,
+    split_cmdline,
 )
 
 # imports from same module:
@@ -1866,7 +1866,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, str):
-            cmd = shlex.split(cmd_str, posix=not on_windows)
+            cmd = split_cmdline(cmd_str)
         else:
             cmd = cmd_str[:]  # we will modify in-place
 
