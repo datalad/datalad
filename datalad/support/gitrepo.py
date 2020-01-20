@@ -1111,6 +1111,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 log_stdout=True, log_stderr=True,
                 expect_fail=True, expect_stderr=True)
             toppath = toppath.rstrip('\n\r')
+            if on_windows:
+                # normalize POSIX-like path reported by Git
+                # back to platform conventions
+                toppath = str(Path(toppath))
         except CommandError:
             return None
         except OSError:

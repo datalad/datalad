@@ -24,7 +24,10 @@ import sys
 from datalad import get_encoding_info
 from datalad.cmd import Runner
 
-from datalad.utils import unlink
+from datalad.utils import (
+    unlink,
+    Path,
+)
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
@@ -47,7 +50,6 @@ from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import integration
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
@@ -187,14 +189,12 @@ def test_GitRepo_equals(path1, path2):
     ok_(repo1 != repo2)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:515
-@known_failure_windows
 @assert_cwd_unchanged
-@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile
 def test_GitRepo_add(src, path):
 
-    gr = GitRepo.clone(src, path)
+    gr = GitRepo(path, create=True)
     filename = get_most_obscure_supported_name()
     with open(op.join(path, filename), 'w') as f:
         f.write("File to add to git")
@@ -445,15 +445,13 @@ def test_GitRepo_remote_remove(orig_path, path):
     assert_in('origin', out)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:491
-@known_failure_windows
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_remote_url(orig_path, path):
 
     gr = GitRepo.clone(orig_path, path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    eq_(gr.get_remote_url('origin'), orig_path)
+    eq_(gr.get_remote_url('origin'), Path(orig_path).as_posix())
     eq_(gr.get_remote_url('github'),
                  'git://github.com/datalad/testrepo--basic--r1')
 
@@ -769,12 +767,11 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:505
-@known_failure_windows
-@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_GitRepo_get_toppath(repo, tempdir, repo2):
+    GitRepo(repo, create=True)
     reporeal = op.realpath(repo)
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)
     eq_(GitRepo.get_toppath(repo), repo)
