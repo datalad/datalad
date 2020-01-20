@@ -369,6 +369,30 @@ from pathlib import (
     PurePosixPath,
 )
 
+if sys.version_info.major == 3 and sys.version_info.minor < 6:
+    # Path.resolve() doesn't have strict=False until 3.6
+    # monkey patch it -- all code imports this class from this
+    # module
+    Path._datalad_moved_resolve = Path.resolve
+
+    def _resolve_without_strict(self, strict=False):
+        if strict or self.exists():
+            # this is pre 3.6 behavior
+            return self._datalad_moved_resolve()
+
+        # if strict==False, find the closest component
+        # that actually exists and resolve that one
+        for p in self.parents:
+            if not p.exists():
+                continue
+            resolved = p._datalad_moved_resolve()
+            # append the rest that did not exist
+            return resolved / self.relative_to(p)
+        # pathlib return the unresolved if nothing resolved
+        return self
+
+    Path.resolve = _resolve_without_strict
+
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
