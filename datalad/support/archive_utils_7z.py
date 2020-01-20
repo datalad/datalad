@@ -16,20 +16,9 @@ external_versions.check(
         "Setting the config flag 'datalad.runtime.use-patool' enabled an "
         "alternative implementation that may no need 7z.")
 
-# TODO make common helper
-# https://github.com/datalad/datalad/issues/4048
-from datalad.utils import on_windows
-if not on_windows:
-    from shlex import quote as quote_filename
-else:
-    def quote_filename(name):
-        # https://stackoverflow.com/a/15262019
-        return '"{}"'.format(
-            name.replace('"', '""')
-        )
-
 from datalad.utils import (
     Path,
+    quote_cmdlinearg,
 )
 
 import logging
@@ -55,7 +44,7 @@ def decompress_file(archive, dir_):
         # decompressor first
         # hangs somehow, do via single string arg
         #cmd = ['7z', 'x', archive, '-so', '|', '7z', 'x', '-si', '-ttar']
-        cmd = '7z x {} -so | 7z x -si -ttar'.format(quote_filename(archive))
+        cmd = '7z x {} -so | 7z x -si -ttar'.format(quote_cmdlinearg(archive))
     else:
         # fire and forget
         cmd = ['7z', 'x', archive]
@@ -87,8 +76,8 @@ def compress_files(files, archive, path=None, overwrite=True):
             )
     if len(apath.suffixes) > 1 and apath.suffixes[-2] == '.tar':
         cmd = '7z u .tar -so -- {} | 7z u -si -- {}'.format(
-            ' '.join(quote_filename(f) for f in files),
-            quote_filename(str(apath)),
+            ' '.join(quote_cmdlinearg(f) for f in files),
+            quote_cmdlinearg(str(apath)),
         )
     else:
         cmd = ['7z', 'u', str(apath), '--'] + files
