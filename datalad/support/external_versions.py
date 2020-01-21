@@ -118,7 +118,8 @@ def _get_system_7z_version():
             # the one with the dot is the version
             if '.' in p:
                 return p
-        lgr.debug("Could not determine version of 7z: %s", exc_str(exc))
+        lgr.debug("Could not determine version of 7z from stdout. "
+                  "stdout: %s, stderr: %s", out, err)
         return None
     except CommandError as exc:
         lgr.debug("Could not determine version of 7z: %s", exc_str(exc))
