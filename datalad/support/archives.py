@@ -11,42 +11,62 @@
 """
 
 import hashlib
-
 import os
 import tempfile
-from .path import (
+from urllib.parse import unquote as urlunquote
+import string
+import random
+import logging
+
+from datalad.support.path import (
     join as opj,
-    exists, abspath, isabs, normpath, relpath, pardir, isdir,
+    exists,
+    abspath,
+    isabs,
+    normpath,
+    relpath,
+    pardir,
+    isdir,
     realpath,
     sep as opsep,
 )
-from urllib.parse import unquote as urlunquote
 
-import string
-import random
-
-from .locking import lock_if_check_fails
-from ..utils import (
+from datalad.support.locking import lock_if_check_fails
+from datalad.support.external_versions import external_versions
+from datalad.consts import ARCHIVES_TEMP_DIR
+from datalad.utils import (
     any_re_search,
-    assure_bytes,
+    ensure_bytes,
+    ensure_unicode,
     unlink,
     rmdir,
+    rmtemp,
+    rmtree,
+    get_tempfile_kwargs,
+    on_windows,
 )
+from datalad import cfg
+from datalad.config import anything2bool
 
-import logging
+# fall back on patool, if a functional implementation is available
+# (i.e. not on windows), it is requested, or 7z is not found
+if not on_windows and (
+        cfg.obtain(
+            'datalad.runtime.use-patool', default=False,
+            valtype=anything2bool) or not external_versions['cmd:7z']):
+    from datalad.support.archive_utils_patool import (
+        decompress_file as _decompress_file,
+        # other code expects this to be here
+        compress_files
+    )
+else:
+    from datalad.support.archive_utils_7z import (
+        decompress_file as _decompress_file,
+        # other code expects this to be here
+        compress_files
+    )
+
 lgr = logging.getLogger('datalad.support.archives')
-
-from ..utils import rmtemp
-from ..consts import ARCHIVES_TEMP_DIR
-from ..utils import rmtree
-from ..utils import get_tempfile_kwargs
-from ..utils import assure_unicode
-
-from datalad.support.archive_utils_patool import (
-    decompress_file as _decompress_file,
-    # other code expects this to be here
-    compress_files
-)
 
 
 def decompress_file(archive, dir_, leading_directories='strip'):
@@ -89,7 +109,7 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    archive_cached = hashlib.md5(assure_bytes(realpath(archive))).hexdigest()[:10]
+    archive_cached = hashlib.md5(ensure_bytes(realpath(archive))).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
 
@@ -132,7 +152,7 @@ class ArchivesCache(object):
             path = tempfile.mktemp(**get_tempfile_kwargs())
         self._path = path
         self.persistent = persistent
-        # TODO?  assure that it is absent or we should allow for it to persist a bit?
+        # TODO?  ensure that it is absent or we should allow for it to persist a bit?
         #if exists(path):
         #    self._clean_cache()
         self._archives = {}
@@ -144,7 +164,7 @@ class ArchivesCache(object):
                 self._made_path = True
                 os.makedirs(path)
                 lgr.debug("Cache initialized")
-            except:
+            except Exception as e:
                 lgr.error("Failed to initialize cached under %s" % path)
                 raise
         else:
@@ -307,7 +327,7 @@ class ExtractedArchive(object):
         assert (exists(path))
         # create a stamp
         with open(self.stamp_path, 'wb') as f:
-            f.write(assure_bytes(self._archive))
+            f.write(ensure_bytes(self._archive))
         # assert that stamp mtime is not older than archive's directory
         assert (self.is_extracted)
 
@@ -330,7 +350,7 @@ class ExtractedArchive(object):
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
         for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
-                yield assure_unicode(opj(root, name)[path_len:])
+                yield ensure_unicode(opj(root, name)[path_len:])
 
     def get_leading_directory(self, depth=None, consider=None, exclude=None):
         """Return leading directory of the content within archive
@@ -396,5 +416,5 @@ class ExtractedArchive(object):
         try:
             if self._persistent:
                 self.clean()
-        except:  # MIH: IOError?
+        except Exception as e:  # MIH: IOError?
             pass
