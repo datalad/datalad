@@ -131,7 +131,7 @@ class Clone(Interface):
              code_py="clone(dataset='.', "
              "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
              code_cmd="datalad clone -d . "
-             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+             "https://github.com/datalad-datasets/longnow-podcasts.git"),
         dict(text="Install the main superdataset from datasets.datalad.org",
              code_py="clone(source='///')",
              code_cmd="datalad clone ///"),
