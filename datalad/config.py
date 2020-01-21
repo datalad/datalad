@@ -722,3 +722,49 @@ class ConfigManager(object):
 
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)
+
+
+def rewrite_url(cfg, url):
+    """Any matching 'url.<base>.insteadOf' configuration is applied
+
+    Any URL that starts with such a configuration will be rewritten
+    to start, instead, with <base>. When more than one insteadOf
+    strings match a given URL, the longest match is used.
+
+    Parameters
+    ----------
+    cfg : ConfigManager or dict
+      dict-like with configuration variable name/value-pairs.
+    url : str
+      URL to be rewritten, if matching configuration is found.
+
+    Returns
+    -------
+    str
+      Rewritten or unmodified URL.
+    """
+    insteadof = {
+        # only leave the base url
+        k[4:-10]: v
+        for k, v in cfg.items()
+        if k.startswith('url.') and k.endswith('.insteadof')
+    }
+    prev_url = None
+    while url != prev_url:
+        prev_url = url
+        # all config that applies
+        matches = {k: len(v) for k, v in insteadof.items()
+                   if url.startswith(v)}
+        # find longest match, like Git does
+        if matches:
+            rewrite_base, match_len = sorted(
+                matches.items(),
+                key=lambda x: x[1],
+                reverse=True,
+            )[0]
+            url = '{}{}'.format(rewrite_base, url[match_len:])
+    return url
+
+
+# for convenience, bind to class too
+ConfigManager.rewrite_url = rewrite_url

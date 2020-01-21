@@ -32,7 +32,10 @@ from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
-from datalad.config import ConfigManager
+from datalad.config import (
+    ConfigManager,
+    rewrite_url,
+)
 from datalad.cmd import CommandError
 
 from datalad.support.external_versions import external_versions
@@ -373,3 +376,28 @@ def test_overrides():
          cfg._cfgfiles,
          [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
     ))
+
+
+def test_rewrite_url():
+    test_cases = (
+        # no match
+        ('unicorn', 'unicorn'),
+        # custom label replacement
+        ('example:datalad/datalad.git', 'git@example.com:datalad/datalad.git'),
+        # protocol enforcement
+        ('git://example.com/some', 'https://example.com/some'),
+        # chained rewrite
+        ('ria+ssh://myinst#SOMEID', 'ria+file://some/path#SOMEID'),
+    )
+    cfg_in = {
+        'git@example.com:': 'example:',
+        'https://example': 'git://example',
+        'ria+ssh://fully.qualified.com': 'ria+ssh://myinst',
+        'ria+file://some/path': 'ria+ssh://fully.qualified.com',
+    }
+    cfg = {
+        'url.{}.insteadof'.format(k): v
+        for k, v in cfg_in.items()
+    }
+    for input, output in test_cases:
+        assert_equal(rewrite_url(cfg, input), output)
