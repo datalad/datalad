@@ -365,12 +365,9 @@ def test_path_diff(_path, linkpath):
     # duplicate paths do not change things
     eq_(plain_recursive, ds.diff(path=['.', '.'], recursive=True, annex='all'))
     # neither do nested paths
-    if external_versions["cmd:git"] < "2.24.0":
-        # TODO: The link below points to discussion of this behavioral change
-        # in Git. If the behavior is addressed in a future release, update the
-        # condition above with a ceiling. If it's not, think more about how to
-        # handle this change on our side.
-        # https://lore.kernel.org/git/87fti15agv.fsf@kyleam.com/T/#u
+    if not ("2.24.0" <= external_versions["cmd:git"] < "2.25.0"):
+        # Release 2.24.0 contained a regression that was fixed with 072a231016
+        # (2019-12-10).
         eq_(plain_recursive,
             ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all'))
     # when invoked in a subdir of a dataset it still reports on the full thing
