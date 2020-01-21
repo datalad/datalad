@@ -13,8 +13,8 @@ from datalad.support.external_versions import external_versions
 external_versions.check(
     "cmd:7z",
     msg='The 7z binary (7-Zip) is required for archive handling, but is missing. '
-        "Setting the config flag 'datalad.runtime.use-patool' enabled an "
-        "alternative implementation that may no need 7z.")
+        "Setting the config flag 'datalad.runtime.use-patool' enables an "
+        "alternative implementation that may not need 7z.")
 
 from datalad.utils import (
     Path,
