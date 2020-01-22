@@ -10,6 +10,7 @@
 
 """
 
+import logging
 import os
 from os.path import exists
 from os.path import join as opj
@@ -386,18 +387,34 @@ def test_rewrite_url():
         ('example:datalad/datalad.git', 'git@example.com:datalad/datalad.git'),
         # protocol enforcement
         ('git://example.com/some', 'https://example.com/some'),
-        # chained rewrite
-        ('ria+ssh://myinst#SOMEID', 'ria+file://some/path#SOMEID'),
+        # multi-match
+        ('mylabel', 'ria+ssh://fully.qualified.com'),
+        ('myotherlabel', 'ria+ssh://fully.qualified.com'),
+        # conflicts, same label pointing to different URLs
+        ('conflict', 'conflict'),
+        # also conflicts, but hidden in a multi-value definition
+        ('conflict2', 'conflict2'),
     )
     cfg_in = {
+        # label rewrite
         'git@example.com:': 'example:',
+        # protocol change
         'https://example': 'git://example',
-        'ria+ssh://fully.qualified.com': 'ria+ssh://myinst',
-        'ria+file://some/path': 'ria+ssh://fully.qualified.com',
+        # multi-value
+        'ria+ssh://fully.qualified.com': ('mylabel', 'myotherlabel'),
+        # conflicting definitions
+        'http://host1': 'conflict',
+        'http://host2': 'conflict',
+        # hidden conflict
+        'http://host3': 'conflict2',
+        'http://host4': ('someokish', 'conflict2'),
     }
     cfg = {
         'url.{}.insteadof'.format(k): v
         for k, v in cfg_in.items()
     }
     for input, output in test_cases:
-        assert_equal(rewrite_url(cfg, input), output)
+        with swallow_logs(logging.WARNING) as msg:
+            assert_equal(rewrite_url(cfg, input), output)
+        if input.startswith('conflict'):
+            assert_in("Ignoring URL rewrite", msg.out)
