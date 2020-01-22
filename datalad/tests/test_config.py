@@ -449,3 +449,19 @@ def test_no_leaks(path1, path2):
         # these are the right ones
         assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
         assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+
+
+@with_tempfile
+def test_dataset_local_mode(path):
+    ds = create(path)
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', ds.config)
+    # from .datalad/config
+    assert_in('datalad.dataset.id', ds.config)
+    # from .git/config
+    assert_in('annex.version', ds.config)
+    # now check that dataset-local mode doesn't have the global piece
+    cfg = ConfigManager(ds, source='dataset-local')
+    assert_not_in('user.name', cfg)
+    assert_in('datalad.dataset.id', cfg)
+    assert_in('annex.version', cfg)

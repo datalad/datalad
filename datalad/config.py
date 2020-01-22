@@ -172,19 +172,21 @@ class ConfigManager(object):
       Legacy option, do not use.
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
-    source : {'any', 'local', 'dataset'}, optional
+    source : {'any', 'local', 'dataset', 'dataset-local'}, optional
       Which sources of configuration setting to consider. If 'dataset',
       configuration items are only read from a dataset's persistent
       configuration file, if any is present (the one in ``.datalad/config``, not
-      ``.git/config``); if 'local' any non-committed source is considered
-      (local and global configuration in Git config's terminology); if 'any'
+      ``.git/config``); if 'local', any non-committed source is considered
+      (local and global configuration in Git config's terminology);
+      if 'dataset-local', persistent dataset configuration and local, but
+      not global or system configuration are considered; if 'any'
       all possible sources of configuration are considered.
     """
 
     _checked_git_identity = False
 
     def __init__(self, dataset=None, dataset_only=False, overrides=None, source='any'):
-        if source not in ('any', 'local', 'dataset'):
+        if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
                 'Unkown ConfigManager(source=) setting: {}'.format(source))
             # legacy compat
@@ -211,7 +213,7 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            if source == 'dataset':
+            if source in ('dataset', 'dataset-local'):
                 raise ValueError(
                     'ConfigManager configured to read dataset only, '
                     'but no dataset given')
@@ -295,6 +297,8 @@ class ConfigManager(object):
             self._store.update(self.overrides)
             return
 
+        if self._src_mode == 'dataset-local':
+            run_args.append('--local')
         stdout, stderr = self._run(run_args, log_stderr=True)
         self._store, self._cfgfiles = _parse_gitconfig_dump(
             stdout, self._store, self._cfgfiles, replace=True,
