@@ -749,20 +749,17 @@ def rewrite_url(cfg, url):
         for k, v in cfg.items()
         if k.startswith('url.') and k.endswith('.insteadof')
     }
-    prev_url = None
-    while url != prev_url:
-        prev_url = url
-        # all config that applies
-        matches = {k: len(v) for k, v in insteadof.items()
-                   if url.startswith(v)}
-        # find longest match, like Git does
-        if matches:
-            rewrite_base, match_len = sorted(
-                matches.items(),
-                key=lambda x: x[1],
-                reverse=True,
-            )[0]
-            url = '{}{}'.format(rewrite_base, url[match_len:])
+    # all config that applies
+    matches = {k: len(v) for k, v in insteadof.items()
+               if url.startswith(v)}
+    # find longest match, like Git does
+    if matches:
+        rewrite_base, match_len = sorted(
+            matches.items(),
+            key=lambda x: x[1],
+            reverse=True,
+        )[0]
+        url = '{}{}'.format(rewrite_base, url[match_len:])
     return url
 
 
