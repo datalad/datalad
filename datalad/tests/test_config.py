@@ -446,3 +446,6 @@ def test_no_leaks(path1, path2):
         # and that we do not track the wrong files
         assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
         assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        # these are the right ones
+        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
+        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)

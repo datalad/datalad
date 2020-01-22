@@ -2516,7 +2516,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             '',
             ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
-        db, _ = _parse_gitconfig_dump(out, {}, None, True)
+        db, _ = _parse_gitconfig_dump(out, {}, None, True, cwd=self.path)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):

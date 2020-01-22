@@ -25,6 +25,7 @@ from os.path import (
     exists,
     getmtime,
     abspath,
+    isabs,
 )
 from time import time
 
@@ -64,7 +65,7 @@ def _where_reload(obj):
     return obj
 
 
-def _parse_gitconfig_dump(dump, store, fileset, replace):
+def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
     if replace:
         # if we want to replace existing values in the store
         # collect into a new dict and `update` the store at the
@@ -81,7 +82,10 @@ def _parse_gitconfig_dump(dump, store, fileset, replace):
             continue
         if line.startswith('file:'):
             # origin line
-            fileset.add(abspath(line[5:]))
+            fname = line[5:]
+            if not isabs(fname):
+                fname = opj(cwd, fname) if cwd else abspath(fname)
+            fileset.add(fname)
             continue
         if line.startswith('command line:'):
             # nothing we could handle
@@ -283,7 +287,8 @@ class ConfigManager(object):
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store, self._cfgfiles = _parse_gitconfig_dump(
-                    stdout, self._store, self._cfgfiles, replace=False)
+                    stdout, self._store, self._cfgfiles, replace=False,
+                    cwd=self._runner.cwd)
 
         if self._src_mode == 'dataset':
             # superimpose overrides, and stop early
@@ -292,7 +297,8 @@ class ConfigManager(object):
 
         stdout, stderr = self._run(run_args, log_stderr=True)
         self._store, self._cfgfiles = _parse_gitconfig_dump(
-            stdout, self._store, self._cfgfiles, replace=True)
+            stdout, self._store, self._cfgfiles, replace=True,
+            cwd=self._runner.cwd)
 
         # always monitor the dataset cfg location, we know where it is in all cases
         if self._dataset_cfgfname:
