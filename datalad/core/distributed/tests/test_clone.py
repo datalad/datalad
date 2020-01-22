@@ -64,6 +64,7 @@ from datalad.tests.utils import (
     with_sameas_remote,
     known_failure,
     known_failure_appveyor,
+    patch_config,
 )
 from datalad.core.distributed.clone import (
     decode_source_spec,
@@ -685,6 +686,29 @@ def test_ria_http(lcl, storepath, url):
             clone('ria+{}#{}@impossible'.format(url, ds.id),
                   lcl / 'clone_failed')
         assert_in("not found in upstream", str(cme.exception))
+
+    # lastly test if URL rewriting is in effect
+    # on the surface we clone from an SSH source identified by some custom
+    # label, no full URL, but URL rewriting setup maps it back to the
+    # HTTP URL used above
+    with patch_config({
+            'url.ria+{}#.insteadof'.format(url): 'ria+ssh://somelabel#'}):
+        cloned_by_label = clone(
+            'ria+ssh://somelabel#{}'.format(origds.id),
+            lcl / 'cloned_by_label',
+        )
+    # so we get the same setup as above, but....
+    eq_(origds.id, cloned_by_label.id)
+    if not ds.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        eq_(origds.repo.get_hexsha(), cloned_by_label.repo.get_hexsha())
+    ok_(cloned_by_label.config.get('remote.origin.url').startswith(url))
+    eq_(cloned_by_label.config.get('remote.origin.annex-ignore'), 'true')
+    # ... the clone candidates go with the label-based URL such that
+    # future get() requests acknowlege a (system-wide) configuration
+    # update
+    eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-origin'),
+        'ria+ssh://somelabel#{id}')
 
 
 @skip_if_no_network

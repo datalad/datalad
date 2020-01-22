@@ -771,6 +771,9 @@ def decode_source_spec(spec, cfg=None):
         props['type'] = 'dataladri'
         props['giturl'] = source_ri.as_git_url()
     elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
+        # Git never gets to see these URLs, so let's manually apply any
+        # rewrite configuration Git might know about
+        source_ri = RI(cfg.rewrite_url(spec))
         # parse a RIA URI
         dsid, version = source_ri.fragment.split('@', maxsplit=1) \
             if '@' in source_ri.fragment else (source_ri.fragment, None)

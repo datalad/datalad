@@ -10,6 +10,7 @@
 
 """
 
+import logging
 import os
 from os.path import exists
 from os.path import join as opj
@@ -32,7 +33,10 @@ from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
-from datalad.config import ConfigManager
+from datalad.config import (
+    ConfigManager,
+    rewrite_url,
+)
 from datalad.cmd import CommandError
 
 from datalad.support.external_versions import external_versions
@@ -373,3 +377,44 @@ def test_overrides():
          cfg._cfgfiles,
          [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
     ))
+
+
+def test_rewrite_url():
+    test_cases = (
+        # no match
+        ('unicorn', 'unicorn'),
+        # custom label replacement
+        ('example:datalad/datalad.git', 'git@example.com:datalad/datalad.git'),
+        # protocol enforcement
+        ('git://example.com/some', 'https://example.com/some'),
+        # multi-match
+        ('mylabel', 'ria+ssh://fully.qualified.com'),
+        ('myotherlabel', 'ria+ssh://fully.qualified.com'),
+        # conflicts, same label pointing to different URLs
+        ('conflict', 'conflict'),
+        # also conflicts, but hidden in a multi-value definition
+        ('conflict2', 'conflict2'),
+    )
+    cfg_in = {
+        # label rewrite
+        'git@example.com:': 'example:',
+        # protocol change
+        'https://example': 'git://example',
+        # multi-value
+        'ria+ssh://fully.qualified.com': ('mylabel', 'myotherlabel'),
+        # conflicting definitions
+        'http://host1': 'conflict',
+        'http://host2': 'conflict',
+        # hidden conflict
+        'http://host3': 'conflict2',
+        'http://host4': ('someokish', 'conflict2'),
+    }
+    cfg = {
+        'url.{}.insteadof'.format(k): v
+        for k, v in cfg_in.items()
+    }
+    for input, output in test_cases:
+        with swallow_logs(logging.WARNING) as msg:
+            assert_equal(rewrite_url(cfg, input), output)
+        if input.startswith('conflict'):
+            assert_in("Ignoring URL rewrite", msg.out)

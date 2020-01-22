@@ -722,3 +722,61 @@ class ConfigManager(object):
 
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)
+
+
+def rewrite_url(cfg, url):
+    """Any matching 'url.<base>.insteadOf' configuration is applied
+
+    Any URL that starts with such a configuration will be rewritten
+    to start, instead, with <base>. When more than one insteadOf
+    strings match a given URL, the longest match is used.
+
+    Parameters
+    ----------
+    cfg : ConfigManager or dict
+      dict-like with configuration variable name/value-pairs.
+    url : str
+      URL to be rewritten, if matching configuration is found.
+
+    Returns
+    -------
+    str
+      Rewritten or unmodified URL.
+    """
+    insteadof = {
+        # only leave the base url
+        k[4:-10]: v
+        for k, v in cfg.items()
+        if k.startswith('url.') and k.endswith('.insteadof')
+    }
+
+    # all config that applies
+    matches = {
+        key: v
+        for key, val in insteadof.items()
+        for v in (val if isinstance(val, tuple) else (val,))
+        if url.startswith(v)
+    }
+    # find longest match, like Git does
+    if matches:
+        rewrite_base, match = sorted(
+            matches.items(),
+            key=lambda x: len(x[1]),
+            reverse=True,
+        )[0]
+        if sum(match == v for v in matches.values()) > 1:
+            lgr.warning(
+                "Ignoring URL rewrite configuration for '%s', "
+                "multiple conflicting definitions exists: %s",
+                match,
+                ['url.{}.insteadof'.format(k)
+                 for k, v in matches.items()
+                 if v == match]
+            )
+        else:
+            url = '{}{}'.format(rewrite_base, url[len(match):])
+    return url
+
+
+# for convenience, bind to class too
+ConfigManager.rewrite_url = rewrite_url
