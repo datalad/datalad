@@ -602,6 +602,16 @@ def test_decode_source_spec():
     assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
 
 
+def _move2store(storepath, d):
+    # make a bare clone of it into a local that matches the organization
+    # of a ria dataset store
+    store_loc = str(storepath / d.id[:3] / d.id[3:])
+    d.repo.call_git(['clone', '--bare', d.path, store_loc])
+    d.siblings('configure', name='store', url=str(store_loc),
+               result_renderer='disabled')
+    Runner(cwd=store_loc).run(['git', 'update-server-info'])
+
+
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -622,13 +632,7 @@ def test_ria_http(lcl, storepath, url):
     ds.save(version_tag='original')
     assert_repo_status(ds.path)
     for d in (ds, subds):
-        # make a bare clone of it into a local that matches the organization
-        # of a ria dataset store
-        store_loc = str(storepath / d.id[:3] / d.id[3:])
-        ds.repo.call_git(['clone', '--bare', d.path, store_loc])
-        d.siblings('configure', name='store', url=str(store_loc),
-                   result_renderer='disabled')
-        Runner(cwd=store_loc).run(['git', 'update-server-info'])
+        _move2store(storepath, d)
     # location of superds in store
     storeds_loc = str(storepath / ds.id[:3] / ds.id[3:])
     # now we should be able to clone from a ria+http url
