@@ -750,8 +750,12 @@ def rewrite_url(cfg, url):
         if k.startswith('url.') and k.endswith('.insteadof')
     }
     # all config that applies
-    matches = {k: len(v) for k, v in insteadof.items()
-               if url.startswith(v)}
+    matches = {
+        key: len(v)
+        for key, val in insteadof.items()
+        for v in (val if isinstance(val, tuple) else (val,))
+        if url.startswith(v)
+    }
     # find longest match, like Git does
     if matches:
         rewrite_base, match_len = sorted(
