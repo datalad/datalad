@@ -433,7 +433,7 @@ def test_no_leaks(path1, path2):
     # now we move into this one repo, and create another
     # make sure that no config from ds1 leaks into ds2
     with chpwd(path1):
-        ds2 = Dataset(path2).create()
+        ds2 = Dataset(path2)
         assert_not_in('i.was.here', ds2.config.keys())
         ds2.config.reload()
         assert_not_in('i.was.here', ds2.config.keys())
