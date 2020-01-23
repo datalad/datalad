@@ -119,7 +119,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 ('origin', ds_subpath),
-                ('bang', 'youredead'),
+                ('subdataset-source-candidate-bang', 'youredead'),
                 ('local', clone_subpath),
         ])
     # verify template instantiation works
@@ -129,7 +129,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 ('origin', ds_subpath),
-                ('bang', 'pre-{}-post'.format(sub.id)),
+                ('subdataset-source-candidate-bang', 'pre-{}-post'.format(sub.id)),
                 ('local', clone_subpath),
         ])
     # now again, but have an additional remote besides origin that

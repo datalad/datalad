@@ -198,7 +198,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         alternate_suffix=False)
                 )
 
-        for name, tmpl in [(c[40:], ds_repo.config[c])
+        for name, tmpl in [(c[12:], ds_repo.config[c])
                            for c in ds_repo.config.keys()
                            if c.startswith(
                                'datalad.get.subdataset-source-candidate-')]:
