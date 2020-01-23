@@ -14,7 +14,10 @@ from datalad.consts import (
     DATASET_CONFIG_FILE,
     DATALAD_DOTDIR,
 )
-from datalad.cmd import GitRunner
+from datalad.cmd import (
+    GitRunner,
+    CommandError,
+)
 from datalad.dochelpers import exc_str
 from distutils.version import LooseVersion
 
@@ -26,6 +29,7 @@ from os.path import (
     getmtime,
     abspath,
     isabs,
+    expanduser,
 )
 from time import time
 
@@ -195,6 +199,11 @@ class ConfigManager(object):
                 raise ValueError('Refuse to combine legacy dataset_only flag, with '
                                  'source setting')
             source = 'dataset'
+        if dataset and source in ('local', 'dataset-local') \
+                and not dataset.is_installed():
+            raise ValueError(
+                'Cannot manage local configuration of an absent dataset'
+            )
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
@@ -213,7 +222,7 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            if source == 'dataset':
+            if source in ('dataset', 'dataset-local'):
                 raise ValueError(
                     'ConfigManager configured to read dataset only, '
                     'but no dataset given')
@@ -229,10 +238,6 @@ class ConfigManager(object):
         # any "facilitated" leakage -- just disable logging of outputs for
         # this runner
         run_kwargs = dict(log_outputs=False)
-        if dataset is not None:
-            # make sure we run the git config calls in the dataset
-            # to pick up the right config files
-            run_kwargs['cwd'] = dataset.path
         self._runner = GitRunner(**run_kwargs)
         try:
             self._gitconfig_has_showorgin = \
@@ -299,10 +304,33 @@ class ConfigManager(object):
 
         if self._src_mode == 'dataset-local':
             run_args.append('--local')
-        stdout, stderr = self._run(run_args, log_stderr=True)
-        self._store, self._cfgfiles = _parse_gitconfig_dump(
-            stdout, self._store, self._cfgfiles, replace=True,
-            cwd=self._runner.cwd)
+
+        dspath_exists = self._dataset_path and exists(self._dataset_path)
+        if not dspath_exists:
+            # if the dataset is not here (yet), we prevent reading from
+            # CWD in case this happens to be another dataset
+            run_args.append(
+                '--global'
+                # gitconfig would fail with --global if it is not here
+                if exists(opj(expanduser('~'), '.gitconfig'))
+                else '--system')
+
+        try:
+            stdout, stderr = self._run(
+                run_args,
+                log_stderr=True,
+            )
+            self._store, self._cfgfiles = _parse_gitconfig_dump(
+                stdout, self._store, self._cfgfiles, replace=True,
+                cwd=self._dataset_path if dspath_exists else None)
+        except CommandError as e:
+            if 'unable to read config file' in e.stderr:
+                lgr.debug(
+                    'Cannot read non-dataset config, likely there is none: %s',
+                    exc_str(e),
+                )
+            else:
+                raise
 
         # always monitor the dataset cfg location, we know where it is in all cases
         if self._dataset_cfgfname:
@@ -587,7 +615,18 @@ class ConfigManager(object):
         """
         if where:
             args = self._get_location_args(where) + args
-        out = self._runner.run(['git', 'config'] + args, **kwargs)
+        dspath_exists = self._dataset_path and exists(self._dataset_path)
+        if where in ('local', 'dataset') and not dspath_exists:
+            raise ValueError(
+                'Dataset does not exist at {}, cannot write to {} '
+                'configuration.'.format(
+                    self._dataset_path,
+                    where,
+                ))
+        out = self._runner.run(
+            ['git', 'config'] + args,
+            cwd=self._dataset_path if dspath_exists else None,
+            **kwargs)
         if reload:
             self.reload()
         return out
