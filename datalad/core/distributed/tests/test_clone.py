@@ -22,6 +22,7 @@ import os.path as op
 
 from unittest.mock import patch
 
+from datalad.config import ConfigManager
 from datalad import consts
 from datalad.api import (
     create,
@@ -713,6 +714,45 @@ def test_ria_http(lcl, storepath, url):
     # update
     eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-origin'),
         'ria+ssh://somelabel#{id}')
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_inherit_src_candidates(lcl, storepath, url):
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    # dataset with a subdataset
+    ds1 = Dataset(lcl / 'ds1').create()
+    ds1sub = ds1.create('sub')
+    # a different dataset into which we install ds1, but do not touch its subds
+    ds2 = Dataset(lcl / 'ds2').create()
+    ds2.clone(source=ds1.path, path='mysub')
+
+    # we give no dataset a source candidate config!
+    # move all dataset into the store
+    for d in (ds1, ds1sub, ds2):
+        _move2store(storepath, d)
+
+    # now we must be able to obtain all three datasets from the store
+    riaclone = clone(
+        'ria+{}#{}'.format(
+            # store URL
+            url,
+            # ID of the root dataset
+            ds2.id),
+        lcl / 'clone',
+    )
+    # what happens is the the initial clone call sets a source candidate
+    # config, because it sees the dataset coming from a store
+    # all obtained subdatasets get the config inherited on-clone
+    datasets = riaclone.get('.', get_data=False, recursive=True, result_xfm='datasets')
+    # we get two subdatasets
+    eq_(len(datasets), 2)
+    for ds in datasets:
+        eq_(ConfigManager(dataset=ds, source='dataset-local').get(
+            'datalad.get.subdataset-source-candidate-origin'),
+            'ria+%s#{id}' % url)
 
 
 @skip_if_no_network
