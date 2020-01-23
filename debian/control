@@ -45,7 +45,7 @@ Build-Depends: debhelper-compat (= 12),
                python3-wrapt
 Standards-Version: 4.4.1
 Vcs-Browser: https://github.com/datalad/datalad/
-Vcs-Git: https://github.com/datalad/datalad -b debian
+Vcs-Git: https://github.com/datalad/datalad.git -b debian
 Homepage: https://datalad.org
 
 Package: datalad
