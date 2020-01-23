@@ -55,7 +55,7 @@ Depends: python3-datalad (= ${binary:Version}),
          python3-argcomplete,
          ${misc:Depends},
          ${python3:Depends}
-Suggests: datalad-containers,
+Suggests: datalad-container,
           datalad-crawler,
           datalad-neuroimaging
 Description: data files management and distribution platform
