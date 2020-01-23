@@ -465,3 +465,22 @@ def test_dataset_local_mode(path):
     assert_not_in('user.name', cfg)
     assert_in('datalad.dataset.id', cfg)
     assert_in('annex.version', cfg)
+
+
+# https://github.com/datalad/datalad/issues/4071
+@with_tempfile
+def test_dataset_systemglobal_mode(path):
+    ds = create(path)
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', ds.config)
+    # from .datalad/config
+    assert_in('datalad.dataset.id', ds.config)
+    # from .git/config
+    assert_in('annex.version', ds.config)
+    with chpwd(path):
+        # now check that no config from a random dataset at PWD is picked up
+        # if not dataset instance was provided
+        cfg = ConfigManager(dataset=None, source='any')
+        assert_in('user.name', cfg)
+        assert_not_in('datalad.dataset.id', cfg)
+        assert_not_in('annex.version', cfg)
