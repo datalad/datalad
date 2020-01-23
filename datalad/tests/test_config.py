@@ -176,7 +176,7 @@ def test_something(path, new_home):
         assert_in('datalad.unittest.youcan', globalcfg)
         with swallow_logs():
             assert_raises(
-                CommandError,
+                ValueError,
                 globalcfg.unset,
                 'datalad.unittest.youcan',
                 where='local')
@@ -214,17 +214,19 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    # manager needs a valid repo to consider dataset config
+    ds = Dataset(opj(path, 'ds')).create(force=True)
+    cfg = ConfigManager(ds, source='dataset')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
+    cfg = ConfigManager(ds, source='local')
     assert_not_in('crazy.padry', cfg)
     # it will make it in in 'any' mode though
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='any')
+    cfg = ConfigManager(ds, source='any')
     assert_in('crazy.padry', cfg)
     # typos in the source mode arg will not have silent side-effects
     assert_raises(
-        ValueError, ConfigManager, Dataset(opj(path, 'ds')), source='locale')
+        ValueError, ConfigManager, ds, source='locale')
 
 
 @with_tempfile
@@ -438,7 +440,11 @@ def test_no_leaks(path1, path2):
         ds2.config.reload()
         assert_not_in('i.was.here', ds2.config.keys())
 
-        cfg = ConfigManager(ds2, source='local')
+        # we cannot bring it to force-read from a dataset that is not on disk
+        assert_raises(ValueError, ConfigManager, ds2, source='local')
+        assert_raises(ValueError, ConfigManager, ds2, source='dataset-local')
+
+        cfg = ConfigManager(ds2, source='any')
         assert_not_in('i.was.here', cfg.keys())
         cfg.reload()
         assert_not_in('i.was.here', cfg.keys())
@@ -447,8 +453,9 @@ def test_no_leaks(path1, path2):
         assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
         assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
         # these are the right ones
-        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        # but local is excluded, the dataset does not exist on disk
+        assert_not_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
+        assert_not_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
 
 
 @with_tempfile
