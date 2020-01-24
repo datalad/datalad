@@ -641,6 +641,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         elif self.dot_git.is_symlink():
             self.dot_git = self.dot_git.resolve()
 
+        self._is_with_annex = None  # unknown yet
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
@@ -1076,13 +1077,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             self._cfg = ConfigManager(dataset=self, source='any')
         return self._cfg
 
-    def is_with_annex(self):
+    def is_with_annex(self, reload=False):
         """Report if GitRepo (assumed) has (remotes with) a git-annex branch
         """
-        return any(
-            b['refname:strip=2'] == 'git-annex' or b['refname:strip=2'].endswith('/git-annex')
-            for b in self.for_each_ref_(fields='refname:strip=2', pattern=['refs/heads', 'refs/remotes'])
-        )
+        # print("Am I with annex? Last time I thought: %s" % self._is_with_annex)
+        if self._is_with_annex is None or reload:
+            self._is_with_annex = any(
+                b['refname:strip=2'] == 'git-annex' or b['refname:strip=2'].endswith('/git-annex')
+                for b in self.for_each_ref_(fields='refname:strip=2', pattern=['refs/heads', 'refs/remotes'])
+            )
+        return self._is_with_annex
 
     @classmethod
     def get_toppath(cls, path, follow_up=True, git_options=None):
