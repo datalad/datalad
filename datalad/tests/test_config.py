@@ -438,10 +438,8 @@ def test_no_leaks(path1, path2):
         ds2.config.reload()
         assert_not_in('i.was.here', ds2.config.keys())
 
-        cfg = ConfigManager(ds2, source='local')
-        assert_not_in('i.was.here', cfg.keys())
-        cfg.reload()
-        assert_not_in('i.was.here', cfg.keys())
+        ds2.create()
+        assert_not_in('i.was.here', ds2.config.keys())
 
         # and that we do not track the wrong files
         assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
@@ -449,6 +447,15 @@ def test_no_leaks(path1, path2):
         # these are the right ones
         assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
         assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+
+
+@with_tempfile()
+def test_no_local_write_if_no_dataset(path):
+    Dataset(path).create()
+    with chpwd(path):
+        cfg = ConfigManager()
+        with assert_raises(CommandError):
+            cfg.set('a.b.c', 'd', where='local')
 
 
 @with_tempfile

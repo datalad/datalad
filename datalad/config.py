@@ -204,6 +204,7 @@ class ConfigManager(object):
         self._dataset_path = None
         self._dataset_cfgfname = None
         self._repo_cfgfname = None
+        self._config_cmd = ['git', 'config']
         # public dict to store variables that always override any setting
         # read from a file
         # `hasattr()` is needed because `datalad.cfg` is generated upon first module
@@ -217,6 +218,10 @@ class ConfigManager(object):
                 raise ValueError(
                     'ConfigManager configured to read dataset only, '
                     'but no dataset given')
+            # The caller didn't specify a repository. Unset the git directory
+            # when calling 'git config' to prevent a repository in the current
+            # working directory from leaking configuration into the output.
+            self._config_cmd = ['git', '--git-dir=', 'config']
         else:
             self._dataset_path = dataset.path
             if source != 'local':
@@ -587,7 +592,7 @@ class ConfigManager(object):
         """
         if where:
             args = self._get_location_args(where) + args
-        out = self._runner.run(['git', 'config'] + args, **kwargs)
+        out = self._runner.run(self._config_cmd + args, **kwargs)
         if reload:
             self.reload()
         return out
