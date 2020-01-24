@@ -597,12 +597,38 @@ class AnnexRepo(GitRepo, RepoInterface):
         """A little helper to obtain size encoded in a key"""
         if not key:
             return None
-        try:
-            size_str = key.split('-', 2)[1].lstrip('s')
-        except IndexError:
-            # has no 2nd field in the key
+
+        # TODO: this method can be more compact. we don't need particularly
+        #       elaborated error distinction
+
+        # see: https://git-annex.branchable.com/internals/key_format/
+        key_parts = key.split('--')
+        key_fields = key_parts[0].split('-')
+
+        s = S = C = None
+
+        for field in key_fields[1:]:  # first one has to be backend -> ignore
+            if field.startswith('s'):
+                # size of the annexed file content:
+                s = int(field[1:]) if field[1:].isdigit() else None
+            elif field.startswith('S'):
+                # we have a chunk and that's the chunksize:
+                S = int(field[1:]) if field[1:].isdigit() else None
+            elif field.startswith('C'):
+                # we have a chunk, this is it's number:
+                C = int(field[1:]) if field[1:].isdigit() else None
+
+        if s is None:
             return None
-        return int(size_str) if size_str.isdigit() else None
+        elif S is None and C is None:
+            return s
+        elif S and C:
+            if C <= int(s / S):
+                return S
+            else:
+                return s % S
+        else:
+            raise ValueError("invalid key: {}".format(key))
 
     @normalize_path
     def get_file_size(self, path):
