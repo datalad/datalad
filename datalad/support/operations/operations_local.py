@@ -44,7 +44,7 @@ class PosixShellOperations(PurePythonOperations):
         self._runner = Runner(
             # pull from superclass, who knows what might have been
             # done to it
-            cwd=self._cwd,
+            cwd=quote_cmdlinearg(str(self._cwd)),
             env=env,
         )
 
