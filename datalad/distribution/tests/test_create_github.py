@@ -17,7 +17,7 @@ from datalad.api import (
     Dataset,
 )
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     chpwd,
 )
 from datalad.tests.utils import (
@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     with_memory_keyring,
     with_tempfile,
     with_testsui,
+    patch_config,
 )
 from datalad.support.exceptions import (
     MissingExternalDependency,
@@ -169,16 +170,15 @@ def check_integration1(login, keyring,
         kwargs['github_organization'] = organization
 
     ds = Dataset(path).create()
+    config_patch = {}
     if oauthtokens:
-        for oauthtoken in assure_list(oauthtokens):
-            ds.config.add('hub.oauthtoken', oauthtoken, where='local')
+        config_patch['hub.oauthtoken'] = tuple(ensure_list(oauthtokens))
 
     # so we do not pick up local repo configuration/token
     repo_name = 'test_integration1'
-    with chpwd(path):
-        # ATM all the github goodness does not care about "this dataset"
-        # so force "process wide" cfg to pick up our defined above oauthtoken
-        cfg.reload(force=True)
+    # ATM all the github goodness does not care about "this dataset"
+    # so patch the global config
+    with patch_config(config_patch):
         # everything works just nice, no conflicts etc
         res = ds.create_sibling_github(repo_name, **kwargs)
 
@@ -203,4 +203,3 @@ def check_integration1(login, keyring,
 
         # If we ask to reconfigure - should proceed normally
         ds.create_sibling_github(repo_name, existing='reconfigure', **kwargs)
-    cfg.reload(force=True)
