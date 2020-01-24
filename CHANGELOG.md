@@ -164,6 +164,31 @@ only supported Python flavor.
 - [clone][] will now correctly interpret '~/...' paths as absolute path
   specifications. ([#3958][])
 
+- [run-procedure][] mistakenly reported a directory as a procedure.
+  ([#3793][])
+
+- The cleanup for batched git-annex processes has been improved.
+  ([#3794][]) ([#3851][])
+
+- The function for adding a version ID to an AWS S3 URL doesn't
+  support URLs with an "s3://" scheme and raises a
+  `NotImplementedError` exception when it encounters one.  The
+  function learned to return a URL untouched if an "s3://" URL comes
+  in with a version ID.  ([#3842][])
+
+- A few spots needed to be adjusted for compatibility with git-annex's
+  new `--sameas` [feature][gx-sameas], which allows special remotes to
+  share a data store. ([#3856][])
+
+- The `swallow_logs` utility failed to capture some log messages due
+  to an incompatibility with Python 3.7.  ([#3935][])
+
+- [siblings][]
+  - crashed if `--inherit` was passed but the parent dataset did not
+    have a remote with a matching name.  ([#3954][])
+  - configured the wrong pushurl and annexurl values in some
+    cases. ([#3955][])
+
 ### Enhancements and new features since 0.12.0rc6
 
 - By default, datasets cloned from local source paths will now get a
@@ -658,46 +683,6 @@ with more performant implementations.
 
 - Imported various additional methods for the Repo classes to query
   information and save changes.
-
-
-## 0.11.9 (??? ??, 2019) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
-
-### Fixes
-
-- [run-procedure][] mistakenly reported a directory as a procedure.
-  ([#3793][])
-
-- The cleanup for batched git-annex processes has been improved.
-  ([#3794][]) ([#3851][])
-
-- The function for adding a version ID to an AWS S3 URL doesn't
-  support URLs with an "s3://" scheme and raises a
-  `NotImplementedError` exception when it encounters one.  The
-  function learned to return a URL untouched if an "s3://" URL comes
-  in with a version ID.  ([#3842][])
-
-- A few spots needed to be adjusted for compatibility with git-annex's
-  new `--sameas` [feature][gx-sameas], which allows special remotes to
-  share a data store. ([#3856][])
-
-- The `swallow_logs` utility failed to capture some log messages due
-  to an incompatibility with Python 3.7.  ([#3935][])
-
-- [siblings][]
-  - crashed if `--inherit` was passed but the parent dataset did not
-    have a remote with a matching name.  ([#3954][])
-  - configured the wrong pushurl and annexurl values in some
-    cases. ([#3955][])
-
-### Enhancements and new features
-
-?
 
 
 ## 0.11.8 (Oct 11, 2019) -- annex-we-are-catching-up
