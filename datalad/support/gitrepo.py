@@ -881,24 +881,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                with GitPythonProgressBar("Cloning") as git_progress:
-                    repo = gitpy.Repo.clone_from(
-                        url, path,
-                        env=env,
-                        # we accept a plain dict with options, and not a gitpy
-                        # tailored list of "multi options" to make a future
-                        # non-GitPy based implementation easier. Do conversion
-                        # here
-                        multi_options=to_options(**clone_options) if clone_options else None,
-                        odbt=default_git_odbt,
-                        progress=git_progress
-                    )
-                # Note/TODO: signature for clone from:
-                # (url, to_path, progress=None, env=None, **kwargs)
 
+                # TODO bring back progress reporting
+                GitRunner(env=env).run(
+                    ['git', 'clone', url, path] \
+                    + (to_options(**clone_options) if clone_options else []),
+                    expect_fail=False,
+                    expect_stderr=True,
+                )
                 lgr.debug("Git clone completed")
                 break
-            except GitCommandError as e:
+            except CommandError as e:
                 # log here but let caller decide what to do
                 e_str = exc_str(e)
                 # see https://github.com/datalad/datalad/issues/785
@@ -918,18 +911,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
                 raise
 
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' \
-                        and "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython
-                    # /issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
-
-        gr = cls(path, *args, repo=repo, **kwargs)
+        # get ourselves a repository instance
+        gr = cls(path, *args, **kwargs)
         if fix_annex:
             # cheap check whether we deal with an AnnexRepo - we can't check the class of `gr` itself, since we then
             # would need to import our own subclass
