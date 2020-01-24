@@ -456,6 +456,7 @@ def clone_dataset(
         if cand['type'] == 'ria':
             yield from postclonecfg_ria(destds, cand)
 
+        result_props['source'] = cand
         # do not bother with other sources if succeeded
         break
 
