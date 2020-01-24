@@ -98,6 +98,8 @@ test_script:
   # remaining fails: test_addurls test_export_archive test_plugins"
   # additional tests need module `dateutil`!!
   - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.plugin.tests.test_check_dates
+  # command abstraction tests:
+  - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.support.operations.tests
   # remaining fails: test__main__ test_cmd test_log  test_protocols test_test_utils test_auto
   - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.tests.test_utils datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives datalad.tests.test_witless_runner
  

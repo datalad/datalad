@@ -8,7 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
 """
-from datalad.operations import OperationsBase
+from datalad.support.operations.operations_abstract import (
+    OperationsBase
+)
+
 from datalad.cmd import Runner
 from datalad.utils import (
     quote_cmdlinearg,
@@ -18,13 +21,20 @@ from datalad.utils import (
 
 class PurePythonOperations(OperationsBase):
     def make_directory(self, path, force=False):
+        path = self._ensure_absolute(path)
         path.mkdir(
             parents=force,
             exist_ok=force,
         )
 
     def exists(self, path):
+        path = self._ensure_absolute(path)
         return path.exists() or path.is_symlink()
+
+    def rename(self, src, dst):
+        src = self._ensure_absolute(src)
+        dst = self._ensure_absolute(dst)
+        return src.rename(dst)
 
 
 class PosixShellOperations(PurePythonOperations):
@@ -61,9 +71,10 @@ class PosixShellOperations(PurePythonOperations):
         )
 
     def remove(self, path, recursive=False):
+        # Note, that this would currently raise non-specific CommandError
         self._run('rm {} -f {}'.format(
             '-r' if recursive else '',
-            quote_cmdlinearg))
+            quote_cmdlinearg(str(path))))
 
 
 class WindowsShellOperations(PurePythonOperations):

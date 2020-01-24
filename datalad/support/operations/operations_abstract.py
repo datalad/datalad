@@ -29,6 +29,33 @@ class OperationsBase(object):
         """
         self._cwd = Path.cwd() if cwd is None else cwd
 
+    def _ensure_absolute(self, path):
+        """Internal helper to make a path absolute
+
+        If relative path is given, interprete it as relative to initialized CWD
+        if any, to PWD otherwise.
+
+        Parameters
+        ----------
+        path : Path
+
+        Returns
+        -------
+        Path
+        """
+
+        # Note, that this doesn't actually resolve the path. For now, this is
+        # intentional to not get completely confusing return values. This is
+        # only about interpreting as relative to the correct base.
+        # TODO: possibly turn this into a decorator, that allows to assign
+        #       arguments of the actual methods, that need to go through this.
+        if not path.is_absolute():
+            if self._cwd:
+                path = self._cwd / path
+            else:
+                path = Path.cwd() / path
+        return path
+
     def make_directory(self, path, force=False):
         """Create a new directory
 
@@ -69,6 +96,20 @@ class OperationsBase(object):
           If True, everything underneath `path` is also removed, If False,
           `path` removal might fail with present content.
         """
+        raise NotImplementedError
+
+    def rename(self, src, dst):
+        """Rename path `src` to `dst`
+
+        Parameters
+        ----------
+        src : Path
+        dst : Path
+        """
+
+        # TODO; specify what happens if `dst` exists. Note, that pathlib would
+        # silently replace an existing file on Unix, if permissions allow it.
+        # Need a unified behavior across subclasses
         raise NotImplementedError
 
     def change_permissions(self, path, mode, recursive=False):
