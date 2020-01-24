@@ -16,15 +16,54 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- The minimum required version for GitPython is now 2.1.12. ([#4070][])
 
 ### Fixes
 
-?
+- The class for handling configuration values, `ConfigManager`,
+  inappropriately considered the current working directory's dataset,
+  if any, for both reading and writing when instantiated with
+  `dataset=None`.  This misbehavior is fairly inaccessible through
+  typical use of DataLad.  It affects `datalad.cfg`, the top-level
+  configuration instance that should not consider repository-specific
+  values.  It also affects Python users that call `Dataset` with a
+  path that does not yet exist and persists until that dataset is
+  created. ([#4078][])
+
+- [update][] saved the dataset when called with `--merge`, which is
+  unnecessary and risks committing unrelated changes.  ([#3996][])
+
+- Confusing and irrelevant information about Python defaults have been
+  dropped from the command-line help.  ([#4002][])
+
+- The logic for automatically propagating the 'origin' remote when
+  cloning a local source didn't properly account for relative paths.
+  ([#4045][])
+
+- Various fixes to file name handling and quoting on Windows.
+  ([#4049][]) ([#4050][])
+
+- When cloning failed, error lines were not bubbled up to the user in
+  some scenarios.  ([#4060][])
 
 ### Enhancements and new features
 
-?
+- [clone][] (and thus [install][])
+  - now propagates the `reckless` mode from the superdataset when
+    cloning a dataset into it.  ([#4037][])
+  - gained support for `ria+<protocol>://` URLs that point to
+    [RIA][handbook-scalable-datastore] stores.  ([#4022][])
+  - learned to read "@version" from `ria+` URLs and install that
+    version of a dataset ([#4036][]) and to apply URL rewrites
+    configured through Git's `url.*.insteadOf` mechanism ([#4064][]).
+  - now copies `datalad.get.subdataset-source-candidate-<name>`
+    options configured within the superdataset into the subdataset.
+    This is particularly useful for RIA data stores. ([#4073][])
+
+- Archives are now (optionally) handled with 7-Zip instead of
+  `patool`.  7-Zip will be used by default, but `patool` will be used
+  on non-Windows systems if the `datalad.runtime.use-patool` option is
+  set or the `7z` executable is not found.  ([#4041][])
 
 
 ## 0.12.1 (Jan 15, 2020) -- Small bump after big bang
@@ -2006,6 +2045,7 @@ publishing
 [wtf]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-wtf.html
 
 [handbook]: http://handbook.datalad.org
+[handbook-scalable-datastore]: http://handbook.datalad.org/en/latest/usecases/datastorage_for_institutions.html
 [hooks]: http://handbook.datalad.org/en/latest/basics/101-145-hooks.html
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 [NO_COLOR]: https://no-color.org/
@@ -2325,4 +2365,18 @@ publishing
 [#3975]: https://github.com/datalad/datalad/issues/3975
 [#3976]: https://github.com/datalad/datalad/issues/3976
 [#3979]: https://github.com/datalad/datalad/issues/3979
+[#3996]: https://github.com/datalad/datalad/issues/3996
 [#3999]: https://github.com/datalad/datalad/issues/3999
+[#4002]: https://github.com/datalad/datalad/issues/4002
+[#4022]: https://github.com/datalad/datalad/issues/4022
+[#4036]: https://github.com/datalad/datalad/issues/4036
+[#4037]: https://github.com/datalad/datalad/issues/4037
+[#4041]: https://github.com/datalad/datalad/issues/4041
+[#4045]: https://github.com/datalad/datalad/issues/4045
+[#4049]: https://github.com/datalad/datalad/issues/4049
+[#4050]: https://github.com/datalad/datalad/issues/4050
+[#4060]: https://github.com/datalad/datalad/issues/4060
+[#4064]: https://github.com/datalad/datalad/issues/4064
+[#4070]: https://github.com/datalad/datalad/issues/4070
+[#4073]: https://github.com/datalad/datalad/issues/4073
+[#4078]: https://github.com/datalad/datalad/issues/4078
