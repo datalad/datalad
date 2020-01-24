@@ -121,18 +121,18 @@ def test_integration1_yarikoptic():
     )
 
 
-@skip_if_no_network
-@use_cassette('github_datalad_tester')
-@with_testsui(responses=[
-    'datalad-tester',
-    'secret-password',
-    'yes',      # Generate a GitHub token?
-    '2FA code', # VCR tape has a real one
-    'local',    # Where to store the token?
-])
-def test_integration1_datalad_tester():
-    # use case 2 - nothing is known, 2FA, would generate 'DataLad token', and save it
-    check_integration1('datalad-tester')
+#@skip_if_no_network
+#@use_cassette('github_datalad_tester')
+#@with_testsui(responses=[
+#    'datalad-tester',
+#    'secret-password',
+#    'yes',      # Generate a GitHub token?
+#    '2FA code', # VCR tape has a real one
+#    'local',    # Where to store the token?
+#])
+#def test_integration1_datalad_tester():
+#    # use case 2 - nothing is known, 2FA, would generate 'DataLad token', and save it
+#    check_integration1('datalad-tester')
 
 
 @skip_if_no_network
