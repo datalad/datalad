@@ -78,7 +78,49 @@ class PosixShellOperations(PurePythonOperations):
 
 
 class WindowsShellOperations(PurePythonOperations):
-    pass
+
+    # Note that, while this currently a plain copy of PosixShellOperations,
+    # it seems unlikely that it would be good idea to make this a subclass of
+    # PosixShellOperations in the long run. Or may be it is. We need to see a
+    # few more usecases, I think.
+
+    def __init__(self, cwd=None, env=None):
+        super(WindowsShellOperations, self).__init__(cwd=cwd)
+
+        self._runner = Runner(
+            # pull from superclass, who knows what might have been
+            # done to it
+            cwd=quote_cmdlinearg(str(self._cwd)),
+            env=env,
+        )
+
+    def _run(self,
+             cmd,
+             log_stdout=True,
+             log_stderr=True,
+             log_online=False,
+             expect_stderr=False,
+             expect_fail=False,
+             stdin=None):
+        """Internal helper to execute command.
+
+        MUST NOT BE CALLED by non-(sub)class code.
+        """
+        return self._runner.run(
+            cmd,
+            log_stdout=log_stdout,
+            log_stderr=log_stderr,
+            log_online=log_online,
+            expect_stderr=expect_stderr,
+            expect_fail=expect_fail,
+            stdin=stdin,
+        )
+
+    def remove(self, path, recursive=False):
+        # Note, that this would currently raise non-specific CommandError
+        self._run('rm {} -f {}'.format(
+            '-r' if recursive else '',
+            quote_cmdlinearg(str(path))))
 
 
 LocalOperation = WindowsShellOperations if on_windows else PosixShellOperations
