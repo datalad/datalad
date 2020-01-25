@@ -99,10 +99,10 @@ def _cleanup_output(stream, std):
 
 
 class LeanRunner(object):
-    __slots__ = ['cwd', 'env', '_communicate_period']
+    __slots__ = ['cwd', 'env', '_poll_period']
 
-    def __init__(self, cwd=None, env=None, communicate_period=0.1):
-        self._communicate_period = communicate_period
+    def __init__(self, cwd=None, env=None, poll_period=0.1):
+        self._poll_period = poll_period
         self.env = env.copy() if env else None
         self.cwd = cwd
         if cwd and env is not None:
@@ -127,7 +127,7 @@ class LeanRunner(object):
                 stdin=stdin,
                 # intermediate reports are never decoded anyways
                 # from PY37 onwards
-                text=False,
+                #text=False,
                 universal_newlines=False,
             )
         except Exception as e:
@@ -145,7 +145,7 @@ class LeanRunner(object):
                     # get a chunk of output for the specific period
                     # of time
                     pout = process.communicate(
-                        timeout=self._communicate_period,
+                        timeout=self._poll_period,
                     )
                 except subprocess.TimeoutExpired as poll:
                     # this will always be the full report so far,
