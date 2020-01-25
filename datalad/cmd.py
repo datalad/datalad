@@ -99,18 +99,71 @@ def _cleanup_output(stream, std):
 
 
 class LeanRunner(object):
+    """Minimal Runner with support for online command output processing
+
+    It aims to be as simple as possible, providing only essential
+    functionality. Derived classes should be used for additional
+    specializations and convenience features.
+    """
     __slots__ = ['cwd', 'env', '_poll_period']
 
     def __init__(self, cwd=None, env=None, poll_period=0.1):
+        """
+        Parameters
+        ----------
+        cwd : path-like, optional
+          If given, commands are executed with this path as PWD,
+          the PWD of the parent process is used otherwise.
+        env : dict, optional
+          Environment to be pass to subprocess.Popen(). If `cwd`
+          was given, 'PWD' in the environment is set to its value.
+        poll_period : float, optional
+          Interval at which the running process is queried for
+          output.
+        """
         self._poll_period = poll_period
         self.env = env.copy() if env else None
-        self.cwd = cwd
+        # stringify to support Path instances on PY35
+        self.cwd = str(cwd)
         if cwd and env is not None:
             # if CWD was provided, we must not make it conflict with
             # a potential PWD setting
             self.env['PWD'] = cwd
 
     def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None):
+        """Execute a command and communicate with it.
+
+        Parameters
+        ----------
+        cmd : list
+          Sequence of program arguments. Passing a single string means
+          that it is simply the name of the program, no complex shell
+          commands are supported.
+        proc_stdout : callable, optional
+          If given, all stdout is passed as byte-string to this callable,
+          in the chunks it was received by polling the processing. The
+          callable may transform it in any way, its output (byte-string)
+          is concatenated and provided as stdout return value.
+        proc_stderr : callable, optional
+          Like proc_stdout, but for stderr.
+        stdin : byte stream, optional
+          File descriptor like, used as stdin for the process. Passed
+          verbatim to subprocess.Popen().
+
+        Returns
+        -------
+        stdout, stderr
+          Unicode string with the cumulative standard output and error
+          of the process.
+
+        Raises
+        ------
+        CommandError
+          On executation failure (non-zero exit code) this exception is
+          raised which provides the command (cmd), stdout, stderr,
+          exit code (status), and a message identifying the failed
+          command, as properties.
+        """
         proc_out = (proc_stdout, proc_stderr)
         if all(p is None for p in proc_out):
             proc_out = None

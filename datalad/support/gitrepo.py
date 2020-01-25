@@ -420,9 +420,6 @@ def guard_BadName(func):
 
 class GitProgress(object):
     """Reduced variant of GitPython's RemoteProgress class
-
-    Handler providing an interface to parse progress information emitted by git-push
-    and git-fetch and to dispatch callbacks allowing subclasses to react to the progress.
     """
     _num_op_codes = 9
     BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT = \
@@ -466,13 +463,40 @@ class GitProgress(object):
             )
 
     def __call__(self, byts):
+        """Callable interface compatible with LeanRunner()
+
+        Parameters
+        ----------
+        byts : bytes
+          One or more lines of command output.
+
+        Returns
+        -------
+        bytes
+          All input in its orignal form, excepted for lines that
+          were identified as recognized progress reports.
+        """
         keep_lines = []
         for line in byts.splitlines(keepends=True):
             if not self._parse_progress_line(line):
                 keep_lines.append(line)
+        # the zero indicated that no data remained unprocessed at the
+        # end of the input
+        # TODO reevaluate whether it is useful to keep this feature
         return b''. join(keep_lines), 0
 
     def _parse_progress_line(self, line):
+        """Process a single line
+
+        Parameters
+        ----------
+        line : bytes
+
+        Returns
+        -------
+        bool
+          Flag whether the line was recognized as a Git progress report.
+        """
         # handle
         # Counting objects: 4, done.
         # Compressing objects:  50% (1/2)
