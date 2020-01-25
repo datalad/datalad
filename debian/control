@@ -4,7 +4,7 @@ Uploaders: Yaroslav Halchenko <debian@onerussian.com>,
            Michael Hanke <mih@debian.org>
 Section: science
 Priority: optional
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper-compat (= 12),
                dh-python,
                git-annex (>= 7.20190503~) | git-annex-standalone (>= 7.20190503~),
                help2man,
@@ -14,7 +14,7 @@ Build-Depends: debhelper (>= 9),
                python3-argcomplete,
                python3-boto,
                python3-dateutil,
-               python3-distutils | libpython3-stdlib (<=3.6.4~rc1-2),
+               python3-distutils | libpython3-stdlib (<= 3.6.4~rc1-2),
                python3-distro,
                python3-exif,
                python3-fasteners,
@@ -25,7 +25,7 @@ Build-Depends: debhelper (>= 9),
                python3-html5lib,
                python3-httpretty,
                python3-humanize,
-               python3-keyrings.alt | python3-keyring (<=8),
+               python3-keyrings.alt | python3-keyring (<= 8),
                python3-keyring,
                python3-secretstorage,
                python3-nose (>= 1.3.7-2) | python3-libxmp,
@@ -45,8 +45,8 @@ Build-Depends: debhelper (>= 9),
                python3-wrapt
 Standards-Version: 4.4.1
 Vcs-Browser: https://github.com/datalad/datalad/
-Vcs-Git: https://github.com/datalad/datalad -b debian
-Homepage: http://datalad.org
+Vcs-Git: https://github.com/datalad/datalad.git -b debian
+Homepage: https://datalad.org
 
 Package: datalad
 Architecture: all

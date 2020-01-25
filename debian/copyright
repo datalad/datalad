@@ -15,7 +15,7 @@ License: BSD-3-Clause
 Files: datalad/resources/website/tests/qunit/sinon*
 Copyright: 2010-2014, Christian Johansen <christian@cjohansen.no> and contributors
            2012-2013, Maximilian Antoni
-		   2011, Sven Fuchs
+ 		   2011, Sven Fuchs
 License: BSD-3-Clause
 
 Files: datalad/resources/website/tests/qunit/qunit*
