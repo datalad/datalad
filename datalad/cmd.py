@@ -124,7 +124,7 @@ class LeanRunner(object):
         self._poll_period = poll_period
         self.env = env.copy() if env else None
         # stringify to support Path instances on PY35
-        self.cwd = str(cwd)
+        self.cwd = str(cwd) if cwd is not None else None
         if cwd and env is not None:
             # if CWD was provided, we must not make it conflict with
             # a potential PWD setting
