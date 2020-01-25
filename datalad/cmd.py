@@ -98,7 +98,125 @@ def _cleanup_output(stream, std):
         std.close()
 
 
-class Runner(object):
+class LeanRunner(object):
+    __slots__ = ['cwd', 'env', '_communicate_period']
+
+    def __init__(self, cwd=None, env=None, communicate_period=0.1):
+        self._communicate_period = communicate_period
+        self.env = env.copy() if env else None
+        self.cwd = cwd
+        if cwd and env is not None:
+            # if CWD was provided, we must not make it conflict with
+            # a potential PWD setting
+            self.env['PWD'] = cwd
+
+    def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None):
+        proc_out = (proc_stdout, proc_stderr)
+        if all(p is None for p in proc_out):
+            proc_out = None
+        try:
+            process = subprocess.Popen(
+                cmd,
+                # from PY37 onwards
+                #capture_output=proc_output,
+                stdout=subprocess.PIPE if proc_out else None,
+                stderr=subprocess.PIPE if proc_out else None,
+                shell=False,
+                cwd=self.cwd,
+                env=self.env,
+                stdin=stdin,
+                # intermediate reports are never decoded anyways
+                # from PY37 onwards
+                text=False,
+                universal_newlines=False,
+            )
+        except Exception as e:
+            lgr.log(11, "Failed to start %r%r: %s" %
+                    (cmd,
+                     (" under %r" % self.cwd) if self.cwd else '',
+                     exc_str(e)))
+            raise
+
+        try:
+            out = [b'', b'']
+            last_idx = [0, 0]
+            while process.poll() is None:
+                try:
+                    # get a chunk of output for the specific period
+                    # of time
+                    pout = process.communicate(
+                        timeout=self._communicate_period,
+                    )
+                except subprocess.TimeoutExpired as poll:
+                    # this will always be the full report so far,
+                    # not just an output increment
+                    pout = (poll.stdout, poll.stderr)
+
+                if proc_out is not None:
+                    for i, (o, proc) in enumerate(zip(pout, proc_out)):
+                        if proc_out is None:
+                            out[i] += o
+                            # no index update needed, can never change
+                            continue
+                        # current length of output
+                        len_o = len(o) if o else 0
+                        # anything new in the output?
+                        if len_o - last_idx[i] > 0:
+                            # engage output processed
+                            processed, unprocessed_len = proc(o[last_idx[i]:])
+                            # only keep the processed output
+                            out[i] += processed
+                            # record point to which we processed the output
+                            # subtract number of bytes reported as unprocessed
+                            last_idx[i] = len_o - unprocessed_len
+
+            # obtain exit code
+            status = process.poll()
+
+            # decode bytes to string
+            out = tuple(o.decode('utf-8') if o else '' for o in pout)
+
+            if status not in [0, None]:
+                msg = "Failed to run %r%s." % (
+                    cmd,
+                    (" under %r" % self.cwd) if self.cwd else '',
+                )
+                raise CommandError(
+                    cmd=str(cmd),
+                    msg=msg,
+                    code=status,
+                    stdout=out[0],
+                    stderr=out[1],
+                )
+            else:
+                lgr.log(8, "Finished running %r with status %s", (cmd, status))
+
+        except CommandError:
+            # do not bother with reacting to "regular" CommandError
+            # exceptions.  Somehow if we also terminate here for them
+            # some processes elsewhere might stall:
+            # see https://github.com/datalad/datalad/pull/3794
+            raise
+
+        except BaseException as exc:
+            exc_info = sys.exc_info()
+            # KeyboardInterrupt is subclass of BaseException
+            lgr.debug("Terminating process for %s upon exception: %s",
+                      cmd, exc_str(exc))
+            try:
+                # there are still possible (although unlikely) cases when
+                # we fail to interrupt but we
+                # should not crash if we fail to terminate the process
+                proc.terminate()
+            except BaseException as exc2:
+                lgr.warning("Failed to terminate process for %s: %s",
+                            cmd, exc_str(exc2))
+            raise exc_info[1]
+
+        return out
+
+
+class Runner(LeanRunner):
     """Provides a wrapper for calling functions and commands.
 
     An object of this class provides a methods that calls shell commands or
@@ -131,9 +249,8 @@ class Runner(object):
              Switch to instruct whether outputs should be logged or not.  If not
              set (default), config 'datalad.log.outputs' would be consulted
         """
+        super(Runner, self).__init__(cwd=cwd, env=env)
 
-        self.cwd = cwd
-        self.env = env
         if protocol is None:
             # TODO: config cmd.protocol = null
             protocol_str = os.environ.get('DATALAD_CMD_PROTOCOL', 'null')
