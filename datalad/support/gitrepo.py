@@ -53,10 +53,12 @@ from git.exc import (
     NoSuchPathError,
     InvalidGitRepositoryError
 )
+from datalad.log import log_progress
 from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import (
+    LeanRunner,
     GitRunner,
     BatchedCommand
 )
@@ -414,6 +416,180 @@ def guard_BadName(func):
             return func(repo, *args, **kwargs)
 
     return wrapped
+
+
+class GitProgress(object):
+    """Reduced variant of GitPython's RemoteProgress class
+
+    Handler providing an interface to parse progress information emitted by git-push
+    and git-fetch and to dispatch callbacks allowing subclasses to react to the progress.
+    """
+    _num_op_codes = 9
+    BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT = \
+        [1 << x for x in range(_num_op_codes)]
+    STAGE_MASK = BEGIN | END
+    OP_MASK = ~STAGE_MASK
+
+    DONE_TOKEN = 'done.'
+    TOKEN_SEPARATOR = ', '
+
+    _known_ops = {
+        COUNTING: ("Counting", "Objects"),
+        COMPRESSING: ("Compressing", "Objects"),
+        WRITING: ("Writing", "Objects"),
+        RECEIVING: ("Receiving", "Objects"),
+        RESOLVING: ("Resolving", "Deltas"),
+        FINDING_SOURCES: ("Finding", "Sources"),
+        CHECKING_OUT: ("Check out", "Things"),
+    }
+
+    __slots__ = ('_seen_ops', '_pbars')
+
+    re_op_absolute = re.compile(r"(remote: )?([\w\s]+):\s+()(\d+)()(.*)")
+    re_op_relative = re.compile(r"(remote: )?([\w\s]+):\s+(\d+)% \((\d+)/(\d+)\)(.*)")
+
+    def __init__(self):
+        self.__enter__()
+
+    def __enter__(self):
+        self._seen_ops = []
+        self._pbars = set()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # take down any progress bars that were not closed orderly
+        for pbar_id in self._pbars:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished',
+            )
+
+    def __call__(self, byts):
+        keep_lines = []
+        for line in byts.splitlines(keepends=True):
+            if not self._parse_progress_line(line):
+                keep_lines.append(line)
+        return b''. join(keep_lines), 0
+
+    def _parse_progress_line(self, line):
+        # handle
+        # Counting objects: 4, done.
+        # Compressing objects:  50% (1/2)
+        # Compressing objects: 100% (2/2)
+        # Compressing objects: 100% (2/2), done.
+        line = line.decode('utf-8') if isinstance(line, bytes) else line
+        if line.startswith(('error:', 'fatal:')):
+            return False
+
+        # find escape characters and cut them away - regex will not work with
+        # them as they are non-ascii. As git might expect a tty, it will send them
+        last_valid_index = None
+        for i, c in enumerate(reversed(line)):
+            if ord(c) < 32:
+                # its a slice index
+                last_valid_index = -i - 1
+            # END character was non-ascii
+        # END for each character in line
+        if last_valid_index is not None:
+            line = line[:last_valid_index]
+        # END cut away invalid part
+        line = line.rstrip()
+
+        cur_count, max_count = None, None
+        match = self.re_op_relative.match(line)
+        if match is None:
+            match = self.re_op_absolute.match(line)
+
+        if not match:
+            return False
+        # END could not get match
+
+        op_code = 0
+        _remote, op_name, _percent, cur_count, max_count, message = match.groups()
+
+        # get operation id
+        if op_name == "Counting objects":
+            op_code |= self.COUNTING
+        elif op_name == "Compressing objects":
+            op_code |= self.COMPRESSING
+        elif op_name == "Writing objects":
+            op_code |= self.WRITING
+        elif op_name == 'Receiving objects':
+            op_code |= self.RECEIVING
+        elif op_name == 'Resolving deltas':
+            op_code |= self.RESOLVING
+        elif op_name == 'Finding sources':
+            op_code |= self.FINDING_SOURCES
+        elif op_name == 'Checking out files':
+            op_code |= self.CHECKING_OUT
+        else:
+            # Note: On windows it can happen that partial lines are sent
+            # Hence we get something like "CompreReceiving objects", which is
+            # a blend of "Compressing objects" and "Receiving objects".
+            # This can't really be prevented, so we drop the line verbosely
+            # to make sure we get informed in case the process spits out new
+            # commands at some point.
+            # TODO investigate if there is any chance that we might swallow
+            # important info -- until them do not flag this line
+            # as progress
+            return False
+        # END handle op code
+
+        pbar_id = 'gitprogress-{}-{}'.format(id(self), op_code)
+
+        op_props = self._known_ops[op_code]
+
+        # figure out stage
+        if op_code not in self._seen_ops:
+            self._seen_ops.append(op_code)
+            op_code |= self.BEGIN
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Start {} {}'.format(
+                    op_props[0].lower(),
+                    op_props[1].lower(),
+                ),
+                label=op_props[0],
+                unit=' {}'.format(op_props[1]),
+                total=float(max_count) if max_count else None,
+            )
+            self._pbars.add(pbar_id)
+        # END begin opcode
+
+        if message is None:
+            message = ''
+        # END message handling
+
+        done_progress = False
+        message = message.strip()
+        if message.endswith(self.DONE_TOKEN):
+            op_code |= self.END
+            message = message[:-len(self.DONE_TOKEN)]
+            done_progress = True
+        # END end message handling
+        message = message.strip(self.TOKEN_SEPARATOR)
+
+        if cur_count and max_count:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                message,
+                update=float(cur_count),
+            )
+
+        if done_progress:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished {} {}'.format(
+                    op_props[0].lower(),
+                    op_props[1].lower(),
+                ),
+            )
+            self._pbars.discard(pbar_id)
+        return True
 
 
 class GitPythonProgressBar(RemoteProgress):
@@ -883,12 +1059,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
                 # TODO bring back progress reporting
-                GitRunner(env=env).run(
-                    ['git', 'clone', url, path] \
-                    + (to_options(**clone_options) if clone_options else []),
-                    expect_fail=False,
-                    expect_stderr=True,
-                )
+                with GitProgress() as progress:
+                    LeanRunner(env=env).run(
+                        ['git', 'clone', '--progress', url, path] \
+                        + (to_options(**clone_options) if clone_options else []),
+                        proc_stderr=progress,
+                    )
                 lgr.debug("Git clone completed")
                 break
             except CommandError as e:
