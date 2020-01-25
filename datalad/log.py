@@ -271,7 +271,9 @@ def log_progress(lgrcall, pid, *args, **kwargs):
     """
     d = dict(
         {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
-         if v},
+         # initial progress might be zero, but not sending it further
+         # would signal to destroy the progress bar, hence test for 'not None'
+         if v is not None},
         dlm_progress=pid)
     lgrcall(*args, extra=d)
 
