@@ -16,6 +16,7 @@ import logging
 from functools import partial
 from glob import glob
 import os
+import re
 from os import mkdir
 from os.path import join as opj
 from os.path import basename
@@ -258,7 +259,7 @@ def test_AnnexRepo_get_outofspace(annex_path):
         ar.get("file")
     exc = cme.exception
     eq_(exc.sizemore_msg, '905.6 MB')
-    assert_re_in(".*annex (find|get). needs 905.6 MB more", str(exc))
+    assert_re_in(".*annex (find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:405
