@@ -1065,7 +1065,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = GitRepo.GIT_SSH_ENV
+            env = os.environ.copy()
+            env.update(GitRepo.GIT_SSH_ENV)
         else:
             if isinstance(url_ri, PathRI):
                 new_url = os.path.expanduser(url)

@@ -117,6 +117,8 @@ class LeanRunner(object):
         env : dict, optional
           Environment to be pass to subprocess.Popen(). If `cwd`
           was given, 'PWD' in the environment is set to its value.
+          This must be a complete environment definition, no values
+          from the current environment will be inherited.
         poll_period : float, optional
           Interval at which the running process is queried for
           output.
