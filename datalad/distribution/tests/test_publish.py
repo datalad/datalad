@@ -24,7 +24,7 @@ from datalad.dochelpers import exc_str
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import CommandError
 from datalad.utils import chpwd
 
 from nose.tools import eq_, ok_, assert_is_instance
@@ -220,7 +220,7 @@ def test_publish_plain_git(origin, src_path, dst_path):
     # amend and change commit msg in order to test for force push:
     source.repo.commit("amended", options=['--amend'])
     # push should be rejected (non-fast-forward):
-    assert_raises(IncompleteResultsError,
+    assert_raises(CommandError,
                   publish, dataset=source, to='target', result_xfm='datasets')
     # push with force=True works:
     res = publish(dataset=source, to='target', result_xfm='datasets', force=True)
