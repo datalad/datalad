@@ -1069,10 +1069,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             env.update(GitRepo.GIT_SSH_ENV)
         else:
             if isinstance(url_ri, PathRI):
+                # expand user, because execution not going through a shell
+                # doesn't work well otherwise
                 new_url = os.path.expanduser(url)
                 if url != new_url:
-                    # TODO: remove whenever GitPython is fixed:
-                    # https://github.com/gitpython-developers/GitPython/issues/731
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
             env = None
