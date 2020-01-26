@@ -262,7 +262,7 @@ class LeanRunner(object):
                 # there are still possible (although unlikely) cases when
                 # we fail to interrupt but we
                 # should not crash if we fail to terminate the process
-                proc.terminate()
+                process.terminate()
             except BaseException as exc2:
                 lgr.warning("Failed to terminate process for %s: %s",
                             cmd, exc_str(exc2))
