@@ -170,6 +170,7 @@ class LeanRunner(object):
         if all(p is None for p in proc_out):
             proc_out = None
         try:
+            lgr.log(8, "Start running %r", cmd)
             process = subprocess.Popen(
                 cmd,
                 # from PY37 onwards
@@ -244,7 +245,7 @@ class LeanRunner(object):
                     stderr=out[1],
                 )
             else:
-                lgr.log(8, "Finished running %r with status %s", (cmd, status))
+                lgr.log(8, "Finished running %r with status %s", cmd, status)
 
         except CommandError:
             # do not bother with reacting to "regular" CommandError
