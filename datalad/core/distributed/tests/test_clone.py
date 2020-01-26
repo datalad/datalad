@@ -401,7 +401,7 @@ def test_autoenabled_remote_msg(path):
 def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
     ds = Dataset(repo.path)
     with swallow_logs(new_level=logging.INFO) as cml:
-        res = clone(ds, clone_path)
+        res = clone(ds, clone_path, result_xfm=None, return_type='list')
         assert_status('ok', res)
         assert_in("r_dir", cml.out)
         assert_in("not auto-enabled", cml.out)
