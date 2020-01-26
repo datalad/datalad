@@ -210,8 +210,9 @@ class LeanRunner(object):
 
                 if proc_out is not None:
                     for i, (o, proc) in enumerate(zip(pout, proc_out)):
-                        if proc_out is None:
-                            out[i] += o
+                        if proc is None:
+                            if o is not None:
+                                out[i] += o
                             # no index update needed, can never change
                             continue
                         # current length of output
