@@ -196,7 +196,10 @@ class LeanRunner(object):
         try:
             out = [b'', b'']
             last_idx = [0, 0]
-            while process.poll() is None:
+            pout = None
+            # make sure to run this loop at least once, even if the
+            # process is already dead
+            while process.poll() is None or pout is None:
                 try:
                     # get a chunk of output for the specific period
                     # of time
