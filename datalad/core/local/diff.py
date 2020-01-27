@@ -55,10 +55,10 @@ lgr = logging.getLogger('datalad.core.local.diff')
 class Diff(Interface):
     """Report differences between two states of a dataset (hierarchy)
 
-    The two to-be-compared states are given via to --from and --to options.
+    The two to-be-compared states are given via the --from and --to options.
     These state identifiers are evaluated in the context of the (specified
-    or detected) dataset. In case of a recursive report on a dataset
-    hierarchy corresponding state pairs for any subdataset are determined
+    or detected) dataset. In the case of a recursive report on a dataset
+    hierarchy, corresponding state pairs for any subdataset are determined
     from the subdataset record in the respective superdataset. Only changes
     recorded in a subdataset between these two states are reported, and so on.
 
@@ -93,7 +93,7 @@ class Diff(Interface):
             metavar="REVISION",
             doc="""state to compare against the original state, as given by
             any identifier that Git understands. If none is specified,
-            the state of the worktree will be used compared.""",
+            the state of the worktree will be compared.""",
             constraints=EnsureStr() | EnsureNone()),
     )
 
