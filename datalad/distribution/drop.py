@@ -129,16 +129,6 @@ class Drop(Interface):
     file content is dropped. As these checks could lead to slow operation
     (network latencies, etc), they can be disabled.
 
-    Examples:
-
-      Drop all file content in a dataset::
-
-        ~/some/dataset$ datalad drop
-
-      Drop all file content in a dataset and all its subdatasets::
-
-        ~/some/dataset$ datalad drop --recursive
-
     """
     _examples_ = [
         dict(text="Drop single file content",
@@ -155,6 +145,7 @@ class Drop(Interface):
              code_py="drop(path='path/to/content', check=False)",
              code_cmd="datalad drop <path/to/content> --nocheck"),
     ]
+
     _action = 'drop'
 
     _params_ = dict(
