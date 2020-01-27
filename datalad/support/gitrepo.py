@@ -1079,6 +1079,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def is_with_annex(self):
         """Report if GitRepo (assumed) has (remotes with) a git-annex branch
         """
+        # OPT: To avoid "lengthy" invocation of git, first sample ref for
+        # `git-annex` branch
+        if op.exists(self.dot_git / "refs" / "heads" / "git-annex"):
+            return True
+        # It still could be present in the remote ones
         return any(
             b['refname:strip=2'] == 'git-annex' or b['refname:strip=2'].endswith('/git-annex')
             for b in self.for_each_ref_(fields='refname:strip=2', pattern=['refs/heads', 'refs/remotes'])
