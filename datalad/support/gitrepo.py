@@ -421,8 +421,8 @@ def guard_BadName(func):
 class GitProgress(object):
     """Reduced variant of GitPython's RemoteProgress class
     """
-    _num_op_codes = 9
-    BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT = \
+    _num_op_codes = 10
+    BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT, ENUMERATING = \
         [1 << x for x in range(_num_op_codes)]
     STAGE_MASK = BEGIN | END
     OP_MASK = ~STAGE_MASK
@@ -432,6 +432,7 @@ class GitProgress(object):
 
     _known_ops = {
         COUNTING: ("Counting", "Objects"),
+        ENUMERATING: ("Enumerating", "Objects"),
         COMPRESSING: ("Compressing", "Objects"),
         WRITING: ("Writing", "Objects"),
         RECEIVING: ("Receiving", "Objects"),
@@ -547,6 +548,8 @@ class GitProgress(object):
             op_code |= self.FINDING_SOURCES
         elif op_name == 'Checking out files':
             op_code |= self.CHECKING_OUT
+        elif op_name == 'Enumerating objects':
+            op_code |= self.ENUMERATING
         else:
             # Note: On windows it can happen that partial lines are sent
             # Hence we get something like "CompreReceiving objects", which is
