@@ -211,6 +211,7 @@ class ExternalVersions(object):
             modname = module
             module = None
 
+        lgr.log(5, "Requested to provide version for %s", modname)
         # Early returns None so we do not store prev result for  them
         # and allow users to install things at run time, so later check
         # doesn't pick it up from the _versions
