@@ -1081,6 +1081,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         # OPT: To avoid "lengthy" invocation of git, first sample ref for
         # `git-annex` branch
+        if (self.pathobj / ".noannex").exists():
+            return False
         if (self.dot_git / "refs" / "heads" / "git-annex").exists():
             return True
         # It still could be present in the remote ones
