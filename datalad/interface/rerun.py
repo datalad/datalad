@@ -73,30 +73,6 @@ class Rerun(Interface):
     information about the revision the would be checked out before rerunning
     any commands.
 
-    Examples:
-
-      Re-execute the command from the previous commit::
-
-        % datalad rerun
-
-      Re-execute any commands in the last five commits::
-
-        % datalad rerun --since=HEAD~5
-
-      Do the same as above, but re-execute the commands on top of
-      HEAD~5 in a detached state::
-
-        % datalad rerun --onto= --since=HEAD~5
-
-      Re-execute all previous commands and compare the old and new
-      results::
-
-        % # on master branch
-        % datalad rerun --branch=verify --since=
-        % # now on verify branch
-        % datalad diff --revision=master..
-        % git log --oneline --left-right --cherry-pick master...
-
     .. note::
       Currently the "onto" feature only sets the working tree of the current
       dataset to a previous state. The working trees of any subdatasets remain
@@ -177,6 +153,28 @@ class Rerun(Interface):
             CMD][PY: `onto` PY] because checking out a new HEAD can easily fail
             when the working tree has modifications."""),
     )
+
+    _examples_ = [
+        dict(text="Re-execute the command from the previous commit",
+             code_py="rerun()",
+             code_cmd="datalad rerun"),
+        dict(text="Re-execute any commands in the last five commits",
+             code_py="rerun(since='HEAD~5')",
+             code_cmd="datalad rerun --since=HEAD~5"),
+        dict(text="""Do the same as above, but re-execute the commands on top of
+                     HEAD~5 in a detached state""",
+             code_py="rerun(onto='', since='HEAD~5')",
+             code_cmd="datalad rerun --onto= --since=HEAD~5"),
+        dict(text="""Re-execute all previous commands and compare the old and
+                     new results""",
+             code_py=" ",
+             code_cmd="""# on master branch
+                      % datalad rerun --branch=verify --since=
+                      % # now on verify branch
+                      % datalad diff --revision=master..
+                      % git log --oneline --left-right --cherry-pick master..."""),
+    ]
+
 
     @staticmethod
     @datasetmethod(name='rerun')
