@@ -234,7 +234,7 @@ class LeanRunner(object):
             status = process.poll()
 
             # decode bytes to string
-            out = tuple(o.decode('utf-8') if o else '' for o in pout)
+            out = tuple(o.decode('utf-8') if o else '' for o in out)
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s." % (
