@@ -407,9 +407,11 @@ def build_example(example, api='python'):
     code = dedent_docstring(example.get(code_field))
     code = textwrap.indent(code, '     ').lstrip()
 
+    # only show an example if it exist for the API
     ex = """{}::\n\n   {} {}\n\n""".format(description,
                                            indicator,
-                                           code)
+                                           code) if code else ""
+
     return ex
 
 
