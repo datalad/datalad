@@ -167,11 +167,11 @@ class Rerun(Interface):
              code_cmd="datalad rerun --onto= --since=HEAD~5"),
         dict(text="""Re-execute all previous commands and compare the old and
                      new results""",
-             code_cmd="""# on master branch
-                      % datalad rerun --branch=verify --since=
-                      % # now on verify branch
-                      % datalad diff --revision=master..
-                      % git log --oneline --left-right --cherry-pick master..."""),
+             code_cmd="""% # on master branch
+                % datalad rerun --branch=verify --since=
+                % # now on verify branch
+                % datalad diff --revision=master..
+                % git log --oneline --left-right --cherry-pick master..."""),
     ]
 
 

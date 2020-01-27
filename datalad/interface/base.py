@@ -410,9 +410,16 @@ def build_example(example, api='python'):
     code = dedent_docstring(example.get(code_field))
     code = textwrap.indent(code, '     ').lstrip()
 
-    ex = """{}::\n\n   {} {}\n\n""".format(description,
-                                           indicator,
-                                           code)
+    ex = """{}::\n\n   {}{}\n\n""".format(
+        description,
+        # disable automatic prefixing, if the example already has one
+        # this enables providing more complex examples without having
+        # to infer its inner structure
+        '{} '.format(indicator)
+        if not code.startswith(indicator)
+        # maintain spacing to avoid undesired relative indentation
+        else '  ',
+        code)
 
     return ex
 
