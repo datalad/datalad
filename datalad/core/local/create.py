@@ -106,13 +106,13 @@ class Create(Interface):
         EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _examples_ = [
-        dict(text="""Create a dataset 'mydataset' in the current directory""",
+        dict(text="Create a dataset 'mydataset' in the current directory",
              code_py="create(path='mydataset')",
              code_cmd="datalad create mydataset"),
-        dict(text="""Apply the text2git procedure upon creation of a dataset""",
+        dict(text="Apply the text2git procedure upon creation of a dataset",
              code_py="create(path='mydataset', cfg_proc='text2git')",
              code_cmd="datalad create -c text2git mydataset"),
-        dict(text="""Create a subdataset in the root of an existing dataset""",
+        dict(text="Create a subdataset in the root of an existing dataset",
              code_py="create(dataset='.', path='mysubdataset')",
              code_cmd="datalad create -d . mysubdataset"),
         dict(text="Create a dataset in an existing, non-empty directory",

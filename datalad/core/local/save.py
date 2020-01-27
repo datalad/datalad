@@ -86,9 +86,9 @@ class Save(Interface):
              recurse into any potential subdatasets""",
              code_py="ds.save(recursive=True)",
              code_cmd="datalad save . --recursive"),
-        dict(text="""Save any modification of known dataset content in the
-             current directory, but leave untracked files (e.g. temporary files)
-             untouched""",
+        dict(text="Save any modification of known dataset content in the "
+                  "current directory, but leave untracked files (e.g. temporary files) "
+                  "untouched",
              code_py="""ds.save(updated=True, path='.')""",
              code_cmd="""datalad save -u -d ."""),
         dict(text="Tag the most recent saved state of a dataset",

@@ -64,7 +64,7 @@ class Unlock(Interface):
     )
 
     _examples_ = [
-        dict(text="""Unlock a single file""",
+        dict(text="Unlock a single file",
              code_py="unlock(path='path/to/file')",
              code_cmd="datalad unlock <path/to/file>"),
         dict(text="Unlock all contents in the dataset",

@@ -98,14 +98,14 @@ class Diff(Interface):
     )
 
     _examples_ = [
-        dict(text="""Show unsaved changes in the current dataset""",
+        dict(text="Show unsaved changes in the current dataset",
              code_py="diff(dataset='.')",
              code_cmd="datalad diff"),
-        dict(text="""Compare a previous dataset state identified by shasum
-                     against current worktree""",
+        dict(text="Compare a previous dataset state identified by shasum "
+                  "against current worktree",
              code_py="diff(dataset='.', fr='SHASUM')",
              code_cmd="datalad diff --from <SHASUM>"),
-        dict(text="""Compare two branches against each other""",
+        dict(text="Compare two branches against each other",
              code_py="diff(fr='branch1', to='branch2')",
              code_cmd="datalad diff --from branch1 --to branch2"),
         dict(text="Show unsaved changes in the dataset and potential subdatasets",

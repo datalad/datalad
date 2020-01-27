@@ -161,12 +161,12 @@ class Rerun(Interface):
         dict(text="Re-execute any commands in the last five commits",
              code_py="rerun(since='HEAD~5')",
              code_cmd="datalad rerun --since=HEAD~5"),
-        dict(text="""Do the same as above, but re-execute the commands on top of
-                     HEAD~5 in a detached state""",
+        dict(text="Do the same as above, but re-execute the commands on top of "
+                  "HEAD~5 in a detached state",
              code_py="rerun(onto='', since='HEAD~5')",
              code_cmd="datalad rerun --onto= --since=HEAD~5"),
-        dict(text="""Re-execute all previous commands and compare the old and
-                     new results""",
+        dict(text="Re-execute all previous commands and compare the old and "
+                  "new results",
              code_cmd="""% # on master branch
                 % datalad rerun --branch=verify --since=
                 % # now on verify branch
