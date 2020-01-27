@@ -89,7 +89,7 @@ class Remove(Interface):
              code_py="remove('path/to/dataset/', recursive=True)",
              code_cmd="datalad remove -d <path/to/dataset/> --recursive"),
         dict(text="Permanently remove a dataset and all subdatasets even if there "
-                  "are less than the configured minimum amount of (remote) sources "
+                  "are fewer than the configured minimum number of (remote) sources "
                   "for data",
              code_py="remove('path/to/dataset', recursive=True, check=False)",
              code_cmd="datalad remove -d <path/to/dataset/> --recursive --nocheck"),

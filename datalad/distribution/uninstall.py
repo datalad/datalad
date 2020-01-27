@@ -144,10 +144,10 @@ class Uninstall(Interface):
         dict(text="Uninstall a subdataset (undo installation)",
              code_py="uninstall(path='path/to/subds')",
              code_cmd="datalad uninstall <path/to/subds>"),
-        dict(text="Uninstall a subdataset and all potential further subdatasets",
+        dict(text="Uninstall a subdataset and all potential subdatasets",
              code_py="uninstall(path='path/to/subds', recursive=True)",
              code_cmd="datalad uninstall -r <path/to/subds>"),
-        dict(text="Skip checks that assure a minimal number of (remote) sources",
+        dict(text="Skip checks that ensure a minimal number of (remote) sources",
              code_py="uninstall(path='path/to/subds', check=False)",
              code_cmd="datalad uninstall <path/to/subds> --nocheck"),
     ]
