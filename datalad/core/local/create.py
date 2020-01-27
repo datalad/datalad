@@ -145,7 +145,7 @@ class Create(Interface):
             destination path of the repository will be passed to git-init
             as-is CMD]. Note that not all options will lead to viable results.
             For example '--bare' will not yield a repository where DataLad
-            can adjust files in its worktree."""),
+            can adjust files in its working tree."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar='DATASET',

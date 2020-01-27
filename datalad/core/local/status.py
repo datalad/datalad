@@ -87,7 +87,7 @@ _common_diffstatus_params = dict(
         metavar='MODE',
         constraints=EnsureChoice('no', 'normal', 'all'),
         doc="""If and how untracked content is reported when comparing
-        a revision to the state of the work tree. 'no': no untracked
+        a revision to the state of the working tree. 'no': no untracked
         content is reported; 'normal': untracked files and entire
         untracked directories are reported as such; 'all': report
         individual files even in fully untracked directories."""),

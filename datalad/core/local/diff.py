@@ -93,7 +93,7 @@ class Diff(Interface):
             metavar="REVISION",
             doc="""state to compare against the original state, as given by
             any identifier that Git understands. If none is specified,
-            the state of the worktree will be compared.""",
+            the state of the working tree will be compared.""",
             constraints=EnsureStr() | EnsureNone()),
     )
 
