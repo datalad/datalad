@@ -49,6 +49,15 @@ class Update(Interface):
     # TODO: adjust docs to say:
     # - update from just one sibling at a time
 
+    _examples_ = [
+        dict(text="Update from a particular sibling",
+             code_py="update(sibling='siblingname')",
+             code_cmd="datalad update -s <siblingname>"),
+        dict(text="Update from a particular sibling and merge the obtained changes",
+             code_py="update(sibling='siblingname', merge=True)",
+             code_cmd="datalad update --merge -s <siblingname>"),
+    ]
+
     _params_ = dict(
         path=Parameter(
             args=("path",),
