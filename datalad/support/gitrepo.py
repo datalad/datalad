@@ -554,9 +554,10 @@ class GitProgress(object):
             # Note: On windows it can happen that partial lines are sent
             # Hence we get something like "CompreReceiving objects", which is
             # a blend of "Compressing objects" and "Receiving objects".
-            # This can't really be prevented, so we drop the line verbosely
-            # to make sure we get informed in case the process spits out new
-            # commands at some point.
+            # This can't really be prevented.
+            lgr.debug(
+                'Output line matched a progress report of an unknown type: %s',
+                line)
             # TODO investigate if there is any chance that we might swallow
             # important info -- until them do not flag this line
             # as progress
