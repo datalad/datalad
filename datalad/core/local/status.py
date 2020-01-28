@@ -240,11 +240,11 @@ class Status(Interface):
         dict(text="Get a status query for the state within the subdataset "
                   "without causing a status query for the superdataset (using trailing "
                   "path separator in the query path):",
-             code_py="ds.status(path='mysubdataset')",
+             code_py="ds.status(dataset='.', path='mysubdataset/')",
              code_cmd="datalad status --dataset . mysubdataset/"),
         dict(text="Report on the state of a subdataset in a superdataset and "
                   "on the state within the subdataset",
-             code_py="ds.status(path=['mysubdataset', 'mysubdataset/'])",
+             code_py="ds.status(dataset='.', path=['mysubdataset', 'mysubdataset/'])",
              code_cmd="datalad status --dataset . mysubdataset mysubdataset/"),
         dict(text="Report the file size of annexed content in a dataset",
              code_py="ds.status(annex=True)",

@@ -83,15 +83,15 @@ class Remove(Interface):
     _examples_ = [
         dict(text="Permanently remove a subdataset from a dataset and wipe out "
                   "the subdataset association too",
-             code_py="remove(path='path/to/subds')",
-             code_cmd="datalad remove <path/to/subds>"),
+             code_py="remove(dataset='path/to/dataset', path='path/to/subds')",
+             code_cmd="datalad remove -d <path/to/dataset> <path/to/subds>"),
         dict(text="Permanently remove a dataset and all subdatasets",
-             code_py="remove('path/to/dataset/', recursive=True)",
+             code_py="remove(dataset='path/to/dataset', recursive=True)",
              code_cmd="datalad remove -d <path/to/dataset/> --recursive"),
         dict(text="Permanently remove a dataset and all subdatasets even if there "
                   "are fewer than the configured minimum number of (remote) sources "
                   "for data",
-             code_py="remove('path/to/dataset', recursive=True, check=False)",
+             code_py="remove(dataset='path/to/dataset', recursive=True, check=False)",
              code_cmd="datalad remove -d <path/to/dataset/> --recursive --nocheck"),
     ]
 
