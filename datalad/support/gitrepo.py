@@ -420,6 +420,11 @@ def guard_BadName(func):
 
 class GitProgress(object):
     """Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
     """
     _num_op_codes = 10
     BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT, ENUMERATING = \
