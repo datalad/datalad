@@ -402,7 +402,7 @@ def build_example(example, api='python'):
     if code_field not in example:
         # only show an example if it exist for the API
         return ''
-    description = dedent_docstring(example.get('text'))
+    description = textwrap.fill(example.get('text'))
     # this indent the code snippet to get it properly rendered as code
     # we are not using textwrap.fill(), because it would not acknowledge
     # any meaningful structure/formatting of code snippets. Instead, we
