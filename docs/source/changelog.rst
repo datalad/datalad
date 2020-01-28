@@ -15,10 +15,89 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the `DataLad git
 repository <http://github.com/datalad/datalad>`__ for more details.
 
+0.12.2 (Jan 28, 2020) – Smoothen the ride
+-----------------------------------------
+
+Mostly a bugfix release with various robustifications, but also makes
+the first step towards versioned dataset installation requests.
+
+Major refactoring and deprecations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  The minimum required version for GitPython is now 2.1.12.
+   (`#4070 <https://github.com/datalad/datalad/issues/4070>`__)
+
+Fixes
+~~~~~
+
+-  The class for handling configuration values, ``ConfigManager``,
+   inappropriately considered the current working directory’s dataset,
+   if any, for both reading and writing when instantiated with
+   ``dataset=None``. This misbehavior is fairly inaccessible through
+   typical use of DataLad. It affects ``datalad.cfg``, the top-level
+   configuration instance that should not consider repository-specific
+   values. It also affects Python users that call ``Dataset`` with a
+   path that does not yet exist and persists until that dataset is
+   created. (`#4078 <https://github.com/datalad/datalad/issues/4078>`__)
+
+-  `update <http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html>`__
+   saved the dataset when called with ``--merge``, which is unnecessary
+   and risks committing unrelated changes.
+   (`#3996 <https://github.com/datalad/datalad/issues/3996>`__)
+
+-  Confusing and irrelevant information about Python defaults have been
+   dropped from the command-line help.
+   (`#4002 <https://github.com/datalad/datalad/issues/4002>`__)
+
+-  The logic for automatically propagating the ‘origin’ remote when
+   cloning a local source didn’t properly account for relative paths.
+   (`#4045 <https://github.com/datalad/datalad/issues/4045>`__)
+
+-  Various fixes to file name handling and quoting on Windows.
+   (`#4049 <https://github.com/datalad/datalad/issues/4049>`__)
+   (`#4050 <https://github.com/datalad/datalad/issues/4050>`__)
+
+-  When cloning failed, error lines were not bubbled up to the user in
+   some scenarios.
+   (`#4060 <https://github.com/datalad/datalad/issues/4060>`__)
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  `clone <http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html>`__
+   (and thus
+   `install <http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html>`__)
+
+   -  now propagates the ``reckless`` mode from the superdataset when
+      cloning a dataset into it.
+      (`#4037 <https://github.com/datalad/datalad/issues/4037>`__)
+   -  gained support for ``ria+<protocol>://`` URLs that point to
+      `RIA <http://handbook.datalad.org/en/latest/usecases/datastorage_for_institutions.html>`__
+      stores.
+      (`#4022 <https://github.com/datalad/datalad/issues/4022>`__)
+   -  learned to read “@version” from ``ria+`` URLs and install that
+      version of a dataset
+      (`#4036 <https://github.com/datalad/datalad/issues/4036>`__) and
+      to apply URL rewrites configured through Git’s ``url.*.insteadOf``
+      mechanism
+      (`#4064 <https://github.com/datalad/datalad/issues/4064>`__).
+   -  now copies ``datalad.get.subdataset-source-candidate-<name>``
+      options configured within the superdataset into the subdataset.
+      This is particularly useful for RIA data stores.
+      (`#4073 <https://github.com/datalad/datalad/issues/4073>`__)
+
+-  Archives are now (optionally) handled with 7-Zip instead of
+   ``patool``. 7-Zip will be used by default, but ``patool`` will be
+   used on non-Windows systems if the ``datalad.runtime.use-patool``
+   option is set or the ``7z`` executable is not found.
+   (`#4041 <https://github.com/datalad/datalad/issues/4041>`__)
+
 0.12.1 (Jan 15, 2020) – Small bump after big bang
 -------------------------------------------------
 
 Fix some fallout after major release.
+
+.. _fixes-1:
 
 Fixes
 ~~~~~
@@ -235,6 +314,38 @@ Fixes since 0.12.0rc6
    specifications.
    (`#3958 <https://github.com/datalad/datalad/issues/3958>`__)
 
+-  `run-procedure <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html>`__
+   mistakenly reported a directory as a procedure.
+   (`#3793 <https://github.com/datalad/datalad/issues/3793>`__)
+
+-  The cleanup for batched git-annex processes has been improved.
+   (`#3794 <https://github.com/datalad/datalad/issues/3794>`__)
+   (`#3851 <https://github.com/datalad/datalad/issues/3851>`__)
+
+-  The function for adding a version ID to an AWS S3 URL doesn’t support
+   URLs with an “s3://” scheme and raises a ``NotImplementedError``
+   exception when it encounters one. The function learned to return a
+   URL untouched if an “s3://” URL comes in with a version ID.
+   (`#3842 <https://github.com/datalad/datalad/issues/3842>`__)
+
+-  A few spots needed to be adjusted for compatibility with git-annex’s
+   new ``--sameas``
+   `feature <https://git-annex.branchable.com/tips/multiple_remotes_accessing_the_same_data_store/>`__,
+   which allows special remotes to share a data store.
+   (`#3856 <https://github.com/datalad/datalad/issues/3856>`__)
+
+-  The ``swallow_logs`` utility failed to capture some log messages due
+   to an incompatibility with Python 3.7.
+   (`#3935 <https://github.com/datalad/datalad/issues/3935>`__)
+
+-  `siblings <http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html>`__
+
+   -  crashed if ``--inherit`` was passed but the parent dataset did not
+      have a remote with a matching name.
+      (`#3954 <https://github.com/datalad/datalad/issues/3954>`__)
+   -  configured the wrong pushurl and annexurl values in some cases.
+      (`#3955 <https://github.com/datalad/datalad/issues/3955>`__)
+
 Enhancements and new features since 0.12.0rc6
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -332,6 +443,8 @@ Enhancements and new features since 0.12.0rc6
 
 bet we will fix some bugs and make a world even a better place.
 
+.. _major-refactoring-and-deprecations-1:
+
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -390,7 +503,7 @@ Major refactoring and deprecations
 -  The ``rev_resolve_path`` substituted ``resolve_path`` helper.
    (`#3797 <https://github.com/datalad/datalad/issues/3797>`__)
 
-.. _fixes-1:
+.. _fixes-2:
 
 Fixes
 ~~~~~
@@ -452,6 +565,8 @@ Fixes
 -  ``path_is_under()`` was incapable of comparing Windows paths with
    different drive letters.
    (`#3728 <https://github.com/datalad/datalad/issues/3728>`__)
+
+.. _enhancements-and-new-features-1:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -524,7 +639,7 @@ Enhancements and new features
 
 Various fixes and enhancements that bring the 0.12.0 release closer.
 
-.. _major-refactoring-and-deprecations-1:
+.. _major-refactoring-and-deprecations-2:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -565,7 +680,7 @@ Major refactoring and deprecations
    ``unlock`` and ``addurls``, follow the new logic. The goal is for all
    commands to eventually do so.
 
-.. _fixes-2:
+.. _fixes-3:
 
 Fixes
 ~~~~~
@@ -619,7 +734,7 @@ Fixes
    arguments to avoid exceeding the command-line character limit.
    (`#3587 <https://github.com/datalad/datalad/issues/3587>`__)
 
-.. _enhancements-and-new-features-1:
+.. _enhancements-and-new-features-2:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -689,7 +804,7 @@ command). ￼ ### Major refactoring and deprecations
 -  The ``add`` command is now deprecated. It will be removed in a future
    release.
 
-.. _fixes-3:
+.. _fixes-4:
 
 Fixes
 ~~~~~
@@ -706,7 +821,7 @@ Fixes
    exists yet
    (`#3403 <https://github.com/datalad/datalad/issues/3403>`__)
 
-.. _enhancements-and-new-features-2:
+.. _enhancements-and-new-features-3:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -722,7 +837,7 @@ Enhancements and new features
 ￼ Continues API consolidation and replaces the ``create`` and ``diff``
 command with more performant implementations.
 
-.. _major-refactoring-and-deprecations-2:
+.. _major-refactoring-and-deprecations-3:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -755,7 +870,7 @@ Major refactoring and deprecations
 -  ``AnnexRepo.get_status`` has been replaced by ``AnnexRepo.status``.
    (`#3330 <https://github.com/datalad/datalad/issues/3330>`__)
 
-.. _fixes-4:
+.. _fixes-5:
 
 Fixes
 ~~~~~
@@ -784,7 +899,7 @@ Fixes
 -  The new pathlib-based code had various encoding issues on Python 2.
    (`#3332 <https://github.com/datalad/datalad/issues/3332>`__)
 
-.. _enhancements-and-new-features-3:
+.. _enhancements-and-new-features-4:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -863,7 +978,7 @@ Enhancements and new features
 0.12.0rc2 (Mar 18, 2019) – revolution!
 --------------------------------------
 
-.. _fixes-5:
+.. _fixes-6:
 
 Fixes
 ~~~~~
@@ -873,7 +988,7 @@ Fixes
 
 -  ``GitRepo.save()`` reports results on deleted files.
 
-.. _enhancements-and-new-features-4:
+.. _enhancements-and-new-features-5:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -891,7 +1006,7 @@ Enhancements and new features
 0.12.0rc1 (Mar 03, 2019) – to boldly go …
 -----------------------------------------
 
-.. _major-refactoring-and-deprecations-3:
+.. _major-refactoring-and-deprecations-4:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -899,7 +1014,7 @@ Major refactoring and deprecations
 -  Discontinued support for git-annex direct-mode (also no longer
    supported upstream).
 
-.. _enhancements-and-new-features-5:
+.. _enhancements-and-new-features-6:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -909,62 +1024,6 @@ Enhancements and new features
 
 -  Imported various additional methods for the Repo classes to query
    information and save changes.
-
-0.11.9 (??? ??, 2019) – will be better than ever
-------------------------------------------------
-
-bet we will fix some bugs and make a world even a better place.
-
-.. _major-refactoring-and-deprecations-4:
-
-Major refactoring and deprecations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
--  hopefully none
-
-.. _fixes-6:
-
-Fixes
-~~~~~
-
--  `run-procedure <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html>`__
-   mistakenly reported a directory as a procedure.
-   (`#3793 <https://github.com/datalad/datalad/issues/3793>`__)
-
--  The cleanup for batched git-annex processes has been improved.
-   (`#3794 <https://github.com/datalad/datalad/issues/3794>`__)
-   (`#3851 <https://github.com/datalad/datalad/issues/3851>`__)
-
--  The function for adding a version ID to an AWS S3 URL doesn’t support
-   URLs with an “s3://” scheme and raises a ``NotImplementedError``
-   exception when it encounters one. The function learned to return a
-   URL untouched if an “s3://” URL comes in with a version ID.
-   (`#3842 <https://github.com/datalad/datalad/issues/3842>`__)
-
--  A few spots needed to be adjusted for compatibility with git-annex’s
-   new ``--sameas``
-   `feature <https://git-annex.branchable.com/tips/multiple_remotes_accessing_the_same_data_store/>`__,
-   which allows special remotes to share a data store.
-   (`#3856 <https://github.com/datalad/datalad/issues/3856>`__)
-
--  The ``swallow_logs`` utility failed to capture some log messages due
-   to an incompatibility with Python 3.7.
-   (`#3935 <https://github.com/datalad/datalad/issues/3935>`__)
-
--  `siblings <http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html>`__
-
-   -  crashed if ``--inherit`` was passed but the parent dataset did not
-      have a remote with a matching name.
-      (`#3954 <https://github.com/datalad/datalad/issues/3954>`__)
-   -  configured the wrong pushurl and annexurl values in some cases.
-      (`#3955 <https://github.com/datalad/datalad/issues/3955>`__)
-
-.. _enhancements-and-new-features-6:
-
-Enhancements and new features
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-?
 
 0.11.8 (Oct 11, 2019) – annex-we-are-catching-up
 ------------------------------------------------
