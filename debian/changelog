@@ -16,8 +16,9 @@ datalad (0.12.2-1) unstable; urgency=medium
   * debian/control
     - Recommend datalad-container not datalad-containers
     - Boost python3-git dependency to 2.1.12
+    - *Depend on p7zip-full which is used for archives handling
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 28 Jan 2020 08:27:53 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 28 Jan 2020 09:46:50 -0500
 
 datalad (0.12.1-1) unstable; urgency=medium
 
