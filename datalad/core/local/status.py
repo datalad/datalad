@@ -232,7 +232,7 @@ class Status(Interface):
         dict(text="Report on the state of a dataset and all subdatasets",
              code_py="ds.status(recursive=True)",
              code_cmd="datalad status --recursive"),
-        dict(text="ddress a subdataset record in a superdataset without "
+        dict(text="Address a subdataset record in a superdataset without "
                   "causing a status query for the state _within_ the subdataset "
                   "itself",
              code_py="ds.status(path='mysubdataset')",
