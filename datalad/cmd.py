@@ -98,7 +98,7 @@ def _cleanup_output(stream, std):
         std.close()
 
 
-class LeanRunner(object):
+class WitlessRunner(object):
     """Minimal Runner with support for online command output processing
 
     It aims to be as simple as possible, providing only essential
@@ -276,7 +276,7 @@ class LeanRunner(object):
         return out
 
 
-class Runner(LeanRunner):
+class Runner(WitlessRunner):
     """Provides a wrapper for calling functions and commands.
 
     An object of this class provides a methods that calls shell commands or

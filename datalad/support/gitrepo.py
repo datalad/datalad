@@ -58,7 +58,7 @@ from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import (
-    LeanRunner,
+    WitlessRunner,
     GitRunner,
     BatchedCommand
 )
@@ -469,7 +469,7 @@ class GitProgress(object):
             )
 
     def __call__(self, byts):
-        """Callable interface compatible with LeanRunner()
+        """Callable interface compatible with WitlessRunner()
 
         Parameters
         ----------
@@ -1094,7 +1094,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
                 # TODO bring back progress reporting
                 with GitProgress() as progress:
-                    LeanRunner(env=env).run(
+                    WitlessRunner(env=env).run(
                         ['git', 'clone', '--progress', url, path] \
                         + (to_options(**clone_options) if clone_options else []),
                         proc_stderr=progress,
