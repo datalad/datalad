@@ -226,27 +226,27 @@ class Status(Interface):
     # does not yield meaningful output for this command
     result_renderer = 'tailored'
     _examples_ = [
-        dict(text="""Report on the state of a dataset""",
+        dict(text="Report on the state of a dataset",
              code_py="ds.status()",
              code_cmd="datalad status"),
-        dict(text="""Report on the state of a dataset and all subdatasets""",
+        dict(text="Report on the state of a dataset and all subdatasets",
              code_py="ds.status(recursive=True)",
              code_cmd="datalad status --recursive"),
-        dict(text="""Address a subdataset record in a superdataset without
-             causing a status query for the state _within_ the subdataset
-             itself""",
+        dict(text="Address a subdataset record in a superdataset without "
+                  "causing a status query for the state _within_ the subdataset "
+                  "itself",
              code_py="ds.status(path='mysubdataset')",
              code_cmd="datalad status --dataset . mysubdataset"),
-        dict(text="""Get a status query for the state within the subdataset
-             without causing a status query for the superdataset (using trailing
-             path separator in the query path):""",
-             code_py="ds.status(path='mysubdataset')",
+        dict(text="Get a status query for the state within the subdataset "
+                  "without causing a status query for the superdataset (using trailing "
+                  "path separator in the query path):",
+             code_py="ds.status(path='mysubdataset/')",
              code_cmd="datalad status --dataset . mysubdataset/"),
-        dict(text="""Report on the state of a subdataset in a superdataset and
-             on the state within the subdataset""",
+        dict(text="Report on the state of a subdataset in a superdataset and "
+                  "on the state within the subdataset",
              code_py="ds.status(path=['mysubdataset', 'mysubdataset/'])",
              code_cmd="datalad status --dataset . mysubdataset mysubdataset/"),
-        dict(text="""Report the file size of annexed content in a dataset""",
+        dict(text="Report the file size of annexed content in a dataset",
              code_py="ds.status(annex=True)",
              code_cmd="datalad status --annex")
     ]

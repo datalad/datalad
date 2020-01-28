@@ -129,16 +129,6 @@ class Drop(Interface):
     file content is dropped. As these checks could lead to slow operation
     (network latencies, etc), they can be disabled.
 
-    Examples:
-
-      Drop all file content in a dataset::
-
-        ~/some/dataset$ datalad drop
-
-      Drop all file content in a dataset and all its subdatasets::
-
-        ~/some/dataset$ datalad drop --recursive
-
     """
     _examples_ = [
         dict(text="Drop single file content",
@@ -150,11 +140,12 @@ class Drop(Interface):
         dict(text="Drop all file content in a dataset and all its subdatasets",
              code_py="drop(dataset='.', recursive=True)",
              code_cmd="datalad drop --dataset <path/to/dataset> --recursive"),
-        dict(text="""Disable check to assure the configured minimum number of
-             remote sources for dropped data""",
+        dict(text="Disable check to ensure the configured minimum number of "
+                  "remote sources for dropped data",
              code_py="drop(path='path/to/content', check=False)",
              code_cmd="datalad drop <path/to/content> --nocheck"),
     ]
+
     _action = 'drop'
 
     _params_ = dict(

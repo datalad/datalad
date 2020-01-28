@@ -596,6 +596,9 @@ class Get(Interface):
         dict(text="Get all contents of the current dataset and its subdatasets",
              code_py="get(dataset='.', recursive=True)",
              code_cmd="datalad get . --recursive"),
+        dict(text="Get (clone) a registered subdataset, but don't retrieve data",
+             code_py="get('path/to/subds', get_data=False)",
+             code_cmd="datalad get -n <path/to/subds>"),
     ]
 
     _params_ = dict(

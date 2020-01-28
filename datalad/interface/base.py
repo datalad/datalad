@@ -399,7 +399,10 @@ def build_example(example, api='python'):
         indicator='%'
     else:
         raise ValueError("unknown API selection: {}".format(api))
-    description = dedent_docstring(example.get('text'))
+    if code_field not in example:
+        # only show an example if it exist for the API
+        return ''
+    description = textwrap.fill(example.get('text'))
     # this indent the code snippet to get it properly rendered as code
     # we are not using textwrap.fill(), because it would not acknowledge
     # any meaningful structure/formatting of code snippets. Instead, we
@@ -407,9 +410,17 @@ def build_example(example, api='python'):
     code = dedent_docstring(example.get(code_field))
     code = textwrap.indent(code, '     ').lstrip()
 
-    ex = """{}::\n\n   {} {}\n\n""".format(description,
-                                           indicator,
-                                           code)
+    ex = """{}::\n\n   {}{}\n\n""".format(
+        description,
+        # disable automatic prefixing, if the example already has one
+        # this enables providing more complex examples without having
+        # to infer its inner structure
+        '{} '.format(indicator)
+        if not code.startswith(indicator)
+        # maintain spacing to avoid undesired relative indentation
+        else '  ',
+        code)
+
     return ex
 
 

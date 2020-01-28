@@ -301,6 +301,15 @@ class RunProcedure(Interface):
         )
     )
 
+    _examples_ = [
+        dict(text="Find out which procedures are available on the current system",
+             code_py="run_procedure(discover=True)",
+             code_cmd="datalad run-procedure --discover"),
+        dict(text="Run the 'yoda' procedure in the current dataset",
+             code_py="run_procedure(spec='cfg_yoda', recursive=True)",
+             code_cmd="datalad run-procedure cfg_yoda"),
+    ]
+
     result_renderer = 'tailored'
 
     @staticmethod
