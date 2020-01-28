@@ -105,7 +105,7 @@ test_script:
   # remaining fails: test_annexrepo test_digests test_locking test_repodates test_sshrun 
   - "python -m nose -s -v --with-cov --cover-package datalad datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions datalad.support.tests.test_network datalad.support.tests.test_external_versions datalad.support.tests.test_sshconnector datalad.support.tests.test_json_py datalad.support.tests.test_vcr_ datalad.support.tests.test_gitrepo"
   # remaining fails: test__main__ test_cmd test_log  test_protocols test_test_utils test_auto
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.tests.test_utils datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives"
+  - "python -m nose -s -v --with-cov --cover-package datalad datalad.tests.test_utils datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives datalad.tests.test_witless_runner"
 
   - "python -m nose -s -v --with-cov --cover-package datalad datalad.ui"
   
