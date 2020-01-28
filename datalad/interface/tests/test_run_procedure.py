@@ -17,7 +17,7 @@ import sys
 
 from datalad.cmd import Runner
 from datalad.utils import chpwd
-from datalad.utils import maybe_shlex_quote
+from datalad.utils import quote_cmdlinearg
 from datalad.utils import swallow_outputs
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
@@ -204,7 +204,7 @@ def test_configs(path):
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        u'%s {script} {ds} {{mysub}} {args}' % maybe_shlex_quote(sys.executable),
+        u'%s {script} {ds} {{mysub}} {args}' % quote_cmdlinearg(sys.executable),
         where='dataset'
     )
     ds.config.add(
@@ -224,7 +224,7 @@ def test_configs(path):
     # config on dataset level:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        u'%s {script} {ds} local {args}' % maybe_shlex_quote(sys.executable),
+        u'%s {script} {ds} local {args}' % quote_cmdlinearg(sys.executable),
         where='local'
     )
     ds.unlock("fromproc.txt")

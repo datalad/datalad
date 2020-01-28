@@ -16,7 +16,6 @@ __docformat__ = 'restructuredtext'
 
 import re
 import os
-import shlex
 import tempfile
 
 from os.path import join as opj, realpath, curdir, exists, lexists, relpath, basename
@@ -42,6 +41,7 @@ from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import assure_tuple_or_list
 from ..utils import get_dataset_root
+from ..utils import split_cmdline
 
 from datalad.customremotes.base import init_datalad_remote
 
@@ -314,7 +314,7 @@ class AddArchiveContent(Interface):
 
             if annex_options:
                 if isinstance(annex_options, str):
-                    annex_options = shlex.split(annex_options)
+                    annex_options = split_cmdline(annex_options)
 
             leading_dir = earchive.get_leading_directory(
                 depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \

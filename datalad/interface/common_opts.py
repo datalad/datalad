@@ -137,7 +137,9 @@ reckless_opt = Parameter(
     risk the data integrity (e.g. hardlink files from a local clone
     of the dataset). Use with care, and limit to "read-only" use
     cases. With this flag the installed dataset will be marked as
-    untrusted.""")
+    untrusted. The reckless mode is stored in a dataset's local
+    configuration under 'datalad.clone.reckless', and will be inherited
+    to any of its subdatasets.""")
 
 jobs_opt = Parameter(
     args=("-J", "--jobs"),

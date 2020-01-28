@@ -62,7 +62,6 @@ from datalad.distribution.dataset import (
     EnsureDataset,
 )
 from datalad.distribution.utils import (
-    _get_git_url_from_source,
     _get_flexible_source_candidates,
 )
 
@@ -85,16 +84,23 @@ class Clone(Interface):
 
     Primary differences over a direct `git clone` call are 1) the automatic
     initialization of a dataset annex (pure Git repositories are equally
-    supported); 2) automatic registration of the newly obtained dataset
-    as a subdataset (submodule), if a parent dataset is specified; and
-    3) support for datalad's resource identifiers and automatic configurable
-    generation of alternative access URL for common cases (such as appending
-    '.git' to the URL in case the accessing the base URL failed).
+    supported); 2) automatic registration of the newly obtained dataset as a
+    subdataset (submodule), if a parent dataset is specified; and 3) support
+    for additional resource identifiers (DataLad resource identifiers as used
+    on datasets.datalad.org, and RIA store URLs as used for store.datalad.org;
+    see examples); and 4) automatic configurable generation of alternative
+    access URL for common cases (such as appending '.git' to the URL in case
+    the accessing the base URL failed).
 
     || PYTHON >>By default, the command returns a single Dataset instance for
     an installed dataset, regardless of whether it was newly installed ('ok'
     result), or found already installed from the specified source ('notneeded'
     result).<< PYTHON ||
+
+    .. seealso::
+
+      http://handbook.datalad.org/en/latest/usecases/datastorage_for_institutions.html
+        More information on Remote Indexed Archive (RIA) stores
     """
     # by default ignore everything but install results
     # i.e. no "add to super dataset"
@@ -125,7 +131,13 @@ class Clone(Interface):
              code_py="clone(dataset='.', "
              "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
              code_cmd="datalad clone -d . "
-             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+             "https://github.com/datalad-datasets/longnow-podcasts.git"),
+        dict(text="Install the main superdataset from datasets.datalad.org",
+             code_py="clone(source='///')",
+             code_cmd="datalad clone ///"),
+        dict(text="Install a dataset identified by its ID from store.datalad.org",
+             code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561')",
+             code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561"),
     ]
 
     _params_ = dict(
@@ -162,11 +174,6 @@ class Clone(Interface):
             dataset=None,
             description=None,
             reckless=None):
-        # legacy compatibility
-        if reckless is True:
-            # so that we can forget about how things used to be
-            reckless = 'auto'
-
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
@@ -174,6 +181,16 @@ class Clone(Interface):
             dataset, check_installed=True, purpose='cloning') \
             if dataset is not None else dataset
         refds_path = ds.path if ds else None
+
+        # legacy compatibility
+        if reckless is True:
+            # so that we can forget about how things used to be
+            reckless = 'auto'
+        if reckless is None and ds:
+            # if reckless is not explicitly given, but we operate on a
+            # superdataset, query whether it has been instructed to operate
+            # in a reckless mode, and inherit it for the coming clone
+            reckless = ds.config.get('datalad.clone.reckless', None)
 
         if isinstance(source, Dataset):
             source = source.path
@@ -191,22 +208,18 @@ class Clone(Interface):
         if path is not None:
             path = resolve_path(path, dataset)
 
-        # Possibly do conversion from source into a git-friendly url
-        # luckily GitRepo will undo any fancy file:/// url to make use of Git's
-        # optimization for local clones....
-        source_url = source
-        source_ = _get_git_url_from_source(source)
-        lgr.debug("Resolved clone source from '%s' to '%s'",
-                  source, source_)
-        source = source_
-
         # derive target from source:
         if path is None:
             # we got nothing but a source. do something similar to git clone
             # and derive the path from the source and continue
-            path = _get_installationpath_from_url(source)
             # since this is a relative `path`, resolve it:
-            path = resolve_path(path, dataset)
+            # we are not going to reuse the decoded URL, as this is done for
+            # all source candidates in clone_dataset(), we just use to determine
+            # a destination path here in order to perform a bunch of additional
+            # checks that shall not pollute the helper function
+            source_ = decode_source_spec(
+                source, cfg=None if ds is None else ds.config)
+            path = resolve_path(source_['default_destpath'], dataset)
             lgr.debug("Determined clone target path from source")
         lgr.debug("Resolved clone target path to: '%s'", path)
 
@@ -217,7 +230,7 @@ class Clone(Interface):
             action='install',
             logger=lgr,
             refds=refds_path,
-            source_url=source_url)
+            source_url=source)
 
         try:
             # this will implicitly cause pathlib to run a bunch of checks
@@ -252,7 +265,11 @@ class Clone(Interface):
             reckless,
             description,
             result_props,
+            cfg=None if ds is None else ds.config,
         )
+
+        # TODO handle any 'version' property handling and verification using a dedicated
+        # public helper
 
         if ds is not None:
             # we created a dataset in another dataset
@@ -271,7 +288,8 @@ def clone_dataset(
         destds,
         reckless=None,
         description=None,
-        result_props=None):
+        result_props=None,
+        cfg=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -290,6 +308,10 @@ def clone_dataset(
       Location description for the annex of the dataset clone (if there is any).
     result_props : dict, optional
       Default properties for any yielded result, passed on to get_status_dict().
+    cfg : ConfigManager, optional
+      Configuration will be queried from this instance (i.e. from a particular
+      dataset). If None is given, the global DataLad configuration will be
+      queried.
 
     Yields
     ------
@@ -307,11 +329,16 @@ def clone_dataset(
 
     dest_path = destds.pathobj
 
-    # generate candidate URLs from source argument to overcome a few corner cases
-    # and hopefully be more robust than git clone
+    # decode all source candidate specifications
+    candidate_sources = [decode_source_spec(s, cfg=cfg) for s in srcs]
+
+    # now expand the candidate sources with additional variants of the decoded
+    # giturl, while duplicating the other properties in the additional records
+    # for simplicity. The hope is to overcome a few corner cases and be more
+    # robust than git clone
     candidate_sources = [
-        s for src in srcs
-        for s in _get_flexible_source_candidates(src)
+        dict(props, giturl=s) for props in candidate_sources
+        for s in _get_flexible_source_candidates(props['giturl'])
     ]
 
     # important test! based on this `rmtree` will happen below after failed clone
@@ -334,7 +361,8 @@ def clone_dataset(
                 # pathlib behavior changes
                 lgr.debug("Unexpected behavior of pathlib!")
                 track_path = None
-            for src in candidate_sources:
+            for cand in candidate_sources:
+                src = cand['giturl']
                 if track_url == src \
                         or get_local_file_url(track_url, compatibility='git') == src \
                         or track_path == expanduser(src):
@@ -361,22 +389,41 @@ def clone_dataset(
         unit=' Candidate locations',
     )
     error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
-    for isource_, source_ in enumerate(candidate_sources):
+    for cand in candidate_sources:
+        log_progress(
+            lgr.info,
+            'cloneds',
+            'Attempting to clone from %s to %s', cand['giturl'], dest_path,
+            update=1,
+            increment=True)
+
+        clone_opts = {}
+
+        if cand.get('version', None):
+            clone_opts['branch'] = cand['version']
         try:
-            log_progress(
-                lgr.info,
-                'cloneds',
-                'Attempting to clone from %s to %s', source_, dest_path,
-                update=1,
-                increment=True)
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
             # doesn't make it happen seemlessly
-            GitRepo.clone(path=str(dest_path), url=source_, create=True)
-            break  # do not bother with other sources if succeeded
+            GitRepo.clone(
+                path=str(dest_path),
+                url=cand['giturl'],
+                clone_options=clone_opts,
+                create=True)
+
         except GitCommandError as e:
-            error_msgs[source_] = e
+            # Whenever progress reporting is enabled, as it is now,
+            # we end up without e.stderr since it is "processed" out by
+            # GitPython/our progress handler.
+            e_stderr = e.stderr
+            from datalad.support.gitrepo import GitPythonProgressBar
+            if not e_stderr and GitPythonProgressBar._last_error_lines:
+                e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
+                # Mimic format set in GitCommandError.__init__().
+                e.stderr = "{}  stderr: {}".format(os.linesep, e_stderr)
+
+            error_msgs[cand['giturl']] = e
             lgr.debug("Failed to clone from URL: %s (%s)",
-                      source_, exc_str(e))
+                      cand['giturl'], exc_str(e))
             if dest_path.exists():
                 lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                           dest_path)
@@ -385,13 +432,7 @@ def clone_dataset(
                 # TODO stringification can be removed once patlib compatible
                 # or if PY35 is no longer supported
                 rmtree(str(dest_path), children_only=dest_path_existed)
-            # Whenever progress reporting is enabled, as it is now,
-            # we end up without e.stderr since it is "processed" out by
-            # GitPython/our progress handler.
-            e_stderr = e.stderr
-            from datalad.support.gitrepo import GitPythonProgressBar
-            if not e_stderr and GitPythonProgressBar._last_error_lines:
-                e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
+
             if 'could not create work tree' in e_stderr.lower():
                 # this cannot be fixed by trying another URL
                 re_match = re.match(r".*fatal: (.*)$", e_stderr,
@@ -407,6 +448,18 @@ def clone_dataset(
                     message=re_match.group(1) if re_match else "stderr: " + e_stderr,
                     **result_props)
                 return
+            # next candidate
+            continue
+
+        # perform any post-processing that needs to know details of the clone
+        # source
+        if cand['type'] == 'ria':
+            yield from postclonecfg_ria(destds, cand)
+
+        result_props['source'] = cand
+        # do not bother with other sources if succeeded
+        break
+
     log_progress(
         lgr.info,
         'cloneds',
@@ -435,14 +488,14 @@ def clone_dataset(
                         "Although no errors were encountered, target " \
                         "dataset at %s seems to be not fully installed. " \
                         "The 'succesful' source was: %s"
-            error_args = (destds.path, source_)
+            error_args = (destds.path, cand['giturl'])
         yield get_status_dict(
             status='error',
             message=(error_msg, error_args),
             **result_props)
         return
 
-    yield from _handle_possible_annex_dataset(
+    yield from postclonecfg_annexdataset(
         destds,
         reckless,
         description)
@@ -453,7 +506,39 @@ def clone_dataset(
     yield get_status_dict(status='ok', **result_props)
 
 
-def _handle_possible_annex_dataset(ds, reckless, description=None):
+def postclonecfg_ria(ds, props):
+    """Configure a dataset freshly cloned from a RIA store"""
+    # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
+    # ssh) would make it see a bare repo and establish a hashdir lower annex object
+    # tree.
+    # Moreover, we want the RIA remote to receive all data for the store, so its
+    # objects could be moved into archives (the main point of a RIA store).
+    ds.config.set(
+        'remote.origin.annex-ignore', 'true',
+        where='local')
+
+    # chances are that if this dataset came from a RIA store, its subdatasets may live
+    # there too. Place a subdataset source candidate config that makes get probe this
+    # RIA store when obtaining subdatasets
+    ds.config.set(
+        # we use the label 'origin' for this candidate in order to not have to
+        # generate a complicated name from the actual source specification
+        'datalad.get.subdataset-source-candidate-origin',
+        # use the entire original URL, up to the fragment + plus dataset ID
+        # placeholder, this should make things work with any store setup we
+        # support (paths, ports, ...)
+        props['source'].split('#', maxsplit=1)[0] + '#{id}',
+        where='local')
+
+    # TODO setup publication dependency, if a corresponding special remote exists
+    # and was enabled (there could be RIA stores that actually only have repos)
+    # make this function be a generator even though it doesn't actually yield
+    # anything yet
+    if None:
+        yield None
+
+
+def postclonecfg_annexdataset(ds, reckless, description=None):
     """If ds "knows annex" -- annex init it, set into reckless etc
 
     Provides additional tune up to a possibly an annex repo, e.g.
@@ -469,7 +554,14 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
-        ds.config.add(
+        # store the reckless setting in the dataset to make it
+        # known to later clones of subdatasets via get()
+        ds.config.set(
+            'datalad.clone.reckless', reckless,
+            where='local',
+            # delay reload until all config IO is done
+            reload=False)
+        ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
 
     # we have just cloned the repo, so it has 'origin', configure any
@@ -551,6 +643,8 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
 
+_handle_possible_annex_dataset = postclonecfg_annexdataset
+
 
 def configure_origins(cfgds, probeds, label=None):
     """Configure any discoverable local dataset 'origin' sibling as a remote
@@ -577,7 +671,7 @@ def configure_origins(cfgds, probeds, label=None):
         # given the clone source is a local dataset, we can have a
         # cheap look at it, and configure its own 'origin' as a remote
         # (if there is any), and benefit from additional annex availability
-        originorigin_ds = Dataset(origin_url)
+        originorigin_ds = Dataset(probeds.pathobj / origin_url)
         originorigin_url = originorigin_ds.config.get('remote.origin.url')
         if originorigin_url:
             yield from cfgds.siblings(
@@ -636,3 +730,85 @@ def _get_installationpath_from_url(url):
     if path.endswith('.git'):
         path = path[:-4]
     return path
+
+
+def decode_source_spec(spec, cfg=None):
+    """Decode information from a clone source specification
+
+    Parameters
+    ----------
+    spec : str
+      Any supported clone source specification
+    cfg : ConfigManager, optional
+      Configuration will be queried from the instance (i.e. from a particular
+      dataset). If None is given, the global DataLad configuration will be
+      queried.
+
+    Returns
+    -------
+    dict
+      The value of each decoded property is stored under its own key in this
+      dict. By default the following keys are return: 'type', a specification
+      type label {'giturl', 'dataladri', 'ria'}; 'source' the original
+      source specification; 'giturl' a URL for the source that is a suitable
+      source argument for git-clone; 'version' a version-identifer, if present
+      (None else); 'default_destpath' a relative path that that can be used as
+      a clone destination.
+    """
+    if cfg is None:
+        from datalad import cfg
+    # standard property dict composition
+    props = dict(
+        source=spec,
+        version=None,
+    )
+    # common starting point is a RI instance, support for accepting an RI
+    # instance is kept for backward-compatibility reasons
+    source_ri = RI(spec) if not isinstance(spec, RI) else spec
+
+    # scenario switch, each case must set 'giturl' at the very minimum
+    if isinstance(source_ri, DataLadRI):
+        # we have got our DataLadRI as the source, so expand it
+        props['type'] = 'dataladri'
+        props['giturl'] = source_ri.as_git_url()
+    elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
+        # Git never gets to see these URLs, so let's manually apply any
+        # rewrite configuration Git might know about
+        source_ri = RI(cfg.rewrite_url(spec))
+        # parse a RIA URI
+        dsid, version = source_ri.fragment.split('@', maxsplit=1) \
+            if '@' in source_ri.fragment else (source_ri.fragment, None)
+        uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
+        if not re.match(uuid_regex, dsid):
+            raise ValueError('RIA URI does not contain a valid dataset ID: {}'.format(spec))
+        # now we cancel the fragment in the original URL, but keep everthing else
+        # in order to be able to support the various combinations of ports, paths,
+        # and everything else
+        source_ri.fragment = ''
+        # strip the custom protocol and go with standard one
+        source_ri.scheme = source_ri.scheme[4:]
+        # take any existing path, and add trace to dataset within the store
+        source_ri.path = '{urlpath}{urldelim}{trace}'.format(
+            urlpath=source_ri.path if source_ri.path else '',
+            urldelim='' if not source_ri.path or source_ri.path.endswith('/') else '/',
+            trace='{}/{}'.format(dsid[:3], dsid[3:]),
+        )
+        props.update(
+            type='ria',
+            giturl=str(source_ri),
+            version=version,
+            default_destpath=dsid,
+        )
+    else:
+        # let's assume that anything else is a URI that Git can handle
+        props['type'] = 'giturl'
+        # use original input verbatim
+        props['giturl'] = spec
+
+    if 'default_destpath' not in props:
+        # if we still have no good idea on where a dataset could be cloned to if no
+        # path was given, do something similar to git clone and derive the path from
+        # the source
+        props['default_destpath'] = _get_installationpath_from_url(props['giturl'])
+
+    return props

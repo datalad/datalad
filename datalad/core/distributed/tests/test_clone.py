@@ -22,6 +22,8 @@ import os.path as op
 
 from unittest.mock import patch
 
+from datalad.config import ConfigManager
+from datalad import consts
 from datalad.api import (
     create,
     clone,
@@ -43,6 +45,7 @@ from datalad.tests.utils import (
     with_tree,
     with_testrepos,
     eq_,
+    neq_,
     ok_,
     assert_false,
     ok_file_has_content,
@@ -62,9 +65,16 @@ from datalad.tests.utils import (
     with_sameas_remote,
     known_failure,
     known_failure_appveyor,
+    patch_config,
 )
-from datalad.core.distributed.clone import _get_installationpath_from_url
+from datalad.core.distributed.clone import (
+    decode_source_spec,
+    _get_installationpath_from_url,
+)
 from datalad.distribution.dataset import Dataset
+
+# this is the dataset ID of our test dataset in the main datalad RIA store
+datalad_store_testds_id = '76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561'
 
 
 @with_tempfile(mkdir=True)
@@ -313,11 +323,18 @@ def test_failed_clone(dspath):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_reckless(path, top_path):
-    ds = clone(path, top_path, reckless=True,
+def test_reckless(src, top_path):
+    ds = clone(src, top_path, reckless=True,
                result_xfm='datasets', return_type='item-or-list')
     eq_(ds.config.get('annex.hardlink', None), 'true')
+    # actual value is 'auto', because True is a legacy value and we map it
+    eq_(ds.config.get('datalad.clone.reckless', None), 'auto')
     eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+    # now, if we clone another repo into this one, it will inherit the setting
+    # without having to provide it explicitly
+    sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
+    eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
+    eq_(sub.config.get('annex.hardlink', None), 'true')
 
 
 @with_tempfile
@@ -384,7 +401,7 @@ def test_autoenabled_remote_msg(path):
 def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
     ds = Dataset(repo.path)
     with swallow_logs(new_level=logging.INFO) as cml:
-        res = clone(ds, clone_path)
+        res = clone(ds, clone_path, result_xfm=None, return_type='list')
         assert_status('ok', res)
         assert_in("r_dir", cml.out)
         assert_in("not auto-enabled", cml.out)
@@ -465,25 +482,37 @@ def test_cfg_originorigin(path):
     origin = Dataset(path / 'origin').create()
     (origin.pathobj / 'file1.txt').write_text('content')
     origin.save()
-    clone_direct = clone(origin, path / 'clone_direct')
-    clone_clone = clone(clone_direct, path / 'clone_clone')
+    clone_lev1 = clone(origin, path / 'clone_lev1')
+    clone_lev2 = clone(clone_lev1, path / 'clone_lev2')
     # the goal is to be able to get file content from origin without
     # the need to configure it manually
     assert_result_count(
-        clone_clone.get('file1.txt', on_failure='ignore'),
+        clone_lev2.get('file1.txt', on_failure='ignore'),
         1,
         action='get',
         status='ok',
-        path=str(clone_clone.pathobj / 'file1.txt'),
+        path=str(clone_lev2.pathobj / 'file1.txt'),
     )
-    eq_((clone_clone.pathobj / 'file1.txt').read_text(), 'content')
+    eq_((clone_lev2.pathobj / 'file1.txt').read_text(), 'content')
     eq_(
-        Path(clone_clone.siblings(
+        Path(clone_lev2.siblings(
             'query',
             name='origin-2',
             return_type='item-or-list')['url']),
         origin.pathobj
     )
+
+    # Clone another level, this time with a relative path. Drop content from
+    # lev2 so that origin is the only place that the file is available from.
+    clone_lev2.drop("file1.txt")
+    with chpwd(path):
+        clone_lev3 = clone('clone_lev2', 'clone_lev3')
+    assert_result_count(
+        clone_lev3.get('file1.txt', on_failure='ignore'),
+        1,
+        action='get',
+        status='ok',
+        path=str(clone_lev3.pathobj / 'file1.txt'))
 
 
 # test fix for gh-2601/gh-3538
@@ -521,3 +550,216 @@ def test_local_url_with_fetch(path, path_other):
             ds_cloned = clone(source=source, path=path)
             # Perform a fetch to check that the URL points to a valid location.
             ds_cloned.repo.fetch()
+
+
+def test_decode_source_spec():
+    # resolves datalad RIs:
+    eq_(decode_source_spec('///subds'),
+        dict(source='///subds', giturl=consts.DATASETS_TOPURL + 'subds', version=None,
+             type='dataladri', default_destpath='subds'))
+    assert_raises(NotImplementedError, decode_source_spec,
+                  '//custom/subds')
+
+    # doesn't harm others:
+    for url in (
+            'http://example.com',
+            '/absolute/path',
+            'file://localhost/some',
+            'localhost/another/path',
+            'user@someho.st/mydir',
+            'ssh://somewhe.re/else',
+            'git://github.com/datalad/testrepo--basic--r1',
+    ):
+        props = decode_source_spec(url)
+        dest = props.pop('default_destpath')
+        eq_(props, dict(source=url, version=None, giturl=url, type='giturl'))
+
+    # RIA URIs with and without version specification
+    dsid = '6d69ca68-7e85-11e6-904c-002590f97d84'
+    for proto, loc, version in (
+            ('http', 'example.com', None),
+            ('http', 'example.com', 'v1.0'),
+            ('http', 'example.com', 'some_with@in_it'),
+            ('ssh', 'example.com', 'some_with@in_it'),
+    ):
+        spec = 'ria+{}://{}{}{}'.format(
+            proto,
+            loc,
+            '#{}'.format(dsid),
+            '@{}'.format(version) if version else '')
+        eq_(decode_source_spec(spec),
+            dict(
+                source=spec,
+                giturl='{}://{}/{}/{}'.format(
+                    proto,
+                    loc,
+                    dsid[:3],
+                    dsid[3:]),
+                version=version,
+                default_destpath=dsid,
+                type='ria')
+        )
+    # not a dataset UUID
+    assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
+
+
+def _move2store(storepath, d):
+    # make a bare clone of it into a local that matches the organization
+    # of a ria dataset store
+    store_loc = str(storepath / d.id[:3] / d.id[3:])
+    d.repo.call_git(['clone', '--bare', d.path, store_loc])
+    d.siblings('configure', name='store', url=str(store_loc),
+               result_renderer='disabled')
+    Runner(cwd=store_loc).run(['git', 'update-server-info'])
+
+
+@with_tree(tree={
+    'ds': {
+        'test.txt': 'some',
+        'subdir': {
+            'subds': {'testsub.txt': 'somemore'},
+        },
+    },
+})
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_ria_http(lcl, storepath, url):
+    # create a local dataset with a subdataset
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
+    subds.save()
+    ds = Dataset(lcl / 'ds').create(force=True)
+    ds.save(version_tag='original')
+    assert_repo_status(ds.path)
+    for d in (ds, subds):
+        _move2store(storepath, d)
+    # location of superds in store
+    storeds_loc = str(storepath / ds.id[:3] / ds.id[3:])
+    # now we should be able to clone from a ria+http url
+    # the super
+    riaclone = clone(
+        'ria+{}#{}'.format(url, ds.id),
+        lcl / 'clone',
+    )
+
+    # due to default configuration, clone() should automatically look for the
+    # subdataset in the store, too -- if not the following would fail, because
+    # we never configured a proper submodule URL
+    riaclonesub = riaclone.get(
+        op.join('subdir', 'subds'), get_data=False,
+        result_xfm='datasets', return_type='item-or-list')
+
+    # both datasets came from the store and must be set up in an identical
+    # fashion
+    for origds, cloneds in ((ds, riaclone), (subds, riaclonesub)):
+        eq_(origds.id, cloneds.id)
+        if not ds.repo.is_managed_branch():
+            # test logic cannot handle adjusted branches
+            eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
+        ok_(cloneds.config.get('remote.origin.url').startswith(url))
+        eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
+        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
+            'ria+%s#{id}' % url)
+
+    # now advance the source dataset
+    (ds.pathobj / 'newfile.txt').write_text('new')
+    ds.save()
+    ds.publish(to='store')
+    Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
+    # re-clone as before
+    riaclone2 = clone(
+        'ria+{}#{}'.format(url, ds.id),
+        lcl / 'clone2',
+    )
+    # and now clone a specific version, here given be the tag name
+    riaclone_orig = clone(
+        'ria+{}#{}@{}'.format(url, ds.id, 'original'),
+        lcl / 'clone_orig',
+    )
+    if not ds.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        # we got the precise version we wanted
+        eq_(riaclone.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
+        # and not the latest
+        eq_(riaclone2.repo.get_hexsha(), ds.repo.get_hexsha())
+        neq_(riaclone2.repo.get_hexsha(), riaclone_orig.repo.get_hexsha())
+
+    # attempt to clone a version that doesn't exist
+    with swallow_logs():
+        with assert_raises(IncompleteResultsError) as cme:
+            clone('ria+{}#{}@impossible'.format(url, ds.id),
+                  lcl / 'clone_failed')
+        assert_in("not found in upstream", str(cme.exception))
+
+    # lastly test if URL rewriting is in effect
+    # on the surface we clone from an SSH source identified by some custom
+    # label, no full URL, but URL rewriting setup maps it back to the
+    # HTTP URL used above
+    with patch_config({
+            'url.ria+{}#.insteadof'.format(url): 'ria+ssh://somelabel#'}):
+        cloned_by_label = clone(
+            'ria+ssh://somelabel#{}'.format(origds.id),
+            lcl / 'cloned_by_label',
+        )
+    # so we get the same setup as above, but....
+    eq_(origds.id, cloned_by_label.id)
+    if not ds.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        eq_(origds.repo.get_hexsha(), cloned_by_label.repo.get_hexsha())
+    ok_(cloned_by_label.config.get('remote.origin.url').startswith(url))
+    eq_(cloned_by_label.config.get('remote.origin.annex-ignore'), 'true')
+    # ... the clone candidates go with the label-based URL such that
+    # future get() requests acknowlege a (system-wide) configuration
+    # update
+    eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-origin'),
+        'ria+ssh://somelabel#{id}')
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_inherit_src_candidates(lcl, storepath, url):
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    # dataset with a subdataset
+    ds1 = Dataset(lcl / 'ds1').create()
+    ds1sub = ds1.create('sub')
+    # a different dataset into which we install ds1, but do not touch its subds
+    ds2 = Dataset(lcl / 'ds2').create()
+    ds2.clone(source=ds1.path, path='mysub')
+
+    # we give no dataset a source candidate config!
+    # move all dataset into the store
+    for d in (ds1, ds1sub, ds2):
+        _move2store(storepath, d)
+
+    # now we must be able to obtain all three datasets from the store
+    riaclone = clone(
+        'ria+{}#{}'.format(
+            # store URL
+            url,
+            # ID of the root dataset
+            ds2.id),
+        lcl / 'clone',
+    )
+    # what happens is the the initial clone call sets a source candidate
+    # config, because it sees the dataset coming from a store
+    # all obtained subdatasets get the config inherited on-clone
+    datasets = riaclone.get('.', get_data=False, recursive=True, result_xfm='datasets')
+    # we get two subdatasets
+    eq_(len(datasets), 2)
+    for ds in datasets:
+        eq_(ConfigManager(dataset=ds, source='dataset-local').get(
+            'datalad.get.subdataset-source-candidate-origin'),
+            'ria+%s#{id}' % url)
+
+
+@skip_if_no_network
+@with_tempfile()
+def test_ria_http_storedataladorg(path):
+    # can we clone from the store w/o any dedicated config
+    ds = clone('ria+http://store.datalad.org#{}'.format(datalad_store_testds_id), path)
+    ok_(ds.is_installed())
+    eq_(ds.id, datalad_store_testds_id)
+

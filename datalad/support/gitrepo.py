@@ -13,7 +13,6 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import re
-import shlex
 import time
 import os
 import os.path as op
@@ -82,7 +81,8 @@ from datalad.utils import (
     posix_relpath,
     assure_dir,
     generate_file_chunks,
-    assure_unicode
+    assure_unicode,
+    split_cmdline,
 )
 
 # imports from same module:
@@ -361,14 +361,13 @@ def _remove_empty_items(list_):
     return [file_ for file_ in list_ if file_]
 
 
-if external_versions["cmd:git"] >= "2.24.0":
+if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
     # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
     # into untracked submodules when multiple pathspecs are given, returning
     # repositories that are deeper than the first level. This helper filters
     # these deeper levels out so that save_() doesn't fail trying to add them.
     #
-    # TODO: Once an upstream release includes a fix, either set a ceiling on
-    # the Git version above or remove _prune_deeper_repos() entirely.
+    # This regression fixed with upstream's 072a231016 (2019-12-10).
     def _prune_deeper_repos(repos):
         firstlevel_repos = []
         prev = None
@@ -804,7 +803,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return self._repo
 
     @classmethod
-    def clone(cls, url, path, *args, **kwargs):
+    def clone(cls, url, path, *args, clone_options=None, **kwargs):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -814,6 +813,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ----------
         url : str
         path : str
+        clone_options : dict
+          Key/value pairs of arbitrary options that will be passed on to the
+          underlying call to `git-clone`.
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
@@ -883,6 +885,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     repo = gitpy.Repo.clone_from(
                         url, path,
                         env=env,
+                        # we accept a plain dict with options, and not a gitpy
+                        # tailored list of "multi options" to make a future
+                        # non-GitPy based implementation easier. Do conversion
+                        # here
+                        multi_options=to_options(**clone_options) if clone_options else None,
                         odbt=default_git_odbt,
                         progress=git_progress
                     )
@@ -1858,7 +1865,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, str):
-            cmd = shlex.split(cmd_str, posix=not on_windows)
+            cmd = split_cmdline(cmd_str)
         else:
             cmd = cmd_str[:]  # we will modify in-place
 
@@ -2509,7 +2516,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             '',
             ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
-        db, _ = _parse_gitconfig_dump(out, {}, None, True)
+        db, _ = _parse_gitconfig_dump(out, {}, None, True, cwd=self.path)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):

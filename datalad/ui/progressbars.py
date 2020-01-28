@@ -28,7 +28,7 @@ class ProgressBarBase(object):
 
     def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B', initial=0):
         self.label = label
-        self.fill_test = fill_text
+        self.fill_text = fill_text
         self.total = total
         self.unit = unit
         self.out = out

@@ -13,7 +13,6 @@ import os
 import os.path as op
 import sys
 import logging
-import shlex
 
 from .utils import (
     ok_,
@@ -46,6 +45,7 @@ from ..cmd import (
 )
 from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
+from ..utils import split_cmdline
 
 
 @known_failure_githubci_win
@@ -63,7 +63,7 @@ def test_runner_dry(tempfile):
         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
     assert_equal(("DRY", "DRY"), ret,
                  "Output of dry run (%s): %s" % (cmd, ret))
-    assert_equal(shlex.split(cmd, posix=not on_windows), dry[0]['command'])
+    assert_equal(split_cmdline(cmd), dry[0]['command'])
     assert_false(os.path.exists(tempfile))
 
     # test dry python function call
@@ -102,7 +102,7 @@ def test_runner(tempfile):
     #   the shell itself.
     # which is what it ruins it for us!  So, for now we are not testing/using
     # this form
-    # ret = runner.run(shlex.split(cmd, posix=not on_windows), shell=True)
+    # ret = runner.run(split_cmdline(cmd), shell=True)
     # # ?! for some reason there is an empty line in stdout
     # # TODO: figure out.  It shouldn't though be of critical effect
     # ret = (ret[0].rstrip(), ret[1])

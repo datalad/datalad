@@ -25,6 +25,7 @@ from os.path import (
     exists,
     getmtime,
     abspath,
+    isabs,
 )
 from time import time
 
@@ -64,7 +65,7 @@ def _where_reload(obj):
     return obj
 
 
-def _parse_gitconfig_dump(dump, store, fileset, replace):
+def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
     if replace:
         # if we want to replace existing values in the store
         # collect into a new dict and `update` the store at the
@@ -81,7 +82,10 @@ def _parse_gitconfig_dump(dump, store, fileset, replace):
             continue
         if line.startswith('file:'):
             # origin line
-            fileset.add(abspath(line[5:]))
+            fname = line[5:]
+            if not isabs(fname):
+                fname = opj(cwd, fname) if cwd else abspath(fname)
+            fileset.add(fname)
             continue
         if line.startswith('command line:'):
             # nothing we could handle
@@ -168,19 +172,21 @@ class ConfigManager(object):
       Legacy option, do not use.
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
-    source : {'any', 'local', 'dataset'}, optional
+    source : {'any', 'local', 'dataset', 'dataset-local'}, optional
       Which sources of configuration setting to consider. If 'dataset',
       configuration items are only read from a dataset's persistent
       configuration file, if any is present (the one in ``.datalad/config``, not
-      ``.git/config``); if 'local' any non-committed source is considered
-      (local and global configuration in Git config's terminology); if 'any'
+      ``.git/config``); if 'local', any non-committed source is considered
+      (local and global configuration in Git config's terminology);
+      if 'dataset-local', persistent dataset configuration and local, but
+      not global or system configuration are considered; if 'any'
       all possible sources of configuration are considered.
     """
 
     _checked_git_identity = False
 
     def __init__(self, dataset=None, dataset_only=False, overrides=None, source='any'):
-        if source not in ('any', 'local', 'dataset'):
+        if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
                 'Unkown ConfigManager(source=) setting: {}'.format(source))
             # legacy compat
@@ -198,6 +204,7 @@ class ConfigManager(object):
         self._dataset_path = None
         self._dataset_cfgfname = None
         self._repo_cfgfname = None
+        self._config_cmd = ['git', 'config']
         # public dict to store variables that always override any setting
         # read from a file
         # `hasattr()` is needed because `datalad.cfg` is generated upon first module
@@ -207,10 +214,14 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            if source == 'dataset':
+            if source in ('dataset', 'dataset-local'):
                 raise ValueError(
                     'ConfigManager configured to read dataset only, '
                     'but no dataset given')
+            # The caller didn't specify a repository. Unset the git directory
+            # when calling 'git config' to prevent a repository in the current
+            # working directory from leaking configuration into the output.
+            self._config_cmd = ['git', '--git-dir=', 'config']
         else:
             self._dataset_path = dataset.path
             if source != 'local':
@@ -283,16 +294,20 @@ class ConfigManager(object):
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store, self._cfgfiles = _parse_gitconfig_dump(
-                    stdout, self._store, self._cfgfiles, replace=False)
+                    stdout, self._store, self._cfgfiles, replace=False,
+                    cwd=self._runner.cwd)
 
         if self._src_mode == 'dataset':
             # superimpose overrides, and stop early
             self._store.update(self.overrides)
             return
 
+        if self._src_mode == 'dataset-local':
+            run_args.append('--local')
         stdout, stderr = self._run(run_args, log_stderr=True)
         self._store, self._cfgfiles = _parse_gitconfig_dump(
-            stdout, self._store, self._cfgfiles, replace=True)
+            stdout, self._store, self._cfgfiles, replace=True,
+            cwd=self._runner.cwd)
 
         # always monitor the dataset cfg location, we know where it is in all cases
         if self._dataset_cfgfname:
@@ -577,7 +592,7 @@ class ConfigManager(object):
         """
         if where:
             args = self._get_location_args(where) + args
-        out = self._runner.run(['git', 'config'] + args, **kwargs)
+        out = self._runner.run(self._config_cmd + args, **kwargs)
         if reload:
             self.reload()
         return out
@@ -722,3 +737,61 @@ class ConfigManager(object):
 
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)
+
+
+def rewrite_url(cfg, url):
+    """Any matching 'url.<base>.insteadOf' configuration is applied
+
+    Any URL that starts with such a configuration will be rewritten
+    to start, instead, with <base>. When more than one insteadOf
+    strings match a given URL, the longest match is used.
+
+    Parameters
+    ----------
+    cfg : ConfigManager or dict
+      dict-like with configuration variable name/value-pairs.
+    url : str
+      URL to be rewritten, if matching configuration is found.
+
+    Returns
+    -------
+    str
+      Rewritten or unmodified URL.
+    """
+    insteadof = {
+        # only leave the base url
+        k[4:-10]: v
+        for k, v in cfg.items()
+        if k.startswith('url.') and k.endswith('.insteadof')
+    }
+
+    # all config that applies
+    matches = {
+        key: v
+        for key, val in insteadof.items()
+        for v in (val if isinstance(val, tuple) else (val,))
+        if url.startswith(v)
+    }
+    # find longest match, like Git does
+    if matches:
+        rewrite_base, match = sorted(
+            matches.items(),
+            key=lambda x: len(x[1]),
+            reverse=True,
+        )[0]
+        if sum(match == v for v in matches.values()) > 1:
+            lgr.warning(
+                "Ignoring URL rewrite configuration for '%s', "
+                "multiple conflicting definitions exists: %s",
+                match,
+                ['url.{}.insteadof'.format(k)
+                 for k, v in matches.items()
+                 if v == match]
+            )
+        else:
+            url = '{}{}'.format(rewrite_base, url[len(match):])
+    return url
+
+
+# for convenience, bind to class too
+ConfigManager.rewrite_url = rewrite_url

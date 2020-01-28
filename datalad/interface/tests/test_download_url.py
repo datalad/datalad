@@ -57,7 +57,8 @@ def test_download_url_existing_dir_no_slash_exception(path):
         res = download_url('url', path="dir", save=False, on_failure='ignore')
         assert_result_count(res, 1, status='error')
         assert_message("Non-directory path given (no trailing separator) "
-                       "but a directory with that name exists",
+                       "but a directory with that name (after adding "
+                       "archive suffix) exists",
                        res)
 
 

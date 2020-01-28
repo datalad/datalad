@@ -26,25 +26,6 @@ from datalad.support.network import PathRI
 lgr = logging.getLogger('datalad.distribution.utils')
 
 
-def _get_git_url_from_source(source):
-    """Return URL for cloning associated with a source specification
-
-    For now just resolves DataLadRIs
-    """
-    # TODO: Probably RF this into RI.as_git_url(), that would be overridden
-    # by subclasses or sth. like that
-    if not isinstance(source, RI):
-        source_ri = RI(source)
-    else:
-        source_ri = source
-    if isinstance(source_ri, DataLadRI):
-        # we have got our DataLadRI as the source, so expand it
-        source = source_ri.as_git_url()
-    else:
-        source = str(source_ri)
-    return source
-
-
 def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
     """Get candidates to try cloning from.
 

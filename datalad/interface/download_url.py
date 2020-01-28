@@ -21,6 +21,8 @@ from ..interface.common_opts import save_message_opt
 from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
 from ..utils import assure_list_from_str
+from ..utils import Path
+from ..utils import PurePosixPath
 from ..distribution.dataset import Dataset
 from ..distribution.dataset import datasetmethod
 from ..distribution.dataset import EnsureDataset
@@ -74,9 +76,10 @@ class DownloadURL(Interface):
             it is treated as a directory, and each specified URL is downloaded
             under that directory to a base name taken from the URL. Without a
             trailing separator, the value specifies the name of the downloaded
-            file and only a single URL should be given. In both cases, leading
-            directories will be created if needed. This argument defaults to
-            the current directory.""",
+            file (file name extensions inferred from the URL may be added to it,
+            if they are not yet present) and only a single URL should be given.
+            In both cases, leading directories will be created if needed. This
+            argument defaults to the current directory.""",
             constraints=EnsureStr() | EnsureNone()),
         archive=Parameter(
             args=("--archive",),
@@ -128,6 +131,16 @@ class DownloadURL(Interface):
                     path=path,
                     **common_report)
                 return
+            if archive:
+                # make sure the file suffix indicated by a URL is preserved
+                # so that any further archive processing doesn't have to
+                # employ mime type inspection in order to determine the archive
+                # type
+                from datalad.support.network import URL
+                suffixes = PurePosixPath(URL(urls[0]).path).suffixes
+                if not Path(path).suffixes == suffixes:
+                    path += ''.join(suffixes)
+            # we know that we have a single URL
             # download() would be fine getting an existing directory and
             # downloading the URL underneath it, but let's enforce a trailing
             # slash here for consistency.
@@ -136,7 +149,8 @@ class DownloadURL(Interface):
                     status="error",
                     message=(
                         "Non-directory path given (no trailing separator) "
-                        "but a directory with that name exists"),
+                        "but a directory with that name (after adding archive "
+                        "suffix) exists"),
                     type="file",
                     path=path,
                     **common_report)

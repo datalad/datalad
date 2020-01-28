@@ -50,7 +50,10 @@ from os.path import dirname
 from os.path import split as psplit
 import posixpath
 
-from shlex import quote as shlex_quote
+from shlex import (
+    quote as shlex_quote,
+    split as shlex_split,
+)
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
@@ -2315,13 +2318,56 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
     return format % dict(symbol=symbols[0], value=n)
 
 
-def maybe_shlex_quote(val):
-    """
-    shlex_quote() a value if the command is not run on a Windows
-    machine.
-    """
+def quote_cmdlinearg(arg):
+    """Perform platform-appropriate argument quoting"""
+    # https://stackoverflow.com/a/15262019
+    return '"{}"'.format(
+        arg.replace('"', '""')
+    ) if on_windows else shlex_quote(arg)
 
-    return val if on_windows else shlex_quote(val)
+
+def split_cmdline(s):
+    """Perform platform-appropriate command line splitting.
+
+    Identical to `shlex.split()` on non-windows platforms.
+
+    Modified from https://stackoverflow.com/a/35900070
+    """
+    if not on_windows:
+        return shlex_split(s)
+
+    # the rest is for windows
+    RE_CMD_LEX = r'''"((?:""|\\["\\]|[^"])*)"?()|(\\\\(?=\\*")|\\")|(&&?|\|\|?|\d?>|[<])|([^\s"&|<>]+)|(\s+)|(.)'''
+
+    args = []
+    accu = None   # collects pieces of one arg
+    for qs, qss, esc, pipe, word, white, fail in re.findall(RE_CMD_LEX, s):
+        if word:
+            pass   # most frequent
+        elif esc:
+            word = esc[1]
+        elif white or pipe:
+            if accu is not None:
+                args.append(accu)
+            if pipe:
+                args.append(pipe)
+            accu = None
+            continue
+        elif fail:
+            raise ValueError("invalid or incomplete shell string")
+        elif qs:
+            word = qs.replace('\\"', '"').replace('\\\\', '\\')
+            if platform == 0:
+                word = word.replace('""', '"')
+        else:
+            word = qss   # may be even empty; must be last
+
+        accu = (accu or '') + word
+
+    if accu is not None:
+        args.append(accu)
+
+    return args
 
 
 def get_wrapped_class(wrapped):
