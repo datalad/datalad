@@ -15,6 +15,7 @@ datalad (0.12.2-1) unstable; urgency=medium
   * Unbump debhelper to 11 for backporting
   * debian/control
     - Recommend datalad-container not datalad-containers
+    - Boost python3-git dependency to 2.1.12
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 28 Jan 2020 08:27:53 -0500
 
