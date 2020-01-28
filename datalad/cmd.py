@@ -98,6 +98,21 @@ def _cleanup_output(stream, std):
         std.close()
 
 
+def kill_output(output):
+    """Helper for WitlessRunner to swallow all output and neither
+    relay it to the parent process's stdout, not provide it as
+    return value of WitlessRunner.run().
+    """
+    return b'', 0
+
+
+def capture_output(output):
+    """Helper for WitlessRunner to capture all output and
+    provide it as return value of WitlessRunner.run().
+    """
+    return output, 0
+
+
 class WitlessRunner(object):
     """Minimal Runner with support for online command output processing
 
@@ -142,10 +157,15 @@ class WitlessRunner(object):
           that it is simply the name of the program, no complex shell
           commands are supported.
         proc_stdout : callable, optional
-          If given, all stdout is passed as byte-string to this callable,
-          in the chunks it was received by polling the processing. The
-          callable may transform it in any way, its output (byte-string)
-          is concatenated and provided as stdout return value.
+          By defaultno stdout is captured, but relayed to the parent
+          process's stdout. If given, all stdout is passed as byte-string
+          to this callable, in the chunks it was received by polling the
+          processing. The callable may transform it in any way, its output
+          (byte-string) is concatenated and provided as stdout return value.
+          The helper functions 'kill_output', and 'capture_output' are
+          provided to either swallow all output (and not relay it to the
+          parent), or to capture all output and provide it as return
+          value.
         proc_stderr : callable, optional
           Like proc_stdout, but for stderr.
         stdin : byte stream, optional
