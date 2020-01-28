@@ -787,8 +787,10 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
         clone1_annex = (clone1.repo.dot_git / 'annex')
         ok_(clone1_annex.is_symlink())
         ok_(clone1_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
-        ok_file_has_content(clone1.pathobj / file_test, content='some')
-        ok_file_has_content(clone1.pathobj / file_testsub, content='somemore')
+        if not clone1.repo.is_managed_branch():
+            # TODO: We can't properly handle adjusted branch yet
+            eq_((clone1.pathobj / file_test).read_text(), 'some')
+            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
 
     # 2. clone via file-scheme URL
     clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
@@ -798,8 +800,10 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
         clone2_annex = (clone2.repo.dot_git / 'annex')
         ok_(clone2_annex.is_symlink())
         ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
-        ok_file_has_content(clone2.pathobj / file_test, content='some')
-        ok_file_has_content(clone2.pathobj / file_testsub, content='somemore')
+        if not clone2.repo.is_managed_branch():
+            # TODO: We can't properly handle adjusted branch yet
+            eq_((clone1.pathobj / file_test).read_text(), 'some')
+            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
 
     # 3. add something to clone1 and push back to origin availability from
     # clone1 should not be propagated (we declared 'here' dead to that end)
