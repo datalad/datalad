@@ -479,7 +479,7 @@ class GitProgress(object):
         Returns
         -------
         bytes
-          All input in its orignal form, excepted for lines that
+          All input in its original form, except for lines that
           were identified as recognized progress reports.
         """
         keep_lines = []

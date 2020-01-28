@@ -100,7 +100,7 @@ def _cleanup_output(stream, std):
 
 def kill_output(output):
     """Helper for WitlessRunner to swallow all output and neither
-    relay it to the parent process's stdout, not provide it as
+    relay it to the parent process's stdout, nor provide it as the
     return value of WitlessRunner.run().
     """
     return b'', 0
@@ -108,7 +108,7 @@ def kill_output(output):
 
 def capture_output(output):
     """Helper for WitlessRunner to capture all output and
-    provide it as return value of WitlessRunner.run().
+    provide it as the return value of WitlessRunner.run().
     """
     return output, 0
 
@@ -130,7 +130,7 @@ class WitlessRunner(object):
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise.
         env : dict, optional
-          Environment to be pass to subprocess.Popen(). If `cwd`
+          Environment to be passed to subprocess.Popen(). If `cwd`
           was given, 'PWD' in the environment is set to its value.
           This must be a complete environment definition, no values
           from the current environment will be inherited.
@@ -157,14 +157,14 @@ class WitlessRunner(object):
           that it is simply the name of the program, no complex shell
           commands are supported.
         proc_stdout : callable, optional
-          By defaultno stdout is captured, but relayed to the parent
-          process's stdout. If given, all stdout is passed as byte-string
+          By default no stdout is captured, but relayed to the parent
+          process's stdout. If given, all stdout is passed as a byte-string
           to this callable, in the chunks it was received by polling the
           processing. The callable may transform it in any way, its output
           (byte-string) is concatenated and provided as stdout return value.
-          The helper functions 'kill_output', and 'capture_output' are
+          The helper functions 'kill_output' and 'capture_output' are
           provided to either swallow all output (and not relay it to the
-          parent), or to capture all output and provide it as return
+          parent) or to capture all output and provide it as the return
           value.
         proc_stderr : callable, optional
           Like proc_stdout, but for stderr.
@@ -181,7 +181,7 @@ class WitlessRunner(object):
         Raises
         ------
         CommandError
-          On executation failure (non-zero exit code) this exception is
+          On execution failure (non-zero exit code) this exception is
           raised which provides the command (cmd), stdout, stderr,
           exit code (status), and a message identifying the failed
           command, as properties.
