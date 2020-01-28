@@ -4,7 +4,7 @@ Uploaders: Yaroslav Halchenko <debian@onerussian.com>,
            Michael Hanke <mih@debian.org>
 Section: science
 Priority: optional
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: debhelper (>= 11),
                dh-python,
                git-annex (>= 7.20190503~) | git-annex-standalone (>= 7.20190503~),
                help2man,
