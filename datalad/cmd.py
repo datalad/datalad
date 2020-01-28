@@ -142,10 +142,10 @@ class WitlessRunner(object):
         self.env = env.copy() if env else None
         # stringify to support Path instances on PY35
         self.cwd = str(cwd) if cwd is not None else None
-        if cwd and env is not None:
+        if self.cwd and env is not None:
             # if CWD was provided, we must not make it conflict with
             # a potential PWD setting
-            self.env['PWD'] = cwd
+            self.env['PWD'] = self.cwd
 
     def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None):
         """Execute a command and communicate with it.
