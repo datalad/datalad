@@ -2392,3 +2392,34 @@ assure_dir = ensure_dir
 
 
 lgr.log(5, "Done importing datalad.utils")
+
+
+def check_symlink_capability(path, target):
+    """helper similar to datalad.tests.utils.has_symlink_capability
+
+    However, for use in a datalad command context, we shouldn't
+    assume to be able to write to tmpfile and also not import a whole lot from
+    datalad's test machinery. Finally, we want to know, whether we can create a
+    symlink at a specific location, not just somewhere. Therefore use
+    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    location can therefore be determined by high lever code.
+
+    Paremeter
+    ---------
+    path: Path
+    target: Path
+
+    Returns
+    -------
+    bool
+    """
+
+    try:
+        target.touch()
+        path.symlink_to(target)
+        return True
+    except Exception:
+        return False
+    finally:
+        path.unlink()
+        target.unlink()

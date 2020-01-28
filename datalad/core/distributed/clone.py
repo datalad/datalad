@@ -64,8 +64,8 @@ from datalad.distribution.dataset import (
 from datalad.distribution.utils import (
     _get_flexible_source_candidates,
 )
-from datalad.tests.utils import (
-    has_symlink_capability
+from datalad.utils import (
+    check_symlink_capability
 )
 
 __docformat__ = 'restructuredtext'
@@ -605,7 +605,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
         ds.repo._run_annex_command('dead', annex_options=['here'])
 
-        if has_symlink_capability():
+        if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
+                                    ds.repo.dot_git / 'dl_target_test'):
             # symlink the annex to avoid needless copies in an emphemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
             origin_annex_url = ds.config.get("remote.origin.url", None)
@@ -613,7 +614,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 try:
                     # deal with file:// scheme URLs as well as plain paths
                     # if origin isn't local, we have nothing to do
-                    # TODO: Double-check it's always .git!
                     origin_git_path = Path(PathRI(origin_annex_url).localpath)
                     if origin_git_path.name != '.git':
                         origin_git_path /= '.git'
