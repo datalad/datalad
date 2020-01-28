@@ -219,13 +219,16 @@ class WitlessRunner(object):
             pout = None
             # make sure to run this loop at least once, even if the
             # process is already dead
-            while process.poll() is None or pout is None:
+            keep_going = True
+            while process.poll() is None or keep_going:
                 try:
                     # get a chunk of output for the specific period
                     # of time
                     pout = process.communicate(
                         timeout=self._poll_period,
                     )
+                    # we know the process ended at this point
+                    keep_going = False
                 except subprocess.TimeoutExpired as poll:
                     # this will always be the full report so far,
                     # not just an output increment

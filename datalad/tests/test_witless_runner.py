@@ -30,24 +30,26 @@ from datalad.utils import Path
 from datalad.support.exceptions import CommandError
 
 
-class SwallowOutput(object):
-    """Test helper to collect output from WitlessRunner"""
-    def __init__(self):
+class TweakOutput(object):
+    """Test helper to twist and turn output from WitlessRunner"""
+    def __init__(self, rtruncate_nbytes=None, report_truncation=True):
+        self._rtruncate_nbytes = rtruncate_nbytes
+        self._report_truncation = report_truncation
         self.__enter__()
 
     def __enter__(self):
-        self.swallowed = b''
+        self.received = []
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
     def __call__(self, byts):
-        self.swallowed += byts
-        return b'', 0
-
-    def as_utf8(self):
-        return self.swallowed.decode('utf-8')
+        self.received.append(byts)
+        rtrunc = (-1) * self._rtruncate_nbytes \
+            if self._rtruncate_nbytes else None
+        byts = byts[:rtrunc]
+        return byts, self._rtruncate_nbytes if self._report_truncation else 0
 
 
 def py2cmd(code):
@@ -147,3 +149,44 @@ def test_runner_stdin(path):
         proc_stdout=capture_output,
     )
     assert_in(OBSCURE_FILENAME, out)
+
+
+py_9bytes_plus_6bytes = """\
+import sys
+print("123456789", end="", file=sys.stdout, flush=True)
+import time
+time.sleep(0.5)
+print("abcdefg", end="", file=sys.stdout)
+"""
+
+
+def test_runner_incomplete_capture():
+    # make sure the runner polls faster than the output is coming
+    runner = Runner(poll_period=0.1)
+    with TweakOutput(rtruncate_nbytes=3) as outproc:
+        out, err = runner.run(
+            py2cmd(py_9bytes_plus_6bytes),
+            # we don't process the last three in the output, but we
+            # report that to the runner
+            proc_stdout=outproc)
+    # we must not loose any output, except for the very last three bytes
+    # even though we poll at a higher frequency
+    eq_(out, '123456789abcd')
+    # we see the first batch received
+    eq_(outproc.received[0], b'123456789')
+    # we see the truncated 3 bytes of the first batch, repeatedly
+    # sent (but the processor rejects them)
+    eq_(outproc.received[1:-1], (len(outproc.received) - 2) * [b'789'])
+    # we see the last batch that carries the pending 3 bytes upfront
+    eq_(outproc.received[-1], b'789abcdefg')
+
+    # no the same, but the processor doesn't tell that it ignored
+    # 3 bytes
+    with TweakOutput(rtruncate_nbytes=3, report_truncation=False) as outproc:
+        out, err = runner.run(
+            py2cmd(py_9bytes_plus_6bytes),
+            # we don't process the last three in the output, but we
+            # report that to the runner
+            proc_stdout=outproc)
+    # we miss three bytes at the end of each batch
+    eq_(out, '123456abcd')
