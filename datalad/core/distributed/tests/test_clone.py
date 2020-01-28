@@ -66,6 +66,7 @@ from datalad.tests.utils import (
     known_failure,
     known_failure_appveyor,
     patch_config,
+    has_symlink_capability
 )
 from datalad.core.distributed.clone import (
     decode_source_spec,
@@ -763,3 +764,62 @@ def test_ria_http_storedataladorg(path):
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)
 
+
+@with_tree(tree={
+    'ds': {
+        'test.txt': 'some',
+        'subdir': {'testsub.txt': 'somemore'},
+    },
+})
+@with_tempfile
+@with_tempfile
+def test_ephemeral(origin_path, clone1_path, clone2_path):
+
+    file_test = Path('ds') / 'test.txt'
+    file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
+
+    origin = Dataset(origin_path).create(force=True)
+    origin.save()
+    # 1. clone via path
+    clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
+
+    if has_symlink_capability():
+        clone1_annex = (clone1.repo.dot_git / 'annex')
+        ok_(clone1_annex.is_symlink())
+        ok_(clone1_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+        ok_file_has_content(clone1.pathobj / file_test, content='some')
+        ok_file_has_content(clone1.pathobj / file_testsub, content='somemore')
+
+    # 2. clone via file-scheme URL
+    clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
+                   reckless='ephemeral')
+
+    if has_symlink_capability():
+        clone2_annex = (clone2.repo.dot_git / 'annex')
+        ok_(clone2_annex.is_symlink())
+        ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+        ok_file_has_content(clone2.pathobj / file_test, content='some')
+        ok_file_has_content(clone2.pathobj / file_testsub, content='somemore')
+
+    # 3. add something to clone1 and push back to origin availability from
+    # clone1 should not be propagated (we declared 'here' dead to that end)
+
+    (clone1.pathobj / 'addition.txt').write_text("even more")
+    clone1.save()
+    origin.config.set("receive.denyCurrentBranch", "updateInstead",
+                      where="local")
+    clone1.publish(to='origin', transfer_data='none')
+    if not origin.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())
+    res = origin.repo.whereis("addition.txt")
+    # obv. present in origin, but this is not yet known to origin:
+    eq_(res, [])
+    res = origin.repo.fsck()
+    assert_result_count(res, 3, success=True)
+    # TODO: Double check whether annex reports POSIX paths o windows!
+    eq_({str(file_test), str(file_testsub), "addition.txt"},
+        {r['file'] for r in res})
+    # now origin knows:
+    res = origin.repo.whereis("addition.txt")
+    eq_(res, [origin.config.get("annex.uuid")])

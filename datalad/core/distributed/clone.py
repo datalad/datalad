@@ -64,6 +64,9 @@ from datalad.distribution.dataset import (
 from datalad.distribution.utils import (
     _get_flexible_source_candidates,
 )
+from datalad.tests.utils import (
+    has_symlink_capability
+)
 
 __docformat__ = 'restructuredtext'
 
@@ -301,7 +304,7 @@ def clone_dataset(
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
-    reckless : {None, 'auto'}, optional
+    reckless : {None, 'auto', 'ephemeral'}, optional
       Mode switch to put cloned dataset into throw-away configurations, i.e.
       sacrifice data safety for performance or resource footprint.
     description : str, optional
@@ -550,7 +553,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         return
 
     # init annex when traces of a remote annex can be detected
-    if reckless:
+    if reckless == 'auto':
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
@@ -571,15 +574,63 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
     # If such an instance already exists, its __init__ will not be executed.
-    # Therefore do quick test once we have an object and decide whether to call its _init().
+    # Therefore do quick test once we have an object and decide whether to call
+    # its _init().
     #
     # Additionally, call init if we need to add a description (see #1403),
     # since AnnexRepo.__init__ can only do it with create=True
     repo = AnnexRepo(ds.path, init=True)
     if not repo.is_initialized() or description:
         repo._init(description=description)
-    if reckless:
+    if reckless == 'auto':
         repo._run_annex_command('untrust', annex_options=['here'])
+
+    elif reckless == 'ephemeral':
+        # with ephemeral we declare 'here' as 'dead' right away, whenever
+        # we symlink origins annex. Because we want annex to copy to
+        # the ria remote to get availability info correct for an eventual
+        # git-push into the store
+        # this will cause stuff like this for a locally present annexed file:
+        # % git annex whereis d1
+        # whereis d1 (0 copies) failed
+        # BUT this works:
+        # % git annex find . --not --in here
+        # % git annex find . --in here
+        # d1
+
+        # we don't want annex copy-to origin
+        ds.config.set(
+            'remote.origin.annex-ignore', 'true',
+            where='local')
+
+        ds.repo._run_annex_command('dead', annex_options=['here'])
+
+        if has_symlink_capability():
+            # symlink the annex to avoid needless copies in an emphemeral clone
+            annex_dir = ds.repo.dot_git / 'annex'
+            origin_annex_url = ds.config.get("remote.origin.url", None)
+            if origin_annex_url:
+                try:
+                    # deal with file:// scheme URLs as well as plain paths
+                    # if origin isn't local, we have nothing to do
+                    # TODO: Double-check it's always .git!
+                    origin_git_path = Path(PathRI(origin_annex_url).localpath)
+                    if origin_git_path.name != '.git':
+                        origin_git_path /= '.git'
+                except Exception:
+                    # TODO: What level? + note, that annex-dead is independ
+                    lgr.warning("origin doesn't seem local: %s\nno symlinks "
+                                "being used", origin_annex_url)
+                    pass
+            if origin_git_path:
+                # TODO make sure that we do not delete any unique data
+                rmtree(str(annex_dir)) \
+                    if not annex_dir.is_symlink() else annex_dir.unlink()
+                annex_dir.symlink_to(origin_git_path / 'annex',
+                                     target_is_directory=True)
+        else:
+            # TODO: What level? + note, that annex-dead is independ
+            lgr.warning("Unable to create symlinks.")
 
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
@@ -600,8 +651,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         except ValueError:
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
-                'dataset %s as bool.  You might need to enable it later '
-                'manually and/or fix it up to avoid this message in the future.',
+                'dataset %s as bool.'
+                'You might need to enable it later manually and/or fix it up to'
+                ' avoid this message in the future.',
                 sr_autoenable, sr_name, ds.path)
             continue
 
@@ -626,7 +678,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             " but no UUIDs for them yet known for dataset %s",
             # since we are only at debug level, we could call things their
             # proper names
-            single_or_plural("special remote", "special remotes", len(srs[True]), True),
+            single_or_plural("special remote",
+                             "special remotes", len(srs[True]), True),
             ", ".join(srs[True]),
             ds.path
         )
@@ -634,10 +687,12 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     if srs[False]:
         # if has no auto-enable special remotes
         lgr.info(
-            'access to %s %s not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
+            'access to %s %s not auto-enabled, enable with:\n'
+            '\t\tdatalad siblings -d "%s" enable -s %s',
             # but since humans might read it, we better confuse them with our
             # own terms!
-            single_or_plural("dataset sibling", "dataset siblings", len(srs[False]), True),
+            single_or_plural("dataset sibling",
+                             "dataset siblings", len(srs[False]), True),
             ", ".join(srs[False]),
             ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
