@@ -150,9 +150,9 @@ class Run(Interface):
                     inputs=['data/*', 'datafile.txt'],
                     outputs=['output_dir', 'outfile.txt'])""",
              code_cmd="""\
-             datalad run -m 'run my script' --input 'data/*'
-               --input 'datafile.txt' --output 'output_dir/*' --output
-               'outfile.txt' 'code/script.sh'""")
+             datalad run -m 'run my script' --input 'data/*' \\
+             --input 'datafile.txt' --output 'output_dir/*' --output \\
+             'outfile.txt' 'code/script.sh'""")
     ]
 
     _params_ = dict(
