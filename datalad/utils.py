@@ -2404,8 +2404,8 @@ def check_symlink_capability(path, target):
     arbitrary path to test-build a symlink and delete afterwards. Suiteable
     location can therefore be determined by high lever code.
 
-    Paremeter
-    ---------
+    Parameters
+    ----------
     path: Path
     target: Path
 
