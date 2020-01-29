@@ -479,7 +479,9 @@ def build_doc(cls, **kwargs):
         cls_doc = cls_doc.format(**cls._docs_)
     # get examples
     ex = getattr(cls, '_examples_', [])
-    cls_doc = update_docstring_with_examples(cls_doc, ex)
+    if ex:
+        cls_doc = update_docstring_with_examples(cls_doc, ex)
+
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
