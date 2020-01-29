@@ -80,7 +80,7 @@ class Save(Interface):
              code_py="save(path='myfile.txt')",
              code_cmd="datalad save myfile.txt"),
         dict(text="""Attach a commit message to save""",
-             code_py="save(path='myfile.txt', message='add a file')",
+             code_py="save(path='myfile.txt', message='add file')",
              code_cmd="datalad save -m 'add file' myfile.txt"),
         dict(text="""Save any content underneath the current directory, and
              recurse into any potential subdatasets""",
@@ -93,7 +93,7 @@ class Save(Interface):
              code_cmd="""datalad save -u ."""),
         dict(text="Tag the most recent saved state of a dataset",
              code_py="save(version_tag='bestyet')",
-             code_cmd="datalad save -d . --version-tag 'bestyet'"),
+             code_cmd="datalad save --version-tag 'bestyet'"),
     ]
 
     _params_ = dict(
