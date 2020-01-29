@@ -512,17 +512,17 @@ def clone_dataset(
 def postclonecfg_ria(ds, props):
     """Configure a dataset freshly cloned from a RIA store"""
     # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
-    # ssh) would make it see a bare repo and establish a hashdir lower annex object
-    # tree.
+    # ssh) would make it see a bare repo and establish a hashdir lower annex
+    # object tree.
     # Moreover, we want the RIA remote to receive all data for the store, so its
     # objects could be moved into archives (the main point of a RIA store).
     ds.config.set(
         'remote.origin.annex-ignore', 'true',
         where='local')
 
-    # chances are that if this dataset came from a RIA store, its subdatasets may live
-    # there too. Place a subdataset source candidate config that makes get probe this
-    # RIA store when obtaining subdatasets
+    # chances are that if this dataset came from a RIA store, its subdatasets
+    # may live there too. Place a subdataset source candidate config that makes
+    # get probe this RIA store when obtaining subdatasets
     ds.config.set(
         # we use the label 'origin' for this candidate in order to not have to
         # generate a complicated name from the actual source specification
@@ -533,12 +533,24 @@ def postclonecfg_ria(ds, props):
         props['source'].split('#', maxsplit=1)[0] + '#{id}',
         where='local')
 
-    # TODO setup publication dependency, if a corresponding special remote exists
+    # setup publication dependency, if a corresponding special remote exists
     # and was enabled (there could be RIA stores that actually only have repos)
-    # make this function be a generator even though it doesn't actually yield
-    # anything yet
-    if None:
-        yield None
+    # make this function be a generator
+    ria_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
+                   if s.get('annex-externaltype', None) == 'ria'
+    ]
+    if not ria_remotes:
+        lgr.debug("Found no RIA special remote")
+    elif len(ria_remotes) == 1:
+        yield from ds.siblings('configure',
+                               name='origin',
+                               publish_depends=ria_remotes[0]['name'],
+                               result_filter=None,
+                               result_renderer='disabled')
+    else:
+        lgr.warning("Found multiple RIA remotes. Couldn't decide which "
+                    "publishing to origin should depend on: %s",
+                    [r['name'] for r in ria_remotes])
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None):
