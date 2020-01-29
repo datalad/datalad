@@ -407,7 +407,7 @@ def clone_dataset(
             GitRepo.clone(
                 path=str(dest_path),
                 url=cand['giturl'],
-                clone_options=clone_opts,
+                options=clone_opts,
                 create=True)
 
         except GitCommandError as e:

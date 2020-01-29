@@ -803,7 +803,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return self._repo
 
     @classmethod
-    def clone(cls, url, path, *args, clone_options=None, **kwargs):
+    def clone(cls, url, path, *args, options=None, **kwargs):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -813,7 +813,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ----------
         url : str
         path : str
-        clone_options : dict
+        options : dict
           Key/value pairs of arbitrary options that will be passed on to the
           underlying call to `git-clone`.
         expect_fail : bool
@@ -889,7 +889,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         # tailored list of "multi options" to make a future
                         # non-GitPy based implementation easier. Do conversion
                         # here
-                        multi_options=to_options(**clone_options) if clone_options else None,
+                        multi_options=to_options(**options) if options else None,
                         odbt=default_git_odbt,
                         progress=git_progress
                     )
