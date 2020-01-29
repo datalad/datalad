@@ -128,7 +128,7 @@ class Run(Interface):
     """
     _examples_ = [
         dict(text="Run an executable script and record the impact on a dataset",
-             code_py="ds.run(message='run my script', cmd='code/script.sh')",
+             code_py="run(message='run my script', cmd='code/script.sh')",
              code_cmd="datalad run -m 'run my script' 'code/script.sh'"),
         dict(text="Run a command and specify a directory as a dependency "
                   "for the run. The contents of the dependency will be retrieved "
@@ -136,22 +136,22 @@ class Run(Interface):
              code_cmd="datalad run -m 'run my script' --input 'data/*' "
              "'code/script.sh'",
              code_py="""\
-             ds.run(cmd='code/script.sh', message='run my script',
-                    inputs=['data/*'])"""),
+             run(cmd='code/script.sh', message='run my script',
+                 inputs=['data/*'])"""),
         dict(text="Run an executable script and specify output files of the "
                   "script to be unlocked prior to running the script",
              code_py="""\
-             ds.run(cmd='code/script.sh', message='run my script',
-                    inputs=['data/*'], outputs=['output_dir'])""",
+             run(cmd='code/script.sh', message='run my script',
+                 inputs=['data/*'], outputs=['output_dir'])""",
              code_cmd="""\
              datalad run -m 'run my script' --input 'data/*' \\
              --output 'output_dir/*' 'code/script.sh'"""),
         dict(text="Specify multiple inputs and outputs",
              code_py="""\
-             ds.run(cmd='code/script.sh',
-                    message='run my script',
-                    inputs=['data/*', 'datafile.txt'],
-                    outputs=['output_dir', 'outfile.txt'])""",
+             run(cmd='code/script.sh',
+                 message='run my script',
+                 inputs=['data/*', 'datafile.txt'],
+                 outputs=['output_dir', 'outfile.txt'])""",
              code_cmd="""\
              datalad run -m 'run my script' --input 'data/*' \\
              --input 'datafile.txt' --output 'output_dir/*' --output \\
