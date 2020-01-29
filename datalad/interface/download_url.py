@@ -46,10 +46,6 @@ class DownloadURL(Interface):
     It allows for a uniform download interface to various supported URL
     schemes, re-using or asking for authentication details maintained by
     datalad.
-
-    Examples:
-
-      $ datalad download-url http://example.com/file.dat s3://bucket/file2.dat
     """
 
     _params_ = dict(
