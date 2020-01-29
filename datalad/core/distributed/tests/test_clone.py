@@ -783,7 +783,9 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
     # 1. clone via path
     clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
 
-    if has_symlink_capability():
+    can_symlink = has_symlink_capability()
+
+    if can_symlink:
         clone1_annex = (clone1.repo.dot_git / 'annex')
         ok_(clone1_annex.is_symlink())
         ok_(clone1_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
@@ -796,7 +798,7 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
     clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
                    reckless='ephemeral')
 
-    if has_symlink_capability():
+    if can_symlink:
         clone2_annex = (clone2.repo.dot_git / 'annex')
         ok_(clone2_annex.is_symlink())
         ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
@@ -812,18 +814,21 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
     clone1.save()
     origin.config.set("receive.denyCurrentBranch", "updateInstead",
                       where="local")
-    clone1.publish(to='origin', transfer_data='none')
+    # Note, that the only thing to test is git-annex-dead here,
+    # if we couldn't symlink:
+    clone1.publish(to='origin', transfer_data='none' if can_symlink else 'auto')
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
         eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())
     res = origin.repo.whereis("addition.txt")
-    # obv. present in origin, but this is not yet known to origin:
-    eq_(res, [])
-    res = origin.repo.fsck()
-    assert_result_count(res, 3, success=True)
-    # TODO: Double check whether annex reports POSIX paths o windows!
-    eq_({str(file_test), str(file_testsub), "addition.txt"},
-        {r['file'] for r in res})
-    # now origin knows:
+    if can_symlink:
+        # obv. present in origin, but this is not yet known to origin:
+        eq_(res, [])
+        res = origin.repo.fsck()
+        assert_result_count(res, 3, success=True)
+        # TODO: Double check whether annex reports POSIX paths o windows!
+        eq_({str(file_test), str(file_testsub), "addition.txt"},
+            {r['file'] for r in res})
+        # now origin knows:
     res = origin.repo.whereis("addition.txt")
     eq_(res, [origin.config.get("annex.uuid")])
