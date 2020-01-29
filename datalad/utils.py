@@ -2421,5 +2421,7 @@ def check_symlink_capability(path, target):
     except Exception:
         return False
     finally:
-        path.unlink()
-        target.unlink()
+        if path.exists():
+            path.unlink()
+        if target.exists():
+            target.unlink()
