@@ -473,3 +473,6 @@ class Status(Interface):
                         len(annexed),
                         single_or_plural('file', 'files', len(annexed)),
                         total_size))
+        if all(r.get('state', None) == 'clean' for r in results):
+            from datalad.ui import ui
+            ui.message("nothing to save, working tree clean")
