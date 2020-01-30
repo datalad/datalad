@@ -608,7 +608,7 @@ class ConfigManager(object):
         if where == 'dataset':
             if not self._dataset_cfgfname:
                 raise ValueError(
-                    'ConfigManager cannot store to configuration to dataset, '
+                    'ConfigManager cannot store configuration to dataset, '
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
