@@ -74,7 +74,7 @@ class Save(Interface):
     _examples_ = [
         dict(text="""Save any content underneath the current directory, without
              altering any potential subdataset""",
-             code_py="save()",
+             code_py="save(path='.')",
              code_cmd="datalad save ."),
         dict(text="""Save specific content in the dataset""",
              code_py="save(path='myfile.txt')",
@@ -84,13 +84,13 @@ class Save(Interface):
              code_cmd="datalad save -m 'add file' myfile.txt"),
         dict(text="""Save any content underneath the current directory, and
              recurse into any potential subdatasets""",
-             code_py="save(recursive=True)",
+             code_py="save(path='.', recursive=True)",
              code_cmd="datalad save . --recursive"),
         dict(text="Save any modification of known dataset content in the "
                   "current directory, but leave untracked files (e.g. temporary files) "
                   "untouched",
-             code_py="""save(updated=True)""",
-             code_cmd="""datalad save -u -d ."""),
+             code_py="""save(path='.', updated=True)""",
+             code_cmd="""datalad save -u ."""),
         dict(text="Tag the most recent saved state of a dataset",
              code_py="save(version_tag='bestyet')",
              code_cmd="datalad save -d . --version-tag 'bestyet'"),
