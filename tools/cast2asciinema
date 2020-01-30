@@ -66,7 +66,7 @@ function say()
 }
 function show () {
     check_asciinema
-    $xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
+    $xdt type --clearmodifiers --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
     key Return
     sleep 3
 }
