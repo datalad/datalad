@@ -64,21 +64,6 @@ THE SOFTWARE.
 """
 
 
-class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
-    # Don't accept abbreviations for long options. With py3.5 and above, we
-    # could just use allow_abbrev=False.
-    #
-    # Modified from the solution posted at
-    # https://bugs.python.org/issue14910#msg204678
-    def _get_option_tuples(self, option_string):
-        chars = self.prefix_chars
-        if option_string[0] in chars and option_string[1] in chars:
-            # option_string is a long flag. Disable abbreviation.
-            return []
-        return super(ArgumentParserDisableAbbrev, self)._get_option_tuples(
-            option_string)
-
-
 # TODO:  OPT look into making setup_parser smarter to become faster
 # Now it seems to take up to 200ms to do all the parser setup
 # even though it might not be necessary to know about all the commands etc.
@@ -101,7 +86,7 @@ def setup_parser(
     # setup cmdline args parser
     parts = {}
     # main parser
-    parser = ArgumentParserDisableAbbrev(
+    parser = argparse.ArgumentParser(
         fromfile_prefix_chars=None,
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
@@ -115,6 +100,7 @@ def setup_parser(
             simultaneously work with multiple inter-related repositories."""),
         epilog='"Be happy!"',
         formatter_class=formatter_class,
+        allow_abbrev=False,
         add_help=False)
     # common options
     helpers.parser_add_common_opt(parser, 'log_level')
