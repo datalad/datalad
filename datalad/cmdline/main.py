@@ -65,8 +65,12 @@ THE SOFTWARE.
 
 
 class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
-    # Don't accept abbreviations for long options. With py3.5 and above, we
-    # could just use allow_abbrev=False.
+    # Don't accept abbreviations for long options. This kludge was originally
+    # added at a time when our minimum required Python version was below 3.5,
+    # preventing us from using allow_abbrev=False. Now our minimum Python
+    # version is high enough, but we still can't use allow_abbrev=False because
+    # it suffers from the problem described in 6b3f2fffe (BF: cmdline: Restore
+    # handling of short options, 2018-07-23).
     #
     # Modified from the solution posted at
     # https://bugs.python.org/issue14910#msg204678
