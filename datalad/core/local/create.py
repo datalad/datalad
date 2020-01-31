@@ -116,11 +116,11 @@ class Create(Interface):
              code_py="create(dataset='.', path='mysubdataset')",
              code_cmd="datalad create -d . mysubdataset"),
         dict(text="Create a dataset in an existing, non-empty directory",
-             code_py="create(force=True, path='.')",
+             code_py="create(force=True)",
              code_cmd="datalad create --force"),
         dict(text="Create a plain Git repository",
              code_py="create(path='mydataset', no_annex=True)",
-             code_cmd="datalad create --no-annex"),
+             code_cmd="datalad create --no-annex mydataset"),
     ]
 
     _params_ = dict(

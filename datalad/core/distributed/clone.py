@@ -121,15 +121,16 @@ class Clone(Interface):
              code_cmd="datalad clone "
              "https://github.com/datalad-datasets/longnow-podcasts.git"),
         dict(text="Install a dataset into a specific directory",
-             code_py="clone("
-             "source='https://github.com/datalad-datasets/longnow"
-             "-podcasts.git', path='myfavpodcasts')",
-             code_cmd="datalad clone "
-             "https://github.com/datalad-datasets/longnow-podcasts.git "
-             "myfavpodcasts"),
+             code_py="""\
+             clone(source='https://github.com/datalad-datasets/longnow-podcasts.git',
+                   path='myfavpodcasts')""",
+             code_cmd="""\
+             datalad clone https://github.com/datalad-datasets/longnow-podcasts.git \\
+             myfavpodcasts"""),
         dict(text="Install a dataset as a subdataset into the current dataset",
-             code_py="clone(dataset='.', "
-             "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
+             code_py="""\
+             clone(dataset='.',
+                   source='https://github.com/datalad-datasets/longnow-podcasts.git')""",
              code_cmd="datalad clone -d . "
              "https://github.com/datalad-datasets/longnow-podcasts.git"),
         dict(text="Install the main superdataset from datasets.datalad.org",

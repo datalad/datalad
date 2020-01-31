@@ -408,7 +408,8 @@ def build_example(example, api='python'):
     # any meaningful structure/formatting of code snippets. Instead, we
     # maintain line content as is.
     code = dedent_docstring(example.get(code_field))
-    code = textwrap.indent(code, '     ').lstrip()
+    needs_indicator = not code.startswith(indicator)
+    code = textwrap.indent(code, ' ' * (5 if needs_indicator else 3)).lstrip()
 
     ex = """{}::\n\n   {}{}\n\n""".format(
         description,
@@ -416,9 +417,9 @@ def build_example(example, api='python'):
         # this enables providing more complex examples without having
         # to infer its inner structure
         '{} '.format(indicator)
-        if not code.startswith(indicator)
+        if needs_indicator
         # maintain spacing to avoid undesired relative indentation
-        else '  ',
+        else '',
         code)
 
     return ex
@@ -479,7 +480,9 @@ def build_doc(cls, **kwargs):
         cls_doc = cls_doc.format(**cls._docs_)
     # get examples
     ex = getattr(cls, '_examples_', [])
-    cls_doc = update_docstring_with_examples(cls_doc, ex)
+    if ex:
+        cls_doc = update_docstring_with_examples(cls_doc, ex)
+
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
