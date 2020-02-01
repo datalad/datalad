@@ -63,7 +63,7 @@ say "All fixed and committed, ready to start. Hopefully, there are no more bugs.
 say "Just need to have one quick look at the data. Git-annex will obtain it in no time..."
 run "git annex get study/data/work"
 
-say "Ah, right. Also needs to be done in the repository that actually has the file. I still remeber the boundaries...Gotta keep them in mind."
+say "Ah, right. Also needs to be done in the repository that actually has the file. I still remember the boundaries...Gotta keep them in mind."
 run "git -C study/data annex get work"
 
 say "Good! Now back to writing!"
