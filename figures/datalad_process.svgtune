@@ -1,0 +1,45 @@
+%file datalad_process.svg
+
+g id:re=g_act.* style=display:none
+
+layer label=center style=display:inline
+layer label=actions-bg style=display:inline;opacity:1.0
+%save 00base
+
+layer label=actions-bg style=display:inline;opacity:0.5
+g id=g_act_install style=display:inline;opacity:1.0
+%save install
+
+g id:re=g_act.* style=display:none
+g id=g_act_create style=display:inline;opacity:1.0
+%save create
+
+g id:re=g_act.* style=display:none
+g id=g_act_crawl style=display:inline;opacity:1.0
+%save crawl
+
+g id:re=g_act.* style=display:none
+g id=g_act_run style=display:inline;opacity:1.0
+%save run
+
+g id:re=g_act.* style=display:none
+g id=g_act_publish style=display:inline;opacity:1.0
+%save publish
+
+g id:re=g_act.* style=display:none
+g id=g_act_export style=display:inline;opacity:1.0
+%save export
+
+g id:re=g_act.* style=display:none
+g id=g_act_publish style=display:inline;opacity:1.0
+%save publish
+
+g id:re=g_act.* style=display:none
+g id=g_act_metadata style=display:inline;opacity:1.0
+%save metadata
+
+g id:re=g_act.* style=display:none
+layer label=subds style=display:inline;opacity:0.6
+layer label=superds style=display:inline;opacity:0.6
+layer label=nesting style=display:inline
+%save nesting
