@@ -1,22 +1,22 @@
 say "Fast forward through some prior work..."
 
 say "Let's assume a student developed an algorithm, using Git."
-run "mkdir code; git -C code init; touch code/work; git -C code add work ; git -C code commit -m 'MSc thesis by student A done'"
+run "mkdir code; cd code; git init; touch work; git add work ; git commit -m 'MSc thesis by student A done'; cd .."
 
 say "An another student collected some data, tracked with Git-annex."
-run "mkdir data; git -C data init; git -C data annex init; echo 'DATA!' > data/work; git -C data annex add work ; git -C data commit -m 'Data collection by student B done'"
+run "mkdir data; cd data; git init; git annex init; echo 'DATA!' > work; git annex add work ; git commit -m 'Data collection by student B done'; cd .."
 
 say "A postdoc performed an analysis with the new algorithm on that data, results tracked with Git-annex."
 
-run "mkdir analysis; git -C analysis init && git -C analysis annex init"
+run "mkdir analysis; cd analysis; git init && git annex init"
 
 say "Git submodules are perfect for versioned tracking of dependencies, code or data."
-run "git -C analysis submodule add ../code"
-run "git -C analysis submodule add ../data"
-run "git -C analysis/data annex init"
-run "git -C analysis commit -m 'Add dependencies'"
+run "git submodule add ../code"
+run "git submodule add ../data"
+run "git -C data annex init"
+run "git commit -m 'Add dependencies'"
 
-run "touch analysis/work; git -C analysis add work && git -C analysis commit -m 'Analysis by postdoc done'"
+run "touch work; git add work && git commit -m 'Analysis by postdoc done'; cd .."
 
 say "This happened in the past... Now the students left and the postdocs is on vacation. Time for the PI to write up the paper..."
 
@@ -41,13 +41,13 @@ say "Quickly commit the fix, so it can be pushed upstream later..."
 run "git add study/code/work"
 
 say "Erm... Needs to happen in the repository that actually contains the file...Need to look up the boundaries..."
-run "git submodule status --recursive"
+run "git diff --submodule=diff"
 
 say "Ok, let's do this..."
 run "cd study/code"
 run "git add work && git commit -m 'Fix'"
 
-say "Damn, the postdoc didn't specify a branch when adding the submodule. Need to fix, or it will be difficult to push."
+say "Damn, detached HEAD. Need to fix, or it will be difficult to push."
 run "git reset HEAD~1"
 run "git checkout master"
 run "git add work && git commit -m 'Fix'"
@@ -92,7 +92,7 @@ run "echo 'fix' >> study/code/work"
 run "datalad status"
 
 say "Unlike Git, DataLad makes nested datasets feel like a monorepo"
-run "datalad status --recursive --untracked all"
+run "datalad status --recursive"
 
 say "Not just for reporting, but also for modification"
 run "datalad save --dataset . -m 'Fix' study/code/work"
