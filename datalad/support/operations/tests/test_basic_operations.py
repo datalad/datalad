@@ -9,7 +9,9 @@
 """
 """
 
-from datalad.support.operations.operations_local import LocalOperation
+from datalad.support.operations.operations_local import (
+    LocalOperation,
+)
 from datalad.support.operations.operations_remote import RemoteOperation
 from datalad.support.exceptions import CommandError
 from datalad.utils import (

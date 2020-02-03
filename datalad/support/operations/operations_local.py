@@ -36,6 +36,27 @@ class PurePythonOperations(OperationsBase):
         dst = self._ensure_absolute(dst)
         return src.rename(dst)
 
+    # TODO: force? How about permissions?
+    def remove(self, path, recursive=False):
+        path = self._ensure_absolute(path)
+
+        def _remove_dir_content(path):
+
+            for p in path.iterdir():
+                if p.is_dir():
+                    _remove_dir_content(p)
+                    p.rmdir()
+                else:
+                    p.unlink()
+
+        if path.is_dir():
+            if recursive:
+                _remove_dir_content(path)
+            else:
+                path.rmdir()
+        else:
+            path.unlink()
+
 
 class PosixShellOperations(PurePythonOperations):
     def __init__(self, cwd=None, env=None):
@@ -116,6 +137,8 @@ class WindowsShellOperations(PurePythonOperations):
             stdin=stdin,
         )
 
+    # TODO: This doesn't currently work. However, will likely only become
+    #  relevatn for git calls and a Windows remote shell
     def remove(self, path, recursive=False):
         # Note, that this would currently raise non-specific CommandError
         self._run('rm {} -f {}'.format(
