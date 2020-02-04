@@ -62,7 +62,7 @@ class Update(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="""contrain to-be-updated subdatasets to the given path for recursive
+            doc="""constrain to-be-updated subdatasets to the given path for recursive
             operation.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
