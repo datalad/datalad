@@ -485,6 +485,7 @@ class GitProgress(object):
         keep_lines = []
         for line in byts.splitlines(keepends=True):
             if not self._parse_progress_line(line):
+                lgr.debug('Non-progress Git output: %s', line)
                 keep_lines.append(line)
         # the zero indicated that no data remained unprocessed at the
         # end of the input
@@ -508,7 +509,7 @@ class GitProgress(object):
         # Compressing objects: 100% (2/2)
         # Compressing objects: 100% (2/2), done.
         line = line.decode('utf-8') if isinstance(line, bytes) else line
-        if line.startswith(('error:', 'fatal:')):
+        if line.startswith(('warning:', 'error:', 'fatal:')):
             return False
 
         # find escape characters and cut them away - regex will not work with
