@@ -16,7 +16,7 @@ env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
-    - NOSE_OPTS=
+    - NOSE_OPTS=-s
     - NOSE_SELECTION="integration or usecase or slow"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
     # Special settings/helper for combined coverage from special remotes execution
@@ -263,7 +263,7 @@ script:
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
-      -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"
+      -v -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"
       --with-doctest
       --with-cov --cover-package datalad
       --logging-level=INFO
