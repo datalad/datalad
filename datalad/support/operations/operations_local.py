@@ -57,6 +57,45 @@ class PurePythonOperations(OperationsBase):
         else:
             path.unlink()
 
+    def change_permissions(self, path, mode, recursive=False):
+        # TODO: mode should prob. mapped from labels to whatever is needed
+        #      (platform independent -> dependent)
+        if on_windows:
+            # TODO: There's no obv. approach to realize this on windows yet.
+            #       Need to figure current concept of permissions and groups
+            #       on windows and how to use them.
+            #
+            # Note, that pathlib's chmod is explicitly "like os.chmod". From
+            # docs:
+            #
+            # Note
+            #
+            # Although Windows supports chmod(), you can only set the file’s
+            # read-only flag with it (via the stat.S_IWRITE and stat.S_IREAD
+            # constants or a corresponding integer value). All other bits are
+            # ignored.
+
+            raise NotImplementedError("Not implemented on windows")
+
+        path = self._ensure_absolute(path)
+        path.chmod(mode)
+
+        if recursive and path.is_dir():
+            [self.change_permissions(pp, mode, recursive=True)
+             for pp in path.iterdir()]
+
+    def change_group(self, path, label, recursive=False):
+        if on_windows:
+            # TODO: same as change_permissions: Not clear ATM, what we can
+            #       and should do on windows.
+            raise NotImplementedError("Not implemented on windows")
+        path = self._ensure_absolute(path)
+        from shutil import chown
+        chown(path, group=label)
+        if recursive and path.is_dir():
+            [self.change_group(pp, label, recursive=True)
+             for pp in path.iterdir()]
+
 
 class PosixShellOperations(PurePythonOperations):
     def __init__(self, cwd=None, env=None):
@@ -90,12 +129,6 @@ class PosixShellOperations(PurePythonOperations):
             expect_fail=expect_fail,
             stdin=stdin,
         )
-
-    def remove(self, path, recursive=False):
-        # Note, that this would currently raise non-specific CommandError
-        self._run('rm {} -f {}'.format(
-            '-r' if recursive else '',
-            quote_cmdlinearg(str(path))))
 
 
 class WindowsShellOperations(PurePythonOperations):
@@ -137,13 +170,10 @@ class WindowsShellOperations(PurePythonOperations):
             stdin=stdin,
         )
 
-    # TODO: This doesn't currently work. However, will likely only become
-    #  relevatn for git calls and a Windows remote shell
-    def remove(self, path, recursive=False):
-        # Note, that this would currently raise non-specific CommandError
-        self._run('rm {} -f {}'.format(
-            '-r' if recursive else '',
-            quote_cmdlinearg(str(path))))
 
-
-LocalOperation = WindowsShellOperations if on_windows else PosixShellOperations
+# Note: Currently outcommented, since WindowsShellOperations hasn't implemented
+# anything yet. However, eventually the idea is to automatically determine which
+# operations class to use:
+# LocalOperation = WindowsShellOperations if on_windows else
+# PosixShellOperations
+LocalOperation = PurePythonOperations
