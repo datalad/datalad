@@ -156,19 +156,20 @@ import sys
 print("123456789", end="", file=sys.stdout, flush=True)
 import time
 time.sleep(1.5)
-print("abcdefg", end="", file=sys.stdout)
+print("abcdefg", end="", file=sys.stdout, flush=True)
 """
 
 
 def test_runner_incomplete_capture():
-    # make sure the runner polls faster than the output is coming
-    runner = Runner(poll_period=0.1)
+    runner = Runner()
     with TweakOutput(rtruncate_nbytes=3) as outproc:
         out, err = runner.run(
             py2cmd(py_9bytes_plus_6bytes),
             # we don't process the last three in the output, but we
             # report that to the runner
-            proc_stdout=outproc)
+            proc_stdout=outproc,
+            # make sure the runner polls faster than the output is coming
+            poll_period=0.1)
     # we must not loose any output, except for the very last three bytes
     # even though we poll at a higher frequency
     eq_(out, '123456789abcd')
@@ -190,7 +191,8 @@ def test_runner_incomplete_capture():
             py2cmd(py_9bytes_plus_6bytes),
             # we don't process the last three in the output, but we
             # report that to the runner
-            proc_stdout=outproc)
+            proc_stdout=outproc,
+            poll_period=0.1)
     # we miss three bytes at the end of each batch
     if len(outproc.received) > 1:
         eq_(out, '123456abcd')

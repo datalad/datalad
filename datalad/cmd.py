@@ -168,9 +168,10 @@ class WitlessRunner(object):
         stdin : byte stream, optional
           File descriptor like, used as stdin for the process. Passed
           verbatim to subprocess.Popen().
-        poll_period : float, optional
-          Interval at which the running process is queried for
-          output (in seconds).
+        poll_latency : float, optional
+          Shortest interval at which the running process is queried for
+          output (in seconds). Any potential output processing will increase
+          the effective interval.
 
         Returns
         -------
@@ -187,16 +188,12 @@ class WitlessRunner(object):
           command, as properties.
         """
         proc_out = (proc_stdout, proc_stderr)
-        if all(p is None for p in proc_out):
-            proc_out = None
         try:
             lgr.log(8, "Start running %r", cmd)
             process = subprocess.Popen(
                 cmd,
-                # from PY37 onwards
-                #capture_output=proc_output,
-                stdout=subprocess.PIPE if proc_out else None,
-                stderr=subprocess.PIPE if proc_out else None,
+                stdout=subprocess.PIPE if proc_stdout else None,
+                stderr=subprocess.PIPE if proc_stderr else None,
                 shell=False,
                 cwd=self.cwd,
                 env=self.env,
@@ -214,50 +211,51 @@ class WitlessRunner(object):
             raise
 
         try:
-            out = [b'', b'']
-            last_idx = [0, 0]
-            pout = None
+            out = [[], []]
+            unprocessed = [None, None]
             # make sure to run this loop at least once, even if the
             # process is already dead
             keep_going = True
-            while process.poll() is None or keep_going:
-                try:
-                    # get a chunk of output for the specific period
-                    # of time
-                    pout = process.communicate(
-                        timeout=poll_period,
-                    )
-                    # we know the process ended at this point
-                    keep_going = False
-                except subprocess.TimeoutExpired as poll:
-                    # this will always be the full report so far,
-                    # not just an output increment
-                    pout = (poll.stdout, poll.stderr)
 
-                if proc_out is not None:
-                    for i, (o, proc) in enumerate(zip(pout, proc_out)):
-                        if proc is None:
-                            if o is not None:
-                                out[i] += o
-                            # no index update needed, can never change
-                            continue
-                        # current length of output
-                        len_o = len(o) if o else 0
-                        # anything new in the output?
-                        if len_o - last_idx[i] > 0:
-                            # engage output processed
-                            processed, unprocessed_len = proc(o[last_idx[i]:])
-                            # only keep the processed output
-                            out[i] += processed
-                            # record point to which we processed the output
-                            # subtract number of bytes reported as unprocessed
-                            last_idx[i] = len_o - unprocessed_len
+            def _handle_output(u, o, p):
+                processed, unprocessed_len = proc(u)
+                if processed:
+                    o.append(processed)
+                return u[-(unprocessed_len):] if unprocessed_len else None
+
+            while process.poll() is None or keep_going:
+                # one last read?
+                keep_going = process.returncode is None
+                # get a chunk of output for the specific period
+                # of time
+                pout = [
+                    # read whatever is available, should not block
+                    o.read1(-1) if p else None
+                    for o, p in zip(
+                        (process.stdout, process.stderr),
+                        proc_out)
+                ]
+
+                for i, (o, proc) in enumerate(zip(pout, proc_out)):
+                    if not o:
+                        # nothing read
+                        continue
+                    if proc is None:
+                        # no index update needed, can never change, hence no unprocessed
+                        # output either
+                        out[i].append(o)
+                        continue
+                    # make sure to feed back any unprocessed stuff
+                    buffer = unprocessed[i] + o if unprocessed[i] else o
+                    # engage output processor
+                    unprocessed[i] = _handle_output(buffer, out[i], proc)
+                time.sleep(poll_period)
 
             # obtain exit code
             status = process.poll()
 
             # decode bytes to string
-            out = tuple(o.decode('utf-8') if o else '' for o in out)
+            out = tuple(b''.join(o).decode('utf-8') if o else '' for o in out)
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s." % (
