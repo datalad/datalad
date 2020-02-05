@@ -169,7 +169,7 @@ def test_runner_incomplete_capture():
             # report that to the runner
             proc_stdout=outproc,
             # make sure the runner polls faster than the output is coming
-            poll_period=0.1)
+            poll_latency=0.1)
     # we must not loose any output, except for the very last three bytes
     # even though we poll at a higher frequency
     eq_(out, '123456789abcd')
@@ -192,7 +192,7 @@ def test_runner_incomplete_capture():
             # we don't process the last three in the output, but we
             # report that to the runner
             proc_stdout=outproc,
-            poll_period=0.1)
+            poll_latency=0.1)
     # we miss three bytes at the end of each batch
     if len(outproc.received) > 1:
         eq_(out, '123456abcd')

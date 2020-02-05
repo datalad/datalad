@@ -144,7 +144,7 @@ class WitlessRunner(object):
             self.env['PWD'] = self.cwd
 
     def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None,
-            poll_period=0.1):
+            poll_latency=0.1):
         """Execute a command and communicate with it.
 
         Parameters
@@ -171,7 +171,9 @@ class WitlessRunner(object):
         poll_latency : float, optional
           Shortest interval at which the running process is queried for
           output (in seconds). Any potential output processing will increase
-          the effective interval.
+          the effective interval. When the effective polling frequency is
+          too low to keep the output buffers below their maximum size,
+          a process will deadlock.
 
         Returns
         -------
@@ -226,8 +228,7 @@ class WitlessRunner(object):
             while process.poll() is None or keep_going:
                 # one last read?
                 keep_going = process.returncode is None
-                # get a chunk of output for the specific period
-                # of time
+                # get a chunk of output
                 pout = [
                     # read whatever is available, should not block
                     o.read1(-1) if p else None
@@ -249,7 +250,7 @@ class WitlessRunner(object):
                     buffer = unprocessed[i] + o if unprocessed[i] else o
                     # engage output processor
                     unprocessed[i] = _handle_output(buffer, out[i], proc)
-                time.sleep(poll_period)
+                time.sleep(poll_latency)
 
             # obtain exit code
             status = process.poll()
