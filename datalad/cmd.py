@@ -230,6 +230,12 @@ class WitlessRunner(object):
                     o.append(processed)
                 return u[-(unprocessed_len):] if unprocessed_len else None
 
+            def _read_stream(stream):
+                #if sys.version_info.major == 3 and sys.version_info.minor < 7:
+                nbytes_avail = len(stream.peek())
+                return stream.read(nbytes_avail) if nbytes_avail > 0 else None
+                # o.read1(-1)
+
             while process.poll() is None or keep_going:
                 # one last read?
                 keep_going = process.returncode is None
@@ -240,7 +246,7 @@ class WitlessRunner(object):
                     #o.read1(-1) if p else None
                     # but instead we say, give me what you have, and if you have nothing,
                     # make the shortest possible blocking read
-                    o.read1(1) if p else None
+                    _read_stream(o) if p else None
                     for o, p in zip(
                         (process.stdout, process.stderr),
                         proc_out)
