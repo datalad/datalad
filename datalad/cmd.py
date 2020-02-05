@@ -236,7 +236,11 @@ class WitlessRunner(object):
                 # get a chunk of output
                 pout = [
                     # read whatever is available, should not block
-                    o.read1(-1) if p else None
+                    # From P37 onwards we could say "I don't care how much you can give me"
+                    #o.read1(-1) if p else None
+                    # but instead we say, give me what you have, and if you have nothing,
+                    # make the shortest possible blocking read
+                    o.read1(1) if p else None
                     for o, p in zip(
                         (process.stdout, process.stderr),
                         proc_out)
