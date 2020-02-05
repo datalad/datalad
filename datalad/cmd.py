@@ -155,10 +155,15 @@ class WitlessRunner(object):
           commands are supported.
         proc_stdout : callable, optional
           By default no stdout is captured, but relayed to the parent
-          process's stdout. If given, all stdout is passed as a byte-string
-          to this callable, in the chunks it was received by polling the
-          processing. The callable may transform it in any way, its output
-          (byte-string) is concatenated and provided as stdout return value.
+          process's stdout. If given, all stdout is sequentially passed
+          as a byte-string to this callable, in the chunks it was received
+          by polling the process (see `poll_latency`).
+          The callable may transform it in any way. It must
+          return a byte-string of the transformed output, and an integer
+          with the number of bytes at the end of the original output
+          that were left unprocessed (or 0, if the entire output was
+          considered). The returned byte-strings are concatenated and
+          provided as stdout return value.
           The helper functions 'kill_output' and 'capture_output' are
           provided to either swallow all output (and not relay it to the
           parent) or to capture all output and provide it as the return
