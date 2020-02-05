@@ -120,9 +120,9 @@ class WitlessRunner(object):
     functionality. Derived classes should be used for additional
     specializations and convenience features.
     """
-    __slots__ = ['cwd', 'env', '_poll_period']
+    __slots__ = ['cwd', 'env']
 
-    def __init__(self, cwd=None, env=None, poll_period=0.1):
+    def __init__(self, cwd=None, env=None):
         """
         Parameters
         ----------
@@ -134,11 +134,7 @@ class WitlessRunner(object):
           was given, 'PWD' in the environment is set to its value.
           This must be a complete environment definition, no values
           from the current environment will be inherited.
-        poll_period : float, optional
-          Interval at which the running process is queried for
-          output.
         """
-        self._poll_period = poll_period
         self.env = env.copy() if env else None
         # stringify to support Path instances on PY35
         self.cwd = str(cwd) if cwd is not None else None
@@ -147,7 +143,8 @@ class WitlessRunner(object):
             # a potential PWD setting
             self.env['PWD'] = self.cwd
 
-    def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None):
+    def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None,
+            poll_period=0.1):
         """Execute a command and communicate with it.
 
         Parameters
@@ -171,6 +168,9 @@ class WitlessRunner(object):
         stdin : byte stream, optional
           File descriptor like, used as stdin for the process. Passed
           verbatim to subprocess.Popen().
+        poll_period : float, optional
+          Interval at which the running process is queried for
+          output (in seconds).
 
         Returns
         -------
@@ -225,7 +225,7 @@ class WitlessRunner(object):
                     # get a chunk of output for the specific period
                     # of time
                     pout = process.communicate(
-                        timeout=self._poll_period,
+                        timeout=poll_period,
                     )
                     # we know the process ended at this point
                     keep_going = False
