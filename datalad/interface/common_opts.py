@@ -127,13 +127,19 @@ message_file_opt = Parameter(
 
 reckless_opt = Parameter(
     args=("--reckless",),
-    action="store_true",
+    # if no specific mode is given, set to auto
+    const='auto',
+    nargs='?',
+    # boolean types only for backward compatibility
+    constraints=EnsureChoice(None, True, False, 'auto'),
     doc="""Set up the dataset to be able to obtain content in the
     cheapest/fastest possible way, even if this poses a potential
     risk the data integrity (e.g. hardlink files from a local clone
     of the dataset). Use with care, and limit to "read-only" use
     cases. With this flag the installed dataset will be marked as
-    untrusted.""")
+    untrusted. The reckless mode is stored in a dataset's local
+    configuration under 'datalad.clone.reckless', and will be inherited
+    to any of its subdatasets.""")
 
 jobs_opt = Parameter(
     args=("-J", "--jobs"),
@@ -308,15 +314,6 @@ eval_params = dict(
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
         constraints=EnsureChoice('ignore', 'continue', 'stop')),
-    proc_pre=Parameter(
-        doc="""DataLad procedure to run prior to the main command. The argument
-        a list of lists with procedure names and optional arguments.
-        Procedures are called in the order their are given in this list.
-        It is important to provide the respective target dataset to run a procedure
-        on as the `dataset` argument of the main command."""),
-    proc_post=Parameter(
-        doc="""Like `proc_pre`, but procedures are executed after the main command
-        has finished."""),
 )
 
 eval_defaults = dict(
@@ -325,6 +322,4 @@ eval_defaults = dict(
     result_renderer=None,
     result_xfm=None,
     on_failure='continue',
-    proc_pre=None,
-    proc_post=None,
 )

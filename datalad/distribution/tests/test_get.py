@@ -41,6 +41,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_message
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import slow
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import with_pathsep
 from datalad.utils import chpwd
 from datalad.utils import assure_list
@@ -118,7 +119,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 ('origin', ds_subpath),
-                ('bang', 'youredead'),
+                ('subdataset-source-candidate-bang', 'youredead'),
                 ('local', clone_subpath),
         ])
     # verify template instantiation works
@@ -128,7 +129,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 ('origin', ds_subpath),
-                ('bang', 'pre-{}-post'.format(sub.id)),
+                ('subdataset-source-candidate-bang', 'pre-{}-post'.format(sub.id)),
                 ('local', clone_subpath),
         ])
     # now again, but have an additional remote besides origin that
@@ -139,13 +140,13 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     clone3.siblings('add', name='myremote', url=ds.path,
                     result_renderer='disabled')
     clone3.update(sibling='myremote')
-    # we should end up with three pieces
-    eq_(f(clone3, clone3.subdatasets(return_type='item-or-list')),
-        [
-            ('origin', clone_subpath),
-            ('myremote', ds_subpath),
-            ('local', str(clone3.pathobj / 'sub')),
-    ])
+    # we should end up with this additional piece
+    # we are not checking for the name of the remote, because it is actually
+    # registered under two different names
+    assert_in(
+        ds_subpath,
+        [i[1] for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
+    )
 
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
@@ -299,6 +300,8 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
+@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)

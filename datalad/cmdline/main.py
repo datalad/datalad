@@ -65,8 +65,12 @@ THE SOFTWARE.
 
 
 class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
-    # Don't accept abbreviations for long options. With py3.5 and above, we
-    # could just use allow_abbrev=False.
+    # Don't accept abbreviations for long options. This kludge was originally
+    # added at a time when our minimum required Python version was below 3.5,
+    # preventing us from using allow_abbrev=False. Now our minimum Python
+    # version is high enough, but we still can't use allow_abbrev=False because
+    # it suffers from the problem described in 6b3f2fffe (BF: cmdline: Restore
+    # handling of short options, 2018-07-23).
     #
     # Modified from the solution posted at
     # https://bugs.python.org/issue14910#msg204678
@@ -176,29 +180,11 @@ def setup_parser(
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.""")
     parser.add_argument(
-        '--proc-pre', dest='common_proc_pre',
-        nargs='+',
-        action='append',
-        metavar=('<PROCEDURE NAME>', 'ARGS'),
-        help="""Dataset procedure to run before the main command (see run-procedure
-        command for details). This option can be given more than once to run
-        multiple procedures in the order in which they were given.
-        It is important to specify the target dataset via the --dataset argument
-        of the main command."""),
-    parser.add_argument(
-        '--proc-post', dest='common_proc_post',
-        nargs='+',
-        action='append',
-        metavar=('<PROCEDURE NAME>', 'ARGS'),
-        help="""Like --proc-pre, but procedures are executed after the main command
-        has finished."""),
-    parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
-        command line options before the subcommand label. Options like
-        --proc-pre can take an arbitrary number of arguments and may require
-        to be followed by a single --cmd in order to enable identification
-        of the subcommand.""")
+        command line options before the subcommand label. Options taking
+        an arbitrary number of arguments may require to be followed by a single
+        --cmd in order to enable identification of the subcommand.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now

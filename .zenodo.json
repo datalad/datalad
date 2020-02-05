@@ -1,14 +1,14 @@
 {
   "creators": [
     {
-      "affiliation": "Dartmouth College, Hanover, NH, United States",
-      "name": "Halchenko, Yaroslav O.",
-      "orcid": "0000-0003-3456-2493"
-    },
-    {
       "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany",
       "name": "Hanke, Michael",
       "orcid": "0000-0001-6398-6370"
+    },
+    {
+      "affiliation": "Dartmouth College, Hanover, NH, United States",
+      "name": "Halchenko, Yaroslav O.",
+      "orcid": "0000-0003-3456-2493"
     },
     {
       "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany",
@@ -95,8 +95,7 @@
     }
   ],
   "grants": [
-    {"id": "10.13039/100000001::1429999"},
-    {"id": "10.13039/100000001::1912266"}
+    {"id": "10.13039/100000001::1429999"}
   ],
   "keywords": [
     "data management",

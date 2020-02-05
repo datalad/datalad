@@ -63,7 +63,7 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
-    known_failure,
+    known_failure_githubci_win,
     known_failure_appveyor,
     known_failure_windows,
     slow,
@@ -253,8 +253,10 @@ def test_run_from_subds_gh3551(path):
         ok_(subds.repo.file_has_content("f"))
 
 
+# unexpected content of state "modified", likely a more fundamental issue with the
+# testrepo setup
+@known_failure_githubci_win
 @slow  # ~10s
-# use of testrepos is broken on Windows and causes this test to be skipped there
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -351,10 +353,12 @@ def test_inject(path):
 @with_tempfile(mkdir=True)
 def test_format_command_strip_leading_dashes(path):
     ds = Dataset(path).create()
-    eq_(format_command(ds, ["--", "cmd", "--opt"]), "cmd --opt")
+    eq_(format_command(ds, ["--", "cmd", "--opt"]),
+        '"cmd" "--opt"' if on_windows else "cmd --opt")
     eq_(format_command(ds, ["--"]), "")
     # Can repeat to escape.
-    eq_(format_command(ds, ["--", "--", "ok"]), "-- ok")
+    eq_(format_command(ds, ["--", "--", "ok"]),
+         '"--" "ok"' if on_windows else "-- ok")
     # String stays as is.
     eq_(format_command(ds, "--"), "--")
 
@@ -378,7 +382,8 @@ def test_run_cmdline_disambiguation(path):
             with assert_raises(SystemExit):
                 main(["datalad", "run", "--", "--message"])
             exec_cmd.assert_called_once_with(
-                "--message", path, expected_exit=None)
+                '"--message"' if on_windows else "--message",
+                path, expected_exit=None)
 
         # And a twist on above: Our parser mishandles --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
@@ -400,7 +405,8 @@ def test_run_cmdline_disambiguation(path):
             with assert_raises(SystemExit):
                 main(["datalad", "run", "--", "echo", "--version"])
             exec_cmd.assert_called_once_with(
-                "echo --version", path, expected_exit=None)
+                '"echo" "--version"' if on_windows else "echo --version",
+                path, expected_exit=None)
 
 
 @with_tempfile(mkdir=True)

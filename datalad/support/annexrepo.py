@@ -18,7 +18,6 @@ import logging
 import math
 import os
 import re
-import shlex
 
 from itertools import chain
 from os import linesep
@@ -54,7 +53,9 @@ from datalad.utils import (
     assure_list,
     make_tempfile,
     partition,
-    unlink
+    unlink,
+    quote_cmdlinearg,
+    split_cmdline,
 )
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
@@ -129,7 +130,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180416 -- annex handles unicode filenames more uniformly
     # 6.20180913 -- annex fixes all known to us issues for v6
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
-    GIT_ANNEX_MIN_VERSION = '7'
+    # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
+    GIT_ANNEX_MIN_VERSION = '7.20190503'
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None
@@ -2775,7 +2777,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         stdout, stderr
         """
-        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
+        cmd = split_cmdline(
+            cmd_str + " " + " ".join(quote_cmdlinearg(f) for f in files)) \
             if isinstance(cmd_str, str) \
             else cmd_str + files
 
@@ -2964,7 +2967,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         annex_options = ['--to=%s' % remote]
         if options:
-            annex_options.extend(shlex.split(options))
+            annex_options.extend(split_cmdline(options))
 
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones

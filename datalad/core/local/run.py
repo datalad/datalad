@@ -22,8 +22,6 @@ from os.path import normpath
 from os.path import relpath
 from tempfile import mkdtemp
 
-from shlex import quote as shlex_quote
-
 from datalad.core.local.save import Save
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
@@ -57,6 +55,7 @@ from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
 from datalad.utils import SequenceFormatter
+from datalad.utils import quote_cmdlinearg
 
 lgr = logging.getLogger('datalad.core.local.run')
 
@@ -129,31 +128,34 @@ class Run(Interface):
     """
     _examples_ = [
         dict(text="Run an executable script and record the impact on a dataset",
-             code_py="ds.run(message='run my script', cmd='code/script.sh')",
+             code_py="run(message='run my script', cmd='code/script.sh')",
              code_cmd="datalad run -m 'run my script' 'code/script.sh'"),
-        dict(text="""Run a command and specify a directory as a dependency
-             for the run. The contents of the dependency will be retrieved
-             prior to running the script""",
+        dict(text="Run a command and specify a directory as a dependency "
+                  "for the run. The contents of the dependency will be retrieved "
+                  "prior to running the script",
              code_cmd="datalad run -m 'run my script' --input 'data/*' "
              "'code/script.sh'",
-             code_py="ds.run(cmd='code/script.sh', message='run my script', "
-             "inputs='data/*')"),
-        dict(text="""Run an executable script and specify output files of the
-             script to be unlocked prior to running the script""",
-             code_py="ds.run(cmd='code/script.sh', message='run my script', "
-             "inputs='data/*', outputs='output_dir')",
-             code_cmd="datalad run -m 'run my script' --input 'data/*' "
-             "--output 'output_dir/*' 'code/script.sh'"),
+             code_py="""\
+             run(cmd='code/script.sh', message='run my script',
+                 inputs=['data/*'])"""),
+        dict(text="Run an executable script and specify output files of the "
+                  "script to be unlocked prior to running the script",
+             code_py="""\
+             run(cmd='code/script.sh', message='run my script',
+                 inputs=['data/*'], outputs=['output_dir'])""",
+             code_cmd="""\
+             datalad run -m 'run my script' --input 'data/*' \\
+             --output 'output_dir/*' 'code/script.sh'"""),
         dict(text="Specify multiple inputs and outputs",
              code_py="""\
-             ds.run(cmd='code/script.sh',
-                    message='run my script',
-                    inputs=['data/*', 'datafile.txt'],
-                    outputs=['output_dir', 'outfile.txt'])""",
+             run(cmd='code/script.sh',
+                 message='run my script',
+                 inputs=['data/*', 'datafile.txt'],
+                 outputs=['output_dir', 'outfile.txt'])""",
              code_cmd="""\
-             datalad run -m 'run my script' --input 'data/*'
-               --input 'datafile.txt' --output 'output_dir/*' --output
-               'outfile.txt' 'code/script.sh'""")
+             datalad run -m 'run my script' --input 'data/*' \\
+             --input 'datafile.txt' --output 'output_dir/*' --output \\
+             'outfile.txt' 'code/script.sh'""")
     ]
 
     _params_ = dict(
@@ -411,7 +413,7 @@ def normalize_command(command):
                 # Strip disambiguation marker. Note: "running from Python API"
                 # FIXME from below applies to this too.
                 command = command[1:]
-            command = " ".join(shlex_quote(c) for c in command)
+            command = " ".join(quote_cmdlinearg(c) for c in command)
     else:
         command = assure_unicode(command)
     return command
@@ -444,7 +446,7 @@ def format_command(dset, command, **kwds):
         io_val = kwds.pop(name, None)
         if not isinstance(io_val, GlobbedPaths):
             io_val = GlobbedPaths(io_val, pwd=kwds.get("pwd"))
-        kwds[name] = list(map(shlex_quote, io_val.expand(dot=False)))
+        kwds[name] = list(map(quote_cmdlinearg, io_val.expand(dot=False)))
     return sfmt.format(command, **kwds)
 
 

@@ -39,6 +39,7 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     on_windows,
     PurePath,
+    Path,
 )
 from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
 from datalad import consts
@@ -900,24 +901,32 @@ def is_ssh(ri):
         or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
+def get_local_file_url(fname, compatibility='git-annex'):
     """Return OS specific URL pointing to a local file
 
     Parameters
     ----------
     fname : string
         Filename.  If not absolute, abspath is used
+    compatibility : {'git', 'git-annex'}, optional
+        On Windows, and only on that platform, file:// URLs may need to look
+        different depending on the use case or consuming application. This
+        switch selects different compatibility modes: 'git' for use with
+        Git commands (e.g. `clone` or `submodule add`); 'git-annex` for
+        Git-annex command input (e.g. `addurl`). On any other platform this
+        setting has no effect.
     """
-    fname = fname if isabs(fname) else abspath(fname)
+    path = Path(fname).absolute()
     if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % urlquote(fname_rep)
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+        path = path.as_posix()
+        furl = 'file://{}{}'.format(
+            '/' if compatibility == 'git' else '',
+            urlquote(
+                re.sub(r'([a-zA-Z]):', r'\1', path)
+            ))
     else:
         # TODO:  need to fix for all the encoding etc
-        furl = str(URL(scheme='file', path=fname))
+        furl = str(URL(scheme='file', path=str(path)))
     return furl
 
 

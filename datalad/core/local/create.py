@@ -106,21 +106,21 @@ class Create(Interface):
         EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _examples_ = [
-        dict(text="""Create a dataset 'mydataset' in the current directory""",
+        dict(text="Create a dataset 'mydataset' in the current directory",
              code_py="create(path='mydataset')",
              code_cmd="datalad create mydataset"),
-        dict(text="""Apply the text2git procedure upon creation of a dataset""",
+        dict(text="Apply the text2git procedure upon creation of a dataset",
              code_py="create(path='mydataset', cfg_proc='text2git')",
              code_cmd="datalad create -c text2git mydataset"),
-        dict(text="""Create a subdataset in the root of an existing dataset""",
+        dict(text="Create a subdataset in the root of an existing dataset",
              code_py="create(dataset='.', path='mysubdataset')",
              code_cmd="datalad create -d . mysubdataset"),
         dict(text="Create a dataset in an existing, non-empty directory",
-             code_py="create(force=True, path='.')",
+             code_py="create(force=True)",
              code_cmd="datalad create --force"),
         dict(text="Create a plain Git repository",
              code_py="create(path='mydataset', no_annex=True)",
-             code_cmd="datalad create --no-annex"),
+             code_cmd="datalad create --no-annex mydataset"),
     ]
 
     _params_ = dict(
@@ -145,7 +145,7 @@ class Create(Interface):
             destination path of the repository will be passed to git-init
             as-is CMD]. Note that not all options will lead to viable results.
             For example '--bare' will not yield a repository where DataLad
-            can adjust files in its worktree."""),
+            can adjust files in its working tree."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar='DATASET',
@@ -329,6 +329,10 @@ class Create(Interface):
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
+        # Note for the code below:
+        # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
+        # Re-use tbrepo instance, do not use tbds.repo
+
         # create and configure desired repository
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
@@ -365,7 +369,7 @@ class Create(Interface):
             tbrepo.set_default_backend(
                 cfg.obtain('datalad.repo.backend'),
                 persistent=True, commit=False)
-            add_to_git[tbds.repo.pathobj / '.gitattributes'] = {
+            add_to_git[tbrepo.pathobj / '.gitattributes'] = {
                 'type': 'file',
                 'state': 'added'}
             # make sure that v6 annex repos never commit content under .datalad
@@ -375,7 +379,7 @@ class Create(Interface):
                 ('metadata/objects/**', 'annex.largefiles',
                  '({})'.format(cfg.obtain(
                      'datalad.metadata.create-aggregate-annex-limit'))))
-            attrs = tbds.repo.get_gitattributes(
+            attrs = tbrepo.get_gitattributes(
                 [op.join('.datalad', i[0]) for i in attrs_cfg])
             set_attrs = []
             for p, k, v in attrs_cfg:
@@ -383,20 +387,24 @@ class Create(Interface):
                         op.join('.datalad', p), {}).get(k, None) == v:
                     set_attrs.append((p, {k: v}))
             if set_attrs:
-                tbds.repo.set_gitattributes(
+                tbrepo.set_gitattributes(
                     set_attrs,
                     attrfile=op.join('.datalad', '.gitattributes'))
 
             # prevent git annex from ever annexing .git* stuff (gh-1597)
-            attrs = tbds.repo.get_gitattributes('.git')
+            attrs = tbrepo.get_gitattributes('.git')
             if not attrs.get('.git', {}).get(
                     'annex.largefiles', None) == 'nothing':
-                tbds.repo.set_gitattributes([
+                tbrepo.set_gitattributes([
                     ('**/.git*', {'annex.largefiles': 'nothing'})])
                 # must use the repo.pathobj as this will have resolved symlinks
-                add_to_git[tbds.repo.pathobj / '.gitattributes'] = {
+                add_to_git[tbrepo.pathobj / '.gitattributes'] = {
                     'type': 'file',
                     'state': 'untracked'}
+
+        # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
+        # Note, must not happen earlier (before if) since "smart" it would not be
+        tbds_config = tbds.config
 
         # record an ID for this repo for the afterlife
         # to be able to track siblings and children
@@ -404,10 +412,10 @@ class Create(Interface):
         # Note, that Dataset property `id` will change when we unset the
         # respective config. Therefore store it before:
         tbds_id = tbds.id
-        if id_var in tbds.config:
+        if id_var in tbds_config:
             # make sure we reset this variable completely, in case of a
             # re-create
-            tbds.config.unset(id_var, where='dataset')
+            tbds_config.unset(id_var, where='dataset')
 
         if _seed is None:
             # just the standard way
@@ -415,7 +423,7 @@ class Create(Interface):
         else:
             # Let's generate preseeded ones
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
-        tbds.config.add(
+        tbds_config.add(
             id_var,
             tbds_id if tbds_id is not None else uuid_id,
             where='dataset',
@@ -427,21 +435,21 @@ class Create(Interface):
         # a dedicated argument, because it is sufficient for the cmdline
         # and unnecessary for the Python API (there could simply be a
         # subsequence ds.config.add() call)
-        for k, v in tbds.config.overrides.items():
-            tbds.config.add(k, v, where='local', reload=False)
+        for k, v in tbds_config.overrides.items():
+            tbds_config.add(k, v, where='local', reload=False)
 
         # all config manipulation is done -> fll reload
-        tbds.config.reload()
+        tbds_config.reload()
 
         # must use the repo.pathobj as this will have resolved symlinks
-        add_to_git[tbds.repo.pathobj / '.datalad'] = {
+        add_to_git[tbrepo.pathobj / '.datalad'] = {
             'type': 'directory',
             'state': 'untracked'}
 
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent
         # but cannot until we have a first commit
-        tbds.repo.save(
+        tbrepo.save(
             message='[DATALAD] new dataset',
             git=True,
             # we have to supply our own custom status, as the repo does

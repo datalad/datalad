@@ -54,6 +54,9 @@ from datalad.tests.utils import (
 )
 
 
+# https://ci.appveyor.com/project/mih/datalad/builds/29840270/job/oya0cs55nwtoga4p
+# # (The system cannot find the path specified.)
+@known_failure_appveyor
 @with_testrepos('.*git.*', flavors=['clone'])
 def test_save(path):
 
@@ -621,7 +624,7 @@ def test_save_partial_commit_shrinking_annex(path):
     create_tree(ds.path, tree={"foo": "a", "staged": ""},
                 remove_existing=True)
     # Even without this staged change, a plain 'git commit -- foo' would fail
-    # with git-annex's partial index error, but rev-save (or more specifically
+    # with git-annex's partial index error, but save (or more specifically
     # GitRepo.save_) drops the pathspec if there are no staged changes.
     ds.repo.add("staged", git=True)
     if ds.repo.supports_unlocked_pointers:

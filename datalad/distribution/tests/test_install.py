@@ -26,7 +26,6 @@ from datalad.utils import getpwd
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
-from datalad import consts
 from datalad.utils import chpwd
 from datalad.utils import on_windows
 from datalad.support import path as op
@@ -71,33 +70,10 @@ from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_git_url_from_source
 
 ###############
 # Test helpers:
 ###############
-
-
-def test_get_git_url_from_source():
-
-    # resolves datalad RIs:
-    eq_(_get_git_url_from_source('///subds'), consts.DATASETS_TOPURL + 'subds')
-    assert_raises(NotImplementedError, _get_git_url_from_source,
-                  '//custom/subds')
-
-    # doesn't harm others:
-    eq_(_get_git_url_from_source('http://example.com'), 'http://example.com')
-    eq_(_get_git_url_from_source('/absolute/path'), '/absolute/path')
-    eq_(_get_git_url_from_source('file://localhost/some'),
-        'file://localhost/some')
-    eq_(_get_git_url_from_source('localhost/another/path'),
-        'localhost/another/path')
-    eq_(_get_git_url_from_source('user@someho.st/mydir'),
-        'user@someho.st/mydir')
-    eq_(_get_git_url_from_source('ssh://somewhe.re/else'),
-        'ssh://somewhe.re/else')
-    eq_(_get_git_url_from_source('git://github.com/datalad/testrepo--basic--r1'),
-        'git://github.com/datalad/testrepo--basic--r1')
 
 
 @with_tree(tree={'file.txt': '123'})
@@ -214,6 +190,8 @@ def test_install_datasets_root(tdir):
         assert_in("already exists and not empty", str(cme.exception))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:360
+@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -253,6 +231,8 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:298
+@known_failure_windows
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -318,6 +298,8 @@ def test_install_dataladri(src, topurl, path):
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -334,21 +316,21 @@ def test_install_recursive(src, path_nr, path_r):
 
     # now recursively:
     # don't filter implicit results so we can inspect them
-    ds_list = install(path_r, source=src, recursive=True, result_filter=None)
+    res = install(path_r, source=src, recursive=True,
+                  result_xfm=None, result_filter=None)
     # installed a dataset and two subdatasets
-    eq_(len(ds_list), 3)
-    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
+    assert_result_count(res, 3, action='install', type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
-    eq_(ds_list[0].path, path_r)
-    top_ds = ds_list[0]
+    eq_(res[0]['path'], path_r)
+    top_ds = Dataset(res[0]['path'])
     ok_(top_ds.is_installed())
 
     # the subdatasets are contained in returned list:
     # (Note: Until we provide proper (singleton) instances for Datasets,
     # need to check for their paths)
-    assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
-    assert_in(opj(top_ds.path, '2'), [i.path for i in ds_list])
+    assert_in_results(res, path=opj(top_ds.path, 'subm 1'), type='dataset')
+    assert_in_results(res, path=opj(top_ds.path, '2'), type='dataset')
 
     eq_(len(top_ds.subdatasets(recursive=True)), 2)
 
@@ -383,8 +365,8 @@ def test_install_recursive_with_data(src, path):
     assert_status('ok', res)
     # installed a dataset and two subdatasets, and one file with content in
     # each
-    eq_(len(res), 6)
-    assert_result_count(res, 3, type='dataset')
+    assert_result_count(res, 3, type='dataset', action='install')
+    assert_result_count(res, 3, type='file', action='get')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
     eq_(res[0]['path'], path)
@@ -398,6 +380,8 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
+@known_failure_windows
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -467,6 +451,8 @@ def test_failed_install_multiple(top_path):
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:318
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_install_known_subdataset(src, path):

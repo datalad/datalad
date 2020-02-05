@@ -399,17 +399,29 @@ def build_example(example, api='python'):
         indicator='%'
     else:
         raise ValueError("unknown API selection: {}".format(api))
-    description = dedent_docstring(example.get('text'))
+    if code_field not in example:
+        # only show an example if it exist for the API
+        return ''
+    description = textwrap.fill(example.get('text'))
     # this indent the code snippet to get it properly rendered as code
     # we are not using textwrap.fill(), because it would not acknowledge
     # any meaningful structure/formatting of code snippets. Instead, we
     # maintain line content as is.
     code = dedent_docstring(example.get(code_field))
-    code = textwrap.indent(code, '     ').lstrip()
+    needs_indicator = not code.startswith(indicator)
+    code = textwrap.indent(code, ' ' * (5 if needs_indicator else 3)).lstrip()
 
-    ex = """{}::\n\n   {} {}\n\n""".format(description,
-                                           indicator,
-                                           code)
+    ex = """{}::\n\n   {}{}\n\n""".format(
+        description,
+        # disable automatic prefixing, if the example already has one
+        # this enables providing more complex examples without having
+        # to infer its inner structure
+        '{} '.format(indicator)
+        if needs_indicator
+        # maintain spacing to avoid undesired relative indentation
+        else '',
+        code)
+
     return ex
 
 
@@ -468,7 +480,9 @@ def build_doc(cls, **kwargs):
         cls_doc = cls_doc.format(**cls._docs_)
     # get examples
     ex = getattr(cls, '_examples_', [])
-    cls_doc = update_docstring_with_examples(cls_doc, ex)
+    if ex:
+        cls_doc = update_docstring_with_examples(cls_doc, ex)
+
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
@@ -659,10 +673,19 @@ class Interface(object):
                             p for p in param.constraints._allowed
                             # in the cmdline None pretty much means
                             # don't give the options, so listing it
-                            # doesn't make sense
-                            if p is not None)
+                            # doesn't make sense. Moreover, any non-string
+                            # value cannot be given and very likely only
+                            # serves a special purpose in the Python API
+                            # or implementation details
+                            if isinstance(p, str))
             if defaults_idx >= 0:
-                help += " [Default: %r]" % (defaults[defaults_idx],)
+                # if it is a flag, in commandline it makes little sense to show
+                # showing the Default: (likely boolean).
+                #   See https://github.com/datalad/datalad/issues/3203
+                if not parser_kwargs.get('action', '').startswith('store_'):
+                    # [Default: None] also makes little sense for cmdline
+                    if defaults[defaults_idx] is not None:
+                        help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
             # conversion
             parser.add_argument(*parser_args, help=help,
@@ -681,7 +704,7 @@ class Interface(object):
             # XXX define or better get from elsewhere
             common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
                            'help', 'log_level', 'logger', 'pbs_runner',
-                           'result_renderer', 'proc_pre', 'proc_post', 'subparser')
+                           'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
@@ -712,8 +735,6 @@ class Interface(object):
                 # eval_results can't distinguish between --report-{status,type}
                 # not specified via the CLI and None passed via the Python API.
                 kwargs['result_filter'] = res_filter
-            kwargs['proc_pre'] = args.common_proc_pre
-            kwargs['proc_post'] = args.common_proc_post
         try:
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):

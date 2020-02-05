@@ -16,26 +16,32 @@ from datalad.support.path import (
     relpath,
 )
 
-from datalad.api import clone
-from datalad.api import create
-from datalad.api import Dataset
-from datalad.api import install
-from datalad.api import siblings
+from datalad.api import (
+    clone,
+    create,
+    Dataset,
+    install,
+    siblings,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
-from datalad.tests.utils import chpwd
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_tempfile, with_testrepos
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import with_sameas_remote
+from datalad.tests.utils import (
+    chpwd,
+    create_tree,
+    with_tempfile, with_testrepos,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_status,
+    assert_result_count,
+    with_sameas_remote,
+    eq_,
+    ok_,
+)
 
-from nose.tools import eq_, ok_
+from datalad.utils import Path
 
 
 # work on cloned repos to be safer
@@ -305,8 +311,7 @@ def test_sibling_enable_sameas(repo, clone_path):
     ds.repo.copy_to(["f0"], remote="r_dir")
     ds.repo.drop(["f0"])
 
-    ds_cloned = clone(ds.path, clone_path,
-                      result_xfm="datasets", return_type="item-or-list")
+    ds_cloned = clone(ds.path, clone_path)
 
     assert_false(ds_cloned.repo.file_has_content("f0"))
     res = ds_cloned.siblings(action="enable", name="r_rsync")
@@ -325,7 +330,7 @@ def test_sibling_inherit(basedir):
                       annex_group="grp", result_renderer=None)
 
     ds_clone = ds_super.clone(
-        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+        source=ds_source.path, path="clone")
     # In a subdataset, adding a "source" sibling with inherit=True pulls in
     # that configuration.
     ds_clone.siblings(action="add", name="source", url=ds_source.path,
@@ -340,8 +345,29 @@ def test_sibling_inherit_no_super_remote(basedir):
     ds_source = Dataset(opj(basedir, "source")).create()
     ds_super = Dataset(opj(basedir, "super")).create()
     ds_clone = ds_super.clone(
-        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+        source=ds_source.path, path="clone")
     # Adding a sibling with inherit=True doesn't crash when the superdataset
     # doesn't have a remote `name`.
     ds_clone.siblings(action="add", name="donotexist", inherit=True,
                       url=ds_source.path, result_renderer=None)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_sibling_path_is_posix(basedir, otherpath):
+    ds_source = Dataset(opj(basedir, "source")).create()
+    # add remote with system native path
+    ds_source.siblings(
+        action="add",
+        name="donotexist",
+        url=otherpath,
+        result_renderer=None)
+    res = ds_source.siblings(
+        action="query",
+        name="donotexist",
+        result_renderer=None,
+        return_type='item-or-list')
+    # path URL should come out POSIX as if `git clone` had configured it for origin
+    # https://github.com/datalad/datalad/issues/3972
+    eq_(res['url'], Path(otherpath).as_posix())
+     

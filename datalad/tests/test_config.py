@@ -10,25 +10,36 @@
 
 """
 
+import logging
 import os
 from os.path import exists
 from os.path import join as opj
 
 from unittest.mock import patch
-from nose.tools import assert_false, assert_true, assert_equal
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_in, assert_not_in
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import (
+    assert_raises,
+    assert_false,
+    assert_true,
+    assert_equal,
+    assert_not_equal,
+    assert_in,
+    assert_not_in,
+    ok_file_has_content,
+    with_tree,
+    with_tempfile,
+    with_testsui,
+    chpwd,
+)
 from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
-from datalad.config import ConfigManager
+from datalad.config import (
+    ConfigManager,
+    rewrite_url,
+)
 from datalad.cmd import CommandError
 
-from datalad.tests.utils import with_testsui
 from datalad.support.external_versions import external_versions
 
 # XXX tabs are intentional (part of the format)!
@@ -322,9 +333,161 @@ def test_from_env():
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
-    cfg.overrides['datalad.crazy.override'] = 'fromoverride'
+    cfg.set('datalad.crazy.override', 'fromoverride', where='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
     os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromenv')
+
+
+def test_overrides():
+    cfg = ConfigManager()
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', cfg)
+    # set
+    cfg.set('user.name', 'myoverride', where='override')
+    assert_equal(cfg['user.name'], 'myoverride')
+    # unset just removes override, not entire config
+    cfg.unset('user.name', where='override')
+    assert_in('user.name', cfg)
+    assert_not_equal('user.name', 'myoverride')
+    # add
+    # there is no initial increment
+    cfg.add('user.name', 'myoverride', where='override')
+    assert_equal(cfg['user.name'], 'myoverride')
+    # same as with add, not a list
+    assert_equal(cfg['user.name'], 'myoverride')
+    # but then there is
+    cfg.add('user.name', 'myother', where='override')
+    assert_equal(cfg['user.name'], ['myoverride', 'myother'])
+    # rename
+    assert_not_in('ups.name', cfg)
+    cfg.rename_section('user', 'ups', where='override')
+    # original variable still there
+    assert_in('user.name', cfg)
+    # rename of override in effect
+    assert_equal(cfg['ups.name'], ['myoverride', 'myother'])
+    # remove entirely by section
+    cfg.remove_section('ups', where='override')
+    from datalad.utils import Path
+    assert_not_in(
+        'ups.name', cfg,
+        (cfg._store,
+         cfg.overrides,
+         cfg._cfgfiles,
+         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
+    ))
+
+
+def test_rewrite_url():
+    test_cases = (
+        # no match
+        ('unicorn', 'unicorn'),
+        # custom label replacement
+        ('example:datalad/datalad.git', 'git@example.com:datalad/datalad.git'),
+        # protocol enforcement
+        ('git://example.com/some', 'https://example.com/some'),
+        # multi-match
+        ('mylabel', 'ria+ssh://fully.qualified.com'),
+        ('myotherlabel', 'ria+ssh://fully.qualified.com'),
+        # conflicts, same label pointing to different URLs
+        ('conflict', 'conflict'),
+        # also conflicts, but hidden in a multi-value definition
+        ('conflict2', 'conflict2'),
+    )
+    cfg_in = {
+        # label rewrite
+        'git@example.com:': 'example:',
+        # protocol change
+        'https://example': 'git://example',
+        # multi-value
+        'ria+ssh://fully.qualified.com': ('mylabel', 'myotherlabel'),
+        # conflicting definitions
+        'http://host1': 'conflict',
+        'http://host2': 'conflict',
+        # hidden conflict
+        'http://host3': 'conflict2',
+        'http://host4': ('someokish', 'conflict2'),
+    }
+    cfg = {
+        'url.{}.insteadof'.format(k): v
+        for k, v in cfg_in.items()
+    }
+    for input, output in test_cases:
+        with swallow_logs(logging.WARNING) as msg:
+            assert_equal(rewrite_url(cfg, input), output)
+        if input.startswith('conflict'):
+            assert_in("Ignoring URL rewrite", msg.out)
+
+
+# https://github.com/datalad/datalad/issues/4071
+@with_tempfile()
+@with_tempfile()
+def test_no_leaks(path1, path2):
+    ds1 = Dataset(path1).create()
+    ds1.config.set('i.was.here', 'today', where='local')
+    assert_in('i.was.here', ds1.config.keys())
+    ds1.config.reload()
+    assert_in('i.was.here', ds1.config.keys())
+    # now we move into this one repo, and create another
+    # make sure that no config from ds1 leaks into ds2
+    with chpwd(path1):
+        ds2 = Dataset(path2)
+        assert_not_in('i.was.here', ds2.config.keys())
+        ds2.config.reload()
+        assert_not_in('i.was.here', ds2.config.keys())
+
+        ds2.create()
+        assert_not_in('i.was.here', ds2.config.keys())
+
+        # and that we do not track the wrong files
+        assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
+        assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        # these are the right ones
+        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
+        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+
+
+@with_tempfile()
+def test_no_local_write_if_no_dataset(path):
+    Dataset(path).create()
+    with chpwd(path):
+        cfg = ConfigManager()
+        with assert_raises(CommandError):
+            cfg.set('a.b.c', 'd', where='local')
+
+
+@with_tempfile
+def test_dataset_local_mode(path):
+    ds = create(path)
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', ds.config)
+    # from .datalad/config
+    assert_in('datalad.dataset.id', ds.config)
+    # from .git/config
+    assert_in('annex.version', ds.config)
+    # now check that dataset-local mode doesn't have the global piece
+    cfg = ConfigManager(ds, source='dataset-local')
+    assert_not_in('user.name', cfg)
+    assert_in('datalad.dataset.id', cfg)
+    assert_in('annex.version', cfg)
+
+
+# https://github.com/datalad/datalad/issues/4071
+@with_tempfile
+def test_dataset_systemglobal_mode(path):
+    ds = create(path)
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', ds.config)
+    # from .datalad/config
+    assert_in('datalad.dataset.id', ds.config)
+    # from .git/config
+    assert_in('annex.version', ds.config)
+    with chpwd(path):
+        # now check that no config from a random dataset at PWD is picked up
+        # if not dataset instance was provided
+        cfg = ConfigManager(dataset=None, source='any')
+        assert_in('user.name', cfg)
+        assert_not_in('datalad.dataset.id', cfg)
+        assert_not_in('annex.version', cfg)

@@ -14,6 +14,7 @@ import logging
 
 import os.path as op
 
+from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -69,7 +70,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.distribution.clone import Clone
+from datalad.core.distributed.clone import clone_dataset
 from datalad.distribution.utils import _get_flexible_source_candidates
 
 __docformat__ = 'restructuredtext'
@@ -197,7 +198,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         alternate_suffix=False)
                 )
 
-        for name, tmpl in [(c[40:], ds_repo.config[c])
+        for name, tmpl in [(c[12:], ds_repo.config[c])
                            for c in ds_repo.config.keys()
                            if c.startswith(
                                'datalad.get.subdataset-source-candidate-')]:
@@ -238,7 +239,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
 
     # prevent inevitable exception from `clone`
     dest_path = op.join(ds.path, sm_path)
-    clone_urls = [src for name, src in clone_urls if src != dest_path]
+    clone_urls_ = [src for name, src in clone_urls if src != dest_path]
 
     if not clone_urls:
         # yield error
@@ -253,20 +254,9 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         )
         return
 
-    # now loop over all candidates and try to clone
-    for res in Clone.__call__(
-            clone_urls[0],
-            path=dest_path,
-            # pretend no parent -- we don't want clone to add to ds
-            # because this is a submodule already!
-            dataset=None,
-            # if we have more than one source, pass as alternatives
-            alt_sources=clone_urls[1:],
-            result_xfm=None,
-            # we yield all an have the caller decide
-            on_failure='ignore',
-            result_renderer='disabled',
-            return_type='generator',
+    for res in clone_dataset(
+            clone_urls_,
+            Dataset(dest_path),
             **kwargs):
         # make sure to fix a detached HEAD before yielding the install success
         # result. The resetting of the branch would undo any change done
@@ -286,6 +276,27 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
     if not subds.is_installed():
         lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
         return
+
+    # check whether clone URL generators were involved
+    cand_cfg = set(n for n, s in clone_urls
+                   if n.startswith('subdataset-source-candidate-'))
+    if cand_cfg:
+        # get a handle on the configuration that is specified in the
+        # dataset itself (local and dataset)
+        super_cfg = ConfigManager(dataset=ds, source='dataset-local')
+        need_reload = False
+        for c in cand_cfg:
+            # check whether any of this configuration originated from the
+            # superdataset. if so, inherit the config in the new subdataset
+            # clone. if not, keep things clean in order to be able to move with
+            # any outside configuration change
+            c = 'datalad.get.{}'.format(c)
+            if c in super_cfg.keys():
+                subds.config.set(c, super_cfg.get(c), where='local',
+                                 reload=False)
+                need_reload = True
+        if need_reload:
+            subds.config.reload(force=True)
 
 
 def _install_necessary_subdatasets(
@@ -500,7 +511,8 @@ def _install_targetpath(
         # yield immediately so errors could be acted upon
         # outside, before we continue
         res.update(
-            action='get',
+            # do not override reported action, could be anything
+            #action='get',
             contains=[Path(res['path'])],
         )
         yield res
@@ -584,6 +596,9 @@ class Get(Interface):
         dict(text="Get all contents of the current dataset and its subdatasets",
              code_py="get(dataset='.', recursive=True)",
              code_cmd="datalad get . --recursive"),
+        dict(text="Get (clone) a registered subdataset, but don't retrieve data",
+             code_py="get('path/to/subds', get_data=False)",
+             code_cmd="datalad get -n <path/to/subds>"),
     ]
 
     _params_ = dict(
@@ -641,7 +656,7 @@ class Get(Interface):
             recursion_limit=None,
             get_data=True,
             description=None,
-            reckless=False,
+            reckless=None,
             jobs='auto',
     ):
         refds_path = Interface.get_refds_path(dataset)

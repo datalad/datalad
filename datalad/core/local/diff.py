@@ -55,10 +55,10 @@ lgr = logging.getLogger('datalad.core.local.diff')
 class Diff(Interface):
     """Report differences between two states of a dataset (hierarchy)
 
-    The two to-be-compared states are given via to --from and --to options.
+    The two to-be-compared states are given via the --from and --to options.
     These state identifiers are evaluated in the context of the (specified
-    or detected) dataset. In case of a recursive report on a dataset
-    hierarchy corresponding state pairs for any subdataset are determined
+    or detected) dataset. In the case of a recursive report on a dataset
+    hierarchy, corresponding state pairs for any subdataset are determined
     from the subdataset record in the respective superdataset. Only changes
     recorded in a subdataset between these two states are reported, and so on.
 
@@ -66,7 +66,7 @@ class Diff(Interface):
     difference report. As with Git's diff, it will not result in an error when
     a path is specified that does not exist on the filesystem.
 
-    Reports are very similar to those of the `rev-status` command, with the
+    Reports are very similar to those of the `status` command, with the
     distinguished content types and states being identical.
     """
     # make the custom renderer the default one, as the global default renderer
@@ -93,9 +93,28 @@ class Diff(Interface):
             metavar="REVISION",
             doc="""state to compare against the original state, as given by
             any identifier that Git understands. If none is specified,
-            the state of the worktree will be used compared.""",
+            the state of the working tree will be compared.""",
             constraints=EnsureStr() | EnsureNone()),
     )
+
+    _examples_ = [
+        dict(text="Show unsaved changes in a dataset",
+             code_py="diff()",
+             code_cmd="datalad diff"),
+        dict(text="Compare a previous dataset state identified by shasum "
+                  "against current worktree",
+             code_py="diff(fr='SHASUM')",
+             code_cmd="datalad diff --from <SHASUM>"),
+        dict(text="Compare two branches against each other",
+             code_py="diff(fr='branch1', to='branch2')",
+             code_cmd="datalad diff --from branch1 --to branch2"),
+        dict(text="Show unsaved changes in the dataset and potential subdatasets",
+             code_py="diff(recursive=True)",
+             code_cmd="datalad diff --recursive"),
+        dict(text="Show unsaved changes made to a particular file",
+             code_py="diff(path='path/to/file')",
+             code_cmd="datalad diff <path/to/file>"),
+    ]
 
     @staticmethod
     @datasetmethod(name='diff')
@@ -198,7 +217,7 @@ def _diff_cmd(
     # paradigm for this command. If we gather all information first, we
     # could do post-processing and detect when a file (same gitsha, or same
     # key) was copied/moved from another dataset. Another command (e.g.
-    # rev-save) could act on this information and also move/copy
+    # save) could act on this information and also move/copy
     # availability information or at least enhance the respective commit
     # message with cross-dataset provenance info
 

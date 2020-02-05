@@ -91,17 +91,30 @@ def _get_system_ssh_version():
     Annex prior 20170302 was using bundled version, but now would use system one
     if installed
     """
-    try:
-        out, err = _runner.run('ssh -V'.split(),
-                               expect_fail=True, expect_stderr=True)
-        # apparently spits out to err but I wouldn't trust it blindly
-        if err.startswith('OpenSSH'):
-            out = err
-        assert out.startswith('OpenSSH')  # that is the only one we care about atm
-        return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
-    except CommandError as exc:
-        lgr.debug("Could not determine version of ssh available: %s", exc_str(exc))
-        return None
+    out, err = _runner.run('ssh -V'.split(),
+                           expect_fail=True, expect_stderr=True)
+    # apparently spits out to err but I wouldn't trust it blindly
+    if err.startswith('OpenSSH'):
+        out = err
+    assert out.startswith('OpenSSH')  # that is the only one we care about atm
+    return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
+
+
+def _get_system_7z_version():
+    """Return version of 7-Zip"""
+    out, err = _runner.run(
+        ['7z'], expect_fail=True, expect_stderr=True,
+    )
+    # reporting in variable order across platforms
+    # Linux: 7-Zip [64] 16.02
+    # Windows: 7-Zip 19.00 (x86)
+    pieces = out.strip().split(':', maxsplit=1)[0].strip().split()
+    for p in pieces:
+        # the one with the dot is the version
+        if '.' in p:
+            return p
+    lgr.debug("Could not determine version of 7z from stdout. "
+              "stdout: %s, stderr: %s", out, err)
 
 
 class ExternalVersions(object):
@@ -126,6 +139,7 @@ class ExternalVersions(object):
         'cmd:bundled-git': _get_bundled_git_version,
         'cmd:system-git': _get_system_git_version,
         'cmd:system-ssh': _get_system_ssh_version,
+        'cmd:7z': _get_system_7z_version,
     }
     INTERESTING = (
         'appdirs',
@@ -140,6 +154,7 @@ class ExternalVersions(object):
         'msgpack',
         'mutagen',
         'patool',
+        'cmd:7z',
         'requests',
         'scrapy',
         'wrapt',
@@ -196,6 +211,7 @@ class ExternalVersions(object):
             modname = module
             module = None
 
+        lgr.log(5, "Requested to provide version for %s", modname)
         # Early returns None so we do not store prev result for  them
         # and allow users to install things at run time, so later check
         # doesn't pick it up from the _versions

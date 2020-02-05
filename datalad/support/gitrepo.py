@@ -13,7 +13,6 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 import re
-import shlex
 import time
 import os
 import os.path as op
@@ -82,7 +81,8 @@ from datalad.utils import (
     posix_relpath,
     assure_dir,
     generate_file_chunks,
-    assure_unicode
+    assure_unicode,
+    split_cmdline,
 )
 
 # imports from same module:
@@ -104,7 +104,7 @@ from .network import (
 )
 from .path import get_parent_paths
 from .repo import (
-    Flyweight,
+    PathBasedFlyweight,
     RepoInterface
 )
 
@@ -361,14 +361,13 @@ def _remove_empty_items(list_):
     return [file_ for file_ in list_ if file_]
 
 
-if external_versions["cmd:git"] >= "2.24.0":
+if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
     # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
     # into untracked submodules when multiple pathspecs are given, returning
     # repositories that are deeper than the first level. This helper filters
     # these deeper levels out so that save_() doesn't fail trying to add them.
     #
-    # TODO: Once an upstream release includes a fix, either set a ceiling on
-    # the Git version above or remove _prune_deeper_repos() entirely.
+    # This regression fixed with upstream's 072a231016 (2019-12-10).
     def _prune_deeper_repos(repos):
         firstlevel_repos = []
         prev = None
@@ -516,7 +515,7 @@ class GitPythonProgressBar(RemoteProgress):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
-class GitRepo(RepoInterface, metaclass=Flyweight):
+class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
@@ -532,39 +531,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     # Begin Flyweight:
 
     _unique_instances = WeakValueDictionary()
-
-    @classmethod
-    def _flyweight_id_from_args(cls, *args, **kwargs):
-
-        if args:
-            # to a certain degree we need to simulate an actual call to __init__
-            # and make sure, passed arguments are fitting:
-            # TODO: Figure out, whether there is a cleaner way to do this in a
-            # generic fashion
-            assert('path' not in kwargs)
-            path = args[0]
-            args = args[1:]
-        elif 'path' in kwargs:
-            path = kwargs.pop('path')
-        else:
-            raise TypeError("__init__() requires argument `path`")
-
-        if path is None:
-            raise AttributeError
-
-        # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
-            path = str(path)
-
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-        # resolve symlinks to make sure we have exactly one instance per
-        # physical repository at a time
-        path = realpath(path)
-        kwargs['path'] = path
-        return path, args, kwargs
 
     def _flyweight_invalid(self):
         return not self.is_valid_git()
@@ -837,7 +803,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return self._repo
 
     @classmethod
-    def clone(cls, url, path, *args, **kwargs):
+    def clone(cls, url, path, *args, clone_options=None, **kwargs):
         """Clone url into path
 
         Provides workarounds for known issues (e.g.
@@ -847,6 +813,9 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         ----------
         url : str
         path : str
+        clone_options : dict
+          Key/value pairs of arbitrary options that will be passed on to the
+          underlying call to `git-clone`.
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
@@ -879,12 +848,18 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         # Massage URL
         url_ri = RI(url) if not isinstance(url, RI) else url
-        # try to get a local path from `url`:
-        try:
-            url = url_ri.localpath
-            url_ri = RI(url)
-        except ValueError:
-            pass
+        if not on_windows:
+            # if we are on windows, the local path of a URL
+            # would not end up being a proper local path and cloning
+            # would fail. Don't try to be smart and just pass the
+            # URL along unmodified
+
+            # try to get a local path from `url`:
+            try:
+                url = url_ri.localpath
+                url_ri = RI(url)
+            except ValueError:
+                pass
 
         if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
@@ -910,6 +885,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     repo = gitpy.Repo.clone_from(
                         url, path,
                         env=env,
+                        # we accept a plain dict with options, and not a gitpy
+                        # tailored list of "multi options" to make a future
+                        # non-GitPy based implementation easier. Do conversion
+                        # here
+                        multi_options=to_options(**clone_options) if clone_options else None,
                         odbt=default_git_odbt,
                         progress=git_progress
                     )
@@ -1885,7 +1865,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, str):
-            cmd = shlex.split(cmd_str, posix=not on_windows)
+            cmd = split_cmdline(cmd_str)
         else:
             cmd = cmd_str[:]  # we will modify in-place
 
@@ -2536,7 +2516,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             '',
             ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
-        db, _ = _parse_gitconfig_dump(out, {}, None, True)
+        db, _ = _parse_gitconfig_dump(out, {}, None, True, cwd=self.path)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
@@ -3219,7 +3199,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 pass
             else:
                 raise ValueError(
-                    'unknown value for `untracked`: %s', untracked)
+                    'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
 
@@ -3540,8 +3520,15 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
                     props = dict(
-                        state='clean' if f.exists() or \
-                              f.is_symlink() else 'deleted',
+                        # at this point we know that the reported object ids
+                        # for this file are identical in the to and from
+                        # records.  If to is None, we're comparing to the
+                        # working tree and a deleted file will still have an
+                        # identical id, so we need to check whether the file is
+                        # gone before declaring it clean. This working tree
+                        # check is irrelevant and wrong if to is a ref.
+                        state='clean' if to is not None or (f.exists() or \
+                              f.is_symlink()) else 'deleted',
                         type=to_state_r['type'],
                     )
                 else:

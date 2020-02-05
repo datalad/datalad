@@ -16,7 +16,6 @@ import subprocess
 import sys
 import logging
 import os
-import shlex
 import atexit
 import functools
 import tempfile
@@ -38,6 +37,7 @@ from .utils import (
     assure_bytes,
     unlink,
     auto_repr,
+    split_cmdline,
 )
 from .dochelpers import borrowdoc
 
@@ -383,7 +383,7 @@ class Runner(object):
         system's stdout or stderr respectively.
 
         Note: Using a string as `cmd` and shell=True allows for piping,
-              multiple commands, etc., but that implies shlex.split() is not
+              multiple commands, etc., but that implies split_cmdline() is not
               used. This is considered to be a security hazard.
               So be careful with input.
 
@@ -487,7 +487,7 @@ class Runner(object):
             if self.protocol.records_ext_commands:
                 prot_exc = None
                 prot_id = self.protocol.start_section(
-                    shlex.split(cmd, posix=not on_windows)
+                    split_cmdline(cmd)
                     if isinstance(cmd, str)
                     else cmd)
             try:
@@ -576,8 +576,7 @@ class Runner(object):
 
         else:
             if self.protocol.records_ext_commands:
-                self.protocol.add_section(shlex.split(cmd,
-                                                      posix=not on_windows)
+                self.protocol.add_section(split_cmdline(cmd)
                                           if isinstance(cmd, str)
                                           else cmd, None)
             out = ("DRY", "DRY")

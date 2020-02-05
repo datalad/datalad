@@ -88,6 +88,7 @@ from datalad.tests.utils import slow
 from datalad.tests.utils import set_annex_version
 from datalad.tests.utils import known_failure_githubci_win
 from datalad.tests.utils import with_sameas_remote
+from datalad.tests.utils import known_failure_windows
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -204,6 +205,8 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
         assert_false(dm)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:473
+@known_failure_windows
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
@@ -258,6 +261,8 @@ def test_AnnexRepo_get_outofspace(annex_path):
     assert_re_in(".*annex (find|get). needs 905.6 MB more", str(exc))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:405
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['local'])
 def test_AnnexRepo_get_remote_na(path):
     ar = AnnexRepo(path)
@@ -733,6 +738,8 @@ def test_AnnexRepo_always_commit(path):
     eq_(num_commits, 4)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:445
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['local'])
 @with_tempfile
 def test_AnnexRepo_on_uninited_annex(origin, path):
@@ -778,6 +785,8 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:295
+@known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
 
@@ -925,6 +934,8 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:348
+@known_failure_windows
 @with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
 def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
@@ -1255,6 +1266,8 @@ def test_repo_version(path1, path2, path3):
             eq_(version, 5)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:330
+@known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
 def test_annex_copy_to(origin, clone):
@@ -1691,6 +1704,8 @@ def test_AnnexRepo_flyweight(path1, path2):
     assert_not_is_instance(repo4, AnnexRepo)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
+@known_failure_windows
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile
@@ -1774,7 +1789,15 @@ def test_AnnexRepo_dirty(path):
     ok_(repo.dirty)
     # commit
     repo.commit("file2.txt annexed")
-    ok_(not repo.dirty)
+
+    try:
+        ok_(not repo.dirty)
+    except AssertionError:
+        if "7.20191024" <= external_versions['cmd:annex'] < "7.20191230":
+            raise SkipTest(
+                "Test known to trigger git-to-annex content conversion "
+                "with this git-annex version (see gh-3890)")
+        raise
 
     repo.unlock("file2.txt")
     # Unlocking the file is seen as a modification when we're not already in an
@@ -1968,6 +1991,8 @@ def test_AnnexRepo_get_tracking_branch(path):
     eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:433
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 

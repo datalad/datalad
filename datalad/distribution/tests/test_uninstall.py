@@ -9,8 +9,6 @@
 
 """
 
-
-
 import os
 from os.path import join as opj, split as psplit
 from os.path import exists, lexists
@@ -23,7 +21,6 @@ from datalad.api import drop
 from datalad.api import remove
 from datalad.api import install
 from datalad.api import create
-from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -43,8 +40,10 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import usecase
 from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import chpwd
 from datalad.utils import _path_
+from datalad.utils import Path
 from datalad.support.external_versions import external_versions
 
 from ..dataset import Dataset
@@ -126,6 +125,8 @@ def test_uninstall_invalid(path):
         assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:489
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_uninstall_annex_file(path):
     ds = Dataset(path)
@@ -182,6 +183,8 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:509
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
@@ -212,7 +215,16 @@ def test_uninstall_subdataset(src, dst):
             raise SkipTest(
                 "Known problem with GitPython. See "
                 "https://github.com/gitpython-developers/GitPython/pull/521")
-        res = ds.uninstall(path=subds.path, result_xfm='datasets')
+        # simulate a cmdline invocation pointing to the subdataset
+        # with a relative path from outside the superdataset to catch
+        # https://github.com/datalad/datalad/issues/4001
+        pwd = Path(dst).parent
+        with chpwd(str(pwd)):
+            res = uninstall(
+                dataset=ds.path,
+                path=str(subds.pathobj.relative_to(pwd)),
+                result_xfm='datasets',
+            )
         eq_(res[0], subds)
         ok_(not subds.is_installed())
         # just a deinit must not remove the subdataset registration

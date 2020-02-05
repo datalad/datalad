@@ -365,12 +365,9 @@ def test_path_diff(_path, linkpath):
     # duplicate paths do not change things
     eq_(plain_recursive, ds.diff(path=['.', '.'], recursive=True, annex='all'))
     # neither do nested paths
-    if external_versions["cmd:git"] < "2.24.0":
-        # TODO: The link below points to discussion of this behavioral change
-        # in Git. If the behavior is addressed in a future release, update the
-        # condition above with a ceiling. If it's not, think more about how to
-        # handle this change on our side.
-        # https://lore.kernel.org/git/87fti15agv.fsf@kyleam.com/T/#u
+    if not ("2.24.0" <= external_versions["cmd:git"] < "2.25.0"):
+        # Release 2.24.0 contained a regression that was fixed with 072a231016
+        # (2019-12-10).
         eq_(plain_recursive,
             ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all'))
     # when invoked in a subdir of a dataset it still reports on the full thing
@@ -481,3 +478,31 @@ def test_diff_nonexistent_ref_unicode(path):
         1,
         path=ds.path,
         status="impossible")
+
+
+# https://github.com/datalad/datalad/issues/3997
+@with_tempfile(mkdir=True)
+def test_no_worktree_impact_false_deletions(path):
+    ds = Dataset(path).create()
+    # create a branch that has no new content
+    ds.repo.call_git(['checkout', '-b', 'test'])
+    # place to successive commits with file additions into the master branch
+    ds.repo.call_git(['checkout', 'master'])
+    (ds.pathobj / 'identical').write_text('should be')
+    ds.save()
+    (ds.pathobj / 'new').write_text('yes')
+    ds.save()
+    # now perform a diff for the last commit, there is one file that remained
+    # identifical
+    ds.repo.call_git(['checkout', 'test'])
+    res = ds.diff(fr='master~1', to='master')
+    # under no circumstances can there be any reports on deleted files
+    # because we never deleted anything
+    assert_result_count(res, 0, state='deleted')
+    # the identical file must be reported clean
+    assert_result_count(
+        res,
+        1,
+        state='clean',
+        path=str(ds.pathobj / 'identical'),
+    )

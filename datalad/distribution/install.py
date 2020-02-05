@@ -49,7 +49,7 @@ from datalad.distribution.dataset import (
     EnsureDataset,
 )
 from datalad.distribution.get import Get
-from datalad.distribution.clone import Clone
+from datalad.core.distributed.clone import Clone
 
 __docformat__ = 'restructuredtext'
 
@@ -104,23 +104,26 @@ class Install(Interface):
              code_cmd="datalad install "
              "https://github.com/datalad-datasets/longnow-podcasts.git"),
         dict(text="Install a dataset as a subdataset into the current dataset",
-             code_py="install(dataset='.', "
-             "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
-             code_cmd="datalad install -d . "
-             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+             code_py="""\
+             install(dataset='.',
+                     source='https://github.com/datalad-datasets/longnow-podcasts.git')""",
+             code_cmd="""\
+             datalad install -d . \\
+             --source='https://github.com/datalad-datasets/longnow-podcasts.git'"""),
         dict(text="Install a dataset, and get all content right away",
-             code_py="install(source="
-             "'https://github.com/datalad-datasets/longnow-podcasts.git', "
-             "get_data=True')",
-             code_cmd="datalad install --get-data "
-             "--source https://github.com/datalad-datasets/longnow-podcasts.git"),
+             code_py="""\
+             install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
+                     get_data=True)""",
+             code_cmd="""\
+             datalad install --get-data \\
+             --source https://github.com/datalad-datasets/longnow-podcasts.git"""),
         dict(text="Install a dataset with all its subdatasets",
-             code_py="install("
-             "source='https://github.com/datalad-datasets/longnow-podcasts.git', "
-             "recursive=True)",
-             code_cmd="datalad install "
-             "https://github.com/datalad-datasets/longnow-podcasts.git "
-             "--recursive"),
+             code_py="""\
+             install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
+                     recursive=True)""",
+             code_cmd="""\
+             datalad install --recursive \\
+             https://github.com/datalad-datasets/longnow-podcasts.git"""),
     ]
 
     _params_ = dict(
@@ -172,7 +175,7 @@ class Install(Interface):
             recursive=False,
             recursion_limit=None,
             save=True,
-            reckless=False,
+            reckless=None,
             jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and

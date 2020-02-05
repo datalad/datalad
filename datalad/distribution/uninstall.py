@@ -22,6 +22,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
+from datalad.local.subdatasets import Subdatasets
 from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
@@ -123,11 +124,6 @@ class Uninstall(Interface):
     subdirectories within a dataset is done automatically. An optional
     recursion limit is applied relative to each given input path.
 
-    Examples:
-
-      Uninstall a subdataset (undo installation)::
-
-        ~/some/dataset$ datalad uninstall somesubdataset1
     """
     _action = 'uninstall'
 
@@ -143,6 +139,18 @@ class Uninstall(Interface):
         check=check_argument,
         if_dirty=if_dirty_opt,
     )
+
+    _examples_ = [
+        dict(text="Uninstall a subdataset (undo installation)",
+             code_py="uninstall(path='path/to/subds')",
+             code_cmd="datalad uninstall <path/to/subds>"),
+        dict(text="Uninstall a subdataset and all potential subdatasets",
+             code_py="uninstall(path='path/to/subds', recursive=True)",
+             code_cmd="datalad uninstall -r <path/to/subds>"),
+        dict(text="Skip checks that ensure a minimal number of (remote) sources",
+             code_py="uninstall(path='path/to/subds', check=False)",
+             code_cmd="datalad uninstall <path/to/subds> --nocheck"),
+    ]
 
     @staticmethod
     @datasetmethod(name=_action)
@@ -179,7 +187,11 @@ class Uninstall(Interface):
                 return
 
         saw_subds = False
-        for ds in itertools.chain(refds.subdatasets(
+        for ds in itertools.chain(Subdatasets.__call__(
+                # it is critical to pass the dataset arg as-is
+                # to not invalidate the path argument semantics
+                # in subdatasets()
+                dataset=dataset,
                 path=path,
                 fulfilled=True,
                 # makes no sense to ignore subdatasets further down

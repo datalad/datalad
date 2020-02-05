@@ -17,7 +17,7 @@ import sys
 
 from datalad.cmd import Runner
 from datalad.utils import chpwd
-from datalad.utils import maybe_shlex_quote
+from datalad.utils import quote_cmdlinearg
 from datalad.utils import swallow_outputs
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
@@ -70,57 +70,6 @@ def test_dirty(path):
     assert_repo_status(ds.path)
 
 
-@known_failure_windows  #FIXME
-@with_tree(tree={
-    'code': {'datalad_test_proc.py': """\
-import sys
-import os.path as op
-from datalad.api import save, Dataset
-
-with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
-    f.write('hello\\n')
-save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-"""}})
-@with_tempfile
-def test_basics(path, super_path):
-    ds = Dataset(path).create(force=True)
-    ds.run_procedure('cfg_yoda')
-    assert_false(ds.repo.is_under_annex("README.md"))
-    # save the procedure
-    ds.save('code')
-    # configure dataset to look for procedures in its code folder
-    ds.config.add(
-        'datalad.locations.dataset-procedures',
-        'code',
-        where='dataset')
-    # commit this procedure config for later use in a clone:
-    ds.save(op.join('.datalad', 'config'))
-    # configure dataset to run the demo procedure prior to the clean command
-    ds.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='local')
-    # run command that should trigger the demo procedure
-    ds.clean()
-    # look for traces
-    ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-
-    # make a fresh dataset:
-    super = Dataset(super_path).create()
-    # configure dataset to run the demo procedure prior to the clean command
-    super.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='local')
-    # 'super' doesn't know any procedures but should get to know one by
-    # installing the above as a subdataset
-    super.install('sub', source=ds.path)
-    # run command that should trigger the demo procedure
-    super.clean()
-    # look for traces
-    ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
-
-
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -159,11 +108,6 @@ def test_procedure_discovery(path, super_path):
     ds.config.add(
         'datalad.locations.dataset-procedures',
         'code',
-        where='dataset')
-    # configure dataset to run the demo procedure prior to the clean command
-    ds.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
         where='dataset')
     ds.save(op.join('.datalad', 'config'))
 
@@ -260,7 +204,7 @@ def test_configs(path):
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        u'%s {script} {ds} {{mysub}} {args}' % maybe_shlex_quote(sys.executable),
+        u'%s {script} {ds} {{mysub}} {args}' % quote_cmdlinearg(sys.executable),
         where='dataset'
     )
     ds.config.add(
@@ -280,7 +224,7 @@ def test_configs(path):
     # config on dataset level:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        u'%s {script} {ds} local {args}' % maybe_shlex_quote(sys.executable),
+        u'%s {script} {ds} local {args}' % quote_cmdlinearg(sys.executable),
         where='local'
     )
     ds.unlock("fromproc.txt")
@@ -360,17 +304,51 @@ def test_quoting(path):
         with assert_raises(CommandError):
             runner.run("datalad run-procedure just2args 'still-one arg'")
 
+
 @skip_if_on_windows
-@with_tempfile
-def test_text2git_empty(path):
-    """
-    Tests that empty files are not annexed in a ds configured with text2git.
-    """
+@with_tree(tree={
+    # "TEXT" ones
+    'empty': '',  # we have special rule to treat empty ones as text
+    # check various structured files - libmagic might change its decisions which
+    # can effect git-annex. https://github.com/datalad/datalad/issues/3361
+    'JSON': """\
+{
+    "name": "John Smith",
+    "age": 33
+}
+""",
+    'YAML': """\
+--- # The Smiths
+- {name: John Smith, age: 33}
+- name: Mary Smith
+  age: 27
+""",
+    'MARKDOWN': """\
+# Title
+
+## Section1
+
+When the earth was flat
+
+## Section2
+""",
+    # BINARY ones
+    '0blob': '\x00',
+    'emptyline': '\n',  # libmagic: "binary" "application/octet-stream"
+})
+def test_text2git(path):
+    # Test if files being correctly annexed in a ds configured with text2git.
+    TEXT_FILES = ('JSON', 'YAML', 'MARKDOWN', 'empty')
+    BINARY_FILES = ('0blob', 'emptyline')
+
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_text2git')
+    ds.save(path=TEXT_FILES + BINARY_FILES, message="added all files")
     assert_repo_status(ds.path)
-    # create an empty file, no extension
-    open(op.join(path, 'emptyfile'), 'a').close()
-    ds.save(message="add empty file")
-    # check that it's not annexed
-    assert_false(ds.repo.is_under_annex("emptyfile"))
+
+    # check that text files are not annexed
+    for f in TEXT_FILES:
+        assert_false(ds.repo.is_under_annex(f))
+    # and trivial binaries - annexed
+    for f in BINARY_FILES:
+        assert_true(ds.repo.is_under_annex(f))
