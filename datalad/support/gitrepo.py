@@ -488,7 +488,6 @@ class GitProgress(object):
                 keep_lines.append(line)
         # the zero indicated that no data remained unprocessed at the
         # end of the input
-        # TODO reevaluate whether it is useful to keep this feature
         return b''. join(keep_lines), 0
 
     def _parse_progress_line(self, line):
@@ -1092,7 +1091,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
-                # TODO bring back progress reporting
                 with GitProgress() as progress:
                     WitlessRunner(env=env).run(
                         ['git', 'clone', '--progress', url, path] \
