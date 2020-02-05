@@ -313,7 +313,7 @@ class WitlessRunner(object):
         return out
 
 
-class Runner(WitlessRunner):
+class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
     An object of this class provides a methods that calls shell commands or
@@ -346,8 +346,9 @@ class Runner(WitlessRunner):
              Switch to instruct whether outputs should be logged or not.  If not
              set (default), config 'datalad.log.outputs' would be consulted
         """
-        super(Runner, self).__init__(cwd=cwd, env=env)
 
+        self.cwd = cwd
+        self.env = env
         if protocol is None:
             # TODO: config cmd.protocol = null
             protocol_str = os.environ.get('DATALAD_CMD_PROTOCOL', 'null')
