@@ -1093,11 +1093,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
                 with GitProgress() as progress:
-                    WitlessRunner(env=env).run(
+                    out, err = WitlessRunner(env=env).run(
                         ['git', 'clone', '--progress', url, path] \
                         + (to_options(**clone_options) if clone_options else []),
                         proc_stderr=progress,
                     )
+                # fish out non-critical warnings by git-clone
+                # (empty repo clone, etc.), all other content is logged
+                # by the progress helper to 'debug'
+                for errline in err.splitlines():
+                    if errline.startswith('warning:'):
+                        lgr.warning(errline[8:].strip())
                 lgr.debug("Git clone completed")
                 break
             except CommandError as e:
