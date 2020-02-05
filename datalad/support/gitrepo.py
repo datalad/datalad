@@ -728,8 +728,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
-
     # We use our sshrun helper
+    # TODO remove this, when GitPython code is gone. It is a duplicate of
+    # GitRunner.get_git_environ_adjusted()
     GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND,
                    'GIT_SSH_VARIANT': 'ssh'}
 
@@ -1072,10 +1073,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
-            # TODO: with git <= 2.3 keep old mechanism:
-            #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = os.environ.copy()
-            env.update(GitRepo.GIT_SSH_ENV)
         else:
             if isinstance(url_ri, PathRI):
                 # expand user, because execution not going through a shell
@@ -1084,7 +1081,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if url != new_url:
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
-            env = None
 
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
@@ -1093,10 +1089,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
                 with GitProgress() as progress:
-                    out, err = WitlessRunner(env=env).run(
-                        ['git', 'clone', '--progress', url, path] \
-                        + (to_options(**clone_options) if clone_options else []),
-                        proc_stderr=progress,
+                    out, err = WitlessRunner(
+                        env=GitRunner.get_git_environ_adjusted()).run(
+                            ['git', 'clone', '--progress', url, path] \
+                            + (to_options(**clone_options)
+                               if clone_options else []),
+                            proc_stderr=progress,
                     )
                 # fish out non-critical warnings by git-clone
                 # (empty repo clone, etc.), all other content is logged
