@@ -19,6 +19,7 @@ import os
 import atexit
 import functools
 import tempfile
+from locale import getpreferredencoding
 
 from collections import OrderedDict
 from .support import path as op
@@ -271,7 +272,10 @@ class WitlessRunner(object):
             status = process.poll()
 
             # decode bytes to string
-            out = tuple(b''.join(o).decode('utf-8') if o else '' for o in out)
+            out = tuple(
+                b''.join(o).decode(getpreferredencoding(do_setlocale=False))
+                if o else ''
+                for o in out)
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s." % (

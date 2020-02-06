@@ -17,6 +17,7 @@ import time
 import os
 import os.path as op
 import warnings
+from locale import getpreferredencoding
 
 
 from itertools import chain
@@ -446,13 +447,14 @@ class GitProgress(object):
         CHECKING_OUT: ("Check out", "Things"),
     }
 
-    __slots__ = ('_seen_ops', '_pbars')
+    __slots__ = ('_seen_ops', '_pbars', '_encoding')
 
     re_op_absolute = re.compile(r"(remote: )?([\w\s]+):\s+()(\d+)()(.*)")
     re_op_relative = re.compile(r"(remote: )?([\w\s]+):\s+(\d+)% \((\d+)/(\d+)\)(.*)")
 
     def __init__(self):
         self.__enter__()
+        self._encoding = getpreferredencoding(do_setlocale=False)
 
     def __enter__(self):
         self._seen_ops = []
@@ -508,7 +510,7 @@ class GitProgress(object):
         # Compressing objects:  50% (1/2)
         # Compressing objects: 100% (2/2)
         # Compressing objects: 100% (2/2), done.
-        line = line.decode('utf-8') if isinstance(line, bytes) else line
+        line = line.decode(self._encoding) if isinstance(line, bytes) else line
         if line.startswith(('warning:', 'error:', 'fatal:')):
             return False
 
