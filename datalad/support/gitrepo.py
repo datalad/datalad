@@ -487,6 +487,13 @@ class GitProgress(object):
         keep_lines = []
         for line in byts.splitlines(keepends=True):
             if not self._parse_progress_line(line):
+                # anything that doesn't look like a progress report
+                # is retained and returned
+                # in case of partial progress lines, this can lead to
+                # leakage of progress info into the output, but
+                # it is better to enable better (maybe more expensive)
+                # subsequent filtering than hidding lines with
+                # unknown, potentially important info
                 lgr.debug('Non-progress Git output: %s', line)
                 keep_lines.append(line)
         # the zero indicated that no data remained unprocessed at the
