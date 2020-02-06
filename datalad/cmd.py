@@ -194,6 +194,8 @@ class WitlessRunner(object):
           raised which provides the command (cmd), stdout, stderr,
           exit code (status), and a message identifying the failed
           command, as properties.
+        FileNotFoundError
+          When a given executable does not exist.
         """
         proc_out = (proc_stdout, proc_stderr)
         try:
