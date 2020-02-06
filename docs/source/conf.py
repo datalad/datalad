@@ -336,4 +336,12 @@ texinfo_documents = [
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {
+    'handbook': (
+        # use handbook matching "major" release
+        'http://handbook.datalad.org/en/{version}/'.format(
+            #version='.'.join(datalad.__version__.split('.', maxsplit=2)[:2]),
+            version='latest',
+        ),
+        None),
+}

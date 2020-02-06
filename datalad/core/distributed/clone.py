@@ -99,7 +99,7 @@ class Clone(Interface):
 
     .. seealso::
 
-      http://handbook.datalad.org/en/latest/usecases/datastorage_for_institutions.html
+      :ref:`handbook:3-001`
         More information on Remote Indexed Archive (RIA) stores
     """
     # by default ignore everything but install results
