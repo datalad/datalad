@@ -292,13 +292,6 @@ class WitlessRunner(object):
             else:
                 lgr.log(8, "Finished running %r with status %s", cmd, status)
 
-        except CommandError:
-            # do not bother with reacting to "regular" CommandError
-            # exceptions.  Somehow if we also terminate here for them
-            # some processes elsewhere might stall:
-            # see https://github.com/datalad/datalad/pull/3794
-            raise
-
         except BaseException as exc:
             exc_info = sys.exc_info()
             # KeyboardInterrupt is subclass of BaseException
