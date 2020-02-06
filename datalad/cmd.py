@@ -232,21 +232,19 @@ class WitlessRunner(object):
                 return u[-(unprocessed_len):] if unprocessed_len else None
 
             def _read_stream(stream):
-                #if sys.version_info.major == 3 and sys.version_info.minor < 7:
+                # read whatever is available, must not block,
+                # because if it blocks on, e.g., stdout, we will not get to
+                # read from stderr and vice versa. But if the other one
+                # receives large amounts of data in the meantime, we will
+                # get into issues and deadlock the process
                 nbytes_avail = len(stream.peek())
                 return stream.read(nbytes_avail) if nbytes_avail > 0 else None
-                # o.read1(-1)
 
             while process.poll() is None or keep_going:
                 # one last read?
                 keep_going = process.returncode is None
                 # get a chunk of output
                 pout = [
-                    # read whatever is available, should not block
-                    # From P37 onwards we could say "I don't care how much you can give me"
-                    #o.read1(-1) if p else None
-                    # but instead we say, give me what you have, and if you have nothing,
-                    # make the shortest possible blocking read
                     _read_stream(o) if p else None
                     for o, p in zip(
                         (process.stdout, process.stderr),
