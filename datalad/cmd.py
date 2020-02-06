@@ -225,7 +225,7 @@ class WitlessRunner(object):
             keep_going = True
 
             def _handle_output(u, o, p):
-                processed, unprocessed_len = proc(u)
+                processed, unprocessed_len = p(u)
                 if processed:
                     o.append(processed)
                 return u[-(unprocessed_len):] if unprocessed_len else None
