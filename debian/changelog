@@ -1,3 +1,9 @@
+datalad (0.12.2-2) unstable; urgency=medium
+
+  * Just for source only upload
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 06 Feb 2020 23:55:56 -0800
+
 datalad (0.12.2-1) unstable; urgency=medium
 
   [ Debian Janitor ]
