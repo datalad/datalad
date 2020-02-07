@@ -2375,7 +2375,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             )
         )
 
-    # TODO: centralize all the c&p code in fetch, pull, push
     @guard_BadName
     def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Fetches changes from a remote (or all remotes).
@@ -2393,92 +2392,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         git_options : list, optional
           Additional command line options for git-push.
         """
-        git_options = ensure_list(git_options)
+        yield from self._fetch_push_helper(
+            base_cmd=['git', 'fetch', '--verbose', '--progress'],
+            action='fetch',
+            urlvars=('remote.{}.url', 'remote.{}.url'),
+            proc_stdout=None,
+            info_cls=FetchInfo,
+            info_from=1,
+            add_remote=False,
+            remote=remote,
+            refspec=refspec,
+            all_=all_,
+            git_options=git_options)
 
-        cmd = ['git', 'fetch', '--verbose', '--progress'] + git_options
-
-        if remote is None:
-            if refspec:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError(
-                    "refspec specified without a remote. ({})".format(refspec))
-            if all_:
-                # we cannot simply add '--all', because this flag will make
-                # git-fetch no longer report progress -- kinda makes sense,
-                # because there would be successive progress sections for all
-                # remotes
-                remotes_to_fetch = self.get_remotes(with_urls_only=True)
-            else:
-                # No explicit remote to fetch.
-                # => get tracking branch:
-                tb_remote, refspec = self.get_tracking_branch()
-                if tb_remote is not None:
-                    remotes_to_fetch = [tb_remote]
-                else:
-                    # No remote, no tracking branch
-                    # => fail
-                    raise ValueError("Neither a remote is specified to fetch "
-                                     "from nor a tracking branch is set up.")
-        else:
-            if all_:
-                raise ValueError(
-                    "Option 'all_' conflicts with specified remote "
-                    "'{}'.".format(remote))
-            remotes_to_fetch = [remote]
-
-        if refspec:
-            # prep for appending to cmd
-            refspec = ensure_list(refspec)
-
-        pbar_id = 'fetchremotes-{}'.format(id(self))
-        log_progress(
-            lgr.info,
-            pbar_id,
-            'Start fetching remotes for %s', self,
-            total=len(remotes_to_fetch),
-            label='Fetch',
-            unit=' Remotes',
-        )
-        try:
-            for remote in remotes_to_fetch:
-                r_cmd = cmd + [remote]
-                if refspec:
-                    r_cmd += refspec
-                log_progress(
-                    lgr.info,
-                    pbar_id,
-                    'Fetching remote %s', remote,
-                    update=1,
-                    increment=True,
-                )
-                # best effort to enable SSH connection caching
-                url = self.config.get('remote.{}.url'.format(remote), None)
-                if url and is_ssh(url):
-                    ssh_manager.get_connection(url).open()
-                with GitProgress() as progress:
-                    out = WitlessRunner(
-                        cwd=self.path,
-                        env=GitRunner.get_git_environ_adjusted()).run(
-                            r_cmd,
-                            proc_stderr=progress,
-                    )
-                stderr = out[1] or ''
-                for line in stderr.splitlines():
-                    try:
-                        yield FetchInfo._from_line(line)
-                    except Exception:
-                        # it is not progress and no fetch info
-                        # don't hide it completely
-                        lgr.debug('git-fetch reported stderr: %s', line)
-        finally:
-            log_progress(
-                lgr.info,
-                pbar_id,
-                'Finished fetching remotes for %s', self,
-            )
-
+    # XXX Consider removing this method. It is only used in `update()`,
+    # where it could be easily replaced with fetch+merge
     def pull(self, remote=None, refspec=None, git_options=None, **kwargs):
         """Pulls changes from a remote.
 
@@ -2572,9 +2500,33 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         git_options : list, optional
           Additional command line options for git-push.
         """
+        yield from self._fetch_push_helper(
+            base_cmd=['git', 'push', '--progress', '--porcelain'],
+            action='push',
+            urlvars=('remote.{}.pushurl', 'remote.{}.url'),
+            proc_stdout=capture_output,
+            info_cls=PushInfo,
+            info_from=0,
+            add_remote=True,
+            remote=remote,
+            refspec=refspec,
+            all_=all_,
+            git_options=git_options)
+
+    def _fetch_push_helper(
+            self,
+            base_cmd,     # arg list
+            action,       # label fetch|push
+            urlvars,      # variables to query for URLs
+            proc_stdout,  # processor for stdout
+            info_cls,     # Push|FetchInfo
+            info_from,    # 0=stdout, 1=stderr
+            add_remote,   # whether to add a 'remote' field to the info dict
+            remote=None, refspec=None, all_=False, git_options=None):
+
         git_options = ensure_list(git_options)
 
-        cmd = ['git', 'push', '--progress', '--porcelain'] + git_options
+        cmd = base_cmd + git_options
 
         if remote is None:
             if refspec:
@@ -2584,56 +2536,57 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 raise ValueError(
                     "refspec specified without a remote. ({})".format(refspec))
             if all_:
-                remotes_to_push = self.get_remotes(with_urls_only=True)
+                remotes_to_process = self.get_remotes(with_urls_only=True)
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
                 tb_remote, refspec = self.get_tracking_branch()
                 if tb_remote is not None:
-                    remotes_to_push = [tb_remote]
+                    remotes_to_process = [tb_remote]
                 else:
                     # No remote, no tracking branch
                     # => fail
-                    raise ValueError("Neither a remote is specified to fetch "
-                                     "from nor a tracking branch is set up.")
+                    raise ValueError(
+                        "Neither a remote is specified to {} "
+                        "from nor a tracking branch is set up.".format(action))
         else:
             if all_:
                 raise ValueError(
                     "Option 'all_' conflicts with specified remote "
                     "'{}'.".format(remote))
-            remotes_to_push = [remote]
+            remotes_to_process = [remote]
 
         if refspec:
             # prep for appending to cmd
             refspec = ensure_list(refspec)
 
-        pbar_id = 'pushremotes-{}'.format(id(self))
+        pbar_id = '{}remotes-{}'.format(action, id(self))
         log_progress(
             lgr.info,
             pbar_id,
-            'Start pushing remotes for %s', self,
-            total=len(remotes_to_push),
-            label='Push',
+            'Start %sing remotes for %s', action, self,
+            total=len(remotes_to_process),
+            label=action.capitalize(),
             unit=' Remotes',
         )
         try:
-            for remote in remotes_to_push:
+            for remote in remotes_to_process:
                 r_cmd = cmd + [remote]
                 if refspec:
                     r_cmd += refspec
                 log_progress(
                     lgr.info,
                     pbar_id,
-                    'Pushing remote %s', remote,
+                    '{}ing remote %s'.format(action.capitalize()), remote,
                     update=1,
                     increment=True,
                 )
                 # best effort to enable SSH connection caching
                 url = self.config.get(
-                    # use pushurl, if available, and fall back on url
-                    'remote.{}.pushurl'.format(remote),
+                    # make two attempts to get a URL
+                    urlvars[0].format(remote),
                     self.config.get(
-                        'remote.{}.url'.format(remote),
+                        urlvars[1].format(remote),
                         None)
                 )
                 if url and is_ssh(url):
@@ -2643,27 +2596,26 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         cwd=self.path,
                         env=GitRunner.get_git_environ_adjusted()).run(
                             r_cmd,
-                            proc_stdout=capture_output,
+                            proc_stdout=proc_stdout,
                             proc_stderr=progress,
                     )
-                stdout = out[0] or ''
-                for line in stdout.splitlines():
+                output = out[info_from] or ''
+                for line in output.splitlines():
                     try:
-                        # push info doesn't identify a remote
-                        # if one was given to push() we could easily add it
-                        # but if not (all=True) we need to perform
-                        # introspection -- delay that -- we don't know,
-                        # if it is needed
-                        yield PushInfo._from_line(line)
+                        # push info doesn't identify a remote, add it here
+                        pi = info_cls._from_line(line)
+                        if add_remote:
+                            pi['remote'] = remote
+                        yield pi
                     except Exception:
                         # it is not progress and no push info
                         # don't hide it completely
-                        lgr.error('git-push reported stdout: %s', line)
+                        lgr.debug('git-%s reported: %s', action, line)
         finally:
             log_progress(
                 lgr.info,
                 pbar_id,
-                'Finished pushing remotes for %s', self,
+                'Finished %sing remotes for %s', action, self,
             )
 
     def get_remote_url(self, name, push=False):
