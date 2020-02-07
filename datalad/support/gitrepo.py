@@ -61,7 +61,8 @@ from datalad import ssh_manager
 from datalad.cmd import (
     WitlessRunner,
     GitRunner,
-    BatchedCommand
+    BatchedCommand,
+    run_gitcommand_on_file_list_chunks,
 )
 from datalad.config import (
     ConfigManager,
@@ -2087,7 +2088,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
         #  handling????
         try:
-            out, err = self._run_command_files_split(
+            out, err = run_gitcommand_on_file_list_chunks(
                 self.cmd_call_wrapper.run,
                 cmd,
                 files,
@@ -2112,35 +2113,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.debug("Reloading config due to supposed working tree update")
             self.config.reload()
 
-        return out, err
-
-    # TODO: could be static or class method even
-    def _run_command_files_split(
-            self,
-            func,
-            cmd,
-            files,
-            *args, **kwargs
-        ):
-        """
-        Run `func(cmd + files, ...)` possibly multiple times if `files` is too long
-        """
-        assert isinstance(cmd, list)
-        if not files:
-            file_chunks = [[]]
-        else:
-            file_chunks = generate_file_chunks(files, cmd)
-
-        out, err = "", ""
-        for file_chunk in file_chunks:
-            out_, err_ = func(
-                cmd + (['--'] if file_chunk else []) + file_chunk,
-                *args, **kwargs)
-            # out_, err_ could be None, and probably no need to append empty strings
-            if out_:
-                out += out_
-            if err_:
-                err += err_
         return out, err
 
     # Convenience wrappers for one-off git calls that don't require further

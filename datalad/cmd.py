@@ -39,6 +39,7 @@ from .utils import (
     unlink,
     auto_repr,
     split_cmdline,
+    generate_file_chunks,
 )
 from .dochelpers import borrowdoc
 
@@ -97,6 +98,48 @@ def _cleanup_output(stream, std):
             unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
+
+
+def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
+    """Run a git command multiple times if `files` is too long
+
+    Parameters
+    ----------
+    func : callable
+      Typically a Runner.run variant. Assumed to return a 2-tuple with stdout,
+      and stderr as strings.
+    cmd : list
+      Base Git command argument list, to be ammended with '--', followed
+      by a file list chunk.
+    files : list
+      List of files.
+    args, kwargs :
+      Passed to `func`
+
+    Returns
+    -------
+    str, str
+        Concatenated stdout and stderr.
+    """
+    assert isinstance(cmd, list)
+    if not files:
+        file_chunks = [[]]
+    else:
+        file_chunks = generate_file_chunks(files, cmd)
+
+    out, err = [], []
+    for i, file_chunk in enumerate(file_chunks):
+        if file_chunk:
+            lgr.debug('Process file list chunk %i (length %i)',
+                      i, len(file_chunk))
+            out_, err_ = func(cmd + ['--'] + file_chunk, *args, **kwargs)
+        else:
+            out_, err_ = func(cmd, *args, **kwargs)
+        if out_:
+            out.append(out_)
+        if err_:
+            err.append(err_)
+    return ''.join(out), ''.join(err)
 
 
 def kill_output(output):

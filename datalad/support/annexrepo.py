@@ -61,7 +61,8 @@ from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
     GitRunner,
     BatchedCommand,
-    SafeDelCloseMixin
+    SafeDelCloseMixin,
+    run_gitcommand_on_file_list_chunks,
 )
 
 # imports from same module:
@@ -957,7 +958,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         try:
             # TODO: RF to use --batch where possible instead of splitting
             # into multiple invocations
-            return self._run_command_files_split(
+            return run_gitcommand_on_file_list_chunks(
                 self.cmd_call_wrapper.run,
                 cmd_list,
                 files,
