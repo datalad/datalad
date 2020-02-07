@@ -1491,9 +1491,10 @@ def test_custom_runner_protocol(path):
     gr.add("foo")
     check(prev_len, prot, "add")
 
-    prev_len = len(prot)
-    gr.commit("commit foo")
-    check(prev_len, prot, "commit")
+    # commit no longer uses a Runner with protocol capabilities
+    #prev_len = len(prot)
+    #gr.commit("commit foo")
+    #check(prev_len, prot, "commit")
 
     ok_(all(p['duration'] >= 0 for p in prot))
 

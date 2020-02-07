@@ -337,6 +337,16 @@ definitions = {
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
     },
+    'datalad.save.no-message': {
+        'ui': ('question', {
+            'title': 'Commit message handling',
+            'text': 'When no commit message was provided: '
+                    'attempt to obtain one interactively (interactive); '
+                    'allow a messageless commit (allow); '
+                    'use a generic commit message (generic)'}),
+        'default': 'interactive',
+        'type': EnsureChoice('interactive', 'allow', 'generic'),
+    },
     'datalad.install.inherit-local-origin': {
         'ui': ('question', {
             'title': 'Inherit local origin of dataset source',

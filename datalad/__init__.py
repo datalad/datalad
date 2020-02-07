@@ -108,6 +108,8 @@ def setup_package():
     _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
     os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    # ensure non-interactive behavior of save when no message was given
+    os.environ['DATALAD_SAVE_NO__MESSAGE'] = 'generic'
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
