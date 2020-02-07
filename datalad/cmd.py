@@ -19,6 +19,7 @@ import os
 import atexit
 import functools
 import tempfile
+from locale import getpreferredencoding
 
 from collections import OrderedDict
 from .support import path as op
@@ -96,6 +97,217 @@ def _cleanup_output(stream, std):
             unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
+
+
+def kill_output(output):
+    """Helper for WitlessRunner to swallow all output and neither
+    relay it to the parent process's stdout, nor provide it as the
+    return value of WitlessRunner.run().
+    """
+    return b'', 0
+
+
+def capture_output(output):
+    """Helper for WitlessRunner to capture all output and
+    provide it as the return value of WitlessRunner.run().
+    """
+    return output, 0
+
+
+class WitlessRunner(object):
+    """Minimal Runner with support for online command output processing
+
+    It aims to be as simple as possible, providing only essential
+    functionality. Derived classes should be used for additional
+    specializations and convenience features.
+    """
+    __slots__ = ['cwd', 'env']
+
+    def __init__(self, cwd=None, env=None):
+        """
+        Parameters
+        ----------
+        cwd : path-like, optional
+          If given, commands are executed with this path as PWD,
+          the PWD of the parent process is used otherwise.
+        env : dict, optional
+          Environment to be passed to subprocess.Popen(). If `cwd`
+          was given, 'PWD' in the environment is set to its value.
+          This must be a complete environment definition, no values
+          from the current environment will be inherited.
+        """
+        self.env = env.copy() if env else None
+        # stringify to support Path instances on PY35
+        self.cwd = str(cwd) if cwd is not None else None
+        if self.cwd and env is not None:
+            # if CWD was provided, we must not make it conflict with
+            # a potential PWD setting
+            self.env['PWD'] = self.cwd
+
+    def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None,
+            poll_latency=0.1):
+        """Execute a command and communicate with it.
+
+        Parameters
+        ----------
+        cmd : list
+          Sequence of program arguments. Passing a single string means
+          that it is simply the name of the program, no complex shell
+          commands are supported.
+        proc_stdout : callable, optional
+          By default no stdout is captured, but relayed to the parent
+          process's stdout. If given, all stdout is sequentially passed
+          as a byte-string to this callable, in the chunks it was received
+          by polling the process (see `poll_latency`).
+          The callable may transform it in any way. It must
+          return a byte-string of the transformed output, and an integer
+          with the number of bytes at the end of the original output
+          that were left unprocessed (or 0, if the entire output was
+          considered). The returned byte-strings are concatenated and
+          provided as stdout return value.
+          The helper functions 'kill_output' and 'capture_output' are
+          provided to either swallow all output (and not relay it to the
+          parent) or to capture all output and provide it as the return
+          value.
+        proc_stderr : callable, optional
+          Like proc_stdout, but for stderr.
+        stdin : byte stream, optional
+          File descriptor like, used as stdin for the process. Passed
+          verbatim to subprocess.Popen().
+        poll_latency : float, optional
+          Shortest interval at which the running process is queried for
+          output (in seconds). Any potential output processing will increase
+          the effective interval. When the effective polling frequency is
+          too low to keep the output buffers below their maximum size,
+          a process will deadlock.
+
+        Returns
+        -------
+        stdout, stderr
+          Unicode string with the cumulative standard output and error
+          of the process.
+
+        Raises
+        ------
+        CommandError
+          On execution failure (non-zero exit code) this exception is
+          raised which provides the command (cmd), stdout, stderr,
+          exit code (status), and a message identifying the failed
+          command, as properties.
+        FileNotFoundError
+          When a given executable does not exist.
+        """
+        proc_out = (proc_stdout, proc_stderr)
+        try:
+            lgr.log(8, "Start running %r", cmd)
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE if proc_stdout else None,
+                stderr=subprocess.PIPE if proc_stderr else None,
+                shell=False,
+                cwd=self.cwd,
+                env=self.env,
+                stdin=stdin,
+                # intermediate reports are never decoded anyways
+                # from PY37 onwards
+                #text=False,
+                universal_newlines=False,
+            )
+        except Exception as e:
+            lgr.log(11, "Failed to start %r%r: %s" %
+                    (cmd,
+                     (" under %r" % self.cwd) if self.cwd else '',
+                     exc_str(e)))
+            raise
+
+        try:
+            out = [[], []]
+            unprocessed = [None, None]
+            # make sure to run this loop at least once, even if the
+            # process is already dead
+            keep_going = True
+
+            def _handle_output(u, o, p):
+                processed, unprocessed_len = p(u)
+                if processed:
+                    o.append(processed)
+                return u[-(unprocessed_len):] if unprocessed_len else None
+
+            def _read_stream(stream):
+                # read whatever is available, must not block,
+                # because if it blocks on, e.g., stdout, we will not get to
+                # read from stderr and vice versa. But if the other one
+                # receives large amounts of data in the meantime, we will
+                # get into issues and deadlock the process
+                nbytes_avail = len(stream.peek())
+                return stream.read(nbytes_avail) if nbytes_avail > 0 else None
+
+            while process.poll() is None or keep_going:
+                # one last read?
+                keep_going = process.returncode is None
+                # get a chunk of output
+                pout = [
+                    _read_stream(o) if p else None
+                    for o, p in zip(
+                        (process.stdout, process.stderr),
+                        proc_out)
+                ]
+
+                for i, (o, proc) in enumerate(zip(pout, proc_out)):
+                    if not o:
+                        # nothing read
+                        continue
+                    if proc is None:
+                        # no index update needed, can never change, hence no unprocessed
+                        # output either
+                        out[i].append(o)
+                        continue
+                    # make sure to feed back any unprocessed stuff
+                    buffer = unprocessed[i] + o if unprocessed[i] else o
+                    # engage output processor
+                    unprocessed[i] = _handle_output(buffer, out[i], proc)
+                time.sleep(poll_latency)
+
+            # obtain exit code
+            status = process.poll()
+
+            # decode bytes to string
+            out = tuple(
+                b''.join(o).decode(getpreferredencoding(do_setlocale=False))
+                if o else ''
+                for o in out)
+
+            if status not in [0, None]:
+                msg = "Failed to run %r%s." % (
+                    cmd,
+                    (" under %r" % self.cwd) if self.cwd else '',
+                )
+                raise CommandError(
+                    cmd=str(cmd),
+                    msg=msg,
+                    code=status,
+                    stdout=out[0],
+                    stderr=out[1],
+                )
+            else:
+                lgr.log(8, "Finished running %r with status %s", cmd, status)
+
+        except BaseException as exc:
+            exc_info = sys.exc_info()
+            # KeyboardInterrupt is subclass of BaseException
+            lgr.debug("Terminating process for %s upon exception: %s",
+                      cmd, exc_str(exc))
+            try:
+                # there are still possible (although unlikely) cases when
+                # we fail to interrupt but we
+                # should not crash if we fail to terminate the process
+                process.terminate()
+            except BaseException as exc2:
+                lgr.warning("Failed to terminate process for %s: %s",
+                            cmd, exc_str(exc2))
+            raise exc_info[1]
+
+        return out
 
 
 class Runner(object):

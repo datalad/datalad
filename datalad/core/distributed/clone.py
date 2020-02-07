@@ -27,7 +27,9 @@ from datalad.interface.common_opts import (
 from datalad.log import log_progress
 from datalad.support.gitrepo import (
     GitRepo,
-    GitCommandError,
+)
+from datalad.cmd import (
+    CommandError,
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import (
@@ -411,7 +413,7 @@ def clone_dataset(
                 clone_options=clone_opts,
                 create=True)
 
-        except GitCommandError as e:
+        except CommandError as e:
             # Whenever progress reporting is enabled, as it is now,
             # we end up without e.stderr since it is "processed" out by
             # GitPython/our progress handler.
@@ -446,7 +448,8 @@ def clone_dataset(
                 )
                 yield get_status_dict(
                     status='error',
-                    message=re_match.group(1) if re_match else "stderr: " + e_stderr,
+                    message=re_match.group(1).strip()
+                    if re_match else "stderr: " + e_stderr,
                     **result_props)
                 return
             # next candidate

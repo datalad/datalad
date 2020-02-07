@@ -17,6 +17,7 @@ import time
 import os
 import os.path as op
 import warnings
+from locale import getpreferredencoding
 
 
 from itertools import chain
@@ -53,10 +54,12 @@ from git.exc import (
     NoSuchPathError,
     InvalidGitRepositoryError
 )
+from datalad.log import log_progress
 from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import (
+    WitlessRunner,
     GitRunner,
     BatchedCommand
 )
@@ -74,14 +77,14 @@ import datalad.utils as ut
 from datalad.utils import (
     Path,
     PurePosixPath,
-    assure_list,
+    ensure_list,
     optional_args,
     on_windows,
     getpwd,
     posix_relpath,
-    assure_dir,
+    ensure_dir,
     generate_file_chunks,
-    assure_unicode,
+    ensure_unicode,
     split_cmdline,
 )
 
@@ -416,6 +419,221 @@ def guard_BadName(func):
     return wrapped
 
 
+class GitProgress(object):
+    """Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+    _num_op_codes = 10
+    BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT, ENUMERATING = \
+        [1 << x for x in range(_num_op_codes)]
+    STAGE_MASK = BEGIN | END
+    OP_MASK = ~STAGE_MASK
+
+    DONE_TOKEN = 'done.'
+    TOKEN_SEPARATOR = ', '
+
+    _known_ops = {
+        COUNTING: ("Counting", "Objects"),
+        ENUMERATING: ("Enumerating", "Objects"),
+        COMPRESSING: ("Compressing", "Objects"),
+        WRITING: ("Writing", "Objects"),
+        RECEIVING: ("Receiving", "Objects"),
+        RESOLVING: ("Resolving", "Deltas"),
+        FINDING_SOURCES: ("Finding", "Sources"),
+        CHECKING_OUT: ("Check out", "Things"),
+    }
+
+    __slots__ = ('_seen_ops', '_pbars', '_encoding')
+
+    re_op_absolute = re.compile(r"(remote: )?([\w\s]+):\s+()(\d+)()(.*)")
+    re_op_relative = re.compile(r"(remote: )?([\w\s]+):\s+(\d+)% \((\d+)/(\d+)\)(.*)")
+
+    def __init__(self):
+        self.__enter__()
+        self._encoding = getpreferredencoding(do_setlocale=False)
+
+    def __enter__(self):
+        self._seen_ops = []
+        self._pbars = set()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # take down any progress bars that were not closed orderly
+        for pbar_id in self._pbars:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished',
+            )
+
+    def __call__(self, byts):
+        """Callable interface compatible with WitlessRunner()
+
+        Parameters
+        ----------
+        byts : bytes
+          One or more lines of command output.
+
+        Returns
+        -------
+        bytes
+          All input in its original form, except for lines that
+          were identified as recognized progress reports.
+        """
+        keep_lines = []
+        for line in byts.splitlines(keepends=True):
+            if not self._parse_progress_line(line):
+                # anything that doesn't look like a progress report
+                # is retained and returned
+                # in case of partial progress lines, this can lead to
+                # leakage of progress info into the output, but
+                # it is better to enable better (maybe more expensive)
+                # subsequent filtering than hidding lines with
+                # unknown, potentially important info
+                lgr.debug('Non-progress Git output: %s', line)
+                keep_lines.append(line)
+        # the zero indicated that no data remained unprocessed at the
+        # end of the input
+        return b''. join(keep_lines), 0
+
+    def _parse_progress_line(self, line):
+        """Process a single line
+
+        Parameters
+        ----------
+        line : bytes
+
+        Returns
+        -------
+        bool
+          Flag whether the line was recognized as a Git progress report.
+        """
+        # handle
+        # Counting objects: 4, done.
+        # Compressing objects:  50% (1/2)
+        # Compressing objects: 100% (2/2)
+        # Compressing objects: 100% (2/2), done.
+        line = line.decode(self._encoding) if isinstance(line, bytes) else line
+        if line.startswith(('warning:', 'error:', 'fatal:')):
+            return False
+
+        # find escape characters and cut them away - regex will not work with
+        # them as they are non-ascii. As git might expect a tty, it will send them
+        last_valid_index = None
+        for i, c in enumerate(reversed(line)):
+            if ord(c) < 32:
+                # its a slice index
+                last_valid_index = -i - 1
+            # END character was non-ascii
+        # END for each character in line
+        if last_valid_index is not None:
+            line = line[:last_valid_index]
+        # END cut away invalid part
+        line = line.rstrip()
+
+        cur_count, max_count = None, None
+        match = self.re_op_relative.match(line)
+        if match is None:
+            match = self.re_op_absolute.match(line)
+
+        if not match:
+            return False
+        # END could not get match
+
+        op_code = 0
+        _remote, op_name, _percent, cur_count, max_count, message = match.groups()
+
+        # get operation id
+        if op_name == "Counting objects":
+            op_code |= self.COUNTING
+        elif op_name == "Compressing objects":
+            op_code |= self.COMPRESSING
+        elif op_name == "Writing objects":
+            op_code |= self.WRITING
+        elif op_name == 'Receiving objects':
+            op_code |= self.RECEIVING
+        elif op_name == 'Resolving deltas':
+            op_code |= self.RESOLVING
+        elif op_name == 'Finding sources':
+            op_code |= self.FINDING_SOURCES
+        elif op_name == 'Checking out files':
+            op_code |= self.CHECKING_OUT
+        elif op_name == 'Enumerating objects':
+            op_code |= self.ENUMERATING
+        else:
+            # Note: On windows it can happen that partial lines are sent
+            # Hence we get something like "CompreReceiving objects", which is
+            # a blend of "Compressing objects" and "Receiving objects".
+            # This can't really be prevented.
+            lgr.debug(
+                'Output line matched a progress report of an unknown type: %s',
+                line)
+            # TODO investigate if there is any chance that we might swallow
+            # important info -- until them do not flag this line
+            # as progress
+            return False
+        # END handle op code
+
+        pbar_id = 'gitprogress-{}-{}'.format(id(self), op_code)
+
+        op_props = self._known_ops[op_code]
+
+        # figure out stage
+        if op_code not in self._seen_ops:
+            self._seen_ops.append(op_code)
+            op_code |= self.BEGIN
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Start {} {}'.format(
+                    op_props[0].lower(),
+                    op_props[1].lower(),
+                ),
+                label=op_props[0],
+                unit=' {}'.format(op_props[1]),
+                total=float(max_count) if max_count else None,
+            )
+            self._pbars.add(pbar_id)
+        # END begin opcode
+
+        if message is None:
+            message = ''
+        # END message handling
+
+        done_progress = False
+        message = message.strip()
+        if message.endswith(self.DONE_TOKEN):
+            op_code |= self.END
+            message = message[:-len(self.DONE_TOKEN)]
+            done_progress = True
+        # END end message handling
+        message = message.strip(self.TOKEN_SEPARATOR)
+
+        if cur_count and max_count:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                message,
+                update=float(cur_count),
+            )
+
+        if done_progress:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished {} {}'.format(
+                    op_props[0].lower(),
+                    op_props[1].lower(),
+                ),
+            )
+            self._pbars.discard(pbar_id)
+        return True
+
+
 class GitPythonProgressBar(RemoteProgress):
     """A handler for Git commands interfaced by GitPython which report progress
     """
@@ -519,8 +737,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
-
     # We use our sshrun helper
+    # TODO remove this, when GitPython code is gone. It is a duplicate of
+    # GitRunner.get_git_environ_adjusted()
     GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND,
                    'GIT_SSH_VARIANT': 'ssh'}
 
@@ -863,42 +1082,38 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
-            # TODO: with git <= 2.3 keep old mechanism:
-            #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = GitRepo.GIT_SSH_ENV
         else:
             if isinstance(url_ri, PathRI):
+                # expand user, because execution not going through a shell
+                # doesn't work well otherwise
                 new_url = os.path.expanduser(url)
                 if url != new_url:
-                    # TODO: remove whenever GitPython is fixed:
-                    # https://github.com/gitpython-developers/GitPython/issues/731
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
-            env = None
 
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                with GitPythonProgressBar("Cloning") as git_progress:
-                    repo = gitpy.Repo.clone_from(
-                        url, path,
-                        env=env,
-                        # we accept a plain dict with options, and not a gitpy
-                        # tailored list of "multi options" to make a future
-                        # non-GitPy based implementation easier. Do conversion
-                        # here
-                        multi_options=to_options(**clone_options) if clone_options else None,
-                        odbt=default_git_odbt,
-                        progress=git_progress
-                    )
-                # Note/TODO: signature for clone from:
-                # (url, to_path, progress=None, env=None, **kwargs)
 
+                with GitProgress() as progress:
+                    out, err = WitlessRunner(
+                        env=GitRunner.get_git_environ_adjusted()).run(
+                            ['git', 'clone', '--progress', url, path] \
+                            + (to_options(**clone_options)
+                               if clone_options else []),
+                            proc_stderr=progress,
+                    )
+                # fish out non-critical warnings by git-clone
+                # (empty repo clone, etc.), all other content is logged
+                # by the progress helper to 'debug'
+                for errline in err.splitlines():
+                    if errline.startswith('warning:'):
+                        lgr.warning(errline[8:].strip())
                 lgr.debug("Git clone completed")
                 break
-            except GitCommandError as e:
+            except CommandError as e:
                 # log here but let caller decide what to do
                 e_str = exc_str(e)
                 # see https://github.com/datalad/datalad/issues/785
@@ -918,18 +1133,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
                 raise
 
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' \
-                        and "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython
-                    # /issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
-
-        gr = cls(path, *args, repo=repo, **kwargs)
+        # get ourselves a repository instance
+        gr = cls(path, *args, **kwargs)
         if fix_annex:
             # cheap check whether we deal with an AnnexRepo - we can't check the class of `gr` itself, since we then
             # would need to import our own subclass
@@ -1174,7 +1379,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # there is no other way then to collect all files into a list
         # at this point, because we need to pass them at once to a single
         # `git add` call
-        files = [_normalize_path(self.path, f) for f in assure_list(files) if f]
+        files = [_normalize_path(self.path, f) for f in ensure_list(files) if f]
 
         if not (files or git_options or update):
             # wondering why just a warning? in cmdline this is also not an error
@@ -1188,7 +1393,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # Set annex.largefiles to prevent storing files in annex when
                 # GitRepo() is instantiated with a v6+ annex repo.
                 ['git', '-c', 'annex.largefiles=nothing', 'add'] +
-                assure_list(git_options) +
+                ensure_list(git_options) +
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
@@ -1230,7 +1435,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         modes when ran through proxy
         """
         return [{u'file': f, u'success': True}
-                for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
+                for f in re.findall("'(.*)'[\n$]", ensure_unicode(stdout))]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, recursive=False, **kwargs):
@@ -1331,7 +1536,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if not fields:
             raise ValueError('no `fields` provided, refuse to proceed')
-        fields = assure_list(fields)
+        fields = ensure_list(fields)
         cmd = [
             "git",
             "for-each-ref",
@@ -1344,10 +1549,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if contains:
             cmd.append('--contains={}'.format(contains))
         if sort:
-            for k in assure_list(sort):
+            for k in ensure_list(sort):
                 cmd.append('--sort={}'.format(k))
         if pattern:
-            cmd += assure_list(pattern)
+            cmd += ensure_list(pattern)
         if count:
             cmd.append('--count={:d}'.format(count))
 
@@ -3028,7 +3233,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           name and value items. Attribute values are either True or False,
           for set and unset attributes, or are the literal attribute value.
         """
-        path = assure_list(path)
+        path = ensure_list(path)
         cmd = ["git", "check-attr", "-z", "--all"]
         if index_only:
             cmd.append('--cached')
@@ -3926,7 +4131,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._git_custom_command(
                 list(files.keys()),
-                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
+                ['git', 'add'] + ensure_list(git_opts) + ['--verbose']
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
@@ -3983,7 +4188,7 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     src_dotgit = str(repo.dot_git)
     # move .git
     from os import rename, listdir, rmdir
-    assure_dir(subds_dotgit)
+    ensure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
         rename(opj(src_dotgit, dot_git_entry),
                opj(subds_dotgit, dot_git_entry))

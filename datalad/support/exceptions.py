@@ -13,7 +13,6 @@ import re
 from os import linesep
 
 
-
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
@@ -27,13 +26,17 @@ class CommandError(RuntimeError):
         self.stderr = stderr
 
     def __str__(self):
-        from datalad.utils import assure_unicode
+        from datalad.utils import ensure_unicode
         to_str = "%s: " % self.__class__.__name__
         if self.cmd:
             to_str += "command '%s'" % (self.cmd,)
         if self.code:
             to_str += " failed with exitcode %d" % self.code
-        to_str += "\n%s" % assure_unicode(self.msg)
+        to_str += "\n{}\nstdout={}\nstderr={}".format(
+            ensure_unicode(self.msg),
+            ensure_unicode(self.stdout),
+            ensure_unicode(self.stderr),
+        )
         return to_str
 
 
