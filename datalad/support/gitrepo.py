@@ -63,6 +63,7 @@ from datalad.cmd import (
     GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
+    StdOutErrCapture,
 )
 from datalad.config import (
     ConfigManager,
@@ -1739,71 +1740,73 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         self.precommit()
 
-        if _datalad_msg:
-            msg = self._get_prefixed_commit_msg(msg)
-
-        options = options or []
-
-        if not msg:
-            if options:
-                if "--allow-empty-message" not in options:
-                        options.append("--allow-empty-message")
-            else:
-                options = ["--allow-empty-message"]
+        # assemble commandline
+        cmd = ['git', 'commit']
+        options = ensure_list(options)
 
         if date:
             options += ["--date", date]
-        # Note: We used to use a direct call to git only if there were options,
-        # since we can't pass all possible options to gitpython's implementation
-        # of commit.
-        # But there's an additional issue. GitPython implements commit in a way,
-        # that it might create a new commit, when a direct call wouldn't. This
-        # was discovered with a modified (but unstaged) submodule, leading to a
-        # commit, that apparently did nothing - git status still showed the very
-        # same thing afterwards. But a commit was created nevertheless:
-        # diff --git a/sub b/sub
-        # --- a/sub
-        # +++ b/sub
-        # @@ -1 +1 @@
-        # -Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f
-        # +Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f-dirty
-        #
-        # Therefore, for now always use direct call.
-        # TODO: Figure out, what exactly is going on with gitpython here
 
-        cmd = ['git', 'commit'] + (["-m", msg if msg else ""])
-        if options:
-            cmd.extend(options)
+        if not msg:
+            msg = 'Recorded changes'
+            _datalad_msg = True
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
+
+        options += ["-m", msg]
+        cmd.extend(options)
+
+        # set up env for commit
+        env = GitRunner.get_git_environ_adjusted()
+        if self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+        if index_file:
+            env['GIT_INDEX_FILE'] = index_file
+
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
+        file_chunks = generate_file_chunks(files, cmd) if files else [[]]
+
+        runner = WitlessRunner(cwd=self.path, env=env)
+
         try:
-            self._git_custom_command(files, cmd,
-                                     expect_stderr=True, expect_fail=True,
-                                     check_fake_dates=True,
-                                     index_file=index_file)
+            for i, chunk in enumerate(file_chunks):
+                cur_cmd = cmd + (
+                    # if this is an explicit dry-run, there is no point in
+                    # amending, because no commit was ever made
+                    # otherwise, amend the first commit, and prevent
+                    # leaving multiple commits behind
+                    ['--amend', '--no-edit']
+                    if i > 0 and '--dry-run' not in cmd
+                    else []
+                ) + ['--'] + chunk
+                runner.run(
+                    cur_cmd,
+                    protocol=StdOutErrCapture,
+                    stdin=None,
+                )
         except CommandError as e:
-            if 'nothing to commit' in e.stdout:
-                if careless:
-                    lgr.debug(u"nothing to commit in {}. "
-                              "Ignored.".format(self))
-                else:
-                    raise
+            # real errors first
+            if "did not match any file(s) known to git" in e.stderr:
+                raise FileNotInRepositoryError(
+                    cmd=e.cmd,
+                    msg="File(s) unknown to git",
+                    code=e.code,
+                    filename=linesep.join([
+                        l for l in e.stderr.splitlines()
+                        if l.startswith("error: pathspec")
+                    ])
+                )
+            # behavior choices now
+            elif not careless:
+                # not willing to compromise at all
+                raise
+            elif 'nothing to commit' in e.stdout:
+                lgr.debug("nothing to commit in %s. Ignored.", self)
             elif 'no changes added to commit' in e.stdout or \
                     'nothing added to commit' in e.stdout:
-                if careless:
-                    lgr.debug(u"no changes added to commit in {}. "
-                              "Ignored.".format(self))
-                else:
-                    raise
-            elif "did not match any file(s) known to git" in e.stderr:
-                # TODO: Improve FileNotInXXXXError classes to better deal with
-                # multiple files; Also consider PathOutsideRepositoryError
-                raise FileNotInRepositoryError(cmd=e.cmd,
-                                               msg="File(s) unknown to git",
-                                               code=e.code,
-                                               filename=linesep.join(
-                                            [l for l in e.stderr.splitlines()
-                                             if l.startswith("pathspec")]))
+                lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
 
@@ -4007,10 +4010,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def _save_post(self, message, status, partial_commit):
         # helper to commit changes reported in status
-        _datalad_msg = False
-        if not message:
-            message = 'Recorded changes'
-            _datalad_msg = True
 
         # TODO remove pathobj stringification when commit() can
         # handle it
@@ -4025,7 +4024,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 self,
                 files=to_commit,
                 msg=message,
-                _datalad_msg=_datalad_msg,
                 options=None,
                 # do not raise on empty commit
                 # it could be that the `add` in this save-cycle has already
