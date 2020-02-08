@@ -212,19 +212,19 @@ def _update_repo(ds, remote, reobtain_data):
             # get all annexed files that have data present
             lgr.info('Recording file content availability '
                      'to re-obtain updated files later on')
-            reobtain_data = [
+            present_files = [
                 opj(ds.path, p)
                 for p in repo.get_annexed_files(with_content_only=True)]
         # this runs 'annex sync' and should deal with anything
         repo.sync(remotes=remote, push=False, pull=True, commit=False)
         if reobtain_data:
-            reobtain_data = [p for p in reobtain_data if lexists(p)]
-        if reobtain_data:
-            lgr.info('Ensuring content availability for %i '
-                     'previously available files',
-                     len(reobtain_data))
-            yield from ds.get(reobtain_data, recursive=False,
-                              return_type='generator')
+            present_files = [p for p in present_files if lexists(p)]
+            if present_files:
+                lgr.info('Ensuring content availability for %i '
+                         'previously available files',
+                         len(present_files))
+                yield from ds.get(present_files, recursive=False,
+                                  return_type='generator')
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
