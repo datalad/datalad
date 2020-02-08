@@ -255,7 +255,9 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
             ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
              "@{upstream}"])
     elif branch:
-        merge_target = "{}/{}".format(remote, branch)
+        remote_branch = "{}/{}".format(remote, branch)
+        if repo.commit_exists(remote_branch):
+            merge_target = remote_branch
     return merge_target
 
 
