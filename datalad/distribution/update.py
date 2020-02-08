@@ -17,15 +17,22 @@ import logging
 from os.path import lexists, join as opj
 import itertools
 
+from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
+from datalad.interface.results import (
+    get_status_dict,
+    YieldDatasets
+)
 from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+)
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import (
     recursion_flag,
@@ -39,6 +46,14 @@ from .dataset import (
 )
 
 lgr = logging.getLogger('datalad.distribution.update')
+
+
+class YieldDatasetAndRevision(YieldDatasets):
+    """Like YieldDatasets, but also provide "revision" value, if any.
+    """
+    def __call__(self, res):
+        ds = super(YieldDatasetAndRevision, self).__call__(res)
+        return ds, res.get("revision")
 
 
 @build_doc
@@ -120,14 +135,14 @@ class Update(Interface):
         save_paths = []
 
         saw_subds = False
-        for ds in itertools.chain([refds], refds.subdatasets(
+        for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
                 fulfilled=True,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',
                 result_renderer='disabled',
-                result_xfm='datasets') if recursive else []):
+                result_xfm=YieldDatasetAndRevision()) if recursive else []):
             if ds != refds:
                 saw_subds = True
             repo = ds.repo
@@ -183,10 +198,41 @@ class Update(Interface):
             # a GitRepo to an AnnexRepo
             repo = ds.repo
 
+            needed_direct_fetch = False
+            if revision and not repo.commit_exists(revision):
+                needed_direct_fetch = True
+                if sibling_:
+                    try:
+                        lgr.debug("Fetching revision %s directly for %s",
+                                  revision, repo)
+                        repo.fetch(remote=sibling_, refspec=revision,
+                                   git_options=["--recurse-submodules=no"])
+                    except CommandError as exc:
+                        yield dict(
+                            res,
+                            status="impossible",
+                            message=(
+                                "Attempt in %s to fetch %s from %s failed: %s",
+                                repo, revision, sibling_, exc_str(exc)))
+                        continue
+                else:
+                    yield dict(res,
+                               status="impossible",
+                               message=("Need to fetch %s directly for %s "
+                                        "but single sibling not resolved",
+                                        revision, repo))
+                    continue
+
             if merge:
-                merge_target = _choose_merge_target(
-                    repo, curr_branch,
-                    sibling_, tracking_remote)
+                if needed_direct_fetch:
+                    lgr.debug("Needed to explicitly fetch revision %s in %s. "
+                              "Using revision as merge target",
+                              revision, repo)
+                    merge_target = revision
+                else:
+                    merge_target = _choose_merge_target(
+                        repo, curr_branch,
+                        sibling_, tracking_remote)
 
                 if merge_target is None:
                     lgr.warning("No merge target determined for %s update. "
@@ -198,6 +244,13 @@ class Update(Interface):
                     repo,
                     is_annex=is_annex,
                     adjusted=is_annex and repo.is_managed_branch(curr_branch))
+                if needed_direct_fetch and merge_fn is _annex_sync:
+                    lgr.warning(
+                        "Needed to explicitly fetch revision in %s. "
+                        "No changes will be merged because you're on an "
+                        "adjusted branch",
+                        repo)
+                    continue
                 if is_annex and reobtain_data:
                     merge_fn = _reobtain(ds, merge_fn)
                 yield from merge_fn(repo, sibling_, merge_target)
