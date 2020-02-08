@@ -25,6 +25,7 @@ from datalad.utils import (
     knows_annex,
     rmtree,
     chpwd,
+    Path,
 )
 from datalad.support.gitrepo import (
     GitRepo,
@@ -42,9 +43,11 @@ from datalad.tests.utils import (
     create_tree,
     ok_file_has_content,
     ok_clean_git,
+    assert_repo_status,
     assert_status,
     assert_result_count,
     assert_in_results,
+    SkipTest,
     slow,
     known_failure_windows,
 )
@@ -452,3 +455,20 @@ def test_multiway_merge(path):
     assert_status('ok', ds.update())
     # ATM we do not support multi-way merges
     assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
+
+
+@with_tempfile(mkdir=True)
+def test_merge_no_merge_target(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    if ds_src.repo.is_managed_branch():
+        # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
+        # adjusted branch, so we don't give an error if TARGET can't be
+        # determined.
+        raise SkipTest("Test depends on non-adjusted branch")
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    assert_repo_status(ds_src.path)
+    ds_clone.repo.checkout("master", options=["-bnew"])
+    res = ds_clone.update(merge=True, on_failure="ignore")
+    assert_in_results(res, status="impossible", action="update")
