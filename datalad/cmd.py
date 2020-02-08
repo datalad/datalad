@@ -106,10 +106,10 @@ def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
     Parameters
     ----------
     func : callable
-      Typically a Runner.run variant. Assumed to return a 2-tuple with stdout,
+      Typically a Runner.run variant. Assumed to return a 2-tuple with stdout
       and stderr as strings.
     cmd : list
-      Base Git command argument list, to be ammended with '--', followed
+      Base Git command argument list, to be amended with '--', followed
       by a file list chunk.
     files : list
       List of files.
