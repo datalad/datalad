@@ -148,7 +148,7 @@ class Update(Interface):
                 sibling_ = remotes[0]
             elif not sibling:
                 # nothing given, look for tracking branch
-                sibling_ = repo.get_tracking_branch()[0]
+                sibling_ = repo.get_tracking_branch(remote_only=True)[0]
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
