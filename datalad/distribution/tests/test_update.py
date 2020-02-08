@@ -460,6 +460,37 @@ def test_multiway_merge(path):
     assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
 
 
+@with_tempfile(mkdir=True)
+def test_merge_subdataset_other_branch(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    on_adjusted = ds_src.repo.is_managed_branch()
+    ds_src_subds = ds_src.create("subds")
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_subds = Dataset(ds_clone.pathobj / "subds")
+
+    ds_src_subds.repo.call_git(["checkout", "-b", "other"])
+    (ds_src_subds.pathobj / "foo").write_text("foo content")
+    ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    ds_clone.update(merge=True, recursive=True)
+    # Our git-annex sync based approach will not help in this case.
+    if not on_adjusted:
+        eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+        ok_(ds_clone_subds.repo.is_under_annex("foo"))
+
+    (ds_src_subds.pathobj / "bar").write_text("bar content")
+    ds_src.save(recursive=True)
+    ds_clone_subds.repo.checkout("master", options=["-bnew"])
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        ds_clone.update(merge=True, recursive=True)
+        assert_in("No merge target determined", cml.out)
+    if not on_adjusted:
+        eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+
+
 def _adjust(repo):
     """Put `repo` into an adjusted branch, upgrading if needed.
     """

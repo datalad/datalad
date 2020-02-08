@@ -232,7 +232,7 @@ class Update(Interface):
                 else:
                     merge_target = _choose_merge_target(
                         repo, curr_branch,
-                        sibling_, tracking_remote)
+                        sibling_, revision, tracking_remote)
 
                 if merge_target is None:
                     lgr.warning("No merge target determined for %s update. "
@@ -278,7 +278,7 @@ class Update(Interface):
                 yield r
 
 
-def _choose_merge_target(repo, branch, remote, cfg_remote):
+def _choose_merge_target(repo, branch, remote, revision, cfg_remote):
     """Select a merge target for the update to `repo`.
 
     Parameters
@@ -288,6 +288,9 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
         The current branch.
     remote : str
         The remote which updates are coming from.
+    revision : str
+        The specific revision from `remote` that should come in with the
+        update.
     cfg_remote : str
         The configured upstream remote.
 
@@ -311,6 +314,13 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
             merge_target = remote_branch
+
+    if revision and merge_target:
+        if not repo.is_ancestor(revision, merge_target):
+            lgr.debug("Revision %s in subdataset %s is not contained "
+                      "in merge target %s. Using revision as target.",
+                      revision, repo, merge_target)
+            merge_target = revision
     return merge_target
 
 
