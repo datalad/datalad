@@ -144,12 +144,14 @@ class Update(Interface):
                 res['status'] = 'notneeded'
                 yield res
                 continue
+            curr_branch = repo.get_active_branch()
             if not sibling and len(remotes) == 1:
                 # there is only one remote, must be this one
                 sibling_ = remotes[0]
             elif not sibling:
                 # nothing given, look for tracking branch
-                sibling_ = repo.get_tracking_branch(remote_only=True)[0]
+                sibling_ = repo.get_tracking_branch(
+                    branch=curr_branch, remote_only=True)[0]
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
@@ -182,7 +184,8 @@ class Update(Interface):
             if merge:
                 merge_fn = _choose_merge_fn(
                     repo,
-                    is_annex=is_annex)
+                    is_annex=is_annex,
+                    adjusted=is_annex and repo.is_managed_branch(curr_branch))
                 if is_annex and reobtain_data:
                     merge_fn = _reobtain(ds, merge_fn)
                 yield from merge_fn(repo, sibling_)
@@ -213,9 +216,16 @@ class Update(Interface):
 #  Merge functions
 
 
-def _choose_merge_fn(repo, is_annex=False):
-    if is_annex:
+def _choose_merge_fn(repo, is_annex=False, adjusted=False):
+    if adjusted and is_annex:
+        # For adjusted repos, blindly sync.
         merge_fn = _annex_sync
+    elif is_annex:
+        merge_fn = _annex_plain_merge
+    elif adjusted:
+        raise RuntimeError(
+            "bug: Upstream checks should make it impossible for "
+            "adjusted=True, is_annex=False")
     else:
         merge_fn = _pull
     return merge_fn
@@ -238,6 +248,14 @@ def _pull(repo, remote):
         else:
             # no marriage yet, be specific
             repo.pull(remote=remote, refspec=active_branch)
+    return []
+
+
+def _annex_plain_merge(repo, remote):
+    _pull(repo, remote)
+    # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
+    # branches.
+    repo.call_git(["annex", "merge"])
     return []
 
 
