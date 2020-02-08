@@ -212,8 +212,9 @@ def _update_repo(ds, remote, reobtain_data):
             # get all annexed files that have data present
             lgr.info('Recording file content availability '
                      'to re-obtain updated files later on')
+            ds_path = ds.path
             present_files = [
-                opj(ds.path, p)
+                opj(ds_path, p)
                 for p in repo.get_annexed_files(with_content_only=True)]
         # this runs 'annex sync' and should deal with anything
         repo.sync(remotes=remote, push=False, pull=True, commit=False)
