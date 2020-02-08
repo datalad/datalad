@@ -235,7 +235,7 @@ def _update_repo(ds, remote, reobtain_data):
                 repo
             )
         else:
-            if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
+            if repo.config.get('branch.{}.remote'.format(active_branch)) == remote:
                 # the branch love this remote already, let git pull do its thing
                 repo.pull(remote=remote)
             else:
