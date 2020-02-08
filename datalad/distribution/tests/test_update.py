@@ -610,3 +610,150 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
     ds_clone.update(merge=True, follow="parentds", recursive=True)
     if not on_adjusted:
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+
+
+def _adjust(repo):
+    """Put `repo` into an adjusted branch, upgrading if needed.
+    """
+    # This can be removed once GIT_ANNEX_MIN_VERSION is at least
+    # 7.20190912.
+    if not repo.supports_unlocked_pointers:
+        repo.call_git(["annex", "upgrade"])
+        repo.config.reload(force=True)
+    repo.adjust()
+
+
+@with_tempfile(mkdir=True)
+def test_merge_follow_parentds_subdataset_adjusted_warning(path):
+    path = Path(path)
+
+    ds_src = Dataset(path / "source").create()
+    if ds_src.repo.is_managed_branch():
+        raise SkipTest(
+            "This test depends on the source repo being "
+            "an un-adjusted branch")
+
+    ds_src_subds = ds_src.create("subds")
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_subds = Dataset(ds_clone.pathobj / "subds")
+    _adjust(ds_clone_subds.repo)
+    # Note: Were we to save ds_clone here, we would get a merge conflict in the
+    # top repo for the submodule (even if using 'git annex sync' rather than
+    # 'git merge').
+
+    ds_src_subds.repo.call_git(["checkout", "master^0"])
+    (ds_src_subds.pathobj / "foo").write_text("foo content")
+    ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    assert_in_results(
+        ds_clone.update(merge=True, recursive=True, follow="parentds",
+                        on_failure="ignore"),
+        status="impossible",
+        path=ds_clone_subds.path,
+        action="update")
+    eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+
+
+@with_tempfile(mkdir=True)
+def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
+    # Note: For the adjusted case, this is not much more than a smoke test that
+    # on an adjusted branch we fail sensibly. The resulting state is not easy
+    # to reason about nor desirable.
+    path = Path(path)
+    # $path/source/s0/s1
+    # The additional dataset level is to gain some confidence that this works
+    # for nested datasets.
+    ds_src = Dataset(path / "source").create()
+    if ds_src.repo.is_managed_branch():
+        if not on_adjusted:
+            raise SkipTest("System only supports adjusted branches. "
+                           "Skipping non-adjusted test")
+    ds_src_s0 = ds_src.create("s0")
+    ds_src_s1 = ds_src_s0.create("s1")
+    ds_src.save(recursive=True)
+    if on_adjusted:
+        # Note: We adjust after creating all the datasets above to avoid a bug
+        # fixed in git-annex 7.20191024, specifically bbdeb1a1a (sync: Fix
+        # crash when there are submodules and an adjusted branch is checked
+        # out, 2019-10-23).
+        for ds in [ds_src, ds_src_s0, ds_src_s1]:
+            _adjust(ds.repo)
+        ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_s1 = Dataset(ds_clone.pathobj / "s0" / "s1")
+
+    ds_src_s1.repo.checkout("master^0")
+    (ds_src_s1.pathobj / "foo").write_text("foo content")
+    ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    res = ds_clone.update(merge=True, recursive=True, follow="parentds",
+                          on_failure="ignore")
+    if on_adjusted:
+        # The top-level update is okay because there is no parent revision to
+        # update to.
+        assert_in_results(
+            res,
+            status="ok",
+            path=ds_clone.path,
+            action="update")
+        # The subdataset, on the other hand, is impossible.
+        assert_in_results(
+            res,
+            status="impossible",
+            path=ds_clone_s1.path,
+            action="update")
+        return
+    assert_repo_status(ds_clone.path)
+
+    # We brought in the revision and got to the same state of the remote.
+    # Blind saving here without bringing in the current subdataset revision
+    # would have resulted in a new commit in ds_clone that reverting the
+    # last subdataset ID recorded in ds_src.
+    eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+
+    # Record a revision in the parent and then move HEAD away from it so that
+    # the explicit revision fetch fails.
+    (ds_src_s1.pathobj / "bar").write_text("bar content")
+    ds_src.save(recursive=True)
+    ds_src_s1.repo.checkout(
+        ds_src_s1.repo.get_corresponding_branch("master"))
+    # This is the default, but just in case:
+    ds_src_s1.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
+                              where="local")
+    res = ds_clone.update(merge=True, recursive=True, follow="parentds",
+                          on_failure="ignore")
+    # The fetch with the explicit ref fails because it isn't advertised.
+    assert_in_results(
+        res,
+        status="impossible",
+        path=ds_clone_s1.path,
+        action="update")
+
+    # Back to the detached head.
+    ds_src_s1.repo.checkout("HEAD@{1}")
+    # Set up a case where update() will not resolve the sibling.
+    ds_clone_s1.repo.call_git(["branch", "--unset-upstream"])
+    ds_clone_s1.config.reload(force=True)
+    ds_clone_s1.repo.call_git(["remote", "add", "other", ds_src_s1.path])
+    res = ds_clone.update(recursive=True, follow="parentds",
+                          on_failure="ignore")
+    # In this case, update() won't abort if we call with merge=False, but
+    # it does if the revision wasn't brought down in the `fetch(all_=True)`
+    # call.
+    assert_in_results(
+        res,
+        status="impossible",
+        path=ds_clone_s1.path,
+        action="update")
+
+
+def test_merge_follow_parentds_subdataset_detached():
+    yield check_merge_follow_parentds_subdataset_detached, True
+    yield check_merge_follow_parentds_subdataset_detached, False

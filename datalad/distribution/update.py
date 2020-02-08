@@ -220,11 +220,27 @@ class Update(Interface):
 
             follow_parent = revision and follow == "parentds"
             if follow_parent and not repo.commit_exists(revision):
-                yield dict(
-                    res, status="impossible",
-                    message=("Revision recorded in parent (%s) not found",
-                             revision))
-                continue
+                if sibling_:
+                    try:
+                        lgr.debug("Fetching revision %s directly for %s",
+                                  revision, repo)
+                        repo.fetch(remote=sibling_, refspec=revision,
+                                   git_options=["--recurse-submodules=no"])
+                    except CommandError as exc:
+                        yield dict(
+                            res,
+                            status="impossible",
+                            message=(
+                                "Attempt to fetch %s from %s failed: %s",
+                                revision, sibling_, exc_str(exc)))
+                        continue
+                else:
+                    yield dict(res,
+                               status="impossible",
+                               message=("Need to fetch %s directly "
+                                        "but single sibling not resolved",
+                                        revision))
+                    continue
 
             saw_merge_failure = False
             if merge:
