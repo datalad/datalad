@@ -145,13 +145,15 @@ class Update(Interface):
                 yield res
                 continue
             curr_branch = repo.get_active_branch()
+            tracking_remote = None
             if not sibling and len(remotes) == 1:
                 # there is only one remote, must be this one
                 sibling_ = remotes[0]
             elif not sibling:
                 # nothing given, look for tracking branch
-                sibling_ = repo.get_tracking_branch(
+                tracking_remote = repo.get_tracking_branch(
                     branch=curr_branch, remote_only=True)[0]
+                sibling_ = tracking_remote
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
@@ -182,13 +184,23 @@ class Update(Interface):
             repo = ds.repo
 
             if merge:
+                merge_target = _choose_merge_target(
+                    repo, curr_branch,
+                    sibling_, tracking_remote)
+
+                if merge_target is None:
+                    lgr.warning("No merge target determined for %s update. "
+                                "Fetched changes won't be merged in",
+                                repo)
+                    continue
+
                 merge_fn = _choose_merge_fn(
                     repo,
                     is_annex=is_annex,
                     adjusted=is_annex and repo.is_managed_branch(curr_branch))
                 if is_annex and reobtain_data:
                     merge_fn = _reobtain(ds, merge_fn)
-                yield from merge_fn(repo, sibling_)
+                yield from merge_fn(repo, sibling_, merge_target)
 
             res['status'] = 'ok'
             yield res
@@ -213,6 +225,40 @@ class Update(Interface):
                 yield r
 
 
+def _choose_merge_target(repo, branch, remote, cfg_remote):
+    """Select a merge target for the update to `repo`.
+
+    Parameters
+    ----------
+    repo : Repo instance
+    branch : str
+        The current branch.
+    remote : str
+        The remote which updates are coming from.
+    cfg_remote : str
+        The configured upstream remote.
+
+    Returns
+    -------
+    str (the merge target) or None if a choice wasn't made.
+    """
+    merge_target = None
+    if cfg_remote and remote == cfg_remote:
+        # Use the configured cfg_remote branch as the merge target.
+        #
+        # In this scenario, it's tempting to use FETCH_HEAD as the merge
+        # target. That would be the equivalent of 'git pull REMOTE'. But doing
+        # so would be problematic when the GitRepo.fetch() call was passed
+        # all_=True. Given we can't use FETCH_HEAD, it's tempting to use the
+        # branch.*.merge value, but that assumes a value for remote.*.fetch.
+        merge_target = repo.call_git_oneline(
+            ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
+             "@{upstream}"])
+    elif branch:
+        merge_target = "{}/{}".format(remote, branch)
+    return merge_target
+
+
 #  Merge functions
 
 
@@ -227,39 +273,24 @@ def _choose_merge_fn(repo, is_annex=False, adjusted=False):
             "bug: Upstream checks should make it impossible for "
             "adjusted=True, is_annex=False")
     else:
-        merge_fn = _pull
+        merge_fn = _plain_merge
     return merge_fn
 
 
-def _pull(repo, remote):
-    active_branch = repo.get_active_branch()
-    if active_branch is None:
-        # I guess we need to fetch, and then let super-dataset to update
-        # into the state it points to for this submodule, but for now let's
-        # just blow I guess :-/
-        lgr.warning(
-            "No active branch in %s - we just fetched and not changing state",
-            repo
-        )
-    else:
-        if repo.config.get('branch.{}.remote'.format(active_branch)) == remote:
-            # the branch love this remote already, let git pull do its thing
-            repo.pull(remote=remote)
-        else:
-            # no marriage yet, be specific
-            repo.pull(remote=remote, refspec=active_branch)
+def _plain_merge(repo, _, target):
+    repo.merge(name=target)
     return []
 
 
-def _annex_plain_merge(repo, remote):
-    _pull(repo, remote)
+def _annex_plain_merge(repo, _, target):
+    _plain_merge(repo, _, target)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
     repo.call_git(["annex", "merge"])
     return []
 
 
-def _annex_sync(repo, remote):
+def _annex_sync(repo, remote, _):
     repo.sync(remotes=remote, push=False, pull=True, commit=False)
     return []
 
