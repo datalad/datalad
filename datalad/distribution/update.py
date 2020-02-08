@@ -131,12 +131,13 @@ class Update(Interface):
             if ds != refds:
                 saw_subds = True
             repo = ds.repo
+            is_annex = isinstance(repo, AnnexRepo)
             # prepare return value
             res = get_status_dict('update', ds=ds, logger=lgr, refds=refds.path)
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
-                **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
+                **({'exclude_special_remotes': True} if is_annex else {}))
             if not remotes and not sibling:
                 res['message'] = ("No siblings known to dataset at %s\nSkipping",
                                   repo.path)
@@ -174,12 +175,18 @@ class Update(Interface):
                 recurse_submodules="no",
                 prune=True)  # prune to not accumulate a mess over time
             repo.fetch(**fetch_kwargs)
-            # NOTE if any further acces to `repo` is needed, reevaluate
-            # ds.repo again, as it might have be converted from an GitRepo
-            # to an AnnexRepo
+            # NOTE reevaluate ds.repo again, as it might have be converted from
+            # a GitRepo to an AnnexRepo
+            repo = ds.repo
+
             if merge:
-                for fr in _update_repo(ds, sibling_, reobtain_data):
-                    yield fr
+                merge_fn = _choose_merge_fn(
+                    repo,
+                    is_annex=is_annex)
+                if is_annex and reobtain_data:
+                    merge_fn = _reobtain(ds, merge_fn)
+                yield from merge_fn(repo, sibling_)
+
             res['status'] = 'ok'
             yield res
             save_paths.append(ds.path)
@@ -203,44 +210,63 @@ class Update(Interface):
                 yield r
 
 
-def _update_repo(ds, remote, reobtain_data):
-    repo = ds.repo
+#  Merge functions
 
-    lgr.info("Applying updates to %s", ds)
-    if isinstance(repo, AnnexRepo):
-        if reobtain_data:
-            # get all annexed files that have data present
-            lgr.info('Recording file content availability '
-                     'to re-obtain updated files later on')
-            ds_path = ds.path
-            present_files = [
-                opj(ds_path, p)
-                for p in repo.get_annexed_files(with_content_only=True)]
-        # this runs 'annex sync' and should deal with anything
-        repo.sync(remotes=remote, push=False, pull=True, commit=False)
-        if reobtain_data:
-            present_files = [p for p in present_files if lexists(p)]
-            if present_files:
-                lgr.info('Ensuring content availability for %i '
-                         'previously available files',
-                         len(present_files))
-                yield from ds.get(present_files, recursive=False,
-                                  return_type='generator')
+
+def _choose_merge_fn(repo, is_annex=False):
+    if is_annex:
+        merge_fn = _annex_sync
     else:
-        # handle merge in plain git
-        active_branch = repo.get_active_branch()
-        if active_branch is None:
-            # I guess we need to fetch, and then let super-dataset to update
-            # into the state it points to for this submodule, but for now let's
-            # just blow I guess :-/
-            lgr.warning(
-                "No active branch in %s - we just fetched and not changing state",
-                repo
-            )
+        merge_fn = _pull
+    return merge_fn
+
+
+def _pull(repo, remote):
+    active_branch = repo.get_active_branch()
+    if active_branch is None:
+        # I guess we need to fetch, and then let super-dataset to update
+        # into the state it points to for this submodule, but for now let's
+        # just blow I guess :-/
+        lgr.warning(
+            "No active branch in %s - we just fetched and not changing state",
+            repo
+        )
+    else:
+        if repo.config.get('branch.{}.remote'.format(active_branch)) == remote:
+            # the branch love this remote already, let git pull do its thing
+            repo.pull(remote=remote)
         else:
-            if repo.config.get('branch.{}.remote'.format(active_branch)) == remote:
-                # the branch love this remote already, let git pull do its thing
-                repo.pull(remote=remote)
-            else:
-                # no marriage yet, be specific
-                repo.pull(remote=remote, refspec=active_branch)
+            # no marriage yet, be specific
+            repo.pull(remote=remote, refspec=active_branch)
+    return []
+
+
+def _annex_sync(repo, remote):
+    repo.sync(remotes=remote, push=False, pull=True, commit=False)
+    return []
+
+
+def _reobtain(ds, merge_fn):
+    def wrapped(*args, **kwargs):
+        repo = ds.repo
+
+        lgr.info("Applying updates to %s", ds)
+        # get all annexed files that have data present
+        lgr.info('Recording file content availability '
+                 'to re-obtain updated files later on')
+        ds_path = ds.path
+        present_files = [
+            opj(ds_path, p)
+            for p in repo.get_annexed_files(with_content_only=True)]
+
+        # Anticipate a day where these provide results.
+        yield from merge_fn(*args, **kwargs)
+
+        present_files = [p for p in present_files if lexists(p)]
+        if present_files:
+            lgr.info('Ensuring content availability for %i '
+                     'previously available files',
+                     len(present_files))
+            yield from ds.get(present_files, recursive=False,
+                              return_type='generator')
+    return wrapped
