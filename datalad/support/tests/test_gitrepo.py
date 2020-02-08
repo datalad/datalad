@@ -945,6 +945,12 @@ def test_get_tracking_branch(o_path, c_path):
     eq_(('origin', 'refs/heads/' + master_branch),
         clone.get_tracking_branch(master_branch))
 
+    clone.checkout(master_branch, options=["--track", "-btopic"])
+    eq_(('.', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch())
+    eq_((None, None),
+        clone.get_tracking_branch(remote_only=True))
+
 
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_submodule_deinit(path):
