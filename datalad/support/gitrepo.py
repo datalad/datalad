@@ -3226,13 +3226,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except:
             return None
 
-    def get_tracking_branch(self, branch=None):
+    def get_tracking_branch(self, branch=None, remote_only=False):
         """Get the tracking branch for `branch` if there is any.
 
         Parameters
         ----------
         branch: str
             local branch to look up. If none is given, active branch is used.
+        remote_only : bool
+            Don't return a value if the upstream remote is set to "." (meaning
+            this repository).
 
         Returns
         -------
@@ -3245,6 +3248,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 return None, None
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
+        if remote_only and track_remote == ".":
+            return None, None
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
         return track_remote, track_branch
 
