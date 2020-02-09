@@ -24,32 +24,11 @@ from .utils import (
 )
 from datalad.cmd import (
     WitlessRunner as Runner,
-    capture_output,
+    StdOutErrCapture,
+    StdOutCapture,
 )
 from datalad.utils import Path
 from datalad.support.exceptions import CommandError
-
-
-class TweakOutput(object):
-    """Test helper to twist and turn output from WitlessRunner"""
-    def __init__(self, rtruncate_nbytes=None, report_truncation=True):
-        self._rtruncate_nbytes = rtruncate_nbytes
-        self._report_truncation = report_truncation
-        self.__enter__()
-
-    def __enter__(self):
-        self.received = []
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        pass
-
-    def __call__(self, byts):
-        self.received.append(byts)
-        rtrunc = (-1) * self._rtruncate_nbytes \
-            if self._rtruncate_nbytes else None
-        byts = byts[:rtrunc]
-        return byts, self._rtruncate_nbytes if self._report_truncation else 0
 
 
 def py2cmd(code):
@@ -80,8 +59,7 @@ def test_runner_stderr_capture():
     test_msg = "stderr-Message"
     out, err = runner.run(py2cmd(
         'import sys; print(%r, file=sys.stderr)' % test_msg),
-        proc_stdout=capture_output,
-        proc_stderr=capture_output,
+        protocol=StdOutErrCapture,
     )
     eq_(err.rstrip(), test_msg)
     ok_(not out)
@@ -92,8 +70,7 @@ def test_runner_stdout_capture():
     test_msg = "stdout-Message"
     out, err = runner.run(py2cmd(
         'import sys; print(%r, file=sys.stdout)' % test_msg),
-        proc_stdout=capture_output,
-        proc_stderr=capture_output,
+        protocol=StdOutErrCapture,
     )
     eq_(out.rstrip(), test_msg)
     ok_(not err)
@@ -116,7 +93,7 @@ def test_runner_fix_PWD(path):
     runner = Runner(cwd=path, env=env)
     out, err = runner.run(
         py2cmd('import os; print(os.environ["PWD"])'),
-        proc_stdout=capture_output,
+        protocol=StdOutCapture,
     )
     eq_(out.strip(), path)  # was fixed up to point to point to cwd's path
     eq_(env['PWD'], orig_cwd)  # no side-effect
@@ -146,53 +123,6 @@ def test_runner_stdin(path):
     out, err = runner.run(
         py2cmd('import fileinput; print(fileinput.input().readline())'),
         stdin=fakestdin.open(),
-        proc_stdout=capture_output,
+        protocol=StdOutCapture,
     )
     assert_in(OBSCURE_FILENAME, out)
-
-
-py_9bytes_plus_6bytes = """\
-import sys
-print("123456789", end="", file=sys.stdout, flush=True)
-import time
-time.sleep(1.5)
-print("abcdefg", end="", file=sys.stdout, flush=True)
-"""
-
-
-def test_runner_incomplete_capture():
-    runner = Runner()
-    with TweakOutput(rtruncate_nbytes=3) as outproc:
-        out, err = runner.run(
-            py2cmd(py_9bytes_plus_6bytes),
-            # we don't process the last three in the output, but we
-            # report that to the runner
-            proc_stdout=outproc,
-            # make sure the runner polls faster than the output is coming
-            poll_latency=0.1)
-    # we must not loose any output, except for the very last three bytes
-    # even though we poll at a higher frequency
-    eq_(out, '123456789abcd')
-    # conditional protect against slow execution
-    # we see the first batch received
-    if len(outproc.received) > 1:
-        eq_(outproc.received[0], b'123456789')
-        # we see the last batch that carries the pending 3 bytes upfront
-        eq_(outproc.received[-1], b'789abcdefg')
-    if len(outproc.received) > 2:
-        # we see the truncated 3 bytes of the first batch, repeatedly
-        # sent (but the processor rejects them)
-        eq_(outproc.received[1:-1], (len(outproc.received) - 2) * [b'789'])
-
-    # no the same, but the processor doesn't tell that it ignored
-    # 3 bytes
-    with TweakOutput(rtruncate_nbytes=3, report_truncation=False) as outproc:
-        out, err = runner.run(
-            py2cmd(py_9bytes_plus_6bytes),
-            # we don't process the last three in the output, but we
-            # report that to the runner
-            proc_stdout=outproc,
-            poll_latency=0.1)
-    # we miss three bytes at the end of each batch
-    if len(outproc.received) > 1:
-        eq_(out, '123456abcd')

@@ -60,6 +60,7 @@ from datalad.support.due import due, Doi
 from datalad import ssh_manager
 from datalad.cmd import (
     WitlessRunner,
+    WitlessProtocol,
     GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
@@ -420,7 +421,7 @@ def guard_BadName(func):
     return wrapped
 
 
-class GitProgress(object):
+class GitProgress(WitlessProtocol):
     """Reduced variant of GitPython's RemoteProgress class
 
     Original copyright:
@@ -428,6 +429,9 @@ class GitProgress(object):
     Original license:
         BSD 3-Clause "New" or "Revised" License
     """
+    # inform super-class to capture stderr
+    proc_err = True
+
     _num_op_codes = 10
     BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT, ENUMERATING = \
         [1 << x for x in range(_num_op_codes)]
@@ -453,16 +457,17 @@ class GitProgress(object):
     re_op_absolute = re.compile(r"(remote: )?([\w\s]+):\s+()(\d+)()(.*)")
     re_op_relative = re.compile(r"(remote: )?([\w\s]+):\s+(\d+)% \((\d+)/(\d+)\)(.*)")
 
-    def __init__(self):
-        self.__enter__()
+    def __init__(self, *args):
+        super().__init__(*args)
         self._encoding = getpreferredencoding(do_setlocale=False)
+        self._unprocessed = None
 
-    def __enter__(self):
+    def connection_made(self, transport):
+        super().connection_made(transport)
         self._seen_ops = []
         self._pbars = set()
-        return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def process_exited(self):
         # take down any progress bars that were not closed orderly
         for pbar_id in self._pbars:
             log_progress(
@@ -470,23 +475,18 @@ class GitProgress(object):
                 pbar_id,
                 'Finished',
             )
+        super().process_exited()
 
-    def __call__(self, byts):
-        """Callable interface compatible with WitlessRunner()
-
-        Parameters
-        ----------
-        byts : bytes
-          One or more lines of command output.
-
-        Returns
-        -------
-        bytes
-          All input in its original form, except for lines that
-          were identified as recognized progress reports.
-        """
-        keep_lines = []
+    def pipe_data_received(self, fd, byts):
+        # progress reports only come from stderr
+        if fd != 2:
+            # let the base class decide what to do with it
+            super().pipe_data_received(fd, byts)
+            return
         for line in byts.splitlines(keepends=True):
+            # put any unprocessed content back in front
+            line = self._unprocessed + line if self._unprocessed else line
+            self._unprocessed = None
             if not self._parse_progress_line(line):
                 # anything that doesn't look like a progress report
                 # is retained and returned
@@ -496,10 +496,13 @@ class GitProgress(object):
                 # subsequent filtering than hidding lines with
                 # unknown, potentially important info
                 lgr.debug('Non-progress Git output: %s', line)
-                keep_lines.append(line)
-        # the zero indicated that no data remained unprocessed at the
-        # end of the input
-        return b''. join(keep_lines), 0
+                if line.endswith((b'\r', b'\n')):
+                    # complete non-progress line, pass on
+                    super().pipe_data_received(fd, line)
+                else:
+                    # an incomplete line, maybe the next batch completes
+                    # it to become a recognizable progress report
+                    self._unprocessed = line
 
     def _parse_progress_line(self, line):
         """Process a single line
@@ -1098,14 +1101,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
-                with GitProgress() as progress:
-                    out, err = WitlessRunner(
-                        env=GitRunner.get_git_environ_adjusted()).run(
-                            ['git', 'clone', '--progress', url, path] \
-                            + (to_options(**clone_options)
-                               if clone_options else []),
-                            proc_stderr=progress,
-                    )
+                out, err = WitlessRunner(
+                    env=GitRunner.get_git_environ_adjusted()).run(
+                        ['git', 'clone', '--progress', url, path] \
+                        + (to_options(**clone_options)
+                           if clone_options else []),
+                        protocol=GitProgress,
+                )
                 # fish out non-critical warnings by git-clone
                 # (empty repo clone, etc.), all other content is logged
                 # by the progress helper to 'debug'

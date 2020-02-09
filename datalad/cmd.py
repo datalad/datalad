@@ -20,6 +20,8 @@ import atexit
 import functools
 import tempfile
 from locale import getpreferredencoding
+import asyncio
+from collections import namedtuple
 
 from collections import OrderedDict
 from .support import path as op
@@ -141,27 +143,103 @@ def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
     return ''.join(out), ''.join(err)
 
 
-def kill_output(output):
-    """Helper for WitlessRunner to swallow all output and neither
-    relay it to the parent process's stdout, nor provide it as the
-    return value of WitlessRunner.run().
-    """
-    return b'', 0
+async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
+    lgr.debug('Async run %s', cmd)
+
+    cmd_done = asyncio.Future(loop=loop)
+    factory = functools.partial(protocol, cmd_done)
+    proc = loop.subprocess_exec(
+        factory,
+        *cmd,
+        stdin=stdin,
+        # ask the protocol which streams to capture
+        stdout=asyncio.subprocess.PIPE if protocol.proc_out else None,
+        stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
+        **kwargs
+    )
+    try:
+        lgr.debug('Launching process %s', cmd)
+        transport, protocol = await proc
+        lgr.debug('Waiting for process %i to complete', transport.get_pid())
+        await cmd_done
+    finally:
+        transport.close()
+
+    return cmd_done.result()
 
 
-def capture_output(output):
-    """Helper for WitlessRunner to capture all output and
-    provide it as the return value of WitlessRunner.run().
-    """
-    return output, 0
+class WitlessProtocol(asyncio.SubprocessProtocol):
+
+    FD_NAMES = ['stdin', 'stdout', 'stderr']
+
+    proc_out = None
+    proc_err = None
+
+    def __init__(self, done_future):
+        # future promise to be fulfilled when process exits
+        self.done = done_future
+        # capture output in bytearrays while the process is running
+        Streams = namedtuple('Streams', ['out', 'err'])
+        self.buffer = Streams(
+            out=bytearray() if self.proc_out else None,
+            err=bytearray() if self.proc_err else None,
+        )
+        self.pid = None
+        super().__init__()
+
+    def connection_made(self, transport):
+        self.transport = transport
+        self.pid = transport.get_pid()
+        lgr.debug('Process %i started', self.pid)
+
+    def pipe_data_received(self, fd, data):
+        lgr.debug('Read %i bytes from %i[%s]', len(data), self.pid, self.FD_NAMES[fd])
+        # store received output if stream was to be captured
+        if self.buffer[fd - 1] is not None:
+            self.buffer[fd - 1].extend(data)
+
+    def process_exited(self):
+        return_code = self.transport.get_returncode()
+        lgr.debug(
+            'Process %i exited with return code %i',
+            self.pid, return_code)
+        # give captured process output back to the runner as bytestring(s)
+        results = [bytes(byt) if byt else None for byt in self.buffer]
+        # actually fulfill the future promise and let the execution finish
+        self.done.set_result((return_code, results))
+
+
+class NoCapture(WitlessProtocol):
+    pass
+
+
+class StdOutCapture(WitlessProtocol):
+    proc_out = True
+
+
+class StdErrCapture(WitlessProtocol):
+    proc_err = True
+
+
+class StdOutErrCapture(WitlessProtocol):
+    proc_out = True
+    proc_err = True
+
+
+class KillOutput(WitlessProtocol):
+    proc_out = True
+    proc_err = True
+
+    def pipe_data_received(self, fd, data):
+        lgr.debug('Discarded %i bytes from %i[%s]',
+                  len(data), self.pid, self.FD_NAMES[fd])
 
 
 class WitlessRunner(object):
     """Minimal Runner with support for online command output processing
 
     It aims to be as simple as possible, providing only essential
-    functionality. Derived classes should be used for additional
-    specializations and convenience features.
+    functionality.
     """
     __slots__ = ['cwd', 'env']
 
@@ -186,8 +264,7 @@ class WitlessRunner(object):
             # a potential PWD setting
             self.env['PWD'] = self.cwd
 
-    def run(self, cmd, proc_stdout=None, proc_stderr=None, stdin=None,
-            poll_latency=0.1):
+    def run(self, cmd, protocol=None, stdin=None):
         """Execute a command and communicate with it.
 
         Parameters
@@ -196,32 +273,13 @@ class WitlessRunner(object):
           Sequence of program arguments. Passing a single string means
           that it is simply the name of the program, no complex shell
           commands are supported.
-        proc_stdout : callable, optional
-          By default no stdout is captured, but relayed to the parent
-          process's stdout. If given, all stdout is sequentially passed
-          as a byte-string to this callable, in the chunks it was received
-          by polling the process (see `poll_latency`).
-          The callable may transform it in any way. It must
-          return a byte-string of the transformed output, and an integer
-          with the number of bytes at the end of the original output
-          that were left unprocessed (or 0, if the entire output was
-          considered). The returned byte-strings are concatenated and
-          provided as stdout return value.
-          The helper functions 'kill_output' and 'capture_output' are
-          provided to either swallow all output (and not relay it to the
-          parent) or to capture all output and provide it as the return
-          value.
-        proc_stderr : callable, optional
-          Like proc_stdout, but for stderr.
+        protocol : WitlessProtocol, optional
+          Protocol class handling interaction with the running process
+          (e.g. output capture). A number of pre-crafted classes are
+          provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
         stdin : byte stream, optional
           File descriptor like, used as stdin for the process. Passed
           verbatim to subprocess.Popen().
-        poll_latency : float, optional
-          Shortest interval at which the running process is queried for
-          output (in seconds). Any potential output processing will increase
-          the effective interval. When the effective polling frequency is
-          too low to keep the output buffers below their maximum size,
-          a process will deadlock.
 
         Returns
         -------
@@ -239,126 +297,45 @@ class WitlessRunner(object):
         FileNotFoundError
           When a given executable does not exist.
         """
-        try:
-            lgr.log(8, "Start running %r", cmd)
-            process = subprocess.Popen(
+        if protocol is None:
+            # by default let all subprocess stream pass through
+            protocol = NoCapture
+        # include the subprocess manager in the asyncio event loop
+        if sys.platform == "win32":
+            # use special event loop that supports subprocesses on windows
+            event_loop = asyncio.ProactorEventLoop()
+            asyncio.set_event_loop(event_loop)
+        else:
+            event_loop = asyncio.get_event_loop()
+        return_code, results = event_loop.run_until_complete(
+            run_async_cmd(
+                event_loop,
                 cmd,
-                stdout=subprocess.PIPE if proc_stdout else None,
-                stderr=subprocess.PIPE if proc_stderr else None,
-                shell=False,
+                protocol,
+                stdin,
                 cwd=self.cwd,
                 env=self.env,
-                stdin=stdin,
-                # intermediate reports are never decoded anyways
-                # from PY37 onwards
-                #text=False,
-                universal_newlines=False,
-            )
-        except Exception as e:
-            lgr.log(11, "Failed to start %r%r: %s" %
-                    (cmd,
-                     (" under %r" % self.cwd) if self.cwd else '',
-                     exc_str(e)))
-            raise
-
-        data = dict(
-            out=dict(
-                stream=process.stdout,
-                processor=proc_stdout,
-                unprocessed=None,
-                output=[],
-            ),
-            err=dict(
-                stream=process.stderr,
-                processor=proc_stderr,
-                unprocessed=None,
-                output=[],
             )
         )
+        # when we are here the process finished, take output from bytes to string
+        output = tuple(
+            o.decode(getpreferredencoding(do_setlocale=False))
+            if o else ''
+            for o in results)
 
-        def _read_stream(stream):
-            # read whatever is available, must not block,
-            # because if it blocks on, e.g., stdout, we will not get to
-            # read from stderr and vice versa. But if the other one
-            # receives large amounts of data in the meantime, we will
-            # get into issues and deadlock the process
-            nbytes_avail = len(stream.peek())
-            return stream.read(nbytes_avail) if nbytes_avail > 0 else None
-
-        # make sure to run this loop at least once, even if the
-        # process is already dead
-        keep_going = True
-
-        try:
-            while process.poll() is None or keep_going:
-                # one last read?
-                keep_going = process.returncode is None
-
-                for name, props in data.items():
-                    proc = props['processor']
-
-                    if proc is None:
-                        # if there is no proc the subprocess stream is not
-                        # a pipe
-                        continue
-                    cur_out = _read_stream(props['stream'])
-
-                    if not cur_out:
-                        # nothing read
-                        continue
-
-                    # make sure to feed back any unprocessed stuff
-                    buffer = (props['unprocessed'] + cur_out) \
-                        if props['unprocessed'] else cur_out
-                    # engage output processor
-                    processed, unprocessed_len = proc(buffer)
-                    if processed:
-                        props['output'].append(processed)
-                    # stash any unprocessed bits of the current output
-                    # for the next iteration
-                    props['unprocessed'] = buffer[-(unprocessed_len):] \
-                        if unprocessed_len else None
-                time.sleep(poll_latency)
-
-            # obtain exit code
-            status = process.poll()
-
-            # decode bytes to string
-            output = tuple(
-                b''.join(o).decode(getpreferredencoding(do_setlocale=False))
-                if o else ''
-                for o in (data['out']['output'], data['err']['output']))
-
-            if status not in [0, None]:
-                msg = "Failed to run %r%s." % (
-                    cmd,
-                    (" under %r" % self.cwd) if self.cwd else '',
-                )
-                raise CommandError(
-                    cmd=str(cmd),
-                    msg=msg,
-                    code=status,
-                    stdout=output[0],
-                    stderr=output[1],
-                )
-            else:
-                lgr.log(8, "Finished running %r with status %s", cmd, status)
-
-        except BaseException as exc:
-            exc_info = sys.exc_info()
-            # KeyboardInterrupt is subclass of BaseException
-            lgr.debug("Terminating process for %s upon exception: %s",
-                      cmd, exc_str(exc))
-            try:
-                # there are still possible (although unlikely) cases when
-                # we fail to interrupt but we
-                # should not crash if we fail to terminate the process
-                process.terminate()
-            except BaseException as exc2:
-                lgr.warning("Failed to terminate process for %s: %s",
-                            cmd, exc_str(exc2))
-            raise exc_info[1]
-
+        if return_code not in [0, None]:
+            msg = "Failed to run %r%s." % (
+                cmd,
+                (" at %r" % self.cwd) if self.cwd else '',
+            )
+            raise CommandError(
+                cmd=str(cmd),
+                msg=msg,
+                code=return_code,
+                stdout=output[0],
+                stderr=output[1],
+            )
+        lgr.log(8, "Finished running %r with status %s", cmd, return_code)
         return output
 
 
