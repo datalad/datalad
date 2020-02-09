@@ -32,9 +32,8 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    on_windows,
-    get_tempfile_kwargs,
     assure_unicode,
+    get_tempfile_kwargs,
     assure_bytes,
     unlink,
     auto_repr,
@@ -240,7 +239,6 @@ class WitlessRunner(object):
         FileNotFoundError
           When a given executable does not exist.
         """
-        proc_out = (proc_stdout, proc_stderr)
         try:
             lgr.log(8, "Start running %r", cmd)
             process = subprocess.Popen(
@@ -263,62 +261,73 @@ class WitlessRunner(object):
                      exc_str(e)))
             raise
 
+        data = dict(
+            out=dict(
+                stream=process.stdout,
+                processor=proc_stdout,
+                unprocessed=None,
+                output=[],
+            ),
+            err=dict(
+                stream=process.stderr,
+                processor=proc_stderr,
+                unprocessed=None,
+                output=[],
+            )
+        )
+
+        def _read_stream(stream):
+            # read whatever is available, must not block,
+            # because if it blocks on, e.g., stdout, we will not get to
+            # read from stderr and vice versa. But if the other one
+            # receives large amounts of data in the meantime, we will
+            # get into issues and deadlock the process
+            nbytes_avail = len(stream.peek())
+            return stream.read(nbytes_avail) if nbytes_avail > 0 else None
+
+        # make sure to run this loop at least once, even if the
+        # process is already dead
+        keep_going = True
+
         try:
-            out = [[], []]
-            unprocessed = [None, None]
-            # make sure to run this loop at least once, even if the
-            # process is already dead
-            keep_going = True
-
-            def _handle_output(u, o, p):
-                processed, unprocessed_len = p(u)
-                if processed:
-                    o.append(processed)
-                return u[-(unprocessed_len):] if unprocessed_len else None
-
-            def _read_stream(stream):
-                # read whatever is available, must not block,
-                # because if it blocks on, e.g., stdout, we will not get to
-                # read from stderr and vice versa. But if the other one
-                # receives large amounts of data in the meantime, we will
-                # get into issues and deadlock the process
-                nbytes_avail = len(stream.peek())
-                return stream.read(nbytes_avail) if nbytes_avail > 0 else None
-
             while process.poll() is None or keep_going:
                 # one last read?
                 keep_going = process.returncode is None
-                # get a chunk of output
-                pout = [
-                    _read_stream(o) if p else None
-                    for o, p in zip(
-                        (process.stdout, process.stderr),
-                        proc_out)
-                ]
 
-                for i, (o, proc) in enumerate(zip(pout, proc_out)):
-                    if not o:
+                for name, props in data.items():
+                    proc = props['processor']
+
+                    if proc is None:
+                        # if there is no proc the subprocess stream is not
+                        # a pipe
+                        continue
+                    cur_out = _read_stream(props['stream'])
+
+                    if not cur_out:
                         # nothing read
                         continue
-                    if proc is None:
-                        # no index update needed, can never change, hence no unprocessed
-                        # output either
-                        out[i].append(o)
-                        continue
+
                     # make sure to feed back any unprocessed stuff
-                    buffer = unprocessed[i] + o if unprocessed[i] else o
+                    buffer = (props['unprocessed'] + cur_out) \
+                        if props['unprocessed'] else cur_out
                     # engage output processor
-                    unprocessed[i] = _handle_output(buffer, out[i], proc)
+                    processed, unprocessed_len = proc(buffer)
+                    if processed:
+                        props['output'].append(processed)
+                    # stash any unprocessed bits of the current output
+                    # for the next iteration
+                    props['unprocessed'] = buffer[-(unprocessed_len):] \
+                        if unprocessed_len else None
                 time.sleep(poll_latency)
 
             # obtain exit code
             status = process.poll()
 
             # decode bytes to string
-            out = tuple(
+            output = tuple(
                 b''.join(o).decode(getpreferredencoding(do_setlocale=False))
                 if o else ''
-                for o in out)
+                for o in (data['out']['output'], data['err']['output']))
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s." % (
@@ -329,8 +338,8 @@ class WitlessRunner(object):
                     cmd=str(cmd),
                     msg=msg,
                     code=status,
-                    stdout=out[0],
-                    stderr=out[1],
+                    stdout=output[0],
+                    stderr=output[1],
                 )
             else:
                 lgr.log(8, "Finished running %r with status %s", cmd, status)
@@ -350,7 +359,7 @@ class WitlessRunner(object):
                             cmd, exc_str(exc2))
             raise exc_info[1]
 
-        return out
+        return output
 
 
 class Runner(object):
