@@ -144,6 +144,32 @@ def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
 
 
 async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
+    """Run a command in a subprocess managed by asyncio
+
+    This implementation has been inspired by
+    https://pymotw.com/3/asyncio/subprocesses.html
+
+    Parameters
+    ----------
+    loop : asyncio.AbstractEventLoop
+      asyncio event loop instance. Must support subprocesses on the
+      target platform.
+    cmd : list
+      Command to be executed, passed to `subprocess_exec`.
+    protocol : WitlessProtocol
+      Protocol class to be instantiated for managing communication
+      with the subprocess.
+    stdin : file-like or None
+      Passed to the subprocess as its standard input.
+    kwargs : Pass to `subprocess_exec`, will typically be parameters
+      supported by `subprocess.Popen`.
+
+    Returns
+    -------
+    undefined
+      The nature of the return value is determined by the given
+      protocol class.
+    """
     lgr.debug('Async run %s', cmd)
 
     cmd_done = asyncio.Future(loop=loop)
@@ -172,6 +198,18 @@ async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
+    """Subprocess communication protocol base class for `run_async_cmd`
+
+    This class implements basic subprocess output handling. Derived classes
+    like `StdOutCapture` should be used for subprocess communication that need
+    to capture and return output. In particula, the `pipe_data_received()`
+    method can be overwritten to implement "online" processing of process
+    output.
+
+    This class defines a default return value setup that causes
+    `run_async_cmd()` to return a 2-tuple with the subprocess's exit code
+    and a list with bytestrings of all captured output streams.
+    """
 
     FD_NAMES = ['stdin', 'stdout', 'stderr']
 
@@ -216,23 +254,34 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
 
 class NoCapture(WitlessProtocol):
+    """WitlessProtocol that captures no subprocess output
+
+    As this is identical with the behavior of the WitlessProtocol base class,
+    this class is merely a more readable convenience alias.
+    """
     pass
 
 
 class StdOutCapture(WitlessProtocol):
+    """WitlessProtocol that only captures and returns stdout of a subprocess"""
     proc_out = True
 
 
 class StdErrCapture(WitlessProtocol):
+    """WitlessProtocol that only captures and returns stderr of a subprocess"""
     proc_err = True
 
 
 class StdOutErrCapture(WitlessProtocol):
+    """WitlessProtocol that captures and returns stdout/stderr of a subprocess
+    """
     proc_out = True
     proc_err = True
 
 
 class KillOutput(WitlessProtocol):
+    """WitlessProtocol that swallows stdout/stderr of a subprocess
+    """
     proc_out = True
     proc_err = True
 
