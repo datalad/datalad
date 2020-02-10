@@ -157,13 +157,16 @@ async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
         stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
         **kwargs
     )
+    transport = None
     try:
         lgr.debug('Launching process %s', cmd)
         transport, protocol = await proc
         lgr.debug('Waiting for process %i to complete', transport.get_pid())
         await cmd_done
     finally:
-        transport.close()
+        # protect against a crash whe launching the process
+        if transport:
+            transport.close()
 
     return cmd_done.result()
 
