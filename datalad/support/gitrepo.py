@@ -63,7 +63,6 @@ from datalad.cmd import (
     GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
-    capture_output,
 )
 from datalad.config import (
     ConfigManager,
@@ -494,7 +493,7 @@ class GitProgress(WitlessProtocol):
                 # it is better to enable better (maybe more expensive)
                 # subsequent filtering than hidding lines with
                 # unknown, potentially important info
-                lgr.debug('Non-progress Git output: %s', line)
+                lgr.debug('Non-progress stderr: %s', line)
                 if line.endswith((b'\r', b'\n')):
                     # complete non-progress line, pass on
                     super().pipe_data_received(fd, line)
@@ -635,6 +634,10 @@ class GitProgress(WitlessProtocol):
             )
             self._pbars.discard(pbar_id)
         return True
+
+
+class StdOutCaptureWithGitProgress(GitProgress):
+    proc_out = True
 
 
 class FetchInfo(dict):
@@ -2396,7 +2399,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             base_cmd=['git', 'fetch', '--verbose', '--progress'],
             action='fetch',
             urlvars=('remote.{}.url', 'remote.{}.url'),
-            proc_stdout=None,
+            protocol=GitProgress,
             info_cls=FetchInfo,
             info_from=1,
             add_remote=False,
@@ -2455,13 +2458,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         url = self.config.get('remote.{}.url'.format(remote), None)
         if url and is_ssh(url):
             ssh_manager.get_connection(url).open()
-        with GitProgress() as progress:
-            WitlessRunner(
-                cwd=self.path,
-                env=GitRunner.get_git_environ_adjusted()).run(
-                    cmd,
-                    proc_stderr=progress,
-            )
+        WitlessRunner(
+            cwd=self.path,
+            env=GitRunner.get_git_environ_adjusted()).run(
+                cmd,
+                protocol=GitProgress,
+        )
 
     def push(self, remote=None, refspec=None, all_remotes=False,
              all_=False, git_options=None, **kwargs):
@@ -2504,7 +2506,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             base_cmd=['git', 'push', '--progress', '--porcelain'],
             action='push',
             urlvars=('remote.{}.pushurl', 'remote.{}.url'),
-            proc_stdout=capture_output,
+            protocol=StdOutCaptureWithGitProgress,
             info_cls=PushInfo,
             info_from=0,
             add_remote=True,
@@ -2518,7 +2520,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             base_cmd,     # arg list
             action,       # label fetch|push
             urlvars,      # variables to query for URLs
-            proc_stdout,  # processor for stdout
+            protocol,     # processor for output
             info_cls,     # Push|FetchInfo
             info_from,    # 0=stdout, 1=stderr
             add_remote,   # whether to add a 'remote' field to the info dict
@@ -2591,14 +2593,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 )
                 if url and is_ssh(url):
                     ssh_manager.get_connection(url).open()
-                with GitProgress() as progress:
-                    out = WitlessRunner(
-                        cwd=self.path,
-                        env=GitRunner.get_git_environ_adjusted()).run(
-                            r_cmd,
-                            proc_stdout=proc_stdout,
-                            proc_stderr=progress,
-                    )
+                out = WitlessRunner(
+                    cwd=self.path,
+                    env=GitRunner.get_git_environ_adjusted()).run(
+                        r_cmd,
+                        protocol=protocol,
+                )
                 output = out[info_from] or ''
                 for line in output.splitlines():
                     try:
