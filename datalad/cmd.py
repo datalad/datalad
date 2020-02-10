@@ -202,7 +202,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     This class implements basic subprocess output handling. Derived classes
     like `StdOutCapture` should be used for subprocess communication that need
-    to capture and return output. In particula, the `pipe_data_received()`
+    to capture and return output. In particular, the `pipe_data_received()`
     method can be overwritten to implement "online" processing of process
     output.
 
