@@ -8,7 +8,8 @@ From:neurodebian:buster
     # If needed to replicate some prior build environment, use nd_freeze
     #apt-get install neurodebian-freeze   # upgrade it
     #echo "Freezing the environment"
-    nd_freeze 2019/08/13  # should be good enough
+    nd_freeze 2020/02/09  # current build of annex 7.20200204+git1-gb2c529b88-1~ndall+1 freezes one of our tests
+    #nd_freeze 2019/08/13  # should be good enough
     #nd_freeze 2018/05/18  # I thought incorrectly that it is when ghc upgraded in testing
     #nd_freeze 2017/09/01  # 20170902 is when ghc moved from 8.0.1-17 to 8.0.2-9 in testing
 

@@ -5,6 +5,8 @@
 #
 # Changelog
 # ---------
+# 0.12.2-105-g7afff524f (2020/02/09)
+#  - Update to get a fresh build of master and newer git-annex
 # 0.12.0rc4-239-gba66d1c9f
 #  - Update to get a fresh build of master
 # 0.11.1
