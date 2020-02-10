@@ -81,6 +81,7 @@ from .external_versions import external_versions
 from .exceptions import (
     CommandNotAvailableError,
     CommandError,
+    FileNotInRepositoryError,
     FileNotInAnnexError,
     FileInGitError,
     AnnexBatchCommandError,
@@ -2566,11 +2567,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if files:
             files = assure_list(files)
 
-            # Raise FileNotInRepositoryError if `files` aren't tracked.
-            super(AnnexRepo, self).commit(
-                "dryrun", options=["--dry-run", "--no-status"],
-                files=files)
-
         alt_index_file = None
         try:
             # we might need to avoid explicit paths
@@ -2595,6 +2591,21 @@ class AnnexRepo(GitRepo, RepoInterface):
 
                 # Files which were staged but not among files
                 staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
+                # Since we are analysing and preparing lists of files, we have to also
+                # check for unknown to Git(-annex) files here, since they would not be
+                # passed into GitRepo.commit, which would raise exception.
+                # Alternative solution would be to add those files_unknown to underlying
+                # GitRepo.commit, but that would only delay the crash, possibly leading
+                # to partial commit on a long list of files.  So, IMHO (yoh) to do it
+                # here since we can at a small cost of duplicating the raise
+                files_unknown = (
+                    set(files_normalized) - files_changed_staged - files_changed_notstaged
+                )
+                if files_unknown:
+                    raise FileNotInRepositoryError(
+                        cmd="commit",
+                        msg="File(s) unknown to git",
+                        filename=linesep.join(files_unknown))
 
                 if files_changed_notstaged:
                     self.add(files=list(files_changed_notstaged))
