@@ -300,13 +300,20 @@ class WitlessRunner(object):
         if protocol is None:
             # by default let all subprocess stream pass through
             protocol = NoCapture
-        # include the subprocess manager in the asyncio event loop
+        # start a new event loop, which we will close again further down
+        # if this is not done events like this will occur
+        #   BlockingIOError: [Errno 11] Resource temporarily unavailable
+        #   Exception ignored when trying to write to the signal wakeup fd:
+        # It is unclear to me why it happens when reusing an event looped
+        # that it stopped from time to time, but starting fresh and doing
+        # a full termination seems to address the issue
         if sys.platform == "win32":
             # use special event loop that supports subprocesses on windows
             event_loop = asyncio.ProactorEventLoop()
-            asyncio.set_event_loop(event_loop)
         else:
-            event_loop = asyncio.get_event_loop()
+            event_loop = asyncio.SelectorEventLoop()
+        asyncio.set_event_loop(event_loop)
+        # include the subprocess manager in the asyncio event loop
         return_code, results = event_loop.run_until_complete(
             run_async_cmd(
                 event_loop,
@@ -317,6 +324,9 @@ class WitlessRunner(object):
                 env=self.env,
             )
         )
+        # terminate the event loop, cannot be undone, hence we start a fresh
+        # one each time (see BlockingIOError notes above)
+        event_loop.close()
         # when we are here the process finished, take output from bytes to string
         output = tuple(
             o.decode(getpreferredencoding(do_setlocale=False))
