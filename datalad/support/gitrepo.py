@@ -1006,7 +1006,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             #       - also: call to self._repo and only afterwards checking whether it's None seems strange
 
             # reset background processes invoked by GitPython:
-            self._repo.git.clear_cache()
+            # it can be that we never got to instantiate a GitPython repo instance
+            if self._repo:
+                self._repo.git.clear_cache()
             self.inode = inode
 
         if self._repo is None:
