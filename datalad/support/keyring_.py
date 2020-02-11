@@ -42,10 +42,16 @@ class Keyring(object):
     def _get_service_name(cls, name):
         return "datalad-%s" % str(name)
 
+    @staticmethod
+    def _get_envvar_name(name, field):
+        """Return env variable which would be checked first for a credential"""
+        return ('DATALAD_KEYRING_%s__%s' % (name, field))\
+            .replace('-', '_').replace(':', '_')
+
     # proxy few methods of interest explicitly, to be rebound to the module's
     def get(self, name, field):
         # consult environment, might be provided there and should take precedence
-        env_var = ('DATALAD_%s_%s' % (name, field)).replace('-', '_')
+        env_var = self._get_envvar_name(name, field)
         if env_var in os.environ:
             return os.environ[env_var]
         return self._keyring.get_password(self._get_service_name(name), field)
