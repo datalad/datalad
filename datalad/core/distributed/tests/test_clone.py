@@ -66,7 +66,8 @@ from datalad.tests.utils import (
     known_failure,
     known_failure_appveyor,
     patch_config,
-    has_symlink_capability
+    has_symlink_capability,
+    skip_if_on_windows
 )
 from datalad.core.distributed.clone import (
     decode_source_spec,
@@ -765,6 +766,7 @@ def test_ria_http_storedataladorg(path):
     eq_(ds.id, datalad_store_testds_id)
 
 
+@skip_if_on_windows  # see gh-
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
