@@ -234,8 +234,9 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         lgr.debug('Process %i started', self.pid)
 
     def pipe_data_received(self, fd, data):
-        if lgr.isEnabledFor(logging.DEBUG):
-            lgr.debug(
+        if lgr.isEnabledFor(5):
+            lgr.log(
+                5,
                 'Read %i bytes from %i[%s]',
                 len(data), self.pid, self.FD_NAMES[fd])
         # store received output if stream was to be captured
@@ -286,9 +287,11 @@ class KillOutput(WitlessProtocol):
     proc_err = True
 
     def pipe_data_received(self, fd, data):
-        if lgr.isEnabledFor(logging.DEBUG):
-            lgr.debug('Discarded %i bytes from %i[%s]',
-                      len(data), self.pid, self.FD_NAMES[fd])
+        if lgr.isEnabledFor(5):
+            lgr.log(
+                5,
+                'Discarded %i bytes from %i[%s]',
+                len(data), self.pid, self.FD_NAMES[fd])
 
 
 class WitlessRunner(object):
