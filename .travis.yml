@@ -242,6 +242,9 @@ install:
 script:
   # Test installation system-wide
   - sudo pip install .
+  # install RIA special remote
+  # TODO: Remove whenever move of git-annex-ria-remote to datalad-core is finished
+  - sudo pip install git+https://github.com/datalad/git-annex-ria-remote
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests

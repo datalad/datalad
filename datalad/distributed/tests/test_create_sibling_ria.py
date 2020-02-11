@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     assert_raises,
     chpwd,
     skip_ssh,
+    skip_if_on_windows
 )
 from functools import wraps
 from nose.plugins.attrib import attr
@@ -57,6 +58,7 @@ def test_invalid_calls(path):
                   name='some', ria_remote_name='some')
 
 
+@skip_if_on_windows  # running into short path issues; same as gh-4131
 @with_tempfile
 @with_store_insteadof
 @with_tree({'ds': {'file1.txt': 'some'},
