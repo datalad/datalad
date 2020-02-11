@@ -16,6 +16,32 @@ from datalad.tests.utils import (
     chpwd,
     skip_ssh,
 )
+from functools import wraps
+from nose.plugins.attrib import attr
+
+
+def with_store_insteadof(func):
+    """decorator to set a (user-) config and clean up afterwards"""
+
+    @wraps(func)
+    @attr('with_config')
+    def newfunc(*args, **kwargs):
+        host = args[0]
+        base_path = args[1]
+        try:
+            cfg.set('url.ria+{prot}://{host}{path}.insteadOf'
+                    ''.format(prot='ssh' if host else 'file',
+                              host=host if host else '',
+                              path=base_path),
+                    'ria+ssh://test-store:', where='global')
+            return func(*args, **kwargs)
+        finally:
+            cfg.unset('url.ria+{prot}://{host}{path}.insteadOf'
+                      ''.format(prot='ssh' if host else 'file',
+                                host=host if host else '',
+                                path=base_path),
+                      where='global', reload=True)
+    return newfunc
 
 
 @with_tempfile
@@ -31,24 +57,12 @@ def test_invalid_calls(path):
                   name='some', ria_remote_name='some')
 
 
+@with_tempfile
+@with_store_insteadof
 @with_tree({'ds': {'file1.txt': 'some'},
             'sub': {'other.txt': 'other'}})
-@with_tempfile
 @with_tempfile(mkdir=True)
-def _test_create_store(host, ds_path, base_path, clone_path):
-
-    # TODO: This is an issue. We are writing to ~/.gitconfig here. Override
-    #       doesn't work, since RIARemote itself (actually git-annex!) doesn't
-    #       have access to it, so initremote will still fail.
-    #       => at least move cfg.set/unset into a decorator, so it doesn't
-    #       remain when a test is failing.
-    # TODO this should be wrapped in a decorator that performs the set/unset
-    # in a try-finally configuration
-    cfg.set('url.ria+{prot}://{host}{path}.insteadOf'
-            ''.format(prot='ssh' if host else 'file',
-                      host=host if host else '',
-                      path=base_path),
-            'ria+ssh://test-store:', where='global')
+def _test_create_store(host, base_path, ds_path, clone_path):
 
     ds = Dataset(ds_path).create(force=True)
     subds = ds.create('sub', force=True)
@@ -104,12 +118,6 @@ def _test_create_store(host, ds_path, base_path, clone_path):
     sub_siblings = subds.siblings(result_renderer=None)
     eq_({'datastore', 'datastore-ria', 'here'},
         {s['name'] for s in sub_siblings})
-
-    cfg.unset('url.ria+{prot}://{host}{path}.insteadOf'
-              ''.format(prot='ssh' if host else 'file',
-                        host=host if host else '',
-                        path=base_path),
-              where='global', reload=True)
 
 
 def test_create_simple():
