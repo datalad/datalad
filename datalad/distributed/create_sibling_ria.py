@@ -68,7 +68,7 @@ class CreateSiblingRia(Interface):
     This creates a representation of a dataset in a ria-remote compliant
     storage location. For access to it two siblings are configured for the
     dataset by default. A "regular" one and a RIA remote (git-annex
-    special remote).  Furthermore, the former is configured to have a
+    special remote). Furthermore, the former is configured to have a
     publication dependency on the latter. If not given a default name for
     the RIA remote is derived from the sibling's name by appending "-ria".
 
@@ -76,21 +76,21 @@ class CreateSiblingRia(Interface):
 
       - not yet exist or
       - be empty or
-      - have a valid `ria-layout-version` file and an `error_logs` directory.
+      - have a valid "ria-layout-version" file and an "error_logs" directory.
 
     In the first two cases, said file and directory are created by this
     command. Alternatively you can manually create the third case, of course.
-    Please note, that `ria-layout-version` needs to contain a line stating the
-    version (currently '1') and optionally enable error logging (append '|l' in
-    that case). Currently, this line MUST end with a newline!
+    Please note, that "ria-layout-version" needs to contain a line stating the
+    version (currently "1") and optionally enable error logging (append a pipe
+    symbol and an "l"  in that case). Currently, this line MUST end with a newline!
 
-    Error logging will create files in the `error_log` directory whenever the
+    Error logging will create files in the "error_log" directory whenever the
     RIA special remote (storage sibling) raises an exception, storing the
     python traceback of it. The logfiles are named according to the scheme
     <dataset id>.<annex uuid of the remote>.log showing 'who' ran into this
     issue with what dataset. Since this logging can potentially leak personal
     data (like local file paths for example) it can be disabled from the client
-    side via `annex.ria-remote.<RIAREMOTE>.ignore-remote-config`.
+    side via "annex.ria-remote.<RIAREMOTE>.ignore-remote-config".
 
     Todo
     ----
@@ -100,7 +100,7 @@ class CreateSiblingRia(Interface):
     configured base path. First level of subdirectories are named for the first
     three characters of the datasets' id, second level is the remainder of
     those ids. The thereby created dataset directories contain a bare git
-    repository.  Those bare repositories are slightly different from plain
+    repository. Those bare repositories are slightly different from plain
     git-annex bare repositories in that they use the standard dirhashmixed
     layout beneath annex/objects as opposed to dirhashlower, which is
     git-annex's default for bare repositories. Furthermore, there is an
@@ -108,11 +108,11 @@ class CreateSiblingRia(Interface):
     or may not contain archives with annexed content.  Note, that this helps to
     reduce the number of inodes consumed (no checkout + potential archive) as
     well as it allows to resolve dependencies (that is (sub)datasets) merely by
-    their id.  Finally, there is a file `ria-layout-version` put beneath the
+    their id.  Finally, there is a file "ria-layout-version" put beneath the
     store's base path, determining the version of the dataset tree layout and a
     file of the same name per each dataset directory determining object tree
     layout version (we already switch from dirhashlower to dirhashmixed for
-    example) and an additional directory `error_logs` at the toplevel.  """
+    example) and an additional directory "error_logs" at the toplevel.  """
 
     # TODO: description?
     _params_ = dict(
