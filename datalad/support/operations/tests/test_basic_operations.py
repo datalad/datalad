@@ -9,6 +9,7 @@
 """
 """
 
+import stat
 from datalad.support.operations.operations_local import (
     LocalOperation,
 )
@@ -348,3 +349,117 @@ def test_rename_remote(cwd, remote_cwd):
         ops.rename(link_path, Path("newlink"))
         ok_(ops.exists(Path("newlink")))
         assert_false(ops.exists(link_path))
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_change_permissions_local(file_path, dir_path, cwd):
+
+    file_path = Path(file_path)
+    dir_path = Path(dir_path)
+    cwd = Path(cwd)
+    ops = LocalOperation(cwd=cwd)
+
+    # non-existing path:
+    assert_raises(FileNotFoundError, ops.change_permissions, file_path, 0o777)
+    # existing file:
+    file_path.write_text("some")
+    neq_(stat.S_IMODE(file_path.stat().st_mode), 0o777)
+    ops.change_permissions(file_path, 0o777)
+    eq_(stat.S_IMODE(file_path.stat().st_mode), 0o777)
+
+    # directory
+    dir_perms = stat.S_IMODE(dir_path.stat().st_mode)
+    neq_(dir_perms, 0o777)
+    file_underneath = dir_path / "sub"
+    file_underneath.write_text("content")
+    file_underneath_perms = stat.S_IMODE(file_underneath.stat().st_mode)
+    ops.change_permissions(dir_path, 0o777)
+    eq_(stat.S_IMODE(dir_path.stat().st_mode), 0o777)
+    # perms of file underneath didn't change, since we didn't call with
+    # recursive
+    eq_(stat.S_IMODE(file_underneath.stat().st_mode), file_underneath_perms)
+
+    # change dir perms back:
+    ops.change_permissions(dir_path, dir_perms)
+    eq_(stat.S_IMODE(dir_path.stat().st_mode), dir_perms)
+    # now recursively
+    ops.change_permissions(dir_path, 0o777, recursive=True)
+    eq_(stat.S_IMODE(dir_path.stat().st_mode), 0o777)
+    eq_(stat.S_IMODE(file_underneath.stat().st_mode), 0o777)
+
+    # relative paths are relative to passed in `cwd`, not to "actual" CWD of
+    # test's process
+    rel_path = Path("relative")
+    (cwd / "relative").write_text("other")
+    assert_false((Path.cwd() / "relative").exists())
+    # relative to real CWD doesn't exist and should therefore raise
+    ops.change_permissions(rel_path, 0o777)
+    eq_(stat.S_IMODE((cwd / "relative").stat().st_mode), 0o777)
+
+
+@skip_ssh
+@with_tempfile
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_change_permissions_remote(file_path, dir_path, cwd, remote_cwd):
+
+    file_path = Path(file_path)
+    dir_path = Path(dir_path)
+    cwd = Path(cwd)
+    remote_cwd = Path(remote_cwd)
+    # NOTE, that "datalad-test" is supposed to be localhost. So, absolute paths
+    # match on "local" and "remote" end.
+    ops = RemoteOperation("ssh://datalad-test:",
+                          cwd=cwd,
+                          remote_cwd=remote_cwd)
+
+    # non-existing path:
+    assert_raises(FileNotFoundError, ops.change_permissions, file_path, 0o777)
+    # existing file:
+    file_path.write_text("some")
+    neq_(stat.S_IMODE(file_path.stat().st_mode), 0o777)
+    ops.change_permissions(file_path, 0o777)
+    eq_(stat.S_IMODE(file_path.stat().st_mode), 0o777)
+
+    # directory
+    dir_perms = stat.S_IMODE(dir_path.stat().st_mode)
+    neq_(dir_perms, 0o777)
+    file_underneath = dir_path / "sub"
+    file_underneath.write_text("content")
+    file_underneath_perms = stat.S_IMODE(file_underneath.stat().st_mode)
+    ops.change_permissions(dir_path, 0o777)
+    eq_(stat.S_IMODE(dir_path.stat().st_mode), 0o777)
+    # perms of file underneath didn't change, since we didn't call with
+    # recursive
+    eq_(stat.S_IMODE(file_underneath.stat().st_mode), file_underneath_perms)
+
+    # change dir perms back:
+    ops.change_permissions(dir_path, dir_perms)
+    eq_(stat.S_IMODE(dir_path.stat().st_mode), dir_perms)
+    # now recursively
+    ops.change_permissions(dir_path, 0o777, recursive=True)
+    eq_(stat.S_IMODE(dir_path.stat().st_mode), 0o777)
+    eq_(stat.S_IMODE(file_underneath.stat().st_mode), 0o777)
+
+    # relative paths are relative to passed in `cwd`, not to "actual" CWD of
+    # test's process
+    rel_path = Path("relative")
+    (remote_cwd / "relative").write_text("other")
+    assert_false((Path.cwd() / "relative").exists())
+    assert_false((cwd / "relative").exists())
+    # relative to real CWD and ops' `cwd` don't exist and should therefore raise
+    # if `change_permissions` would interpret "relative" as being relative to
+    # either of them:
+    ops.change_permissions(rel_path, 0o777)
+    eq_(stat.S_IMODE((cwd / "relative").stat().st_mode), 0o777)
+
+
+def test_change_group_local():
+    raise SkipTest("TODO")
+
+
+def test_change_group_remote():
+    raise SkipTest("TODO")

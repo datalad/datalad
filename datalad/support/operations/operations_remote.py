@@ -30,6 +30,25 @@ from datalad.utils import (
 #       dedicated class
 
 
+#
+# TODO: From respective github-issue:
+#
+#     ATM create_sibling has custom code to perform a bunch of operations via
+#     SSH that are equivalents of:
+#
+#     exist()
+#     rmtree()
+#     chmod
+#     chgrp
+#     rm
+#     mkdir()
+#     git update-server-info
+#     git config
+#     enable post-update hook
+#     annex init
+#
+
+
 class RemoteSSHShellOperations(RemoteOperationsBase):
 
     def __init__(self, url,
@@ -89,6 +108,24 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
 
         self.con('mv {} {}'.format(quote_cmdlinearg(str(src)),
                                    quote_cmdlinearg(str(dst))))
+
+    def change_permissions(self, path, mode, recursive=False):
+        path = self._ensure_absolute_remote(path)
+
+        self.con("chmod {} {} {}".format(
+            mode,
+            "-R" if recursive else "",
+            quote_cmdlinearg(str(path))
+        ))
+
+    def change_group(self, path, label, recursive=False):
+        path = self._ensure_absolute_remote(path)
+
+        self.con("chgrp {} {} {}".format(
+            "-R" if recursive else "",
+            label,
+            quote_cmdlinearg(str(path))
+        ))
 
 
 class RemotePersistentSSHShellOperations(RemoteOperationsBase):
