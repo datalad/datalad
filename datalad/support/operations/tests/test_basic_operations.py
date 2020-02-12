@@ -211,7 +211,7 @@ def test_remove_local(dir_path, link_path, cwd):
     underneath = (dir_path / 'some')
     underneath.write_text('content')
     # non-empty dir w/o recursive
-    assert_raises(OSError, ops.remove(dir_path))
+    assert_raises(OSError, ops.remove, dir_path)
     ok_(ops.exists(dir_path))
     # non-empty dir w/ recursive
     ops.remove(dir_path, recursive=True)
@@ -261,7 +261,7 @@ def test_remove_remote(dir_path, link_path, cwd, remote_cwd):
     underneath = (dir_path / 'some')
     underneath.write_text('content')
     # non-empty dir w/o recursive
-    assert_raises(CommandError, ops.remove(dir_path))
+    assert_raises(CommandError, ops.remove, dir_path)
     ok_(ops.exists(dir_path))
     # non-empty dir w/ recursive
     ops.remove(dir_path, recursive=True)
@@ -419,7 +419,7 @@ def test_change_permissions_remote(file_path, dir_path, cwd, remote_cwd):
                           remote_cwd=remote_cwd)
 
     # non-existing path:
-    assert_raises(FileNotFoundError, ops.change_permissions, file_path, 0o777)
+    assert_raises(CommandError, ops.change_permissions, file_path, 0o777)
     # existing file:
     file_path.write_text("some")
     neq_(stat.S_IMODE(file_path.stat().st_mode), 0o777)
