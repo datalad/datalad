@@ -622,14 +622,17 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             # symlink the annex to avoid needless copies in an emphemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
             origin_annex_url = ds.config.get("remote.origin.url", None)
+            origin_git_path = None
             if origin_annex_url:
                 try:
                     # Deal with file:// scheme URLs as well as plain paths.
                     # If origin isn't local, we have nothing to do.
-                    origin_git_path = Path(PathRI(origin_annex_url).localpath)
+                    origin_git_path = Path(RI(origin_annex_url).localpath)
                     if origin_git_path.name != '.git':
                         origin_git_path /= '.git'
-                except Exception:
+                except ValueError:
+                    # Note, that accessing localpath on a non-local RI throws
+                    # ValueError rather than resulting in an AttributeError.
                     # TODO: Warning level okay or is info level sufficient?
                     # Note, that setting annex-dead is independent of
                     # symlinking .git/annex. It might still make sense to
