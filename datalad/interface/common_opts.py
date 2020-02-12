@@ -136,12 +136,14 @@ reckless_opt = Parameter(
     cheapest/fastest possible way, even if this poses a potential
     risk the data integrity ('auto': hardlink files from a local clone
     of the dataset, 'ephemeral': symlink annex to origin's annex and discard 
-    local availability info via git-annex-dead 'here'). Use with care, 
-    and limit to "read-only" use
-    cases. With this flag the installed dataset will be marked as
-    untrusted. The reckless mode is stored in a dataset's local
-    configuration under 'datalad.clone.reckless', and will be inherited
-    to any of its subdatasets.""")
+    local availability info via git-annex-dead 'here'. Please note, that with a
+    symlinked annex you share the annex with origin w/o git-annex knowing
+    this. In case of a change in origin you need to update the clone before
+    you're able to save new content on your end.).
+    Use with care, and limit to "read-only" use cases. With this flag the
+    installed dataset will be marked as untrusted. The reckless mode is
+    stored in a dataset's local configuration under 'datalad.clone.reckless',
+    and will be inherited to any of its subdatasets.""")
 
 jobs_opt = Parameter(
     args=("-J", "--jobs"),
