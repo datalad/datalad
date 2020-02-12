@@ -615,7 +615,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             'remote.origin.annex-ignore', 'true',
             where='local')
 
-        ds.repo._run_annex_command('dead', annex_options=['here'])
+        ds.repo.set_remote_dead('here')
 
         if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
                                     ds.repo.dot_git / 'dl_target_test'):
