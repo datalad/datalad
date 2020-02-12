@@ -46,7 +46,8 @@ from datalad.tests.utils import (
     OBSCURE_FILENAME,
     SkipTest,
     has_symlink_capability,
-    skip_ssh
+    skip_ssh,
+    skip_if_on_windows
 )
 
 
@@ -399,6 +400,7 @@ def test_change_permissions_local(file_path, dir_path, cwd):
     eq_(stat.S_IMODE((cwd / "relative").stat().st_mode), 0o777)
 
 
+@skip_if_on_windows  # not yet implemented on windows
 @skip_ssh
 @with_tempfile
 @with_tempfile(mkdir=True)

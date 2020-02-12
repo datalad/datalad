@@ -53,7 +53,9 @@ class PurePythonOperations(OperationsBase):
         except FileNotFoundError:
             # result oriented; don't raise
             pass
-        except IsADirectoryError:
+        except (IsADirectoryError, PermissionError):
+            # Note, that on windows apparently PermissionError is raised
+            # instead of IsADirectoryError
             if recursive:
                 _remove_dir_content(path)
             path.rmdir()
