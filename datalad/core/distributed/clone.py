@@ -569,13 +569,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
-        # store the reckless setting in the dataset to make it
-        # known to later clones of subdatasets via get()
-        ds.config.set(
-            'datalad.clone.reckless', reckless,
-            where='local',
-            # delay reload until all config IO is done
-            reload=False)
         ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
 
@@ -651,6 +644,16 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             # TODO: What level? + note, that annex-dead is independ
             lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
                         "this file system.")
+
+    if reckless:
+        # we successfully dealt with reckless here.
+        # store the reckless setting in the dataset to make it
+        # known to later clones of subdatasets via get()
+        ds.config.set(
+            'datalad.clone.reckless', reckless,
+            where='local',
+            # delay reload until all config IO is done
+            reload=False)
 
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
