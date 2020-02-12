@@ -599,10 +599,10 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
     elif reckless == 'ephemeral':
         # with ephemeral we declare 'here' as 'dead' right away, whenever
-        # we symlink origins annex. Because we want annex to copy to
-        # the ria remote to get availability info correct for an eventual
-        # git-push into the store
-        # this will cause stuff like this for a locally present annexed file:
+        # we symlink origin's annex, since availability from 'here' should
+        # not be propagated for an ephemeral clone when we publish back to
+        # origin.
+        # This will cause stuff like this for a locally present annexed file:
         # % git annex whereis d1
         # whereis d1 (0 copies) failed
         # BUT this works:
@@ -624,16 +624,20 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             origin_annex_url = ds.config.get("remote.origin.url", None)
             if origin_annex_url:
                 try:
-                    # deal with file:// scheme URLs as well as plain paths
-                    # if origin isn't local, we have nothing to do
+                    # Deal with file:// scheme URLs as well as plain paths.
+                    # If origin isn't local, we have nothing to do.
                     origin_git_path = Path(PathRI(origin_annex_url).localpath)
                     if origin_git_path.name != '.git':
                         origin_git_path /= '.git'
                 except Exception:
-                    # TODO: What level? + note, that annex-dead is independ
-                    lgr.warning("origin doesn't seem local: %s\nno symlinks "
-                                "being used", origin_annex_url)
-                    pass
+                    # TODO: Warning level okay or is info level sufficient?
+                    # Note, that setting annex-dead is independent of
+                    # symlinking .git/annex. It might still make sense to
+                    # have an ephemeral clone that doesn't propagate its avail.
+                    # info. Therefore don't fail altogether.
+                    lgr.warning("reckless=ephemeral mode: origin doesn't seem "
+                                "local: %s\nno symlinks being used",
+                                origin_annex_url)
             if origin_git_path:
                 # TODO make sure that we do not delete any unique data
                 rmtree(str(annex_dir)) \
@@ -642,7 +646,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                                      target_is_directory=True)
         else:
             # TODO: What level? + note, that annex-dead is independ
-            lgr.warning("Unable to create symlinks.")
+            lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
+                        "this file system.")
 
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
