@@ -352,6 +352,7 @@ def test_rename_remote(cwd, remote_cwd):
         assert_false(ops.exists(link_path))
 
 
+@skip_if_on_windows  # not yet implemented on windows
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
