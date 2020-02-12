@@ -465,3 +465,11 @@ def test_change_group_local():
 
 def test_change_group_remote():
     raise SkipTest("TODO")
+
+
+def test_get():
+    raise SkipTest("TODO")
+
+
+def test_put():
+    raise SkipTest("TODO")

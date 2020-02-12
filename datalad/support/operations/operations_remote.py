@@ -128,6 +128,20 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
             quote_cmdlinearg(str(path))
         ))
 
+    def get(self, source, destination, recursive=False, preserve_attrs=False):
+        source = self._ensure_absolute_remote(source)
+        destination = self._ensure_absolute(destination)
+
+        self.con.get(source, destination, recursive=recursive,
+                     preserve_attrs=preserve_attrs)
+
+    def put(self, source, destination, recursive=False, preserve_attrs=False):
+        source = self._ensure_absolute(source)
+        destination = self._ensure_absolute_remote(destination)
+
+        self.con.put(source, destination, recursive=recursive,
+                     preserve_attrs=preserve_attrs)
+
 
 class RemotePersistentSSHShellOperations(RemoteOperationsBase):
 

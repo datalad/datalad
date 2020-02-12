@@ -190,3 +190,25 @@ class RemoteOperationsBase(OperationsBase):
         if not path.is_absolute() and self._remote_cwd:
             path = self._remote_cwd / path
         return path
+
+    def get(self, source, destination, recursive=False, preserve_attrs=False):
+        # TODO: Doc. Not quite sure yet. For now signature is copied from
+        #       SSHConnection. Trying to use it delegating to SSHConnection from
+        #       within RemoteSSHShellOperations and differently from within
+        #       RemotePersistentSSHShellOperations. Let's see how that works.
+        #
+        #       Eventually we might even want get/put to be "copy" instead,
+        #       that can be performed locally as well. Would most consistent
+        #       with base idea about those command abstractions.
+        raise NotImplementedError
+
+    def put(self, source, destination, recursive=False, preserve_attrs=False):
+        # TODO: Doc. Not quite sure yet. For now signature is copied from
+        #       SSHConnection. Trying to use it delegating to SSHConnection from
+        #       within RemoteSSHShellOperations and differently from within
+        #       RemotePersistentSSHShellOperations. Let's see how that works.
+        #
+        #       Eventually we might even want get/put to be "copy" instead,
+        #       that can be performed locally as well. Would most consistent
+        #       with base idea about those command abstractions.
+        raise NotImplementedError
