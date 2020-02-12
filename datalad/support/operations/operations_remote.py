@@ -46,17 +46,13 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
             use_remote_annex_bundle=use_remote_annex_bundle,
             force_ip=force_ip)
 
-        # TODO: Not sure yet about the following part. Might be better to
-        #   to deal with this per command
-        self.con.open()
-        if self._remote_cwd:
-            self.con("cd {}".format(quote_cmdlinearg(str(self._remote_cwd))))
-
     def make_directory(self, path, force=False):
+        path = self._ensure_absolute_remote(path)
         self.con("mkdir {} {}".format("-p" if force else "",
                                       quote_cmdlinearg(str(path))))
 
     def exists(self, path):
+        path = self._ensure_absolute_remote(path)
         try:
             self.con("test -e {}".format(quote_cmdlinearg(str(path))))
             return True
@@ -64,6 +60,7 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
             return False
 
     def remove(self, path, recursive=False):
+        path = self._ensure_absolute_remote(path)
         path = quote_cmdlinearg(str(path))
 
         # test for directory:
@@ -87,6 +84,8 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
         self.con(cmd)
 
     def rename(self, src, dst):
+        src = self._ensure_absolute_remote(src)
+        dst = self._ensure_absolute_remote(dst)
 
         self.con('mv {} {}'.format(quote_cmdlinearg(str(src)),
                                    quote_cmdlinearg(str(dst))))

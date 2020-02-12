@@ -32,7 +32,7 @@ class OperationsBase(object):
     def _ensure_absolute(self, path):
         """Internal helper to make a path absolute
 
-        If relative path is given, interprete it as relative to initialized CWD
+        If relative path is given, interpret it as relative to initialized CWD
         if any, to PWD otherwise.
 
         Parameters
@@ -117,6 +117,7 @@ class OperationsBase(object):
         # Need a unified behavior across subclasses
         raise NotImplementedError
 
+    # TODO: What do we want to do with symlinks? Follow? Make an option?
     def change_permissions(self, path, mode, recursive=False):
         """Change the permissions for a path
 
@@ -131,6 +132,7 @@ class OperationsBase(object):
         """
         raise NotImplementedError
 
+    # TODO: What do we want to do with symlinks? Follow? Make an option?
     def change_group(self, path, label, recursive=False):
         """Change the group ownership for a path
 
@@ -164,3 +166,27 @@ class RemoteOperationsBase(OperationsBase):
         super(RemoteOperationsBase, self).__init__(cwd=cwd)
 
         self._remote_cwd = remote_cwd
+
+    def _ensure_absolute_remote(self, path):
+        """Internal helper to make a path absolute
+
+        If relative path is given, interpret it as relative to initialized
+        REMOTE_CWD if any, pass into remote operation unchanged otherwise.
+
+        Parameters
+        ----------
+        path : Path
+
+        Returns
+        -------
+        Path
+        """
+
+        # Note, that this doesn't actually resolve the path. For now, this is
+        # intentional to not get completely confusing return values. This is
+        # only about interpreting as relative to the correct base.
+        # TODO: possibly turn this into a decorator, that allows to assign
+        #       arguments of the actual methods, that need to go through this.
+        if not path.is_absolute() and self._remote_cwd:
+            path = self._remote_cwd / path
+        return path
