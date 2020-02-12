@@ -64,9 +64,27 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
             return False
 
     def remove(self, path, recursive=False):
+        path = quote_cmdlinearg(str(path))
 
-        self.con('rm {} -f {}'.format('-r' if recursive else '',
-                                      quote_cmdlinearg(str(path))))
+        # test for directory:
+        isdir = True
+        try:
+            self.con('[ -d {} ]'.format(path))
+        except CommandError as e:
+            if e.code != 0:
+                isdir = False
+
+        # build actual command
+        if isdir:
+            if recursive:
+                cmd = "rm -r -f {}".format(path)
+            else:
+                cmd = "rmdir {}".format(path)
+
+        else:
+            cmd = "rm -f {}".format(path)
+
+        self.con(cmd)
 
     def rename(self, src, dst):
 

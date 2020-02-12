@@ -36,7 +36,6 @@ class PurePythonOperations(OperationsBase):
         dst = self._ensure_absolute(dst)
         return src.rename(dst)
 
-    # TODO: force? How about permissions?
     def remove(self, path, recursive=False):
         path = self._ensure_absolute(path)
 
@@ -49,13 +48,15 @@ class PurePythonOperations(OperationsBase):
                 else:
                     p.unlink()
 
-        if path.is_dir():
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            # result oriented; don't raise
+            pass
+        except IsADirectoryError:
             if recursive:
                 _remove_dir_content(path)
-            else:
-                path.rmdir()
-        else:
-            path.unlink()
+            path.rmdir()
 
     def change_permissions(self, path, mode, recursive=False):
         # TODO: mode should prob. mapped from labels to whatever is needed

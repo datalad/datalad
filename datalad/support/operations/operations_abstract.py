@@ -85,8 +85,13 @@ class OperationsBase(object):
         """
         raise NotImplementedError
 
+    # TODO: force? How about permissions?
     def remove(self, path, recursive=False):
         """Remove the given path
+
+        Note, that this is supposed to not raise in case `path` doesn't exist
+        and `recursive` isn't required for an empty directory (as opposed to
+        plain shell "rm").
 
         Parameters
         ----------

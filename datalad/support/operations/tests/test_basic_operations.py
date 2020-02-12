@@ -200,11 +200,17 @@ def test_remove_local(dir_path, link_path, cwd):
     ops.remove(dir_path)
     ops.make_directory(dir_path)
     ok_(ops.exists(dir_path))
-    # directory, but w/o recursive
-    assert_raises(CommandError, ops.remove, dir_path)
+    # empty directory
+    ops.remove(dir_path)
+    assert_false(ops.exists(dir_path))
+    # recreate for a tree
+    ops.make_directory(dir_path)
     ok_(ops.exists(dir_path))
     underneath = (dir_path / 'some')
     underneath.write_text('content')
+    # non-empty dir w/o recursive
+    assert_raises(OSError, ops.remove(dir_path))
+    ok_(ops.exists(dir_path))
     # non-empty dir w/ recursive
     ops.remove(dir_path, recursive=True)
     assert_false(ops.exists(dir_path))
@@ -244,11 +250,17 @@ def test_remove_remote(dir_path, link_path, cwd, remote_cwd):
     ops.remove(dir_path)
     ops.make_directory(dir_path)
     ok_(ops.exists(dir_path))
-    # directory, but w/o recursive
-    assert_raises(CommandError, ops.remove, dir_path)
+    # empty directory
+    ops.remove(dir_path)
+    assert_false(ops.exists(dir_path))
+    # recreate for a tree
+    ops.make_directory(dir_path)
     ok_(ops.exists(dir_path))
     underneath = (dir_path / 'some')
     underneath.write_text('content')
+    # non-empty dir w/o recursive
+    assert_raises(CommandError, ops.remove(dir_path))
+    ok_(ops.exists(dir_path))
     # non-empty dir w/ recursive
     ops.remove(dir_path, recursive=True)
     assert_false(ops.exists(dir_path))
