@@ -620,9 +620,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # don't lookup the dict for the same things several times;
         # Is there a faster (and more compact) way of doing this? Note, that
         # locals() can't be updated.
-        s = parsed['s'] if 's' in parsed.keys() else None
-        S = parsed['S'] if 'S' in parsed.keys() else None
-        C = parsed['C'] if 'C' in parsed.keys() else None
+        s = parsed.get('s')
+        S = parsed.get('S')
+        C = parsed.get('C')
 
         if S is None and C is None:
             return s  # also okay if s is None as well -> no size to report
