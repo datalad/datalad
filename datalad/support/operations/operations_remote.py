@@ -73,7 +73,8 @@ class RemoteSSHShellOperations(RemoteOperationsBase):
     def exists(self, path):
         path = self._ensure_absolute_remote(path)
         try:
-            self.con("test -e {}".format(quote_cmdlinearg(str(path))))
+            self.con("[ -h {p} -o -e {p} ]".format(
+                p=quote_cmdlinearg(str(path))))
             return True
         except CommandError:
             return False
