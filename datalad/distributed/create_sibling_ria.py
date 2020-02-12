@@ -175,7 +175,7 @@ class CreateSiblingRia(Interface):
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice(
-                'skip', 'replace', 'error', 'reconfigure'),
+                'skip', 'replace', 'error', 'reconfigure') | EnsureNone(),
             metavar='MODE',
             doc="""Action to perform, if a sibling or ria-remote is already
             configured under the given name and/or a target already exists.
@@ -186,6 +186,15 @@ class CreateSiblingRia(Interface):
             ('error').""", ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        trust_level=Parameter(
+            args=("--trust-level",),
+            metavar="TRUST-LEVEL",
+            constraints=EnsureChoice(
+                'trust', 'semitrust', 'untrust') | EnsureNone(),
+            doc="""specify a trust level for the RIA sibling. Internally this
+            will call the respective git-annex command. If not specified
+            nothing will be explicitly done, thereby defaulting to git-annex'
+            default.""",),
     )
 
     @staticmethod
@@ -200,6 +209,7 @@ class CreateSiblingRia(Interface):
                  group=None,
                  ria_remote=True,
                  existing='error',
+                 trust_level=None,
                  recursive=False,
                  recursion_limit=None
                  ):
@@ -305,6 +315,7 @@ class CreateSiblingRia(Interface):
             shared,
             group,
             post_update_hook,
+            trust_level,
             res_kwargs)
 
         if recursive:
@@ -326,6 +337,7 @@ class CreateSiblingRia(Interface):
                     shared,
                     group,
                     post_update_hook,
+                    trust_level,
                     res_kwargs)
 
 
@@ -339,6 +351,7 @@ def _create_sibling_ria(
         shared,
         group,
         post_update_hook,
+        trust_level,
         res_kwargs):
     # be safe across datasets
     res_kwargs = res_kwargs.copy()
@@ -452,6 +465,10 @@ def _create_sibling_ria(
             remote=ria_remote_name,
             fast=True,
             annex_options=['--exclude=*/*'])
+
+        if trust_level:
+            ds.repo.call_git(['annex', trust_level, ria_remote_name])
+
     else:
         # with no special remote we currently need to create the
         # required directories

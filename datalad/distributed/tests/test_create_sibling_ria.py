@@ -121,6 +121,17 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     eq_({'datastore', 'datastore-ria', 'here'},
         {s['name'] for s in sub_siblings})
 
+    # for testing trust_level parameter, redo for each label:
+    for trust in ['trust', 'semitrust', 'untrust']:
+        ds.create_sibling_ria("ria+ssh://test-store:",
+                              "datastore",
+                              existing='replace',
+                              trust_level=trust)
+        res = ds.repo.repo_info()
+        assert_in('[datastore-ria]',
+                  [r['description']
+                   for r in res['{}ed repositories'.format(trust)]])
+
 
 def test_create_simple():
 
