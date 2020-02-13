@@ -40,10 +40,10 @@ def test_get_default_title(path):
 
     # Initialize and get UUID
     ds.create(force=True)
-    eq_(_get_default_title(ds), f'{dirname}#{ds.id}')
+    eq_(_get_default_title(ds), '{dirname}#{ds.id}'.format(**locals()))
 
     # Tag and get @version
     # cannot use ds.save since our tags are not annotated,
     # see https://github.com/datalad/datalad/issues/4139
     ds.repo.tag("0.1", message="important version")
-    eq_(_get_default_title(ds), f'{dirname}#{ds.id}@0.1')
+    eq_(_get_default_title(ds), '{dirname}#{ds.id}@0.1'.format(**locals()))
