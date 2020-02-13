@@ -15,7 +15,7 @@ import os
 import logging
 from os.path import join as opj
 from os.path import exists
-from nose.tools import assert_raises, assert_equal
+from datalad.tests.utils import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_in

@@ -16,8 +16,8 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import known_failure_githubci_win
 
-from nose import SkipTest
-from nose.tools import assert_equal
+from datalad.tests.utils import SkipTest
+from datalad.tests.utils import assert_equal
 
 
 @with_tree(tree={'file.dat': ''})

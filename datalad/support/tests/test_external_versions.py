@@ -26,12 +26,12 @@ from ...tests.utils import (
 )
 
 from unittest.mock import patch
-from nose.tools import (
+from datalad.tests.utils import (
     assert_true, assert_false,
     assert_equal, assert_greater_equal, assert_greater,
     assert_raises, assert_in
 )
-from nose import SkipTest
+from datalad.tests.utils import SkipTest
 
 
 # just to ease testing

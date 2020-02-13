@@ -12,7 +12,7 @@ import sys
 from unittest.mock import patch
 from io import StringIO
 from tempfile import NamedTemporaryFile
-from nose.tools import assert_raises, assert_equal
+from datalad.tests.utils import assert_raises, assert_equal
 
 from .. import __main__, __version__
 from ..auto import AutomagicIO

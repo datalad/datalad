@@ -23,7 +23,7 @@ from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.create_test_dataset import _parse_spec
 
-from nose.tools import eq_
+from datalad.tests.utils import eq_
 
 
 @with_tempfile(mkdir=True)

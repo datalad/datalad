@@ -15,7 +15,7 @@ from ..support.s3 import add_version_to_url, get_versioned_url
 from .utils import use_cassette
 from .utils import ok_startswith
 
-from nose.tools import eq_, assert_raises
+from datalad.tests.utils import eq_, assert_raises
 from datalad.tests.utils import skip_if_no_network
 from ..downloaders.tests.utils import get_test_providers
 

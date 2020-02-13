@@ -27,7 +27,7 @@ from datalad.utils import Path
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, \
+from datalad.tests.utils import ok_, eq_, assert_false, assert_equal, assert_true, \
     assert_is_instance, assert_is_none, assert_is_not, assert_is_not_none
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, with_testrepos

@@ -44,7 +44,7 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import assert_true, assert_equal, assert_raises
+from datalad.tests.utils import assert_true, assert_equal, assert_raises
 
 
 _dataset_hierarchy_template = {

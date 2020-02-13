@@ -10,7 +10,7 @@
 
 """
 
-from nose.tools import assert_is_instance
+from datalad.tests.utils import assert_is_instance
 
 import logging
 

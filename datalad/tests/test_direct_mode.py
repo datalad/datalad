@@ -19,7 +19,7 @@ import logging
 import datalad.api
 from datalad import cfg
 
-from nose.tools import ok_
+from datalad.tests.utils import ok_
 from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo

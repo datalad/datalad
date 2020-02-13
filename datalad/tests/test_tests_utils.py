@@ -25,8 +25,8 @@ from os.path import exists, join as opj, basename
 from urllib.request import urlopen
 
 from unittest.mock import patch
-from nose.tools import assert_in, assert_not_in, assert_true
-from nose import SkipTest
+from datalad.tests.utils import assert_in, assert_not_in, assert_true
+from datalad.tests.utils import SkipTest
 
 from ..utils import getpwd, chpwd
 

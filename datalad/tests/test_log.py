@@ -14,7 +14,7 @@ import os.path
 from os.path import exists
 
 from logging import makeLogRecord
-from nose.tools import assert_raises, assert_is_instance, assert_true
+from datalad.tests.utils import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
 from unittest.mock import patch

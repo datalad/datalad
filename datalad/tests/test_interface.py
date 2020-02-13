@@ -10,7 +10,7 @@
 """
 
 import re
-from nose.tools import assert_is, assert_equal, assert_raises, assert_true
+from datalad.tests.utils import assert_is, assert_equal, assert_raises, assert_true
 
 from ..support.param import Parameter
 from ..support import constraints as cnstr

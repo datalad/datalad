@@ -10,7 +10,7 @@
 
 from io import StringIO as SIO
 from os.path import exists
-from nose import SkipTest
+from datalad.tests.utils import SkipTest
 try:
     import formatters as fmt
 except ImportError:  # pragma: no cover

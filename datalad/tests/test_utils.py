@@ -68,7 +68,7 @@ from ..utils import Path
 
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import (
+from datalad.tests.utils import (
     assert_equal,
     assert_false,
     assert_greater,

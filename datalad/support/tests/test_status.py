@@ -9,7 +9,7 @@
 
 from ..status import FileStatus
 from ...tests.utils import assert_equal, assert_false
-from nose.tools import assert_not_equal
+from datalad.tests.utils import assert_not_equal
 
 def test_FileStatus_basic():
     assert_equal(FileStatus(size=0), FileStatus(size=0))

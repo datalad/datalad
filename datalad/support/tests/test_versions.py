@@ -11,7 +11,7 @@ from ..versions import get_versions
 from ...tests.utils import assert_equal, assert_false
 from ...tests.utils import assert_raises
 from ...support.status import FileStatus
-from nose.tools import assert_not_equal
+from datalad.tests.utils import assert_not_equal
 from collections import OrderedDict as od
 
 

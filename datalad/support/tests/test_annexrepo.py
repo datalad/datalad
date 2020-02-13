@@ -26,7 +26,7 @@ from os.path import curdir
 from os.path import pardir
 from os.path import exists
 from shutil import copyfile
-from nose.tools import assert_not_is_instance
+from datalad.tests.utils import assert_not_is_instance
 
 
 from urllib.parse import urljoin

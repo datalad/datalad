@@ -25,7 +25,7 @@ from datalad.tests.utils import create_tree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
-from nose.tools import eq_, assert_false
+from datalad.tests.utils import eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos
 from datalad.tests.utils import ok_file_has_content

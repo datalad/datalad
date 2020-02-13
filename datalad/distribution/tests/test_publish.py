@@ -27,8 +27,8 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.utils import chpwd
 
-from nose.tools import eq_, ok_, assert_is_instance
-from nose.tools import assert_false as nok_
+from datalad.tests.utils import eq_, ok_, assert_is_instance
+from datalad.tests.utils import assert_false as nok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.utils import _path_

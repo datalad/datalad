@@ -16,7 +16,7 @@ from os import makedirs
 from os.path import join as opj
 from os.path import dirname
 from datalad.api import Dataset
-from nose.tools import assert_equal, assert_raises
+from datalad.tests.utils import assert_equal, assert_raises
 from datalad.utils import (
     chpwd,
     swallow_logs,

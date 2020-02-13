@@ -11,7 +11,7 @@
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.extractors.datalad_rfc822 import MetadataExtractor
-from nose.tools import assert_equal
+from datalad.tests.utils import assert_equal
 from datalad.tests.utils import with_tree
 
 

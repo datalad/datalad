@@ -14,7 +14,7 @@ Note: DryRunProtocol and NullProtocol are already (kind of) tested within
 
 import os
 from os.path import normpath
-from nose.tools import ok_, eq_, assert_is, assert_equal, assert_greater, \
+from datalad.tests.utils import ok_, eq_, assert_is, assert_equal, assert_greater, \
     assert_raises, assert_in, assert_is_instance, assert_true, assert_false
 
 from ..support.protocol import DryRunProtocol, DryRunExternalsProtocol, \

@@ -27,7 +27,7 @@ from datalad.support.gitrepo import (
 )
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import eq_, assert_false, assert_is_instance, ok_
+from datalad.tests.utils import eq_, assert_false, assert_is_instance, ok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
 from datalad.tests.utils import create_tree
