@@ -66,6 +66,9 @@ from datalad.distribution.dataset import (
 from datalad.distribution.utils import (
     _get_flexible_source_candidates,
 )
+from datalad.utils import (
+    check_symlink_capability
+)
 
 __docformat__ = 'restructuredtext'
 
@@ -304,7 +307,7 @@ def clone_dataset(
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
-    reckless : {None, 'auto'}, optional
+    reckless : {None, 'auto', 'ephemeral'}, optional
       Mode switch to put cloned dataset into throw-away configurations, i.e.
       sacrifice data safety for performance or resource footprint.
     description : str, optional
@@ -513,17 +516,17 @@ def clone_dataset(
 def postclonecfg_ria(ds, props):
     """Configure a dataset freshly cloned from a RIA store"""
     # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
-    # ssh) would make it see a bare repo and establish a hashdir lower annex object
-    # tree.
+    # ssh) would make it see a bare repo and establish a hashdir lower annex
+    # object tree.
     # Moreover, we want the RIA remote to receive all data for the store, so its
     # objects could be moved into archives (the main point of a RIA store).
     ds.config.set(
         'remote.origin.annex-ignore', 'true',
         where='local')
 
-    # chances are that if this dataset came from a RIA store, its subdatasets may live
-    # there too. Place a subdataset source candidate config that makes get probe this
-    # RIA store when obtaining subdatasets
+    # chances are that if this dataset came from a RIA store, its subdatasets
+    # may live there too. Place a subdataset source candidate config that makes
+    # get probe this RIA store when obtaining subdatasets
     ds.config.set(
         # we use the label 'origin' for this candidate in order to not have to
         # generate a complicated name from the actual source specification
@@ -534,12 +537,24 @@ def postclonecfg_ria(ds, props):
         props['source'].split('#', maxsplit=1)[0] + '#{id}',
         where='local')
 
-    # TODO setup publication dependency, if a corresponding special remote exists
+    # setup publication dependency, if a corresponding special remote exists
     # and was enabled (there could be RIA stores that actually only have repos)
-    # make this function be a generator even though it doesn't actually yield
-    # anything yet
-    if None:
-        yield None
+    # make this function be a generator
+    ria_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
+                   if s.get('annex-externaltype', None) == 'ria'
+    ]
+    if not ria_remotes:
+        lgr.debug("Found no RIA special remote")
+    elif len(ria_remotes) == 1:
+        yield from ds.siblings('configure',
+                               name='origin',
+                               publish_depends=ria_remotes[0]['name'],
+                               result_filter=None,
+                               result_renderer='disabled')
+    else:
+        lgr.warning("Found multiple RIA remotes. Couldn't decide which "
+                    "publishing to origin should depend on: %s",
+                    [r['name'] for r in ria_remotes])
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None):
@@ -554,17 +569,10 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         return
 
     # init annex when traces of a remote annex can be detected
-    if reckless:
+    if reckless == 'auto':
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
             "sources, if possible (reckless)", ds.path)
-        # store the reckless setting in the dataset to make it
-        # known to later clones of subdatasets via get()
-        ds.config.set(
-            'datalad.clone.reckless', reckless,
-            where='local',
-            # delay reload until all config IO is done
-            reload=False)
         ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
 
@@ -575,15 +583,80 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
     # If such an instance already exists, its __init__ will not be executed.
-    # Therefore do quick test once we have an object and decide whether to call its _init().
+    # Therefore do quick test once we have an object and decide whether to call
+    # its _init().
     #
     # Additionally, call init if we need to add a description (see #1403),
     # since AnnexRepo.__init__ can only do it with create=True
     repo = AnnexRepo(ds.path, init=True)
     if not repo.is_initialized() or description:
         repo._init(description=description)
-    if reckless:
+    if reckless == 'auto':
         repo._run_annex_command('untrust', annex_options=['here'])
+
+    elif reckless == 'ephemeral':
+        # with ephemeral we declare 'here' as 'dead' right away, whenever
+        # we symlink origin's annex, since availability from 'here' should
+        # not be propagated for an ephemeral clone when we publish back to
+        # origin.
+        # This will cause stuff like this for a locally present annexed file:
+        # % git annex whereis d1
+        # whereis d1 (0 copies) failed
+        # BUT this works:
+        # % git annex find . --not --in here
+        # % git annex find . --in here
+        # d1
+
+        # we don't want annex copy-to origin
+        ds.config.set(
+            'remote.origin.annex-ignore', 'true',
+            where='local')
+
+        ds.repo.set_remote_dead('here')
+
+        if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
+                                    ds.repo.dot_git / 'dl_target_test'):
+            # symlink the annex to avoid needless copies in an emphemeral clone
+            annex_dir = ds.repo.dot_git / 'annex'
+            origin_annex_url = ds.config.get("remote.origin.url", None)
+            origin_git_path = None
+            if origin_annex_url:
+                try:
+                    # Deal with file:// scheme URLs as well as plain paths.
+                    # If origin isn't local, we have nothing to do.
+                    origin_git_path = Path(RI(origin_annex_url).localpath)
+                    if origin_git_path.name != '.git':
+                        origin_git_path /= '.git'
+                except ValueError:
+                    # Note, that accessing localpath on a non-local RI throws
+                    # ValueError rather than resulting in an AttributeError.
+                    # TODO: Warning level okay or is info level sufficient?
+                    # Note, that setting annex-dead is independent of
+                    # symlinking .git/annex. It might still make sense to
+                    # have an ephemeral clone that doesn't propagate its avail.
+                    # info. Therefore don't fail altogether.
+                    lgr.warning("reckless=ephemeral mode: origin doesn't seem "
+                                "local: %s\nno symlinks being used",
+                                origin_annex_url)
+            if origin_git_path:
+                # TODO make sure that we do not delete any unique data
+                rmtree(str(annex_dir)) \
+                    if not annex_dir.is_symlink() else annex_dir.unlink()
+                annex_dir.symlink_to(origin_git_path / 'annex',
+                                     target_is_directory=True)
+        else:
+            # TODO: What level? + note, that annex-dead is independ
+            lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
+                        "this file system.")
+
+    if reckless:
+        # we successfully dealt with reckless here.
+        # store the reckless setting in the dataset to make it
+        # known to later clones of subdatasets via get()
+        ds.config.set(
+            'datalad.clone.reckless', reckless,
+            where='local',
+            reload=True)
 
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
@@ -604,8 +677,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         except ValueError:
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
-                'dataset %s as bool.  You might need to enable it later '
-                'manually and/or fix it up to avoid this message in the future.',
+                'dataset %s as bool.'
+                'You might need to enable it later manually and/or fix it up to'
+                ' avoid this message in the future.',
                 sr_autoenable, sr_name, ds.path)
             continue
 
@@ -630,7 +704,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             " but no UUIDs for them yet known for dataset %s",
             # since we are only at debug level, we could call things their
             # proper names
-            single_or_plural("special remote", "special remotes", len(srs[True]), True),
+            single_or_plural("special remote",
+                             "special remotes", len(srs[True]), True),
             ", ".join(srs[True]),
             ds.path
         )
@@ -638,10 +713,12 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     if srs[False]:
         # if has no auto-enable special remotes
         lgr.info(
-            'access to %s %s not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
+            'access to %s %s not auto-enabled, enable with:\n'
+            '\t\tdatalad siblings -d "%s" enable -s %s',
             # but since humans might read it, we better confuse them with our
             # own terms!
-            single_or_plural("dataset sibling", "dataset siblings", len(srs[False]), True),
+            single_or_plural("dataset sibling",
+                             "dataset siblings", len(srs[False]), True),
             ", ".join(srs[False]),
             ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
