@@ -34,7 +34,7 @@ def with_store_insteadof(func):
                     ''.format(prot='ssh' if host else 'file',
                               host=host if host else '',
                               path=base_path),
-                    'ria+ssh://test-store:', where='global')
+                    'ria+ssh://test-store:', where='global', reload=True)
             return func(*args, **kwargs)
         finally:
             cfg.unset('url.ria+{prot}://{host}{path}.insteadOf'
@@ -67,6 +67,7 @@ def test_invalid_calls(path):
 def _test_create_store(host, base_path, ds_path, clone_path):
 
     ds = Dataset(ds_path).create(force=True)
+
     subds = ds.create('sub', force=True)
     ds.save(recursive=True)
     assert_repo_status(ds.path)

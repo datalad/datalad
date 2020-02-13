@@ -244,7 +244,7 @@ script:
   - sudo pip install .
   # install RIA special remote
   # TODO: Remove whenever move of git-annex-ria-remote to datalad-core is finished
-  - sudo pip install git+https://github.com/datalad/git-annex-ria-remote@transition-to-core
+  - sudo pip install git+https://github.com/bpoldrack/git-annex-ria-remote@transition-to-core
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
