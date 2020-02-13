@@ -148,10 +148,10 @@ def _get_default_title(dataset):
     from ..support.path import basename
     title = basename(dataset.path)
     if dataset.id:
-        title += f"#{dataset.id}"
+        title += "#{dataset.id}".format(**locals())
     version = dataset.repo.describe()
     if version:
-        title += f"@{version}"
+        title += "@{version}".format(**locals())
     # 3 is minimal length. Just in case there is no UUID or version and dir
     # is short
     if len(title) < 3:
