@@ -643,6 +643,13 @@ class StdOutCaptureWithGitProgress(GitProgress):
 class FetchInfo(dict):
     """
     dict that carries results of a fetch operation of a single head
+
+    Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
     """
 
     NEW_TAG, NEW_HEAD, HEAD_UPTODATE, TAG_UPDATE, REJECTED, FORCED_UPDATE, \
@@ -725,8 +732,15 @@ class FetchInfo(dict):
 
 
 class PushInfo(dict):
-    """dict that carries results of a push operation of a single head"""
+    """dict that carries results of a push operation of a single head
 
+    Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
     NEW_TAG, NEW_HEAD, NO_MATCH, REJECTED, REMOTE_REJECTED, REMOTE_FAILURE, DELETED, \
         FORCED_UPDATE, FAST_FORWARD, UP_TO_DATE, ERROR = [1 << x for x in range(11)]
 
