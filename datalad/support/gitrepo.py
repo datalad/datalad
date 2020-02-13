@@ -2375,7 +2375,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def fetch(self, remote=None, refspec=None, all_=False, git_options=None,
               **kwargs):
-        """
+        """Fetches changes from a remote (or all remotes).
+
+        Parameters
+        ----------
+        remote : str, optional
+          name of the remote to fetch from. If no remote is given and
+          `all_` is not set, the tracking branch is fetched.
+        refspec : str, optional
+          refspec to fetch.
+        all_ : bool, optional
+          fetch all remotes (and all of their branches).
+          Fails if `remote` was given.
+        git_options : list, optional
+          Additional command line options for git-push.
         kwargs :
           Deprecated. GitPython-style keyword argument for git-push.
           Will be appended to any git_options.
@@ -2394,21 +2407,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     @guard_BadName
     def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
-        """Fetches changes from a remote (or all remotes).
-
-        Parameters
-        ----------
-        remote : str, optional
-          name of the remote to fetch from. If no remote is given and
-          `all_` is not set, the tracking branch is fetched.
-        refspec : str, optional
-          refspec to fetch.
-        all_ : bool, optional
-          fetch all remotes (and all of their branches).
-          Fails if `remote` was given.
-        git_options : list, optional
-          Additional command line options for git-push.
-        """
+        """Like `fetch`, but returns a generator"""
         yield from self._fetch_push_helper(
             base_cmd=['git', 'fetch', '--verbose', '--progress'],
             action='fetch',
@@ -2481,7 +2480,19 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def push(self, remote=None, refspec=None, all_remotes=False,
              all_=False, git_options=None, **kwargs):
-        """
+        """Push changes to a remote (or all remotes).
+
+        Parameters
+        ----------
+        remote : str, optional
+          name of the remote to push to. If no remote is given and
+          `all_` is not set, the tracking branch is pushed.
+        refspec : str, optional
+          refspec to push.
+        all_ : bool, optional
+          push to all remotes. Fails if `remote` was given.
+        git_options : list, optional
+          Additional command line options for git-push.
         kwargs :
           Deprecated. GitPython-style keyword argument for git-push.
           Will be appended to any git_options.
@@ -2502,20 +2513,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         )
 
     def push_(self, remote=None, refspec=None, all_=False, git_options=None):
-        """Push changes to a remote (or all remotes).
-
-        Parameters
-        ----------
-        remote : str, optional
-          name of the remote to push to. If no remote is given and
-          `all_` is not set, the tracking branch is pushed.
-        refspec : str, optional
-          refspec to push.
-        all_ : bool, optional
-          push to all remotes. Fails if `remote` was given.
-        git_options : list, optional
-          Additional command line options for git-push.
-        """
+        """Like `push`, but returns a generator"""
         yield from self._fetch_push_helper(
             base_cmd=['git', 'push', '--progress', '--porcelain'],
             action='push',
