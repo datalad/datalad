@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 from distutils.version import LooseVersion
 from glob import glob
 import logging
+import os
 from os.path import join as opj, relpath, normpath, dirname, curdir
 
 import datalad
@@ -120,23 +121,16 @@ def _create_dataset_sibling(
     if remoteds_path != '.':
         # check if target exists
         # TODO: Is this condition valid for != '.' only?
-        path_exists = True
-        try:
-            out, err = ssh("ls {}".format(sh_quote(remoteds_path)))
-        except CommandError as e:
-            if "No such file or directory" in e.stderr and \
-                    remoteds_path in e.stderr:
-                path_exists = False
-            else:
-                raise  # It's an unexpected failure here
+        path_children = _ls_remote_path(ssh, remoteds_path)
+        path_exists = path_children is not None
 
         if path_exists:
             _msg = "Target path %s already exists." % remoteds_path
-            # path might be existing but be an empty directory, which should be
-            # ok to remove
+        if path_exists and not path_children:
+            # path should be an empty directory, which should be ok to remove
             try:
                 lgr.debug(
-                    "Trying to rmdir %s on remote since might be an empty dir",
+                    "Trying to rmdir %s on remote since seems to be an empty dir",
                     remoteds_path
                 )
                 # should be safe since should not remove anything unless an empty dir
@@ -163,6 +157,27 @@ def _create_dataset_sibling(
                 lgr.info(_msg + " Skipping")
                 return
             elif existing == 'replace':
+                if path_children:
+                    has_git = '.git' in path_children
+                    _msg_stats = _msg \
+                                 + " It is %sa git repository and has %d files/dirs." % (
+                                     "" if has_git else "not ", len(path_children)
+                                 )
+                    from datalad.ui import ui
+                    remove = False
+                    if ui.is_interactive:
+                        remove = ui.yesno(
+                            "Do you really want to remove it?",
+                            title=_msg_stats,
+                            default=False
+                        )
+                    if not remove:
+                        raise RuntimeError(
+                            _msg_stats +
+                            " Remove it manually first or rerun datalad in interactive shell"
+                        )
+                # Remote location might already contain a git repository or be
+                # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
                 ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
@@ -285,6 +300,21 @@ def _create_dataset_sibling(
                       "hook.\nError: %s" % exc_str(e))
 
     return remoteds_path
+
+
+def _ls_remote_path(ssh, path):
+    try:
+        # yoh tried ls on mac
+        out, err = ssh("ls -a1 {}".format(sh_quote(path)))
+    except CommandError as e:
+        if "No such file or directory" in e.stderr and \
+                path in e.stderr:
+            return None
+        else:
+            raise  # It's an unexpected failure here
+    return [
+        o for o in out.split(os.linesep) if o not in ('.', '..', '')
+    ]
 
 
 @build_doc
