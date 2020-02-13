@@ -2605,13 +2605,24 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 )
                 if url and is_ssh(url):
                     ssh_manager.get_connection(url).open()
-                out = WitlessRunner(
-                    cwd=self.path,
-                    env=GitRunner.get_git_environ_adjusted()).run(
-                        r_cmd,
-                        protocol=protocol,
-                )
-                output = out[info_from] or ''
+                try:
+                    out = WitlessRunner(
+                        cwd=self.path,
+                        env=GitRunner.get_git_environ_adjusted()).run(
+                            r_cmd,
+                            protocol=protocol,
+                    )
+                    output = out[info_from] or ''
+                except CommandError as e:
+                    # intercept some errors that we express as an error report
+                    # in the info dicts
+                    if re.match('error: failed to (push|fetch) some refs', e.stderr):
+                        output = {1: e.stderr, 0: e.stdout}[info_from]
+                        if output is None:
+                            output = ''
+                    else:
+                        raise
+
                 for line in output.splitlines():
                     try:
                         # push info doesn't identify a remote, add it here

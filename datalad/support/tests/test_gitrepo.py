@@ -39,7 +39,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import local_testrepo_flavors
@@ -648,7 +648,15 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     # amend to make it require "--force":
     repo.commit("amended", options=['--amend'])
     # push without --force should yield an error:
-    assert_raises(CommandError, repo.push, remote="ssh-remote", refspec="ssh-test")
+    res = repo.push(remote="ssh-remote", refspec="ssh-test")
+    assert_in_results(
+        res,
+        from_ref='refs/heads/ssh-test',
+        to_ref='refs/heads/ssh-test',
+        operations=['rejected', 'error'],
+        note='[rejected] (non-fast-forward)',
+        remote='ssh-remote',
+    )
     # now push using force:
     repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
     # correct commit message in remote:
