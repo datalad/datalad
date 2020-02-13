@@ -162,28 +162,29 @@ def _create_dataset_sibling(
             elif existing == 'skip':
                 lgr.info(_msg + " Skipping")
                 return
-            elif existing == 'replace':
-                lgr.info(_msg + " Replacing")
-                # enable write permissions to allow removing dir
-                ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
-                # remove target at path
-                ssh("rm -rf {}".format(sh_quote(remoteds_path)))
-                # if we succeeded in removing it
-                path_exists = False
-                # Since it is gone now, git-annex also should forget about it
-                remotes = ds.repo.get_remotes()
-                if name in remotes:
-                    # so we had this remote already, we should announce it dead
-                    # XXX what if there was some kind of mismatch and this name
-                    # isn't matching the actual remote UUID?  should have we
-                    # checked more carefully?
-                    lgr.info(
-                        "Announcing existing remote %s dead to annex and removing",
-                        name
-                    )
-                    if isinstance(ds.repo, AnnexRepo):
-                        ds.repo.set_remote_dead(name)
-                    ds.repo.remove_remote(name)
+            # https://github.com/datalad/datalad/issues/4145
+            #elif existing == 'replace':
+            #    lgr.info(_msg + " Replacing")
+            #    # enable write permissions to allow removing dir
+            #    ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
+            #    # remove target at path
+            #    ssh("rm -rf {}".format(sh_quote(remoteds_path)))
+            #    # if we succeeded in removing it
+            #    path_exists = False
+            #    # Since it is gone now, git-annex also should forget about it
+            #    remotes = ds.repo.get_remotes()
+            #    if name in remotes:
+            #        # so we had this remote already, we should announce it dead
+            #        # XXX what if there was some kind of mismatch and this name
+            #        # isn't matching the actual remote UUID?  should have we
+            #        # checked more carefully?
+            #        lgr.info(
+            #            "Announcing existing remote %s dead to annex and removing",
+            #            name
+            #        )
+            #        if isinstance(ds.repo, AnnexRepo):
+            #            ds.repo.set_remote_dead(name)
+            #        ds.repo.remove_remote(name)
             elif existing == 'reconfigure':
                 lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
@@ -379,13 +380,14 @@ class CreateSibling(Interface):
         recursion_limit=recursion_limit,
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
+            # https://github.com/datalad/datalad/issues/4145
+            #constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure'),
             metavar='MODE',
             doc="""action to perform, if a sibling is already configured under the
             given name and/or a target directory already exists.
-            In this case, a dataset can be skipped ('skip'), an existing target
-            directory be forcefully re-initialized, and the sibling (re-)configured
-            ('replace', implies 'reconfigure'), the sibling configuration be updated
+            In this case, a dataset can be skipped ('skip'),
+            the sibling configuration be updated
             only ('reconfigure'), or to error ('error').""",),
         inherit=inherit_opt,
         shared=Parameter(

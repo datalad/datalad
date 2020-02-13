@@ -53,6 +53,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.utils import on_windows
 from datalad.utils import _path_
+from datalad.utils import rmtree
 
 import logging
 lgr = logging.getLogger('datalad.tests')
@@ -220,15 +221,17 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     # Note: on windows absolute path is not url conform. But this way it's easy
     # to test, that ssh path is correctly used.
     if not on_windows:
-        # add random file under target_path, to explicitly test existing=replace
-        open(opj(target_path, 'random'), 'w').write('123')
+        # https://github.com/datalad/datalad/issues/4145
+        ## add random file under target_path, to explicitly test existing=replace
+        #open(opj(target_path, 'random'), 'w').write('123')
 
+        rmtree(target_path)
         assert_create_sshwebserver(
             dataset=source,
             name="local_target",
             sshurl="ssh://localhost" + target_path,
             publish_by_default='master',
-            existing='replace',
+            existing='reconfigure',
             ui=True,
         )
         eq_("ssh://localhost" + urlquote(target_path),
@@ -257,7 +260,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_pushurl="ssh://localhost" + target_path,
             ui=True,
         )
-        assert_create_sshwebserver(existing='replace', **cpkwargs)
+        # https://github.com/datalad/datalad/issues/4145
+        rmtree(target_path)
+        assert_create_sshwebserver(existing='reconfigure', **cpkwargs)
         if src_is_annex:
             target_description = AnnexRepo(target_path,
                                            create=False).get_description()
@@ -496,18 +501,19 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     assert_false(out)
     assert_false(err)
 
-    # Verify that we could replace and publish no problem
-    # https://github.com/datalad/datalad/issues/1656
-    # Strangely it spits outs IncompleteResultsError exception atm... so just
-    # checking that it fails somehow
-    res = ds.create_sibling(url, on_failure='ignore')
-    assert_status('error', res)
-    assert_in('already configured', res[0]['message'][0])
-    # "Settings" such as UI do not persist, so we specify it again
-    # for the test below depending on it
-    ds.create_sibling(url, existing='replace', ui=True)
-    published2 = ds.publish(to='localhost', transfer_data='all')
-    assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
+    # https://github.com/datalad/datalad/issues/4145
+    ## Verify that we could replace and publish no problem
+    ## https://github.com/datalad/datalad/issues/1656
+    ## Strangely it spits outs IncompleteResultsError exception atm... so just
+    ## checking that it fails somehow
+    #res = ds.create_sibling(url, on_failure='ignore')
+    #assert_status('error', res)
+    #assert_in('already configured', res[0]['message'][0])
+    ## "Settings" such as UI do not persist, so we specify it again
+    ## for the test below depending on it
+    #ds.create_sibling(url, existing='replace', ui=True)
+    #published2 = ds.publish(to='localhost', transfer_data='all')
+    #assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 
     # and one more test since in above test it would not puke ATM but just
     # not even try to copy since it assumes that file is already there
