@@ -14,6 +14,9 @@ from datalad.utils import unlink
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
+import logging
+lgr = logging.getLogger('datalad.export_to_figshare')
+
 
 class FigshareRESTLaison(object):
     """A little helper to provide minimal interface to interact with Figshare
@@ -53,6 +56,10 @@ class FigshareRESTLaison(object):
             headers["Content-Type"] = "application/json"
         headers['Authorization'] = "token %s" % self.token
 
+        lgr.debug(
+            "Submitting %s request to %s with data %s (headers: %s)",
+            m.__name__, url_, data, 'sanitized'  # headers
+        )
         r = m(url_, data=data, headers=headers)
         status_code = r.status_code
         if (success != "donotcheck") and \
@@ -132,6 +139,38 @@ class FigshareRESTLaison(object):
         result = self.post('account/articles', data=data)
         result = self.get(result['location'])
         return result
+
+
+def _get_default_title(dataset):
+    """Create default title as dataset directory[#UUID][@version]
+    with any of [] missing if not defined
+    """
+    from ..support.path import basename
+    title = basename(dataset.path)
+    if dataset.id:
+        title += f"#{dataset.id}"
+    version = dataset.repo.describe()
+    if version:
+        title += f"@{version}"
+    # 3 is minimal length. Just in case there is no UUID or version and dir
+    # is short
+    if len(title) < 3:
+        title += "0"*(3 - len(title))
+    return title
+
+
+def _enter_title(ui, dataset):
+    default = _get_default_title(dataset)
+    while True:
+        title = ui.question(
+            "Please enter the title (must be at least 3 characters long).",
+            title="New article",
+            default=default
+        )
+        if len(title) < 3:
+            ui.error("Title must be at least 3 characters long.")
+        else:
+            return title
 
 
 @build_doc
@@ -267,7 +306,7 @@ class ExportToFigshare(Interface):
                     title="Article"
                 ):
                     article = figshare.create_article(
-                        title=os.path.basename(dataset.path)
+                        title=_enter_title(ui, dataset)
                     )
                     lgr.info(
                         "Created a new (private) article %(id)s at %(url_private_html)s. "
