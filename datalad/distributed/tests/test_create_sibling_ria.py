@@ -110,7 +110,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 
     # now, again but recursive.
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
-                                recursive=True, existing='replace')
+                                recursive=True, existing='reconfigure')
     eq_(len(res), 2)
     assert_result_count(res, 2, status='ok', action="create-sibling-ria")
 
@@ -125,7 +125,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     for trust in ['trust', 'semitrust', 'untrust']:
         ds.create_sibling_ria("ria+ssh://test-store:",
                               "datastore",
-                              existing='replace',
+                              existing='reconfigure',
                               trust_level=trust)
         res = ds.repo.repo_info()
         assert_in('[datastore-ria]',
@@ -140,5 +140,3 @@ def test_create_simple():
 
 
 # TODO: explicit naming of special remote
-# TODO: Don't publish git history via --no-publish
-# TODO: --no-server switch

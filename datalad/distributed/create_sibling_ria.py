@@ -175,15 +175,14 @@ class CreateSiblingRia(Interface):
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice(
-                'skip', 'replace', 'error', 'reconfigure') | EnsureNone(),
+                'skip', 'error', 'reconfigure') | EnsureNone(),
             metavar='MODE',
             doc="""Action to perform, if a sibling or ria-remote is already
             configured under the given name and/or a target already exists.
             In this case, a dataset can be skipped ('skip'), an existing target
-            directory be forcefully re-initialized, and the sibling
-            (re-)configured ('replace', implies 'reconfigure'), the sibling
-            configuration be updated only ('reconfigure'), or to error
-            ('error').""", ),
+            repository be forcefully re-initialized, and the sibling
+            (re-)configured ('reconfigure'), or the command be instructed to
+            fail ('error').""", ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         trust_level=Parameter(
@@ -374,7 +373,7 @@ def _create_sibling_ria(
         url + '#{}'.format(ds.id),
         cfg=ds.config
     )['giturl']
-    # go for a v1 layout
+    # determine layout locations; go for a v1 layout
     repo_path, _, _ = get_layout_locations(1, base_path, ds.id)
 
     ds_siblings = [r['name'] for r in ds.siblings(result_renderer=None)]
@@ -391,15 +390,8 @@ def _create_sibling_ria(
         # down
         return
 
-    # we might learn that some processing (remote repo creation is
-    # not desired)
-    skip = False
-
-    lgr.info("create sibling{} '{}'{} ...".format(
-        's' if ria_remote_name else '',
-        name,
-        " and '{}'".format(ria_remote_name) if ria_remote_name else '',
-    ))
+    # figure whether we need to skip or error due an existing target repo before
+    # we try to init a special remote.
     if ssh_host:
         from datalad import ssh_manager
         ssh = ssh_manager.get_connection(
@@ -407,7 +399,47 @@ def _create_sibling_ria(
             use_remote_annex_bundle=False)
         ssh.open()
 
-    # determine layout locations
+    if existing in ['skip', 'error']:
+        config_path = repo_path / 'config'
+        # No .git -- if it's an existing repo in a RIA store it should be a
+        # bare repo.
+        # Theoretically we could have additional checks for whether we have
+        # an empty repo dir or a non-bare repo or whatever else.
+        if ssh_host:
+            try:
+                ssh('[ -e {p} ]'.format(p=quote_cmdlinearg(str(config_path))))
+                exists = True
+            except CommandError:
+                exists = False
+        else:
+            exists = config_path.exists()
+
+        if exists:
+            if existing == 'skip':
+                # 1. not rendered by default
+                # 2. message doesn't show up in ultimate result
+                #    record as shown by -f json_pp
+                yield get_status_dict(
+                    status='notneeded',
+                    message="Skipped on existing remote "
+                            "directory {}".format(repo_path),
+                    **res_kwargs
+                )
+                return
+            else:  # existing == 'error'
+                yield get_status_dict(
+                    status='error',
+                    message="remote directory {} already "
+                            "exists.".format(repo_path),
+                    **res_kwargs
+                )
+                return
+
+    lgr.info("create sibling{} '{}'{} ...".format(
+        's' if ria_remote_name else '',
+        name,
+        " and '{}'".format(ria_remote_name) if ria_remote_name else '',
+    ))
     if ria_remote:
         lgr.debug('init special remote {}'.format(ria_remote_name))
         ria_remote_options = ['type=external',
@@ -420,7 +452,7 @@ def _create_sibling_ria(
                 ria_remote_name,
                 options=ria_remote_options)
         except CommandError as e:
-            if existing in ['replace', 'reconfigure'] \
+            if existing == 'reconfigure' \
                     and 'git-annex: There is already a special remote' \
                     in e.stderr:
                 # run enableremote instead
@@ -476,62 +508,9 @@ def _create_sibling_ria(
         #       special remote's RemoteIO classes without
         #       talking via annex
         if ssh_host:
-            try:
-                stdout, stderr = ssh(
-                    'test -e {repo}'.format(
-                        repo=quote_cmdlinearg(str(repo_path))))
-                exists = True
-            except CommandError as e:
-                exists = False
-            if exists:
-                if existing == 'skip':
-                    # 1. not rendered by default
-                    # 2. message doesn't show up in ultimate result
-                    #    record as shown by -f json_pp
-                    yield get_status_dict(
-                        status='notneeded',
-                        message="Skipped on existing remote "
-                        "directory {}".format(repo_path),
-                        **res_kwargs
-                    )
-                    skip = True
-                elif existing in ['error', 'reconfigure']:
-                    yield get_status_dict(
-                        status='error',
-                        message="remote directory {} already "
-                        "exists.".format(repo_path),
-                        **res_kwargs
-                    )
-                    return
-                elif existing == 'replace':
-                    ssh('chmod u+w -R {}'.format(
-                        quote_cmdlinearg(str(repo_path))))
-                    ssh('rm -rf {}'.format(
-                        quote_cmdlinearg(str(repo_path))))
-            if not skip:
-                ssh('mkdir -p {}'.format(
-                    quote_cmdlinearg(str(repo_path))))
+            ssh('mkdir -p {}'.format(quote_cmdlinearg(str(repo_path))))
         else:
-            if repo_path.exists():
-                if existing == 'skip':
-                    skip = True
-                elif existing in ['error', 'reconfigure']:
-                    yield get_status_dict(
-                        status='error',
-                        message="remote directory {} already "
-                        "exists.".format(repo_path),
-                        **res_kwargs
-                    )
-                    return
-                elif existing == 'replace':
-                    rmtree(repo_path)
-            if not skip:
-                repo_path.mkdir(parents=True)
-
-    # Note, that this could have changed since last tested due to existing
-    # remote dir
-    if skip:
-        return
+            repo_path.mkdir(parents=True)
 
     # 2. create a bare repository in-store:
 
@@ -573,24 +552,15 @@ def _create_sibling_ria(
             subprocess.run(chgrp_cmd, cwd=quote_cmdlinearg(ds.path))
 
     # add a git remote to the bare repository
-    # Note: needs annex-ignore! Otherwise we might push into default
-    # annex/object tree instead of directory type tree with dirhash
-    # lower. This in turn would be an issue, if we want to pack the
+    # Note: needs annex-ignore! Otherwise we might push into dirhash
+    # lower annex/object tree instead of mixed, since it's a bare
+    # repo. This in turn would be an issue, if we want to pack the
     # entire thing into an archive. Special remote will then not be
     # able to access content in the "wrong" place within the archive
     lgr.debug("set up git remote")
-    # TODO:
-    # - This sibings call results in "[WARNING] Failed to determine
-    #   if datastore carries annex."
-    #   (see https://github.com/datalad/datalad/issues/4028)
-    #   => for now have annex-ignore configured before. Evtl. Allow
-    #      configure/add to include that option
-    #      - additionally there's
-    #        https://github.com/datalad/datalad/issues/3989,
-    #        where datalad-siblings might hang forever
     if name in ds_siblings:
         # otherwise we should have skipped or failed before
-        assert existing in ['replace', 'reconfigure']
+        assert existing == 'reconfigure'
     ds.config.set(
         "remote.{}.annex-ignore".format(name),
         value="true",
