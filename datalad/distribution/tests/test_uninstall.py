@@ -10,42 +10,51 @@
 """
 
 import os
-from os.path import join as opj, split as psplit
-from os.path import exists, lexists
-from os.path import realpath
-from os.path import isdir
+from os.path import (
+    join as opj,
+    split as psplit,
+    exists,
+    lexists,
+    realpath,
+    isdir,
+)
 from glob import glob
 
-from datalad.api import uninstall
-from datalad.api import drop
-from datalad.api import remove
-from datalad.api import install
-from datalad.api import create
+from datalad.api import (
+    uninstall,
+    drop,
+    remove,
+    install,
+    create,
+)
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.tests.utils import ok_
-from datalad.tests.utils import eq_
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_result_values_cond
-from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import use_cassette
-from datalad.tests.utils import usecase
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.tests.utils import known_failure_windows
-from datalad.utils import chpwd
-from datalad.utils import _path_
-from datalad.utils import Path
+from datalad.tests.utils import (
+    ok_,
+    eq_,
+    with_testrepos,
+    SkipTest,
+    assert_raises,
+    assert_status,
+    assert_in,
+    assert_result_count,
+    assert_result_values_cond,
+    ok_file_under_git,
+    ok_clean_git,
+    with_tempfile,
+    with_tree,
+    create_tree,
+    skip_if_no_network,
+    use_cassette,
+    usecase,
+    known_failure_githubci_win,
+    known_failure_windows,
+)
+from datalad.utils import (
+    chpwd,
+    _path_,
+    Path,
+)
 from datalad.support.external_versions import external_versions
-
 from ..dataset import Dataset
 
 

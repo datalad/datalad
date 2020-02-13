@@ -22,6 +22,10 @@ from datalad.tests.utils import (
     assert_status,
     assert_result_count,
     with_tempfile,
+    get_deeply_nested_structure,
+    has_symlink_capability,
+    assert_repo_status,
+    OBSCURE_FILENAME,
 )
 from datalad.support.exceptions import (
     NoDatasetArgumentFound,
@@ -29,12 +33,6 @@ from datalad.support.exceptions import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import (
-    get_deeply_nested_structure,
-    has_symlink_capability,
-    assert_repo_status,
-    OBSCURE_FILENAME,
-)
 from datalad.api import (
     status,
 )

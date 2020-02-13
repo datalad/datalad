@@ -16,18 +16,19 @@ from os.path import join as opj
 from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
 
-
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    skip_ssh,
+    with_tree,
+    with_tempfile,
+    assert_result_count,
+    assert_status,
+    assert_dict_equal,
+    assert_not_in,
+    eq_,
+    ok_clean_git,
+    skip_if_on_windows,
+    known_failure_githubci_win,
+)
 
 
 def _assert_metadata_empty(meta):

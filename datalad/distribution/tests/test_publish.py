@@ -9,44 +9,50 @@
 
 """
 
-
-
 import logging
-import os
-from os.path import join as opj
-from os.path import exists
-from os.path import lexists
+from os.path import (
+    join as opj,
+    exists,
+    lexists,
+)
 from ..dataset import Dataset
-from datalad.api import publish, install
-from datalad.api import install
-from datalad.api import create
-from datalad.dochelpers import exc_str
+from datalad.api import (
+    publish,
+    install,
+    create,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import IncompleteResultsError
-from datalad.utils import chpwd
-
-from datalad.tests.utils import eq_, ok_, assert_is_instance
-from datalad.tests.utils import assert_false as nok_
-from datalad.tests.utils import with_tempfile, assert_in, \
-    with_testrepos, assert_not_in
-from datalad.utils import _path_
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_not_equal
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import neq_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_windows
+import IncompleteResultsError
+from datalad.utils import (
+    chpwd,
+    _path_,
+)
+from datalad.tests.utils import (
+    eq_,
+    ok_,
+    assert_false as nok_,
+    with_tempfile,
+    assert_in,
+    with_testrepos,
+    assert_not_in,
+    assert_raises,
+    assert_false,
+    assert_not_equal,
+    assert_result_count,
+    neq_,
+    ok_clean_git,
+    swallow_logs,
+    create_tree,
+    ok_file_has_content,
+    skip_ssh,
+    assert_status,
+    with_tree,
+    serve_path_via_http,
+    skip_if_on_windows,
+    known_failure_windows,
+)
 
 
 @with_testrepos('submodule_annex', flavors=['local'])

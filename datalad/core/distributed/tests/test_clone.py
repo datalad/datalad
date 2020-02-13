@@ -9,13 +9,6 @@
 
 """
 
-
-from datalad.tests.utils import (
-    get_datasets_topdir,
-    integration,
-    slow
-)
-
 import logging
 import os
 import os.path as op
@@ -39,6 +32,9 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.tests.utils import (
+    get_datasets_topdir,
+    integration,
+    slow,
     create_tree,
     with_tempfile,
     assert_in,

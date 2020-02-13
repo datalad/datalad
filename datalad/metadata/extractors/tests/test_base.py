@@ -11,13 +11,13 @@
 from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
-from datalad.utils import on_osx
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_githubci_win
-
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import assert_equal
+from datalad.tests.utils import (
+    with_tree,
+    ok_clean_git,
+    known_failure_githubci_win,
+    SkipTest,
+    assert_equal,
+)
 
 
 @with_tree(tree={'file.dat': ''})

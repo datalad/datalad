@@ -37,6 +37,9 @@ from datalad.tests.utils import (
     OBSCURE_FILENAME,
     known_failure_githubci_win,
     SkipTest,
+    get_deeply_nested_structure,
+    has_symlink_capability,
+    assert_repo_status,
 )
 
 import datalad.utils as ut
@@ -45,11 +48,6 @@ from datalad.api import (
     save,
     create,
     diff,
-)
-from datalad.tests.utils import (
-    get_deeply_nested_structure,
-    has_symlink_capability,
-    assert_repo_status,
 )
 
 

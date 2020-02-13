@@ -11,11 +11,14 @@
 
 from os.path import isabs
 
-from datalad.tests.utils import with_tree
+from datalad.tests.utils import (
+    with_tree,
+    eq_,
+)
 from datalad.support.annexrepo import AnnexRepo
 
 from ..base import AnnexCustomRemote, DEFAULT_AVAILABILITY, DEFAULT_COST
-from datalad.tests.utils import eq_
+
 
 @with_tree(tree={'file.dat': ''})
 def test_get_contentlocation(tdir):

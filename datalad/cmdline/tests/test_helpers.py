@@ -10,16 +10,20 @@
 
 __docformat__ = 'restructuredtext'
 
-from unittest.mock import patch
-from datalad.tests.utils import assert_is_instance
-
 from os import mkdir
-from os.path import join as opj, exists, realpath
+from os.path import (
+    join as opj,
+    realpath,
+)
 from ..helpers import get_repo_instance
 from ..helpers import strip_arg_from_argv
 
-from ...tests.utils import ok_, eq_, assert_cwd_unchanged, ok_clean_git, \
-    with_tempfile, SkipTest, with_testrepos
+from datalad.tests.utils import (
+    assert_is_instance,
+    eq_,
+    assert_cwd_unchanged,
+    with_testrepos,
+)
 from ...support.annexrepo import AnnexRepo
 from ...support.gitrepo import GitRepo
 from ...utils import chpwd, getpwd

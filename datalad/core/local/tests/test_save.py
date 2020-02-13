@@ -23,6 +23,8 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_not_in,
     assert_raises,
+    assert_repo_status,
+    skip_wo_symlink_capability,
     create_tree,
     with_tempfile,
     with_tree,
@@ -46,11 +48,6 @@ from datalad.api import (
     save,
     create,
     install,
-)
-
-from datalad.tests.utils import (
-    assert_repo_status,
-    skip_wo_symlink_capability,
 )
 
 

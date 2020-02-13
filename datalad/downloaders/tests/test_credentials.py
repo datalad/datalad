@@ -9,18 +9,22 @@
 """Tests for credentials"""
 
 from unittest.mock import patch
-
-from datalad.tests.utils import with_testsui
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_true, assert_false
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import SkipTest
+from datalad.tests.utils import (
+    with_testsui,
+    assert_equal,
+    assert_in,
+    assert_true,
+    assert_false,
+    assert_raises,
+    SkipTest,
+)
 from datalad.support.keyring_ import MemoryKeyring
-from datalad.support.keyring_ import Keyring
-from ..credentials import UserPassword
-from ..credentials import CompositeCredential
-from ..credentials import AWS_S3
+import Keyring
+from ..credentials import (
+    UserPassword,
+    CompositeCredential,
+    AWS_S3,
+)
 
 
 @with_testsui(responses=[

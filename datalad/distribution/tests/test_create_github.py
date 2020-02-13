@@ -9,8 +9,6 @@
 
 from os.path import join as opj
 
-from datalad import cfg
-
 # this must import ok with and without pygithub
 from datalad.api import (
     create_sibling_github,
@@ -18,7 +16,6 @@ from datalad.api import (
 )
 from datalad.utils import (
     ensure_list,
-    chpwd,
 )
 from datalad.tests.utils import (
     assert_equal,

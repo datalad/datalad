@@ -35,12 +35,12 @@ from datalad.tests.utils import (
     assert_status,
     assert_raises,
     assert_in_results,
+    assert_repo_status,
     swallow_outputs,
     with_tree,
     OBSCURE_FILENAME,
 )
 
-from datalad.tests.utils import assert_repo_status
 
 
 _dataset_hierarchy_template = {

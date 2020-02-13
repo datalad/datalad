@@ -12,42 +12,64 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
 import os
 from os import unlink
-from os.path import exists, join as opj, pardir, basename, lexists
+from os.path import (
+    exists,
+    join as opj,
+    pardir,
+    basename,
+    lexists,
+)
 from glob import glob
 
-from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
-    with_tempfile, assert_in
-from ...tests.utils import assert_equal, assert_not_equal
-from ...tests.utils import assert_false
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_true
-from ...tests.utils import ok_archives_caches
-from ...tests.utils import slow
-from ...tests.utils import assert_re_in
-from datalad.tests.utils import assert_result_values_cond
-from datalad.tests.utils import known_failure_githubci_win
+from ...tests.utils import (
+    ok_,
+    eq_,
+    assert_cwd_unchanged,
+    assert_raises,
+    with_tempfile,
+    assert_in,
+    assert_equal,
+    assert_not_equal,
+    assert_false,
+    assert_not_in,
+    assert_true,
+    ok_archives_caches,
+    slow,
+    assert_re_in,
+    assert_result_values_cond,
+    known_failure_githubci_win,
+    create_tree,
+    ok_clean_git,
+    swallow_logs,
+    integration,
+    with_tree,
+    serve_path_via_http,
+    ok_file_under_git,
+    swallow_outputs,
+)
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
-from ...support.exceptions import CommandError
-from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
-from ...tests.utils import swallow_logs
-from ...tests.utils import integration
-from ...utils import chpwd, getpwd, rmtemp
-from ...utils import find_files
-from ...utils import rmtree
-from ...utils import on_windows
+from ...utils import (
+    chpwd,
+    getpwd,
+    rmtemp,
+    find_files,
+    rmtree,
+    on_windows,
 from datalad.log import lgr
-from ...api import add_archive_content, clean
+from ...api import (
+    add_archive_content,
+    clean,
+)
 from datalad.support.external_versions import external_versions
-from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
-from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.consts import (
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+    ARCHIVES_SPECIAL_REMOTE,
+)
 
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import ok_clean_git
 
 treeargs = dict(
     tree=(

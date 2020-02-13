@@ -17,28 +17,32 @@ from os.path import join as opj
 
 
 from datalad.distribution.dataset import Dataset
-from datalad.api import create
-from datalad.api import unlock
+from datalad.api import (
+    create,
+    unlock,
+)
 from datalad.utils import Path
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetArgumentFound,
+)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import eq_
-from datalad.tests.utils import getpwd
-from datalad.tests.utils import chpwd
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import on_windows, skip_if
 from datalad.tests.utils import (
+    with_tempfile,
+    assert_false,
+    assert_raises,
+    assert_repo_status,
+    eq_,
+    getpwd,
+    chpwd,
+    assert_cwd_unchanged,
+    with_testrepos,
+    with_tree,
+    on_windows,
+    skip_if,
     assert_in_results,
     assert_not_in_results,
     assert_result_count,
-    assert_status,
     known_failure_githubci_win,
     known_failure_windows,
 )

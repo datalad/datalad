@@ -12,63 +12,70 @@
 import logging
 import os
 
-from os.path import join as opj
-from os.path import isdir
-from os.path import exists
-from os.path import realpath
-from os.path import basename
-from os.path import dirname
-
+from os.path import (
+    join as opj,
+    isdir,
+    exists,
+    realpath,
+    basename,
+    dirname,
+)
 from unittest.mock import patch
-
-from datalad.utils import getpwd
-
-from datalad.api import create
-from datalad.api import install
-from datalad.api import get
-from datalad.utils import chpwd
-from datalad.utils import on_windows
+from datalad.api import (
+    create,
+    install,
+    get,
+)
+from datalad.utils import (
+    chpwd,
+    on_windows,
+    getpwd,
+    _path_,
+    rmtree,
+)
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    IncompleteResultsError,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_is_instance
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import use_cassette
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import put_file_under_git
-from datalad.tests.utils import integration
-from datalad.tests.utils import slow
-from datalad.tests.utils import usecase
-from datalad.tests.utils import get_datasets_topdir
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.utils import _path_
-from datalad.utils import rmtree
-
+from datalad.tests.utils import (
+    skip_ssh,
+    create_tree,
+    with_tempfile,
+    assert_in,
+    with_tree,
+    with_testrepos,
+    eq_,
+    ok_,
+    assert_false,
+    ok_file_has_content,
+    assert_not_in,
+    assert_raises,
+    assert_is_instance,
+    assert_result_count,
+    assert_status,
+    assert_in_results,
+    ok_startswith,
+    ok_clean_git,
+    serve_path_via_http,
+    swallow_logs,
+    use_cassette,
+    skip_if_no_network,
+    skip_if_on_windows,
+    put_file_under_git,
+    integration,
+    slow,
+    usecase,
+    get_datasets_topdir,
+    SkipTest,
+    known_failure_windows,
+    known_failure_githubci_win,
+)
 from ..dataset import Dataset
 
 ###############
@@ -801,8 +808,6 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     # TODO: makes a nice use-case for an update operation
 
-
-from datalad.tests.utils import skip_ssh
 
 @skip_ssh
 @with_tempfile

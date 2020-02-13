@@ -8,7 +8,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test image extractor"""
 
-from datalad.tests.utils import SkipTest
+from datalad.tests.utils import (
+    SkipTest,
+    with_tempfile,
+    ok_clean_git,
+    assert_status,
+    assert_result_count,
+    eq_,
+    assert_in,
+)
 try:
     from PIL import Image
 except ImportError as exc:
@@ -17,15 +25,11 @@ except ImportError as exc:
        "No PIL module available or it cannot be imported: %s" % exc_str(exc))
 
 from shutil import copy
-from os.path import dirname
-from os.path import join as opj
+from os.path import (
+    dirname,
+    join as opj,
+)
 from datalad.api import Dataset
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_in
 
 
 target = {

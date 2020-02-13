@@ -9,8 +9,6 @@
 
 """
 
-
-
 import os
 from os import chmod
 import stat
@@ -18,41 +16,50 @@ import re
 from os.path import join as opj, exists, basename
 
 from ..dataset import Dataset
-from datalad.api import publish, install, create_sibling
+from datalad.api import (
+    publish,
+    install,
+    create_sibling,
+)
 from datalad.cmd import Runner
-from datalad.utils import chpwd
-from datalad.tests.utils import create_tree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
-from datalad.tests.utils import eq_, assert_false
-from datalad.tests.utils import with_tempfile, assert_in, \
-    with_testrepos
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import ok_exists
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_endswith
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_set_equal
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_not_equal
-from datalad.tests.utils import assert_no_errors_logged
-from datalad.tests.utils import get_mtimes_and_digests
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import slow
-from datalad.tests.utils import skip_if_on_windows
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import InsufficientArgumentsError
-
-from datalad.utils import on_windows
-from datalad.utils import _path_
+from datalad.tests.utils import (
+    create_tree,
+    eq_,
+    assert_false,
+    with_tempfile,
+    assert_in,
+    with_testrepos,
+    ok_file_has_content,
+    ok_exists,
+    ok_clean_git,
+    ok_endswith,
+    assert_not_in,
+    assert_raises,
+    skip_ssh,
+    assert_dict_equal,
+    assert_result_count,
+    assert_status,
+    assert_not_equal,
+    assert_no_errors_logged,
+    get_mtimes_and_digests,
+    swallow_logs,
+    ok_,
+    ok_file_under_git,
+    slow,
+    skip_if_on_windows,
+)
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
+from datalad.utils import (
+    chpwd,
+    on_windows,
+    _path_,
+)
 
 import logging
 lgr = logging.getLogger('datalad.tests')

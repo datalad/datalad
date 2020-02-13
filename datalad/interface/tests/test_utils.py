@@ -11,34 +11,43 @@
 """
 
 
-import os
 import logging
-from os.path import join as opj
-from os.path import exists
-from datalad.tests.utils import assert_raises, assert_equal
-from datalad.tests.utils import with_tempfile, assert_not_equal
-from datalad.tests.utils import assert_true
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_
-from datalad.tests.utils import slow
+from os.path import (
+    join as opj,
+    exists,
+)
+from datalad.tests.utils import (
+    assert_raises,
+    assert_equal,
+    with_tempfile,
+    assert_not_equal,
+    assert_true,
+    assert_in,
+    assert_not_in,
+    assert_dict_equal,
+    with_tree,
+    ok_clean_git,
+    ok_,
+    slow,
+)
 from datalad.utils import swallow_logs
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import datasetmethod
-from datalad.distribution.dataset import EnsureDataset
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+)
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureKeyChoice
-
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureNone,
+    EnsureKeyChoice,
+)
 from ..base import Interface
-from ..utils import eval_results
-from ..utils import discover_dataset_trace_to_targets
+from ..utils import (
+    eval_results,
+    discover_dataset_trace_to_targets,
+    handle_dirty_dataset,
+)
 from datalad.interface.base import build_doc
-from ..utils import handle_dirty_dataset
 
 
 __docformat__ = 'restructuredtext'

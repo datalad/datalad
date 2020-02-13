@@ -9,35 +9,45 @@
 
 """
 
-
-
 import os
 import os.path as op
-from os.path import join as opj, exists
+from os.path import (
+    join as opj,
+    exists,
+)
 from ..dataset import Dataset
-from datalad.api import install
-from datalad.api import update
-from datalad.api import remove
-from datalad.utils import knows_annex
-from datalad.utils import rmtree
-from datalad.utils import chpwd
+from datalad.api import (
+    install,
+    update,
+    remove,
+)
+from datalad.utils import (
+    knows_annex,
+    rmtree,
+    chpwd,
+)
 from datalad.support.gitrepo import (
     GitRepo,
-    GitCommandError,
 )
 from datalad.support.annexrepo import AnnexRepo
-
-from datalad.tests.utils import eq_, assert_false, assert_is_instance, ok_
-from datalad.tests.utils import with_tempfile, assert_in, \
-    with_testrepos, assert_not_in
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import slow
-from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import (
+    with_tempfile,
+    assert_in,
+    with_testrepos,
+    assert_not_in,
+    eq_,
+    assert_false,
+    assert_is_instance,
+    ok_,
+    create_tree,
+    ok_file_has_content,
+    ok_clean_git,
+    assert_status,
+    assert_result_count,
+    assert_in_results,
+    slow,
+    known_failure_windows,
+)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622

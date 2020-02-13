@@ -15,34 +15,40 @@ import logging
 from copy import deepcopy
 
 import os
-from os.path import join as opj
-from os.path import basename
-from os.path import lexists
-from os.path import normpath
-from os.path import abspath
-
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import slow
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.tests.utils import assert_cwd_unchanged
-
-
+from os.path import (
+    join as opj,
+    basename,
+    lexists,
+    normpath,
+    abspath,
+)
+from datalad.tests.utils import (
+    with_tree,
+    with_tempfile,
+    ok_clean_git,
+    eq_,
+    assert_result_count,
+    assert_raises,
+    assert_not_in,
+    create_tree,
+    slow,
+    swallow_logs,
+    known_failure_githubci_win,
+    assert_cwd_unchanged,
+)
 from datalad.distribution.dataset import Dataset
-from datalad.api import annotate_paths
-from datalad.api import install
-from datalad.interface.annotate_paths import get_modified_subpaths
-from datalad.interface.annotate_paths import _resolve_path
-from datalad.utils import chpwd
-from datalad.utils import getpwd
-
+from datalad.api import (
+    annotate_paths,
+    install,
+)
+from datalad.interface.annotate_paths import (
+    get_modified_subpaths,
+    _resolve_path,
+)
+from datalad.utils import (
+    chpwd,
+    getpwd,
+)
 from datalad.interface.tests.test_utils import make_demo_hierarchy_datasets
 
 
