@@ -652,8 +652,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         ds.config.set(
             'datalad.clone.reckless', reckless,
             where='local',
-            # delay reload until all config IO is done
-            reload=False)
+            reload=True)
 
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
