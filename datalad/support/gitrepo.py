@@ -2388,9 +2388,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           fetch all remotes (and all of their branches).
           Fails if `remote` was given.
         git_options : list, optional
-          Additional command line options for git-push.
+          Additional command line options for git-fetch.
         kwargs :
-          Deprecated. GitPython-style keyword argument for git-push.
+          Deprecated. GitPython-style keyword argument for git-fetch.
           Will be appended to any git_options.
         """
         git_options = ensure_list(git_options)
