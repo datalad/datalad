@@ -13,38 +13,39 @@
 
 import logging
 from os.path import (
-    join as opj,
     exists,
+    join as opj,
 )
 from datalad.tests.utils import (
-    assert_raises,
-    assert_equal,
-    with_tempfile,
-    assert_not_equal,
-    assert_true,
-    assert_in,
-    assert_not_in,
     assert_dict_equal,
-    with_tree,
-    ok_clean_git,
+    assert_equal,
+    assert_in,
+    assert_not_equal,
+    assert_not_in,
+    assert_raises,
+    assert_true,
     ok_,
+    ok_clean_git,
     slow,
+    with_tempfile,
+    with_tree,
 )
 from datalad.utils import swallow_logs
 from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
+    EnsureDataset,
 )
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
-    EnsureStr,
-    EnsureNone,
     EnsureKeyChoice,
+    EnsureNone,
+    EnsureStr,
 )
 from ..base import Interface
 from ..utils import (
-    eval_results,
     discover_dataset_trace_to_targets,
+    eval_results,
     handle_dirty_dataset,
 )
 from datalad.interface.base import build_doc

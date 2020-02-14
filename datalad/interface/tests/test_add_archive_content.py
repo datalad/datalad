@@ -59,7 +59,7 @@ from ...utils import (
     find_files,
     rmtree,
     on_windows,
-from datalad.log import lgr
+)
 from ...api import (
     add_archive_content,
     clean,

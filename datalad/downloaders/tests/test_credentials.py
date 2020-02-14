@@ -18,8 +18,10 @@ from datalad.tests.utils import (
     assert_raises,
     SkipTest,
 )
-from datalad.support.keyring_ import MemoryKeyring
-import Keyring
+from datalad.support.keyring_ import (
+    Keyring,
+    MemoryKeyring,
+)
 from ..credentials import (
     UserPassword,
     CompositeCredential,

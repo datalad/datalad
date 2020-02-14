@@ -23,8 +23,10 @@ from datalad.api import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import InsufficientArgumentsError
-import IncompleteResultsError
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    IncompleteResultsError,
+)
 from datalad.utils import (
     chpwd,
     _path_,
