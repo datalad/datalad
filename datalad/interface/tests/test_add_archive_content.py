@@ -14,12 +14,12 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os import unlink
+from os.path import (
     basename,
     exists,
     join as opj,
     lexists,
     pardir,
-from os.path import (
 )
 from glob import glob
 
@@ -53,10 +53,10 @@ from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
 from ...utils import (
     chpwd,
-    getpwd,
-    rmtemp,
     find_files,
+    getpwd,
     on_windows,
+    rmtemp,
 )
 from ...api import (
     add_archive_content,

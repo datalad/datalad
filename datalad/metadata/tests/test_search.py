@@ -14,8 +14,8 @@ from shutil import copy
 from unittest.mock import patch
 from os import makedirs
 from os.path import (
-    join as opj,
     dirname,
+    join as opj,
 )
 from datalad.api import Dataset
 from datalad.utils import (
@@ -25,18 +25,18 @@ from datalad.utils import (
 )
 from datalad.tests.utils import (
     assert_equal,
-    assert_raises,
     assert_in,
-    assert_result_count,
     assert_is_generator,
-    with_tempfile,
-    with_testsui,
+    assert_raises,
+    assert_result_count,
+    eq_,
+    known_failure_githubci_win,
     ok_clean_git,
     ok_file_under_git,
     patch_config,
     SkipTest,
-    eq_,
-    known_failure_githubci_win,
+    with_tempfile,
+    with_testsui,
 )
 from datalad.support.exceptions import NoDatasetArgumentFound
 

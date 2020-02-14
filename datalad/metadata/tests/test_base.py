@@ -18,34 +18,36 @@ from os.path import (
 import os.path as op
 
 from datalad.api import (
-    Dataset,
     aggregate_metadata,
+    Dataset,
     install,
     metadata,
 )
 from datalad.metadata.metadata import (
+    _get_containingds_from_agginfo,
     get_metadata_type,
     query_aggregated_metadata,
-    _get_containingds_from_agginfo,
 )
-from datalad.utils import chpwd
-from datalad.utils import assure_unicode
+from datalad.utils import (
+    assure_unicode,
+    chpwd,
+)
 from datalad.tests.utils import (
-    with_tree,
-    with_tempfile,
-    slow,
-    assert_status,
-    assert_result_count,
     assert_dict_equal,
-    assert_in,
-    eq_,
-    ok_clean_git,
-    swallow_logs,
-    assert_re_in,
-    known_failure_githubci_win,
-    assert_true,
     assert_equal,
+    assert_in,
     assert_raises,
+    assert_re_in,
+    assert_result_count,
+    assert_status,
+    assert_true,
+    eq_,
+    known_failure_githubci_win,
+    ok_clean_git,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
 )
 from datalad.support.exceptions import (
     InsufficientArgumentsError,

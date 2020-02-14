@@ -10,8 +10,8 @@
 """Test metadata extraction"""
 
 from os.path import (
-    join as opj,
     dirname,
+    join as opj,
 )
 
 from shutil import copy
@@ -21,12 +21,12 @@ from datalad.api import extract_metadata
 from datalad.utils import chpwd
 
 from datalad.tests.utils import (
-    ok_clean_git,
-    with_tempfile,
+    assert_in,
     assert_raises,
     assert_result_count,
-    assert_in,
     known_failure_githubci_win,
+    ok_clean_git,
+    with_tempfile,
 )
 
 

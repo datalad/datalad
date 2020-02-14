@@ -12,11 +12,11 @@ from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
 from datalad.tests.utils import (
-    with_tree,
-    ok_clean_git,
-    known_failure_githubci_win,
-    SkipTest,
     assert_equal,
+    known_failure_githubci_win,
+    ok_clean_git,
+    SkipTest,
+    with_tree,
 )
 
 

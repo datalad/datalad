@@ -12,10 +12,10 @@ from datalad.utils import (
     on_windows,
 )
 from datalad.tests.utils import (
-    with_tempfile,
+    assert_result_count,
     eq_,
     ok_,
-    assert_result_count,
+    with_tempfile,
 )
 from datalad.api import (
     Dataset,

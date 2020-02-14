@@ -9,13 +9,13 @@
 """Test XMP extractor"""
 
 from datalad.tests.utils import (
+    assert_in,
+    assert_result_count,
+    assert_status,
+    eq_,
+    ok_clean_git,
     SkipTest,
     with_tempfile,
-    ok_clean_git,
-    assert_status,
-    assert_result_count,
-    eq_,
-    assert_in,
 )
 try:
     import libxmp

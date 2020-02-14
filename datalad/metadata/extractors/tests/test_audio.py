@@ -9,14 +9,14 @@
 """Test audio extractor"""
 
 from datalad.tests.utils import (
-    SkipTest,
-    with_tempfile,
-    ok_clean_git,
-    assert_status,
     assert_in,
     assert_not_in,
     assert_result_count,
+    assert_status,
     eq_,
+    ok_clean_git,
+    SkipTest,
+    with_tempfile,
 )
 try:
     import mutagen

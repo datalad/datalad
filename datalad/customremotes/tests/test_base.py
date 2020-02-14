@@ -12,12 +12,16 @@
 from os.path import isabs
 
 from datalad.tests.utils import (
-    with_tree,
     eq_,
+    with_tree,
 )
 from datalad.support.annexrepo import AnnexRepo
 
-from ..base import AnnexCustomRemote, DEFAULT_AVAILABILITY, DEFAULT_COST
+from ..base import (
+    AnnexCustomRemote,
+    DEFAULT_AVAILABILITY,
+    DEFAULT_COST,
+)
 
 
 @with_tree(tree={'file.dat': ''})

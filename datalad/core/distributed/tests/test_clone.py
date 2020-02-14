@@ -18,8 +18,8 @@ from unittest.mock import patch
 from datalad.config import ConfigManager
 from datalad import consts
 from datalad.api import (
-    create,
     clone,
+    create,
     remove,
 )
 from datalad.utils import (
@@ -32,40 +32,40 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.tests.utils import (
-    get_datasets_topdir,
-    integration,
-    slow,
-    create_tree,
-    with_tempfile,
-    assert_in,
-    with_tree,
-    with_testrepos,
-    eq_,
-    neq_,
-    ok_,
     assert_false,
-    ok_file_has_content,
+    assert_in,
+    assert_message,
     assert_not_in,
     assert_raises,
-    assert_status,
-    assert_message,
+    assert_repo_status,
     assert_result_count,
     assert_result_values_equal,
-    ok_startswith,
-    assert_repo_status,
-    serve_path_via_http,
-    swallow_logs,
-    use_cassette,
-    skip_if_no_network,
-    skip_if,
-    with_sameas_remote,
+    assert_status,
+    create_tree,
+    eq_,
+    get_datasets_topdir,
+    integration,
     known_failure,
     known_failure_appveyor,
+    neq_,
+    ok_,
+    ok_file_has_content,
+    ok_startswith,
     patch_config,
+    serve_path_via_http,
+    skip_if,
+    skip_if_no_network,
+    slow,
+    swallow_logs,
+    use_cassette,
+    with_sameas_remote,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
 from datalad.core.distributed.clone import (
-    decode_source_spec,
     _get_installationpath_from_url,
+    decode_source_spec,
 )
 from datalad.distribution.dataset import Dataset
 

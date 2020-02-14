@@ -21,24 +21,24 @@ from datalad.api import create
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
     chpwd,
-    Path,
     on_windows,
+    Path,
 )
 from datalad.cmd import Runner
 
 from datalad.tests.utils import (
-    with_tempfile,
-    eq_,
-    ok_,
-    assert_not_in,
     assert_in,
-    assert_status,
-    assert_raises,
     assert_in_results,
+    assert_not_in,
+    assert_raises,
     assert_repo_status,
-    swallow_outputs,
-    with_tree,
+    assert_status,
+    eq_,
     OBSCURE_FILENAME,
+    ok_,
+    swallow_outputs,
+    with_tempfile,
+    with_tree,
 )
 
 

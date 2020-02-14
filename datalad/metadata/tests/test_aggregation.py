@@ -17,17 +17,17 @@ from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import (
-    skip_ssh,
-    with_tree,
-    with_tempfile,
-    assert_result_count,
-    assert_status,
     assert_dict_equal,
     assert_not_in,
+    assert_result_count,
+    assert_status,
     eq_,
+    known_failure_githubci_win,
     ok_clean_git,
     skip_if_on_windows,
-    known_failure_githubci_win,
+    skip_ssh,
+    with_tempfile,
+    with_tree,
 )
 
 
