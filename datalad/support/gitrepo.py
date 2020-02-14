@@ -2475,7 +2475,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cwd=self.path,
             env=GitRunner.get_git_environ_adjusted()).run(
                 cmd,
-                protocol=GitProgress,
+                protocol=StdOutCaptureWithGitProgress,
         )
 
     def push(self, remote=None, refspec=None, all_remotes=False,
