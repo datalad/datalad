@@ -9,7 +9,7 @@
 
 from os.path import join as opj
 from ..digests import Digester
-from ...tests.utils import (
+from datalad.tests.utils import (
     assert_equal,
     with_tree,
 )

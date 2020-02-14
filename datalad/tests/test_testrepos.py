@@ -12,7 +12,7 @@ import os
 
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import usecase
-from .utils import (
+from datalad.tests.utils import (
     ok_,
     with_testrepos,
     with_tempfile,

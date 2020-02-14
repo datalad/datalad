@@ -12,7 +12,7 @@
 import os
 import sys
 
-from .utils import (
+from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_in,
     assert_raises,

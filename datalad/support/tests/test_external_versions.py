@@ -11,17 +11,17 @@ import logging
 
 from os import linesep
 
-from ... import __version__
-from ...dochelpers import exc_str
-from ...version import __version__
+from datalad import __version__
+from datalad.dochelpers import exc_str
+from datalad.version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
-from ..exceptions import (
+from datalad.support.exceptions import (
     CommandError,
     MissingExternalDependency,
     OutdatedExternalDependency,
 )
-from ...support.annexrepo import AnnexRepo
-from ...tests.utils import (
+from datalad.support.annexrepo import AnnexRepo
+from datalad.tests.utils import (
     create_tree,
     set_annex_version,
     swallow_logs,

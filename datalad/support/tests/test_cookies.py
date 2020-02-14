@@ -7,10 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from .. import path as op
+from datalad.support import path as op
 from ..cookies import CookiesDB
-from ...utils import rmtree
-from ...tests.utils import (
+from datalad.utils import rmtree
+from datalad.tests.utils import (
     assert_equal,
     known_failure_githubci_win,
     with_tempfile,

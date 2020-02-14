@@ -14,9 +14,9 @@ from ..version import (
     __hardcoded_version__,
     __version__,
 )
-from ..support import path as op
-from ..utils import assure_unicode
-from .utils import (
+from datalad.support import path as op
+from datalad.utils import assure_unicode
+from datalad.tests.utils import (
     assert_equal,
     assert_greater,
     assert_in,

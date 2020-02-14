@@ -10,7 +10,7 @@
 import os
 import os.path as op
 
-from .utils import (
+from datalad.tests.utils import (
     assert_in,
     assert_raises,
     chpwd,

@@ -13,15 +13,15 @@ import unittest.mock as mock
 
 import github as gh
 
-from ..exceptions import AccessDeniedError
-from ...tests.utils import (
+from datalad.support.exceptions import AccessDeniedError
+from datalad.tests.utils import (
     assert_raises,
     assert_equal,
     eq_,
     assert_in,
 )
 
-from ...utils import swallow_logs
+from datalad.utils import swallow_logs
 
 from .. import github_
 from ..github_ import get_repo_url

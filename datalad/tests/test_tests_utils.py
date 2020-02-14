@@ -25,15 +25,16 @@ from os.path import exists, join as opj, basename
 from urllib.request import urlopen
 
 from unittest.mock import patch
-from datalad.tests.utils import assert_in, assert_not_in, assert_true
-from datalad.tests.utils import SkipTest
-
-from ..utils import getpwd, chpwd
-
-from .utils import (
+from datalad.utils import (
+    getpwd,
+    chpwd,
+)
+from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_dict_equal,
     assert_false,
+    assert_in,
+    assert_not_in,
     assert_raises,
     assert_re_in,
     assert_str_equal,
@@ -65,6 +66,7 @@ from .utils import (
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
+    SkipTest,
     swallow_logs,
     with_tempfile,
     with_testrepos, with_tree,
@@ -72,8 +74,8 @@ from .utils import (
     without_http_proxy,
 )
 
-from ..support.gitrepo import GitRepo
-from ..support import path as op
+from datalad.support.gitrepo import GitRepo
+from datalad.support import path as op
 #
 # Test with_tempfile, especially nested invocations
 #

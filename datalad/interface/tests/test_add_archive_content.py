@@ -23,7 +23,7 @@ from os.path import (
 )
 from glob import glob
 
-from ...tests.utils import (
+from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
@@ -49,16 +49,16 @@ from ...tests.utils import (
     with_tree,
 )
 
-from ...support.annexrepo import AnnexRepo
-from ...support.exceptions import FileNotInRepositoryError
-from ...utils import (
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.utils import (
     chpwd,
     find_files,
     getpwd,
     on_windows,
     rmtemp,
 )
-from ...api import (
+from datalad.api import (
     add_archive_content,
     clean,
 )

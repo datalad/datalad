@@ -11,15 +11,15 @@
 
 import re
 
-from ..support.param import Parameter
-from ..support import constraints as cnstr
-from ..interface.base import (
+from datalad.support.param import Parameter
+from datalad.support import constraints as cnstr
+from datalad.interface.base import (
     get_api_name,
     get_cmdline_command_name,
     Interface,
 )
 
-from .utils import (
+from datalad.tests.utils import (
     assert_equal,
     assert_in,
     assert_is,

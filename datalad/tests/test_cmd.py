@@ -14,7 +14,7 @@ import os.path as op
 import sys
 import logging
 
-from .utils import (
+from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_equal,
     assert_false,
@@ -42,9 +42,9 @@ from ..cmd import (
     Runner,
     GitRunner,
 )
-from ..support.exceptions import CommandError
-from ..support.protocol import DryRunProtocol
-from ..utils import split_cmdline
+from datalad.support.exceptions import CommandError
+from datalad.support.protocol import DryRunProtocol
+from datalad.utils import split_cmdline
 
 
 @known_failure_githubci_win

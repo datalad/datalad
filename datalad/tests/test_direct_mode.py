@@ -14,10 +14,10 @@ from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
 
-from ..support.exceptions import DirectModeNoLongerSupportedError
-from ..support import path as op
+from datalad.support.exceptions import DirectModeNoLongerSupportedError
+from datalad.support import path as op
 
-from .utils import (
+from datalad.tests.utils import (
     assert_in,
     assert_raises,
     SkipTest,

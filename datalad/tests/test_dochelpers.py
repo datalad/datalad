@@ -18,7 +18,7 @@ from ..dochelpers import (
     exc_str,
 )
 
-from .utils import (
+from datalad.tests.utils import (
     assert_equal,
     assert_true,
     assert_re_in,

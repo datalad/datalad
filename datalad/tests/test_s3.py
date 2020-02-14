@@ -10,16 +10,16 @@
 
 """
 
-from ..support.network import URL
-from ..support.s3 import add_version_to_url, get_versioned_url
-from .utils import (
+from datalad.support.network import URL
+from datalad.support.s3 import add_version_to_url, get_versioned_url
+from datalad.tests.utils import (
     assert_raises,
     eq_,
     ok_startswith,
     skip_if_no_network,
     use_cassette,
 )
-from ..downloaders.tests.utils import get_test_providers
+from datalad.downloaders.tests.utils import get_test_providers
 
 
 def test_add_version_to_url():

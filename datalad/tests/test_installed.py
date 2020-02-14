@@ -10,7 +10,7 @@
 """
 
 from unittest.mock import patch
-from .utils import (
+from datalad.tests.utils import (
     ok_startswith,
     eq_,
     assert_cwd_unchanged,

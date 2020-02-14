@@ -11,7 +11,8 @@
 
 """
 
-import os, os.path as op
+import os
+import os.path as op
 import shutil
 import sys
 import logging
@@ -33,7 +34,7 @@ from os.path import (
 )
 from collections import OrderedDict
 
-from ..utils import (
+from datalad.utils import (
     _path_,
     all_same,
     any_re_search,
@@ -58,7 +59,6 @@ from ..utils import (
     import_module_from_file,
     import_modules,
     is_explicit_path,
-    is_interactive,
     knows_annex,
     line_profile,
     make_tempfile,
@@ -80,7 +80,7 @@ from ..utils import (
     unlink,
     updated,
 )
-from ..support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo
 
 from .utils import (
     as_unicode,

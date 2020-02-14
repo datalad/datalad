@@ -18,9 +18,9 @@ from unittest.mock import patch
 from io import StringIO
 
 from ..auto import AutomagicIO
-from ..support.annexrepo import AnnexRepo
-from ..support.json_py import LZMAFile
-from .utils import (
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.json_py import LZMAFile
+from datalad.tests.utils import (
     assert_false,
     assert_raises,
     assert_true,
