@@ -18,13 +18,15 @@ from glob import glob
 import os
 import re
 from os import mkdir
-from os.path import join as opj
-from os.path import basename
-from os.path import realpath
-from os.path import relpath
-from os.path import curdir
-from os.path import pardir
-from os.path import exists
+from os.path import (
+    join as opj,
+    basename,
+    realpath,
+    relpath,
+    curdir,
+    pardir,
+    exists,
+)
 from shutil import copyfile
 from datalad.tests.utils import assert_not_is_instance
 
@@ -44,75 +46,78 @@ from datalad.support import path as op
 
 from datalad.support.sshconnector import get_connection_hash
 
-from datalad.utils import on_windows
-from datalad.utils import chpwd
-from datalad.utils import rmtree
-from datalad.utils import linux_distribution_name
-from datalad.utils import unlink
-
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_parametric_batch
-from datalad.tests.utils import assert_dict_equal as deq_
-from datalad.tests.utils import assert_is_instance
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_is
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_not_equal
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import assert_true
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_git_config_not_empty
-from datalad.tests.utils import ok_annex_get
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import local_testrepo_flavors
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import OBSCURE_FILENAME
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import skip_if
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import find_files
-from datalad.tests.utils import slow
-from datalad.tests.utils import set_annex_version
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.tests.utils import with_sameas_remote
-from datalad.tests.utils import known_failure_windows
-
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import CommandNotAvailableError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import FileNotInAnnexError
-from datalad.support.exceptions import FileInGitError
-from datalad.support.exceptions import OutOfSpaceError
-from datalad.support.exceptions import RemoteNotAvailableError
-from datalad.support.exceptions import OutdatedExternalDependency
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import AnnexBatchCommandError
-from datalad.support.exceptions import IncompleteResultsError
-
+from datalad.utils import (
+    chpwd,
+    linux_distribution_name,
+    on_windows,
+    rmtree,
+    unlink,
+)
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_dict_equal as deq_,
+    assert_equal,
+    assert_false,
+    assert_in,
+    assert_is,
+    assert_is_instance,
+    assert_not_equal,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_result_count,
+    assert_true,
+    create_tree,
+    eq_,
+    find_files,
+    get_most_obscure_supported_name,
+    known_failure_githubci_win,
+    known_failure_windows,
+    local_testrepo_flavors,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_annex_get,
+    ok_clean_git,
+    ok_file_has_content,
+    ok_file_under_git,
+    ok_git_config_not_empty,
+    serve_path_via_http,
+    set_annex_version,
+    skip_if,
+    skip_ssh,
+    SkipTest,
+    slow,
+    swallow_logs,
+    swallow_outputs,
+    with_parametric_batch,
+    with_sameas_remote,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+)
+from datalad.support.exceptions import (
+    AnnexBatchCommandError,
+    CommandError,
+    CommandNotAvailableError,
+    FileInGitError,
+    FileNotInAnnexError,
+    FileNotInRepositoryError,
+    IncompleteResultsError,
+    InsufficientArgumentsError,
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+    OutOfSpaceError,
+    RemoteNotAvailableError,
+)
 from datalad.support.external_versions import external_versions
 
 from datalad.support.gitrepo import GitRepo
 
 # imports from same module:
 from datalad.support.annexrepo import (
+    _get_size_from_perc_complete,
     AnnexRepo,
     ProcessAnnexProgressIndicators,
-    _get_size_from_perc_complete,
 )
 from .utils import check_repo_deals_with_inode_change
 

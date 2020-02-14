@@ -15,7 +15,6 @@ from datalad.tests.utils import assert_is_instance
 import logging
 
 import os
-from os import linesep
 import os.path as op
 
 import sys
@@ -24,53 +23,62 @@ import sys
 from datalad import get_encoding_info
 from datalad.cmd import Runner
 
-from datalad.utils import unlink
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import neq_
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import local_testrepo_flavors
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import skip_if
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import integration
-from datalad.utils import rmtree
+from datalad.utils import (
+    chpwd,
+    getpwd,
+    on_windows,
+    rmtree,
+    unlink,
+)
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    create_tree,
+    eq_,
+    get_most_obscure_supported_name,
+    integration,
+    known_failure_windows,
+    local_testrepo_flavors,
+    neq_,
+    ok_,
+    ok_clean_git,
+    skip_if,
+    skip_if_no_network,
+    skip_if_on_windows,
+    skip_ssh,
+    SkipTest,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+)
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
-from datalad.utils import getpwd, chpwd
-from datalad.utils import on_windows
 
 from datalad.dochelpers import exc_str
 
 from datalad.support.sshconnector import get_connection_hash
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
-from datalad.support.gitrepo import NoSuchPathError
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import to_options
-from datalad.support.gitrepo import _normalize_path
-from datalad.support.gitrepo import normalize_paths
-from datalad.support.gitrepo import gitpy
-from datalad.support.gitrepo import guard_BadName
-from datalad.support.exceptions import DeprecatedError
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import PathKnownToRepositoryError
+from datalad.support.gitrepo import (
+    _normalize_path,
+    GitCommandError,
+    gitpy,
+    GitRepo,
+    guard_BadName,
+    InvalidGitRepositoryError,
+    normalize_paths,
+    NoSuchPathError,
+    to_options,
+)
+from datalad.support.exceptions import (
+    CommandError,
+    DeprecatedError,
+    FileNotInRepositoryError,
+    PathKnownToRepositoryError,
+)
 from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
 from .utils import check_repo_deals_with_inode_change

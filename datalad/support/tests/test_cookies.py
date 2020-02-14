@@ -12,8 +12,8 @@ from ..cookies import CookiesDB
 from ...utils import rmtree
 from ...tests.utils import (
     assert_equal,
-    with_tempfile,
     known_failure_githubci_win,
+    with_tempfile,
 )
 
 

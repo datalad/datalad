@@ -14,7 +14,12 @@ import unittest.mock as mock
 import github as gh
 
 from ..exceptions import AccessDeniedError
-from ...tests.utils import assert_raises, assert_equal, eq_, assert_in
+from ...tests.utils import (
+    assert_raises,
+    assert_equal,
+    eq_,
+    assert_in,
+)
 
 from ...utils import swallow_logs
 

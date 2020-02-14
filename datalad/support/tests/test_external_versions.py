@@ -15,21 +15,28 @@ from ... import __version__
 from ...dochelpers import exc_str
 from ...version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
-from ..exceptions import CommandError
-from ..exceptions import OutdatedExternalDependency, MissingExternalDependency
+from ..exceptions import (
+    CommandError,
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
 from ...support.annexrepo import AnnexRepo
 from ...tests.utils import (
-    with_tempfile,
     create_tree,
     set_annex_version,
     swallow_logs,
+    with_tempfile,
 )
 
 from unittest.mock import patch
 from datalad.tests.utils import (
-    assert_true, assert_false,
-    assert_equal, assert_greater_equal, assert_greater,
-    assert_raises, assert_in
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_greater_equal,
+    assert_in,
+    assert_raises,
+    assert_true,
 )
 from datalad.tests.utils import SkipTest
 

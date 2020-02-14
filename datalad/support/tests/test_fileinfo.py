@@ -12,13 +12,13 @@ import os.path as op
 import datalad.utils as ut
 
 from datalad.tests.utils import (
-    with_tempfile,
-    assert_equal,
     assert_dict_equal,
+    assert_equal,
     assert_in,
     assert_not_in,
     assert_raises,
     known_failure_githubci_win,
+    with_tempfile,
 )
 
 from datalad.distribution.dataset import Dataset
