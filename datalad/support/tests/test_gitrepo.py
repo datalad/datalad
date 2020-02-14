@@ -39,7 +39,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import local_testrepo_flavors
@@ -507,7 +507,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     fetched = clone.fetch(remote='origin')
     # test FetchInfo list returned by fetch
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
-        [commit.name for commit in fetched])
+        [commit['ref'] for commit in fetched])
 
     ok_clean_git(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
@@ -519,9 +519,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     origin.config.unset('remote.not-available.url', where='local')
 
     # fetch without provided URL
-    fetched = origin.fetch('not-available')
-    # nothing was done, nothing returned:
-    eq_([], fetched)
+    assert_raises(CommandError, origin.fetch, 'not-available')
 
 
 def _path2localsshurl(path):
@@ -555,7 +553,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     eq_([], repo.get_remote_branches())
 
     fetched = repo.fetch(remote="ssh-remote")
-    assert_in('ssh-remote/master', [commit.name for commit in fetched])
+    assert_in('ssh-remote/master', [commit['ref'] for commit in fetched])
     ok_clean_git(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
@@ -633,9 +631,10 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
 
     # push changes:
-    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
-    # test PushInfo object for
-    assert_in("ssh-remote/ssh-test", [commit.remote_ref.name for commit in pushed])
+    pushed = list(repo.push(remote="ssh-remote", refspec="ssh-test"))
+    # test PushInfo
+    assert_in("refs/heads/ssh-test", [p['from_ref'] for p in pushed])
+    assert_in("refs/heads/ssh-test", [p['to_ref'] for p in pushed])
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -649,8 +648,15 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     # amend to make it require "--force":
     repo.commit("amended", options=['--amend'])
     # push without --force should yield an error:
-    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
-    assert_in("[rejected] (non-fast-forward)", pushed[0].summary)
+    res = repo.push(remote="ssh-remote", refspec="ssh-test")
+    assert_in_results(
+        res,
+        from_ref='refs/heads/ssh-test',
+        to_ref='refs/heads/ssh-test',
+        operations=['rejected', 'error'],
+        note='[rejected] (non-fast-forward)',
+        remote='ssh-remote',
+    )
     # now push using force:
     repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
     # correct commit message in remote:
