@@ -11,16 +11,14 @@ import os
 import os.path as op
 
 from .utils import (
+    assert_in,
+    assert_raises,
     chpwd,
     get_dataset_root,
-    with_tree,
-    swallow_logs,
-
-    assert_raises,
-    assert_equal,
-    assert_in,
     ok_file_has_content,
     SkipTest,
+    swallow_logs,
+    with_tree,
 )
 
 from unittest.mock import patch

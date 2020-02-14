@@ -11,49 +11,49 @@
 
 import logging
 from os.path import (
-    join as opj,
     exists,
+    join as opj,
     lexists,
 )
 from ..dataset import Dataset
 from datalad.api import (
-    publish,
-    install,
     create,
+    install,
+    publish,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
-    InsufficientArgumentsError,
     IncompleteResultsError,
+    InsufficientArgumentsError,
 )
 from datalad.utils import (
     chpwd,
     _path_,
 )
 from datalad.tests.utils import (
-    eq_,
-    ok_,
     assert_false as nok_,
-    with_tempfile,
+    assert_false,
     assert_in,
-    with_testrepos,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
-    assert_false,
-    assert_not_equal,
     assert_result_count,
-    neq_,
-    ok_clean_git,
-    swallow_logs,
-    create_tree,
-    ok_file_has_content,
-    skip_ssh,
     assert_status,
-    with_tree,
+    create_tree,
+    eq_,
+    known_failure_windows,
+    neq_,
+    ok_,
+    ok_clean_git,
+    ok_file_has_content,
     serve_path_via_http,
     skip_if_on_windows,
-    known_failure_windows,
+    skip_ssh,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
 
 

@@ -16,19 +16,24 @@ from os.path import join as opj, dirname
 from unittest.mock import patch
 
 from io import StringIO
-from .utils import with_testrepos
-from .utils import assert_raises, eq_, ok_, assert_false, assert_true
-from .utils import swallow_outputs
-from datalad.tests.utils import known_failure_githubci_win
 
 from ..auto import AutomagicIO
-
 from ..support.annexrepo import AnnexRepo
-from .utils import with_tempfile
-from .utils import SkipTest
-from .utils import chpwd
-from .utils import known_failure_windows
-from datalad.support.json_py import LZMAFile
+from ..support.json_py import LZMAFile
+from .utils import (
+    assert_false,
+    assert_raises,
+    assert_true,
+    chpwd,
+    eq_,
+    known_failure_githubci_win,
+    known_failure_windows,
+    ok_,
+    SkipTest,
+    swallow_outputs,
+    with_tempfile,
+    with_testrepos,
+)
 
 try:
     import h5py

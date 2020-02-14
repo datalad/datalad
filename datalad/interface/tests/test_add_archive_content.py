@@ -14,40 +14,39 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os import unlink
-from os.path import (
+    basename,
     exists,
     join as opj,
-    pardir,
-    basename,
     lexists,
+    pardir,
+from os.path import (
 )
 from glob import glob
 
 from ...tests.utils import (
-    ok_,
-    eq_,
     assert_cwd_unchanged,
-    assert_raises,
-    with_tempfile,
-    assert_in,
     assert_equal,
-    assert_not_equal,
     assert_false,
+    assert_in,
     assert_not_in,
-    assert_true,
-    ok_archives_caches,
-    slow,
+    assert_raises,
     assert_re_in,
     assert_result_values_cond,
-    known_failure_githubci_win,
+    assert_true,
     create_tree,
-    ok_clean_git,
-    swallow_logs,
+    eq_,
     integration,
-    with_tree,
-    serve_path_via_http,
+    known_failure_githubci_win,
+    ok_,
+    ok_archives_caches,
+    ok_clean_git,
     ok_file_under_git,
+    serve_path_via_http,
+    slow,
+    swallow_logs,
     swallow_outputs,
+    with_tempfile,
+    with_tree,
 )
 
 from ...support.annexrepo import AnnexRepo
@@ -57,7 +56,6 @@ from ...utils import (
     getpwd,
     rmtemp,
     find_files,
-    rmtree,
     on_windows,
 )
 from ...api import (
@@ -66,8 +64,8 @@ from ...api import (
 )
 from datalad.support.external_versions import external_versions
 from datalad.consts import (
-    DATALAD_SPECIAL_REMOTES_UUIDS,
     ARCHIVES_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
 )
 
 

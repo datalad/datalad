@@ -12,10 +12,10 @@
 import os
 import os.path as op
 from os.path import (
-    join as opj,
     abspath,
-    relpath,
+    join as opj,
     lexists,
+    relpath,
 )
 from ..dataset import (
     Dataset,
@@ -30,34 +30,34 @@ from datalad.api import (
 )
 import datalad.utils as ut
 from datalad.utils import (
-    chpwd,
-    rmtree,
     _path_,
+    chpwd,
     on_windows,
     Path,
+    rmtree,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
-    ok_clean_git,
-    ok_,
-    eq_,
-    assert_false,
     assert_equal,
-    assert_true,
+    assert_false,
+    assert_is,
     assert_is_instance,
     assert_is_none,
     assert_is_not,
     assert_is_not_none,
+    assert_not_equal,
+    assert_raises,
+    assert_result_count,
+    assert_true,
+    eq_,
+    known_failure_windows,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_clean_git,
     SkipTest,
     with_tempfile,
     with_testrepos,
-    assert_raises,
-    known_failure_windows,
-    assert_is,
-    assert_not_equal,
-    assert_result_count,
-    OBSCURE_FILENAME,
 )
 from datalad.support.exceptions import InsufficientArgumentsError
 

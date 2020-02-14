@@ -10,22 +10,22 @@
 
 from unittest.mock import patch
 from datalad.tests.utils import (
-    with_testsui,
     assert_equal,
-    assert_in,
-    assert_true,
     assert_false,
+    assert_in,
     assert_raises,
+    assert_true,
     SkipTest,
+    with_testsui,
 )
 from datalad.support.keyring_ import (
     Keyring,
     MemoryKeyring,
 )
 from ..credentials import (
-    UserPassword,
-    CompositeCredential,
     AWS_S3,
+    CompositeCredential,
+    UserPassword,
 )
 
 

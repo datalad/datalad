@@ -15,32 +15,32 @@ import os.path as op
 from os.path import join as opj
 
 from datalad.api import (
-    create,
     add,
+    create,
     install,
 )
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.tests.utils import (
-    ok_,
-    ok_clean_git,
-    ok_file_under_git,
-    eq_,
-    with_tempfile,
-    with_tree,
-    assert_raises,
     assert_equal,
     assert_false,
     assert_in,
     assert_not_in,
-    assert_status,
-    assert_result_count,
+    assert_raises,
     assert_repo_status,
-    serve_path_via_http,
-    SkipTest,
-    skip_if_on_windows,
+    assert_result_count,
+    assert_status,
     create_tree,
-    OBSCURE_FILENAME,
+    eq_,
     known_failure_githubci_win,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_clean_git,
+    ok_file_under_git,
+    serve_path_via_http,
+    skip_if_on_windows,
+    SkipTest,
+    with_tempfile,
+    with_tree,
 )
 from datalad.utils import chpwd
 
