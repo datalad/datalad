@@ -2574,27 +2574,33 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # prep for appending to cmd
             refspec = ensure_list(refspec)
 
-        pbar_id = '{}remotes-{}'.format(action, id(self))
-        log_progress(
-            lgr.info,
-            pbar_id,
-            'Start %sing remotes for %s', action, self,
-            total=len(remotes_to_process),
-            label=action.capitalize(),
-            unit=' Remotes',
-        )
+        # no need for progress report, when there is just one remote
+        log_remote_progress = len(remotes_to_process) > 1
+        if log_remote_progress:
+            pbar_id = '{}remotes-{}'.format(action, id(self))
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Start %sing remotes for %s', action, self,
+                total=len(remotes_to_process),
+                label=action.capitalize(),
+                unit=' Remotes',
+            )
         try:
             for remote in remotes_to_process:
                 r_cmd = cmd + [remote]
                 if refspec:
                     r_cmd += refspec
-                log_progress(
-                    lgr.info,
-                    pbar_id,
-                    '{}ing remote %s'.format(action.capitalize()), remote,
-                    update=1,
-                    increment=True,
-                )
+
+                if log_remote_progress:
+                    log_progress(
+                        lgr.info,
+                        pbar_id,
+                        '{}ing remote %s'.format(action.capitalize()),
+                        remote,
+                        update=1,
+                        increment=True,
+                    )
                 # best effort to enable SSH connection caching
                 url = self.config.get(
                     # make two attempts to get a URL
@@ -2635,11 +2641,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         # don't hide it completely
                         lgr.debug('git-%s reported: %s', action, line)
         finally:
-            log_progress(
-                lgr.info,
-                pbar_id,
-                'Finished %sing remotes for %s', action, self,
-            )
+            if log_remote_progress:
+                log_progress(
+                    lgr.info,
+                    pbar_id,
+                    'Finished %sing remotes for %s', action, self,
+                )
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
