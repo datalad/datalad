@@ -450,11 +450,6 @@ def clone_dataset(
             # next candidate
             continue
 
-        # perform any post-processing that needs to know details of the clone
-        # source
-        if cand['type'] == 'ria':
-            yield from postclonecfg_ria(destds, cand)
-
         result_props['source'] = cand
         # do not bother with other sources if succeeded
         break
@@ -498,6 +493,11 @@ def clone_dataset(
         destds,
         reckless,
         description)
+
+    # perform any post-processing that needs to know details of the clone
+    # source
+    if result_props['source']['type'] == 'ria':
+        yield from postclonecfg_ria(destds, result_props['source'])
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
