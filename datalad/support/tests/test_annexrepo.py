@@ -2362,3 +2362,26 @@ def test_annex_cmd_expect_fail(path):
         repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
         # message shows up at WARNING level
         assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
+
+
+def test_get_size_from_key():
+
+    # see https://git-annex.branchable.com/internals/key_format/
+    # BACKEND[-sNNNN][-mNNNN][-SNNNN-CNNNN]--NAME
+
+    test_keys = {"ANYBACKEND--NAME": None,
+                 "ANYBACKEND-s123-m1234--NAME-WITH-DASHES.ext": 123,
+                 "MD5E-s100-S10-C1--somen.ame": 10,
+                 "SHA256-s99-S10-C10--name": 9,
+                 "SHA256E-sNaN--name": None,  # debatable: None or raise?
+                 }
+
+    invalid = ["ANYBACKEND-S10-C30--missing-total",
+               "s99-S10-C10--NOBACKEND",
+               "MD5-s100-S5--no-chunk-number"]
+
+    for key in invalid:
+        assert_raises(ValueError, AnnexRepo.get_size_from_key, key)
+
+    for key, value in test_keys.items():
+        eq_(AnnexRepo.get_size_from_key(key), value)

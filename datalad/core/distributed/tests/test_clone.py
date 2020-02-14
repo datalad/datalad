@@ -50,11 +50,16 @@ from datalad.tests.utils import (
     neq_,
     ok_,
     ok_file_has_content,
+    has_symlink_capability,
+    known_failure,
+    known_failure_appveyor,
     ok_startswith,
+    patch_config,
     patch_config,
     serve_path_via_http,
     skip_if,
     skip_if_no_network,
+    skip_if_on_windows,
     slow,
     swallow_logs,
     use_cassette,
@@ -759,3 +764,72 @@ def test_ria_http_storedataladorg(path):
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)
 
+
+@skip_if_on_windows  # see gh-4131
+@with_tree(tree={
+    'ds': {
+        'test.txt': 'some',
+        'subdir': {'testsub.txt': 'somemore'},
+    },
+})
+@with_tempfile
+@with_tempfile
+def test_ephemeral(origin_path, clone1_path, clone2_path):
+
+    file_test = Path('ds') / 'test.txt'
+    file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
+
+    origin = Dataset(origin_path).create(force=True)
+    origin.save()
+    # 1. clone via path
+    clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
+
+    can_symlink = has_symlink_capability()
+
+    if can_symlink:
+        clone1_annex = (clone1.repo.dot_git / 'annex')
+        ok_(clone1_annex.is_symlink())
+        ok_(clone1_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+        if not clone1.repo.is_managed_branch():
+            # TODO: We can't properly handle adjusted branch yet
+            eq_((clone1.pathobj / file_test).read_text(), 'some')
+            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
+
+    # 2. clone via file-scheme URL
+    clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
+                   reckless='ephemeral')
+
+    if can_symlink:
+        clone2_annex = (clone2.repo.dot_git / 'annex')
+        ok_(clone2_annex.is_symlink())
+        ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+        if not clone2.repo.is_managed_branch():
+            # TODO: We can't properly handle adjusted branch yet
+            eq_((clone1.pathobj / file_test).read_text(), 'some')
+            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
+
+    # 3. add something to clone1 and push back to origin availability from
+    # clone1 should not be propagated (we declared 'here' dead to that end)
+
+    (clone1.pathobj / 'addition.txt').write_text("even more")
+    clone1.save()
+    origin.config.set("receive.denyCurrentBranch", "updateInstead",
+                      where="local")
+    # Note, that the only thing to test is git-annex-dead here,
+    # if we couldn't symlink:
+    clone1.publish(to='origin', transfer_data='none' if can_symlink else 'auto')
+    if not origin.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())
+    res = origin.repo.whereis("addition.txt")
+    if can_symlink:
+        # obv. present in origin, but this is not yet known to origin:
+        eq_(res, [])
+        res = origin.repo.fsck()
+        assert_result_count(res, 3, success=True)
+        # TODO: Double check whether annex reports POSIX paths o windows!
+        eq_({str(file_test), str(file_testsub), "addition.txt"},
+            {r['file'] for r in res})
+        # now origin knows:
+    res = origin.repo.whereis("addition.txt")
+    eq_(res, [origin.config.get("annex.uuid")])

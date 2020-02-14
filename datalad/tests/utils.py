@@ -1875,15 +1875,10 @@ def get_deeply_nested_structure(path):
 
 
 def has_symlink_capability():
-    try:
-        wdir = ut.Path(tempfile.mkdtemp())
-        (wdir / 'target').touch()
-        (wdir / 'link').symlink_to(wdir / 'target')
-        return True
-    except Exception:
-        return False
-    finally:
-        shutil.rmtree(str(wdir))
+
+    path = ut.Path(tempfile.mktemp())
+    target = ut.Path(tempfile.mktemp())
+    return utils.check_symlink_capability(path, target)
 
 
 def skip_wo_symlink_capability(func):
