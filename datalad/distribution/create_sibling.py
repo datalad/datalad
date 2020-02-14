@@ -305,16 +305,21 @@ def _create_dataset_sibling(
 def _ls_remote_path(ssh, path):
     try:
         # yoh tried ls on mac
-        out, err = ssh("ls -a1 {}".format(sh_quote(path)))
+        out, err = ssh("ls -A1 {}".format(sh_quote(path)))
+        if err:
+            # we might even want to raise an exception, but since it was
+            # not raised, let's just log a warning
+            lgr.warning(
+                "There was some output to stderr while running ls on %s via ssh: %s",
+                path, err
+            )
     except CommandError as e:
         if "No such file or directory" in e.stderr and \
                 path in e.stderr:
             return None
         else:
             raise  # It's an unexpected failure here
-    return [
-        o for o in out.split(os.linesep) if o not in ('.', '..', '')
-    ]
+    return [l for l in out.split(os.linesep) if l]
 
 
 @build_doc
