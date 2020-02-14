@@ -34,8 +34,8 @@ from datalad.utils import (
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
-    NoDatasetArgumentFound,
     CommandError,
+    NoDatasetArgumentFound,
 )
 from datalad.api import (
     run,
@@ -45,30 +45,30 @@ from datalad.core.local.run import (
     run_command,
 )
 from datalad.tests.utils import (
-    assert_raises,
     assert_false,
-    assert_repo_status,
-    with_tempfile,
-    with_tree,
-    ok_,
-    ok_exists,
-    ok_file_has_content,
-    create_tree,
-    eq_,
-    neq_,
-    assert_status,
-    assert_result_count,
     assert_in,
     assert_in_results,
     assert_not_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    create_tree,
+    eq_,
+    known_failure_appveyor,
+    known_failure_githubci_win,
+    known_failure_windows,
+    neq_,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_exists,
+    ok_file_has_content,
+    slow,
     swallow_logs,
     swallow_outputs,
-    known_failure_githubci_win,
-    known_failure_appveyor,
-    known_failure_windows,
-    slow,
+    with_tempfile,
     with_testrepos,
-    OBSCURE_FILENAME,
+    with_tree,
 )
 
 

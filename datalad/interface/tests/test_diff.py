@@ -13,26 +13,24 @@
 __docformat__ = 'restructuredtext'
 
 
-
 from os.path import join as opj
-from datalad.utils import chpwd
-
 from datalad.cmd import GitRunner
-
 from datalad.distribution.dataset import Dataset
 from datalad.api import diff
 from datalad.interface.diff import _parse_git_diff
 from datalad.consts import PRE_INIT_COMMIT_SHA
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import ok_
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    known_failure_windows,
+    with_tempfile,
+    with_tree,
+    ok_clean_git,
+    create_tree,
+    ok_,
+    eq_,
+    assert_status,
+    assert_result_count,
+    known_failure_githubci_win,
+)
 
 
 @known_failure_windows

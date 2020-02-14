@@ -17,18 +17,18 @@ from os.path import join as opj
 
 from unittest.mock import patch
 from datalad.tests.utils import (
-    assert_raises,
-    assert_false,
-    assert_true,
     assert_equal,
-    assert_not_equal,
+    assert_false,
     assert_in,
+    assert_not_equal,
     assert_not_in,
+    assert_raises,
+    assert_true,
+    chpwd,
     ok_file_has_content,
-    with_tree,
     with_tempfile,
     with_testsui,
-    chpwd,
+    with_tree,
 )
 from datalad.utils import swallow_logs
 

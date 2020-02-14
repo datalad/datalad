@@ -23,16 +23,27 @@ from io import StringIO
 from datalad.api import addurls, Dataset, subdatasets
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.tests.utils import chpwd, slow, swallow_logs
-from datalad.tests.utils import assert_false, assert_true, assert_raises
-from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import eq_, ok_exists
-from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_false,
+    assert_in,
+    assert_in_results,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_true,
+    chpwd,
+    create_tree,
+    eq_,
+    HTTPPath,
+    known_failure_githubci_win,
+    ok_exists,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
+)
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 

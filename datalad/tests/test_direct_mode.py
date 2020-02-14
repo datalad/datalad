@@ -10,34 +10,19 @@
 
 """
 
-
-
-import logging
-
-# Please do ignore possible unused marking.
-# This is used via Dataset class:
-import datalad.api
-from datalad import cfg
-
-from nose.tools import ok_
 from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.utils import swallow_logs
-from datalad.distribution.dataset import Dataset
 
-from ..support.exceptions import DirectModeNoLongerSupportedError
-from ..support import path as op
+from datalad.support.exceptions import DirectModeNoLongerSupportedError
+from datalad.support import path as op
 
-from .utils import with_tempfile
-from .utils import skip_if_no_network
-from .utils import with_testrepos
-from .utils import on_windows
-from .utils import SkipTest
-from .utils import assert_raises
-from .utils import assert_in
-from .utils import eq_
-
+from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
+    SkipTest,
+    with_tempfile,
+)
 
 # if on_windows:
 #     raise SkipTest("Can't test direct mode switch, "

@@ -12,18 +12,22 @@
 from glob import glob
 from os.path import join as opj
 
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.utils import swallow_logs
-from datalad.utils import swallow_outputs
-from datalad.utils import chpwd
+from datalad.tests.utils import (
+    with_tempfile,
+    assert_raises,
+    ok_,
+    ok_clean_git,
+    known_failure_githubci_win,
+)
+from datalad.utils import (
+    swallow_logs,
+    swallow_outputs,
+    chpwd,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.distribution.create_test_dataset import _parse_spec
 
-from nose.tools import eq_
+from datalad.tests.utils import eq_
 
 
 @with_tempfile(mkdir=True)

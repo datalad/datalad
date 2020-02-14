@@ -8,7 +8,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test XMP extractor"""
 
-from datalad.tests.utils import SkipTest
+from datalad.tests.utils import (
+    assert_in,
+    assert_result_count,
+    assert_status,
+    eq_,
+    ok_clean_git,
+    SkipTest,
+    with_tempfile,
+)
 try:
     import libxmp
 except Exception as exc:
@@ -16,15 +24,11 @@ except Exception as exc:
     raise SkipTest("libxmp cannot be imported: %s" % exc_str(exc))
 
 from shutil import copy
-from os.path import dirname
-from os.path import join as opj
+from os.path import (
+    dirname,
+    join as opj,
+)
 from datalad.api import Dataset
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_in
 
 
 target = {

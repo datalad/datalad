@@ -53,11 +53,13 @@ template_fx = lambda x: re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', x))
 class CreateSiblingGithub(Interface):
     """Create dataset sibling on Github.
 
-    A repository can be created under a user's Github account, or any
-    organization a user is a member of (given appropriate permissions).
-
-    Recursive sibling creation for subdatasets is supported. A dataset
-    hierarchy is represented as a flat list of Github repositories.
+    An existing GitHub project, or a project created via the GitHub website can
+    be configured as a sibling with the :command:`siblings` command.
+    Alternatively, this command can create a repository under a user's Github
+    account, or any organization a user is a member of (given appropriate
+    permissions). This is particulary helpful for recursive sibling creation
+    for subdatasets. In such a case, a dataset hierarchy is represented as a
+    flat list of GitHub repositories.
 
     Github cannot host dataset content. However, in combination with
     other data sources (and siblings), publishing a dataset to Github can

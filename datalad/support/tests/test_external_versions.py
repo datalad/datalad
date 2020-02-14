@@ -11,27 +11,34 @@ import logging
 
 from os import linesep
 
-from ... import __version__
-from ...dochelpers import exc_str
-from ...version import __version__
+from datalad import __version__
+from datalad.dochelpers import exc_str
+from datalad.version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
-from ..exceptions import CommandError
-from ..exceptions import OutdatedExternalDependency, MissingExternalDependency
-from ...support.annexrepo import AnnexRepo
-from ...tests.utils import (
-    with_tempfile,
+from datalad.support.exceptions import (
+    CommandError,
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.tests.utils import (
     create_tree,
     set_annex_version,
     swallow_logs,
+    with_tempfile,
 )
 
 from unittest.mock import patch
-from nose.tools import (
-    assert_true, assert_false,
-    assert_equal, assert_greater_equal, assert_greater,
-    assert_raises, assert_in
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_greater_equal,
+    assert_in,
+    assert_raises,
+    assert_true,
 )
-from nose import SkipTest
+from datalad.tests.utils import SkipTest
 
 
 # just to ease testing

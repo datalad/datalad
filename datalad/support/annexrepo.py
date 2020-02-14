@@ -595,15 +595,49 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @staticmethod
     def get_size_from_key(key):
-        """A little helper to obtain size encoded in a key"""
+        """A little helper to obtain size encoded in a key
+
+        Returns
+        -------
+        int or None
+          size of the file or None if either no size is encoded in the key or
+          key was None itself
+
+        Raises
+        ------
+        ValueError
+          if key is considered invalid (at least its size-related part)
+        """
         if not key:
             return None
-        try:
-            size_str = key.split('-', 2)[1].lstrip('s')
-        except IndexError:
-            # has no 2nd field in the key
-            return None
-        return int(size_str) if size_str.isdigit() else None
+
+        # see: https://git-annex.branchable.com/internals/key_format/
+        key_parts = key.split('--')
+        key_fields = key_parts[0].split('-')
+        parsed = {field[0]: int(field[1:]) if field[1:].isdigit() else None
+                  for field in key_fields[1:]
+                  if field[0] in "sSC"}
+
+        # don't lookup the dict for the same things several times;
+        # Is there a faster (and more compact) way of doing this? Note, that
+        # locals() can't be updated.
+        s = parsed.get('s')
+        S = parsed.get('S')
+        C = parsed.get('C')
+
+        if S is None and C is None:
+            return s  # also okay if s is None as well -> no size to report
+        elif s is None:
+            # s is None, while S and/or C are not.
+            raise ValueError("invalid key: {}".format(key))
+        elif S and C:
+            if C <= int(s / S):
+                return S
+            else:
+                return s % S
+        else:
+            # S or C are given with the respective other one missing
+            raise ValueError("invalid key: {}".format(key))
 
     @normalize_path
     def get_file_size(self, path):

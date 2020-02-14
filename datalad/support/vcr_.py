@@ -78,7 +78,7 @@ except Exception as exc:
             def skip_decorator(t):
                 @wraps(t)
                 def wrapper(*args, **kwargs):
-                    from nose import SkipTest
+                    from unittest import SkipTest
                     raise SkipTest("No vcr")
                 return wrapper
             return skip_decorator

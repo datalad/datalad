@@ -17,23 +17,23 @@ from os.path import (
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
-    subdatasets,
     create,
+    subdatasets,
 )
 from datalad.utils import (
     chpwd,
     Path,
 )
 from datalad.tests.utils import (
-    eq_,
-    with_testrepos,
-    with_tempfile,
-    assert_result_count,
     assert_false,
     assert_in,
     assert_not_in,
+    assert_result_count,
     assert_status,
+    eq_,
     known_failure_windows,
+    with_tempfile,
+    with_testrepos,
 )
 
 

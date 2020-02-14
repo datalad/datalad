@@ -15,36 +15,39 @@ __docformat__ = 'restructuredtext'
 
 
 import os
-from os.path import pardir
-from os.path import join as opj
+from os.path import (
+    pardir,
+    join as opj,
+)
 from datalad.utils import (
     chpwd,
     unlink,
 )
-
 from datalad.interface.save import Save
 from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import IncompleteResultsError
-from datalad.tests.utils import ok_
-from datalad.api import create
-from datalad.api import save as rev_save
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_result_values_equal
-from datalad.tests.utils import skip_v6_or_later
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import known_failure_githubci_win
-
+from datalad.api import (
+    create,
+    save as rev_save,
+)
+from datalad.tests.utils import (
+    ok_,
+    assert_raises,
+    with_testrepos,
+    with_tempfile,
+    with_tree,
+    ok_clean_git,
+    create_tree,
+    assert_equal,
+    assert_status,
+    assert_result_count,
+    assert_not_in,
+    assert_result_values_equal,
+    skip_v6_or_later,
+    known_failure_windows,
+    known_failure_githubci_win,
+)
 
 save = Save.__call__
 

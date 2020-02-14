@@ -12,28 +12,30 @@ import os
 import os.path as op
 
 from datalad.utils import (
-    on_windows,
     assure_list,
+    on_windows,
     rmtree,
 )
 from datalad.tests.utils import (
-    assert_status,
-    assert_result_count,
     assert_in,
     assert_in_results,
     assert_not_in,
     assert_raises,
-    create_tree,
-    with_tempfile,
-    with_tree,
-    with_testrepos,
-    eq_,
-    ok_,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
     chpwd,
+    create_tree,
+    eq_,
     known_failure_appveyor,
     known_failure_windows,
-    swallow_outputs,
     OBSCURE_FILENAME,
+    ok_,
+    skip_wo_symlink_capability,
+    swallow_outputs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
 from datalad.distribution.tests.test_add import tree_arg
 
@@ -43,14 +45,9 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
 from datalad.support.external_versions import external_versions
 from datalad.api import (
-    save,
     create,
     install,
-)
-
-from datalad.tests.utils import (
-    assert_repo_status,
-    skip_wo_symlink_capability,
+    save,
 )
 
 
