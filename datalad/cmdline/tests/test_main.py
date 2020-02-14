@@ -8,9 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
-from datalad.tests.utils import on_windows
-
-
 import re
 import sys
 from io import StringIO
@@ -27,12 +24,18 @@ from datalad.cmd import Runner
 from datalad.ui.utils import get_console_width
 from datalad.api import create
 from datalad.utils import chpwd
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import slow
+from datalad.tests.utils import (
+    on_windows,
+    with_tempfile,
+    assert_equal,
+    assert_raises,
+    in_,
+    ok_startswith,
+    assert_in,
+    assert_re_in,
+    assert_not_in,
+    slow,
+)
 
 
 def run_main(args, exit_code=0, expect_stderr=False):

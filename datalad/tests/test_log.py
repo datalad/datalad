@@ -9,30 +9,33 @@
 """Test logging facilities """
 
 import logging
-import re
 import os.path
 from os.path import exists
 
 from logging import makeLogRecord
-from nose.tools import assert_raises, assert_is_instance, assert_true
-from git.exc import GitCommandError
 
 from unittest.mock import patch
 
-from datalad.log import LoggerHelper
-from datalad.log import TraceBack
-from datalad.log import ColorFormatter
+from datalad.log import (
+    ColorFormatter,
+    LoggerHelper,
+    TraceBack,
+)
 from datalad import cfg
 from datalad.support.constraints import EnsureBool
 from datalad.support import ansi_colors as colors
 
-from datalad.tests.utils import with_tempfile, ok_, assert_equal
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import ok_endswith
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_equal,
+    assert_in,
+    assert_not_in,
+    assert_re_in,
+    known_failure_githubci_win,
+    ok_,
+    ok_endswith,
+    swallow_logs,
+    with_tempfile,
+)
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -112,6 +115,7 @@ def check_filters(name):
         assert_in('log1', cml.out)
         assert_in('log2', cml.out)
         assert 'log3' not in cml.out
+
 
 def test_filters():
     def _mock_names(self, v, d=None):

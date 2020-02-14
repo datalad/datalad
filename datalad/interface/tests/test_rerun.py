@@ -13,8 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-
-import os
 import os.path as op
 from os import (
     remove,
@@ -67,7 +65,6 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
-    known_failure,
     known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,

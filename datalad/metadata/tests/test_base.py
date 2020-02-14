@@ -11,40 +11,50 @@
 
 import logging
 
-from os.path import join as opj
-from os.path import relpath
+from os.path import (
+    join as opj,
+    relpath,
+)
 import os.path as op
 
-from datalad.api import Dataset
-from datalad.api import aggregate_metadata
-from datalad.api import install
-from datalad.api import metadata
+from datalad.api import (
+    aggregate_metadata,
+    Dataset,
+    install,
+    metadata,
+)
 from datalad.metadata.metadata import (
+    _get_containingds_from_agginfo,
     get_metadata_type,
     query_aggregated_metadata,
-    _get_containingds_from_agginfo,
 )
-from datalad.utils import chpwd
-from datalad.utils import assure_unicode
-from datalad.tests.utils import with_tree, with_tempfile
-from datalad.tests.utils import slow
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import ok_
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.utils import (
+    assure_unicode,
+    chpwd,
+)
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_equal,
+    assert_in,
+    assert_raises,
+    assert_re_in,
+    assert_result_count,
+    assert_status,
+    assert_true,
+    eq_,
+    known_failure_githubci_win,
+    ok_clean_git,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
+)
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetArgumentFound,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-
-from nose.tools import assert_true, assert_equal, assert_raises
 
 
 _dataset_hierarchy_template = {

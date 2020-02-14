@@ -9,44 +9,49 @@
 
 """
 
-
-
 from os import curdir
-import os.path as op
-from os.path import join as opj, basename
-from glob import glob
+from os.path import (
+    join as opj,
+    basename,
+)
 from unittest.mock import patch
 
-from datalad.api import create
-from datalad.api import get
-from datalad.api import install
+from datalad.api import (
+    create,
+    get,
+    install,
+)
 from datalad.interface.results import only_matching_paths
 from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import RemoteNotAvailableError
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_message
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import slow
-from datalad.tests.utils import known_failure_windows
-from datalad.utils import with_pathsep
-from datalad.utils import chpwd
-from datalad.utils import assure_list
-from datalad.utils import rmtree
-
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    RemoteNotAvailableError,
+)
+from datalad.tests.utils import (
+    ok_,
+    ok_clean_git,
+    eq_,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+    create_tree,
+    assert_raises,
+    assert_in,
+    assert_status,
+    assert_in_results,
+    assert_not_in_results,
+    assert_result_count,
+    assert_message,
+    serve_path_via_http,
+    slow,
+    known_failure_windows,
+)
+from datalad.utils import (
+    with_pathsep,
+    chpwd,
+    rmtree,
+)
 from ..dataset import Dataset
 
 

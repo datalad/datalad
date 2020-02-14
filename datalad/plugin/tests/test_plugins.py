@@ -16,30 +16,33 @@ from os.path import join as opj
 from datalad.api import create
 from datalad.coreapi import Dataset
 from datalad.dochelpers import exc_str
-from datalad.api import wtf
-from datalad.api import no_annex
+from datalad.api import (
+    no_annex,
+    wtf,
+)
 from datalad.plugin.wtf import _HIDDEN
 from datalad.version import __version__
 
 from ..wtf import SECTION_CALLABLES
 
 from datalad.utils import assure_unicode
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import chpwd
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_if_no_module
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import OBSCURE_FILENAME
-from datalad.tests.utils import known_failure_githubci_win
-
+from datalad.tests.utils import (
+    assert_in,
+    assert_not_in,
+    assert_status,
+    chpwd,
+    create_tree,
+    eq_,
+    known_failure_githubci_win,
+    OBSCURE_FILENAME,
+    ok_clean_git,
+    ok_startswith,
+    skip_if_no_module,
+    SkipTest,
+    swallow_outputs,
+    with_tempfile,
+    with_tree,
+)
 
 broken_plugin = """garbage"""
 

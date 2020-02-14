@@ -11,7 +11,10 @@
 
 from os.path import join as opj
 from ..dataset import Dataset, datasetmethod
-from datalad.tests.utils import assert_raises, eq_
+from datalad.tests.utils import (
+    assert_raises,
+    eq_,
+)
 
 
 def test_decorator():

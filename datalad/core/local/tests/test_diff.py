@@ -25,31 +25,29 @@ from datalad.utils import (
     on_windows,
 )
 from datalad.tests.utils import (
-    with_tempfile,
+    assert_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    chpwd,
     create_tree,
     eq_,
-    ok_,
-    assert_raises,
-    assert_status,
-    assert_in,
-    chpwd,
-    assert_result_count,
-    OBSCURE_FILENAME,
+    get_deeply_nested_structure,
+    has_symlink_capability,
     known_failure_githubci_win,
+    OBSCURE_FILENAME,
+    ok_,
     SkipTest,
+    with_tempfile,
 )
 
 import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
-    save,
     create,
     diff,
-)
-from datalad.tests.utils import (
-    get_deeply_nested_structure,
-    has_symlink_capability,
-    assert_repo_status,
+    save,
 )
 
 

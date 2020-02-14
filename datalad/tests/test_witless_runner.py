@@ -12,19 +12,19 @@
 import os
 import sys
 
-from .utils import (
-    ok_,
-    eq_,
-    assert_raises,
-    assert_in,
-    with_tempfile,
+from datalad.tests.utils import (
     assert_cwd_unchanged,
-    ok_file_has_content,
+    assert_in,
+    assert_raises,
+    eq_,
     OBSCURE_FILENAME,
+    ok_,
+    ok_file_has_content,
+    with_tempfile,
 )
 from datalad.cmd import (
-    WitlessRunner as Runner,
     StdOutErrCapture,
+    WitlessRunner as Runner,
     StdOutCapture,
 )
 from datalad.utils import Path
