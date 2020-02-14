@@ -292,7 +292,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # make sure we are up-to-date on this topic on all affected remotes, before
     # we start making decisions
     for r in publish_depends + [remote]:
-        if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+        if not ds.config.get('.'.join(('remote', r, 'annex-uuid')), None):
             lgr.debug("Obtain remote annex info from '%s'", r)
             ds.repo.fetch(remote=r)
             # in order to be able to use git's config to determine what to push,
