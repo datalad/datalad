@@ -14,17 +14,30 @@ Note: DryRunProtocol and NullProtocol are already (kind of) tested within
 
 import os
 from os.path import normpath
-from datalad.tests.utils import ok_, eq_, assert_is, assert_equal, assert_greater, \
-    assert_raises, assert_in, assert_is_instance, assert_true, assert_false
 
-from ..support.protocol import DryRunProtocol, DryRunExternalsProtocol, \
-    NullProtocol, ExecutionTimeProtocol, ExecutionTimeExternalsProtocol, \
-    ProtocolInterface
-from ..support.gitrepo import GitRepo
+from datalad.tests.utils import (
+    ok_,
+    assert_is,
+    assert_equal,
+    assert_raises,
+    assert_in,
+    assert_is_instance,
+    assert_true,
+    assert_false,
+    with_tempfile,
+    swallow_logs,
+    known_failure_githubci_win,
+)
+
+from ..support.protocol import (
+    DryRunProtocol,
+    DryRunExternalsProtocol,
+    NullProtocol,
+    ExecutionTimeProtocol,
+    ExecutionTimeExternalsProtocol,
+    ProtocolInterface,
+)
 from ..cmd import Runner
-from .utils import with_tempfile
-from .utils import swallow_logs
-from .utils import known_failure_githubci_win
 
 
 @known_failure_githubci_win
