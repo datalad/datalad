@@ -47,7 +47,6 @@ from functools import wraps
 from weakref import WeakValueDictionary
 
 import git as gitpy
-from git import RemoteProgress
 from gitdb.exc import BadName
 from git.exc import (
     GitCommandError,
@@ -71,7 +70,6 @@ from datalad.config import (
 )
 
 from datalad.consts import (
-    GIT_SSH_COMMAND,
     ADJUSTED_BRANCH_EXPR,
 )
 from datalad.dochelpers import exc_str
@@ -495,7 +493,7 @@ class GitProgress(WitlessProtocol):
                 # it is better to enable better (maybe more expensive)
                 # subsequent filtering than hidding lines with
                 # unknown, potentially important info
-                lgr.debug('Non-progress Git output: %s', line)
+                lgr.debug('Non-progress stderr: %s', line)
                 if line.endswith((b'\r', b'\n')):
                     # complete non-progress line, pass on
                     super().pipe_data_received(fd, line)
@@ -638,99 +636,192 @@ class GitProgress(WitlessProtocol):
         return True
 
 
-class GitPythonProgressBar(RemoteProgress):
-    """A handler for Git commands interfaced by GitPython which report progress
+class StdOutCaptureWithGitProgress(GitProgress):
+    proc_out = True
+
+
+class FetchInfo(dict):
+    """
+    dict that carries results of a fetch operation of a single head
+
+    Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
     """
 
-    # GitPython operates with op_codes which are a mask for actions.
-    _known_ops = {
-        RemoteProgress.COUNTING: "counting objects",
-        RemoteProgress.COMPRESSING: "compressing objects",
-        RemoteProgress.WRITING: "writing objects",
-        RemoteProgress.RECEIVING: "receiving objects",
-        RemoteProgress.RESOLVING: "resolving stuff",
-        RemoteProgress.FINDING_SOURCES: "finding sources",
-        RemoteProgress.CHECKING_OUT: "checking things out"
+    NEW_TAG, NEW_HEAD, HEAD_UPTODATE, TAG_UPDATE, REJECTED, FORCED_UPDATE, \
+        FAST_FORWARD, ERROR = [1 << x for x in range(8)]
+
+    _re_fetch_result = re.compile(r'^\s*(.) (\[?[\w\s\.$@]+\]?)\s+(.+) [-> ]+ ([^\s]+)(    \(.*\)?$)?')
+
+    _flag_map = {
+        '!': ERROR,
+        '+': FORCED_UPDATE,
+        '*': 0,
+        '=': HEAD_UPTODATE,
+        ' ': FAST_FORWARD,
+        '-': TAG_UPDATE,
+    }
+    _operation_map = {
+        NEW_TAG: 'new-tag',
+        NEW_HEAD: 'new-branch',
+        HEAD_UPTODATE: 'uptodate',
+        TAG_UPDATE: 'tag-update',
+        REJECTED: 'rejected',
+        FORCED_UPDATE: 'forced-update',
+        FAST_FORWARD: 'fast-forward',
+        ERROR: 'error',
     }
 
-    # To overcome the bug when GitPython (<=2.1.11), with tentative fix
-    # in https://github.com/gitpython-developers/GitPython/pull/798
-    # we will collect error_lines from the last progress bar used by GitPython
-    # To do that reliably this class should be used as a ContextManager,
-    # or .close() should be called explicitly before analysis of this
-    # attribute is done.
-    # TODO: remove the workaround whenever new GitPython version provides
-    # it natively and we boost versioned dependency on it
-    _last_error_lines = None
-
-    def __init__(self, action):
-        super(GitPythonProgressBar, self).__init__()
-        self._action = action
-        from datalad.ui import ui
-        self._ui = ui
-        self._pbar = None
-        self._op_code = None
-        GitPythonProgressBar._last_error_lines = None
-
-    def __del__(self):
-        self.close()
-
-    def close(self):
-        GitPythonProgressBar._last_error_lines = self.error_lines
-        self._close_pbar()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-
-    def _close_pbar(self):
-        if self._pbar:
-            self._pbar.finish()
-        self._pbar = None
-
-    def _get_human_msg(self, op_code):
-        """Return human readable action message
+    @classmethod
+    def _from_line(cls, line):
+        """Parse information from the given line as returned by git-fetch -v
+        and return a new FetchInfo object representing this information.
         """
-        op_id = op_code & self.OP_MASK
-        op = self._known_ops.get(op_id, "doing other evil")
-        return "%s (%s)" % (self._action, op)
+        match = cls._re_fetch_result.match(line)
+        if match is None:
+            raise ValueError("Failed to parse line: %r" % line)
 
-    def update(self, op_code, cur_count, max_count=None, message=''):
-        # ATM we ignore message which typically includes bandwidth info etc
+        # parse lines
+        control_character, operation, local_remote_ref, remote_local_ref, note = \
+            match.groups()
+
+        # parse flags from control_character
+        flags = 0
         try:
-            if not max_count:
-                # spotted used by GitPython tests, so may be at times it is not
-                # known and assumed to be a 100%...? TODO
-                max_count = 100.0
-            if op_code:
-                # Apparently those are composite and we care only about the ones
-                # we know, so to avoid switching the progress bar for no good
-                # reason - first & with the mask
-                op_code = op_code & self.OP_MASK
-            if self._op_code is None or self._op_code != op_code:
-                # new type of operation
-                self._close_pbar()
+            flags |= cls._flag_map[control_character]
+        except KeyError:
+            raise ValueError(
+                "Control character %r unknown as parsed from line %r"
+                % (control_character, line))
+        # END control char exception handling
 
-                self._pbar = self._ui.get_progressbar(
-                    self._get_human_msg(op_code),
-                    total=max_count,
-                    unit=' objects'
-                )
-                self._op_code = op_code
-            if not self._pbar:
-                lgr.error("Ended up without progress bar... how?")
-                return
-            self._pbar.update(cur_count, increment=False)
-        except Exception as exc:
-            lgr.debug("GitPythonProgressBar errored with %s", exc_str(exc))
-            return
-        #import time; time.sleep(0.001)  # to see that things are actually "moving"
-        # without it we would get only a blink on initial 0 value, istead of
-        # a blink at some higher value.  Anyways git provides those
-        # without flooding so should be safe to force here.
-        self._pbar.refresh()
+        # parse operation string for more info - makes no sense for symbolic refs,
+        # but we parse it anyway
+        old_commit = None
+        if 'rejected' in operation:
+            flags |= cls.REJECTED
+        if 'new tag' in operation:
+            flags |= cls.NEW_TAG
+        if 'tag update' in operation:
+            flags |= cls.TAG_UPDATE
+        if 'new branch' in operation:
+            flags |= cls.NEW_HEAD
+        if '...' in operation or '..' in operation:
+            split_token = '...'
+            if control_character == ' ':
+                split_token = split_token[:-1]
+            old_commit = operation.split(split_token)[0]
+        # END handle refspec
+
+        return cls(
+            ref=remote_local_ref.strip(),
+            local_ref=local_remote_ref.strip(),
+            # convert flag int into a list of operation labels
+            operations=[
+                cls._operation_map[o]
+                for o in cls._operation_map.keys()
+                if flags & o
+            ],
+            note=note,
+            old_commit=old_commit,
+        )
+
+
+class PushInfo(dict):
+    """dict that carries results of a push operation of a single head
+
+    Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+    NEW_TAG, NEW_HEAD, NO_MATCH, REJECTED, REMOTE_REJECTED, REMOTE_FAILURE, DELETED, \
+        FORCED_UPDATE, FAST_FORWARD, UP_TO_DATE, ERROR = [1 << x for x in range(11)]
+
+    _flag_map = {'X': NO_MATCH,
+                 '-': DELETED,
+                 '*': 0,
+                 '+': FORCED_UPDATE,
+                 ' ': FAST_FORWARD,
+                 '=': UP_TO_DATE,
+                 '!': ERROR}
+
+    _operation_map = {
+        NEW_TAG: 'new-tag',
+        NEW_HEAD: 'new-branch',
+        NO_MATCH: 'no-match',
+        REJECTED: 'rejected',
+        REMOTE_REJECTED: 'remote-rejected',
+        REMOTE_FAILURE: 'remote-failure',
+        DELETED: 'deleted',
+        FORCED_UPDATE: 'forced-update',
+        FAST_FORWARD: 'fast-forward',
+        UP_TO_DATE: 'uptodate',
+        ERROR: 'error',
+    }
+
+    @classmethod
+    def _from_line(cls, line):
+        """Create a new PushInfo instance as parsed from line which is expected to be like
+            refs/heads/master:refs/heads/master 05d2687..1d0568e as bytes"""
+        control_character, from_to, summary = line.split('\t', 3)
+        flags = 0
+
+        # control character handling
+        try:
+            flags |= cls._flag_map[control_character]
+        except KeyError:
+            raise ValueError("Control character %r unknown as parsed from line %r" % (control_character, line))
+        # END handle control character
+
+        # from_to handling
+        from_ref_string, to_ref_string = from_to.split(':')
+
+        # commit handling, could be message or commit info
+        old_commit = None
+        if summary.startswith('['):
+            if "[rejected]" in summary:
+                flags |= cls.REJECTED
+            elif "[remote rejected]" in summary:
+                flags |= cls.REMOTE_REJECTED
+            elif "[remote failure]" in summary:
+                flags |= cls.REMOTE_FAILURE
+            elif "[no match]" in summary:
+                flags |= cls.ERROR
+            elif "[new tag]" in summary:
+                flags |= cls.NEW_TAG
+            elif "[new branch]" in summary:
+                flags |= cls.NEW_HEAD
+            # uptodate encoded in control character
+        else:
+            # fast-forward or forced update - was encoded in control character,
+            # but we parse the old and new commit
+            split_token = "..."
+            if control_character == " ":
+                split_token = ".."
+            old_sha, _new_sha = summary.split(' ')[0].split(split_token)
+            # have to use constructor here as the sha usually is abbreviated
+            old_commit = old_sha
+        # END message handling
+
+        return cls(
+            from_ref=from_ref_string.strip(),
+            to_ref=to_ref_string.strip(),
+            # convert flag int into a list of operation labels
+            operations=[
+                cls._operation_map[o]
+                for o in cls._operation_map.keys()
+                if flags & o
+            ],
+            note=summary.strip(),
+            old_commit=old_commit,
+        )
 
 
 # Compatibility kludge.  See GitRepo.get_submodules().
@@ -741,12 +832,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
-    # We use our sshrun helper
-    # TODO remove this, when GitPython code is gone. It is a duplicate of
-    # GitRunner.get_git_environ_adjusted()
-    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND,
-                   'GIT_SSH_VARIANT': 'ssh'}
-
     # We must check git config to have name and email set, but
     # should do it once
     _config_checked = False
@@ -2288,10 +2373,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             expect_stderr=True
         )
 
-    # TODO: centralize all the c&p code in fetch, pull, push
-    # TODO: document **kwargs passed to gitpython
-    @guard_BadName
-    def fetch(self, remote=None, refspec=None, all_=False, **kwargs):
+    def fetch(self, remote=None, refspec=None, all_=False, git_options=None,
+              **kwargs):
         """Fetches changes from a remote (or all remotes).
 
         Parameters
@@ -2304,211 +2387,266 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         all_ : bool, optional
           fetch all remotes (and all of their branches).
           Fails if `remote` was given.
+        git_options : list, optional
+          Additional command line options for git-push.
         kwargs :
-          passed to gitpython. TODO: Figure it out, make consistent use of it
-          and document it.
-
-        Returns
-        -------
-        list
-            FetchInfo objects of the items fetched from remote
+          Deprecated. GitPython-style keyword argument for git-push.
+          Will be appended to any git_options.
         """
-        # TODO: options=> **kwargs):
-        # Note: Apparently there is no explicit (fetch --all) in gitpython,
-        #       but fetch is always bound to a certain remote instead.
-        #       Therefore implement it on our own:
+        git_options = ensure_list(git_options)
+        if kwargs:
+            git_options.extend(to_options(**kwargs))
+        return list(
+            self.fetch_(
+                remote=remote,
+                refspec=refspec,
+                all_=all_,
+                git_options=git_options,
+            )
+        )
+
+    @guard_BadName
+    def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
+        """Like `fetch`, but returns a generator"""
+        yield from self._fetch_push_helper(
+            base_cmd=['git', 'fetch', '--verbose', '--progress'],
+            action='fetch',
+            urlvars=('remote.{}.url', 'remote.{}.url'),
+            protocol=GitProgress,
+            info_cls=FetchInfo,
+            info_from=1,
+            add_remote=False,
+            remote=remote,
+            refspec=refspec,
+            all_=all_,
+            git_options=git_options)
+
+    # XXX Consider removing this method. It is only used in `update()`,
+    # where it could be easily replaced with fetch+merge
+    def pull(self, remote=None, refspec=None, git_options=None, **kwargs):
+        """Pulls changes from a remote.
+
+        Parameters
+        ----------
+        remote : str, optional
+          name of the remote to pull from. If no remote is given,
+          the remote tracking branch is used.
+        refspec : str, optional
+          refspec to fetch.
+        git_options : list, optional
+          Additional command line options for git-pull.
+        kwargs :
+          Deprecated. GitPython-style keyword argument for git-pull.
+          Will be appended to any git_options.
+        """
+        git_options = ensure_list(git_options)
+        if kwargs:
+            git_options.extend(to_options(**kwargs))
+
+        cmd = ['git', 'pull', '--progress'] + git_options
+
         if remote is None:
-            if refspec is not None:
+            if refspec:
                 # conflicts with using tracking branch or fetch all remotes
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
-                raise ValueError("refspec specified without a remote. (%s)" %
-                                 refspec)
+                raise ValueError(
+                    "refspec specified without a remote. ({})".format(refspec))
+            # No explicit remote to fetch.
+            # => get tracking branch:
+            tb_remote, refspec = self.get_tracking_branch()
+            if tb_remote is not None:
+                remote = tb_remote
+            else:
+                # No remote, no tracking branch
+                # => fail
+                raise ValueError("Neither a remote is specified to pull "
+                                 "from nor a tracking branch is set up.")
+
+        cmd.append(remote)
+        if refspec:
+            cmd += ensure_list(refspec)
+
+        # best effort to enable SSH connection caching
+        url = self.config.get('remote.{}.url'.format(remote), None)
+        if url and is_ssh(url):
+            ssh_manager.get_connection(url).open()
+        WitlessRunner(
+            cwd=self.path,
+            env=GitRunner.get_git_environ_adjusted()).run(
+                cmd,
+                protocol=StdOutCaptureWithGitProgress,
+        )
+
+    def push(self, remote=None, refspec=None, all_remotes=False,
+             all_=False, git_options=None, **kwargs):
+        """Push changes to a remote (or all remotes).
+
+        Parameters
+        ----------
+        remote : str, optional
+          name of the remote to push to. If no remote is given and
+          `all_` is not set, the tracking branch is pushed.
+        refspec : str, optional
+          refspec to push.
+        all_ : bool, optional
+          push to all remotes. Fails if `remote` was given.
+        git_options : list, optional
+          Additional command line options for git-push.
+        kwargs :
+          Deprecated. GitPython-style keyword argument for git-push.
+          Will be appended to any git_options.
+        """
+        git_options = ensure_list(git_options)
+        if kwargs:
+            git_options.extend(to_options(**kwargs))
+        if all_remotes:
+            # be nice to the elderly
+            all_ = True
+        return list(
+            self.push_(
+                remote=remote,
+                refspec=refspec,
+                all_=all_,
+                git_options=git_options,
+            )
+        )
+
+    def push_(self, remote=None, refspec=None, all_=False, git_options=None):
+        """Like `push`, but returns a generator"""
+        yield from self._fetch_push_helper(
+            base_cmd=['git', 'push', '--progress', '--porcelain'],
+            action='push',
+            urlvars=('remote.{}.pushurl', 'remote.{}.url'),
+            protocol=StdOutCaptureWithGitProgress,
+            info_cls=PushInfo,
+            info_from=0,
+            add_remote=True,
+            remote=remote,
+            refspec=refspec,
+            all_=all_,
+            git_options=git_options)
+
+    def _fetch_push_helper(
+            self,
+            base_cmd,     # arg list
+            action,       # label fetch|push
+            urlvars,      # variables to query for URLs
+            protocol,     # processor for output
+            info_cls,     # Push|FetchInfo
+            info_from,    # 0=stdout, 1=stderr
+            add_remote,   # whether to add a 'remote' field to the info dict
+            remote=None, refspec=None, all_=False, git_options=None):
+
+        git_options = ensure_list(git_options)
+
+        cmd = base_cmd + git_options
+
+        if remote is None:
+            if refspec:
+                # conflicts with using tracking branch or push all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError(
+                    "refspec specified without a remote. ({})".format(refspec))
             if all_:
-                remotes_to_fetch = [
-                    self.repo.remote(r)
-                    for r in self.get_remotes(with_urls_only=True)
-                ]
+                remotes_to_process = self.get_remotes(with_urls_only=True)
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
                 tb_remote, refspec = self.get_tracking_branch()
                 if tb_remote is not None:
-                    remotes_to_fetch = [self.repo.remote(tb_remote)]
+                    remotes_to_process = [tb_remote]
                 else:
                     # No remote, no tracking branch
                     # => fail
-                    raise ValueError("Neither a remote is specified to fetch "
-                                     "from nor a tracking branch is set up.")
+                    raise ValueError(
+                        "Neither a remote is specified to {} "
+                        "from nor a tracking branch is set up.".format(action))
         else:
-            remotes_to_fetch = [self.repo.remote(remote)]
+            if all_:
+                raise ValueError(
+                    "Option 'all_' conflicts with specified remote "
+                    "'{}'.".format(remote))
+            remotes_to_process = [remote]
 
-        fi_list = []
-        for rm in remotes_to_fetch:
-            fetch_url = \
-                self.config.get('remote.%s.fetchurl' % rm.name,
-                                self.config.get('remote.%s.url' % rm.name,
-                                                None))
-            if fetch_url is None:
-                lgr.debug("Remote %s has no URL", rm)
-                return []
+        if refspec:
+            # prep for appending to cmd
+            refspec = ensure_list(refspec)
 
-            fi_list += self._call_gitpy_with_progress(
-                "Fetching %s" % rm.name,
-                rm.fetch,
-                rm.repo,
-                refspec,
-                fetch_url,
-                **kwargs
+        # no need for progress report, when there is just one remote
+        log_remote_progress = len(remotes_to_process) > 1
+        if log_remote_progress:
+            pbar_id = '{}remotes-{}'.format(action, id(self))
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Start %sing remotes for %s', action, self,
+                total=len(remotes_to_process),
+                label=action.capitalize(),
+                unit=' Remotes',
             )
+        try:
+            for remote in remotes_to_process:
+                r_cmd = cmd + [remote]
+                if refspec:
+                    r_cmd += refspec
 
-        # TODO: fetch returns a list of FetchInfo instances. Make use of it.
-        return fi_list
+                if log_remote_progress:
+                    log_progress(
+                        lgr.info,
+                        pbar_id,
+                        '{}ing remote %s'.format(action.capitalize()),
+                        remote,
+                        update=1,
+                        increment=True,
+                    )
+                # best effort to enable SSH connection caching
+                url = self.config.get(
+                    # make two attempts to get a URL
+                    urlvars[0].format(remote),
+                    self.config.get(
+                        urlvars[1].format(remote),
+                        None)
+                )
+                if url and is_ssh(url):
+                    ssh_manager.get_connection(url).open()
+                try:
+                    out = WitlessRunner(
+                        cwd=self.path,
+                        env=GitRunner.get_git_environ_adjusted()).run(
+                            r_cmd,
+                            protocol=protocol,
+                    )
+                    output = out[info_from] or ''
+                except CommandError as e:
+                    # intercept some errors that we express as an error report
+                    # in the info dicts
+                    if re.match('error: failed to (push|fetch) some refs', e.stderr):
+                        output = {1: e.stderr, 0: e.stdout}[info_from]
+                        if output is None:
+                            output = ''
+                    else:
+                        raise
 
-    def _call_gitpy_with_progress(self, msg, callable, git_repo,
-                                  refspec, url, **kwargs):
-        """A helper to reduce code duplication
-
-        Wraps call to a GitPython method with all needed decoration for
-        workarounds of having aged git, or not providing full stderr
-        when monitoring progress of the operation
-        """
-        with GitPythonProgressBar(msg) as git_progress:
-            git_kwargs = dict(
-                refspec=refspec,
-                progress=git_progress,
-                **kwargs
-            )
-            if is_ssh(url):
-                ssh_manager.get_connection(url).open()
-                # TODO: with git <= 2.3 keep old mechanism:
-                #       with rm.repo.git.custom_environment(
-                # GIT_SSH="wrapper_script"):
-                with git_repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                    ret = callable(**git_kwargs)
-                    # TODO: +kwargs
-            else:
-                ret = callable(**git_kwargs)
-                # TODO: +kwargs
-        return ret
-
-    def pull(self, remote=None, refspec=None, **kwargs):
-        """See fetch
-        """
-
-        if remote is None:
-            if refspec is not None:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError("refspec specified without a remote. (%s)" %
-                                 refspec)
-            # No explicit remote to pull from.
-            # => get tracking branch:
-            tb_remote, refspec = self.get_tracking_branch()
-            if tb_remote is not None:
-                remote = self.repo.remote(tb_remote)
-            else:
-                # No remote, no tracking branch
-                # => fail
-                raise ValueError("No remote specified to pull from nor a "
-                                 "tracking branch is set up.")
-
-        else:
-            remote = self.repo.remote(remote)
-
-        fetch_url = \
-            remote.config_reader.get(
-                'fetchurl' if remote.config_reader.has_option('fetchurl')
-                else 'url')
-
-        return self._call_gitpy_with_progress(
-                "Pulling",
-                remote.pull,
-                remote.repo,
-                refspec,
-                fetch_url,
-                **kwargs
-            )
-
-    def push(self, remote=None, refspec=None, all_remotes=False,
-             **kwargs):
-        """Push to remote repository
-
-        Parameters
-        ----------
-        remote: str
-          name of the remote to push to
-        refspec: str
-          specify what to push
-        all_remotes: bool
-          if set to True push to all remotes. Conflicts with `remote` not being
-          None.
-        kwargs: dict
-          options to pass to `git push`
-
-        Returns
-        -------
-        list
-            PushInfo objects of the items pushed to remote
-        """
-
-        if remote is None:
-            if refspec is not None:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError("refspec specified without a remote. (%s)" %
-                                 refspec)
-            if all_remotes:
-                remotes_to_push = self.repo.remotes
-            else:
-                # Nothing explicitly specified. Just call `git push` and let git
-                # decide what to do would be an option. But:
-                # - without knowing the remote and its URL we cannot provide
-                #   shared SSH connection
-                # - we lose ability to use GitPython's progress info and return
-                #   values
-                #   (the latter would be solvable:
-                #    Provide a Repo.push() method for GitPython, copying
-                #    Remote.push() for similar return value and progress
-                #    (also: fetch, pull)
-
-                # Do what git would do:
-                # 1. branch.*.remote for current branch or 'origin' as default
-                #    if config is missing
-                # 2. remote.*.push or push.default
-
-                # TODO: check out "same procedure" for fetch/pull
-
-                tb_remote, refspec = self.get_tracking_branch()
-                if tb_remote is None:
-                    tb_remote = 'origin'
-                remotes_to_push = [self.repo.remote(tb_remote)]
-                # use no refspec; let git find remote.*.push or push.default on
-                # its own
-
-        else:
-            if all_remotes:
-                lgr.warning("Option 'all_remotes' conflicts with specified "
-                            "remote '%s'. Option ignored.")
-            remotes_to_push = [self.repo.remote(remote)]
-
-        pi_list = []
-        for rm in remotes_to_push:
-            push_url = \
-                rm.config_reader.get('pushurl'
-                                     if rm.config_reader.has_option('pushurl')
-                                     else 'url')
-            pi_list += self._call_gitpy_with_progress(
-                "Pushing %s" % rm.name,
-                rm.push,
-                rm.repo,
-                refspec,
-                push_url,
-                **kwargs
-            )
-        return pi_list
+                for line in output.splitlines():
+                    try:
+                        # push info doesn't identify a remote, add it here
+                        pi = info_cls._from_line(line)
+                        if add_remote:
+                            pi['remote'] = remote
+                        yield pi
+                    except Exception:
+                        # it is not progress and no push info
+                        # don't hide it completely
+                        lgr.debug('git-%s reported: %s', action, line)
+        finally:
+            if log_remote_progress:
+                log_progress(
+                    lgr.info,
+                    pbar_id,
+                    'Finished %sing remotes for %s', action, self,
+                )
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
