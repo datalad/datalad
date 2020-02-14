@@ -57,9 +57,9 @@ class CreateSiblingGithub(Interface):
     be configured as a sibling with the :command:`siblings` command.
     Alternatively, this command can create a repository under a user's Github
     account, or any organization a user is a member of (given appropriate
-    permissions).  This is particulary helpful for recursive sibling creation
+    permissions). This is particulary helpful for recursive sibling creation
     for subdatasets. In such a case, a dataset hierarchy is represented as a
-    flat list of Github repositories.
+    flat list of GitHub repositories.
 
     Github cannot host dataset content. However, in combination with
     other data sources (and siblings), publishing a dataset to Github can
