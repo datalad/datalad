@@ -171,11 +171,9 @@ def _create_dataset_sibling(
                             title=_msg_stats,
                             default=False
                         )
-                    if not remove:
-                        raise RuntimeError(
-                            _msg_stats +
-                            " Remove it manually first or rerun datalad in interactive shell"
-                        )
+                    else:
+                        remove = True
+                        lgr.warning(_msg_stats)
                 # Remote location might already contain a git repository or be
                 # just a directory.
                 lgr.info(_msg + " Replacing")
@@ -414,14 +412,20 @@ class CreateSibling(Interface):
         recursion_limit=recursion_limit,
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
             metavar='MODE',
             doc="""action to perform, if a sibling is already configured under the
-            given name and/or a target directory already exists.
-            In this case, a dataset can be skipped ('skip'), an existing target
-            directory be forcefully re-initialized, and the sibling (re-)configured
-            ('replace', implies 'reconfigure'), the sibling configuration be updated
-            only ('reconfigure'), or to error ('error').""",),
+            given name and/or a target (non-empty) directory already exists.
+            In this case, a dataset can be skipped ('skip'), the sibling
+            configuration be updated ('reconfigure'), or process interrupts with
+            error ('error'). DANGER ZONE: If 'replace' is used, an existing target
+            directory will be forcefully removed, re-initialized, and the
+            sibling (re-)configured (thus implies 'reconfigure').
+            `replace` could lead to data loss, so use with care.  To minimize
+            possibility of data loss, in interactive mode DataLad will ask for
+            confirmation, but it would just issue a warning and proceed in
+            non-interactive mode.
+            """,),
         inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
