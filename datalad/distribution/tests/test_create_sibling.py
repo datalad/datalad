@@ -212,7 +212,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             sshurl="ssh://localhost",
             target_dir=target_path)
     ok_(str(cm.exception).startswith(
-        "Target path %s already exists. And it fails to rmdir" % target_path))
+        "Target path %s already exists." % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()
         assert_not_equal(target_description, None)
