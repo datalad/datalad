@@ -393,16 +393,12 @@ class WitlessRunner(object):
             for o in results)
 
         if return_code not in [0, None]:
-            msg = "Failed to run %r%s." % (
-                cmd,
-                (" at %r" % self.cwd) if self.cwd else '',
-            )
             raise CommandError(
-                cmd=str(cmd),
-                msg=msg,
+                cmd=cmd,
                 code=return_code,
                 stdout=output[0],
                 stderr=output[1],
+                cwd=self.cwd,
             )
         lgr.log(8, "Finished running %r with status %s", cmd, return_code)
         return output
@@ -846,12 +842,15 @@ class Runner(object):
                         self._log_err(out[1], expected=expect_stderr)
 
                 if status not in [0, None]:
-                    msg = "Failed to run %r%s. Exit code=%d.%s%s" \
-                        % (cmd, " under %r" % (popen_cwd), status,
-                           "" if log_online else " out=%s" % out[0],
-                           "" if log_online else " err=%s" % out[1])
-                    lgr.log(9 if expect_fail else 11, msg)
-                    raise CommandError(str(cmd), msg, status, out[0], out[1])
+                    exc = CommandError(
+                        cmd=cmd,
+                        code=status,
+                        stdout=out[0],
+                        stderr=out[1],
+                        cwd=popen_cwd,
+                    )
+                    lgr.log(9 if expect_fail else 11, str(exc))
+                    raise exc
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)

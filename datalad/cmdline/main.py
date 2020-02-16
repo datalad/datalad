@@ -533,7 +533,9 @@ def main(args=None):
             except CommandError as exc:
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
-                exc_msg = str(exc)
+                # to not duplicate any captured output in the exception
+                # rendering, will come next
+                exc_msg = exc.to_str(include_output=False)
                 if exc_msg:
                     msg = exc_msg.encode() if isinstance(exc_msg, str) else exc_msg
                     os.write(2, msg + b"\n")
