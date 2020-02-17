@@ -1360,10 +1360,10 @@ def assert_result_count(results, n, **kwargs):
             count += 1
     if not n == count:
         raise AssertionError(
-            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+            'Got {} instead of {} expected results matching\n{}\nInspected {} record(s):\n{}'.format(
                 count,
                 n,
-                kwargs,
+                _format_res(kwargs),
                 len(results),
                 _format_res(results)))
 
