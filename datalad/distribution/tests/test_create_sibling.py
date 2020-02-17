@@ -17,48 +17,48 @@ from os.path import join as opj, exists, basename
 
 from ..dataset import Dataset
 from datalad.api import (
-    publish,
-    install,
     create_sibling,
+    install,
+    publish,
 )
 from datalad.cmd import Runner
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
-    create_tree,
-    eq_,
+    assert_dict_equal,
     assert_false,
-    with_tempfile,
     assert_in,
-    with_testrepos,
-    ok_file_has_content,
-    ok_exists,
-    ok_clean_git,
-    ok_endswith,
+    assert_no_errors_logged,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
-    skip_ssh,
-    assert_dict_equal,
     assert_result_count,
     assert_status,
-    assert_not_equal,
-    assert_no_errors_logged,
+    create_tree,
+    eq_,
     get_mtimes_and_digests,
-    swallow_logs,
     ok_,
+    ok_clean_git,
+    ok_endswith,
+    ok_exists,
+    ok_file_has_content,
     ok_file_under_git,
-    slow,
     skip_if_on_windows,
+    skip_ssh,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
 )
 from datalad.support.exceptions import (
     CommandError,
     InsufficientArgumentsError,
 )
 from datalad.utils import (
+    _path_,
     chpwd,
     on_windows,
-    _path_,
 )
 
 import logging
