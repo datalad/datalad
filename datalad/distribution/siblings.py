@@ -18,6 +18,10 @@ import os.path as op
 
 from urllib.parse import urlparse
 
+from datalad.cmd import (
+    WitlessRunner,
+)
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -82,6 +86,10 @@ def _mangle_urls(url, ds_name):
     if not url:
         return url
     return url.replace("%NAME", ds_name.replace("/", "-"))
+
+
+#global list of supported special remotes
+special_remotes = ['drive', 'any']
 
 
 @build_doc
@@ -190,7 +198,60 @@ class Siblings(Interface):
             doc="""Whether to query all information about the annex configurations
             of siblings. Can be disabled if speed is a concern"""),
         recursive=recursion_flag,
-        recursion_limit=recursion_limit)
+        recursion_limit=recursion_limit,
+        remotetype=Parameter(
+            args=('-t', '--type',),
+            dest='remotetype',
+            doc="""Configure a remote of your choice. Default is 'git-remote'.
+                Alternatively, configure special remotes to third party services
+                via rclone. Note: requires rclone and git-annex-remote-rclone.
+                Currently available: 'drive' (Google drive), 'any' (get an
+                interactive prompt)"""),
+        encryption=Parameter(
+            args=('--encryption',),
+            dest='encryption',
+            doc="""If a special remote to a third party service (--type/-t) should
+                be inititialized, which encryption should be used? Default: none.
+                See https://git-annex.branchable.com/encryption/ for more info.
+                """),
+        interactive=Parameter(
+            args=('-i, --interactive',),
+            dest='interactive',
+            action="store_true",
+            doc="""If given, configure rclone special remote interactively.
+                """),
+        chunk=Parameter(
+            args=('--chunk',),
+            dest='chunk',
+            doc="""If a special remote to a third party service (--type/-t) should
+                be inititialized, which chunksize should be used? Default: 50MiB.
+                """),
+        prefix = Parameter(
+            args=('--prefix',),
+            dest='prefix',
+            doc="""If a special remote to a third party service (--type/-t) should
+                be inititialized, which prefix should be used in the directory
+                tree name at the third party remote? Default: dataset ID
+                """),
+        layout=Parameter(
+            args=('--layout',),
+            dest='layout',
+            doc="""If a special remote to a third party service (--type/-t) should
+            be inititialized, which layout should be used in the directory
+            tree name at the third party remote? Default: lower.
+            """),
+        apikey=Parameter(
+            args=('--apikey',),
+            dest='apikey',
+            doc="""Optional API key for third party service if a special remote
+            is created. Default: None"""),
+        apisecret=Parameter(
+            args=('--apisecret',),
+            dest='apisecret',
+            doc="""Optional API secret for a third party service if a special
+            remote is created. Default: None.
+        """),
+    )
 
     @staticmethod
     @datasetmethod(name='siblings')
@@ -214,7 +275,16 @@ class Siblings(Interface):
             inherit=False,
             get_annex_info=True,
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            remotetype='git-remote',
+            interactive=False,
+            encryption='none',
+            chunk='50MiB',
+            prefix=None,
+            layout='lower',
+            apikey=None,
+            apisecret=None,
+    ):
 
         # TODO: Detect malformed URL and fail?
         # XXX possibly fail if fetch is False and as_common_datasrc
@@ -243,6 +313,28 @@ class Siblings(Interface):
 
         res_kwargs = dict(refds=refds_path, logger=lgr)
 
+        # setup for special remote creation and initialization
+        if remotetype != 'git-remote':
+            if not prefix:
+                prefix = 'datalad/' + str(dataset.repo.config.get('datalad.dataset.id', None))
+        # dict with options for inititialization of a special remote
+        init_kwargs = dict(encryption=encryption,
+                           externaltype='rclone',
+                           chunk=chunk,
+                           type='external',
+                           prefix=prefix,
+                           rclone_layout=layout,
+                           )
+        # dict with options for configuration (creation) of an rclone special
+        # remote
+        if remotetype == 'any':
+            print("meeep")
+            # if no specifically implemented special remote is given, just
+            # get into the interactive session later
+            interactive = True
+        config_kwargs = dict(interactive=interactive,
+                             API_key=apikey,
+                             API_secret=apisecret)
         ds_name = op.basename(dataset.path)
 
         # do not form single list of datasets (with recursion results) to
@@ -259,7 +351,7 @@ class Siblings(Interface):
                 fetch, description,
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_required, annex_group, annex_groupwanted,
-                inherit, get_annex_info,
+                inherit, get_annex_info, remotetype, config_kwargs, init_kwargs,
                 **res_kwargs):
             yield r
         if not recursive:
@@ -294,7 +386,7 @@ class Siblings(Interface):
                     description,
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_required, annex_group, annex_groupwanted,
-                    inherit, get_annex_info,
+                    inherit, get_annex_info, remotetype, config_kwargs, init_kwargs,
                     **res_kwargs):
                 yield r
 
@@ -327,7 +419,7 @@ def _add_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
+        inherit, get_annex_info, remotetype, config_kwargs, init_kwargs,
         **res_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
     #       create-sibling already does it -- generalize/use
@@ -337,25 +429,26 @@ def _add_remote(
 
     # it seems that the only difference is that `add` should fail if a remote
     # already exists
-    if (url is None and pushurl is None):
-        raise InsufficientArgumentsError(
-            """insufficient information to add a sibling
-            (needs at least a dataset, and any URL).""")
-    if url is None:
-        url = pushurl
-
-    if not name:
-        urlri = RI(url)
-        # use the hostname as default remote name
-        try:
-            name = urlri.hostname
-        except AttributeError:
+    if remotetype == 'git-remote':
+        if (url is None and pushurl is None):
             raise InsufficientArgumentsError(
-                "cannot derive a default remote name from '{}', "
-                "please specify a name.".format(url))
-        lgr.debug(
-            "No sibling name given, use URL hostname '%s' as sibling name",
-            name)
+                """insufficient information to add a sibling
+                (needs at least a dataset, and any URL).""")
+        if url is None:
+            url = pushurl
+
+        if not name:
+            urlri = RI(url)
+            # use the hostname as default remote name
+            try:
+                name = urlri.hostname
+            except AttributeError:
+                raise InsufficientArgumentsError(
+                    "cannot derive a default remote name from '{}', "
+                    "please specify a name.".format(url))
+            lgr.debug(
+                "No sibling name given, use URL hostname '%s' as sibling name",
+                name)
 
     if not name:
         raise InsufficientArgumentsError("no sibling name given")
@@ -366,9 +459,34 @@ def _add_remote(
             path=ds.path,
             type='sibling',
             name=name,
-            message=("sibling is already known: %s, use `configure` instead?", name),
+            message=(
+            "sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+
+    # if we're not dealing with a standard git-remote, we must be creating
+    # a special remote
+    if remotetype != 'git-remote':
+        # we want to create a new special remote
+        for r in _configure_new_special_remote(ds=ds,
+                                               name=name,
+                                               remotetype=remotetype,
+                                               known_remotes=known_remotes,
+                                               config_kwargs=config_kwargs,
+                                               ):
+            yield r
+        # now, enable the special remote
+        for r in _init_special_remote(ds,
+                                      name,
+                                      init_kwargs
+                                      ):
+            yield r
+
+        # TODO Adina: still need to configure?
+        # TODO Adina: still need to add to "known_remotes"?
+        # TODO Adina: result handing?
+            return
+
     if isinstance(RI(url), PathRI):
         # make sure any path URL is stored in POSIX conventions for consistency
         # with git's behavior (e.g. origin configured by clone)
@@ -382,7 +500,7 @@ def _add_remote(
             ds, name, known_remotes, url, pushurl, fetch, description,
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_required, annex_group, annex_groupwanted,
-            inherit, get_annex_info,
+            inherit, get_annex_info, remotetype, config_kwargs, init_kwargs,
             **res_kwargs):
         if r['action'] == 'configure-sibling':
             r['action'] = 'add-sibling'
@@ -394,7 +512,7 @@ def _configure_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
+        inherit, get_annex_info, remotetype, config_kwargs, init_kwargs,
         **res_kwargs):
     result_props = dict(
         action='configure-sibling',
@@ -598,8 +716,8 @@ def _query_remotes(
         ds, name, known_remotes, url=None, pushurl=None, fetch=None, description=None,
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_required=None, annex_group=None, annex_groupwanted=None,
-        inherit=None, get_annex_info=True,
-        **res_kwargs):
+        inherit=None, get_annex_info=True, remotetype='git-remote', config_kwargs=None,
+        init_kwargs=None, **res_kwargs):
     annex_info = {}
     available_space = None
     if get_annex_info and isinstance(ds.repo, AnnexRepo):
@@ -694,7 +812,7 @@ def _remove_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
+        inherit, get_annex_info, remotetype, config_kwargs, init_kwargs,
         **res_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
@@ -725,7 +843,7 @@ def _enable_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
+        inherit, get_annex_info, config_kwargs, init_kwargs,
         **res_kwargs):
     result_props = dict(
         action='enable-sibling',
@@ -833,6 +951,119 @@ def _inherit_config_var(ds, cfgvar, var):
                 'Inherited publish_depends from %s: %s',
                 ds, var)
     return var
+
+
+def _init_special_remote(ds, name, init_kwargs):
+    """
+
+    Parameters
+    ----------
+    name: str
+      Name of the special remote
+
+    :return:
+    """
+    # set up result properties
+    result_props = dict(
+        action='inititialize-special-remote',
+        path=ds.path,
+       # type='sibling', ## TODO Adina: duplicate key name in init_kwargs...
+        name=name,
+        **init_kwargs)
+    lgr.debug("Attempting to initialize special remote %s", name)
+    options = ['{}={}'.format(str(k), str(v)) for k, v in init_kwargs.items()]
+    options.append('target={}'.format(name))
+    lgr.debug("Using the following options for initremote: %s", options)
+    try:
+        ds.repo.init_remote(name, options)
+        result_props['status'] = 'ok'
+    except Exception as e:
+        result_props['status'] = 'error'
+        result_props['message'] = str(e)
+        # TODO Adina: do I have to do anything else? raise the exception?
+    yield result_props
+
+
+def _configure_new_special_remote(ds, remotetype, name, known_remotes,
+                                  config_kwargs):
+    """
+    Helper to configure a git-annex special remote
+
+    Parameters
+    ----------
+    remotetype: str
+      Type of special remote to be used (e.g., 'drive' for GDrive)
+    name: name to give to the special remote
+
+    """
+    remotetype
+    # set up result properties
+    result_props = dict(
+        action='configure-new-special-remote',
+        path=ds.path,
+        type='sibling',
+        name=name,
+        **config_kwargs)
+
+    # barf if its a special remote we don't recognize
+    if remotetype not in special_remotes:
+        yield dict(
+            result_props,
+            status='impossible',
+            message=("cannot configure special remote of type '%s', "
+                     "not known/implemented. Choose from %s",
+                     name, special_remotes))
+        return
+
+    ## barf if the remote name is already existing
+    if name in known_remotes:
+        yield get_status_dict(
+            action='configure-new-special-remote',
+            status='error',
+            path=ds.path,
+            type='sibling',
+            name=name,
+            message=("sibling is already known: %s, use `configure` instead?", name),
+            **config_kwargs)
+
+    runner = WitlessRunner(cwd=ds.path)
+    # build an rclone config create command
+    lgr.debug('Determined rclone special remote to be created of type %s .',
+              remotetype)
+
+    interactive = config_kwargs.get('interactive', None)
+    if interactive:
+
+        lgr.debug('Entering interactive rclone config session...')
+        rclone_cmd = ['rclone', 'config']
+        ## TODO Adina: if in interactive, we fail to enable the remote if the
+        ## -s/--name option is not the same a the one given in the interactive config
+    else:
+        # this command should be the same for all rclone special remotes when configured
+        # through command-line call (instead of interactive)
+        rclone_cmd = ['rclone', 'config', 'create', str(name), str(remotetype)]
+        if remotetype == 'drive':
+            # We're setting up a GDrive remote. Check for config options in config_kwargs
+            api_key = config_kwargs.get('API_key', None)
+            api_secret = config_kwargs.get('API_secret', None)
+            if api_key:
+                if not api_secret:
+                    # we got a key but no secret.
+                    lgr.warning('Got a client ID but no client secret. Will'
+                                'disregard client ID configuration')
+                else:
+                    rclone_cmd.append('client_id {}'.format(api_key))
+                    rclone_cmd.append('client_secret {}'.format(api_secret))
+
+    lgr.debug('Got the following rclone command: %s', rclone_cmd)
+    try:
+        runner.run(cmd=rclone_cmd)
+        result_props['status'] = 'ok'
+    except Exception as e:
+        result_props['status'] = 'error'
+        result_props['message'] = str(e)
+        # TODO Adina: do I have to do anything else? raise the exception?
+    yield result_props
 
 
 class _DelayedSuper(object):
