@@ -22,6 +22,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import textwrap
 import warnings
 from fnmatch import fnmatch
 import time
@@ -1343,7 +1344,9 @@ def assert_message(message, results):
 
 
 def _format_res(x):
-    return dumps(x, indent=1, default=str)
+    return textwrap.indent(
+        dumps(x, indent=1, default=str),
+        prefix="  ")
 
 
 def assert_result_count(results, n, **kwargs):
