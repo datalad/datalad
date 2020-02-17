@@ -107,8 +107,6 @@ class Update(Interface):
             recursion_limit=None,
             fetch_all=None,
             reobtain_data=False):
-        """
-        """
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
         if path and not recursive:
