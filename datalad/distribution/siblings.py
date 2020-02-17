@@ -671,7 +671,7 @@ def _query_remotes(
                     if groupwanted:
                         info['annex-groupwanted'] = groupwanted
                 except CommandError as exc:
-                    if 'cannot determine uuid' in str(exc):
+                    if 'cannot determine uuid' in exc.stderr:
                         # not an annex (or no connection), would be marked as
                         #  annex-ignore
                         msg = "Failed to determine if %s carries annex." % remote
