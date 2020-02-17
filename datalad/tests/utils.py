@@ -1372,7 +1372,10 @@ def assert_in_results(results, **kwargs):
     for r in assure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
+    if not found:
+        raise AssertionError(
+            "Desired result\n{}\nnot found among\n{}"
+            .format(_format_res(kwargs), _format_res(results)))
 
 
 def assert_not_in_results(results, **kwargs):
