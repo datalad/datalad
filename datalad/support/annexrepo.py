@@ -506,7 +506,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return branch
 
-    def get_tracking_branch(self, branch=None, corresponding=True):
+    def get_tracking_branch(self, branch=None, remote_only=False,
+                            corresponding=True):
         """Get the tracking branch for `branch` if there is any.
 
         By default returns the tracking branch of the corresponding branch if
@@ -516,6 +517,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         ----------
         branch: str
           local branch to look up. If none is given, active branch is used.
+        remote_only : bool
+            Don't return a value if the upstream remote is set to "." (meaning
+            this repository).
         corresponding: bool
           If True actually look up the corresponding branch of `branch` (also if
           `branch` isn't explicitly given)
@@ -530,6 +534,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
 
         return super(AnnexRepo, self).get_tracking_branch(
+                        remote_only=remote_only,
                         branch=self.get_corresponding_branch(branch)
                         if corresponding else branch)
 

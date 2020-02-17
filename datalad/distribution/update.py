@@ -107,8 +107,6 @@ class Update(Interface):
             recursion_limit=None,
             fetch_all=None,
             reobtain_data=False):
-        """
-        """
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
         if path and not recursive:
@@ -148,7 +146,7 @@ class Update(Interface):
                 sibling_ = remotes[0]
             elif not sibling:
                 # nothing given, look for tracking branch
-                sibling_ = repo.get_tracking_branch()[0]
+                sibling_ = repo.get_tracking_branch(remote_only=True)[0]
             else:
                 sibling_ = sibling
             if sibling_ and sibling_ not in remotes:
@@ -210,19 +208,22 @@ def _update_repo(ds, remote, reobtain_data):
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
             # get all annexed files that have data present
-            lgr.info('Recording file content availability to re-obtain updated files later on')
-            reobtain_data = \
-                [opj(ds.path, p)
-                 for p in repo.get_annexed_files(with_content_only=True)]
+            lgr.info('Recording file content availability '
+                     'to re-obtain updated files later on')
+            ds_path = ds.path
+            present_files = [
+                opj(ds_path, p)
+                for p in repo.get_annexed_files(with_content_only=True)]
         # this runs 'annex sync' and should deal with anything
         repo.sync(remotes=remote, push=False, pull=True, commit=False)
         if reobtain_data:
-            reobtain_data = [p for p in reobtain_data if lexists(p)]
-        if reobtain_data:
-            lgr.info('Ensure content availability for %i previously available files', len(reobtain_data))
-            for res in ds.get(
-                    reobtain_data, recursive=False, return_type='generator'):
-                yield res
+            present_files = [p for p in present_files if lexists(p)]
+            if present_files:
+                lgr.info('Ensuring content availability for %i '
+                         'previously available files',
+                         len(present_files))
+                yield from ds.get(present_files, recursive=False,
+                                  return_type='generator')
     else:
         # handle merge in plain git
         active_branch = repo.get_active_branch()
@@ -235,7 +236,7 @@ def _update_repo(ds, remote, reobtain_data):
                 repo
             )
         else:
-            if repo.config.get('branch.{}.remote'.format(remote), None) == remote:
+            if repo.config.get('branch.{}.remote'.format(active_branch)) == remote:
                 # the branch love this remote already, let git pull do its thing
                 repo.pull(remote=remote)
             else:
