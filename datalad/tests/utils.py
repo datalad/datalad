@@ -1345,7 +1345,7 @@ def assert_message(message, results):
 
 def _format_res(x):
     return textwrap.indent(
-        dumps(x, indent=1, default=str),
+        dumps(x, indent=1, default=str, sort_keys=True),
         prefix="  ")
 
 
