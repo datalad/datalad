@@ -21,8 +21,12 @@ from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
+from datalad.interface.results import (
+    get_status_dict,
+    YieldDatasets
+)
 from datalad.support.constraints import (
+    EnsureChoice,
     EnsureStr,
     EnsureNone,
 )
@@ -43,6 +47,14 @@ from .dataset import (
 lgr = logging.getLogger('datalad.distribution.update')
 
 
+class YieldDatasetAndRevision(YieldDatasets):
+    """Like YieldDatasets, but also provide "revision" value, if any.
+    """
+    def __call__(self, res):
+        ds = super(YieldDatasetAndRevision, self).__call__(res)
+        return ds, res.get("revision")
+
+
 @build_doc
 class Update(Interface):
     """Update a dataset from a sibling.
@@ -55,9 +67,18 @@ class Update(Interface):
         dict(text="Update from a particular sibling",
              code_py="update(sibling='siblingname')",
              code_cmd="datalad update -s <siblingname>"),
-        dict(text="Update from a particular sibling and merge the obtained changes",
+        dict(text="Update from a particular sibling and merge the changes "
+                  "from a configured or matching branch from the sibling "
+                  "(see [CMD: --follow CMD][PY: `follow` PY] for details)",
              code_py="update(sibling='siblingname', merge=True)",
              code_cmd="datalad update --merge -s <siblingname>"),
+        dict(text="Update from the sibling 'origin', traversing into "
+                  "subdatasets. For subdatasets, merge the revision "
+                  "registered in the parent dataset into the current branch",
+             code_py="update(sibling='origin', merge=True, "
+                     "follow='parentds', recursive=True)",
+             code_cmd="datalad update -s origin --merge "
+                      "--follow=parentds --recursive"),
     ]
 
     _params_ = dict(
@@ -84,6 +105,19 @@ class Update(Interface):
             action="store_true",
             doc="""merge obtained changes from the given or the
             default sibling""", ),
+        follow=Parameter(
+            args=("--follow",),
+            constraints=EnsureChoice("sibling", "parentds"),
+            doc="""source of updates for subdatasets. For 'sibling', the update
+            will be done by merging in a branch from the (specified or
+            inferred) sibling. The branch brought in will either be the current
+            branch's configured branch, if it points to a branch that belongs
+            to the sibling, or a sibling branch with a name that matches the
+            current branch. For 'parentds', the revision registered in the
+            parent dataset of the subdataset is merged in. Note that the
+            current dataset is always updated according to 'sibling'. This
+            option has no effect unless a merge is requested and [CMD:
+            --recursive CMD][PY: recursive=True PY] is specified.""", ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         fetch_all=Parameter(
@@ -104,6 +138,7 @@ class Update(Interface):
             path=None,
             sibling=None,
             merge=False,
+            follow="sibling",
             dataset=None,
             recursive=False,
             recursion_limit=None,
@@ -120,14 +155,14 @@ class Update(Interface):
         save_paths = []
         merge_failures = set()
         saw_subds = False
-        for ds in itertools.chain([refds], refds.subdatasets(
+        for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
                 fulfilled=True,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',
                 result_renderer='disabled',
-                result_xfm='datasets') if recursive else []):
+                result_xfm=YieldDatasetAndRevision()) if recursive else []):
             if ds != refds:
                 saw_subds = True
             repo = ds.repo
@@ -183,18 +218,36 @@ class Update(Interface):
             # a GitRepo to an AnnexRepo
             repo = ds.repo
 
+            follow_parent = revision and follow == "parentds"
+            if follow_parent and not repo.commit_exists(revision):
+                yield dict(
+                    res, status="impossible",
+                    message=("Revision recorded in parent (%s) not found",
+                             revision))
+                continue
+
             saw_merge_failure = False
             if merge:
-                merge_target = _choose_merge_target(
-                    repo, curr_branch,
-                    sibling_, tracking_remote)
+                if follow_parent:
+                    merge_target = revision
+                else:
+                    merge_target = _choose_merge_target(
+                        repo, curr_branch,
+                        sibling_, tracking_remote)
 
                 merge_fn = _choose_merge_fn(
                     repo,
                     is_annex=is_annex,
                     adjusted=is_annex and repo.is_managed_branch(curr_branch))
 
-                if merge_target is None and merge_fn is not _annex_sync:
+                if merge_fn is _annex_sync:
+                    if follow_parent:
+                        yield dict(
+                            res, status="impossible",
+                            message=("follow='parentds' is incompatible "
+                                     "with adjusted branches"))
+                        continue
+                elif merge_target is None:
                     yield dict(res,
                                status="impossible",
                                message="Could not determine merge target")

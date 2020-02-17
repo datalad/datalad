@@ -575,3 +575,38 @@ def test_merge_conflict_in_subdataset_only(path):
     # ... but the one with the conflict leaves it for the caller to handle.
     ok_(ds_clone_sub_conflict.repo.call_git(
         ["ls-files", "--unmerged", "--", "foo"]).strip())
+
+
+@with_tempfile(mkdir=True)
+def test_merge_follow_parentds_subdataset_other_branch(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    on_adjusted = ds_src.repo.is_managed_branch()
+    ds_src_subds = ds_src.create("subds")
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_subds = Dataset(ds_clone.pathobj / "subds")
+
+    ds_src_subds.repo.call_git(["checkout", "-b", "other"])
+    (ds_src_subds.pathobj / "foo").write_text("foo content")
+    ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    res = ds_clone.update(merge=True, follow="parentds", recursive=True,
+                          on_failure="ignore")
+    if on_adjusted:
+        # Our git-annex sync based on approach on adjusted branches is
+        # incompatible with follow='parentds'.
+        assert_in_results(res, action="update", status="impossible")
+        return
+    else:
+        assert_in_results(res, action="update", status="ok")
+    eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
+    ok_(ds_clone_subds.repo.is_under_annex("foo"))
+
+    (ds_src_subds.pathobj / "bar").write_text("bar content")
+    ds_src.save(recursive=True)
+    ds_clone_subds.repo.checkout("master", options=["-bnew"])
+    ds_clone.update(merge=True, follow="parentds", recursive=True)
+    if not on_adjusted:
+        eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
