@@ -1342,6 +1342,10 @@ def assert_message(message, results):
         assert_equal(m, message)
 
 
+def _format_res(x):
+    return dumps(x, indent=1, default=str)
+
+
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
@@ -1358,7 +1362,7 @@ def assert_result_count(results, n, **kwargs):
                 n,
                 kwargs,
                 len(results),
-                dumps(results, indent=1, default=str)))
+                _format_res(results)))
 
 
 def assert_in_results(results, **kwargs):
