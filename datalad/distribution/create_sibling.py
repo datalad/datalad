@@ -157,6 +157,7 @@ def _create_dataset_sibling(
                 lgr.info(_msg + " Skipping")
                 return
             elif existing == 'replace':
+                remove = False
                 if path_children:
                     has_git = '.git' in path_children
                     _msg_stats = _msg \
@@ -164,7 +165,7 @@ def _create_dataset_sibling(
                                      "" if has_git else "not ", len(path_children)
                                  )
                     from datalad.ui import ui
-                    remove = False
+
                     if ui.is_interactive:
                         remove = ui.yesno(
                             "Do you really want to remove it?",
@@ -174,6 +175,8 @@ def _create_dataset_sibling(
                     else:
                         remove = True
                         lgr.warning(_msg_stats)
+                if not remove:
+                    raise RuntimeError(_msg)
                 # Remote location might already contain a git repository or be
                 # just a directory.
                 lgr.info(_msg + " Replacing")

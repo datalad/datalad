@@ -50,6 +50,7 @@ from datalad.tests.utils import (
     swallow_logs,
     with_tempfile,
     with_testrepos,
+    with_testsui,
 )
 from datalad.support.exceptions import (
     CommandError,
@@ -637,3 +638,28 @@ def test_target_ssh_inherit():
     # Takes too long so one will do with UI and another one without
     yield _test_target_ssh_inherit, 'manual', True  # manual -- no load should be annex copied
     yield _test_target_ssh_inherit, 'backup', False  # backup -- all data files
+
+
+@skip_ssh
+@with_testsui(responses=["no", "yes"])
+@with_tempfile(mkdir=True)
+def test_exists_interactive(path):
+    origin = Dataset(opj(path, "origin")).create()
+    sibling_path = opj(path, "sibling")
+
+    # Initiate sibling directory with "stuff"
+    create_tree(sibling_path, {'stuff': ''})
+
+    # Should fail
+    with assert_raises(RuntimeError):
+        origin.create_sibling('localhost:%s' % sibling_path)
+
+    # Since first response is "no" - we should fail here again:
+    with assert_raises(RuntimeError):
+        origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
+    # and there should be no initiated repository
+    assert not Dataset(sibling_path).is_installed()
+    # But we would succeed on the 2nd try, since answer will be yes
+    origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
+    assert Dataset(sibling_path).is_installed()
+    # And with_testsui should not fail with "Unused responses left"
