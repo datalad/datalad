@@ -148,7 +148,7 @@ def test_update_simple(origin, src_path, dst_path):
 
         # and with merge we would also try to save (but there would be no changes)
         res_merge = update(path=['subm 1'], recursive=True, merge=True)
-        assert_result_count(res_merge, 3)
+        assert_result_count(res_merge, 2, action='update')
         # 2 of "updates" really.
         assert_in_results(res_merge, action='update', status='ok', type='dataset')
         assert_in_results(res_merge, action='save', status='notneeded', type='dataset')
@@ -165,7 +165,7 @@ def test_update_simple(origin, src_path, dst_path):
             status='ok', type='dataset')
     assert_result_count(
         dest.update(merge=True, recursive=True), 2,
-        status='ok', type='dataset')
+        action='update', status='ok', type='dataset')
 
     # and now test recursive update with merging in differences
     create_tree(opj(source.path, '2'), {'load.dat': 'heavy'})
@@ -174,7 +174,7 @@ def test_update_simple(origin, src_path, dst_path):
                 recursive=True)
     assert_result_count(
         dest.update(merge=True, recursive=True), 2,
-        status='ok', type='dataset')
+        action='update', status='ok', type='dataset')
     # and now we can get new file
     dest.get('2/load.dat')
     ok_file_has_content(opj(dest.path, '2', 'load.dat'), 'heavy')
@@ -192,7 +192,7 @@ def test_update_git_smoke(src_path, dst_path):
     ds.save('file.dat')
     assert_result_count(
         target.update(recursive=True, merge=True), 1,
-        status='ok', type='dataset')
+        action='update', status='ok', type='dataset')
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
@@ -246,8 +246,8 @@ def test_update_fetch_all(src, remote_1, remote_2):
 
     # merge a certain remote:
     assert_result_count(
-        ds.update(
-            sibling='sibling_1', merge=True), 1, status='ok', type='dataset')
+        ds.update(sibling='sibling_1', merge=True),
+        1, action='update', status='ok', type='dataset')
 
     # changes from sibling_2 still not present:
     assert_not_in("second.txt",
@@ -283,7 +283,8 @@ def test_newthings_coming_down(originpath, destpath):
     # no branches appeared
     eq_(ds.repo.get_branches(), ['master'])
     # now merge, and get an annex
-    assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
+    assert_result_count(ds.update(merge=True),
+                        1, action='update', status='ok', type='dataset')
     assert_in('git-annex', ds.repo.get_branches())
     assert_is_instance(ds.repo, AnnexRepo)
     # should be fully functional
@@ -332,16 +333,19 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     # nothing without a merge, no inappropriate magic
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
-    assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
+    assert_result_count(ds.update(merge=True),
+                        1, action='update', status='ok', type='dataset')
     # and we should be able to do update with recursive invocation
-    assert_result_count(ds.update(merge=True, recursive=True), 1, status='ok', type='dataset')
+    assert_result_count(ds.update(merge=True, recursive=True),
+                        1, action='update', status='ok', type='dataset')
     # known, and placeholder exists
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_(exists(opj(ds.path, sname)))
 
     # remove from origin
     origin.remove(sname)
-    assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
+    assert_result_count(ds.update(merge=True),
+                        1, action='update', status='ok', type='dataset')
     # gone locally, wasn't checked out
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     assert_false(exists(opj(ds.path, sname)))
@@ -350,7 +354,8 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     osm1 = origin.create(sname)
     create_tree(osm1.path, {'load.dat': 'heavy'})
     origin.save(opj(osm1.path, 'load.dat'))
-    assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
+    assert_result_count(ds.update(merge=True),
+                        1, action='update', status='ok', type='dataset')
     # grab new content of uninstall subdataset, right away
     ds.get(opj(ds.path, sname, 'load.dat'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
@@ -362,7 +367,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
 
     # updates for both datasets should come down the pipe
     assert_result_count(ds.update(merge=True, recursive=True),
-                        2, status='ok', type='dataset')
+                        2, action='update', status='ok', type='dataset')
     ok_clean_git(ds.path)
 
     # now remove just-installed subdataset from origin again
@@ -372,7 +377,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # merge should disconnect the installed subdataset, but leave the actual
     # ex-subdataset alone
     assert_result_count(ds.update(merge=True, recursive=True),
-                        1, type='dataset')
+                        1, action='update', type='dataset')
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
@@ -407,12 +412,14 @@ def test_reobtain_data(originpath, destpath):
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
     # no harm
-    assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
+    assert_result_count(ds.update(merge=True, reobtain_data=True),
+                        1, action="update", status="ok")
     # content
     create_tree(origin.path, {'load.dat': 'heavy'})
     origin.save(opj(origin.path, 'load.dat'))
     # update does not bring data automatically
-    assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
+    assert_result_count(ds.update(merge=True, reobtain_data=True),
+                        1, action="update", status="ok")
     assert_in('load.dat', ds.repo.get_annexed_files())
     assert_false(ds.repo.file_has_content('load.dat'))
     # now get data
@@ -434,7 +441,6 @@ def test_reobtain_data(originpath, destpath):
     origin.save()
     # update must update file with existing data, but leave empty one alone
     res = ds.update(merge=True, reobtain_data=True)
-    assert_result_count(res, 2)
     assert_result_count(res, 1, status='ok', type='dataset', action='update')
     assert_result_count(res, 1, status='ok', type='file', action='get')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'light')
