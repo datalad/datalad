@@ -835,6 +835,13 @@ def decode_source_spec(spec, cfg=None):
         source=spec,
         version=None,
     )
+
+    # Git never gets to see these URLs, so let's manually apply any
+    # rewrite configuration Git might know about.
+    # Note: We need to rewrite before parsing, otherwise parsing might go wrong.
+    # This is particularly true for insteadOf labels replacing even the URL
+    # scheme.
+    spec = cfg.rewrite_url(spec)
     # common starting point is a RI instance, support for accepting an RI
     # instance is kept for backward-compatibility reasons
     source_ri = RI(spec) if not isinstance(spec, RI) else spec
@@ -845,9 +852,6 @@ def decode_source_spec(spec, cfg=None):
         props['type'] = 'dataladri'
         props['giturl'] = source_ri.as_git_url()
     elif isinstance(source_ri, URL) and source_ri.scheme.startswith('ria+'):
-        # Git never gets to see these URLs, so let's manually apply any
-        # rewrite configuration Git might know about
-        source_ri = RI(cfg.rewrite_url(spec))
         # parse a RIA URI
         dsid, version = source_ri.fragment.split('@', maxsplit=1) \
             if '@' in source_ri.fragment else (source_ri.fragment, None)
