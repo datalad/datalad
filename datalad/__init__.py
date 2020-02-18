@@ -132,7 +132,6 @@ def setup_package():
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
-    global cfg
     cfg.reload(force=True)
 
     # To overcome pybuild by default defining http{,s}_proxy we would need
@@ -232,7 +231,6 @@ def teardown_package():
     # Might be superfluous, since after teardown datalad.cfg shouldn't be
     # needed. However, maintaining a consistent state seems a good thing
     # either way.
-    global cfg
     cfg.reload(force=True)
 
     if _test_states['DATASETS_TOPURL_ENV']:
