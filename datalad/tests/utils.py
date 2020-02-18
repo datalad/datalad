@@ -22,6 +22,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import textwrap
 import warnings
 from fnmatch import fnmatch
 import time
@@ -29,18 +30,44 @@ from difflib import unified_diff
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from http.server import SimpleHTTPRequestHandler
-from http.server import HTTPServer
+from http.server import (
+    HTTPServer,
+    SimpleHTTPRequestHandler,
+)
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
-from os.path import relpath
+from os.path import (
+    curdir,
+    exists,
+    join as opj,
+    pardir,
+    realpath,
+    relpath,
+    split as pathsplit,
+)
 
 from nose.plugins.attrib import attr
-from nose.tools import \
-    assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
-    assert_in, assert_not_in, assert_in as in_, assert_is, \
-    raises, ok_, eq_, make_decorator
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_greater_equal,
+    assert_in as in_,
+    assert_in,
+    assert_is,
+    assert_is_none,
+    assert_is_not,
+    assert_is_not_none,
+    assert_not_equal,
+    assert_not_in,
+    assert_not_is_instance,
+    assert_raises,
+    assert_true,
+    eq_,
+    make_decorator,
+    ok_,
+    raises,
+)
 
 from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
@@ -1316,6 +1343,12 @@ def assert_message(message, results):
         assert_equal(m, message)
 
 
+def _format_res(x):
+    return textwrap.indent(
+        dumps(x, indent=1, default=str, sort_keys=True),
+        prefix="  ")
+
+
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
@@ -1327,12 +1360,12 @@ def assert_result_count(results, n, **kwargs):
             count += 1
     if not n == count:
         raise AssertionError(
-            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+            'Got {} instead of {} expected results matching\n{}\nInspected {} record(s):\n{}'.format(
                 count,
                 n,
-                kwargs,
+                _format_res(kwargs),
                 len(results),
-                dumps(results, indent=1, default=lambda x: str(x))))
+                _format_res(results)))
 
 
 def assert_in_results(results, **kwargs):
@@ -1342,7 +1375,10 @@ def assert_in_results(results, **kwargs):
     for r in assure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
+    if not found:
+        raise AssertionError(
+            "Desired result\n{}\nnot found among\n{}"
+            .format(_format_res(kwargs), _format_res(results)))
 
 
 def assert_not_in_results(results, **kwargs):
@@ -1849,15 +1885,10 @@ def get_deeply_nested_structure(path):
 
 
 def has_symlink_capability():
-    try:
-        wdir = ut.Path(tempfile.mkdtemp())
-        (wdir / 'target').touch()
-        (wdir / 'link').symlink_to(wdir / 'target')
-        return True
-    except Exception:
-        return False
-    finally:
-        shutil.rmtree(str(wdir))
+
+    path = ut.Path(tempfile.mktemp())
+    target = ut.Path(tempfile.mktemp())
+    return utils.check_symlink_capability(path, target)
 
 
 def skip_wo_symlink_capability(func):

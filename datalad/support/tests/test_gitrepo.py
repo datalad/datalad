@@ -10,12 +10,11 @@
 
 """
 
-from nose.tools import assert_is_instance
+from datalad.tests.utils import assert_is_instance
 
 import logging
 
 import os
-from os import linesep
 import os.path as op
 
 import sys
@@ -24,53 +23,63 @@ import sys
 from datalad import get_encoding_info
 from datalad.cmd import Runner
 
-from datalad.utils import unlink
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import neq_
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import local_testrepo_flavors
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import skip_if
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import integration
-from datalad.utils import rmtree
+from datalad.utils import (
+    chpwd,
+    getpwd,
+    on_windows,
+    rmtree,
+    unlink,
+)
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_false,
+    assert_in,
+    assert_in_results,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    create_tree,
+    eq_,
+    get_most_obscure_supported_name,
+    integration,
+    known_failure_windows,
+    local_testrepo_flavors,
+    neq_,
+    ok_,
+    ok_clean_git,
+    skip_if,
+    skip_if_no_network,
+    skip_if_on_windows,
+    skip_ssh,
+    SkipTest,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+)
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
-from datalad.utils import getpwd, chpwd
-from datalad.utils import on_windows
 
 from datalad.dochelpers import exc_str
 
 from datalad.support.sshconnector import get_connection_hash
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
-from datalad.support.gitrepo import NoSuchPathError
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import to_options
-from datalad.support.gitrepo import _normalize_path
-from datalad.support.gitrepo import normalize_paths
-from datalad.support.gitrepo import gitpy
-from datalad.support.gitrepo import guard_BadName
-from datalad.support.exceptions import DeprecatedError
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import PathKnownToRepositoryError
+from datalad.support.gitrepo import (
+    _normalize_path,
+    GitCommandError,
+    gitpy,
+    GitRepo,
+    guard_BadName,
+    InvalidGitRepositoryError,
+    normalize_paths,
+    NoSuchPathError,
+    to_options,
+)
+from datalad.support.exceptions import (
+    CommandError,
+    DeprecatedError,
+    FileNotInRepositoryError,
+    PathKnownToRepositoryError,
+)
 from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
 from .utils import check_repo_deals_with_inode_change
@@ -507,7 +516,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     fetched = clone.fetch(remote='origin')
     # test FetchInfo list returned by fetch
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
-        [commit.name for commit in fetched])
+        [commit['ref'] for commit in fetched])
 
     ok_clean_git(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
@@ -519,9 +528,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     origin.config.unset('remote.not-available.url', where='local')
 
     # fetch without provided URL
-    fetched = origin.fetch('not-available')
-    # nothing was done, nothing returned:
-    eq_([], fetched)
+    assert_raises(CommandError, origin.fetch, 'not-available')
 
 
 def _path2localsshurl(path):
@@ -555,7 +562,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     eq_([], repo.get_remote_branches())
 
     fetched = repo.fetch(remote="ssh-remote")
-    assert_in('ssh-remote/master', [commit.name for commit in fetched])
+    assert_in('ssh-remote/master', [commit['ref'] for commit in fetched])
     ok_clean_git(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
@@ -633,9 +640,10 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
 
     # push changes:
-    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
-    # test PushInfo object for
-    assert_in("ssh-remote/ssh-test", [commit.remote_ref.name for commit in pushed])
+    pushed = list(repo.push(remote="ssh-remote", refspec="ssh-test"))
+    # test PushInfo
+    assert_in("refs/heads/ssh-test", [p['from_ref'] for p in pushed])
+    assert_in("refs/heads/ssh-test", [p['to_ref'] for p in pushed])
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -649,8 +657,15 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     # amend to make it require "--force":
     repo.commit("amended", options=['--amend'])
     # push without --force should yield an error:
-    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
-    assert_in("[rejected] (non-fast-forward)", pushed[0].summary)
+    res = repo.push(remote="ssh-remote", refspec="ssh-test")
+    assert_in_results(
+        res,
+        from_ref='refs/heads/ssh-test',
+        to_ref='refs/heads/ssh-test',
+        operations=['rejected', 'error'],
+        note='[rejected] (non-fast-forward)',
+        remote='ssh-remote',
+    )
     # now push using force:
     repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
     # correct commit message in remote:
@@ -929,6 +944,12 @@ def test_get_tracking_branch(o_path, c_path):
 
     eq_(('origin', 'refs/heads/' + master_branch),
         clone.get_tracking_branch(master_branch))
+
+    clone.checkout(master_branch, options=["--track", "-btopic"])
+    eq_(('.', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch())
+    eq_((None, None),
+        clone.get_tracking_branch(remote_only=True))
 
 
 @with_testrepos('submodule_annex', flavors=['clone'])

@@ -10,7 +10,13 @@
 
 from io import StringIO as SIO
 from os.path import exists
-from nose import SkipTest
+from datalad.tests.utils import (
+    ok_,
+    ok_startswith,
+    assert_in,
+    assert_not_in,
+    SkipTest,
+)
 try:
     import formatters as fmt
 except ImportError:  # pragma: no cover
@@ -21,8 +27,6 @@ except ImportError:  # pragma: no cover
         raise SkipTest
 
 from ..main import setup_parser
-from datalad.tests.utils import ok_, assert_in, ok_startswith
-from datalad.tests.utils import assert_not_in
 
 demo_example = """
 #!/bin/sh

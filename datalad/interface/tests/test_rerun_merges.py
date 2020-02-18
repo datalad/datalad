@@ -14,13 +14,15 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 
 from datalad.distribution.dataset import Dataset
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import eq_
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import neq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import slow
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import (
+    assert_false,
+    eq_,
+    known_failure_windows,
+    neq_,
+    ok_,
+    slow,
+    with_tempfile,
+)
 
 # Notation in graphs:
 #

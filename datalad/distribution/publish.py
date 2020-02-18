@@ -61,11 +61,17 @@ def _push(ds, remote, things2push, force=False):
             ds.repo.push(remote=remote, force=force))
     if not push_res:
         return 'notneeded', 'Git reported nothing was pushed'
-    errors = ['{} -> {} {}'.format(
-        pi.local_ref,
-        pi.remote_ref,
-        pi.summary.strip()) for pi in push_res if (pi.flags & PI.ERROR) == PI.ERROR]
-    successes = [pi.summary.strip() for pi in push_res if (pi.flags & PI.ERROR) != PI.ERROR]
+    errors = [
+        '{} -> {} {}'.format(
+            pi['from_ref'],
+            pi['to_ref'],
+            pi['note'])
+        for pi in push_res
+        if 'error' in pi['operations']]
+    successes = [
+        pi['note']
+        for pi in push_res
+        if 'error' not in pi['operations']]
     if errors:
         return 'error', \
                ('failed to push to %s: %s;%s',

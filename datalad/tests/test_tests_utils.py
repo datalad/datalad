@@ -25,44 +25,57 @@ from os.path import exists, join as opj, basename
 from urllib.request import urlopen
 
 from unittest.mock import patch
-from nose.tools import assert_in, assert_not_in, assert_true
-from nose import SkipTest
-
-from ..utils import getpwd, chpwd
-
-from . import utils
-from .utils import (
-    eq_, ok_, assert_false, ok_startswith, nok_startswith,
-    with_tempfile, with_testrepos, with_tree,
-    rmtemp,
-    OBSCURE_PREFIX, OBSCURE_FILENAMES,
-    get_most_obscure_supported_name,
-    swallow_outputs, swallow_logs,
-    on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http,
-    ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink,
-    ok_file_under_git,
-    known_failure_githubci_win,
+from datalad.utils import (
+    getpwd,
+    chpwd,
 )
-from .utils import ok_generator
-from .utils import assert_dict_equal
-from .utils import assert_str_equal
-from .utils import assert_re_in
-from .utils import local_testrepo_flavors
-from .utils import skip_if_no_network
-from .utils import skip_if_no_module
-from .utils import skip_if_on_windows
-from .utils import run_under_dir
-from .utils import skip_if
-from .utils import ok_file_has_content
-from .utils import without_http_proxy
-from .utils import with_testsui
-from .utils import skip_ssh
-from .utils import probe_known_failure
-from .utils import patch_config
-from .utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_dict_equal,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_str_equal,
+    assert_true,
+    eq_,
+    get_most_obscure_supported_name,
+    ignore_nose_capturing_stdout,
+    known_failure_githubci_win,
+    local_testrepo_flavors,
+    nok_startswith,
+    OBSCURE_FILENAMES,
+    OBSCURE_PREFIX,
+    ok_,
+    ok_broken_symlink,
+    ok_file_has_content,
+    ok_file_under_git,
+    ok_generator,
+    ok_good_symlink,
+    ok_startswith,
+    ok_symlink,
+    on_windows,
+    patch_config,
+    probe_known_failure,
+    rmtemp,
+    run_under_dir,
+    serve_path_via_http,
+    skip_if,
+    skip_if_no_module,
+    skip_if_no_network,
+    skip_if_on_windows,
+    skip_ssh,
+    SkipTest,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos, with_tree,
+    with_testsui,
+    without_http_proxy,
+)
 
-from ..support.gitrepo import GitRepo
-from ..support import path as op
+from datalad.support.gitrepo import GitRepo
+from datalad.support import path as op
 #
 # Test with_tempfile, especially nested invocations
 #

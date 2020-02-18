@@ -11,7 +11,8 @@
 
 """
 
-import os, os.path as op
+import os
+import os.path as op
 import shutil
 import sys
 import logging
@@ -19,87 +20,104 @@ from unittest.mock import patch
 import builtins
 
 from operator import itemgetter
-from os.path import dirname, normpath, pardir, basename
-from os.path import isabs, expandvars, expanduser
+from os.path import (
+    abspath,
+    basename,
+    dirname,
+    exists,
+    expanduser,
+    expandvars,
+    isabs,
+    join as opj,
+    normpath,
+    pardir,
+)
 from collections import OrderedDict
 
-from ..utils import updated
-from os.path import join as opj, abspath, exists
-from ..utils import (
-    rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from datalad.utils import (
+    _path_,
+    all_same,
+    any_re_search,
+    assure_unicode,
+    auto_repr,
+    better_wraps,
+    CMD_MAX_ARG,
+    create_tree,
+    disable_logger,
+    dlabspath,
+    expandpath,
+    file_basename,
+    find_files,
+    generate_chunks,
+    get_dataset_root,
+    get_func_kwargs_doc,
+    get_open_files,
+    get_path_prefix,
+    get_timestamp_suffix,
+    get_trace,
+    getpwd, chpwd,
+    import_module_from_file,
+    import_modules,
+    is_explicit_path,
+    knows_annex,
+    line_profile,
+    make_tempfile,
+    map_items,
+    md5sum,
+    never_fail,
+    not_supported_on_windows,
+    on_windows,
+    partition,
+    Path,
+    path_is_subpath,
+    path_startswith,
+    rotree,
+    safe_print,
+    setup_exceptionhook,
+    swallow_logs,
+    swallow_outputs,
+    unique,
+    unlink,
+    updated,
 )
-from ..utils import getpwd, chpwd
-from ..utils import get_path_prefix
-from ..utils import auto_repr
-from ..utils import find_files
-from ..utils import is_interactive
-from ..utils import line_profile
-from ..utils import not_supported_on_windows
-from ..utils import file_basename
-from ..utils import expandpath, is_explicit_path
-from ..utils import assure_unicode
-from ..utils import knows_annex
-from ..utils import any_re_search
-from ..utils import unique
-from ..utils import all_same
-from ..utils import partition
-from ..utils import get_func_kwargs_doc
-from ..utils import make_tempfile
-from ..utils import on_windows
-from ..utils import _path_
-from ..utils import get_timestamp_suffix
-from ..utils import get_trace
-from ..utils import get_dataset_root
-from ..utils import better_wraps
-from ..utils import path_startswith
-from ..utils import path_is_subpath
-from ..utils import dlabspath
-from ..utils import safe_print
-from ..utils import generate_chunks
-from ..utils import disable_logger
-from ..utils import import_modules, import_module_from_file
-from ..utils import get_open_files
-from ..utils import map_items
-from ..utils import unlink
-from ..utils import CMD_MAX_ARG
-from ..utils import create_tree
-from ..utils import never_fail
-from ..utils import Path
+from datalad.support.annexrepo import AnnexRepo
 
-from ..support.annexrepo import AnnexRepo
-
-from nose.tools import (
+from .utils import (
+    as_unicode,
+    assert_cwd_unchanged,
     assert_equal,
     assert_false,
     assert_greater,
+    assert_in,
+    assert_not_in,
+    assert_raises,
     assert_true,
+    assure_bool,
+    assure_dict_from_str,
+    assure_iter,
+    assure_list,
+    assure_list_from_str,
+    assure_unicode,
     eq_,
-    ok_,
-)
-from datalad.tests.utils import nok_, assert_re_in
-
-from .utils import with_tempfile, assert_in, with_tree
-from .utils import SkipTest
-from .utils import assert_cwd_unchanged, skip_if_on_windows
-from .utils import assure_dict_from_str, assure_list_from_str
-from .utils import assure_unicode
-from .utils import as_unicode
-from .utils import assure_bool
-from .utils import assure_iter
-from .utils import assure_list
-from .utils import ok_generator
-from .utils import assert_not_in
-from .utils import assert_raises
-from .utils import ok_startswith
-from .utils import skip_if_no_module
-from .utils import (
-    probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    skip_if,
-    ok_file_has_content,
-    known_failure_windows,
     has_symlink_capability,
+    known_failure,
+    known_failure_v6,
+    known_failure_windows,
+    nok_,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_file_has_content,
+    ok_generator,
+    ok_startswith,
+    probe_known_failure,
+    skip_if,
+    skip_if_no_module,
+    skip_if_on_windows,
+    skip_known_failure,
+    SkipTest,
+    with_tempfile,
+    with_tree,
 )
-from .utils import OBSCURE_FILENAME
 
 
 def test_get_func_kwargs_doc():

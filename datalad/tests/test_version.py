@@ -11,16 +11,16 @@ import re
 from distutils.version import LooseVersion
 
 from ..version import (
-    __version__,
     __hardcoded_version__,
+    __version__,
 )
-from ..support import path as op
-from ..utils import assure_unicode
-from .utils import (
+from datalad.support import path as op
+from datalad.utils import assure_unicode
+from datalad.tests.utils import (
     assert_equal,
     assert_greater,
-    assert_not_in,
     assert_in,
+    assert_not_in,
     SkipTest,
 )
 

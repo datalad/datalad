@@ -19,6 +19,9 @@ import os
 import atexit
 import functools
 import tempfile
+from locale import getpreferredencoding
+import asyncio
+from collections import namedtuple
 
 from collections import OrderedDict
 from .support import path as op
@@ -31,13 +34,13 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    on_windows,
-    get_tempfile_kwargs,
     assure_unicode,
+    get_tempfile_kwargs,
     assure_bytes,
     unlink,
     auto_repr,
     split_cmdline,
+    generate_file_chunks,
 )
 from .dochelpers import borrowdoc
 
@@ -96,6 +99,313 @@ def _cleanup_output(stream, std):
             unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
+
+
+def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
+    """Run a git command multiple times if `files` is too long
+
+    Parameters
+    ----------
+    func : callable
+      Typically a Runner.run variant. Assumed to return a 2-tuple with stdout
+      and stderr as strings.
+    cmd : list
+      Base Git command argument list, to be amended with '--', followed
+      by a file list chunk.
+    files : list
+      List of files.
+    args, kwargs :
+      Passed to `func`
+
+    Returns
+    -------
+    str, str
+        Concatenated stdout and stderr.
+    """
+    assert isinstance(cmd, list)
+    if not files:
+        file_chunks = [[]]
+    else:
+        file_chunks = generate_file_chunks(files, cmd)
+
+    out, err = [], []
+    for i, file_chunk in enumerate(file_chunks):
+        if file_chunk:
+            lgr.debug('Process file list chunk %i (length %i)',
+                      i, len(file_chunk))
+            out_, err_ = func(cmd + ['--'] + file_chunk, *args, **kwargs)
+        else:
+            out_, err_ = func(cmd, *args, **kwargs)
+        if out_:
+            out.append(out_)
+        if err_:
+            err.append(err_)
+    return ''.join(out), ''.join(err)
+
+
+async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
+    """Run a command in a subprocess managed by asyncio
+
+    This implementation has been inspired by
+    https://pymotw.com/3/asyncio/subprocesses.html
+
+    Parameters
+    ----------
+    loop : asyncio.AbstractEventLoop
+      asyncio event loop instance. Must support subprocesses on the
+      target platform.
+    cmd : list
+      Command to be executed, passed to `subprocess_exec`.
+    protocol : WitlessProtocol
+      Protocol class to be instantiated for managing communication
+      with the subprocess.
+    stdin : file-like or None
+      Passed to the subprocess as its standard input.
+    kwargs : Pass to `subprocess_exec`, will typically be parameters
+      supported by `subprocess.Popen`.
+
+    Returns
+    -------
+    undefined
+      The nature of the return value is determined by the given
+      protocol class.
+    """
+    lgr.debug('Async run %s', cmd)
+
+    cmd_done = asyncio.Future(loop=loop)
+    factory = functools.partial(protocol, cmd_done)
+    proc = loop.subprocess_exec(
+        factory,
+        *cmd,
+        stdin=stdin,
+        # ask the protocol which streams to capture
+        stdout=asyncio.subprocess.PIPE if protocol.proc_out else None,
+        stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
+        **kwargs
+    )
+    transport = None
+    try:
+        lgr.debug('Launching process %s', cmd)
+        transport, protocol = await proc
+        lgr.debug('Waiting for process %i to complete', transport.get_pid())
+        await cmd_done
+    finally:
+        # protect against a crash whe launching the process
+        if transport:
+            transport.close()
+
+    return cmd_done.result()
+
+
+class WitlessProtocol(asyncio.SubprocessProtocol):
+    """Subprocess communication protocol base class for `run_async_cmd`
+
+    This class implements basic subprocess output handling. Derived classes
+    like `StdOutCapture` should be used for subprocess communication that need
+    to capture and return output. In particular, the `pipe_data_received()`
+    method can be overwritten to implement "online" processing of process
+    output.
+
+    This class defines a default return value setup that causes
+    `run_async_cmd()` to return a 2-tuple with the subprocess's exit code
+    and a list with bytestrings of all captured output streams.
+    """
+
+    FD_NAMES = ['stdin', 'stdout', 'stderr']
+
+    proc_out = None
+    proc_err = None
+
+    def __init__(self, done_future):
+        # future promise to be fulfilled when process exits
+        self.done = done_future
+        # capture output in bytearrays while the process is running
+        Streams = namedtuple('Streams', ['out', 'err'])
+        self.buffer = Streams(
+            out=bytearray() if self.proc_out else None,
+            err=bytearray() if self.proc_err else None,
+        )
+        self.pid = None
+        super().__init__()
+
+    def connection_made(self, transport):
+        self.transport = transport
+        self.pid = transport.get_pid()
+        lgr.debug('Process %i started', self.pid)
+
+    def pipe_data_received(self, fd, data):
+        if lgr.isEnabledFor(5):
+            lgr.log(
+                5,
+                'Read %i bytes from %i[%s]',
+                len(data), self.pid, self.FD_NAMES[fd])
+        # store received output if stream was to be captured
+        if self.buffer[fd - 1] is not None:
+            self.buffer[fd - 1].extend(data)
+
+    def process_exited(self):
+        return_code = self.transport.get_returncode()
+        lgr.debug(
+            'Process %i exited with return code %i',
+            self.pid, return_code)
+        # give captured process output back to the runner as bytestring(s)
+        results = [bytes(byt) if byt else None for byt in self.buffer]
+        # actually fulfill the future promise and let the execution finish
+        self.done.set_result((return_code, results))
+
+
+class NoCapture(WitlessProtocol):
+    """WitlessProtocol that captures no subprocess output
+
+    As this is identical with the behavior of the WitlessProtocol base class,
+    this class is merely a more readable convenience alias.
+    """
+    pass
+
+
+class StdOutCapture(WitlessProtocol):
+    """WitlessProtocol that only captures and returns stdout of a subprocess"""
+    proc_out = True
+
+
+class StdErrCapture(WitlessProtocol):
+    """WitlessProtocol that only captures and returns stderr of a subprocess"""
+    proc_err = True
+
+
+class StdOutErrCapture(WitlessProtocol):
+    """WitlessProtocol that captures and returns stdout/stderr of a subprocess
+    """
+    proc_out = True
+    proc_err = True
+
+
+class KillOutput(WitlessProtocol):
+    """WitlessProtocol that swallows stdout/stderr of a subprocess
+    """
+    proc_out = True
+    proc_err = True
+
+    def pipe_data_received(self, fd, data):
+        if lgr.isEnabledFor(5):
+            lgr.log(
+                5,
+                'Discarded %i bytes from %i[%s]',
+                len(data), self.pid, self.FD_NAMES[fd])
+
+
+class WitlessRunner(object):
+    """Minimal Runner with support for online command output processing
+
+    It aims to be as simple as possible, providing only essential
+    functionality.
+    """
+    __slots__ = ['cwd', 'env']
+
+    def __init__(self, cwd=None, env=None):
+        """
+        Parameters
+        ----------
+        cwd : path-like, optional
+          If given, commands are executed with this path as PWD,
+          the PWD of the parent process is used otherwise.
+        env : dict, optional
+          Environment to be passed to subprocess.Popen(). If `cwd`
+          was given, 'PWD' in the environment is set to its value.
+          This must be a complete environment definition, no values
+          from the current environment will be inherited.
+        """
+        self.env = env.copy() if env else None
+        # stringify to support Path instances on PY35
+        self.cwd = str(cwd) if cwd is not None else None
+        if self.cwd and env is not None:
+            # if CWD was provided, we must not make it conflict with
+            # a potential PWD setting
+            self.env['PWD'] = self.cwd
+
+    def run(self, cmd, protocol=None, stdin=None):
+        """Execute a command and communicate with it.
+
+        Parameters
+        ----------
+        cmd : list
+          Sequence of program arguments. Passing a single string means
+          that it is simply the name of the program, no complex shell
+          commands are supported.
+        protocol : WitlessProtocol, optional
+          Protocol class handling interaction with the running process
+          (e.g. output capture). A number of pre-crafted classes are
+          provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
+        stdin : byte stream, optional
+          File descriptor like, used as stdin for the process. Passed
+          verbatim to subprocess.Popen().
+
+        Returns
+        -------
+        stdout, stderr
+          Unicode string with the cumulative standard output and error
+          of the process.
+
+        Raises
+        ------
+        CommandError
+          On execution failure (non-zero exit code) this exception is
+          raised which provides the command (cmd), stdout, stderr,
+          exit code (status), and a message identifying the failed
+          command, as properties.
+        FileNotFoundError
+          When a given executable does not exist.
+        """
+        if protocol is None:
+            # by default let all subprocess stream pass through
+            protocol = NoCapture
+        # start a new event loop, which we will close again further down
+        # if this is not done events like this will occur
+        #   BlockingIOError: [Errno 11] Resource temporarily unavailable
+        #   Exception ignored when trying to write to the signal wakeup fd:
+        # It is unclear to me why it happens when reusing an event looped
+        # that it stopped from time to time, but starting fresh and doing
+        # a full termination seems to address the issue
+        if sys.platform == "win32":
+            # use special event loop that supports subprocesses on windows
+            event_loop = asyncio.ProactorEventLoop()
+        else:
+            event_loop = asyncio.SelectorEventLoop()
+        asyncio.set_event_loop(event_loop)
+        # include the subprocess manager in the asyncio event loop
+        return_code, results = event_loop.run_until_complete(
+            run_async_cmd(
+                event_loop,
+                cmd,
+                protocol,
+                stdin,
+                cwd=self.cwd,
+                env=self.env,
+            )
+        )
+        # terminate the event loop, cannot be undone, hence we start a fresh
+        # one each time (see BlockingIOError notes above)
+        event_loop.close()
+        # when we are here the process finished, take output from bytes to string
+        output = tuple(
+            o.decode(getpreferredencoding(do_setlocale=False))
+            if o else ''
+            for o in results)
+
+        if return_code not in [0, None]:
+            msg = "Failed to run %r%s." % (
+                cmd,
+                (" at %r" % self.cwd) if self.cwd else '',
+            )
+            raise CommandError(
+                cmd=str(cmd),
+                msg=msg,
+                code=return_code,
+                stdout=output[0],
+                stderr=output[1],
+            )
+        lgr.log(8, "Finished running %r with status %s", cmd, return_code)
+        return output
 
 
 class Runner(object):

@@ -14,12 +14,12 @@ from datalad.tests.utils_testrepos import (
     BasicGitTestRepo,
 )
 from datalad.tests.utils import (
-    with_tempfile,
-    ok_clean_git,
     ok_,
+    ok_clean_git,
     ok_file_under_git,
-    swallow_outputs,
     skip_if_on_windows,
+    swallow_outputs,
+    with_tempfile,
 )
 
 

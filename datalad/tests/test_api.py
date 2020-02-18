@@ -11,9 +11,9 @@
 import re
 from datalad.utils import getargspec
 
-from nose.tools import assert_true, assert_false
-from nose import SkipTest
-from nose.tools import eq_
+from datalad.tests.utils import assert_true, assert_false
+from datalad.tests.utils import SkipTest
+from datalad.tests.utils import eq_
 
 from datalad.tests.utils import assert_in
 

@@ -10,36 +10,38 @@
 
 """
 
-
-import logging
 import os
 import os.path as op
 from os.path import join as opj
 
-from datalad.api import create
-from datalad.api import add
-from datalad.api import install
+from datalad.api import (
+    add,
+    create,
+    install,
+)
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import OBSCURE_FILENAME
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    create_tree,
+    eq_,
+    known_failure_githubci_win,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_clean_git,
+    ok_file_under_git,
+    serve_path_via_http,
+    skip_if_on_windows,
+    SkipTest,
+    with_tempfile,
+    with_tree,
+)
 from datalad.utils import chpwd
 
 from ..dataset import Dataset

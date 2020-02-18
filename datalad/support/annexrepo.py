@@ -61,7 +61,8 @@ from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
     GitRunner,
     BatchedCommand,
-    SafeDelCloseMixin
+    SafeDelCloseMixin,
+    run_gitcommand_on_file_list_chunks,
 )
 
 # imports from same module:
@@ -505,7 +506,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return branch
 
-    def get_tracking_branch(self, branch=None, corresponding=True):
+    def get_tracking_branch(self, branch=None, remote_only=False,
+                            corresponding=True):
         """Get the tracking branch for `branch` if there is any.
 
         By default returns the tracking branch of the corresponding branch if
@@ -515,6 +517,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         ----------
         branch: str
           local branch to look up. If none is given, active branch is used.
+        remote_only : bool
+            Don't return a value if the upstream remote is set to "." (meaning
+            this repository).
         corresponding: bool
           If True actually look up the corresponding branch of `branch` (also if
           `branch` isn't explicitly given)
@@ -529,6 +534,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
 
         return super(AnnexRepo, self).get_tracking_branch(
+                        remote_only=remote_only,
                         branch=self.get_corresponding_branch(branch)
                         if corresponding else branch)
 
@@ -594,15 +600,49 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @staticmethod
     def get_size_from_key(key):
-        """A little helper to obtain size encoded in a key"""
+        """A little helper to obtain size encoded in a key
+
+        Returns
+        -------
+        int or None
+          size of the file or None if either no size is encoded in the key or
+          key was None itself
+
+        Raises
+        ------
+        ValueError
+          if key is considered invalid (at least its size-related part)
+        """
         if not key:
             return None
-        try:
-            size_str = key.split('-', 2)[1].lstrip('s')
-        except IndexError:
-            # has no 2nd field in the key
-            return None
-        return int(size_str) if size_str.isdigit() else None
+
+        # see: https://git-annex.branchable.com/internals/key_format/
+        key_parts = key.split('--')
+        key_fields = key_parts[0].split('-')
+        parsed = {field[0]: int(field[1:]) if field[1:].isdigit() else None
+                  for field in key_fields[1:]
+                  if field[0] in "sSC"}
+
+        # don't lookup the dict for the same things several times;
+        # Is there a faster (and more compact) way of doing this? Note, that
+        # locals() can't be updated.
+        s = parsed.get('s')
+        S = parsed.get('S')
+        C = parsed.get('C')
+
+        if S is None and C is None:
+            return s  # also okay if s is None as well -> no size to report
+        elif s is None:
+            # s is None, while S and/or C are not.
+            raise ValueError("invalid key: {}".format(key))
+        elif S and C:
+            if C <= int(s / S):
+                return S
+            else:
+                return s % S
+        else:
+            # S or C are given with the respective other one missing
+            raise ValueError("invalid key: {}".format(key))
 
     @normalize_path
     def get_file_size(self, path):
@@ -957,7 +997,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         try:
             # TODO: RF to use --batch where possible instead of splitting
             # into multiple invocations
-            return self._run_command_files_split(
+            return run_gitcommand_on_file_list_chunks(
                 self.cmd_call_wrapper.run,
                 cmd_list,
                 files,

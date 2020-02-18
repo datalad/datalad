@@ -11,11 +11,13 @@
 import os
 
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import integration
 from datalad.tests.utils import usecase
-from .utils import eq_, ok_, with_testrepos, with_tempfile
+from datalad.tests.utils import (
+    ok_,
+    with_testrepos,
+    with_tempfile,
+)
 from datalad.cmd import Runner
-from .utils import local_testrepo_flavors
 from .utils_testdatasets import make_studyforrest_mockup
 
 
