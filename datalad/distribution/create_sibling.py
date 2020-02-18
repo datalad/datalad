@@ -15,7 +15,13 @@ from distutils.version import LooseVersion
 from glob import glob
 import logging
 import os
-from os.path import join as opj, relpath, normpath, dirname, curdir
+from os.path import (
+    curdir,
+    dirname,
+    join as opj,
+    normpath,
+    relpath,
+)
 
 import datalad
 from datalad import ssh_manager
@@ -23,39 +29,62 @@ from datalad import ssh_manager
 from datalad.ui import ui
 
 from datalad.cmd import CommandError
-from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
-from datalad.consts import TIMESTAMP_FMT
+from datalad.consts import (
+    TIMESTAMP_FMT,
+    WEB_HTML_DIR,
+    WEB_META_LOG
+)
 from datalad.dochelpers import exc_str
-from datalad.distribution.siblings import Siblings
-from datalad.distribution.siblings import _DelayedSuper
-from datalad.distribution.dataset import EnsureDataset, Dataset, \
-    datasetmethod, require_dataset
+from datalad.distribution.siblings import (
+    _DelayedSuper,
+    Siblings,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
 from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    Interface,
+)
 from datalad.interface.utils import eval_results
-from datalad.interface.common_opts import recursion_limit, recursion_flag
-from datalad.interface.common_opts import as_common_datasrc
-from datalad.interface.common_opts import publish_by_default
-from datalad.interface.common_opts import publish_depends
-from datalad.interface.common_opts import inherit_opt
-from datalad.interface.common_opts import annex_wanted_opt
-from datalad.interface.common_opts import annex_group_opt
-from datalad.interface.common_opts import annex_groupwanted_opt
+from datalad.interface.common_opts import (
+    annex_group_opt,
+    annex_groupwanted_opt,
+    annex_wanted_opt,
+    as_common_datasrc,
+    inherit_opt,
+    publish_by_default,
+    publish_depends,
+    recursion_flag,
+    recursion_limit,
+)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
-from datalad.support.constraints import EnsureChoice
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.network import RI
-from datalad.support.network import is_ssh
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    MissingExternalDependency,
+)
+from datalad.support.network import (
+    is_ssh,
+    RI,
+)
 from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
-from datalad.utils import make_tempfile
-from datalad.utils import _path_
-from datalad.utils import slash_join
-from datalad.utils import assure_list
-
+from datalad.utils import (
+    make_tempfile,
+    _path_,
+    slash_join,
+    assure_list,
+)
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
