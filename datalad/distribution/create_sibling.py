@@ -19,6 +19,9 @@ from os.path import join as opj, relpath, normpath, dirname, curdir
 
 import datalad
 from datalad import ssh_manager
+
+from datalad.ui import ui
+
 from datalad.cmd import CommandError
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
@@ -164,8 +167,6 @@ def _create_dataset_sibling(
                                  + " It is %sa git repository and has %d files/dirs." % (
                                      "" if has_git else "not ", len(path_children)
                                  )
-                    from datalad.ui import ui
-
                     if ui.is_interactive:
                         remove = ui.yesno(
                             "Do you really want to remove it?",
