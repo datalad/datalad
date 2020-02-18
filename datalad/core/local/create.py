@@ -217,6 +217,14 @@ class Create(Interface):
                                  "description for annex repo and declaring "
                                  "no annex repo.")
 
+        if (isinstance(initopts, (list, tuple)) and '--bare' in initopts) or (
+                isinstance(initopts, dict) and 'bare' in initopts):
+            raise ValueError(
+                "Creation of bare repositories is not supported. Consider "
+                "one of the create-sibling commands, or use "
+                "Git to init a bare repository and push an existing dataset "
+                "into it.")
+
         if path:
             path = resolve_path(path, dataset)
 
