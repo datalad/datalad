@@ -17,6 +17,7 @@ import logging
 from os.path import lexists, join as opj
 import itertools
 
+from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -26,6 +27,7 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import (
     recursion_flag,
@@ -116,7 +118,7 @@ class Update(Interface):
         refds = require_dataset(dataset, check_installed=True, purpose='updating')
 
         save_paths = []
-
+        merge_failures = set()
         saw_subds = False
         for ds in itertools.chain([refds], refds.subdatasets(
                 path=path,
@@ -181,6 +183,7 @@ class Update(Interface):
             # a GitRepo to an AnnexRepo
             repo = ds.repo
 
+            saw_merge_failure = False
             if merge:
                 merge_target = _choose_merge_target(
                     repo, curr_branch,
@@ -199,11 +202,20 @@ class Update(Interface):
 
                 if is_annex and reobtain_data:
                     merge_fn = _reobtain(ds, merge_fn)
-                yield from merge_fn(repo, sibling_, merge_target)
 
-            res['status'] = 'ok'
+                for mres in merge_fn(repo, sibling_, merge_target):
+                    if mres["action"] == "merge" and mres["status"] != "ok":
+                        saw_merge_failure = True
+                    yield dict(res, **mres)
+
+            if saw_merge_failure:
+                merge_failures.add(ds)
+                res['status'] = 'error'
+                res['message'] = ("Merge of %s failed", merge_target)
+            else:
+                res['status'] = 'ok'
+                save_paths.append(ds.path)
             yield res
-            save_paths.append(ds.path)
         # we need to save updated states only if merge was requested -- otherwise
         # it was a pure fetch
         if merge and recursive:
@@ -211,17 +223,22 @@ class Update(Interface):
                 lgr.warning(
                     'path constraints did not match an installed subdataset: %s',
                     path)
-            save_paths = [p for p in save_paths if p != refds.path]
-            if not save_paths:
-                return
-            lgr.debug(
-                'Subdatasets where updated state may need to be '
-                'saved in the parent dataset: %s', save_paths)
-            for r in refds.save(
-                    path=save_paths,
-                    recursive=False,
-                    message='[DATALAD] Save updated subdatasets'):
-                yield r
+            if refds in merge_failures:
+                lgr.warning("Not saving because top-level dataset %s "
+                            "had a merge failure",
+                            refds.path)
+            else:
+                save_paths = [p for p in save_paths if p != refds.path]
+                if not save_paths:
+                    return
+                lgr.debug(
+                    'Subdatasets where updated state may need to be '
+                    'saved in the parent dataset: %s', save_paths)
+                for r in refds.save(
+                        path=save_paths,
+                        recursive=False,
+                        message='[DATALAD] Save updated subdatasets'):
+                    yield r
 
 
 def _choose_merge_target(repo, branch, remote, cfg_remote):
@@ -279,16 +296,22 @@ def _choose_merge_fn(repo, is_annex=False, adjusted=False):
 
 
 def _plain_merge(repo, _, target):
-    repo.merge(name=target)
-    return []
+    try:
+        repo.merge(name=target,
+                   expect_fail=True, expect_stderr=True)
+    except CommandError as exc:
+        yield {"action": "merge", "status": "error",
+               "message": exc_str(exc)}
+    else:
+        yield {"action": "merge", "status": "ok",
+               "message": ("Merged %s", target)}
 
 
 def _annex_plain_merge(repo, _, target):
-    _plain_merge(repo, _, target)
+    yield from _plain_merge(repo, _, target)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
     repo.call_git(["annex", "merge"])
-    return []
 
 
 def _annex_sync(repo, remote, _target):
@@ -309,7 +332,6 @@ def _reobtain(ds, merge_fn):
             opj(ds_path, p)
             for p in repo.get_annexed_files(with_content_only=True)]
 
-        # No merge functions yield results yet...
         yield from merge_fn(*args, **kwargs)
 
         present_files = [p for p in present_files if lexists(p)]

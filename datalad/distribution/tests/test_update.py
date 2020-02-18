@@ -478,3 +478,100 @@ def test_merge_no_merge_target(path):
     ds_clone.repo.checkout("master", options=["-bnew"])
     res = ds_clone.update(merge=True, on_failure="ignore")
     assert_in_results(res, status="impossible", action="update")
+
+
+@with_tempfile(mkdir=True)
+def test_merge_conflict(path):
+    path = Path(path)
+    ds_src = Dataset(path / "src").create()
+    if ds_src.repo.is_managed_branch():
+        # `git annex sync REMOTE` is used on an adjusted branch, but this error
+        # depends on `git merge TARGET` being used.
+        raise SkipTest("Test depends on non-adjusted branch")
+    ds_src_s0 = ds_src.create("s0")
+    ds_src_s1 = ds_src.create("s1")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_s0 = Dataset(path / "clone" / "s0")
+    ds_clone_s1 = Dataset(path / "clone" / "s1")
+
+    (ds_src.pathobj / "foo").write_text("src content")
+    ds_src.save(to_git=True)
+
+    (ds_clone.pathobj / "foo").write_text("clone content")
+    ds_clone.save(to_git=True)
+
+    # Top-level merge failure
+    res = ds_clone.update(merge=True, on_failure="ignore")
+    assert_in_results(res, action="merge", status="error")
+    assert_in_results(res, action="update", status="error")
+    # Deal with the conflicts. Note that save() won't handle this gracefully
+    # because it will try to commit with a pathspec, which git doesn't allow
+    # during a merge.
+    ds_clone.repo.call_git(["checkout", "--theirs", "--", "foo"])
+    ds_clone.repo.call_git(["add", "--", "foo"])
+    ds_clone.repo.call_git(["commit", "--no-edit"])
+    assert_repo_status(ds_clone.path)
+
+    # Top-level and subdataset merge failure
+    (ds_src_s0.pathobj / "foo").write_text("src s0 content")
+    (ds_src_s1.pathobj / "foo").write_text("no conflict")
+    ds_src.save(recursive=True, to_git=True)
+
+    (ds_clone_s0.pathobj / "foo").write_text("clone s0 content")
+    ds_clone.save(recursive=True, to_git=True)
+    res = ds_clone.update(merge=True, recursive=True, on_failure="ignore")
+    assert_result_count(res, 2, action="merge", status="error")
+    assert_result_count(res, 2, action="update", status="error")
+    assert_in_results(res, action="merge", status="ok",
+                      path=ds_clone_s1.path)
+    assert_in_results(res, action="update", status="ok",
+                      path=ds_clone_s1.path)
+    # No saving happens if there's a top-level conflict.
+    assert_repo_status(ds_clone.path,
+                       modified=[ds_clone_s0.path, ds_clone_s1.path])
+
+
+@with_tempfile(mkdir=True)
+def test_merge_conflict_in_subdataset_only(path):
+    path = Path(path)
+    ds_src = Dataset(path / "src").create()
+    if ds_src.repo.is_managed_branch():
+        # `git annex sync REMOTE` is used on an adjusted branch, but this error
+        # depends on `git merge TARGET` being used.
+        raise SkipTest("Test depends on non-adjusted branch")
+    ds_src_sub_conflict = ds_src.create("sub_conflict")
+    ds_src_sub_noconflict = ds_src.create("sub_noconflict")
+    ds_src.save()
+
+    # Set up a scenario where one subdataset has a conflict between the remote
+    # and local version, but the parent dataset does not have a conflict
+    # because it hasn't recorded the subdataset state.
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_sub_conflict = Dataset(path / "clone" / "sub_conflict")
+    ds_clone_sub_noconflict = Dataset(path / "clone" / "sub_noconflict")
+
+    (ds_src_sub_conflict.pathobj / "foo").write_text("src content")
+    ds_src_sub_conflict.save(to_git=True)
+
+    (ds_clone_sub_conflict.pathobj / "foo").write_text("clone content")
+    ds_clone_sub_conflict.save(to_git=True)
+
+    (ds_src_sub_noconflict.pathobj / "foo").write_text("src content")
+    ds_src_sub_noconflict.save()
+
+    res = ds_clone.update(merge=True, recursive=True, on_failure="ignore")
+    assert_in_results(res, action="merge", status="error",
+                      path=ds_clone_sub_conflict.path)
+    assert_in_results(res, action="merge", status="ok",
+                      path=ds_clone_sub_noconflict.path)
+    assert_in_results(res, action="save", status="ok",
+                      path=ds_clone.path)
+    # We saved the subdataset without a conflict...
+    assert_repo_status(ds_clone_sub_noconflict.path)
+    # ... but the one with the conflict leaves it for the caller to handle.
+    ok_(ds_clone_sub_conflict.repo.call_git(
+        ["ls-files", "--unmerged", "--", "foo"]).strip())
