@@ -5,6 +5,8 @@
 #
 # Changelog
 # ---------
+# 0.12.2-174-g180bbd8d4 (2020/02/17)
+#  - Adding rclone and its annexexternal special remote
 # 0.12.2-115-gfd12bdc30 (2020/02/12)
 #  - Update to get a fresh build of master and newer git-annex
 # 0.12.0rc4-239-gba66d1c9f
@@ -37,7 +39,7 @@ From:neurodebian:latest
     # bare essentials to pull everything else in
     eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
 
-    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3
+    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3 rclone git-annex-remote-rclone
 
     # just for scrapy
     eatmydata apt-get -y install --no-install-recommends python3-twisted
