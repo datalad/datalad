@@ -231,14 +231,18 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # add random file under target_path, to explicitly test existing=replace
         open(opj(target_path, 'random'), 'w').write('123')
 
-        assert_create_sshwebserver(
-            dataset=source,
-            name="local_target",
-            sshurl="ssh://localhost" + target_path,
-            publish_by_default='master',
-            existing='replace',
-            ui=True,
-        )
+        @with_testsui(responses=["yes"])
+        def interactive_assert_create_sshwebserver():
+            assert_create_sshwebserver(
+                dataset=source,
+                name="local_target",
+                sshurl="ssh://localhost" + target_path,
+                publish_by_default='master',
+                existing='replace',
+                ui=True,
+            )
+        interactive_assert_create_sshwebserver()
+
         eq_("ssh://localhost" + urlquote(target_path),
             source.repo.get_remote_url("local_target"))
         ok_(source.repo.get_remote_url("local_target", push=True) is None)
@@ -265,7 +269,12 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_pushurl="ssh://localhost" + target_path,
             ui=True,
         )
-        assert_create_sshwebserver(existing='replace', **cpkwargs)
+
+        @with_testsui(responses=['yes'])
+        def interactive_assert_create_sshwebserver():
+            assert_create_sshwebserver(existing='replace', **cpkwargs)
+        interactive_assert_create_sshwebserver()
+
         if src_is_annex:
             target_description = AnnexRepo(target_path,
                                            create=False).get_description()
@@ -513,7 +522,16 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     assert_in('already configured', res[0]['message'][0])
     # "Settings" such as UI do not persist, so we specify it again
     # for the test below depending on it
-    ds.create_sibling(url, existing='replace', ui=True)
+    with assert_raises(RuntimeError):
+        # but we cannot replace in non-interactive mode
+        ds.create_sibling(url, existing='replace', ui=True)
+
+    # We don't have context manager like @with_testsui, so
+    @with_testsui(responses=["yes"])
+    def interactive_create_sibling():
+        ds.create_sibling(url, existing='replace', ui=True)
+    interactive_create_sibling()
+
     published2 = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 

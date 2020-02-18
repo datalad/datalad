@@ -173,8 +173,10 @@ def _create_dataset_sibling(
                             default=False
                         )
                     else:
-                        remove = True
-                        lgr.warning(_msg_stats)
+                        raise RuntimeError(
+                            _msg_stats +
+                            " Remove it manually first or rerun datalad in "
+                            "interactive shell to confirm this action.")
                 if not remove:
                     raise RuntimeError(_msg)
                 # Remote location might already contain a git repository or be
