@@ -578,6 +578,41 @@ def test_merge_conflict_in_subdataset_only(path):
 
 
 @with_tempfile(mkdir=True)
+def test_merge_ff_only(path):
+    path = Path(path)
+    ds_src = Dataset(path / "src").create()
+    if ds_src.repo.is_managed_branch():
+        # `git annex sync REMOTE` is used on an adjusted branch, but this error
+        # depends on `git merge --ff-only ...` being used.
+        raise SkipTest("Test depends on non-adjusted branch")
+
+    ds_clone_ff = install(source=ds_src.path, path=path / "clone_ff",
+                          result_xfm="datasets")
+
+    ds_clone_nonff = install(source=ds_src.path, path=path / "clone_nonff",
+                             result_xfm="datasets")
+
+    (ds_clone_nonff.pathobj / "foo").write_text("local change")
+    ds_clone_nonff.save(recursive=True)
+
+    (ds_src.pathobj / "bar").write_text("remote change")
+    ds_src.save(recursive=True)
+
+    assert_in_results(
+        ds_clone_ff.update(merge="ff-only", on_failure="ignore"),
+        action="merge", status="ok")
+
+    # ff-only prevents a non-fast-forward ...
+    assert_in_results(
+        ds_clone_nonff.update(merge="ff-only", on_failure="ignore"),
+        action="merge", status="error")
+    # ... that would work with "any".
+    assert_in_results(
+        ds_clone_nonff.update(merge="any", on_failure="ignore"),
+        action="merge", status="ok")
+
+
+@with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_other_branch(path):
     path = Path(path)
     ds_src = Dataset(path / "source").create()

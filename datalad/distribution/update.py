@@ -26,6 +26,7 @@ from datalad.interface.results import (
     YieldDatasets
 )
 from datalad.support.constraints import (
+    EnsureBool,
     EnsureChoice,
     EnsureStr,
     EnsureNone,
@@ -102,11 +103,20 @@ class Update(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         merge=Parameter(
             args=("--merge",),
-            action="store_true",
+            metavar="ALLOWED",
+            # const and nargs are set to map --merge to --merge=any.
+            const="any",
+            nargs="?",
+            constraints=EnsureBool() | EnsureChoice("any", "ff-only"),
             doc="""merge obtained changes from the sibling. If a sibling is not
             explicitly given and there is only a single known sibling, that
             sibling is used. Otherwise, an unspecified sibling defaults to the
-            configured remote for the current branch."""),
+            configured remote for the current branch. By default, changes are
+            fetched from the sibling but not merged into the current branch.
+            With [CMD: --merge or --merge=any CMD][PY: merge=True or
+            merge="any" PY], the changes will be merged into the current
+            branch. A value of 'ff-only' restricts the allowed merges to
+            fast-forwards."""),
         follow=Parameter(
             args=("--follow",),
             constraints=EnsureChoice("sibling", "parentds"),
@@ -258,6 +268,7 @@ class Update(Interface):
                     is_annex=is_annex,
                     adjusted=is_annex and repo.is_managed_branch(curr_branch))
 
+                merge_opts = None
                 if merge_fn is _annex_sync:
                     if follow_parent:
                         yield dict(
@@ -270,11 +281,14 @@ class Update(Interface):
                                status="impossible",
                                message="Could not determine merge target")
                     continue
+                elif merge == "ff-only":
+                    merge_opts = ["--ff-only"]
 
                 if is_annex and reobtain_data:
                     merge_fn = _reobtain(ds, merge_fn)
 
-                for mres in merge_fn(repo, sibling_, merge_target):
+                for mres in merge_fn(repo, sibling_, merge_target,
+                                     merge_opts=merge_opts):
                     if mres["action"] == "merge" and mres["status"] != "ok":
                         saw_merge_failure = True
                     yield dict(res, **mres)
@@ -366,9 +380,9 @@ def _choose_merge_fn(repo, is_annex=False, adjusted=False):
     return merge_fn
 
 
-def _plain_merge(repo, _, target):
+def _plain_merge(repo, _, target, merge_opts=None):
     try:
-        repo.merge(name=target,
+        repo.merge(name=target, options=merge_opts,
                    expect_fail=True, expect_stderr=True)
     except CommandError as exc:
         yield {"action": "merge", "status": "error",
@@ -378,14 +392,14 @@ def _plain_merge(repo, _, target):
                "message": ("Merged %s", target)}
 
 
-def _annex_plain_merge(repo, _, target):
-    yield from _plain_merge(repo, _, target)
+def _annex_plain_merge(repo, _, target, merge_opts=None):
+    yield from _plain_merge(repo, _, target, merge_opts=merge_opts)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
     repo.call_git(["annex", "merge"])
 
 
-def _annex_sync(repo, remote, _target):
+def _annex_sync(repo, remote, _target, merge_opts=None):
     repo.sync(remotes=remote, push=False, pull=True, commit=False)
     return []
 
