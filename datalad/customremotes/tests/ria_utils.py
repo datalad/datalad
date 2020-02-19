@@ -29,16 +29,11 @@ def get_all_files(path):
     ])
 
 
-# TODO think about migrating to AnnexRepo
 def initremote(repo, name, encryption=None, config=None):
     cfg = dict(config) if config else {}
     cfg['encryption'] = encryption if encryption else 'none'
-    args = [name]
-    args += ['{}={}'.format(k, v) for k, v in iteritems(cfg)]
-    repo._run_annex_command(
-        'initremote',
-        annex_options=args,
-    )
+    args = ['{}={}'.format(k, v) for k, v in iteritems(cfg)]
+    repo.init_remote(name, args)
 
 
 def initexternalremote(repo, name, type, encryption=None, config=None):
