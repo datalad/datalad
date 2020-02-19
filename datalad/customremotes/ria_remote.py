@@ -608,7 +608,8 @@ class RIARemote(SpecialRemote):
         self.objtree_base_path = Path(self.objtree_base_path)
         if not self.objtree_base_path.is_absolute():
             raise RIARemoteError(
-                'Non-absolute object tree base path configuration')
+                'Non-absolute object tree base path configuration: %s'
+                '' % str(self.objtree_base_path))
 
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:

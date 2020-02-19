@@ -1,10 +1,11 @@
 import os
 import inspect
 from glob import glob
-from pathlib import Path
 from functools import wraps
 from six import iteritems
 
+
+from datalad.utils import Path
 from datalad.tests.utils import (
     create_tree,
 )
@@ -52,11 +53,12 @@ def initexternalremote(repo, name, type, encryption=None, config=None):
 def setup_archive_remote(repo, archive_path):
 
     # for integration in a URL, we need POSIX version of the path
-    archive_path = Path(archive_path).as_posix()
+    archive_path = Path(archive_path)
+
     if 'RIA_TESTS_SSH' in os.environ:
-        cfg = {'url': 'ria+ssh://datalad-test{}'.format(archive_path)}
+        cfg = {'url': 'ria+ssh://datalad-test{}'.format(archive_path.as_posix())}
     else:
-        cfg = {'url': 'ria+file://{}'.format(archive_path)}
+        cfg = {'url': 'ria+{}'.format(archive_path.as_uri())}
     initexternalremote(repo, 'archive', 'ria', config=cfg)
 
 

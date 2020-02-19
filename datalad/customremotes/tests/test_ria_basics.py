@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_status,
     eq_,
+    skip_if_on_windows,
     with_tempfile,
 )
 
@@ -31,6 +32,7 @@ from datalad.customremotes.tests.ria_utils import (
 )
 
 
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
@@ -72,6 +74,7 @@ def test_archive_layout(path, objtree, archivremote):
     eq_(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
 
 
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
@@ -125,6 +128,7 @@ def test_backup_archive(path, objtree, archivremote):
     assert_status('ok', [annexjson2result(r, ds) for r in ds.repo.fsck()])
 
 
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_version_check(path, objtree):
