@@ -103,8 +103,10 @@ class Update(Interface):
         merge=Parameter(
             args=("--merge",),
             action="store_true",
-            doc="""merge obtained changes from the given or the
-            default sibling""", ),
+            doc="""merge obtained changes from the sibling. If a sibling is not
+            explicitly given and there is only a single known sibling, that
+            sibling is used. Otherwise, an unspecified sibling defaults to the
+            configured remote for the current branch."""),
         follow=Parameter(
             args=("--follow",),
             constraints=EnsureChoice("sibling", "parentds"),
