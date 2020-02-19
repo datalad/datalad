@@ -5,6 +5,7 @@ import shutil
 from datalad.tests.utils import (
     assert_raises,
     assert_status,
+    skip_if_on_windows,
     with_tempfile,
 )
 from datalad.support.exceptions import CommandError
@@ -15,7 +16,10 @@ from datalad.customremotes.tests.ria_utils import (
     populate_dataset,
 )
 
+from datalad.utils import Path
 
+
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
@@ -55,6 +59,7 @@ def test_site_archive_location_config(path, objtree, objtree_alt):
     assert_status('ok', ds.get('.'))
 
 
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
@@ -69,7 +74,8 @@ def test_site_archive_url_config(path, objtree, objtree_alt):
         config=None,
     )
     # specify archive location via URL + configured label (url...insteadOf) for reconfiguration
-    ds.config.set('url.ria+file://{}.insteadOf'.format(objtree), 'localstore:', where='local')
+    ds.config.set('url.ria+{}.insteadOf'.format(Path(objtree).as_uri()),
+                  'localstore:', where='local')
     initexternalremote(
         ds.repo, 'archive', 'ria', config={'url': 'localstore:'}
     )
@@ -88,7 +94,7 @@ def test_site_archive_url_config(path, objtree, objtree_alt):
     # relocate the archive on the system
     shutil.move(objtree, objtree_alt)
     # adjust the config -- doesn't touch committed content
-    ds.config.unset('url.ria+file://{}.insteadOf'.format(objtree), where='local')
-    ds.config.set('url.ria+file://{}.insteadOf'.format(objtree_alt), 'localstore:', where='local')
+    ds.config.unset('url.ria+{}.insteadOf'.format(Path(objtree).as_uri()), where='local')
+    ds.config.set('url.ria+{}.insteadOf'.format(Path(objtree_alt).as_uri()), 'localstore:', where='local')
     # remote continues to function normally after system reconfiguration
     assert_status('ok', ds.get('.'))

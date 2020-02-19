@@ -11,6 +11,7 @@ from datalad.tests.utils import (
     assert_status,
     eq_,
     serve_path_via_http,
+    skip_if_on_windows,
     SkipTest,
     with_tempfile,
 )
@@ -21,6 +22,7 @@ from datalad.customremotes.tests.ria_utils import (
 )
 
 
+@skip_if_on_windows
 @skip_non_ssh  # superfluous in an SSH-run and annex-testremote is slow
 @with_tempfile(mkdir=True)
 @with_tempfile()
@@ -96,6 +98,7 @@ def test_bare_git(origin, remote_base_path):
     eq_(len(ds.repo.whereis('one.txt')), 1)
 
 
+@skip_if_on_windows
 @with_tempfile
 @with_tempfile(mkdir=True)
 @serve_path_via_http
