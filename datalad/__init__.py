@@ -130,6 +130,10 @@ def setup_package():
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
+    # Re-load ConfigManager, since otherwise it won't consider global config
+    # from new $HOME (see gh-4153
+    cfg.reload(force=True)
+
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
     # But then haskell libraries do not digest empty value nicely, so we just
@@ -222,6 +226,12 @@ def teardown_package():
 
     if _test_states['HOME'] is not None:
         os.environ['HOME'] = _test_states['HOME']
+
+    # Re-establish correct global config after changing $HOME.
+    # Might be superfluous, since after teardown datalad.cfg shouldn't be
+    # needed. However, maintaining a consistent state seems a good thing
+    # either way.
+    cfg.reload(force=True)
 
     if _test_states['DATASETS_TOPURL_ENV']:
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
