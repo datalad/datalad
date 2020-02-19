@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         extension: [
-            datalad_neuroimaging,
-            datalad_container,
-            datalad_metalad,
-            datalad_crawler,
+            datalad-neuroimaging,
+            datalad-container,
+            datalad-metalad,
+            datalad-crawler,
         ]
     steps:
     - name: Set up system
@@ -39,15 +39,14 @@ jobs:
         pip install -r requirements.txt
     - name: Install ${{ matrix.extension }} extension
       run: |
-        pip install ${{ matrix.extension }}
-      if: matrix.extension != 'datalad_crawler'
-    - name: Install ${{ matrix.extension }} extension
+        pip install https://github.com/datalad/${{ matrix.extension }}/archive/master.zip
+    - name: Install additional dependencies
       run: |
-        pip install ${{ matrix.extension }}[devel]
-      if: matrix.extension == 'datalad_crawler'
+        pip install mock
+      if: matrix.extension == 'datalad-crawler'
     - name: Install Singularity
       run: sudo eatmydata apt-get install singularity-container
-      if: matrix.extension == 'datalad_container'
+      if: matrix.extension == 'datalad-container'
     - name: WTF!?
       run: |
         datalad wtf
@@ -55,4 +54,4 @@ jobs:
       run: |
         mkdir -p __testhome__
         cd __testhome__
-        python -m nose -s -v --with-cov --cover-package datalad ${{ matrix.extension }}
+        python -m nose -s -v --with-cov --cover-package datalad $(echo ${{ matrix.extension }} | tr '-' '_')
