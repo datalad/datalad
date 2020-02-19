@@ -41,6 +41,9 @@ _group_dataset = (
         ('datalad.distributed.create_sibling_gitlab',
          'CreateSiblingGitlab',
          'create-sibling-gitlab'),
+        ('datalad.distributed.create_sibling_ria',
+         'CreateSiblingRia',
+         'create-sibling-ria'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.core.local.save', 'Save', 'save'),
     ])

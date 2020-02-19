@@ -25,6 +25,7 @@ Dataset operations
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github
    generated/man/datalad-create-sibling-gitlab
+   generated/man/datalad-create-sibling-ria
    generated/man/datalad-drop
    generated/man/datalad-get
    generated/man/datalad-install
