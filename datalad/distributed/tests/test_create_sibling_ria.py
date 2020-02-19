@@ -66,7 +66,6 @@ def test_invalid_calls(path):
             'sub': {'other.txt': 'other'}})
 @with_tempfile(mkdir=True)
 def _test_create_store(host, base_path, ds_path, clone_path):
-    skip_if_no_module("ria_remote")  # special remote needs to be installed
 
     ds = Dataset(ds_path).create(force=True)
 
