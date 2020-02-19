@@ -1182,6 +1182,9 @@ def test_get_open_files(p):
     eq_(get_open_files(p), {})
     f1 = opj(p, '1')
     subd = opj(p, 'd')
+
+    # THIS TEST FAILS FOR WINDOWS SHORT PATHS 
+
     with open(f1) as f:
         # since lsof does not care about PWD env var etc, paths
         # will not contain symlinks, we better realpath them
