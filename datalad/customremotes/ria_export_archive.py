@@ -90,8 +90,8 @@ class RIAExportArchive(Interface):
     @eval_results
     def __call__(
             target,
-            dataset=None,
-            opts=None):
+            opts=None,
+            dataset=None):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
             dataset, check_installed=True, purpose='RIA archive export')
