@@ -68,6 +68,7 @@ Miscellaneous commands
    generated/man/datalad-download-url
    generated/man/datalad-ls
    generated/man/datalad-test
+   generated/man/datalad-ria-export-archive
 
 
 Plugin commands
