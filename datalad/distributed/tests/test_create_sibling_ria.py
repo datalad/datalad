@@ -2,21 +2,21 @@ import os.path as op
 
 from datalad import cfg
 from datalad.api import (
-    Dataset,
-    clone
+    clone,
+    Dataset
 )
 from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    chpwd,
+    eq_,
+    skip_if_no_module,
+    skip_if_on_windows,
+    skip_ssh,
     with_tempfile,
     with_tree,
-    assert_repo_status,
-    assert_in,
-    assert_result_count,
-    eq_,
-    assert_raises,
-    chpwd,
-    skip_ssh,
-    skip_if_on_windows,
-    skip_if_no_module
 )
 from functools import wraps
 from nose.plugins.attrib import attr

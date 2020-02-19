@@ -19,8 +19,8 @@ from datalad.interface.common_opts import (
     recursion_limit
 )
 from datalad.interface.base import (
-    Interface,
     build_doc,
+    Interface,
 )
 from datalad.interface.results import (
     get_status_dict,
@@ -28,14 +28,14 @@ from datalad.interface.results import (
 from datalad.interface.utils import eval_results
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
     EnsureNone,
     EnsureStr,
-    EnsureBool,
-    EnsureChoice
 )
 from datalad.distribution.dataset import (
-    EnsureDataset,
     datasetmethod,
+    EnsureDataset,
     require_dataset,
 )
 from datalad.utils import (
