@@ -80,10 +80,10 @@ class IOBase(object):
     def mkdir(self, path):
         raise NotImplementedError
 
-    def put(self, src, dst):
+    def put(self, src, dst, progress_cb):
         raise NotImplementedError
 
-    def get(self, src, dst):
+    def get(self, src, dst, progress_cb):
         raise NotImplementedError
 
     def rename(self, src, dst):
@@ -95,7 +95,7 @@ class IOBase(object):
     def exists(self, path):
         raise NotImplementedError
 
-    def get_from_archive(self, archive, src, dst):
+    def get_from_archive(self, archive, src, dst, progress_cb):
         """Get a file from an archive
 
         Parameters
@@ -157,19 +157,19 @@ class LocalIO(IOBase):
             exist_ok=True,
         )
 
-    def put(self, src, dst):
+    def put(self, src, dst, progress_cb):
         shutil.copy(
             str(src),
             str(dst),
         )
 
-    def get(self, src, dst):
+    def get(self, src, dst, progress_cb):
         shutil.copy(
             str(src),
             str(dst),
         )
 
-    def get_from_archive(self, archive, src, dst):
+    def get_from_archive(self, archive, src, dst, progress_cb):
         # this requires python 3.5
         with open(dst, 'wb') as target_file:
             subprocess.run([
@@ -356,10 +356,10 @@ class SSHRemoteIO(IOBase):
     def mkdir(self, path):
         self._run('mkdir -p {}'.format(sh_quote(str(path))))
 
-    def put(self, src, dst):
+    def put(self, src, dst, progress_cb):
         self.ssh.put(str(src), str(dst))
 
-    def get(self, src, dst):
+    def get(self, src, dst, progress_cb):
 
         # Note, that as we are in blocking mode, we can't easily fail on the actual get (that is 'cat').
         # Therefore check beforehand.
@@ -399,6 +399,7 @@ class SSHRemoteIO(IOBase):
                 if c:
                     bytes_received += len(c)
                     target_file.write(c)
+                    progress_cb(bytes_received)
 
     def rename(self, src, dst):
         self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
@@ -433,7 +434,7 @@ class SSHRemoteIO(IOBase):
 
         return loc in out
 
-    def get_from_archive(self, archive, src, dst):
+    def get_from_archive(self, archive, src, dst, progress_cb):
 
         # Note, that as we are in blocking mode, we can't easily fail on the actual get (that is 'cat').
         # Therefore check beforehand.
@@ -462,6 +463,7 @@ class SSHRemoteIO(IOBase):
                 if c:
                     bytes_received += len(c)
                     target_file.write(c)
+                    progress_cb(bytes_received)
 
     def read_file(self, file_path):
 
@@ -817,7 +819,7 @@ class RIARemote(SpecialRemote):
             # at least tell the conclusion, not just some obscure permission error
             raise RIARemoteError('{}: upload already in progress'.format(filename))
         try:
-            self.io.put(filename, tmp_path)
+            self.io.put(filename, tmp_path, self.annex.progress)
             # copy done, atomic rename to actual target
             self.io.rename(tmp_path, key_path)
         except Exception as e:
@@ -833,11 +835,12 @@ class RIARemote(SpecialRemote):
         # we can either repeat the checks, or just make two opportunistic
         # attempts (at most)
         try:
-            self.io.get(abs_key_path, filename)
+            self.io.get(abs_key_path, filename, self.annex.progress)
         except Exception as e1:
             # catch anything and keep it around for a potential re-raise
             try:
-                self.io.get_from_archive(archive_path, key_path, filename)
+                self.io.get_from_archive(archive_path, key_path, filename,
+                                         self.annex.progress)
             except Exception as e2:
                 raise RIARemoteError('Failed to key: {}'.format([str(e1), str(e2)]))
 
