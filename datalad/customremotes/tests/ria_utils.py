@@ -50,6 +50,9 @@ def initexternalremote(repo, name, type, encryption=None, config=None):
 
 
 def setup_archive_remote(repo, archive_path):
+
+    # for integration in a URL, we need POSIX version of the path
+    archive_path = Path(archive_path).as_posix()
     if 'RIA_TESTS_SSH' in os.environ:
         cfg = {'url': 'ria+ssh://datalad-test{}'.format(archive_path)}
     else:
