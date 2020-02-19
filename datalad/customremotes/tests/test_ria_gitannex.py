@@ -4,10 +4,12 @@ from datalad.api import (
 from datalad.tests.utils import with_tempfile
 
 from datalad.utils import Path
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import (
+    skip_if_on_windows,
+    skip_ssh,
+)
 from datalad.customremotes.tests.ria_utils import (
     initexternalremote,
-    skip_ssh,
     skip_non_ssh,
 )
 
