@@ -1099,50 +1099,6 @@ def test_GitRepo_count_objects(repo_path):
     eq_(empty_count, repo.count_objects)
 
 
-@with_tempfile
-def test_get_missing(path):
-    repo = GitRepo(path, create=True)
-    os.makedirs(op.join(path, 'deep'))
-    with open(op.join(path, 'test1'), 'w') as f:
-        f.write('some')
-    with open(op.join(path, 'deep', 'test2'), 'w') as f:
-        f.write('some more')
-    # no files tracked yet, so nothing changed
-    eq_(repo.get_changed_files(), [])
-    repo.add('.')
-    # still no differences between worktree and staged
-    eq_(repo.get_changed_files(), [])
-    eq_(set(repo.get_changed_files(staged=True)),
-        {'test1', op.join('deep', 'test2')})
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD')),
-        {'test1', op.join('deep', 'test2')})
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['test1'])),
-        {'test1'})
-    # providing 'files' pointing to subdirectory lists files within
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['deep'])),
-        {op.join('deep', 'test2')})
-    # empty list should cause no files being reported in either scenario
-    eq_(repo.get_changed_files(staged=True, files=[]), [])
-    eq_(repo.get_changed_files(staged=False, files=[]), [])
-    eq_(repo.get_changed_files(staged=True, diff_filter='D'), [])
-    repo.commit()
-    eq_(repo.get_changed_files(), [])
-    eq_(repo.get_changed_files(staged=True), [])
-    ok_clean_git(path, annex=False)
-    unlink(op.join(path, 'test1'))
-    eq_(repo.get_missing_files(), ['test1'])
-    rmtree(op.join(path, 'deep'))
-    eq_(sorted(repo.get_missing_files()), [op.join('deep', 'test2'), 'test1'])
-    # nothing is actually known to be deleted
-    eq_(repo.get_deleted_files(), [])
-    # do proper removal
-    repo.remove(op.join(path, 'test1'))
-    # no longer missing
-    eq_(repo.get_missing_files(), [op.join('deep', 'test2')])
-    # but deleted
-    eq_(repo.get_deleted_files(), ['test1'])
-
-
 # this is simply broken on win, but less important
 # https://github.com/datalad/datalad/issues/3639
 @skip_if_on_windows

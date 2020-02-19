@@ -3308,14 +3308,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if f
         ]
 
-    def get_missing_files(self):
-        """Return a list of paths with missing files (and no staged deletion)"""
-        return self.get_changed_files(diff_filter='D')
-
-    def get_deleted_files(self):
-        """Return a list of paths with deleted files (staged deletion)"""
-        return self.get_changed_files(staged=True, diff_filter='D')
-
     def get_git_attributes(self):
         """Query gitattributes which apply to top level directory
 

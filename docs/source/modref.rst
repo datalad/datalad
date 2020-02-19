@@ -24,7 +24,6 @@ Dataset operations
    :toctree: generated
 
    api.Dataset
-   api.add
    api.create
    api.create_sibling
    api.create_sibling_github

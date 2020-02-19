@@ -138,7 +138,7 @@ echo "datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz" > code/g
 #%
 
 # add all content in the code/ directory directly to git
-datalad add --to-git code
+datalad save --to-git code
 
 #%
 # At this point, datalad is aware of all changes that were made to the dataset
@@ -155,12 +155,7 @@ bash code/run_analysis.sh
 # and add generated results to the dataset and provide a custom message to
 # better describe accomplished work:
 #%
-datalad add  -m "First analysis results" result.txt
-
-#%
-# You could also use ``--nosave`` option with add, and invoke ``datalad save``
-# later on to group multiple changes into a single commit.
-#%
+datalad save  -m "First analysis results" result.txt
 
 # git log
 
