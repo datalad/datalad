@@ -96,23 +96,25 @@ class CreateSiblingRia(Interface):
     ----
     Where to put the description of a RIA store (see below)?
 
-    The targeted layout of such a store is a tree of datasets, starting at the
-    configured base path. First level of subdirectories are named for the first
-    three characters of the datasets' id, second level is the remainder of
-    those ids. The thereby created dataset directories contain a bare git
-    repository. Those bare repositories are slightly different from plain
-    git-annex bare repositories in that they use the standard dirhashmixed
-    layout beneath annex/objects as opposed to dirhashlower, which is
-    git-annex's default for bare repositories. Furthermore, there is an
-    additional directory 'archives' within the dataset directories, which may
-    or may not contain archives with annexed content.  Note, that this helps to
-    reduce the number of inodes consumed (no checkout + potential archive) as
-    well as it allows to resolve dependencies (that is (sub)datasets) merely by
-    their id.  Finally, there is a file "ria-layout-version" put beneath the
-    store's base path, determining the version of the dataset tree layout and a
-    file of the same name per each dataset directory determining object tree
-    layout version (we already switch from dirhashlower to dirhashmixed for
-    example) and an additional directory "error_logs" at the toplevel.  """
+    The targeted layout of such a store is a tree of directories containing
+    datasets at the lowest level, starting at the configured base path.
+    First level of subdirectories are named for the first three characters of
+    the datasets' id, second level is the remainder of those ids.
+    The thereby created dataset directories contain a bare git repository.
+    Those bare repositories are slightly different from plain git-annex bare
+    repositories in that they use the standard dirhashmixed layout beneath
+    annex/objects as opposed to dirhashlower, which is git-annex's default for
+    bare repositories. Furthermore, there is an additional directory 'archives'
+    within the dataset directories, which may or may not contain archives with
+    annexed content.
+    Note, that this helps to reduce the number of inodes consumed (no checkout
+    + potential archive) as well as it allows to resolve dependencies (that is
+    (sub)datasets) merely by their id.  Finally, there is a file
+    "ria-layout-version" put beneath the store's base path, determining the
+    version of the dataset tree layout and a file of the same name per each
+    dataset directory determining object tree layout version (we already switch
+    from dirhashlower to dirhashmixed for example) and an additional directory
+    "error_logs" at the toplevel."""
 
     # TODO: description?
     _params_ = dict(
@@ -165,12 +167,12 @@ class CreateSiblingRia(Interface):
         ria_remote=Parameter(
             args=("--no-ria-remote",),
             dest='ria_remote',
-            doc="""Whether to establish remote indexed archive (RIA) capabilties
-            for the created sibling. If enabled, git-annex special remote access
-            will be configured to enable regular git-annex key storage, and
-            also retrieval of keys from (compressed) 7z archives that might be
-            provided by the dataset store. If disabled, git-annex is instructed
-            to ignore the sibling.""",
+            doc="""Flag to disable establishing remote indexed archive (RIA)
+            capabilities for the created sibling. If enabled, git-annex special
+            remote access will be configured to enable regular git-annex key
+            storage, and also retrieval of keys from (compressed) 7z archives
+            that might be provided by the dataset store. If disabled, git-annex
+            is instructed to ignore the sibling.""",
             action="store_false"),
         existing=Parameter(
             args=("--existing",),
