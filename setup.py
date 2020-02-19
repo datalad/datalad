@@ -36,6 +36,7 @@ requires = {
         'patool>=1.7',
         'tqdm',
         'wrapt',
+        'annexremote',
     ],
     'downloaders': [
         'boto',
@@ -129,6 +130,7 @@ setup_kwargs = setup_entry_points(
         'datalad': 'datalad.cmdline.main',
         'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
+        'git-annex-remote-ria': 'datalad.customremotes.ria_remote',
     })
 
 # normal entrypoints for the rest
