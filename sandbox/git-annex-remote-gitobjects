@@ -37,7 +37,7 @@ setconfig () {
 
 # Sets ref to the reference to use to store a key.
 calcref () {
-	ref="refs/gitobjects/$1"
+	ref="refs/annex-gitobjects/$1"
 }
 
 calcobjfile () {
