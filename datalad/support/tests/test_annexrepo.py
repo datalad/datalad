@@ -2133,9 +2133,7 @@ def check_commit_annex_commit_changed(unlock, path):
     unannex = False
 
     ar = AnnexRepo(path, create=True)
-    ar.add('.gitattributes')
-    ar.add('.')
-    ar.commit("initial commit")
+    ar.save("initial commit")
     ok_clean_git(path)
     # Now let's change all but commit only some
     files = [op.basename(p) for p in glob(op.join(path, '*'))]
@@ -2162,7 +2160,7 @@ def check_commit_annex_commit_changed(unlock, path):
           ['alwaysbig', 'tobechanged-annex', 'untracked', 'willgetshort']
     )
 
-    ar.commit("message", files=['alwaysbig', 'willgetshort'])
+    ar.save("message", paths=['alwaysbig', 'willgetshort'])
     ok_clean_git(
         path
         , index_modified=['tobechanged-git', 'tobechanged-annex']
@@ -2174,7 +2172,7 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'willgetshort',
                       annexed=external_versions['cmd:annex']<'7.20191009')
 
-    ar.commit("message2", options=['-a']) # commit all changed
+    ar.save("message2", untracked='no') # commit all changed
     ok_clean_git(
         path
         , untracked=['untracked']
