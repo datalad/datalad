@@ -49,7 +49,6 @@ from weakref import WeakValueDictionary
 import git as gitpy
 from gitdb.exc import BadName
 from git.exc import (
-    GitCommandError,
     NoSuchPathError,
     InvalidGitRepositoryError
 )
@@ -1172,13 +1171,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # fail early on non-empty target:
         from os import listdir
         if exists(path) and listdir(path):
-            # simulate actual GitCommandError:
-            lgr.warning("destination path '%s' already exists and is not an "
-                        "empty directory." % path)
-            raise GitCommandError(
-                ['git', 'clone', '-v', url, path],
-                128,
-                "fatal: destination path '%s' already exists and is not an "
+            raise ValueError(
+                "destination path '%s' already exists and is not an "
                 "empty directory." % path)
         else:
             # protect against cloning into existing and obviously dangling
