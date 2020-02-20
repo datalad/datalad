@@ -5,9 +5,22 @@
 # using regular git objects and refs to store content of files in remote
 # git objects store.
 #
+# Pros:
+#  - could work with any git repository hosting, even the one which does
+#    not support annex
 #
-# Copyright 2013 Joey Hess; licenced under the GNU GPL version 3 or higher.
-#  tuned for the gitobjects type remote by Yaroslav Halchenko, 2019
+# Cons:
+#  - at this point it is more of a "proof of concept"
+#  - longevity of those references on the remote is not guaranteed
+#  - it is quite slow, so should be used for relatively small load
+#
+# Discussion and possibly more ways it could be improved are available
+# from https://github.com/datalad/datalad/pull/3727
+#
+# Based on an example of git annex special remote, which is
+#  Copyright 2013 Joey Hess; licenced under the GNU GPL version 3 or higher.
+# Tuned for the gitobjects type remote by Yaroslav Halchenko, 2019-2020
+#
 
 set -e
 
