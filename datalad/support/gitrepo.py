@@ -3269,48 +3269,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
-                          files=None):
-        """Return files that have changed between the index and working tree.
-
-        Parameters
-        ----------
-        staged: bool, optional
-          Consider changes between HEAD and the index instead of changes
-          between the index and the working tree.
-        diff_filter: str, optional
-          Any value accepted by the `--diff-filter` option of `git diff`.
-          Common ones include "A", "D", "M" for add, deleted, and modified
-          files, respectively.
-        index_file: str, optional
-          Alternative index file for git to use
-        """
-        opts = ['--name-only', '-z']
-        kwargs = {}
-        if staged:
-            opts.append('--staged')
-        if diff_filter:
-            opts.append('--diff-filter=%s' % diff_filter)
-        if index_file:
-            kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        if files is not None:
-            opts.append('--')
-            # might be too many, need to chunk up
-            optss = (
-                opts + file_chunk
-                for file_chunk in generate_file_chunks(files, ['git', 'diff'] + opts)
-            )
-        else:
-            optss = [opts]
-        return [
-            normpath(f)  # Call normpath to convert separators on Windows.
-            for f in chain(
-                *(self.repo.git.diff(*opts, **kwargs).split('\0')
-                for opts in optss)
-            )
-            if f
-        ]
-
     def get_git_attributes(self):
         """Query gitattributes which apply to top level directory
 
