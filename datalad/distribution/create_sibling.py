@@ -14,44 +14,77 @@ __docformat__ = 'restructuredtext'
 from distutils.version import LooseVersion
 from glob import glob
 import logging
-from os.path import join as opj, relpath, normpath, dirname, curdir
+import os
+from os.path import (
+    curdir,
+    dirname,
+    join as opj,
+    normpath,
+    relpath,
+)
 
 import datalad
 from datalad import ssh_manager
+
+from datalad.ui import ui
+
 from datalad.cmd import CommandError
-from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
-from datalad.consts import TIMESTAMP_FMT
+from datalad.consts import (
+    TIMESTAMP_FMT,
+    WEB_HTML_DIR,
+    WEB_META_LOG
+)
 from datalad.dochelpers import exc_str
-from datalad.distribution.siblings import Siblings
-from datalad.distribution.siblings import _DelayedSuper
-from datalad.distribution.dataset import EnsureDataset, Dataset, \
-    datasetmethod, require_dataset
+from datalad.distribution.siblings import (
+    _DelayedSuper,
+    Siblings,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
 from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    Interface,
+)
 from datalad.interface.utils import eval_results
-from datalad.interface.common_opts import recursion_limit, recursion_flag
-from datalad.interface.common_opts import as_common_datasrc
-from datalad.interface.common_opts import publish_by_default
-from datalad.interface.common_opts import publish_depends
-from datalad.interface.common_opts import inherit_opt
-from datalad.interface.common_opts import annex_wanted_opt
-from datalad.interface.common_opts import annex_group_opt
-from datalad.interface.common_opts import annex_groupwanted_opt
+from datalad.interface.common_opts import (
+    annex_group_opt,
+    annex_groupwanted_opt,
+    annex_wanted_opt,
+    as_common_datasrc,
+    inherit_opt,
+    publish_by_default,
+    publish_depends,
+    recursion_flag,
+    recursion_limit,
+)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
-from datalad.support.constraints import EnsureChoice
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.network import RI
-from datalad.support.network import is_ssh
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    MissingExternalDependency,
+)
+from datalad.support.network import (
+    is_ssh,
+    RI,
+)
 from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
-from datalad.utils import make_tempfile
-from datalad.utils import _path_
-from datalad.utils import slash_join
-from datalad.utils import assure_list
-
+from datalad.utils import (
+    make_tempfile,
+    _path_,
+    slash_join,
+    assure_list,
+)
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
@@ -120,23 +153,16 @@ def _create_dataset_sibling(
     if remoteds_path != '.':
         # check if target exists
         # TODO: Is this condition valid for != '.' only?
-        path_exists = True
-        try:
-            out, err = ssh("ls {}".format(sh_quote(remoteds_path)))
-        except CommandError as e:
-            if "No such file or directory" in e.stderr and \
-                    remoteds_path in e.stderr:
-                path_exists = False
-            else:
-                raise  # It's an unexpected failure here
+        path_children = _ls_remote_path(ssh, remoteds_path)
+        path_exists = path_children is not None
 
         if path_exists:
             _msg = "Target path %s already exists." % remoteds_path
-            # path might be existing but be an empty directory, which should be
-            # ok to remove
+        if path_exists and not path_children:
+            # path should be an empty directory, which should be ok to remove
             try:
                 lgr.debug(
-                    "Trying to rmdir %s on remote since might be an empty dir",
+                    "Trying to rmdir %s on remote since seems to be an empty dir",
                     remoteds_path
                 )
                 # should be safe since should not remove anything unless an empty dir
@@ -163,6 +189,28 @@ def _create_dataset_sibling(
                 lgr.info(_msg + " Skipping")
                 return
             elif existing == 'replace':
+                remove = False
+                if path_children:
+                    has_git = '.git' in path_children
+                    _msg_stats = _msg \
+                                 + " It is %sa git repository and has %d files/dirs." % (
+                                     "" if has_git else "not ", len(path_children)
+                                 )
+                    if ui.is_interactive:
+                        remove = ui.yesno(
+                            "Do you really want to remove it?",
+                            title=_msg_stats,
+                            default=False
+                        )
+                    else:
+                        raise RuntimeError(
+                            _msg_stats +
+                            " Remove it manually first or rerun datalad in "
+                            "interactive shell to confirm this action.")
+                if not remove:
+                    raise RuntimeError(_msg)
+                # Remote location might already contain a git repository or be
+                # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
                 ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
@@ -287,6 +335,26 @@ def _create_dataset_sibling(
     return remoteds_path
 
 
+def _ls_remote_path(ssh, path):
+    try:
+        # yoh tried ls on mac
+        out, err = ssh("ls -A1 {}".format(sh_quote(path)))
+        if err:
+            # we might even want to raise an exception, but since it was
+            # not raised, let's just log a warning
+            lgr.warning(
+                "There was some output to stderr while running ls on %s via ssh: %s",
+                path, err
+            )
+    except CommandError as e:
+        if "No such file or directory" in e.stderr and \
+                path in e.stderr:
+            return None
+        else:
+            raise  # It's an unexpected failure here
+    return [l for l in out.split(os.linesep) if l]
+
+
 @build_doc
 class CreateSibling(Interface):
     """Create a dataset sibling on a UNIX-like SSH-accessible machine
@@ -379,14 +447,20 @@ class CreateSibling(Interface):
         recursion_limit=recursion_limit,
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
             metavar='MODE',
             doc="""action to perform, if a sibling is already configured under the
-            given name and/or a target directory already exists.
-            In this case, a dataset can be skipped ('skip'), an existing target
-            directory be forcefully re-initialized, and the sibling (re-)configured
-            ('replace', implies 'reconfigure'), the sibling configuration be updated
-            only ('reconfigure'), or to error ('error').""",),
+            given name and/or a target (non-empty) directory already exists.
+            In this case, a dataset can be skipped ('skip'), the sibling
+            configuration be updated ('reconfigure'), or process interrupts with
+            error ('error'). DANGER ZONE: If 'replace' is used, an existing target
+            directory will be forcefully removed, re-initialized, and the
+            sibling (re-)configured (thus implies 'reconfigure').
+            `replace` could lead to data loss, so use with care.  To minimize
+            possibility of data loss, in interactive mode DataLad will ask for
+            confirmation, but it would just issue a warning and proceed in
+            non-interactive mode.
+            """,),
         inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
