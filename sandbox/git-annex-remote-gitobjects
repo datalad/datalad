@@ -152,7 +152,9 @@ while read line; do
 		REMOVE)
 			key="$2"
 			calcref "$key"
-			rungitcmd push "$remote" ":$ref"
+			rungitcmd push "$remote" ":$ref" \
+			&& echo "REMOVE-SUCCESS $key" \
+			|| echo "REMOVE-FAILURE $key Who knows why?"
 		;;
 		GETINFO)
 			echo INFOFIELD "remote"
