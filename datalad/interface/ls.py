@@ -505,7 +505,6 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         # workaround for explosion of git cat-file --batch processes
         # https://github.com/datalad/datalad/issues/1888
         if dsm.repo is not None:
-            dsm.repo.repo.close()
             del dsm.repo
             dsm.repo = None
 

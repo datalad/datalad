@@ -101,7 +101,6 @@ from datalad.tests.utils import (
 from datalad.support.exceptions import (
     AnnexBatchCommandError,
     CommandError,
-    CommandNotAvailableError,
     FileInGitError,
     FileNotInAnnexError,
     FileNotInRepositoryError,
@@ -112,7 +111,6 @@ from datalad.support.exceptions import (
     OutOfSpaceError,
     RemoteNotAvailableError,
 )
-from datalad.support.external_versions import external_versions
 
 from datalad.support.gitrepo import GitRepo
 
@@ -123,8 +121,6 @@ from datalad.support.annexrepo import (
     AnnexJsonProtocol,
     ProcessAnnexProgressIndicators,
 )
-from .utils import check_repo_deals_with_inode_change
-
 
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
@@ -2024,13 +2020,6 @@ def test_AnnexRepo_is_managed_branch(path):
     if ar.supports_unlocked_pointers:
         ar.adjust()
         ok_(ar.is_managed_branch())
-
-
-@with_tempfile(mkdir=True)
-@with_tempfile()
-def test_AnnexRepo_flyweight_monitoring_inode(path, store):
-    # testing for issue #1512
-    check_repo_deals_with_inode_change(AnnexRepo, path, store)
 
 
 @with_tempfile(mkdir=True)

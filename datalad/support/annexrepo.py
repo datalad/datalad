@@ -3039,8 +3039,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           Returns a the annex UUID, if there is any, or `None` otherwise.
         """
         if not self._uuid:
-            if not self.repo:
-                return None
             self._uuid = self.config.get('annex.uuid', default=None)
         return self._uuid
 

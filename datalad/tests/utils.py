@@ -340,7 +340,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     eq_(sorted(r.untracked_files), sorted(untracked))
 
-    repo = r.repo
+    import git
+    repo = git.Repo(r.path)
 
     if repo.index.entries.keys():
         ok_(repo.head.is_valid())

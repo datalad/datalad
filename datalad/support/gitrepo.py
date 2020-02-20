@@ -6,9 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface to Git via GitPython
-
-For further information on GitPython see http://gitpython.readthedocs.org/
+"""Internal low-level interface to Git repositories
 
 """
 
@@ -20,7 +18,6 @@ import warnings
 from locale import getpreferredencoding
 
 
-from itertools import chain
 import logging
 from collections import (
     OrderedDict,
@@ -46,8 +43,6 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-import git as gitpy
-from gitdb.exc import BadName
 from git.exc import (
     NoSuchPathError,
     InvalidGitRepositoryError
@@ -96,7 +91,6 @@ from .exceptions import (
     FileNotInRepositoryError,
     GitIgnoreError,
     InvalidGitReferenceError,
-    MissingBranchError,
     OutdatedExternalDependencyWarning,
     PathKnownToRepositoryError,
 )
@@ -111,29 +105,12 @@ from .repo import (
     RepoInterface
 )
 
-#from git.objects.blob import Blob
-
 # shortcuts
 _curdirsep = curdir + sep
 _pardirsep = pardir + sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
-_lgr_level = lgr.getEffectiveLevel()
-if _lgr_level <= 2:
-    from ..log import LoggerHelper
-    # Let's also enable gitpy etc debugging
-    gitpy_lgr = LoggerHelper(logtarget="git").get_initialized_logger()
-    gitpy_lgr.setLevel(_lgr_level)
-    gitpy_lgr.propagate = True
-
-# Override default GitPython's DB backend to talk directly to git so it doesn't
-# interfere with possible operations performed by gc/repack
-default_git_odbt = gitpy.GitCmdObjectDB
-
-# TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
-# Didn't work as expected on a first try. Probably there is a neatier way to
-# log Exceptions from git commands.
 
 
 def to_options(split_single_char_options=True, **kwargs):
@@ -375,27 +352,6 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
     return newfunc
 
 
-def _remove_empty_items(list_):
-    """Remove empty entries from list
-
-    This is needed, since some functions of GitPython may convert
-    an empty entry to '.', when used with a list of paths.
-
-    Parameter:
-    ----------
-    list_: list of str
-
-    Returns
-    -------
-    list of str
-    """
-    if not isinstance(list_, list):
-        lgr.warning(
-            "_remove_empty_items() called with non-list type: %s" % type(list_))
-        return list_
-    return [file_ for file_ in list_ if file_]
-
-
 if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
     # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
     # into untracked submodules when multiple pathspecs are given, returning
@@ -414,41 +370,6 @@ if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
 else:
     def _prune_deeper_repos(repos):
         return repos
-
-
-def Repo(*args, **kwargs):
-    """Factory method around gitpy.Repo to consistently initiate with different
-    backend
-    """
-    # TODO: This probably doesn't work as intended (or at least not as
-    #       consistently as intended). gitpy.Repo could be instantiated by
-    #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
-    #       would be needed as a parameter to these methods instead of the
-    #       constructor.
-    if 'odbt' not in kwargs:
-        kwargs['odbt'] = default_git_odbt
-    return gitpy.Repo(*args, **kwargs)
-
-
-def guard_BadName(func):
-    """A helper to guard against BadName exception
-
-    Workaround for
-    https://github.com/gitpython-developers/GitPython/issues/768
-    also see https://github.com/datalad/datalad/issues/2550
-    Let's try to precommit (to flush anything flushable) and do
-    it again
-    """
-
-    @wraps(func)
-    def wrapped(repo, *args, **kwargs):
-        try:
-            return func(repo, *args, **kwargs)
-        except BadName:
-            repo.precommit()
-            return func(repo, *args, **kwargs)
-
-    return wrapped
 
 
 class GitProgress(WitlessProtocol):
@@ -928,7 +849,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
         repo: git.Repo, optional
-          GitPython's Repo instance to (re)use if provided
+          This argument is ignored.
         create_sanity_checks: bool, optional
           Whether to perform sanity checks during initialization (when
           `create=True` and target path is not a valid repo already), such as
@@ -1021,9 +942,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # Could be used to e.g. disable automatic garbage and autopacking
         # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         self._GIT_COMMON_OPTIONS = []
-        # actually no need with default GitPython db backend not in memory
-        # default_git_odbt but still allows for faster testing etc.
-        # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
         if git_opts is None:
             git_opts = {}
@@ -1031,18 +949,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             git_opts.update(kwargs)
 
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        self._repo = repo
         self._cfg = None
 
-        if do_create:  # we figured it out ealier
-            self._repo = self._create_empty_repo(path,
-                                                 create_sanity_checks, **git_opts)
-
-        # inject git options into GitPython's git call wrapper:
-        # Note: `None` currently can happen, when Runner's protocol prevents
-        # calls above from being actually executed (DryRunProtocol)
-        if self._repo is not None:
-            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+        if do_create:  # we figured it out earlier
+            self._create_empty_repo(path, create_sanity_checks, **git_opts)
 
         # with DryRunProtocol path might still not exist
         if exists(self.path):
@@ -1106,43 +1016,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
-        # we want to return None and have lazy eval take care of
-        # the rest
-        return
-
-    @property
-    def repo(self):
-        # with DryRunProtocol path not exist
-        if exists(self.path):
-            inode = os.stat(self.path).st_ino
-        else:
-            inode = None
-        if self.inode != inode:
-
-            # TODO: - what if we never had any inode? possible?
-            #       - also: call to self._repo and only afterwards checking whether it's None seems strange
-
-            # reset background processes invoked by GitPython:
-            # it can be that we never got to instantiate a GitPython repo instance
-            if self._repo:
-                self._repo.git.clear_cache()
-            self.inode = inode
-
-        if self._repo is None:
-            # Note, that this may raise GitCommandError, NoSuchPathError,
-            # InvalidGitRepositoryError:
-            self._repo = self.cmd_call_wrapper(
-                Repo,
-                self.path)
-            lgr.log(8, "Using existing Git repository at %s", self.path)
-
-        # inject git options into GitPython's git call wrapper:
-        # Note: `None` currently can happen, when Runner's protocol prevents
-        # call of Repo(path) above from being actually executed (DryRunProtocol)
-        if self._repo is not None:
-            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
-
-        return self._repo
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
@@ -1270,22 +1143,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
         # stalls etc
         self._cfg = None
-        # Make sure to flush pending changes, especially close batch processes
-        # (internal `git cat-file --batch` by GitPython)
-        try:
-            if getattr(self, '_repo', None) is not None and exists(self.path):
-                # gc might be late, so the (temporary)
-                # repo doesn't exist on FS anymore
-                self._repo.git.clear_cache()
-                # We used to write out the index to flush GitPython's
-                # state... but such unconditional write is really a workaround
-                # and does not play nice with read-only operations - permission
-                # denied etc. So disabled 
-                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                #    self.repo.index.write()
-        except (InvalidGitRepositoryError, AttributeError):
-            # might have being removed and no longer valid or attributes unbound
-            pass
 
     def __repr__(self):
         return "<GitRepo path=%s (%s)>" % (self.path, type(self))
@@ -1575,9 +1432,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         [str]
           list of successfully removed files.
         """
-
-        files = _remove_empty_items(files)
-
         if recursive:
             kwargs['r'] = True
         stdout, stderr = self._git_custom_command(
@@ -1586,23 +1440,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # output per removed file is expected to be "rm 'PATH'":
         return [line.strip()[4:-1] for line in stdout.splitlines()]
 
-        #return self.repo.git.rm(files, cached=False, **kwargs)
-
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-        # All GitPython commands should take care about flushing index
-        # whenever they modify it, so we would not care to do anything
-        # if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
-        #     # flush possibly cached in GitPython changes to index:
-        #     # if self.repo.git:
-        #     #     sys.stderr.write("CLEARING\n")
-        #     #     self.repo.git.clear_cache()
-        #     self.repo.index.write()
-
-        # Close batched by GitPython git processes etc
-        # Ref: https://github.com/gitpython-developers/GitPython/issues/718
-        self.repo.__del__()
+        # we used to clean up GitPython here
         pass
 
     @staticmethod
@@ -2119,11 +1960,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         remotes : list of str
           List of names of the remotes
         """
-
-        # Note: read directly from config and spare instantiation of gitpy.Repo
-        # since we need this in AnnexRepo constructor. Furthermore gitpy does it
-        # pretty much the same way and the use of a Repo instance seems to have
-        # no reason other than a nice object oriented look.
         from datalad.utils import unique
 
         self.config.reload()
@@ -2170,9 +2006,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             updates_tree=False):
         """Allows for calling arbitrary commands.
 
-        Helper for developing purposes, i.e. to quickly implement git commands
-        for proof of concept without the need to figure out, how this is done
-        via GitPython.
+        The method should be avoided and the call_git*() should be used instead.
 
         Parameters
         ----------
@@ -2435,7 +2269,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             )
         )
 
-    @guard_BadName
     def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `fetch`, but returns a generator"""
         yield from self._fetch_push_helper(
@@ -2966,14 +2799,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if name is None:
             name = Path(path).as_posix()
-        # XXX the following should do it, but GitPython will refuse to add a submodule
-        # unless you specify a URL that is configured as one of its remotes, or you
-        # specify no URL, but the repo has at least one remote.
-        # this is stupid, as for us it is valid to not have any remote, because we can
-        # still obtain the submodule from a future publication location, based on the
-        # parent
-        # gitpy.Submodule.add(self.repo, name, path, url=url, branch=branch)
-        # going git native instead
         cmd = ['submodule', 'add', '--name', name]
         if branch is not None:
             cmd += ['-b', branch]
