@@ -330,7 +330,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # changes
     if not diff and is_annex_repo:
         try:
-            git_annex_commit = next(ds.repo.get_branch_commits('git-annex'))
+            git_annex_commit = next(ds.repo.get_branch_commits_('git-annex'))
         except StopIteration:
             git_annex_commit = None
         #diff = _get_remote_diff(ds, [], git_annex_commit, remote, 'git-annex')
@@ -547,7 +547,7 @@ def _get_remote_diff(ds, current_commit, remote, remote_branch_name):
         lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
                   remote_branch_name, remote)
         if current_commit is None:
-            current_commit = ds.repo.repo.commit()
+            current_commit = ds.repo.get_hexsha()
         remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
         # XXX: ATM nothing calls this function with a non-empty `paths` arg
         #if paths:
@@ -560,7 +560,7 @@ def _get_remote_diff(ds, current_commit, remote, remote_branch_name):
         #else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
-        diff = current_commit != remote_ref.commit
+        diff = current_commit != remote_ref.commit.hexsha
     else:
         lgr.debug("Remote '%s' has no branch matching %r. Will publish",
                   remote, remote_branch_name)
