@@ -943,24 +943,6 @@ def _get_resolved_flavors(flavors):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
 
-def _get_repo_url(path):
-    """Return ultimate URL for this repo"""
-
-    if path.startswith('http') or path.startswith('git'):
-        # We were given a URL, so let's just return it
-        return path
-
-    if not exists(opj(path, '.git')):
-        # do the dummiest check so we know it is not git.Repo's fault
-        raise AssertionError("Path %s does not point to a git repository "
-                             "-- missing .git" % path)
-    repo = git.Repo(path)
-    if len(repo.remotes) == 1:
-        remote = repo.remotes[0]
-    else:
-        remote = repo.remotes.origin
-    return remote.config_reader.get('url')
-
 
 def clone_url(url):
     # delay import of our code until needed for certain
