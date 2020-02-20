@@ -1059,11 +1059,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         True if in direct mode, False otherwise.
         """
-        # TEMP: Disable lazy loading and make sure to read from file every time
-        # instead, since we might have several instances pointing to the very
-        # same repo atm. TODO: We can remove that, right?
-        self.repo.config_reader()._is_initialized = False
-        self.repo.config_reader().read()
         self._direct_mode = None
 
         if self._direct_mode is None:

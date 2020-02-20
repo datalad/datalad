@@ -168,17 +168,13 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     ar = AnnexRepo.clone(src, dst)
 
     # fake git-annex entries in .git/config:
-    writer = ar.repo.config_writer()
-    writer.set_value("annex", "crippledfilesystem", True)
-    writer.release()
+    ar.config.set("annex.crippledfilesystem", 'true')
     ok_(ar.is_crippled_fs())
-    writer.set_value("annex", "crippledfilesystem", False)
-    writer.release()
+    ar.config.set("annex.crippledfilesystem", 'false')
     assert_false(ar.is_crippled_fs())
     # since we can't remove the entry, just rename it to fake its absence:
-    writer.rename_section("annex", "removed")
-    writer.set_value("annex", "something", "value")
-    writer.release()
+    ar.config.rename_section("annex", "removed")
+    ar.config.set("annex.something", "value")
     assert_false(ar.is_crippled_fs())
 
 
@@ -1252,7 +1248,7 @@ def test_annex_remove(path1, path2):
 def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
-    version = annex.repo.config_reader().get_value('annex', 'version')
+    version = int(annex.config.get('annex.version'))
     # Since git-annex 7.20181031, v6 repos upgrade to v7.
     supported_versions = AnnexRepo.check_repository_versions()["supported"]
     v6_lands_on = next(i for i in supported_versions if i >= 6)
@@ -1261,14 +1257,14 @@ def test_repo_version(path1, path2, path3):
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
-        version = annex.repo.config_reader().get_value('annex', 'version')
+        version = int(annex.config.get('annex.version'))
         eq_(version, v6_lands_on)
 
         # Assuming specified version is a supported version...
         if 5 in supported_versions:
             # ...parameter `version` still has priority over default config:
             annex = AnnexRepo(path3, create=True, version=5)
-            version = annex.repo.config_reader().get_value('annex', 'version')
+            version = int(annex.config.get('annex.version'))
             eq_(version, 5)
 
 
