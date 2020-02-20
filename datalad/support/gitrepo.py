@@ -1977,18 +1977,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             commitishes = commitishes + [self.get_active_branch()]
 
         try:
-            bases = self.call_git_oneline(['merge-base'] + commitishes)
+            base = self.call_git_oneline(['merge-base'] + commitishes)
         except CommandError as exc:
-            if "fatal: Not a valid object name" not in exc.stderr and (
-                    exc.stdout or exc.stderr):
-                # we don't know what this is, and we have something to tell about it
-                # then log it. Without output, it could also just be "no merge base"
-                lgr.debug(exc_str(exc))
-            return None
+            if exc.code == 1 and not (exc.stdout or exc.stderr):
+                # No merge base was found (unrelated commits).
+                return None
+            if "fatal: Not a valid object name" in exc.stderr:
+                return None
+            raise
 
-        if not bases:
-            return None
-        return bases
+        return base
 
     def is_ancestor(self, reva, revb):
         """Is `reva` an ancestor of `revb`?
