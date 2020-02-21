@@ -3511,7 +3511,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # we don't want it to scream on stdout
                 expect_fail=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in str(exc):
+            if "fatal: Not a valid object name" in exc.stderr:
                 raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
