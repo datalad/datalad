@@ -168,13 +168,19 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     ar = AnnexRepo.clone(src, dst)
 
     # fake git-annex entries in .git/config:
-    ar.config.set("annex.crippledfilesystem", 'true')
+    ar.config.set(
+        "annex.crippledfilesystem",
+        'true',
+        where='local')
     ok_(ar.is_crippled_fs())
-    ar.config.set("annex.crippledfilesystem", 'false')
+    ar.config.set(
+        "annex.crippledfilesystem",
+        'false',
+        where='local')
     assert_false(ar.is_crippled_fs())
     # since we can't remove the entry, just rename it to fake its absence:
-    ar.config.rename_section("annex", "removed")
-    ar.config.set("annex.something", "value")
+    ar.config.rename_section("annex", "removed", where='local')
+    ar.config.set("annex.something", "value", where='local')
     assert_false(ar.is_crippled_fs())
 
 
