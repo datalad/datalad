@@ -154,9 +154,7 @@ def test_GitRepo_instance_from_not_existing(path, path2):
 def test_GitRepo_init_options(path):
     # passing an option, not explicitly defined in GitRepo class:
     gr = GitRepo(path, create=True, bare=True)
-
-    cfg = gr.repo.config_reader()
-    ok_(cfg.get_value(section="core", option="bare"))
+    ok_(gr.config.getbool(section="core", option="bare"))
 
 
 @skip_if(external_versions['cmd:git'] < '2.14.0')

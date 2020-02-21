@@ -198,11 +198,10 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     eq_(src_is_annex, AnnexRepo.is_valid_repo(target_path))
     # And target one should be known to have a known UUID within the source if annex
     if src_is_annex:
-        annex = AnnexRepo(src_path)
-        local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
+        lclcfg = AnnexRepo(src_path).config
         # basic config in place
-        eq_(local_target_cfg('annex-ignore'), 'false')
-        ok_(local_target_cfg('annex-uuid'))
+        eq_(lclcfg.get('remote.local_target.annex-ignore'), 'false')
+        ok_(lclcfg.get('remote.local_target.annex-uuid'))
 
     # do it again without force, but use a different name to avoid initial checks
     # for existing remotes:
@@ -251,12 +250,12 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         assert_false(exists(opj(target_path, 'random')))
 
         if src_is_annex:
-            annex = AnnexRepo(src_path)
-            local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
-            eq_(local_target_cfg('annex-ignore'), 'false')
-            eq_(local_target_cfg('annex-uuid').count('-'), 4)  # valid uuid
+            lclcfg = AnnexRepo(src_path).config
+            eq_(lclcfg.get('remote.local_target.annex-ignore'), 'false')
+            # valid uuid
+            eq_(lclcfg.get('remote.local_target.annex-uuid').count('-'), 4)
             # should be added too, even if URL matches prior state
-            eq_(local_target_cfg('push'), 'master')
+            eq_(lclcfg.get('remote.local_target.push'), 'master')
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
