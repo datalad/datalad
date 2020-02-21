@@ -29,15 +29,17 @@ from datalad.support.constraints import Constraint
 # DueCredit
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import (
+    InvalidAnnexRepositoryError,
+    InvalidGitRepositoryError,
+    NoDatasetArgumentFound,
+    NoSuchPathError,
+)
 from datalad.support.gitrepo import (
     GitRepo,
-    InvalidGitRepositoryError,
-    NoSuchPathError
 )
 from datalad.support.repo import PathBasedFlyweight
 from datalad.support.network import RI
-from datalad.support.exceptions import InvalidAnnexRepositoryError
 from datalad.support import path as op
 
 import datalad.utils as ut

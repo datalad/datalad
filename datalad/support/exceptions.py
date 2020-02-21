@@ -223,6 +223,14 @@ class PathKnownToRepositoryError(Exception):
     pass
 
 
+class GitError(Exception):
+    """ Base class for all package exceptions """
+
+
+class NoSuchPathError(GitError, OSError):
+    """ Thrown if a path could not be access by the system. """
+
+
 class MissingBranchError(Exception):
     """Thrown if accessing a repository's branch, that is not available"""
 
@@ -310,6 +318,10 @@ class InvalidInstanceRequestError(RuntimeError):
         super(InvalidInstanceRequestError, self).__init__(msg)
         self.id = id_
         self.msg = msg
+
+
+class InvalidGitRepositoryError(GitError):
+    """ Thrown if the given repository appears to have an invalid format.  """
 
 
 class InvalidAnnexRepositoryError(RuntimeError):

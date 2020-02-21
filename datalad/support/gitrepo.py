@@ -43,10 +43,6 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-from git.exc import (
-    NoSuchPathError,
-    InvalidGitRepositoryError
-)
 from datalad.log import log_progress
 from datalad.support.due import due, Doi
 
@@ -91,6 +87,8 @@ from .exceptions import (
     FileNotInRepositoryError,
     GitIgnoreError,
     InvalidGitReferenceError,
+    InvalidGitRepositoryError,
+    NoSuchPathError,
     OutdatedExternalDependencyWarning,
     PathKnownToRepositoryError,
 )

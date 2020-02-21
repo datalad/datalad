@@ -60,16 +60,16 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.support.gitrepo import (
     _normalize_path,
     GitRepo,
-    InvalidGitRepositoryError,
     normalize_paths,
-    NoSuchPathError,
     to_options,
 )
 from datalad.support.exceptions import (
     CommandError,
     DeprecatedError,
     FileNotInRepositoryError,
+    InvalidGitRepositoryError,
     PathKnownToRepositoryError,
+    NoSuchPathError,
 )
 from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
