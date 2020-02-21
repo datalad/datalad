@@ -1160,6 +1160,7 @@ def test_optimized_cloning(path):
 @with_tempfile
 @with_tempfile
 def test_GitRepo_gitpy_injection(path, path2):
+    from git import GitCommandError
 
     gr = GitRepo(path, create=True)
     gr._GIT_COMMON_OPTIONS.extend(['test-option'])
