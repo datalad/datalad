@@ -25,7 +25,6 @@ _group_dataset = (
         ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
-        ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
         ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
@@ -42,6 +41,9 @@ _group_dataset = (
         ('datalad.distributed.create_sibling_gitlab',
          'CreateSiblingGitlab',
          'create-sibling-gitlab'),
+        ('datalad.distributed.create_sibling_ria',
+         'CreateSiblingRia',
+         'create-sibling-ria'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.core.local.save', 'Save', 'save'),
     ])
@@ -91,6 +93,7 @@ _group_plumbing = (
 
 # Some known extensions and their commands to suggest whenever lookup fails
 _known_extension_commands = {
+    'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
     'datalad-neuroimaging': ('bids2scidata',)
 }

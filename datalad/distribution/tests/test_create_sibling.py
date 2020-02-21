@@ -17,48 +17,49 @@ from os.path import join as opj, exists, basename
 
 from ..dataset import Dataset
 from datalad.api import (
-    publish,
-    install,
     create_sibling,
+    install,
+    publish,
 )
 from datalad.cmd import Runner
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
-    create_tree,
-    eq_,
+    assert_dict_equal,
     assert_false,
-    with_tempfile,
     assert_in,
-    with_testrepos,
-    ok_file_has_content,
-    ok_exists,
-    ok_clean_git,
-    ok_endswith,
+    assert_no_errors_logged,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
-    skip_ssh,
-    assert_dict_equal,
     assert_result_count,
     assert_status,
-    assert_not_equal,
-    assert_no_errors_logged,
+    create_tree,
+    eq_,
     get_mtimes_and_digests,
-    swallow_logs,
     ok_,
+    ok_clean_git,
+    ok_endswith,
+    ok_exists,
+    ok_file_has_content,
     ok_file_under_git,
-    slow,
     skip_if_on_windows,
+    skip_ssh,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
+    with_testsui,
 )
 from datalad.support.exceptions import (
     CommandError,
     InsufficientArgumentsError,
 )
 from datalad.utils import (
+    _path_,
     chpwd,
     on_windows,
-    _path_,
 )
 
 import logging
@@ -212,7 +213,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             sshurl="ssh://localhost",
             target_dir=target_path)
     ok_(str(cm.exception).startswith(
-        "Target path %s already exists. And it fails to rmdir" % target_path))
+        "Target path %s already exists." % target_path))
     if src_is_annex:
         target_description = AnnexRepo(target_path, create=False).get_description()
         assert_not_equal(target_description, None)
@@ -230,14 +231,18 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         # add random file under target_path, to explicitly test existing=replace
         open(opj(target_path, 'random'), 'w').write('123')
 
-        assert_create_sshwebserver(
-            dataset=source,
-            name="local_target",
-            sshurl="ssh://localhost" + target_path,
-            publish_by_default='master',
-            existing='replace',
-            ui=True,
-        )
+        @with_testsui(responses=["yes"])
+        def interactive_assert_create_sshwebserver():
+            assert_create_sshwebserver(
+                dataset=source,
+                name="local_target",
+                sshurl="ssh://localhost" + target_path,
+                publish_by_default='master',
+                existing='replace',
+                ui=True,
+            )
+        interactive_assert_create_sshwebserver()
+
         eq_("ssh://localhost" + urlquote(target_path),
             source.repo.get_remote_url("local_target"))
         ok_(source.repo.get_remote_url("local_target", push=True) is None)
@@ -264,7 +269,12 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_pushurl="ssh://localhost" + target_path,
             ui=True,
         )
-        assert_create_sshwebserver(existing='replace', **cpkwargs)
+
+        @with_testsui(responses=['yes'])
+        def interactive_assert_create_sshwebserver():
+            assert_create_sshwebserver(existing='replace', **cpkwargs)
+        interactive_assert_create_sshwebserver()
+
         if src_is_annex:
             target_description = AnnexRepo(target_path,
                                            create=False).get_description()
@@ -512,7 +522,16 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     assert_in('already configured', res[0]['message'][0])
     # "Settings" such as UI do not persist, so we specify it again
     # for the test below depending on it
-    ds.create_sibling(url, existing='replace', ui=True)
+    with assert_raises(RuntimeError):
+        # but we cannot replace in non-interactive mode
+        ds.create_sibling(url, existing='replace', ui=True)
+
+    # We don't have context manager like @with_testsui, so
+    @with_testsui(responses=["yes"])
+    def interactive_create_sibling():
+        ds.create_sibling(url, existing='replace', ui=True)
+    interactive_create_sibling()
+
     published2 = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 
@@ -637,3 +656,28 @@ def test_target_ssh_inherit():
     # Takes too long so one will do with UI and another one without
     yield _test_target_ssh_inherit, 'manual', True  # manual -- no load should be annex copied
     yield _test_target_ssh_inherit, 'backup', False  # backup -- all data files
+
+
+@skip_ssh
+@with_testsui(responses=["no", "yes"])
+@with_tempfile(mkdir=True)
+def test_exists_interactive(path):
+    origin = Dataset(opj(path, "origin")).create()
+    sibling_path = opj(path, "sibling")
+
+    # Initiate sibling directory with "stuff"
+    create_tree(sibling_path, {'stuff': ''})
+
+    # Should fail
+    with assert_raises(RuntimeError):
+        origin.create_sibling('localhost:%s' % sibling_path)
+
+    # Since first response is "no" - we should fail here again:
+    with assert_raises(RuntimeError):
+        origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
+    # and there should be no initiated repository
+    assert not Dataset(sibling_path).is_installed()
+    # But we would succeed on the 2nd try, since answer will be yes
+    origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
+    assert Dataset(sibling_path).is_installed()
+    # And with_testsui should not fail with "Unused responses left"

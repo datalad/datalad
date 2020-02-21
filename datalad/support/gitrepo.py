@@ -63,6 +63,7 @@ from datalad.cmd import (
     GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
+    StdOutErrCapture,
 )
 from datalad.config import (
     ConfigManager,
@@ -136,8 +137,15 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-def to_options(**kwargs):
+def to_options(split_single_char_options=True, **kwargs):
     """Transform keyword arguments into a list of cmdline options
+
+    Imported from GitPython.
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
 
     Parameters
     ----------
@@ -149,9 +157,34 @@ def to_options(**kwargs):
     -------
     list
     """
-    # TODO: borrow_docs!
+    def dashify(string):
+        return string.replace('_', '-')
 
-    return gitpy.Git().transform_kwargs(**kwargs)
+    def transform_kwarg(name, value, split_single_char_options):
+        if len(name) == 1:
+            if value is True:
+                return ["-%s" % name]
+            elif value not in (False, None):
+                if split_single_char_options:
+                    return ["-%s" % name, "%s" % value]
+                else:
+                    return ["-%s%s" % (name, value)]
+        else:
+            if value is True:
+                return ["--%s" % dashify(name)]
+            elif value is not False and value is not None:
+                return ["--%s=%s" % (dashify(name), value)]
+        return []
+
+    args = []
+    kwargs = OrderedDict(sorted(kwargs.items(), key=lambda x: x[0]))
+    for k, v in kwargs.items():
+        if isinstance(v, (list, tuple)):
+            for value in v:
+                args += transform_kwarg(k, value, split_single_char_options)
+        else:
+            args += transform_kwarg(k, v, split_single_char_options)
+    return args
 
 
 def _normalize_path(base_dir, path):
@@ -1739,71 +1772,73 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         self.precommit()
 
-        if _datalad_msg:
-            msg = self._get_prefixed_commit_msg(msg)
-
-        options = options or []
-
-        if not msg:
-            if options:
-                if "--allow-empty-message" not in options:
-                        options.append("--allow-empty-message")
-            else:
-                options = ["--allow-empty-message"]
+        # assemble commandline
+        cmd = ['git', 'commit']
+        options = ensure_list(options)
 
         if date:
             options += ["--date", date]
-        # Note: We used to use a direct call to git only if there were options,
-        # since we can't pass all possible options to gitpython's implementation
-        # of commit.
-        # But there's an additional issue. GitPython implements commit in a way,
-        # that it might create a new commit, when a direct call wouldn't. This
-        # was discovered with a modified (but unstaged) submodule, leading to a
-        # commit, that apparently did nothing - git status still showed the very
-        # same thing afterwards. But a commit was created nevertheless:
-        # diff --git a/sub b/sub
-        # --- a/sub
-        # +++ b/sub
-        # @@ -1 +1 @@
-        # -Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f
-        # +Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f-dirty
-        #
-        # Therefore, for now always use direct call.
-        # TODO: Figure out, what exactly is going on with gitpython here
 
-        cmd = ['git', 'commit'] + (["-m", msg if msg else ""])
-        if options:
-            cmd.extend(options)
+        if not msg:
+            msg = 'Recorded changes'
+            _datalad_msg = True
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
+
+        options += ["-m", msg]
+        cmd.extend(options)
+
+        # set up env for commit
+        env = GitRunner.get_git_environ_adjusted()
+        if self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+        if index_file:
+            env['GIT_INDEX_FILE'] = index_file
+
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
+        file_chunks = generate_file_chunks(files, cmd) if files else [[]]
+
+        runner = WitlessRunner(cwd=self.path, env=env)
+
         try:
-            self._git_custom_command(files, cmd,
-                                     expect_stderr=True, expect_fail=True,
-                                     check_fake_dates=True,
-                                     index_file=index_file)
+            for i, chunk in enumerate(file_chunks):
+                cur_cmd = cmd + (
+                    # if this is an explicit dry-run, there is no point in
+                    # amending, because no commit was ever made
+                    # otherwise, amend the first commit, and prevent
+                    # leaving multiple commits behind
+                    ['--amend', '--no-edit']
+                    if i > 0 and '--dry-run' not in cmd
+                    else []
+                ) + ['--'] + chunk
+                runner.run(
+                    cur_cmd,
+                    protocol=StdOutErrCapture,
+                    stdin=None,
+                )
         except CommandError as e:
-            if 'nothing to commit' in e.stdout:
-                if careless:
-                    lgr.debug(u"nothing to commit in {}. "
-                              "Ignored.".format(self))
-                else:
-                    raise
+            # real errors first
+            if "did not match any file(s) known to git" in e.stderr:
+                raise FileNotInRepositoryError(
+                    cmd=e.cmd,
+                    msg="File(s) unknown to git",
+                    code=e.code,
+                    filename=linesep.join([
+                        l for l in e.stderr.splitlines()
+                        if l.startswith("error: pathspec")
+                    ])
+                )
+            # behavior choices now
+            elif not careless:
+                # not willing to compromise at all
+                raise
+            elif 'nothing to commit' in e.stdout:
+                lgr.debug("nothing to commit in %s. Ignored.", self)
             elif 'no changes added to commit' in e.stdout or \
                     'nothing added to commit' in e.stdout:
-                if careless:
-                    lgr.debug(u"no changes added to commit in {}. "
-                              "Ignored.".format(self))
-                else:
-                    raise
-            elif "did not match any file(s) known to git" in e.stderr:
-                # TODO: Improve FileNotInXXXXError classes to better deal with
-                # multiple files; Also consider PathOutsideRepositoryError
-                raise FileNotInRepositoryError(cmd=e.cmd,
-                                               msg="File(s) unknown to git",
-                                               code=e.code,
-                                               filename=linesep.join(
-                                            [l for l in e.stderr.splitlines()
-                                             if l.startswith("pathspec")]))
+                lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
 
@@ -1974,16 +2009,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             commitishes = commitishes + [self.get_active_branch()]
 
         try:
-            bases = self.repo.merge_base(*commitishes)
-        except GitCommandError as exc:
+            base = self.call_git_oneline(['merge-base'] + commitishes)
+        except CommandError as exc:
+            if exc.code == 1 and not (exc.stdout or exc.stderr):
+                # No merge base was found (unrelated commits).
+                return None
             if "fatal: Not a valid object name" in exc.stderr:
                 return None
             raise
 
-        if not bases:
-            return None
-        assert(len(bases) == 1)  # we do not do 'all' yet
-        return bases[0].hexsha
+        return base
 
     def is_ancestor(self, reva, revb):
         """Is `reva` an ancestor of `revb`?
@@ -2682,11 +2717,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
         self.config.set(var, url, where='local', reload=True)
 
-    def get_branch_commits(self, branch=None, limit=None, stop=None, value=None):
-        """Return GitPython's commits for the branch
-
-        Pretty much similar to what 'git log <branch>' does.
-        It is a generator which returns top commits first
+    def get_branch_commits_(self, branch=None, limit=None, stop=None):
+        """Return commit hexshas for a branch
 
         Parameters
         ----------
@@ -2699,44 +2731,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         stop: str, optional
           hexsha of the commit at which stop reporting (matched one is not
           reported either)
-        value: None | 'hexsha', optional
-          What to yield.  If None - entire commit object is yielded, if 'hexsha'
-          only its hexsha
-        """
 
+        Yields
+        ------
+        str
+        """
+        cmd = ['rev-list']
+        if limit == 'left-only':
+            cmd.append('--left-only')
         if not branch:
             branch = self.get_active_branch()
-
-        try:
-            _branch = self.repo.branches[branch]
-        except IndexError:
-            raise MissingBranchError(self, branch,
-                                     [b.name for b in self.repo.branches])
-
-        fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
-
-        if not limit:
-            def gen():
-                # traverse doesn't yield original commit
-                co = _branch.commit
-                yield co
-                for co_ in co.traverse():
-                    yield co_
-        elif limit == 'left-only':
-            # we need a custom implementation since couldn't figure out how to
-            # do with .traversal
-            def gen():
-                co = _branch.commit
-                while co:
-                    yield co
-                    co = co.parents[0] if co.parents else None
-        else:
-            raise ValueError(limit)
-
-        for c in gen():
-            if stop and c.hexsha == stop:
+        cmd.append(branch)
+        for r in self.call_git_items_(cmd):
+            if stop and stop == r:
                 return
-            yield fvalue(c)
+            yield r
 
     def checkout(self, name, options=None):
         """
@@ -3226,13 +3235,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except:
             return None
 
-    def get_tracking_branch(self, branch=None):
+    def get_tracking_branch(self, branch=None, remote_only=False):
         """Get the tracking branch for `branch` if there is any.
 
         Parameters
         ----------
         branch: str
             local branch to look up. If none is given, active branch is used.
+        remote_only : bool
+            Don't return a value if the upstream remote is set to "." (meaning
+            this repository).
 
         Returns
         -------
@@ -3245,6 +3257,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 return None, None
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
+        if remote_only and track_remote == ".":
+            return None, None
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
         return track_remote, track_branch
 
@@ -3260,56 +3274,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                     for item in count_str.split('\n')
                                     if len(item.split(': ')) == 2]}
         return count
-
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
-                          files=None):
-        """Return files that have changed between the index and working tree.
-
-        Parameters
-        ----------
-        staged: bool, optional
-          Consider changes between HEAD and the index instead of changes
-          between the index and the working tree.
-        diff_filter: str, optional
-          Any value accepted by the `--diff-filter` option of `git diff`.
-          Common ones include "A", "D", "M" for add, deleted, and modified
-          files, respectively.
-        index_file: str, optional
-          Alternative index file for git to use
-        """
-        opts = ['--name-only', '-z']
-        kwargs = {}
-        if staged:
-            opts.append('--staged')
-        if diff_filter:
-            opts.append('--diff-filter=%s' % diff_filter)
-        if index_file:
-            kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        if files is not None:
-            opts.append('--')
-            # might be too many, need to chunk up
-            optss = (
-                opts + file_chunk
-                for file_chunk in generate_file_chunks(files, ['git', 'diff'] + opts)
-            )
-        else:
-            optss = [opts]
-        return [
-            normpath(f)  # Call normpath to convert separators on Windows.
-            for f in chain(
-                *(self.repo.git.diff(*opts, **kwargs).split('\0')
-                for opts in optss)
-            )
-            if f
-        ]
-
-    def get_missing_files(self):
-        """Return a list of paths with missing files (and no staged deletion)"""
-        return self.get_changed_files(diff_filter='D')
-
-    def get_deleted_files(self):
-        """Return a list of paths with deleted files (staged deletion)"""
-        return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
         """Query gitattributes which apply to top level directory
@@ -4010,10 +3974,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def _save_post(self, message, status, partial_commit):
         # helper to commit changes reported in status
-        _datalad_msg = False
-        if not message:
-            message = 'Recorded changes'
-            _datalad_msg = True
 
         # TODO remove pathobj stringification when commit() can
         # handle it
@@ -4028,7 +3988,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 self,
                 files=to_commit,
                 msg=message,
-                _datalad_msg=_datalad_msg,
                 options=None,
                 # do not raise on empty commit
                 # it could be that the `add` in this save-cycle has already

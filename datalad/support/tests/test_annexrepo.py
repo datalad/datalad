@@ -2060,8 +2060,8 @@ def test_fake_dates(path):
     ar = AnnexRepo(path, create=True, fake_dates=True)
     timestamp = ar.config.obtain("datalad.fake-dates-start") + 1
     # Commits from the "git annex init" call are one second ahead.
-    for commit in ar.get_branch_commits("git-annex"):
-        eq_(timestamp, commit.committed_date)
+    for commit in ar.get_branch_commits_("git-annex"):
+        eq_(timestamp, int(ar.format_commit('%ct', commit)))
     assert_in("timestamp={}s".format(timestamp),
               ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
 
@@ -2133,9 +2133,7 @@ def check_commit_annex_commit_changed(unlock, path):
     unannex = False
 
     ar = AnnexRepo(path, create=True)
-    ar.add('.gitattributes')
-    ar.add('.')
-    ar.commit("initial commit")
+    ar.save("initial commit")
     ok_clean_git(path)
     # Now let's change all but commit only some
     files = [op.basename(p) for p in glob(op.join(path, '*'))]
@@ -2162,7 +2160,7 @@ def check_commit_annex_commit_changed(unlock, path):
           ['alwaysbig', 'tobechanged-annex', 'untracked', 'willgetshort']
     )
 
-    ar.commit("message", files=['alwaysbig', 'willgetshort'])
+    ar.save("message", paths=['alwaysbig', 'willgetshort'])
     ok_clean_git(
         path
         , index_modified=['tobechanged-git', 'tobechanged-annex']
@@ -2174,7 +2172,7 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'willgetshort',
                       annexed=external_versions['cmd:annex']<'7.20191009')
 
-    ar.commit("message2", options=['-a']) # commit all changed
+    ar.save("message2", untracked='no') # commit all changed
     ok_clean_git(
         path
         , untracked=['untracked']

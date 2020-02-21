@@ -730,9 +730,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
 
     if objs2add:
         # they are added standard way, depending on the repo type
-        ds.add(
-            [op.join(agg_base_path, p) for p in objs2add],
-            save=False, result_renderer=None, return_type=list)
+        ds.repo.add([op.join(agg_base_path, p) for p in objs2add])
         # queue for save, and mark as staged
         to_save.extend(
             [dict(path=op.join(agg_base_path, p), type='file', staged=True)
@@ -742,8 +740,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
         return
 
     _store_agginfo_db(ds, ds_agginfos)
-    ds.add(agginfo_fpath, save=False, to_git=True,
-           result_renderer=None, return_type=list)
+    ds.repo.add(agginfo_fpath, git=True)
     # queue for save, and mark as staged
     to_save.append(
         dict(path=agginfo_fpath, type='file', staged=True))

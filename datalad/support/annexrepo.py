@@ -506,7 +506,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return branch
 
-    def get_tracking_branch(self, branch=None, corresponding=True):
+    def get_tracking_branch(self, branch=None, remote_only=False,
+                            corresponding=True):
         """Get the tracking branch for `branch` if there is any.
 
         By default returns the tracking branch of the corresponding branch if
@@ -516,6 +517,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         ----------
         branch: str
           local branch to look up. If none is given, active branch is used.
+        remote_only : bool
+            Don't return a value if the upstream remote is set to "." (meaning
+            this repository).
         corresponding: bool
           If True actually look up the corresponding branch of `branch` (also if
           `branch` isn't explicitly given)
@@ -530,6 +534,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
 
         return super(AnnexRepo, self).get_tracking_branch(
+                        remote_only=remote_only,
                         branch=self.get_corresponding_branch(branch)
                         if corresponding else branch)
 
@@ -1643,7 +1648,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if pointers or batch or not allow_quick:
             # We're only concerned about modified files in V6+ mode. In V5
             # `find` returns an empty string for unlocked files.
-            modified = self.get_changed_files() if pointers else []
+            modified = [
+                f for f in self.call_git_items_(
+                    ['diff', '--name-only', '-z'], sep='\0')
+                if f] if pointers else []
             annex_res = fn(files, normalize_paths=False, batch=batch)
             return [bool(annex_res.get(f) and
                          not (pointers and normpath(f) in modified))
@@ -2592,88 +2600,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    @borrowdoc(GitRepo)
-    def commit(self, msg=None, options=None, _datalad_msg=False,
-               careless=True, files=None):
-        self.precommit()
-
-        if files:
-            files = assure_list(files)
-
-            # Raise FileNotInRepositoryError if `files` aren't tracked.
-            super(AnnexRepo, self).commit(
-                "dryrun", options=["--dry-run", "--no-status"],
-                files=files)
-
-        alt_index_file = None
-        try:
-            # we might need to avoid explicit paths
-            files_to_commit = files
-            if files:
-                # In indirect mode, "git commit files" might fail if some
-                # files "jumped" between git/annex.  Then also preparing a
-                # custom index and calling "commit" without files resolves
-                # the issue
-                all_changed_staged = \
-                    set(self.get_changed_files(staged=True))
-
-                files_normalized = [
-                    _normalize_path(self.path, f) if isabs(f) else f
-                    for f in files
-                ]
-
-                files_changed_staged = \
-                    set(self.get_changed_files(staged=True, files=files_normalized))
-                files_changed_notstaged = \
-                    set(self.get_changed_files(staged=False, files=files_normalized))
-
-                # Files which were staged but not among files
-                staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
-
-                if files_changed_notstaged:
-                    self.add(files=list(files_changed_notstaged))
-
-                if staged_not_to_commit:
-                    # Need an alternative index_file
-                    with make_tempfile(dir=opj(self.path,
-                                               GitRepo.get_git_dir(self)),
-                                       prefix="datalad-",
-                                       suffix=".index") as index_file:
-
-                        alt_index_file = index_file
-                        index_tree = self.repo.git.write_tree()
-                        self.repo.git.read_tree(index_tree,
-                                                index_output=index_file)
-                        # Reset the files we are not to be committed
-                        if staged_not_to_commit:
-                            self._git_custom_command(
-                                list(staged_not_to_commit),
-                                ['git', 'reset'],
-                                index_file=alt_index_file)
-
-                        super(AnnexRepo, self).commit(
-                            msg, options,
-                            _datalad_msg=_datalad_msg,
-                            careless=careless,
-                            index_file=alt_index_file)
-
-                        # reset current index to reflect the changes annex might have done
-                        self._git_custom_command(
-                            list(files_changed_notstaged |
-                                 files_changed_staged),
-                            ['git', 'reset']
-                        )
-
-                # in any case we will not specify files explicitly
-                files_to_commit = None
-            if not alt_index_file:
-                super(AnnexRepo, self).commit(msg, options,
-                                              _datalad_msg=_datalad_msg,
-                                              careless=careless,
-                                              files=files_to_commit)
-        finally:
-            if alt_index_file and os.path.exists(alt_index_file):
-                unlink(alt_index_file)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

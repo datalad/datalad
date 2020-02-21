@@ -22,6 +22,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import textwrap
 import warnings
 from fnmatch import fnmatch
 import time
@@ -1342,6 +1343,12 @@ def assert_message(message, results):
         assert_equal(m, message)
 
 
+def _format_res(x):
+    return textwrap.indent(
+        dumps(x, indent=1, default=str, sort_keys=True),
+        prefix="  ")
+
+
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
@@ -1353,12 +1360,12 @@ def assert_result_count(results, n, **kwargs):
             count += 1
     if not n == count:
         raise AssertionError(
-            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+            'Got {} instead of {} expected results matching\n{}\nInspected {} record(s):\n{}'.format(
                 count,
                 n,
-                kwargs,
+                _format_res(kwargs),
                 len(results),
-                dumps(results, indent=1, default=lambda x: str(x))))
+                _format_res(results)))
 
 
 def assert_in_results(results, **kwargs):
@@ -1368,7 +1375,10 @@ def assert_in_results(results, **kwargs):
     for r in assure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
+    if not found:
+        raise AssertionError(
+            "Desired result\n{}\nnot found among\n{}"
+            .format(_format_res(kwargs), _format_res(results)))
 
 
 def assert_not_in_results(results, **kwargs):
