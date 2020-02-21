@@ -13,6 +13,7 @@
 import logging
 
 import os.path as op
+from itertools import chain
 
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
@@ -235,31 +236,47 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
     **kwargs
       Passed onto clone()
     """
-    sm_path = op.relpath(sm['path'], start=sm['parentds'])
+    dest_path = sm['path']
     # compose a list of candidate clone URLs
     clone_urls = _get_flexible_source_candidates_for_submodule(ds, sm)
-
-    # prevent inevitable exception from `clone`
-    dest_path = op.join(ds.path, sm_path)
-    clone_urls_ = [src for name, src in clone_urls if src != dest_path]
-
     if not clone_urls:
         # yield error
         yield get_status_dict(
             action='install',
+            type='dataset',
             ds=ds,
             status='error',
             message=(
                 "Have got no candidates to install subdataset %s from.",
-                sm_path),
+                op.relpath(dest_path, start=sm['parentds'])),
             logger=lgr,
         )
         return
+    clone_res = clone_dataset(
+        [src for name, src in clone_urls],
+        Dataset(dest_path),
+        **kwargs)
+    yield from _post_install_subds(
+        ds, clone_res, dest_path, clone_urls)
 
-    for res in clone_dataset(
-            clone_urls_,
-            Dataset(dest_path),
-            **kwargs):
+
+def _post_install_subds(ds, clone_res, dest_path, clone_urls):
+    """Fixup and reporting after subdataset installation
+
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of installed subdataset.
+    clone_res : generator
+      Results yielded by `clone_dataset()`.
+    dest_path : path
+      Absolute path of the installed subdataset.
+    clone_urls : list(2-tuple)
+      Names and source URL from
+      _get_flexible_source_candidates_for_submodule() for the clone
+      attempt.
+    """
+    for res in clone_res:
         # make sure to fix a detached HEAD before yielding the install success
         # result. The resetting of the branch would undo any change done
         # to the repo by processing in response to the result
@@ -375,11 +392,13 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
     # install using helper that give some flexibility regarding where to
     # get the module from
 
+    # figure out which subdatasets need installation
+    to_install = []
+    to_recurse_only = []
     for sub in ds.subdatasets(
             path=start,
             return_type='generator',
             result_renderer='disabled'):
-        subds = Dataset(sub['path'])
         if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
             lgr.debug(
                 "subdataset %s is configured to be skipped on recursive installation",
@@ -388,20 +407,50 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
-                'install', ds=subds, status='notneeded', logger=lgr,
-                refds=refds_path)
-            # do not continue, even if an intermediate dataset exists it
+                'install', type='dataset', path=sub['path'], status='notneeded',
+                logger=lgr, refds=refds_path)
+            # still recurse, even if an intermediate dataset exists it
             # does not imply that everything below it does too
-        else:
-            # try to get this dataset
-            for res in _install_subds_from_flexible_source(
-                    ds,
-                    sub,
-                    reckless=reckless,
-                    description=description):
-                # yield everything to let the caller decide how to deal with
-                # errors
-                yield res
+            to_recurse_only.append(sub)
+            continue
+        # prepare to get this dataset
+        # compose a list of candidate clone URLs
+        clone_urls = _get_flexible_source_candidates_for_submodule(ds, sub)
+        if not clone_urls:
+            # yield error
+            yield get_status_dict(
+                action='install',
+                type='dataset',
+                ds=ds,
+                status='error',
+                message=(
+                    "Have got no candidates to install subdataset %s from.",
+                    op.relpath(sub['path'], start=sub['parentds'])),
+                logger=lgr,
+            )
+            continue
+        to_install.append((sub, clone_urls))
+
+    # actually install them (later in parallel)
+    clone_res = [
+        (sub['path'],
+         clone_dataset(
+            [src for name, src in clone_urls],
+            Dataset(sub['path']),
+            reckless=reckless,
+            description=description),
+         clone_urls)
+        for sub, clone_urls in to_install
+    ]
+    # fixup and register all subdatasets in the parent, must be done
+    # in serial fashion to avoid locking issues
+    for dest_path, res, urls in clone_res:
+        yield from _post_install_subds(
+            ds, res, dest_path, urls)
+
+    # check and recurse, if needed
+    for sub in chain((s[0] for s in to_install), to_recurse_only):
+        subds = Dataset(sub['path'])
         if not subds.is_installed():
             # an error result was emitted, and the external consumer can decide
             # what to do with it, but there is no point in recursing into
