@@ -216,6 +216,8 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_url,
                 ds.path,
                 alternate_suffix=False)
+            # avoid inclusion of submodule location itself
+            if url != sm['path']
         )
 
     return unique(clone_urls, lambda x: x[1])
