@@ -73,7 +73,6 @@ from .gitrepo import (
     _normalize_path,
     normalize_path,
     normalize_paths,
-    GitCommandError,
     to_options
 )
 from . import ansi_colors

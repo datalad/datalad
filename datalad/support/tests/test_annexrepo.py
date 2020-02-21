@@ -35,7 +35,6 @@ from urllib.parse import urljoin
 from urllib.parse import urlsplit
 
 import git
-from git import GitCommandError
 from unittest.mock import patch
 import gc
 
@@ -131,12 +130,10 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     ok_(os.path.exists(os.path.join(dst, '.git', 'annex')))
 
-    # do it again should raise GitCommandError since git will notice
+    # do it again should raise ValueError since git will notice
     # there's already a git-repo at that path and therefore can't clone to `dst`
     with swallow_logs(new_level=logging.WARN) as cm:
-        assert_raises(GitCommandError, AnnexRepo.clone, src, dst)
-        if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
-            assert("already exists" in cm.out)
+        assert_raises(ValueError, AnnexRepo.clone, src, dst)
 
 
 @assert_cwd_unchanged
@@ -1239,7 +1236,7 @@ def test_annex_remove(path1, path2):
     if repo.is_direct_mode():
         assert_raises(CommandError, repo.remove, "rm-test.dat")
     else:
-        assert_raises(GitCommandError, repo.remove, "rm-test.dat")
+        assert_raises(ValueError, repo.remove, "rm-test.dat")
     assert_in("rm-test.dat", repo.get_annexed_files())
 
     # now force:

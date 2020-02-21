@@ -65,7 +65,6 @@ from datalad.support.sshconnector import get_connection_hash
 
 from datalad.support.gitrepo import (
     _normalize_path,
-    GitCommandError,
     gitpy,
     GitRepo,
     guard_BadName,
@@ -105,13 +104,13 @@ def test_GitRepo_instance_from_clone(src, dst):
                        "Failed to instantiate GitPython Repo object.")
     ok_(op.exists(op.join(dst, '.git')))
 
-    # do it again should raise GitCommandError since git will notice there's
+    # do it again should raise ValueError since git will notice there's
     # already a git-repo at that path and therefore can't clone to `dst`
     # Note: Since GitRepo is now a WeakSingletonRepo, this is prevented from
     # happening atm. Disabling for now:
 #    raise SkipTest("Disabled for RF: WeakSingletonRepo")
     with swallow_logs() as logs:
-        assert_raises(GitCommandError, GitRepo.clone, src, dst)
+        assert_raises(ValueError, GitRepo.clone, src, dst)
 
 
 @assert_cwd_unchanged
@@ -1159,6 +1158,7 @@ def test_optimized_cloning(path):
 @with_tempfile
 @with_tempfile
 def test_GitRepo_gitpy_injection(path, path2):
+    from git import GitCommandError
 
     gr = GitRepo(path, create=True)
     gr._GIT_COMMON_OPTIONS.extend(['test-option'])
