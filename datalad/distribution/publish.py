@@ -15,8 +15,6 @@ import re
 from collections import OrderedDict
 from os.path import join as opj
 
-from git.remote import PushInfo as PI
-
 from datalad import ssh_manager
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
