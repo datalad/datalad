@@ -2804,6 +2804,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           must exist in the remote repository, and will be checked out locally
           as a tracking branch. If `None`, remote HEAD will be checked out.
         """
+        sm_path = op.join(self.path, path)
         if name is None:
             name = Path(path).as_posix()
         cmd = ['submodule', 'add', '--name', name]
@@ -2811,7 +2812,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cmd += ['-b', branch]
         if url is None:
             # repo must already exist locally
-            subm = GitRepo(op.join(self.path, path), create=False, init=False)
+            subm = GitRepo(sm_path, create=False, init=False)
             # check that it has a commit, and refuse
             # to operate on it otherwise, or we would get a bastard
             # submodule that cripples git operations
@@ -2835,14 +2836,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self.call_git(cmd)
         # record dataset ID if possible for comprehesive metadata on
         # dataset components within the dataset itself
-        subm_id = GitRepo(op.join(self.path, path)).config.get(
+        subm_id = GitRepo(sm_path).config.get(
             'datalad.dataset.id', None)
         if subm_id:
             self.call_git(
                 ['config', '--file', '.gitmodules', '--replace-all',
                  'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
-        _fixup_submodule_dotgit_setup(self, path)
+        _fixup_submodule_dotgit_setup(self, sm_path)
         # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
@@ -4061,7 +4062,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 # status?
 
 
-def _fixup_submodule_dotgit_setup(ds, relativepath):
+def _fixup_submodule_dotgit_setup(ds, sm_path):
     """Implementation of our current of .git in a subdataset
 
     Each subdataset/module has its own .git directory where a standalone
@@ -4069,10 +4070,9 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     """
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
-    path = opj(ds.path, relativepath)
-    subds_dotgit = opj(path, ".git")
+    subds_dotgit = opj(sm_path, ".git")
 
-    repo = GitRepo(path, create=False)
+    repo = GitRepo(sm_path, create=False)
     if repo.dot_git.parent == repo.pathobj:
         # this is what we want
         return

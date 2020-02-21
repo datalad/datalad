@@ -267,13 +267,14 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 res.get('status', None) == 'ok' and \
                 res.get('type', None) == 'dataset' and \
                 res.get('path', None) == dest_path:
-            _fixup_submodule_dotgit_setup(ds, sm_path)
+            _fixup_submodule_dotgit_setup(ds, dest_path)
 
             # do fancy update
             lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
-            ds.repo.update_submodule(sm_path, init=True)
+            ds.repo.update_submodule(
+                op.relpath(dest_path, start=ds.path),
+                init=True)
         yield res
-
     subds = Dataset(dest_path)
     if not subds.is_installed():
         lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
