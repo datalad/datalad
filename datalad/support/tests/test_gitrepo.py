@@ -1080,6 +1080,32 @@ def test_to_options():
         ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
 
 
+def test_to_options_from_gitpython():
+    """Imported from GitPython and modified.
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+    eq_(["-s"], to_options(**{'s': True}))
+    eq_(["-s", "5"], to_options(**{'s': 5}))
+    eq_([], to_options(**{'s': None}))
+
+    eq_(["--max-count"], to_options(**{'max_count': True}))
+    eq_(["--max-count=5"], to_options(**{'max_count': 5}))
+    eq_(["--max-count=0"], to_options(**{'max_count': 0}))
+    eq_([], to_options(**{'max_count': None}))
+
+    # Multiple args are supported by using lists/tuples
+    eq_(["-L", "1-3", "-L", "12-18"], to_options(**{'L': ('1-3', '12-18')}))
+    eq_(["-C", "-C"], to_options(**{'C': [True, True, None, False]}))
+
+    # order is undefined
+    res = to_options(**{'s': True, 't': True})
+    eq_({'-s', '-t'}, set(res))
+
+
 @with_tempfile
 def test_GitRepo_count_objects(repo_path):
 

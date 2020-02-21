@@ -137,8 +137,15 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-def to_options(**kwargs):
+def to_options(split_single_char_options=True, **kwargs):
     """Transform keyword arguments into a list of cmdline options
+
+    Imported from GitPython.
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
 
     Parameters
     ----------
@@ -150,9 +157,34 @@ def to_options(**kwargs):
     -------
     list
     """
-    # TODO: borrow_docs!
+    def dashify(string):
+        return string.replace('_', '-')
 
-    return gitpy.Git().transform_kwargs(**kwargs)
+    def transform_kwarg(name, value, split_single_char_options):
+        if len(name) == 1:
+            if value is True:
+                return ["-%s" % name]
+            elif value not in (False, None):
+                if split_single_char_options:
+                    return ["-%s" % name, "%s" % value]
+                else:
+                    return ["-%s%s" % (name, value)]
+        else:
+            if value is True:
+                return ["--%s" % dashify(name)]
+            elif value is not False and value is not None:
+                return ["--%s=%s" % (dashify(name), value)]
+        return []
+
+    args = []
+    kwargs = OrderedDict(sorted(kwargs.items(), key=lambda x: x[0]))
+    for k, v in kwargs.items():
+        if isinstance(v, (list, tuple)):
+            for value in v:
+                args += transform_kwarg(k, value, split_single_char_options)
+        else:
+            args += transform_kwarg(k, v, split_single_char_options)
+    return args
 
 
 def _normalize_path(base_dir, path):
