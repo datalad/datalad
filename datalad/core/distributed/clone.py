@@ -324,6 +324,9 @@ def clone_dataset(
     dict
       DataLad result records
     """
+    if not isinstance(destds, Dataset):
+        destds = Dataset(destds)
+
     if not result_props:
         # in case the caller had no specific idea on how results should look
         # like, provide sensible defaults

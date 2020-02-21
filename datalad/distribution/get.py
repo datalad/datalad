@@ -429,24 +429,44 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 logger=lgr,
             )
             continue
-        to_install.append((sub, clone_urls))
-
-    # actually install them (later in parallel)
-    clone_res = [
-        (sub['path'],
-         clone_dataset(
+        to_install.append((
+            sub,
+            clone_urls,
             [src for name, src in clone_urls],
-            Dataset(sub['path']),
+        ))
+
+    # XXX the following should obtain subdatasets in parallel, but core-dumps
+    #
+    #from concurrent.futures import (
+    #    ThreadPoolExecutor,
+    #    as_completed,
+    #)
+    #with ThreadPoolExecutor(max_workers=5) as executor:
+    #    clone_res = {
+    #        executor.submit(
+    #            clone_dataset,
+    #            urls,
+    #            sub['path'],
+    #            reckless=reckless,
+    #            description=description):
+    #        (sub, url_info, urls)
+    #        for sub, url_info, urls in to_install
+    #    }
+    #    for future in as_completed(clone_res):
+    #        ti = clone_res[future]
+    #        res = future.result()
+    #        # fixup and register all subdatasets in the parent, must be done
+    #        # in serial fashion to avoid locking issues
+    #        yield from _post_install_subds(
+    #            ds, res, ti[0]['path'], ti[1])
+
+    # serial instead
+    for sub, url_info, urls in to_install:
+        yield from clone_dataset(
+            urls,
+            sub['path'],
             reckless=reckless,
-            description=description),
-         clone_urls)
-        for sub, clone_urls in to_install
-    ]
-    # fixup and register all subdatasets in the parent, must be done
-    # in serial fashion to avoid locking issues
-    for dest_path, res, urls in clone_res:
-        yield from _post_install_subds(
-            ds, res, dest_path, urls)
+            description=description)
 
     # check and recurse, if needed
     for sub in chain((s[0] for s in to_install), to_recurse_only):
@@ -861,3 +881,7 @@ class Get(Interface):
                     type=' [{}]'.format(item['type']) if 'type' in item else '')
                 for item in res])
             ui.message(msg)
+
+
+def unwind(fx, *args, **kwargs):
+    return list(fx(*args, **kwargs))
