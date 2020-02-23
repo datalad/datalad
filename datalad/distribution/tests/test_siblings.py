@@ -370,4 +370,20 @@ def test_sibling_path_is_posix(basedir, otherpath):
     # path URL should come out POSIX as if `git clone` had configured it for origin
     # https://github.com/datalad/datalad/issues/3972
     eq_(res['url'], Path(otherpath).as_posix())
-     
+
+
+@with_tempfile(mkdir=True)
+def test_sibling_special_remote(path):
+
+    ds = create(path)
+    # complain about missing name
+    assert_raises(
+        InsufficientArgumentsError,
+        ds.siblings,
+        'add',
+        remotetype='drive',
+    )
+    # TODO Adina: how to test something interactive? AFAIK it always requires
+    # authentication in webinterface, even if using OAuth tokens
+    # ds.siblings('add', name='gdrive', remotetype='drive') or similar always
+    # opens a browser...
