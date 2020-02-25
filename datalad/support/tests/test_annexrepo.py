@@ -522,6 +522,11 @@ def test_find_batch_equivalence(path):
     # If we give a subdirectory, we split that output.
     eq_(set(ar.find(["subdir"])["subdir"]), {"subdir/d", "subdir/e"})
     eq_(ar.find(["subdir"]), ar.find(["subdir"], batch=True))
+    # manually ensure that no annex batch processes are around anymore
+    # that make the test cleanup break on windows.
+    # story at https://github.com/datalad/datalad/issues/4190
+    # even an explicit `del ar` does not get it done
+    ar._batched.close()
 
 
 @with_tempfile(mkdir=True)
