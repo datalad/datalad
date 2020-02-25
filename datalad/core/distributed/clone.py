@@ -727,38 +727,58 @@ def configure_origins(cfgds, probeds, label=None):
     cfgds : Dataset
       Dataset to receive the remote configurations
     probeds : Dataset
-      Dataset to start looking for 'origin' remotes. May be identical with `cfgds`.
+      Dataset to start looking for 'origin' remotes. May be identical with
+      `cfgds`.
     label : int, optional
       Each discovered 'origin' will be configured as a remote under the name
-      'origin-<label>'. If no label is given, '2' will be used by default, given that
-      there is typically a 'origin' remote already.
+      'origin-<label>'. If no label is given, '2' will be used by default,
+      given that there is typically a 'origin' remote already.
     """
     if label is None:
-        label = 2
+        label = 1
     # let's look at the URL for that remote and see if it is a local
     # dataset
     origin_url = probeds.config.get('remote.origin.url')
-    if origin_url and cfgds.config.obtain(
+    if not origin_url:
+        # no origin, nothing to do
+        return
+    if not cfgds.config.obtain(
             'datalad.install.inherit-local-origin',
-            default=True) and isinstance(RI(origin_url), PathRI):
-        # given the clone source is a local dataset, we can have a
-        # cheap look at it, and configure its own 'origin' as a remote
-        # (if there is any), and benefit from additional annex availability
-        originorigin_ds = Dataset(probeds.pathobj / origin_url)
-        originorigin_url = originorigin_ds.config.get('remote.origin.url')
-        if originorigin_url:
+            default=True):
+        # no inheritance wanted
+        return
+    if not isinstance(RI(origin_url), PathRI):
+        # not local path
+        return
+
+    # no need to reconfigure original/direct origin again
+    if cfgds != probeds:
+        # prevent duplicates
+        known_remote_urls = set(
+            cfgds.config.get(r + '.url', None)
+            for r in cfgds.config.sections()
+            if r.startswith('remote.')
+        )
+        if origin_url not in known_remote_urls:
             yield from cfgds.siblings(
                 'configure',
-                # no chance for config, can only be the second configured remote
+                # no chance for conflict, can only be the second configured
+                # remote
                 name='origin-{}'.format(label),
-                url=originorigin_url,
+                url=origin_url,
                 # fetch to get all annex info
                 fetch=True,
                 result_renderer='disabled',
                 on_failure='ignore',
             )
-        # and dive deeper
-        yield from configure_origins(cfgds, originorigin_ds, label=label + 1)
+    # and dive deeper
+    # given the clone source is a local dataset, we can have a
+    # cheap look at it, and configure its own 'origin' as a remote
+    # (if there is any), and benefit from additional annex availability
+    yield from configure_origins(
+        cfgds,
+        Dataset(probeds.pathobj / origin_url),
+        label=label + 1)
 
 
 def _get_tracking_source(ds):
