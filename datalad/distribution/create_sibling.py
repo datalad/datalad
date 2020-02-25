@@ -89,6 +89,7 @@ from datalad.utils import (
     _path_,
     slash_join,
     assure_list,
+    quote_cmdlinearg,
 )
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
@@ -108,7 +109,19 @@ class _RunnerAdapter(Runner):
         import shutil
         copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
         if recursive:
-            shutil.copytree(source, destination, copy_function=copy_fn)
+            args = source, destination
+            kwargs = {"copy_function": copy_fn}
+            try:
+                shutil.copytree(*args, **kwargs)
+            except FileExistsError:
+                # SSHConnection.put() is okay with copying a tree if the
+                # destination directory already exists. With Python 3.8, we can
+                # make copytree() do the same with dirs_exist_ok=True. But for
+                # now, just rely on `cp`.
+                cmd = ["cp", "--recursive"]
+                if preserve_attrs:
+                    cmd.append("--preserve")
+                self(cmd + [quote_cmdlinearg(a) for a in args])
         else:
             copy_fn(source, destination)
 
