@@ -1977,6 +1977,12 @@ def slow(f):
     return attr('slow')(f)
 
 
+def turtle(f):
+    """Mark test as very slow, meaning to not run it on Travis due to its
+    time limit"""
+    return attr('turtle')(f)
+
+
 def usecase(f):
     """Mark test as a usecase user ran into and which (typically) caused bug report
     to be filed/troubleshooted
