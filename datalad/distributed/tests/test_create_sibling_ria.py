@@ -18,6 +18,7 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
+from datalad.utils import Path
 from functools import wraps
 from nose.plugins.attrib import attr
 
@@ -85,6 +86,14 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     eq_({'here'}, {s['name'] for s in sub_siblings})
 
     # TODO: post-update hook was enabled
+
+    # check bare repo:
+    git_config = Path(base_path) / ds.id[:3] / ds.id[3:] / 'config'
+    assert git_config.exists()
+    content = git_config.read_text()
+    assert_in("[datalad \"ria-remote\"]", content)
+    super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-ria'))
+    assert_in("uuid = {}".format(super_uuid), content)
 
     # implicit test of success by ria-installing from store:
     ds.publish(to="datastore", transfer_data='all')
