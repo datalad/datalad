@@ -157,11 +157,12 @@ class Dataset(object, metaclass=PathBasedFlyweight):
     def __eq__(self, other):
         if not hasattr(other, 'pathobj'):
             return False
-        # XXX This is strange, why do we need to resolve the paths
-        # isn't the purpose of the Repo instance to be based
-        # on the realpath, while multiple _different_ dataset
-        # instances could point to the same repo?
-        return self.pathobj.resolve() == other.pathobj.resolve()
+        # Ben: https://github.com/datalad/datalad/pull/4057#discussion_r370153586
+        # It's pointing to the same thing, while not being the same object
+        # (in opposition to the *Repo classes). So `ds1 == ds2`,
+        # `but ds1 is not ds2.` I thought that's a useful distinction. On the
+        # other hand, I don't think we use it anywhere outside tests yet.
+        return self.pathobj.samefile(other.pathobj)
 
     def __getattr__(self, attr):
         # Assure that we are not just missing some late binding
