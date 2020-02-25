@@ -613,15 +613,11 @@ class CreateSibling(Interface):
                 "use ssh://host/path, host:path or path syntax".format(sshurl))
 
         if not name:
-            # use the hostname as default remote name
-            if not ssh_sibling:
-                name = "local"
-            else:
-                name = sibling_ri.hostname
-                lgr.debug(
-                    "No sibling name given. Using URL hostname '%s' as sibling name",
-                    name)
-
+            name = sibling_ri.hostname if ssh_sibling else "local"
+            lgr.debug(
+                "No sibling name given. Using %s'%s' as sibling name",
+                "URL hostname " if ssh_sibling else "",
+                name)
         if since == '':
             # consider creating siblings only since the point of
             # the last update
