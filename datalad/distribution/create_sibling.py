@@ -106,12 +106,12 @@ class _RunnerAdapter(Runner):
     def put(self, source, destination, recursive=False,
             preserve_attrs=False):
         import shutil
+        copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
         if not recursive:
-            (shutil.copy2 if preserve_attrs else shutil.copy)(source, destination)
+            copy_fn(source, destination)
         else:
-            if not preserve_attrs:
-                lgr.debug("recursive copy always preserves attributes in local copying")
-            shutil.copytree(source, destination)
+            shutil.copytree(source, destination, copy_function=copy_fn)
+
 
 def _create_dataset_sibling(
         name,
