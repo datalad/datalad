@@ -2,10 +2,13 @@ from datalad.api import (
     create,
 )
 import shutil
+import subprocess
 from datalad.tests.utils import (
+    assert_in,
     assert_raises,
     assert_status,
     skip_if_on_windows,
+    skip_ssh,
     with_tempfile,
 )
 from datalad.support.exceptions import CommandError
@@ -45,19 +48,6 @@ def test_site_archive_location_config(path, objtree, objtree_alt):
     arxiv_files = get_all_files(objtree)
     assert len(arxiv_files) > 1
 
-    # now simulate a site-wide reconfiguration (here done to the
-    # local git-repos config, but nothing that is committed or
-    # invokes 'enableremote'
-    # drop everything locally
-    assert_status('ok', ds.drop('.'))
-    # relocate the archive on the system
-    shutil.move(objtree, objtree_alt)
-    # adjust the config -- doesn't touch committed content
-    ds.config.set(
-        'annex.ria-remote.archive.base-path', objtree_alt, where='local')
-    # remote continues to function normally after system reconfiguration
-    assert_status('ok', ds.get('.'))
-
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
@@ -86,15 +76,8 @@ def test_site_archive_url_config(path, objtree, objtree_alt):
     arxiv_files = get_all_files(objtree)
     assert len(arxiv_files) > 1
 
-    # now simulate a site-wide reconfiguration (here done to the
-    # local git-repos config, but nothing that is committed or
-    # invokes 'enableremote'
-    # drop everything locally
-    assert_status('ok', ds.drop('.'))
-    # relocate the archive on the system
-    shutil.move(objtree, objtree_alt)
-    # adjust the config -- doesn't touch committed content
-    ds.config.unset('url.ria+{}.insteadOf'.format(Path(objtree).as_uri()), where='local')
-    ds.config.set('url.ria+{}.insteadOf'.format(Path(objtree_alt).as_uri()), 'localstore:', where='local')
-    # remote continues to function normally after system reconfiguration
-    assert_status('ok', ds.get('.'))
+    # ensure we have stored the rewritten URL
+    res = subprocess.run(['git', 'cat-file', 'blob', 'git-annex:remote.log'],
+                         stdout=subprocess.PIPE, check=True,
+                         cwd=str(ds.pathobj))
+    assert_in("url=ria+{}".format(Path(objtree).as_uri()), res.stdout.decode())

@@ -14,7 +14,8 @@ from datalad.distributed.ria_utils import (
     verify_ria_url,
 )
 
-lgr = logging.getLogger('ria_remote')
+
+lgr = logging.getLogger('datalad.customremotes.ria_remote')
 
 # TODO
 # - make archive check optional
@@ -177,6 +178,11 @@ class LocalIO(IOBase):
                 str(archive), str(src)],
                 stdout=target_file,
             )
+        # Note for progress reporting:
+        # man 7z:
+        #
+        # -bs{o|e|p}{0|1|2}
+        #         Set output stream for output/error/progress line
 
     def rename(self, src, dst):
         src.rename(dst)
@@ -590,10 +596,8 @@ class RIARemote(SpecialRemote):
                 for line in url_cfgs_raw.splitlines():
                     k, v = line.split()
                     url_cfgs[k] = v
-            self.storage_host, self.objtree_base_path = verify_ria_url(
-                self.ria_store_url,
-                url_cfgs,
-            )
+            self.storage_host, self.objtree_base_path, self.ria_store_url = \
+                verify_ria_url(self.ria_store_url, url_cfgs)
 
         # TODO duplicates call to `git-config` after RIA url rewrite
         self._load_cfg(gitdir, name)
@@ -663,6 +667,8 @@ class RIARemote(SpecialRemote):
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
         self.annex.setconfig('archive-id', self.archive_id)
+        # make sure, we store the potentially rewritten URL
+        self.annex.setconfig('url', self.ria_store_url)
 
     def _local_io(self):
         """Are we doing local operations?"""
