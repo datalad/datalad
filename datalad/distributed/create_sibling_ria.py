@@ -359,7 +359,7 @@ def _create_sibling_ria(
 
     # parse target URL
     try:
-        ssh_host, base_path = verify_ria_url(url, ds.config)
+        ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
     except ValueError as e:
         yield get_status_dict(
             status='error',

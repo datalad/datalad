@@ -1,4 +1,3 @@
-from pathlib import Path
 import shutil
 import subprocess
 import logging
@@ -8,6 +7,7 @@ from datalad.api import (
 )
 
 from datalad.utils import (
+    Path,
     swallow_logs
 )
 from datalad.tests.utils import (

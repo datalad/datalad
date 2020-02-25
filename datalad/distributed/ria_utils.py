@@ -69,4 +69,4 @@ def verify_ria_url(url, cfg):
     if protocol not in ['ssh', 'file']:
         raise ValueError("Unsupported protocol: %s" % protocol)
 
-    return url_ri.hostname if protocol == 'ssh' else None, url_ri.path
+    return url_ri.hostname if protocol == 'ssh' else None, url_ri.path, url
