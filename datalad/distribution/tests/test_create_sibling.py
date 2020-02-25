@@ -344,13 +344,11 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         ok_(modified_files.issuperset(ok_modified_files))
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
 @slow  # 53.8496s
-@skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_target_ssh_recursive(origin, src_path, target_path):
+def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -367,11 +365,16 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         else:
             sep = os.path.sep
 
+        if use_ssh:
+            sshurl = "ssh://localhost" + target_path_
+        else:
+            sshurl = target_path_
+
         remote_name = 'remote-' + str(flat)
         with chpwd(source.path):
             assert_create_sshwebserver(
                 name=remote_name,
-                sshurl="ssh://localhost" + target_path_,
+                sshurl=sshurl,
                 target_dir=target_dir_tpl,
                 recursive=True,
                 ui=True)
@@ -404,7 +407,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
             #publish(to=remote_name)  # no recursion
             assert_create_sshwebserver(
                 name=remote_name,
-                sshurl="ssh://localhost" + target_path_,
+                sshurl=sshurl,
                 target_dir=target_dir_tpl,
                 recursive=True,
                 existing='skip',
@@ -417,12 +420,20 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
-@skip_ssh
+def test_target_ssh_recursive():
+    skip_if_on_windows()
+    yield skip_ssh(check_target_ssh_recursive), True
+    yield check_target_ssh_recursive, False
+
+
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_target_ssh_since(origin, src_path, target_path):
+def check_target_ssh_since(use_ssh, origin, src_path, target_path):
+    if use_ssh:
+        sshurl = "ssh://localhost" + target_path
+    else:
+        sshurl = target_path
     # prepare src
     source = install(src_path, source=origin, recursive=True)
     eq_(len(source.subdatasets()), 2)
@@ -435,7 +446,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     assert_create_sshwebserver(
         name='dominique_carrera',
         dataset=source,
-        sshurl="ssh://localhost" + target_path,
+        sshurl=sshurl,
         recursive=True,
         since='HEAD~1')
     # there is one thing in the target directory only, and that is the
@@ -453,7 +464,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     assert_create_sshwebserver(
         name='dominique_carrera',
         dataset=source,
-        sshurl="ssh://localhost" + target_path,
+        sshurl=sshurl,
         recursive=True,
         existing='skip')
     # verify that it created the sub and sub/sub
@@ -464,11 +475,19 @@ def test_target_ssh_since(origin, src_path, target_path):
     assert_postupdate_hooks(_path_(target_path, 'brandnew'), installed=False)
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
-@skip_ssh
+def test_target_ssh_since():
+    skip_if_on_windows()
+    yield skip_ssh(check_target_ssh_since), True
+    yield check_target_ssh_since, False
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_failon_no_permissions(src_path, target_path):
+def check_failon_no_permissions(use_ssh, src_path, target_path):
+    if use_ssh:
+        sshurl = "ssh://localhost" + opj(target_path, 'ds')
+    else:
+        sshurl = opj(target_path, 'ds')
     ds = Dataset(src_path).create()
     # remove user write permissions from target path
     chmod(target_path, stat.S_IREAD | stat.S_IEXEC)
@@ -476,36 +495,46 @@ def test_failon_no_permissions(src_path, target_path):
         CommandError,
         ds.create_sibling,
         name='noperm',
-        sshurl="ssh://localhost" + opj(target_path, 'ds'))
+        sshurl=sshurl)
     # restore permissions
     chmod(target_path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
     assert_create_sshwebserver(
         name='goodperm',
         dataset=ds,
-        sshurl="ssh://localhost" + opj(target_path, 'ds'))
+        sshurl=sshurl)
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
-@skip_ssh
+def test_failon_no_permissions():
+    skip_if_on_windows()
+    yield skip_ssh(check_failon_no_permissions), True
+    yield check_failon_no_permissions, False
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile
-def test_replace_and_relative_sshpath(src_path, dst_path):
+def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     # We need to come up with the path relative to our current home directory
     # https://github.com/datalad/datalad/issues/1653
     # but because we override HOME the HOME on the remote end would be
-    # different even though a localhost. So we need to query it
-    from datalad import ssh_manager
-    ssh = ssh_manager.get_connection('localhost')
-    remote_home, err = ssh('pwd')
-    assert not err
-    remote_home = remote_home.rstrip('\n')
-    dst_relpath = os.path.relpath(dst_path, remote_home)
-    url = 'localhost:%s' % dst_relpath
+    # different even though a datalad-test. So we need to query it
+    if use_ssh:
+        from datalad import ssh_manager
+        ssh = ssh_manager.get_connection('localhost')
+        remote_home, err = ssh('pwd')
+        assert not err
+        remote_home = remote_home.rstrip('\n')
+        dst_relpath = os.path.relpath(dst_path, remote_home)
+        url = 'localhost:%s' % dst_relpath
+        sibname = 'localhost'
+    else:
+        url = dst_path
+        sibname = 'local'
+
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
     ds.create_sibling(url, ui=True)
-    published = ds.publish(to='localhost', transfer_data='all')
+    published = ds.publish(to=sibname, transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr
     # since it exits with 0 exit even if there was a problem
@@ -532,21 +561,21 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
         ds.create_sibling(url, existing='replace', ui=True)
     interactive_create_sibling()
 
-    published2 = ds.publish(to='localhost', transfer_data='all')
+    published2 = ds.publish(to=sibname, transfer_data='all')
     assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 
     # and one more test since in above test it would not puke ATM but just
     # not even try to copy since it assumes that file is already there
     create_tree(ds.path, {'sub2.dat': 'more data'})
     ds.save('sub2.dat')
-    published3 = ds.publish(to='localhost', transfer_data='none')  # we publish just git
+    published3 = ds.publish(to=sibname, transfer_data='none')  # we publish just git
     assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
     # now publish "with" data, which should also trigger the hook!
     # https://github.com/datalad/datalad/issues/1658
     from glob import glob
     from datalad.consts import WEB_META_LOG
     logs_prior = glob(_path_(dst_path, WEB_META_LOG, '*'))
-    published4 = ds.publish(to='localhost', transfer_data='all')
+    published4 = ds.publish(to=sibname, transfer_data='all')
     assert_result_count(published4, 1, path=opj(ds.path, 'sub2.dat'))
     logs_post = glob(_path_(dst_path, WEB_META_LOG, '*'))
     eq_(len(logs_post), len(logs_prior) + 1)
@@ -554,12 +583,20 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     assert_postupdate_hooks(dst_path)
 
 
-@skip_ssh
+def test_replace_and_relative_sshpath():
+    skip_if_on_windows()
+    yield skip_ssh(check_replace_and_relative_sshpath), True
+    yield check_replace_and_relative_sshpath, False
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile(suffix="target")
-def _test_target_ssh_inherit(standardgroup, ui, src_path, target_path):
+def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
     ds = Dataset(src_path).create()
-    target_url = 'localhost:%s' % target_path
+    if use_ssh:
+        target_url = 'localhost:%s' % target_path
+    else:
+        target_url = target_path
     remote = "magical"
     # for the test of setting a group, will just smoke test while using current
     # user's group
@@ -654,33 +691,43 @@ def test_target_ssh_inherit():
     # which is now closed but this one is failing ATM, thus leaving as TODO
     # yield _test_target_ssh_inherit, None      # no wanted etc
     # Takes too long so one will do with UI and another one without
-    yield _test_target_ssh_inherit, 'manual', True  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup', False  # backup -- all data files
+    yield skip_ssh(_test_target_ssh_inherit), 'manual', True, True  # manual -- no load should be annex copied
+    yield _test_target_ssh_inherit, 'backup', False, False  # backup -- all data files
 
 
-@skip_ssh
 @with_testsui(responses=["no", "yes"])
 @with_tempfile(mkdir=True)
-def test_exists_interactive(path):
+def check_exists_interactive(use_ssh, path):
     origin = Dataset(opj(path, "origin")).create()
     sibling_path = opj(path, "sibling")
 
     # Initiate sibling directory with "stuff"
     create_tree(sibling_path, {'stuff': ''})
 
+    if use_ssh:
+        sshurl = 'localhost:' + sibling_path
+    else:
+        sshurl = sibling_path
+
     # Should fail
     with assert_raises(RuntimeError):
-        origin.create_sibling('localhost:%s' % sibling_path)
+        origin.create_sibling(sshurl)
 
     # Since first response is "no" - we should fail here again:
     with assert_raises(RuntimeError):
-        origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
+        origin.create_sibling(sshurl, existing='replace')
     # and there should be no initiated repository
     assert not Dataset(sibling_path).is_installed()
     # But we would succeed on the 2nd try, since answer will be yes
-    origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
+    origin.create_sibling(sshurl, existing='replace')
     assert Dataset(sibling_path).is_installed()
     # And with_testsui should not fail with "Unused responses left"
+
+
+def test_check_exists_interactive():
+    skip_if_on_windows()
+    yield skip_ssh(check_exists_interactive), True
+    yield check_exists_interactive, False
 
 
 @skip_if_on_windows
