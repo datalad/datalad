@@ -698,7 +698,7 @@ class CreateSibling(Interface):
             lgr.info("Connecting ...")
             shell = ssh_manager.get_connection(sshurl)
         else:
-            shell = _RunnerAdapter()  # cwd=sibling_ri.path)
+            shell = _RunnerAdapter()
 
         if not shell.get_annex_version():
             raise MissingExternalDependency(
