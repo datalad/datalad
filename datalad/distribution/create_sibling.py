@@ -101,7 +101,7 @@ class _RunnerAdapter(Runner):
         return external_versions['cmd:git']
 
     def get_annex_version(self):
-        return external_versions['cmd:git-annex']
+        return external_versions['cmd:annex']
 
     def put(self, source, destination, recursive=False,
             preserve_attrs=False):
