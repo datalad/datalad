@@ -46,6 +46,7 @@ from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
     EnsureDataset,
+    resolve_path,
     require_dataset,
 )
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -690,6 +691,7 @@ class CreateSibling(Interface):
             shell = ssh_manager.get_connection(sshurl)
         else:
             shell = _RunnerAdapter()
+            sibling_ri.path = str(resolve_path(sibling_ri.path, dataset))
 
         if target_dir is None:
             if sibling_ri.path:

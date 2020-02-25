@@ -60,6 +60,7 @@ from datalad.utils import (
     _path_,
     chpwd,
     on_windows,
+    Path,
 )
 
 import logging
@@ -680,3 +681,29 @@ def test_exists_interactive(path):
     origin.create_sibling('localhost:%s' % sibling_path, existing='replace')
     assert Dataset(sibling_path).is_installed()
     # And with_testsui should not fail with "Unused responses left"
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_local_relpath(path):
+    path = Path(path)
+    ds_main = Dataset(path / "main").create()
+    ds_main.create("subds")
+
+    ds_main.create_sibling(
+        name="relpath-bound", recursive=True,
+        sshurl=os.path.relpath(str(path / "a"), ds_main.path))
+    ok_((path / "a" / "subds").exists())
+
+    with chpwd(path):
+        create_sibling(
+            dataset=ds_main.path,
+            name="relpath-unbound", recursive=True,
+            sshurl="b")
+    ok_((path / "b" / "subds").exists())
+
+    with chpwd(ds_main.path):
+        create_sibling(
+            name="relpath-unbound-dsnone", recursive=True,
+            sshurl=os.path.relpath(str(path / "c"), ds_main.path))
+    ok_((path / "c" / "subds").exists())
