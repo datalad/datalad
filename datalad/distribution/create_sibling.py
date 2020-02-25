@@ -689,12 +689,14 @@ class CreateSibling(Interface):
             lgr.info("Connecting ...")
             assert(sshurl is not None)  # delayed anal verification
             shell = ssh_manager.get_connection(sshurl)
-            if not shell.get_annex_version():
-                raise MissingExternalDependency(
-                    'git-annex',
-                    msg="It's required on the remote machine to create a sibling")
         else:
             shell = _RunnerAdapter()  # cwd=sibling_ri.path)
+
+        if not shell.get_annex_version():
+            raise MissingExternalDependency(
+                'git-annex',
+                msg="It's required on the {} machine to create a sibling"
+                    .format('remote' if ssh_sibling else 'local'))
 
         #
         # all checks done and we have a connection, now do something
