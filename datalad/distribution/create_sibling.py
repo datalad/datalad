@@ -107,10 +107,10 @@ class _RunnerAdapter(Runner):
             preserve_attrs=False):
         import shutil
         copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
-        if not recursive:
-            copy_fn(source, destination)
-        else:
+        if recursive:
             shutil.copytree(source, destination, copy_function=copy_fn)
+        else:
+            copy_fn(source, destination)
 
 
 def _create_dataset_sibling(
