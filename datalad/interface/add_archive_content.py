@@ -34,6 +34,7 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 
 from ..support.annexrepo import AnnexRepo
+from datalad.support.exceptions import FileNotInRepositoryError
 from ..support.strings import apply_replacement_rules
 from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
@@ -228,12 +229,13 @@ class AddArchiveContent(Interface):
             archive_path = opj(annex.path, archive)
         annex_path = annex.path
 
+        # Use `get_dataset_root` to avoid resolving the leading path.
+        ds_root = get_dataset_root(archive_path)
+        if ds_root is None:
+            # no repo was found
+            raise FileNotInRepositoryError(archive_path)
         # _rpath below should depict paths relative to the top of the annex
-        archive_rpath = relpath(
-            archive_path,
-            # Use `get_dataset_root` to avoid resolving the leading path. If no
-            # repo is found, downstream code will raise FileNotInRepositoryError.
-            get_dataset_root(archive_path) or ".")
+        archive_rpath = relpath(archive_path, ds_root)
 
         if archive in annex.untracked_files:
             raise RuntimeError(
