@@ -339,7 +339,8 @@ def _create_dataset_sibling(
         annex_wanted=annex_wanted,
         annex_group=annex_group,
         annex_groupwanted=annex_groupwanted,
-        inherit=inherit
+        inherit=inherit,
+        result_renderer=None,
     )
 
     # check git version on remote end
