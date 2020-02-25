@@ -506,6 +506,8 @@ def _create_sibling_ria(
 
         if trust_level:
             ds.repo.call_git(['annex', trust_level, storage_name])
+        # get uuid for use in bare repo's config
+        uuid = ds.config.get("remote.{}.annex-uuid".format(storage_name))
 
     else:
         # with no special remote we currently need to create the
@@ -538,6 +540,15 @@ def _create_sibling_ria(
             shared=" --shared='{}'".format(
                 quote_cmdlinearg(shared)) if shared else ''
         ))
+
+        if storage_sibling:
+            # write special remote's uuid into git-config, so clone can
+            # which one it is supposed to be and enable it even with
+            # fallback URL
+            ssh("cd {rootdir} && git config datalad.ria-remote.uuid {uuid}"
+                "".format(rootdir=quote_cmdlinearg(str(repo_path)),
+                          uuid=uuid))
+
         if post_update_hook:
             ssh('mv {} {}'.format(quote_cmdlinearg(str(disabled_hook)),
                                   quote_cmdlinearg(str(enabled_hook))))
@@ -548,9 +559,15 @@ def _create_sibling_ria(
             # provided with the same chgrp
             ssh(chgrp_cmd)
     else:
-        GitRepo(repo_path, create=True, bare=True,
-                shared=" --shared='{}'".format(
-                    quote_cmdlinearg(shared)) if shared else None)
+        gr = GitRepo(repo_path, create=True, bare=True,
+                     shared=" --shared='{}'".format(quote_cmdlinearg(shared))
+                     if shared else None)
+        if storage_sibling:
+            # write special remote's uuid into git-config, so clone can
+            # which one it is supposed to be and enable it even with
+            # fallback URL
+            gr.config.add("datalad.ria-remote.uuid", uuid, where='local')
+
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
         if group:
