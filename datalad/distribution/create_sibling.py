@@ -692,7 +692,7 @@ class CreateSibling(Interface):
             if not shell.get_annex_version():
                 raise MissingExternalDependency(
                     'git-annex',
-                    msg='on the remote system')
+                    msg="It's required on the remote machine to create a sibling")
         else:
             shell = _RunnerAdapter()  # cwd=sibling_ri.path)
 
