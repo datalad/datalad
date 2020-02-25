@@ -450,10 +450,12 @@ class CreateSibling(Interface):
             args=('--target-dir',),
             metavar='PATH',
             doc="""path to the directory *on the server* where the dataset
-                shall be created. By default the SSH access URL is used to
-                identify this directory. If a relative path is provided here,
-                it is interpreted as being relative to the user's home
-                directory on the server.\n
+                shall be created. By default this is set to the URL (or local
+                path) specified via [PY: `sshurl` PY][CMD: SSHURL CMD]. If a
+                relative path is provided here, it is interpreted as being
+                relative to the user's home directory on the server (or
+                relative to [PY: `sshurl` PY][CMD: SSHURL CMD], when that is a
+                local path).
                 Additional features are relevant for recursive processing of
                 datasets with subdatasets. By default, the local
                 dataset structure is replicated on the server. However, it is
@@ -692,6 +694,8 @@ class CreateSibling(Interface):
         else:
             shell = _RunnerAdapter()
             sibling_ri.path = str(resolve_path(sibling_ri.path, dataset))
+            if target_dir:
+                target_dir = opj(sibling_ri.path, target_dir)
 
         if target_dir is None:
             if sibling_ri.path:

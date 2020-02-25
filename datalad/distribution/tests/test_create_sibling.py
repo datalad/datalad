@@ -707,3 +707,41 @@ def test_local_relpath(path):
             name="relpath-unbound-dsnone", recursive=True,
             sshurl=os.path.relpath(str(path / "c"), ds_main.path))
     ok_((path / "c" / "subds").exists())
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_local_path_target_dir(path):
+    path = Path(path)
+    ds_main = Dataset(path / "main").create()
+
+    ds_main.create_sibling(
+        name="abspath-targetdir",
+        sshurl=str(path / "a"), target_dir="tdir")
+    ok_((path / "a" / "tdir").exists())
+
+    ds_main.create_sibling(
+        name="relpath-bound-targetdir",
+        sshurl=os.path.relpath(str(path / "b"), ds_main.path),
+        target_dir="tdir")
+    ok_((path / "b" / "tdir").exists())
+
+    with chpwd(path):
+        create_sibling(
+            dataset=ds_main.path,
+            name="relpath-unbound-targetdir",
+            sshurl="c", target_dir="tdir")
+    ok_((path / "c" / "tdir").exists())
+
+    ds_main.create("subds")
+
+    ds_main.create_sibling(
+        name="rec-plain-targetdir", recursive=True,
+        sshurl=str(path / "d"), target_dir="tdir")
+    ok_((path / "d" / "tdir" / "subds").exists())
+
+    ds_main.create_sibling(
+        name="rec-template-targetdir", recursive=True,
+        sshurl=str(path / "e"), target_dir="d%RELNAME")
+    ok_((path / "e" / "d").exists())
+    ok_((path / "e" / "d-subds").exists())
