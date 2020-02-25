@@ -7,6 +7,7 @@ from datalad.utils import Path
 from datalad.tests.utils import (
     skip_if_on_windows,
     skip_ssh,
+    slow
 )
 from datalad.customremotes.tests.ria_utils import (
     initexternalremote,
@@ -30,6 +31,7 @@ def test_gitannex_localio_url(path, objtree):
     )
 
 
+@slow
 @skip_if_on_windows
 @skip_ssh
 @with_tempfile(mkdir=True)
