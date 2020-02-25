@@ -103,8 +103,8 @@ class _RunnerAdapter(Runner):
     def get_annex_version(self):
         return external_versions['cmd:git-annex']
 
-    def copy(self, source, destination, recursive=False,
-             preserve_attrs=False):
+    def put(self, source, destination, recursive=False,
+            preserve_attrs=False):
         import shutil
         if not recursive:
             (shutil.copy2 if preserve_attrs else shutil.copy)(source, destination)
