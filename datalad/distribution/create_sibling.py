@@ -696,7 +696,6 @@ class CreateSibling(Interface):
         if ssh_sibling:
             # request ssh connection:
             lgr.info("Connecting ...")
-            assert(sshurl is not None)  # delayed anal verification
             shell = ssh_manager.get_connection(sshurl)
         else:
             shell = _RunnerAdapter()  # cwd=sibling_ri.path)
