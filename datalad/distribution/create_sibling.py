@@ -615,7 +615,7 @@ class CreateSibling(Interface):
         if not name:
             # use the hostname as default remote name
             if not ssh_sibling:
-                name = "localhost"
+                name = "local"
             else:
                 name = sibling_ri.hostname
                 lgr.debug(
