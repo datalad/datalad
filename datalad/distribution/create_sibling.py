@@ -619,7 +619,7 @@ class CreateSibling(Interface):
             else:
                 name = sibling_ri.hostname
                 lgr.debug(
-                    "No sibling name given, use URL hostname '%s' as sibling name",
+                    "No sibling name given. Using URL hostname '%s' as sibling name",
                     name)
 
         if since == '':
