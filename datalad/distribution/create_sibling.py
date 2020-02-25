@@ -684,6 +684,13 @@ class CreateSibling(Interface):
                      "or --since if this is unexpected")
             return
 
+        if ssh_sibling:
+            # request ssh connection:
+            lgr.info("Connecting ...")
+            shell = ssh_manager.get_connection(sshurl)
+        else:
+            shell = _RunnerAdapter()
+
         if target_dir is None:
             if sibling_ri.path:
                 target_dir = sibling_ri.path
@@ -692,13 +699,6 @@ class CreateSibling(Interface):
 
         # TODO: centralize and generalize template symbol handling
         replicate_local_structure = "%RELNAME" not in target_dir
-
-        if ssh_sibling:
-            # request ssh connection:
-            lgr.info("Connecting ...")
-            shell = ssh_manager.get_connection(sshurl)
-        else:
-            shell = _RunnerAdapter()
 
         if not shell.get_annex_version():
             raise MissingExternalDependency(
