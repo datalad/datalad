@@ -916,7 +916,9 @@ def get_local_file_url(fname, compatibility='git-annex'):
         Git-annex command input (e.g. `addurl`). On any other platform this
         setting has no effect.
     """
-    path = Path(fname).absolute()
+    # we resolve the path to circumwent potential short paths on unfortunate
+    # platforms that would ruin the URL format
+    path = Path(fname).resolve()
     if on_windows:
         path = path.as_posix()
         furl = 'file://{}{}'.format(
