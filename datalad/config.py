@@ -9,6 +9,7 @@
 """
 """
 
+from functools import lru_cache
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
@@ -54,6 +55,7 @@ _where_reload_doc = """
 
 # we cannot import external_versions here, as the cfg comes before anything
 # and we would have circular imports
+@lru_cache()
 def get_git_version(runner=None):
     """Return version of available git"""
     runner = runner or GitRunner()
