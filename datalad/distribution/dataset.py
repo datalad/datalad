@@ -162,7 +162,20 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # (in opposition to the *Repo classes). So `ds1 == ds2`,
         # `but ds1 is not ds2.` I thought that's a useful distinction. On the
         # other hand, I don't think we use it anywhere outside tests yet.
-        return self.pathobj.samefile(other.pathobj)
+        me_exists = self.pathobj.exists()
+        other_exists = other.pathobj.exists()
+        if me_exists != other_exists:
+            # no chance this could be the same
+            return False
+        elif me_exists:
+            # check on filesystem
+            return self.pathobj.samefile(other.pathobj)
+        else:
+            # we can only do lexical comparison.
+            # this will fail to compare a long and a shortpath.
+            # on windows that could actually point to the same thing
+            # if it would exists, but this is how far we go with this.
+            return self.pathobj == other.pathobj
 
     def __getattr__(self, attr):
         # Assure that we are not just missing some late binding
