@@ -23,9 +23,9 @@ from datalad.tests.utils import (
     assert_not_equal,
     assert_not_in,
     assert_raises,
+    assert_repo_status,
     assert_true,
     ok_,
-    ok_clean_git,
     slow,
     with_tempfile,
     with_tree,
@@ -103,7 +103,7 @@ def test_dirty(path):
     # not added to super on purpose!
     subds = ds.create('subds')
     _check_all_clean(subds, subds.repo.get_hexsha())
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # subdataset must be added as a submodule!
     assert_equal(ds.subdatasets(result_xfm='relpaths'), ['subds'])
 
@@ -150,7 +150,7 @@ def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
     ds_bbaa = Dataset(opj(ds_bba.path, 'bbaa'))
@@ -164,7 +164,7 @@ def test_save_hierarchy(path):
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
-        ok_clean_git(d.path)
+        assert_repo_status(d.path)
     ok_(ds.repo.dirty)
     # now with two modified repos
     d = Dataset(opj(ds.path, 'd'))
@@ -175,7 +175,7 @@ def test_save_hierarchy(path):
     # generator
     d.save(recursive=True)
     for d in (d, da, db):
-        ok_clean_git(d.path)
+        assert_repo_status(d.path)
     ok_(ds.repo.dirty)
     # and now with files all over the place and saving
     # all the way to the root
@@ -328,7 +328,7 @@ def test_discover_ds_trace(path, otherdir):
     # subject is also involved in this
     assert_true(exists(opj(db, 'file_db')))
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # now two datasets which are not available locally, but we
     # know about them (e.g. from metadata)
     dba = opj(db, 'sub', 'dba')

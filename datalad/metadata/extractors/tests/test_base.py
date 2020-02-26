@@ -13,8 +13,8 @@ from inspect import isgenerator
 from datalad.api import Dataset
 from datalad.tests.utils import (
     assert_equal,
+    assert_repo_status,
     known_failure_githubci_win,
-    ok_clean_git,
     SkipTest,
     with_tree,
 )
@@ -24,7 +24,7 @@ from datalad.tests.utils import (
 def check_api(no_annex, path):
     ds = Dataset(path).create(force=True, no_annex=no_annex)
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     processed_extractors, skipped_extractors = [], []
     for extractor_ep in iter_entry_points('datalad.metadata.extractors'):

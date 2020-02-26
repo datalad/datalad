@@ -14,8 +14,8 @@ from datalad.tests.utils_testrepos import (
     BasicGitTestRepo,
 )
 from datalad.tests.utils import (
+    assert_repo_status,
     ok_,
-    ok_clean_git,
     ok_file_under_git,
     skip_if_on_windows,
     swallow_outputs,
@@ -26,7 +26,7 @@ from datalad.tests.utils import (
 def _test_BasicAnnexTestRepo(repodir):
     trepo = BasicAnnexTestRepo(repodir)
     trepo.create()
-    ok_clean_git(trepo.path)
+    assert_repo_status(trepo.path)
     ok_file_under_git(trepo.path, 'test.dat')
     ok_file_under_git(trepo.path, 'INFO.txt')
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
@@ -55,6 +55,6 @@ def test_BasicAnnexTestRepo(path):
 def test_BasicGitTestRepo(path):
     trepo = BasicGitTestRepo(path)
     trepo.create()
-    ok_clean_git(trepo.path, annex=False)
+    assert_repo_status(trepo.path, annex=False)
     ok_file_under_git(trepo.path, 'test.dat')
     ok_file_under_git(trepo.path, 'INFO.txt')

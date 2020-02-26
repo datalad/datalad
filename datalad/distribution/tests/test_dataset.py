@@ -48,13 +48,13 @@ from datalad.tests.utils import (
     assert_is_not_none,
     assert_not_equal,
     assert_raises,
+    assert_repo_status,
     assert_result_count,
     assert_true,
     eq_,
     known_failure_windows,
     OBSCURE_FILENAME,
     ok_,
-    ok_clean_git,
     SkipTest,
     with_tempfile,
     with_testrepos,
@@ -385,7 +385,7 @@ def test_property_reevaluation(repo1):
     assert_is_none(ds.id)
 
     ds.create()
-    ok_clean_git(repo1)
+    assert_repo_status(repo1)
     # after creation, we have `repo`, and `config` was reevaluated to point
     # to the repo's config:
     assert_is_not_none(ds.repo)
@@ -409,7 +409,7 @@ def test_property_reevaluation(repo1):
     assert_is_none(ds.id)
 
     ds.create()
-    ok_clean_git(repo1)
+    assert_repo_status(repo1)
     # after recreation everything is sane again:
     assert_is_not_none(ds.repo)
     assert_is_not_none(ds.config)

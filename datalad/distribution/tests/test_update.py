@@ -42,9 +42,8 @@ from datalad.tests.utils import (
     ok_,
     create_tree,
     ok_file_has_content,
-    ok_clean_git,
-    assert_repo_status,
     assert_status,
+    assert_repo_status,
     assert_result_count,
     assert_in_results,
     SkipTest,
@@ -78,18 +77,18 @@ def test_update_simple(origin, src_path, dst_path):
     dest = install(dst_path, source=src_path, recursive=True)
     # test setup done;
     # assert all fine
-    ok_clean_git(dst_path)
-    ok_clean_git(src_path)
+    assert_repo_status(dst_path)
+    assert_repo_status(src_path)
 
     # update yields nothing => up-to-date
     assert_status('ok', dest.update())
-    ok_clean_git(dst_path)
+    assert_repo_status(dst_path)
 
     # modify origin:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
     source.save(path="update.txt", message="Added update.txt")
-    ok_clean_git(src_path)
+    assert_repo_status(src_path)
 
     # update without `merge` only fetches:
     assert_status('ok', dest.update())
@@ -363,12 +362,12 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # modify ds and subds at origin
     create_tree(origin.path, {'mike': 'this', sname: {'probe': 'little'}})
     origin.save(recursive=True)
-    ok_clean_git(origin.path)
+    assert_repo_status(origin.path)
 
     # updates for both datasets should come down the pipe
     assert_result_count(ds.update(merge=True, recursive=True),
                         2, action='update', status='ok', type='dataset')
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # now remove just-installed subdataset from origin again
     origin.remove(sname, check=False)
@@ -386,7 +385,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # not using a bound method, not giving a parentds, should
     # not be needed to get a clean dataset
     remove(op.join(ds.path, sname), check=False)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # new separate subdataset, not within the origin dataset
     otherds = Dataset(otherpath).create()
@@ -394,13 +393,13 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ds.install(source=otherds.path, path='other')
     create_tree(otherds.path, {'brand': 'new'})
     otherds.save()
-    ok_clean_git(otherds.path)
+    assert_repo_status(otherds.path)
     # pull in changes
     res = ds.update(merge=True, recursive=True)
     assert_result_count(
         res, 2, status='ok', action='update', type='dataset')
     # the next is to check for #2858
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
 
 @known_failure_windows  #FIXME

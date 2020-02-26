@@ -36,6 +36,7 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_not_in,
     assert_raises,
+    assert_repo_status,
     create_tree,
     eq_,
     get_most_obscure_supported_name,
@@ -44,7 +45,6 @@ from datalad.tests.utils import (
     local_testrepo_flavors,
     neq_,
     ok_,
-    ok_clean_git,
     skip_if,
     skip_if_no_network,
     skip_if_on_windows,
@@ -129,13 +129,13 @@ def test_GitRepo_instance_from_not_existing(path, path2):
     gr = GitRepo(path2, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path2, '.git')))
-    ok_clean_git(path2, annex=False)
+    assert_repo_status(path2, annex=False)
 
     # 4. create=True, path exists, but no git repo:
     gr = GitRepo(path, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path, '.git')))
-    ok_clean_git(path, annex=False)
+    assert_repo_status(path, annex=False)
 
 
 @with_tempfile
@@ -212,7 +212,7 @@ def test_GitRepo_add(src, path):
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
-    ok_clean_git(path)
+    assert_repo_status(path)
 
 
 @assert_cwd_unchanged
@@ -248,7 +248,7 @@ def test_GitRepo_commit(path):
 
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
-    ok_clean_git(gr)
+    assert_repo_status(gr)
     eq_("Testing GitRepo.commit().",
         gr.format_commit("%B").strip())
 
@@ -262,7 +262,7 @@ def test_GitRepo_commit(path):
 
     # commit with empty message:
     gr.commit()
-    ok_clean_git(gr)
+    assert_repo_status(gr)
 
     # nothing to commit doesn't raise by default:
     gr.commit()
@@ -504,7 +504,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit['ref'] for commit in fetched])
 
-    ok_clean_git(clone.path, annex=False)
+    assert_repo_status(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(op.exists(op.join(clone_path, filename)))  # not checked out
@@ -549,7 +549,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     fetched = repo.fetch(remote="ssh-remote")
     assert_in('ssh-remote/master', [commit['ref'] for commit in fetched])
-    ok_clean_git(repo)
+    assert_repo_status(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -588,7 +588,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 
     # pull changes:
     repo.pull(remote="ssh-remote", refspec=remote_repo.get_active_branch())
-    ok_clean_git(repo.path, annex=False)
+    assert_repo_status(repo.path, annex=False)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -971,8 +971,8 @@ def test_GitRepo_add_submodule(source, path):
     top_repo.add_submodule('sub', name='sub', url=source)
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
-    ok_clean_git(path)
-    ok_clean_git(op.join(path, 'sub'))
+    assert_repo_status(path)
+    assert_repo_status(op.join(path, 'sub'))
 
 
 def test_GitRepo_update_submodule():
@@ -1116,7 +1116,7 @@ def test_optimized_cloning(path):
         f.write('some')
     repo.add('test')
     repo.commit('init')
-    ok_clean_git(originpath, annex=False)
+    assert_repo_status(originpath, annex=False)
     from glob import glob
 
     def _get_inodes(repo):

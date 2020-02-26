@@ -270,7 +270,6 @@ def skip_v6_or_later(func, method='raise'):
 # Addition "checkers"
 #
 
-import git
 import os
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
@@ -278,90 +277,22 @@ from datalad.distribution.dataset import Dataset
 from ..utils import chpwd, getpwd
 
 
-def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
-                 untracked=[], ignore_submodules=False):
-    """Verify that under given path there is a clean git repository
+def ok_clean_git(path, annex=None, index_modified=[], untracked=[]):
+    """Obsolete test helper. Use assert_repo_status() instead.
 
-    it exists, .git exists, nothing is uncommitted/dirty/staged
-
-    Note
-    ----
-    Parameters head_modified and index_modified currently work
-    in pure git or indirect mode annex only. If they are given, no
-    test of modification of known repo content is performed.
-
-    Parameters
-    ----------
-    path: str or Repo
-      in case of a str: path to the repository's base dir;
-      Note, that passing a Repo instance prevents detecting annex. This might be
-      useful in case of a non-initialized annex, a GitRepo is pointing to.
-    annex: bool or None
-      explicitly set to True or False to indicate, that an annex is (not)
-      expected; set to None to autodetect, whether there is an annex.
-      Default: None.
-    ignore_submodules: bool
-      if True, submodules are not inspected
+    Still maps a few common cases to the new helper, to ease transition
+    in extensions.
     """
-    # TODO: See 'Note' in docstring
-
-    if isinstance(path, AnnexRepo):
-        if annex is None:
-            annex = True
-        # if `annex` was set to False, but we find an annex => fail
-        assert_is(annex, True)
-        r = path
-    elif isinstance(path, GitRepo):
-        if annex is None:
-            annex = False
-        # explicitly given GitRepo instance doesn't make sense with 'annex' True
-        assert_is(annex, False)
-        r = path
-    else:
-        # 'path' is an actual path
-        try:
-            r = AnnexRepo(path, init=False, create=False)
-            if annex is None:
-                annex = True
-            # if `annex` was set to False, but we find an annex => fail
-            assert_is(annex, True)
-        except Exception:
-            # Instantiation failed => no annex
-            try:
-                r = GitRepo(path, init=False, create=False)
-            except Exception:
-                raise AssertionError("Couldn't find an annex or a git "
-                                     "repository at {}.".format(path))
-            if annex is None:
-                annex = False
-            # explicitly given GitRepo instance doesn't make sense with
-            # 'annex' True
-            assert_is(annex, False)
-
-    eq_(sorted(r.untracked_files), sorted(untracked))
-
-    import git
-    repo = git.Repo(r.path)
-
-    if repo.index.entries.keys():
-        ok_(repo.head.is_valid())
-
-        if not head_modified and not index_modified:
-            # get string representations of diffs with index to ease
-            # troubleshooting
-            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-            index_diffs = [str(d) for d in repo.index.diff(None)]
-            eq_(head_diffs, [])
-            eq_(index_diffs, [])
-        else:
-            # TODO: These names are confusing/non-descriptive.  REDO
-            if head_modified:
-                # we did ask for interrogating changes
-                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                eq_(sorted(head_modified_), sorted(head_modified))
-            if index_modified:
-                index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                eq_(sorted(index_modified_), sorted(index_modified))
+    kwargs = {}
+    if index_modified:
+        kwargs['modified'] = index_modified
+    if untracked:
+        kwargs['untracked'] = untracked
+    assert_repo_status(
+        path,
+        annex=annex,
+        **kwargs,
+    )
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -1577,8 +1508,6 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
 
     Anything file/directory that is not explicitly indicated must have
     state 'clean', i.e. no modifications and recorded in Git.
-
-    This is an alternative to the traditional `ok_clean_git` helper.
 
     Parameters
     ----------

@@ -30,7 +30,6 @@ from datalad.support.exceptions import (
 )
 from datalad.tests.utils import (
     ok_,
-    ok_clean_git,
     eq_,
     with_tempfile,
     with_testrepos,
@@ -41,6 +40,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_in_results,
     assert_not_in_results,
+    assert_repo_status,
     assert_result_count,
     assert_message,
     serve_path_via_http,
@@ -334,7 +334,7 @@ def test_get_recurse_subdatasets(src, path):
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
-    ok_clean_git(subds1.path)
+    assert_repo_status(subds1.path)
     # explicitly given path in subdataset => implicit recursion:
     # MIH: Nope, we fulfill the dataset handle, but that doesn't
     #      imply fulfilling all file handles

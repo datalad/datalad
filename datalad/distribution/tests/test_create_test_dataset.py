@@ -15,8 +15,8 @@ from os.path import join as opj
 from datalad.tests.utils import (
     with_tempfile,
     assert_raises,
+    assert_repo_status,
     ok_,
-    ok_clean_git,
     known_failure_githubci_win,
 )
 from datalad.utils import (
@@ -49,7 +49,7 @@ def test_create_test_dataset():
         dss = create_test_dataset(spec='2/1-2')
     ok_(5 <= len(dss) <= 7)  # at least five - 1 top, two on top level, 1 in each
     for ds in dss:
-        ok_clean_git(ds, annex=None)  # some of them are annex but we just don't check
+        assert_repo_status(ds, annex=None)  # some of them are annex but we just don't check
         ok_(len(glob(opj(ds, 'file*'))))
 
 
@@ -59,7 +59,7 @@ def test_create_1test_dataset():
     with swallow_outputs():
         dss = create_test_dataset()
     eq_(len(dss), 1)
-    ok_clean_git(dss[0], annex=False)
+    assert_repo_status(dss[0], annex=False)
 
 
 @with_tempfile(mkdir=True)
@@ -70,7 +70,7 @@ def test_new_relpath(topdir):
     eq_(dss[0], opj(topdir, 'testds'))
     eq_(len(dss), 2)  # 1 top + 1 sub-dataset as demanded
     for ds in dss:
-        ok_clean_git(ds, annex=False)
+        assert_repo_status(ds, annex=False)
 
 
 @known_failure_githubci_win
@@ -84,7 +84,7 @@ def test_hierarchy(topdir):
     eq_(len(dss), 3)
     eq_(dss[0], topdir)
     for ids, ds in enumerate(dss):
-        ok_clean_git(ds, annex=False)
+        assert_repo_status(ds, annex=False)
         # each one should have 2 commits (but the last one)-- one for file and
         # another one for sub-dataset
         repo = GitRepo(ds)

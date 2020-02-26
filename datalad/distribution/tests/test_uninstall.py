@@ -36,10 +36,10 @@ from datalad.tests.utils import (
     assert_raises,
     assert_status,
     assert_in,
+    assert_repo_status,
     assert_result_count,
     assert_result_values_cond,
     ok_file_under_git,
-    ok_clean_git,
     with_tempfile,
     with_tree,
     create_tree,
@@ -92,7 +92,7 @@ def test_clean_subds_removal(path):
     subds1 = ds.create('one')
     subds2 = ds.create('two')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['one', 'two'])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # now kill one
     res = ds.remove('one', result_xfm=None)
     # subds1 got uninstalled, and ds got the removal of subds1 saved
@@ -100,7 +100,7 @@ def test_clean_subds_removal(path):
     assert_result_count(res, 1, path=subds1.path, action='remove', status='ok')
     assert_result_count(res, 1, path=ds.path, action='save', status='ok')
     ok_(not subds1.is_installed())
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # two must remain
     eq_(ds.subdatasets(result_xfm='relpaths'), ['two'])
     # one is gone
@@ -109,12 +109,12 @@ def test_clean_subds_removal(path):
     ds.create('three')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ds.uninstall('two')
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ok_(not subds2.is_installed())
     assert(exists(subds2.path))
     res = ds.remove('two', result_xfm='datasets')
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # subds2 was already uninstalled, now ds got the removal of subds2 saved
     assert(not exists(subds2.path))
     eq_(ds.subdatasets(result_xfm='relpaths'), ['three'])
@@ -253,24 +253,24 @@ def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True)
     subds = ds.create('deep', force=True)
     subds.save(recursive=True)
-    ok_clean_git(subds.path)
+    assert_repo_status(subds.path)
     # needs to be able to add a combination of staged files, modified submodule,
     # and untracked files
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # drop content of all 'kill' files
     topfile = 'kill'
     deepfile = opj('deep', 'dir', 'kill')
     # use a tuple not a list! should also work
     ds.drop((topfile, deepfile), check=False)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
     ok_(not ds.repo.file_has_content(topfile))
     ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:])))
     # remove handles for all 'kill' files
     ds.remove([topfile, deepfile], check=False)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
     ok_(not any([f.endswith(topfile) for f in files_left]))
@@ -282,12 +282,12 @@ def test_uninstall_dataset(path):
     ok_(not ds.is_installed())
     ds.create()
     ok_(ds.is_installed())
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # would only drop data
     ds.drop()
     # actually same as this, for cmdline compat reasons
     ds.drop(path=[])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # removing entire dataset, uninstall will refuse to act on top-level
     # datasets
     assert_raises(IncompleteResultsError, ds.uninstall)
@@ -302,7 +302,7 @@ def test_uninstall_dataset(path):
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # make sure there is any key
     ok_(len(ds.repo.get_file_key('one')))
     # both files link to the same key
@@ -339,8 +339,8 @@ def test_uninstall_recursive(path):
     assert_result_count(res, 1, action='save', status='ok', type='dataset')
     # save all -> all clean
     ds.save(recursive=True)
-    ok_clean_git(subds.path)
-    ok_clean_git(ds.path)
+    assert_repo_status(subds.path)
+    assert_repo_status(ds.path)
     # now uninstall in subdataset through superdataset
     target_fname = opj('deep', 'dir', 'test')
     # sane starting point
@@ -360,24 +360,24 @@ def test_uninstall_recursive(path):
     lname = opj(ds.path, target_fname)
     ok_(not exists(lname))
     # entire hierarchy saved
-    ok_clean_git(subds.path)
-    ok_clean_git(ds.path)
+    assert_repo_status(subds.path)
+    assert_repo_status(ds.path)
     # now same with actual handle removal
     # content is dropped already, so no checks in place anyway
     ds.remove(target_fname, check=True, recursive=True)
     ok_(not exists(lname) and not lexists(lname))
-    ok_clean_git(subds.path)
-    ok_clean_git(ds.path)
+    assert_repo_status(subds.path)
+    assert_repo_status(ds.path)
 
 
 @with_tempfile()
 def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # fail on missing --recursive because subdataset is present
     assert_raises(IncompleteResultsError, ds.remove)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ds.remove(recursive=True)
     # completely gone
     ok_(not ds.is_installed())
@@ -385,7 +385,7 @@ def test_remove_dataset_hierarchy(path):
     # now do it again, but without a reference dataset
     ds = Dataset(path).create()
     ds.create('deep')
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     remove(dataset=ds.path, recursive=True)
     # completely gone
     ok_(not ds.is_installed())
@@ -399,13 +399,13 @@ def test_careless_subdataset_uninstall(path):
     subds1 = ds.create('deep1')
     ds.create('deep2')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # now we kill the sub without the parent knowing
     subds1.uninstall()
     ok_(not subds1.is_installed())
     # mountpoint exists
     ok_(exists(subds1.path))
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # parent still knows the sub
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1', 'deep2'])
 
@@ -420,7 +420,7 @@ def test_kill(path):
     ds.save("file.dat")
     subds = ds.create('deep1')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1'])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # and we fail to remove since content can't be dropped
     res = ds.remove(on_failure='ignore')
@@ -451,7 +451,7 @@ def test_remove_recreation(path):
     ds = create(path)
     ds.remove()
     ds = create(path)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_(ds.is_installed())
 
 
@@ -502,7 +502,7 @@ def test_failon_nodrop(path):
     sub = ds.create('sub')
     create_tree(sub.path, {'test': 'content'})
     ds.save(opj('sub', 'test'))
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     eq_(['test'], sub.repo.get_annexed_files(with_content_only=True))
     # we put one file into the dataset's annex, no redundant copies
     # neither uninstall nor remove should work
@@ -521,9 +521,9 @@ def test_uninstall_without_super(path):
     # is just placed underneath the parent, but not an actual subdataset
     parent = Dataset(path).create()
     sub = parent.create('sub')
-    ok_clean_git(parent.path)
+    assert_repo_status(parent.path)
     nosub = create(opj(parent.path, 'nosub'))
-    ok_clean_git(nosub.path)
+    assert_repo_status(nosub.path)
     subreport = parent.subdatasets()
     assert_result_count(subreport, 1, path=sub.path)
     assert_result_count(subreport, 0, path=nosub.path)
@@ -551,7 +551,7 @@ def test_drop_nocrash_absent_subds(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')
     parent.uninstall('sub')
-    ok_clean_git(parent.path)
+    assert_repo_status(parent.path)
     with chpwd(path):
         assert_status('notneeded', drop('.', recursive=True))
 
@@ -560,7 +560,7 @@ def test_drop_nocrash_absent_subds(path):
 def test_remove_more_than_one(path):
     ds = Dataset(path).create(force=True)
     ds.save()
-    ok_clean_git(path)
+    assert_repo_status(path)
     # ensure #1912 stays resolved
     ds.remove(['one', 'two'], check=False)
-    ok_clean_git(path)
+    assert_repo_status(path)

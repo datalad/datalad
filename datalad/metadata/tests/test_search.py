@@ -28,10 +28,10 @@ from datalad.tests.utils import (
     assert_in,
     assert_is_generator,
     assert_raises,
+    assert_repo_status,
     assert_result_count,
     eq_,
     known_failure_githubci_win,
-    ok_clean_git,
     ok_file_under_git,
     patch_config,
     SkipTest,
@@ -213,7 +213,7 @@ def test_within_ds_file_search(path):
     ds.repo.set_metadata(
         opj('stim', 'stim1.mp3'), init={'importance': 'very'})
     ds.aggregate_metadata()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # basic sanity check on the metadata structure of the dataset
     dsmeta = ds.metadata('.', reporton='datasets')[0]['metadata']
     for src in ('audio',):

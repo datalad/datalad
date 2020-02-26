@@ -39,6 +39,7 @@ from datalad.tests.utils import (
     assert_not_equal,
     assert_not_in,
     assert_raises,
+    assert_repo_status,
     assert_result_count,
     assert_status,
     create_tree,
@@ -46,7 +47,6 @@ from datalad.tests.utils import (
     known_failure_windows,
     neq_,
     ok_,
-    ok_clean_git,
     ok_file_has_content,
     serve_path_via_http,
     skip_if_on_windows,
@@ -139,8 +139,8 @@ def test_publish_simple(origin, src_path, dst_path):
     res = publish(dataset=source, to="target", result_xfm='datasets')
     eq_(res, [source])
 
-    ok_clean_git(source.repo, annex=None)
-    ok_clean_git(target, annex=None)
+    assert_repo_status(source.repo, annex=None)
+    assert_repo_status(target, annex=None)
     eq_(list(target.get_branch_commits_("master")),
         list(source.repo.get_branch_commits_("master")))
 
@@ -149,8 +149,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # and nothing is pushed
     assert_result_count(res, 1, status='notneeded')
 
-    ok_clean_git(source.repo, annex=None)
-    ok_clean_git(target, annex=None)
+    assert_repo_status(source.repo, annex=None)
+    assert_repo_status(target, annex=None)
     eq_(list(target.get_branch_commits_("master")),
         list(source.repo.get_branch_commits_("master")))
     eq_(list(target.get_branch_commits_("git-annex")),
@@ -165,12 +165,12 @@ def test_publish_simple(origin, src_path, dst_path):
         f.write("Some additional stuff.")
     source.save(opj(src_path, 'test_mod_file'), to_git=True,
                 message="Modified.")
-    ok_clean_git(source.repo, annex=None)
+    assert_repo_status(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
     eq_(res, [source])
 
-    ok_clean_git(dst_path, annex=None)
+    assert_repo_status(dst_path, annex=None)
     eq_(list(target.get_branch_commits_("master")),
         list(source.repo.get_branch_commits_("master")))
     # Since git-annex 6.20170220, post-receive hook gets triggered
@@ -205,8 +205,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     res = publish(dataset=source, to="target", result_xfm='datasets')
     eq_(res, [source])
 
-    ok_clean_git(source.repo, annex=None)
-    ok_clean_git(target, annex=None)
+    assert_repo_status(source.repo, annex=None)
+    assert_repo_status(target, annex=None)
     eq_(list(target.get_branch_commits_("master")),
         list(source.repo.get_branch_commits_("master")))
 
@@ -215,8 +215,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     # and nothing is pushed
     assert_result_count(res, 1, status='notneeded')
 
-    ok_clean_git(source.repo, annex=None)
-    ok_clean_git(target, annex=None)
+    assert_repo_status(source.repo, annex=None)
+    assert_repo_status(target, annex=None)
     eq_(list(target.get_branch_commits_("master")),
         list(source.repo.get_branch_commits_("master")))
 
@@ -225,12 +225,12 @@ def test_publish_plain_git(origin, src_path, dst_path):
         f.write("Some additional stuff.")
     source.save(opj(src_path, 'test_mod_file'), to_git=True,
                message="Modified.")
-    ok_clean_git(source.repo, annex=None)
+    assert_repo_status(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
     eq_(res, [source])
 
-    ok_clean_git(dst_path, annex=None)
+    assert_repo_status(dst_path, annex=None)
     eq_(list(target.get_branch_commits_("master")),
         list(source.repo.get_branch_commits_("master")))
 
@@ -570,11 +570,11 @@ def test_publish_depends(
     source.create_sibling(
         'ssh://datalad-test' + target3_path,
         name='target3')
-    ok_clean_git(src_path)
+    assert_repo_status(src_path)
     # introduce change in source
     create_tree(src_path, {'probe1': 'probe1'})
     source.save('probe1')
-    ok_clean_git(src_path)
+    assert_repo_status(src_path)
     # only the source has the probe
     ok_file_has_content(opj(src_path, 'probe1'), 'probe1')
     for p in (target1_path, target2_path, target3_path):
@@ -611,14 +611,14 @@ def test_gh1426(origin_path, target_path):
         'receive.denyCurrentBranch', 'updateInstead', where='local')
     origin.siblings('add', name='target', url=target_path)
     origin.publish(to='target')
-    ok_clean_git(origin.path)
-    ok_clean_git(target.path)
+    assert_repo_status(origin.path)
+    assert_repo_status(target.path)
     eq_(origin.repo.get_hexsha(), target.get_hexsha())
 
     # gist of #1426 is that a newly added subdataset does not cause the
     # superdataset to get published
     origin.create('sub')
-    ok_clean_git(origin.path)
+    assert_repo_status(origin.path)
     assert_not_equal(origin.repo.get_hexsha(), target.get_hexsha())
     # now push
     res = origin.publish(to='target')
@@ -642,7 +642,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
     # some content modification of the superdataset
     create_tree(src_path, {'probe1': 'probe1'})
     source.save('probe1')
-    ok_clean_git(src_path)
+    assert_repo_status(src_path)
 
     # create the target(s):
     source.create_sibling(

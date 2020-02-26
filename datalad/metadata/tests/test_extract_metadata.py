@@ -23,9 +23,9 @@ from datalad.utils import chpwd
 from datalad.tests.utils import (
     assert_in,
     assert_raises,
+    assert_repo_status,
     assert_result_count,
     known_failure_githubci_win,
-    ok_clean_git,
     with_tempfile,
 )
 
@@ -52,7 +52,7 @@ def test_ds_extraction(path):
     ds = Dataset(path).create()
     copy(testpath, path)
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     res = extract_metadata(
         types=['xmp'],
