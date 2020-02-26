@@ -2651,7 +2651,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 except CommandError as e:
                     # intercept some errors that we express as an error report
                     # in the info dicts
-                    if re.match('error: failed to (push|fetch) some refs', e.stderr):
+                    if re.match(
+                            '.*^error: failed to (push|fetch) some refs',
+                            e.stderr,
+                            re.DOTALL | re.MULTILINE):
                         output = {1: e.stderr, 0: e.stdout}[info_from]
                         if output is None:
                             output = ''
