@@ -968,7 +968,7 @@ class Runner(object):
             )
 
 
-class GitRunner(Runner):
+class GitRunnerBase(object):
     """
     Runner to be used to run git and git annex commands
 
@@ -978,11 +978,6 @@ class GitRunner(Runner):
     """
     _GIT_PATH = None
 
-    @borrowdoc(Runner)
-    def __init__(self, *args, **kwargs):
-        super(GitRunner, self).__init__(*args, **kwargs)
-        self._check_git_path()
-
     @staticmethod
     def _check_git_path():
         """If using bundled git-annex, we would like to use bundled with it git
@@ -990,7 +985,7 @@ class GitRunner(Runner):
         Thus we will store _GIT_PATH a path to git in the same directory as annex
         if found.  If it is empty (but not None), we do nothing
         """
-        if GitRunner._GIT_PATH is None:
+        if GitRunnerBase._GIT_PATH is None:
             from distutils.spawn import find_executable
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
@@ -998,14 +993,14 @@ class GitRunner(Runner):
                     in ('1', 'on', 'true', 'yes')):
                 git_fpath = find_executable("git")
                 if git_fpath:
-                    GitRunner._GIT_PATH = ''
+                    GitRunnerBase._GIT_PATH = ''
                     lgr.log(9, "Will use default git %s", git_fpath)
                     return  # we are done - there is a default git avail.
                 # if not -- we will look for a bundled one
-            GitRunner._GIT_PATH = GitRunner._get_bundled_path()
+            GitRunnerBase._GIT_PATH = GitRunnerBase._get_bundled_path()
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
-                       "string)", GitRunner._GIT_PATH)
-            assert(GitRunner._GIT_PATH is not None)  # we made the decision!
+                       "string)", GitRunnerBase._GIT_PATH)
+            assert(GitRunnerBase._GIT_PATH is not None)  # we made the decision!
 
     @staticmethod
     def _get_bundled_path():
@@ -1026,10 +1021,10 @@ class GitRunner(Runner):
         """
         # if env set copy else get os environment
         git_env = env.copy() if env else os.environ.copy()
-        if GitRunner._GIT_PATH:
-            git_env['PATH'] = op.pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+        if GitRunnerBase._GIT_PATH:
+            git_env['PATH'] = op.pathsep.join([GitRunnerBase._GIT_PATH, git_env['PATH']]) \
                 if 'PATH' in git_env \
-                else GitRunner._GIT_PATH
+                else GitRunnerBase._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
@@ -1044,12 +1039,34 @@ class GitRunner(Runner):
 
         return git_env
 
+
+class GitRunner(Runner, GitRunnerBase):
+
+    @borrowdoc(Runner)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._check_git_path()
+
+
     def run(self, cmd, env=None, *args, **kwargs):
-        out, err = super(GitRunner, self).run(
-            cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
+        out, err = super().run(
+            cmd,
+            env=self.get_git_environ_adjusted(env),
+            *args, **kwargs)
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
         return assure_unicode(out), assure_unicode(err)
+
+
+class GitWitlessRunner(WitlessRunner, GitRunnerBase):
+
+    @borrowdoc(WitlessRunner)
+    def __init__(self, *args, **kwargs):
+        kwargs['env'] = GitRunnerBase.get_git_environ_adjusted(
+            env=kwargs.get('env', None)
+        )
+        super().__init__(*args, **kwargs)
+        self._check_git_path()
 
 
 def readline_rstripped(stdout):
@@ -1100,7 +1117,7 @@ class BatchedCommand(SafeDelCloseMixin):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=self._stderr_out,
-            env=GitRunner.get_git_environ_adjusted(),
+            env=GitRunnerBase.get_git_environ_adjusted(),
             cwd=self.path,
             bufsize=1,
             universal_newlines=True  # **kwargs

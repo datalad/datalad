@@ -57,7 +57,7 @@ from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import (
-    WitlessRunner,
+    GitWitlessRunner,
     WitlessProtocol,
     GitRunner,
     BatchedCommand,
@@ -1215,8 +1215,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
-                res = WitlessRunner(
-                    env=GitRunner.get_git_environ_adjusted()).run(
+                res = GitWitlessRunner().run(
                         ['git', 'clone', '--progress', url, path] \
                         + (to_options(**clone_options)
                            if clone_options else []),
@@ -2500,11 +2499,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         url = self.config.get('remote.{}.url'.format(remote), None)
         if url and is_ssh(url):
             ssh_manager.get_connection(url).open()
-        WitlessRunner(
-            cwd=self.path,
-            env=GitRunner.get_git_environ_adjusted()).run(
-                cmd,
-                protocol=StdOutCaptureWithGitProgress,
+        GitWitlessRunner(cwd=self.path).run(
+            cmd,
+            protocol=StdOutCaptureWithGitProgress,
         )
 
     def push(self, remote=None, refspec=None, all_remotes=False,
@@ -2641,11 +2638,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if url and is_ssh(url):
                     ssh_manager.get_connection(url).open()
                 try:
-                    out = WitlessRunner(
-                        cwd=self.path,
-                        env=GitRunner.get_git_environ_adjusted()).run(
-                            r_cmd,
-                            protocol=protocol,
+                    out = GitWitlessRunner(cwd=self.path).run(
+                        r_cmd,
+                        protocol=protocol,
                     )
                     output = out[info_from] or ''
                 except CommandError as e:
