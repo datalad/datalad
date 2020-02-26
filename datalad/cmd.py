@@ -233,17 +233,39 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         self.pid = None
         super().__init__()
 
+        self._log_outputs = False
+        if lgr.isEnabledFor(5):
+            try:
+                from . import cfg
+                self._log_outputs = cfg.getbool('datalad.log', 'outputs', default=False)
+            except ImportError:
+                pass
+            self._log = self._log_summary
+        else:
+            self._log = self._log_nolog
+
+    def _log_nolog(self, *args):
+        pass
+
+    def _log_summary(self, fd, data):
+        fd_name = self.FD_NAMES[fd]
+        lgr.log(5, 'Read %i bytes from %i[%s]%s',
+                len(data), self.pid, fd_name, ':' if self._log_outputs else '')
+        if self._log_outputs:
+            log_data = assure_unicode(data)
+            if True: # for line in log_data.split(os.linesep):
+                # Level and way we log is to stay consistent with Runner.
+                # TODO: later we might just log in a single entry, without
+                # fd_name prefix
+                lgr.log(9, "%s| %s " % (fd_name, log_data))
+
     def connection_made(self, transport):
         self.transport = transport
         self.pid = transport.get_pid()
         lgr.debug('Process %i started', self.pid)
 
     def pipe_data_received(self, fd, data):
-        if lgr.isEnabledFor(5):
-            lgr.log(
-                5,
-                'Read %i bytes from %i[%s]',
-                len(data), self.pid, self.FD_NAMES[fd])
+        self._log(fd, data)
         # store received output if stream was to be captured
         if self.buffer[fd - 1] is not None:
             self.buffer[fd - 1].extend(data)
