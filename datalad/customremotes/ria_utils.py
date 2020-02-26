@@ -83,3 +83,19 @@ def verify_ria_url(url, cfg):
         raise ValueError("Unsupported protocol: %s" % protocol)
 
     return url_ri.hostname if protocol == 'ssh' else None, url_ri.path, url
+
+
+def create_store(io, base_path, version):
+    # Note, that the following does create the base-path dir as well:
+    io.mkdir(base_path / 'error_logs')
+
+    io.write_file(base_path / 'ria-layout-version', version + '\n')
+
+
+def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
+    # TODO: This is currently store layout version!
+    #       Too entangled by current get_layout_locations.
+    dsgit_dir, archive_dir, dsobj_dir = \
+        get_layout_locations(int(store_version), base_path, dsid)
+    io.mkdir(archive_dir)
+    io.write_file(dsgit_dir / 'ria-layout-version', obj_version + '\n')

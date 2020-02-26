@@ -587,13 +587,6 @@ class RIARemote(SpecialRemote):
         self.remote_obj_dir = None
         self._io = None  # lazy
 
-    def create_store(self):
-        # Note, that the following does create the base-path dir as well:
-        self.io.mkdir(self.store_base_path / 'error_logs')
-
-        self.io.write_file(self.store_base_path / 'ria-layout-version',
-                           self.dataset_tree_version + '\n')
-
     def verify_store(self):
         """Check whether the store exists and reports a layout version we
         know
@@ -631,11 +624,6 @@ class RIARemote(SpecialRemote):
                 # that is. Treat the same way as if there was an unknown version
                 # on record.
                 raise NoLayoutVersion
-
-    def create_ds_in_store(self):
-        self.io.mkdir(self.remote_archive_dir)
-        self.io.write_file(self.remote_git_dir / 'ria-layout-version',
-                           self.object_tree_version + '\n')
 
     def verify_ds_in_store(self):
         """Check whether the dataset exists in store and reports a layout
@@ -763,106 +751,13 @@ class RIARemote(SpecialRemote):
 
         return remote_version
 
-    @handle_errors
-    def initremote(self):
-        # which repo are we talking about
-        gitdir = self.annex.getgitdir()
-        self._verify_config(gitdir, fail_noid=False)
-        if not self.archive_id:
-            self.archive_id = _get_datalad_id(gitdir)
-            if not self.archive_id:
-                # fall back on the UUID for the annex remote
-                self.archive_id = self.annex.getuuid()
-        self.annex.setconfig('archive-id', self.archive_id)
-        # make sure, we store the potentially rewritten URL
-        self.annex.setconfig('url', self.ria_store_url)
+    def get_store(self):
+        """checks the remote end for an existing store and dataset
 
-        # cache remote layout directories
-        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.store_base_path, self.archive_id)
-
-        # TODO: read-only prob. is superfluous here. Anything writing to the
-        #       remote should come after a call to prepare AFAIK.
-        read_only_msg = "Setting remote to read-only usage in order to" \
-                        "prevent damage by putting things into an unknown " \
-                        "version of the target layout. You can overrule this " \
-                        "by configuring 'annex.ria-remote.<name>.force-write'."
-        try:
-            self.verify_store()
-        except (FileNotFoundError, NoLayoutVersion):
-            self.create_store()
-        except UnknownLayoutVersion:
-            self._info("Remote dataset tree reports version {}. Supported"
-                       "versions are: {}. Consider upgrading datalad or "
-                       "fix the structure on the remote end."
-                       "".format(self.remote_dataset_tree_version,
-                                 self.known_versions_dst))
-            self._set_read_only(read_only_msg)
-
-        try:
-            self.verify_ds_in_store()
-        except (FileNotFoundError, NoLayoutVersion):
-            self.create_ds_in_store()
-        except UnknownLayoutVersion:
-            self._info("Remote object tree reports version {}. Supported"
-                       "versions are {}. Consider upgrading datalad."
-                       "".format(self.remote_object_tree_version,
-                                 self.known_versions_objt))
-            self._set_read_only(read_only_msg)
-
-    def _local_io(self):
-        """Are we doing local operations?"""
-        # let's not make this decision dependent on the existance
-        # of a directory the matches the name of the configured
-        # store tree base dir. Such a match could be pure
-        # coincidence. Instead, let's do remote whenever there
-        # is a remote host configured
-        #return self.store_base_path.is_dir()
-        return not self.storage_host
-
-    def _info(self, msg):
-
-        if self.can_notify:
-            self.annex.info(msg)
-        # TODO: else: if we can't have an actual info message, at least have a debug message
-        #       This probably requires further refurbishment of datalad's capability to deal with such aspects of the
-        #       special remote protocol
-
-    def _set_read_only(self, msg):
-
-        if not self.force_write:
-            self.read_only = True
-            self._info(msg)
-        else:
-            self._info("Was instructed to force write")
-
-    @property
-    def io(self):
-        if not self._io:
-            if self._local_io():
-                self._io = LocalIO()
-            elif self.storage_host:
-                self._io = SSHRemoteIO(self.storage_host)
-                from atexit import register
-                register(self._io.close)
-            else:
-                raise RIARemoteError(
-                    "Local object tree base path does not exist, and no SSH"
-                    "host configuration found.")
-        return self._io
-
-    @handle_errors
-    def prepare(self):
-
-        # can we use self.annex.info() for sending user output to annex?
-        self.can_notify = "INFO" in self.annex.protocol.extensions
-
-        gitdir = self.annex.getgitdir()
-        self.uuid = self.annex.getuuid()
-        self._verify_config(gitdir)
-
-        # make sure, we have an IO:
-        io = self.io
+        Furthermore reads and stores version and config flags, layout
+        locations, etc.
+        If this doesn't raise, the remote end should be fine to work with.
+        """
 
         # cache remote layout directories
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
@@ -900,6 +795,121 @@ class RIARemote(SpecialRemote):
                        "Consider upgrading datalad or fix the structure on"
                        "the remote end.")
             self._set_read_only(read_only_msg)
+
+    @handle_errors
+    def initremote(self):
+        # which repo are we talking about
+        gitdir = self.annex.getgitdir()
+        self._verify_config(gitdir, fail_noid=False)
+        if not self.archive_id:
+            self.archive_id = _get_datalad_id(gitdir)
+            if not self.archive_id:
+                # fall back on the UUID for the annex remote
+                self.archive_id = self.annex.getuuid()
+
+        # TODO: The following block needs to be replaced by get_store() or even
+        #       prepare() only, so initremote would expect an existing remote
+        #       end, while creation has to go completely outside special remote
+        #       itself.
+        #############################
+
+        from .ria_utils import create_store, create_ds_in_store
+
+        # cache remote layout directories
+        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
+            self.get_layout_locations(self.store_base_path, self.archive_id)
+
+        # TODO: read-only prob. is superfluous here. Anything writing to the
+        #       remote should come after a call to prepare AFAIK.
+        read_only_msg = "Setting remote to read-only usage in order to" \
+                        "prevent damage by putting things into an unknown " \
+                        "version of the target layout. You can overrule this " \
+                        "by configuring 'annex.ria-remote.<name>.force-write'."
+        try:
+            self.verify_store()
+        except (FileNotFoundError, NoLayoutVersion):
+            create_store(self.io, self.store_base_path,
+                         self.dataset_tree_version)
+        except UnknownLayoutVersion:
+            self._info("Remote dataset tree reports version {}. Supported"
+                       "versions are: {}. Consider upgrading datalad or "
+                       "fix the structure on the remote end."
+                       "".format(self.remote_dataset_tree_version,
+                                 self.known_versions_dst))
+            self._set_read_only(read_only_msg)
+
+        try:
+            self.verify_ds_in_store()
+        except (FileNotFoundError, NoLayoutVersion):
+            create_ds_in_store(self.io, self.store_base_path, self.archive_id,
+                               self.object_tree_version,
+                               self.dataset_tree_version)
+        except UnknownLayoutVersion:
+            self._info("Remote object tree reports version {}. Supported"
+                       "versions are {}. Consider upgrading datalad."
+                       "".format(self.remote_object_tree_version,
+                                 self.known_versions_objt))
+            self._set_read_only(read_only_msg)
+
+        ##############################
+
+        self.annex.setconfig('archive-id', self.archive_id)
+        # make sure, we store the potentially rewritten URL
+        self.annex.setconfig('url', self.ria_store_url)
+
+    def _local_io(self):
+        """Are we doing local operations?"""
+        # let's not make this decision dependent on the existance
+        # of a directory the matches the name of the configured
+        # store tree base dir. Such a match could be pure
+        # coincidence. Instead, let's do remote whenever there
+        # is a remote host configured
+        #return self.store_base_path.is_dir()
+        return not self.storage_host
+
+    def _info(self, msg):
+
+        if self.can_notify:
+            self.annex.info(msg)
+        # TODO: else: if we can't have an actual info message, at least have a
+        #       debug message.
+        #       This probably requires further refurbishment of datalad's
+        #       capability to deal with such aspects of the
+        #       special remote protocol when parsing annex' output.
+
+    def _set_read_only(self, msg):
+
+        if not self.force_write:
+            self.read_only = True
+            self._info(msg)
+        else:
+            self._info("Was instructed to force write")
+
+    @property
+    def io(self):
+        if not self._io:
+            if self._local_io():
+                self._io = LocalIO()
+            elif self.storage_host:
+                self._io = SSHRemoteIO(self.storage_host)
+                from atexit import register
+                register(self._io.close)
+            else:
+                raise RIARemoteError(
+                    "Local object tree base path does not exist, and no SSH"
+                    "host configuration found.")
+        return self._io
+
+    @handle_errors
+    def prepare(self):
+
+        # can we use self.annex.info() for sending user output to annex?
+        self.can_notify = "INFO" in self.annex.protocol.extensions
+
+        gitdir = self.annex.getgitdir()
+        self.uuid = self.annex.getuuid()
+        self._verify_config(gitdir)
+        self.get_store()
 
         # report active special remote configuration
         self.info = {
