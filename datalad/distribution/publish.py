@@ -33,7 +33,10 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.sshconnector import sh_quote
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
 from datalad.utils import assure_list
@@ -420,8 +423,18 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # even if we already fetched above we need to do it again
         if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
-            ds.repo.fetch(remote=remote)
-            ds.repo.merge_annex(remote)
+            try:
+                ds.repo.fetch(remote=remote)
+                ds.repo.merge_annex(remote)
+            except CommandError as exc:
+                # We might be publishing for the first time to this
+                # possibly special (e.g. LFS) annex special remote,
+                # and no HEAD was known
+                if ("Couldn't find remote ref HEAD" in exc.stderr) and \
+                   ('%s/HEAD' % remote not in ds.repo.get_remote_branches()):
+                    pass
+                else:
+                    raise
 
         # Note: git's push.default is 'matching', which doesn't work for first
         # time publication (a branch, that doesn't exist on remote yet)
