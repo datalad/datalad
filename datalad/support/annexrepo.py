@@ -47,22 +47,24 @@ from datalad.dochelpers import (
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
-    linux_distribution_name,
-    auto_repr,
-    on_windows,
     assure_list,
+    auto_repr,
+    ensure_list,
+    linux_distribution_name,
     make_tempfile,
+    on_windows,
     partition,
-    unlink,
     quote_cmdlinearg,
     split_cmdline,
+    unlink,
 )
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
-    GitRunner,
     BatchedCommand,
-    SafeDelCloseMixin,
+    GitRunner,
+    GitWitlessRunner,
     run_gitcommand_on_file_list_chunks,
+    SafeDelCloseMixin,
 )
 
 # imports from same module:
@@ -1748,19 +1750,20 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command('initremote', annex_options=[name] + options)
         self.config.reload()
 
-    def enable_remote(self, name, env=None):
+    def enable_remote(self, name, options=None, env=None):
         """Enables use of an existing special remote
 
         Parameters
         ----------
         name: str
             name, the special remote was created with
+        options: list, optional
         """
 
         try:
             self._run_annex_command(
                 'enableremote',
-                annex_options=[name],
+                annex_options=[name] + ensure_list(options),
                 expect_fail=True,
                 log_stderr=True,
                 env=env)
