@@ -527,10 +527,12 @@ def handle_errors(func):
                 from datetime import datetime
                 from traceback import format_exc
                 exc_str = format_exc()
-                entry = "{time}: Error:\n{exc_str}\n".format(time=datetime.now(),
-                                                                exc_str=exc_str)
-                log_target = self.objtree_base_path / 'error_logs' / "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                                                                uuid=self.uuid)
+                entry = "{time}: Error:\n{exc_str}\n" \
+                        "".format(time=datetime.now(),
+                                  exc_str=exc_str)
+                log_target = self.store_base_path / 'error_logs' / \
+                             "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                                        uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
@@ -557,7 +559,7 @@ class RIARemote(SpecialRemote):
         self.storage_host = None
         # must be absolute, and POSIX
         # subclass must set this
-        self.objtree_base_path = None
+        self.store_base_path = None
         # by default we can read and write
         self.read_only = False
         self.can_notify = None  # to be figured out later, since annex.protocol.extensions is not yet accessible
@@ -579,10 +581,10 @@ class RIARemote(SpecialRemote):
             self.storage_host = _get_gitcfg(
                 gitdir, 'annex.ria-remote.{}.ssh-host'.format(name))
 
-            objtree_base_path = _get_gitcfg(
+            store_base_path = _get_gitcfg(
                 gitdir, 'annex.ria-remote.{}.base-path'.format(name))
-            self.objtree_base_path = objtree_base_path.strip() \
-                if objtree_base_path else objtree_base_path
+            self.store_base_path = store_base_path.strip() \
+                if store_base_path else store_base_path
         # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
         # version mismatch.
         self.force_write = _get_gitcfg(
@@ -609,7 +611,7 @@ class RIARemote(SpecialRemote):
                 for line in url_cfgs_raw.splitlines():
                     k, v = line.split()
                     url_cfgs[k] = v
-            self.storage_host, self.objtree_base_path, self.ria_store_url = \
+            self.storage_host, self.store_base_path, self.ria_store_url = \
                 verify_ria_url(self.ria_store_url, url_cfgs)
 
         # TODO duplicates call to `git-config` after RIA url rewrite
@@ -617,18 +619,18 @@ class RIARemote(SpecialRemote):
 
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
-            if not self.objtree_base_path:
-                self.objtree_base_path = self.annex.getconfig('base-path')
-            if not self.objtree_base_path:
+            if not self.store_base_path:
+                self.store_base_path = self.annex.getconfig('base-path')
+            if not self.store_base_path:
                 raise RIARemoteError(
                     "No remote base path configured. "
                     "Specify `base-path` setting.")
 
-        self.objtree_base_path = Path(self.objtree_base_path)
-        if not self.objtree_base_path.is_absolute():
+        self.store_base_path = Path(self.store_base_path)
+        if not self.store_base_path.is_absolute():
             raise RIARemoteError(
                 'Non-absolute object tree base path configuration: %s'
-                '' % str(self.objtree_base_path))
+                '' % str(self.store_base_path))
 
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
@@ -687,10 +689,10 @@ class RIARemote(SpecialRemote):
         """Are we doing local operations?"""
         # let's not make this decision dependent on the existance
         # of a directory the matches the name of the configured
-        # object tree base dir. Such a match could be pure
+        # store tree base dir. Such a match could be pure
         # coincidence. Instead, let's do remote whenever there
         # is a remote host configured
-        #return self.objtree_base_path.is_dir()
+        #return self.store_base_path.is_dir()
         return not self.storage_host
 
     def _info(self, msg):
@@ -722,9 +724,9 @@ class RIARemote(SpecialRemote):
         """
 
         dataset_tree_version_file = \
-            self.objtree_base_path / 'ria-layout-version'
+            self.store_base_path / 'ria-layout-version'
         object_tree_version_file = \
-            self.objtree_base_path / self.archive_id[:3] / self.archive_id[3:] / 'ria-layout-version'
+            self.store_base_path / self.archive_id[:3] / self.archive_id[3:] / 'ria-layout-version'
 
         read_only_msg = "Setting remote to read-only usage in order to prevent damage by putting things into an " \
                         "unknown version of the target layout. You can overrule this by configuring " \
@@ -798,7 +800,7 @@ class RIARemote(SpecialRemote):
 
         # report active special remote configuration
         self.info = {
-            'objtree_base_path': str(self.objtree_base_path),
+            'store_base_path': str(self.store_base_path),
             'storage_host': 'local'
             if self._local_io() else self.storage_host,
         }
@@ -807,7 +809,7 @@ class RIARemote(SpecialRemote):
 
         # cache remote layout directories
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.objtree_base_path, self.archive_id)
+            self.get_layout_locations(self.store_base_path, self.archive_id)
 
     @handle_errors
     def transfer_store(self, key, filename):
