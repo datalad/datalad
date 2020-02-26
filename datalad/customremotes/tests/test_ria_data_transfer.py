@@ -51,12 +51,12 @@ def test_binary_data_ssh(dspath, store):
                 ".nii.gz")
 
     ds = clone(url, dspath)
-    ds.get(file)
+    ds.get(str(file))
 
     ds.create_sibling_ria("ria+ssh://localhost{}"
                           "".format(Path(store).as_posix()),
                           "datastore")
 
     ds.publish(to="datastore", transfer_data="all")
-    ds.drop(file)
+    ds.drop(str(file))
     ds.get(file, source="datastore-ria")
