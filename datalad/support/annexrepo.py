@@ -829,7 +829,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(remote)
         opts = self.config.options('remote.{}'.format(remote))
-        if "url" in opts:
+        # for LFS git-annex records URL in the config
+        if "url" in opts and ('annex-git-lfs' not in opts):
             is_special = False
         elif any(o.startswith("annex-") for o in opts
                  if o not in ["annex-uuid", "annex-ignore"]):
