@@ -34,7 +34,6 @@ from datalad.tests.utils import assert_not_is_instance
 from urllib.parse import urljoin
 from urllib.parse import urlsplit
 
-import git
 from unittest.mock import patch
 import gc
 
