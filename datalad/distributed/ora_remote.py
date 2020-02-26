@@ -547,6 +547,10 @@ class UnknownLayoutVersion(Exception):
     pass
 
 
+class NoLayoutVersion(Exception):
+    pass
+
+
 class RIARemote(SpecialRemote):
     """This is the class of RIA remotes.
     """
@@ -601,11 +605,6 @@ class RIARemote(SpecialRemote):
         dataset_tree_version_file = \
             self.store_base_path / 'ria-layout-version'
 
-        read_only_msg = "Setting remote to read-only usage in order to" \
-                        "prevent damage by putting things into an unknown " \
-                        "version of the target layout. You can overrule this " \
-                        "by configuring 'annex.ria-remote.<name>.force-write'."
-
         # check dataset tree version
         try:
             self.remote_dataset_tree_version = \
@@ -613,12 +612,7 @@ class RIARemote(SpecialRemote):
             if self.remote_dataset_tree_version not in self.known_versions_dst:
                 # Note: In later versions, condition might change in order to
                 # deal with older versions.
-                self._info("Remote dataset tree reports version {}. Supported"
-                           "versions are: {}. Consider upgrading datalad or "
-                           "fix the structure on the remote end."
-                           "".format(self.remote_dataset_tree_version,
-                                     self.known_versions_dst))
-                self._set_read_only(read_only_msg)
+                raise UnknownLayoutVersion
 
         except (RemoteError, FileNotFoundError):
             # Exception class depends on whether self.io is local or SSH.
@@ -635,10 +629,7 @@ class RIARemote(SpecialRemote):
                 # Directory is there, but no version file. We don't know what
                 # that is. Treat the same way as if there was an unknown version
                 # on record.
-                self._info("Remote doesn't report any dataset tree version."
-                           "Consider upgrading datalad or fix the structure"
-                           "on the remote end.")
-                self._set_read_only(read_only_msg)
+                raise NoLayoutVersion
 
     def create_ds_in_store(self):
         self.io.mkdir(self.remote_archive_dir)
@@ -657,21 +648,12 @@ class RIARemote(SpecialRemote):
 
         object_tree_version_file = self.remote_git_dir / 'ria-layout-version'
 
-        read_only_msg = "Setting remote to read-only usage in order to" \
-                        "prevent damage by putting things into an unknown " \
-                        "version of the target layout. You can overrule this " \
-                        "by configuring 'annex.ria-remote.<name>.force-write'."
-
         # check (annex) object tree version
         try:
             self.remote_object_tree_version =\
                 self._get_version_config(object_tree_version_file)
             if self.remote_object_tree_version not in self.known_versions_objt:
-                self._info("Remote object tree reports version {}. Supported"
-                           "versions are {}. Consider upgrading datalad."
-                           "".format(self.remote_object_tree_version,
-                                     self.known_versions_objt))
-                self._set_read_only(read_only_msg)
+                raise UnknownLayoutVersion
         except (RemoteError, FileNotFoundError):
             # Exception class depends on whether self.io is local or SSH.
             # assume file doesn't exist
@@ -682,10 +664,7 @@ class RIARemote(SpecialRemote):
                 # unify exception
                 raise FileNotFoundError
             else:
-                self._info("Remote doesn't report any object tree version."
-                           "Consider upgrading datalad or fix the structure on"
-                           "the remote end.")
-                self._set_read_only(read_only_msg)
+                raise NoLayoutVersion
 
     def _load_cfg(self, gitdir, name):
         # for now still accept the configs, if no ria-URL is known:
@@ -848,15 +827,42 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
             self.get_layout_locations(self.store_base_path, self.archive_id)
 
+        read_only_msg = "Setting remote to read-only usage in order to" \
+                        "prevent damage by putting things into an unknown " \
+                        "version of the target layout. You can overrule this " \
+                        "by configuring 'annex.ria-remote.<name>.force-write'."
         try:
             self.verify_store()
         except FileNotFoundError:
             self.create_store()
+        except UnknownLayoutVersion:
+            self._info("Remote dataset tree reports version {}. Supported"
+                       "versions are: {}. Consider upgrading datalad or "
+                       "fix the structure on the remote end."
+                       "".format(self.remote_dataset_tree_version,
+                                 self.known_versions_dst))
+            self._set_read_only(read_only_msg)
+        except NoLayoutVersion:
+            self._info("Remote doesn't report any dataset tree version."
+                       "Consider upgrading datalad or fix the structure"
+                       "on the remote end.")
+            self._set_read_only(read_only_msg)
 
         try:
             self.verify_ds_in_store()
         except FileNotFoundError:
             self.create_ds_in_store()
+        except UnknownLayoutVersion:
+            self._info("Remote object tree reports version {}. Supported"
+                       "versions are {}. Consider upgrading datalad."
+                       "".format(self.remote_object_tree_version,
+                                 self.known_versions_objt))
+            self._set_read_only(read_only_msg)
+        except NoLayoutVersion:
+            self._info("Remote doesn't report any object tree version."
+                       "Consider upgrading datalad or fix the structure on"
+                       "the remote end.")
+            self._set_read_only(read_only_msg)
 
         # report active special remote configuration
         self.info = {
