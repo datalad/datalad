@@ -1793,7 +1793,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
 
-        runner = WitlessRunner(cwd=self.path, env=env)
+        runner = GitWitlessRunner(cwd=self.path, env=env)
 
         try:
             for i, chunk in enumerate(file_chunks):
