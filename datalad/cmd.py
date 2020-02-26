@@ -143,7 +143,8 @@ def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
     return ''.join(out), ''.join(err)
 
 
-async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
+async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
+                        **kwargs):
     """Run a command in a subprocess managed by asyncio
 
     This implementation has been inspired by
@@ -161,6 +162,8 @@ async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
       with the subprocess.
     stdin : file-like or None
       Passed to the subprocess as its standard input.
+    protocol_kwargs : dict, optional
+      Passed to the Protocol class constructor.
     kwargs : Pass to `subprocess_exec`, will typically be parameters
       supported by `subprocess.Popen`.
 
@@ -172,8 +175,10 @@ async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
     """
     lgr.debug('Async run %s', cmd)
 
+    if protocol_kwargs is None:
+        protocol_kwargs = {}
     cmd_done = asyncio.Future(loop=loop)
-    factory = functools.partial(protocol, cmd_done)
+    factory = functools.partial(protocol, cmd_done, **protocol_kwargs)
     proc = loop.subprocess_exec(
         factory,
         *cmd,
@@ -323,7 +328,7 @@ class WitlessRunner(object):
             # a potential PWD setting
             self.env['PWD'] = self.cwd
 
-    def run(self, cmd, protocol=None, stdin=None):
+    def run(self, cmd, protocol=None, stdin=None, **kwargs):
         """Execute a command and communicate with it.
 
         Parameters
@@ -339,6 +344,8 @@ class WitlessRunner(object):
         stdin : byte stream, optional
           File descriptor like, used as stdin for the process. Passed
           verbatim to subprocess.Popen().
+        kwargs :
+          Passed to the Protocol class constructor.
 
         Returns
         -------
@@ -379,6 +386,7 @@ class WitlessRunner(object):
                 cmd,
                 protocol,
                 stdin,
+                protocol_kwargs=kwargs,
                 cwd=self.cwd,
                 env=self.env,
             )

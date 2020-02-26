@@ -126,3 +126,24 @@ def test_runner_stdin(path):
         protocol=StdOutCapture,
     )
     assert_in(OBSCURE_FILENAME, out)
+
+
+def test_runner_parametrized_protocol():
+    runner = Runner()
+
+    # protocol returns a given value whatever it receives
+    class ProtocolInt(StdOutCapture):
+        def __init__(self, done_future, value):
+            self.value = value
+            super().__init__(done_future)
+
+        def pipe_data_received(self, fd, data):
+            super().pipe_data_received(fd, self.value)
+
+    out, err = runner.run(
+        py2cmd('print(1)'),
+        protocol=ProtocolInt,
+        # value passed to protocol constructor
+        value=b'5',
+    )
+    eq_(out, '5')
