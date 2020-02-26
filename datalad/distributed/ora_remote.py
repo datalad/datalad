@@ -542,6 +542,10 @@ def handle_errors(func):
     return new_func
 
 
+class UnknownLayoutVersion(Exception):
+    pass
+
+
 class RIARemote(SpecialRemote):
     """This is the class of RIA remotes.
     """
@@ -574,6 +578,111 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir = None
         self.remote_archive_dir = None
         self.remote_obj_dir = None
+
+    def create_store(self):
+        # Note, that the following does create the base-path dir as well:
+        self.io.mkdir(self.store_base_path / 'error_logs')
+
+        self.io.write_file(self.store_base_path / 'ria-layout-version',
+                           self.dataset_tree_version + '\n')
+
+    def verify_store(self):
+        """Check whether the store exists and reports a layout version we
+        know
+
+        The layout of the store is recorded in base_path/ria-layout-version.
+        If the version found on the remote end isn't supported and `force-write`
+        isn't configured, sets the remote to read-only operation.
+        """
+
+        dataset_tree_version_file = \
+            self.store_base_path / 'ria-layout-version'
+
+        read_only_msg = "Setting remote to read-only usage in order to" \
+                        "prevent damage by putting things into an unknown " \
+                        "version of the target layout. You can overrule this " \
+                        "by configuring 'annex.ria-remote.<name>.force-write'."
+
+        # check dataset tree version
+        try:
+            self.remote_dataset_tree_version = \
+                self._get_version_config(dataset_tree_version_file)
+            if self.remote_dataset_tree_version not in self.known_versions_dst:
+                # Note: In later versions, condition might change in order to
+                # deal with older versions.
+                self._info("Remote dataset tree reports version {}. Supported"
+                           "versions are: {}. Consider upgrading datalad or "
+                           "fix the structure on the remote end."
+                           "".format(self.remote_dataset_tree_version,
+                                     self.known_versions_dst))
+                self._set_read_only(read_only_msg)
+
+        except (RemoteError, FileNotFoundError):
+            # Exception class depends on whether self.io is local or SSH.
+            # assume file doesn't exist
+            # TODO: Is there a possibility RemoteError has a different reason
+            #       and should be handled differently?
+            #       Don't think so ATM. -> Reconsider with new execution layer.
+
+            if not self.io.exists(dataset_tree_version_file.parent):
+                # unify exception
+                raise FileNotFoundError
+
+            else:
+                # Directory is there, but no version file. We don't know what
+                # that is. Treat the same way as if there was an unknown version
+                # on record.
+                self._info("Remote doesn't report any dataset tree version."
+                           "Consider upgrading datalad or fix the structure"
+                           "on the remote end.")
+                self._set_read_only(read_only_msg)
+
+    def create_ds_in_store(self):
+        self.io.mkdir(self.remote_archive_dir)
+        self.io.write_file(self.remote_git_dir / 'ria-layout-version',
+                           self.object_tree_version + '\n')
+
+    def verify_ds_in_store(self):
+        """Check whether the dataset exists in store and reports a layout
+        version we know
+
+        The layout is recorded in
+        'dataset_somewhere_beneath_base_path/ria-layout-version.'
+        If the version found on the remote end isn't supported and `force-write`
+        isn't configured, sets the remote to read-only operation.
+        """
+
+        object_tree_version_file = self.remote_git_dir / 'ria-layout-version'
+
+        read_only_msg = "Setting remote to read-only usage in order to" \
+                        "prevent damage by putting things into an unknown " \
+                        "version of the target layout. You can overrule this " \
+                        "by configuring 'annex.ria-remote.<name>.force-write'."
+
+        # check (annex) object tree version
+        try:
+            self.remote_object_tree_version =\
+                self._get_version_config(object_tree_version_file)
+            if self.remote_object_tree_version not in self.known_versions_objt:
+                self._info("Remote object tree reports version {}. Supported"
+                           "versions are {}. Consider upgrading datalad."
+                           "".format(self.remote_object_tree_version,
+                                     self.known_versions_objt))
+                self._set_read_only(read_only_msg)
+        except (RemoteError, FileNotFoundError):
+            # Exception class depends on whether self.io is local or SSH.
+            # assume file doesn't exist
+            # TODO: Is there a possibility RemoteError has a different reason
+            #       and should be handled differently?
+            #       Don't think so ATM. -> Reconsider with new execution layer.
+            if not self.io.exists(object_tree_version_file.parent):
+                # unify exception
+                raise FileNotFoundError
+            else:
+                self._info("Remote doesn't report any object tree version."
+                           "Consider upgrading datalad or fix the structure on"
+                           "the remote end.")
+                self._set_read_only(read_only_msg)
 
     def _load_cfg(self, gitdir, name):
         # for now still accept the configs, if no ria-URL is known:
@@ -711,72 +820,6 @@ class RIARemote(SpecialRemote):
         else:
             self._info("Was instructed to force write")
 
-    def _check_layout_version(self):
-        """Check whether we can deal with the layout reported by the remote end
-
-        There are two aspects of layout versioning:
-        - the tree to put the datasets in (version recorded in base_path/ria-layout-version)
-        - the tree of the actual annex objects of a particular dataset (version recorded in
-          dataset_somewhere_beneath_base_path/ria-layout-version)
-
-        If the version found on the remote end isn't supported and `force-write` isn't configured,
-        this sets the remote to read-only operation.
-        """
-
-        dataset_tree_version_file = \
-            self.store_base_path / 'ria-layout-version'
-        object_tree_version_file = \
-            self.store_base_path / self.archive_id[:3] / self.archive_id[3:] / 'ria-layout-version'
-
-        read_only_msg = "Setting remote to read-only usage in order to prevent damage by putting things into an " \
-                        "unknown version of the target layout. You can overrule this by configuring " \
-                        "'annex.ora-remote.<name>.force-write'."
-
-        # 1. check dataset tree version
-        try:
-            self.remote_dataset_tree_version = self._get_version_config(dataset_tree_version_file)
-            if self.remote_dataset_tree_version not in self.known_versions_dst:
-                # Note: In later versions, condition might change in order to deal with older versions
-                self._info("Remote dataset tree reports version {}. Supported versions are: {}. Consider upgrading "
-                           "datalad or fix the structure on the remote end."
-                           "".format(self.remote_dataset_tree_version, self.known_versions_dst))
-                self._set_read_only(read_only_msg)
-
-        except (RemoteError, FileNotFoundError):  # depends on whether self.io is local or ssh
-            # assume file doesn't exist
-            # TODO: Is there a possibility RemoteError has a different reason and should be handled differently?
-            #       Don't think so ATM
-            if not self.io.exists(dataset_tree_version_file.parent):
-                # we are first, just put our stamp on it
-                # ensure we have a store and simultaneously ensure the error log subdir
-                self.io.mkdir(dataset_tree_version_file.parent / 'error_logs')
-
-                self.io.write_file(dataset_tree_version_file, self.dataset_tree_version + '\n')
-            else:
-                # directory is there, but no version file. We don't know what that is. Treat the same way as if there
-                # was an unknown version on record
-                self._info("Remote doesn't report any dataset tree version. Consider upgrading datalad or "
-                           "fix the structure on the remote end.")
-                self._set_read_only(read_only_msg)
-
-        # 2. check (annex) object tree version
-        try:
-            self.remote_object_tree_version = self._get_version_config(object_tree_version_file)
-            if self.remote_object_tree_version not in self.known_versions_objt:
-                self._info("Remote object tree reports version {}. Supported versions are {}. Consider upgrading "
-                           "datalad.".format(self.remote_object_tree_version, self.known_versions_objt))
-                self._set_read_only(read_only_msg)
-        except (RemoteError, FileNotFoundError):
-            if not self.io.exists(object_tree_version_file.parent):
-                # we are first, just put our stamp on it
-                # ensure we have a ds dir and simultaneously ensure the archives subdir
-                self.io.mkdir(object_tree_version_file.parent / 'archives')
-                self.io.write_file(object_tree_version_file, self.object_tree_version + '\n')
-            else:
-                self._info("Remote doesn't report any object tree version. Consider upgrading datalad or "
-                           "fix the structure on the remote end.")
-                self._set_read_only(read_only_msg)
-
     @handle_errors
     def prepare(self):
 
@@ -798,18 +841,26 @@ class RIARemote(SpecialRemote):
                 "Local object tree base path does not exist, and no SSH host "
                 "configuration found.")
 
+        # cache remote layout directories
+        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
+            self.get_layout_locations(self.store_base_path, self.archive_id)
+
+        try:
+            self.verify_store()
+        except FileNotFoundError:
+            self.create_store()
+
+        try:
+            self.verify_ds_in_store()
+        except FileNotFoundError:
+            self.create_ds_in_store()
+
         # report active special remote configuration
         self.info = {
             'store_base_path': str(self.store_base_path),
             'storage_host': 'local'
             if self._local_io() else self.storage_host,
         }
-
-        self._check_layout_version()
-
-        # cache remote layout directories
-        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.store_base_path, self.archive_id)
 
     @handle_errors
     def transfer_store(self, key, filename):
