@@ -63,8 +63,10 @@ from datalad.cmd import (
     BatchedCommand,
     GitRunner,
     GitWitlessRunner,
+    # KillOutput,
     run_gitcommand_on_file_list_chunks,
     SafeDelCloseMixin,
+    WitlessProtocol,
 )
 
 # imports from same module:
@@ -931,6 +933,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                            backend=None, jobs=None,
                            files=None,
                            merge_annex_branches=True,
+                           runner=None,
                            **kwargs):
         """Helper to run actual git-annex calls
 
@@ -957,8 +960,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             If False, annex.merge-annex-branches=false config will be set for
             git-annex call.  Useful for operations which are not intended to
             benefit from updating information about remote git-annexes
+        runner: {None, "gitwitless"}, optional
+            Use specified runner class instead of the bound Runner instance.
         **kwargs
-            these are passed as additional kwargs to datalad.cmd.Runner.run()
+            these are passed as additional kwargs to the *Runner.run()
 
         Raises
         ------
@@ -995,14 +1000,32 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
+        expect_fail = False
+        if runner == "gitwitless":
+            class _protocol(WitlessProtocol):
+                # TODO: guard for callables being passed as values
+                proc_out = bool(kwargs.pop('log_stdout', False))
+                proc_err = bool(kwargs.pop('log_stderr', False))
+            # Not yet sure if that is needed
+            # if not (_protocol.proc_out or _protocol.proc_err):
+            #    _protocol = KillOutput
+            expect_fail = kwargs.pop('expect_fail', False)
+            run_func = GitWitlessRunner(cwd=self.path, env=env).run
+            kwargs['protocol'] = _protocol
+        elif runner is None:
+            run_func = self.cmd_call_wrapper.run
+            kwargs['env'] = env
+        else:
+            raise ValueError("Unknown runner %r" % runner)
+
         try:
             # TODO: RF to use --batch where possible instead of splitting
             # into multiple invocations
             return run_gitcommand_on_file_list_chunks(
-                self.cmd_call_wrapper.run,
+                run_func,
                 cmd_list,
                 files,
-                env=env, **kwargs)
+                **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
@@ -1010,7 +1033,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                                                " 'git-annex %s'" % annex_cmd,
                                                e.code, e.stdout, e.stderr)
             else:
-                raise
+                if not expect_fail:
+                    raise
 
     def _run_simple_annex_command(self, *args, **kwargs):
         """Run an annex command and return its output, of which expect 1 line
@@ -1764,7 +1788,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._run_annex_command(
                 'enableremote',
                 annex_options=[name] + ensure_list(options),
+                runner="gitwitless",
                 expect_fail=True,
+                log_stdout=True,
                 log_stderr=True,
                 env=env)
         except CommandError as e:
