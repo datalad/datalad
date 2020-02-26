@@ -9,7 +9,7 @@ from shlex import quote as sh_quote
 import subprocess
 import logging
 from functools import wraps
-from datalad.distributed.ria_utils import (
+from datalad.customremotes.ria_utils import (
     get_layout_locations,
     verify_ria_url,
 )

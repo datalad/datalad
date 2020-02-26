@@ -52,7 +52,7 @@ from datalad.core.distributed.clone import (
     decode_source_spec
 )
 from datalad.log import log_progress
-from datalad.distributed.ria_utils import (
+from datalad.customremotes.ria_utils import (
     get_layout_locations,
     verify_ria_url,
 )
