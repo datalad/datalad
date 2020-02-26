@@ -482,27 +482,6 @@ def _create_sibling_ria(
                 )
                 return
 
-        # 1. create remote object store:
-        # Note: All it actually takes is to trigger the special
-        # remote's `prepare` method once.
-        # ATM trying to achieve that by invoking a minimal fsck.
-        # TODO: - It's probably faster to actually talk to the special
-        #         remote (i.e. pretending to be annex and use
-        #         the protocol to send PREPARE)
-        #       - Alternatively we can create the remote directory and
-        #         ria version file directly, but this means
-        #         code duplication that then needs to be kept in sync
-        #         with ria-remote implementation.
-        #       - this leads to the third option: Have that creation
-        #         routine importable and callable from
-        #         ria-remote package without the need to actually
-        #         instantiate a RIARemote object
-        lgr.debug("initializing object store")
-        ds.repo.fsck(
-            remote=storage_name,
-            fast=True,
-            annex_options=['--exclude=*/*'])
-
         if trust_level:
             ds.repo.call_git(['annex', trust_level, storage_name])
         # get uuid for use in bare repo's config

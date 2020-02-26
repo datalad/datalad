@@ -99,11 +99,11 @@ def test_archive_layout(path, objtree, archivremote):
 @with_tempfile()
 @with_tempfile()
 def test_backup_archive(path, objtree, archivremote):
-    """Similar to test_archive_layout(), but not focused on
-    compatibility with the directory-type special remote. Instead,
-    it tests build a second RIA remote from an existing one, e.g.
-    for backup purposes.
-    """
+    # Similar to test_archive_layout(), but not focused on
+    # compatibility with the directory-type special remote. Instead,
+    # it tests build a second RIA remote from an existing one, e.g.
+    # for backup purposes.
+
     ds = create(path)
     setup_archive_remote(ds.repo, objtree)
     populate_dataset(ds)
@@ -122,7 +122,13 @@ def test_backup_archive(path, objtree, archivremote):
     initexternalremote(ds.repo, '7z', 'ora', config={'base-path': archivremote})
     # wipe out the initial RIA remote (just for testing if the upcoming
     # one can fully take over)
-    shutil.rmtree(objtree)
+
+    # Note: Due to gh-4203 we can't kill everything and expect fsck to find out.
+    # However, point of the test is the archive taking over, so killing the
+    # annex objects should suffice.
+    # shutil.rmtree(objtree)
+    shutil.rmtree(str(Path(objtree) / ds.id[:3] / ds.id[3:] / 'annex' / 'objects'))
+
     # fsck to make git-annex aware of the loss
     assert_status(
         'error',
@@ -162,20 +168,15 @@ def test_version_check(path, objtree):
     remote_ds_tree_version_file = Path(objtree) / 'ria-layout-version'
     remote_obj_tree_version_file = Path(objtree) / ds.id[:3] / ds.id[3:] / 'ria-layout-version'
 
-    if not ds.repo.is_managed_branch():
-        # Those files are not yet there
-        # But: on a crippled FS there is actually a `git annex sync` happening
-        # that triggers the creation of the store with the current special
-        # remote implementation
-        assert not remote_ds_tree_version_file.exists()
-        assert not remote_obj_tree_version_file.exists()
+    # creation is done by initremote ATM, so should exist:
+    assert remote_ds_tree_version_file.exists()
+    assert remote_obj_tree_version_file.exists()
 
     # Now copy everything to remote. This should create the structure including those version files
     ds.repo.copy_to('.', 'archive')
     assert remote_ds_tree_version_file.exists()
     assert remote_obj_tree_version_file.exists()
 
-    # Currently the content of booth should be "2"
     with open(str(remote_ds_tree_version_file), 'r') as f:
         eq_(f.read().strip(), '1')
     with open(str(remote_obj_tree_version_file), 'r') as f:
