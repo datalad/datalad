@@ -511,9 +511,10 @@ class SSHRemoteIO(IOBase):
 def handle_errors(func):
     """Decorator to convert and log errors
 
-    Intended to use with every method of RiaRemote class, facing the outside world.
-    In particular, that is about everything, that may be called via annex' special remote protocol,
-    since a non-RemoteError will simply result in a broken pipe by default handling.
+    Intended to use with every method of RiaRemote class, facing the outside
+    world. In particular, that is about everything, that may be called via
+    annex' special remote protocol, since a non-RemoteError will simply result
+    in a broken pipe by default handling.
     """
 
     # TODO: configurable on remote end (flag within layout_version!)
@@ -566,7 +567,9 @@ class RIARemote(SpecialRemote):
         self.store_base_path = None
         # by default we can read and write
         self.read_only = False
-        self.can_notify = None  # to be figured out later, since annex.protocol.extensions is not yet accessible
+        # to be figured out later, since annex.protocol.extensions is not yet
+        # accessible:
+        self.can_notify = None
         self.force_write = None
         self.uuid = None
         self.ignore_remote_config = None

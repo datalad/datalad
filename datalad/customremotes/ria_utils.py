@@ -63,7 +63,7 @@ def verify_ria_url(url, cfg):
     Returns
     -------
     tuple
-      (host, base-path)
+      (host, base-path, rewritten url)
     """
     from datalad.config import rewrite_url
     from datalad.support.network import URL
