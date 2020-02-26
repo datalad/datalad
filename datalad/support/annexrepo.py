@@ -948,7 +948,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if jobs:
             annex_options += ['-J%d' % jobs]
 
-        cmd_list += [annex_cmd] + backend + debug + annex_options
+        cmd_list += [annex_cmd] + backend + annex_options + debug
 
         env = kwargs.pop("env", None)
         if self.fake_dates_enabled:
