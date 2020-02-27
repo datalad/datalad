@@ -52,7 +52,7 @@ from datalad.tests.utils import known_failure_windows
 def filter_fsck_error_msg(dicts):
     # Filter keys that have expected differences when comparing target.fsck()
     # to fsck(remote=target).
-    return [{k: v for k, v in d.items() if k not in ["note"]}
+    return [{k: v for k, v in d.items() if k not in ["error-messages", "note"]}
             for d in dicts]
 
 
@@ -172,7 +172,8 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
         set(target.get_branch_commits("git-annex"))))
 
-    eq_(source.repo.fsck(), source.repo.fsck(remote='target'))
+    eq_(filter_fsck_error_msg(source.repo.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
 @with_testrepos('basic_git', flavors=['local'])
@@ -500,9 +501,10 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 
     # data integrity check looks identical from all perspectives
     # minus "note" statements from git-annex
-    eq_(source.repo.fsck(),
+    eq_(filter_fsck_error_msg(source.repo.fsck()),
         filter_fsck_error_msg(source.repo.fsck(remote='target')))
-    eq_(target.fsck(), source.repo.fsck(remote='target'))
+    eq_(filter_fsck_error_msg(target.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
 @skip_if_on_windows  # create_sibling incompatible with win servers
