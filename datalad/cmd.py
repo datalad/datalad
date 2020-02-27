@@ -253,11 +253,10 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
                 len(data), self.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
             log_data = assure_unicode(data)
-            if True: # for line in log_data.split(os.linesep):
-                # Level and way we log is to stay consistent with Runner.
-                # TODO: later we might just log in a single entry, without
-                # fd_name prefix
-                lgr.log(9, "%s| %s " % (fd_name, log_data))
+            # The way we log is to stay consistent with Runner.
+            # TODO: later we might just log in a single entry, without
+            # fd_name prefix
+            lgr.log(9, "%s| %s " % (fd_name, log_data))
 
     def connection_made(self, transport):
         self.transport = transport
