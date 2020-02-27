@@ -1151,8 +1151,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cmd="git-annex indirect",
                 msg="Can't switch to indirect mode on that filesystem.")
 
-        self._run_annex_command('direct' if enable_direct_mode else 'indirect',
-                                expect_stderr=True)
+        self._run_annex_command(
+            'direct' if enable_direct_mode else 'indirect',
+            expect_stderr=True,
+            runner="gitwitless"
+        )
         self.config.reload()
 
         # For paranoid we will just re-request
@@ -1595,7 +1598,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                      'version that supports unlocked pointers'))
 
         options = options[:] if options else to_options(unlock=True)
-        self._run_annex_command('adjust', annex_options=options)
+        self._run_annex_command('adjust', annex_options=options, runner="gitwitless")
 
     @normalize_paths
     def unannex(self, files, options=None):
@@ -1782,7 +1785,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TODO: figure out consistent way for passing options + document
 
-        self._run_annex_command('initremote', annex_options=[name] + options)
+        self._run_annex_command(
+            'initremote',
+            annex_options=[name] + options,
+            runner="gitwitless",
+        )
         self.config.reload()
 
     def enable_remote(self, name, options=None, env=None):
@@ -1867,7 +1874,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                all=all,
                                fast=fast))
         args.extend(assure_list(remotes))
-        self._run_annex_command('sync', annex_options=args)
+        self._run_annex_command('sync', annex_options=args, runner="gitwitless")
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
@@ -2019,7 +2026,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         url: str
         """
 
-        self._run_annex_command('rmurl', files=[file_, url])
+        self._run_annex_command('rmurl', files=[file_, url], runner="gitwitless")
 
     @normalize_path
     def get_urls(self, file_, key=False, batch=False):
@@ -2809,7 +2816,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "Command 'migrate' is not available in direct mode.")
         self._run_annex_command('migrate',
                                 annex_options=files,
-                                backend=backend)
+                                backend=backend,
+                                runner="gitwitless")
 
     @classmethod
     def get_key_backend(cls, key):
