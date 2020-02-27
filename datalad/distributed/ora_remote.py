@@ -11,6 +11,7 @@ import logging
 from functools import wraps
 from datalad.customremotes.ria_utils import (
     get_layout_locations,
+    UnknownLayoutVersion,
     verify_ria_url,
 )
 
@@ -219,7 +220,8 @@ class LocalIO(IOBase):
         return content
 
     def write_file(self, file_path, content, mode='w'):
-
+        if not content.endswith('\n'):
+            content += '\n'
         with open(str(file_path), mode) as f:
             f.write(content)
 
@@ -543,10 +545,6 @@ def handle_errors(func):
     return new_func
 
 
-class UnknownLayoutVersion(Exception):
-    pass
-
-
 class NoLayoutVersion(Exception):
     pass
 
@@ -557,6 +555,7 @@ class RIARemote(SpecialRemote):
 
     dataset_tree_version = '1'
     object_tree_version = '2'
+    # TODO: Move known versions. Needed by creation routines as well.
     known_versions_objt = ['1', '2']
     known_versions_dst = ['1']
 

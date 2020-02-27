@@ -11,6 +11,14 @@
 """
 
 
+class UnknownLayoutVersion(Exception):
+    pass
+
+
+known_versions_objt = ['1', '2']
+known_versions_dst = ['1']
+
+
 def get_layout_locations(version, base_path, dsid):
     """Return dataset-related path in a RIA store
 
@@ -86,16 +94,61 @@ def verify_ria_url(url, cfg):
 
 
 def create_store(io, base_path, version):
-    # Note, that the following does create the base-path dir as well:
-    io.mkdir(base_path / 'error_logs')
 
-    io.write_file(base_path / 'ria-layout-version', version + '\n')
+    # At store level the only version we know as of now is 1.
+    if version not in known_versions_dst:
+        raise UnknownLayoutVersion("store layout version unknown: {}"
+                                   "".format(version))
+
+    error_logs = base_path / 'error_logs'
+    version_file = base_path / 'ria-layout-version'
+    # TODO: Check base path for being empty?
+    #       Requires proper IO (command abstraction class).
+    #       But: Likely unnecessary. For now, check for version conflict only.
+    if io.exists(version_file):
+        existing_version = io.read_file(version_file).split('|')[0].strip()
+        if existing_version != version.split('|')[0]:
+            # We have an already existing location with a conflicting version on
+            # record.
+            # Note, that a config flag after pipe symbol is fine.
+            raise ValueError("Conflicting version found at target: {}"
+                             "".format(existing_version))
+
+    # Note, that the following does create the base-path dir as well, since
+    # mkdir has parents=True:
+    io.mkdir(error_logs)
+    io.write_file(version_file, version)
 
 
 def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
-    # TODO: This is currently store layout version!
-    #       Too entangled by current get_layout_locations.
-    dsgit_dir, archive_dir, dsobj_dir = \
-        get_layout_locations(int(store_version), base_path, dsid)
+
+    # TODO: Note for RF'ing, that this is about setting up a valid target
+    #       for the special remote not a replacement for create-sibling-ria.
+    #       There's currently no git (bare) repo created.
+
+    try:
+        # TODO: This is currently store layout version!
+        #       Too entangled by current get_layout_locations.
+        dsgit_dir, archive_dir, dsobj_dir = \
+            get_layout_locations(int(store_version), base_path, dsid)
+    except ValueError as e:
+        raise UnknownLayoutVersion(str(e))
+
+    if obj_version not in known_versions_objt:
+        raise UnknownLayoutVersion("dataset layout version unknown: {}"
+                                   "".format(obj_version))
+
+    version_file = dsgit_dir / 'ria-layout-version'
+
+    if version_file.exists():
+        existing_version = version_file.read_text().split('|')[0].strip()
+        if existing_version != obj_version.split('|')[0]:
+            # We have an already existing location with a conflicting version on
+            # record.
+            # Note, that a config flag after pipe symbol is fine.
+            raise ValueError("Conflicting version found at target: {}"
+                             "".format(existing_version))
+
     io.mkdir(archive_dir)
-    io.write_file(dsgit_dir / 'ria-layout-version', obj_version + '\n')
+    io.mkdir(dsobj_dir)
+    io.write_file(version_file, obj_version)
