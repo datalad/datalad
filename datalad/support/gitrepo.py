@@ -1215,7 +1215,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
-                out, err = WitlessRunner(
+                res = WitlessRunner(
                     env=GitRunner.get_git_environ_adjusted()).run(
                         ['git', 'clone', '--progress', url, path] \
                         + (to_options(**clone_options)
@@ -1225,7 +1225,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # fish out non-critical warnings by git-clone
                 # (empty repo clone, etc.), all other content is logged
                 # by the progress helper to 'debug'
-                for errline in err.splitlines():
+                for errline in res['stderr'].splitlines():
                     if errline.startswith('warning:'):
                         lgr.warning(errline[8:].strip())
                 lgr.debug("Git clone completed")
@@ -2443,7 +2443,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             urlvars=('remote.{}.url', 'remote.{}.url'),
             protocol=GitProgress,
             info_cls=FetchInfo,
-            info_from=1,
+            info_from='stderr',
             add_remote=False,
             remote=remote,
             refspec=refspec,
@@ -2549,7 +2549,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             urlvars=('remote.{}.pushurl', 'remote.{}.url'),
             protocol=StdOutCaptureWithGitProgress,
             info_cls=PushInfo,
-            info_from=0,
+            info_from='stdout',
             add_remote=True,
             remote=remote,
             refspec=refspec,
@@ -2563,7 +2563,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             urlvars,      # variables to query for URLs
             protocol,     # processor for output
             info_cls,     # Push|FetchInfo
-            info_from,    # 0=stdout, 1=stderr
+            info_from,    # stdout, stderr
             add_remote,   # whether to add a 'remote' field to the info dict
             remote=None, refspec=None, all_=False, git_options=None):
 
@@ -2655,7 +2655,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             '.*^error: failed to (push|fetch) some refs',
                             e.stderr,
                             re.DOTALL | re.MULTILINE):
-                        output = {1: e.stderr, 0: e.stdout}[info_from]
+                        output = getattr(e, info_from)
                         if output is None:
                             output = ''
                     else:

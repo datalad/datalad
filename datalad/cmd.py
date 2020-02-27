@@ -249,14 +249,30 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             self.buffer[fd - 1].extend(data)
 
     def process_exited(self):
+        """Prepares the final result to be returned to the runner
+
+        Note for derived classes overwriting this method:
+
+        The result set for the `done` future must be a dict with keys
+        that do not unintentionally conflict with the API of
+        CommandError, as the result dict is passed to this exception
+        class as kwargs pon error. The Runner will overwrite 'cmd' and
+        'cwd' on error, if they are present in the result.
+        """
         return_code = self.transport.get_returncode()
         lgr.debug(
             'Process %i exited with return code %i',
             self.pid, return_code)
-        # give captured process output back to the runner as bytestring(s)
-        results = [bytes(byt) if byt else None for byt in self.buffer]
+        # give captured process output back to the runner as string(s)
+        results = {
+            name:
+            bytes(byt).decode(getpreferredencoding(do_setlocale=False))
+            if byt else ''
+            for name, byt in zip(self.FD_NAMES[1:], self.buffer)
+        }
+        results['code'] = return_code
         # actually fulfill the future promise and let the execution finish
-        self.done.set_result((return_code, results))
+        self.done.set_result(results)
 
 
 class NoCapture(WitlessProtocol):
@@ -349,9 +365,10 @@ class WitlessRunner(object):
 
         Returns
         -------
-        stdout, stderr
-          Unicode string with the cumulative standard output and error
-          of the process.
+        dict
+          At minimum there will be keys 'stdout', 'stderr' with
+          unicode strings of the cumulative standard output and error
+          of the process as values.
 
         Raises
         ------
@@ -380,7 +397,7 @@ class WitlessRunner(object):
             event_loop = asyncio.SelectorEventLoop()
         asyncio.set_event_loop(event_loop)
         # include the subprocess manager in the asyncio event loop
-        return_code, results = event_loop.run_until_complete(
+        results = event_loop.run_until_complete(
             run_async_cmd(
                 event_loop,
                 cmd,
@@ -394,22 +411,26 @@ class WitlessRunner(object):
         # terminate the event loop, cannot be undone, hence we start a fresh
         # one each time (see BlockingIOError notes above)
         event_loop.close()
-        # when we are here the process finished, take output from bytes to string
-        output = tuple(
-            o.decode(getpreferredencoding(do_setlocale=False))
-            if o else ''
-            for o in results)
 
-        if return_code not in [0, None]:
+        # log before any exception is raised
+        lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
+
+        # make it such that we always blow if a protocol did not report
+        # a return code at all
+        if results.get('code', True) not in [0, None]:
+            # the runner has a better idea, doc string warns Protocol
+            # implementations not to return these
+            results.pop('cmd', None)
+            results.pop('cwd', None)
             raise CommandError(
+                # whatever the results were, we carry them forward
                 cmd=cmd,
-                code=return_code,
-                stdout=output[0],
-                stderr=output[1],
                 cwd=self.cwd,
+                **results,
             )
-        lgr.log(8, "Finished running %r with status %s", cmd, return_code)
-        return output
+        # denoise, must be zero at this point
+        results.pop('code', None)
+        return results
 
 
 class Runner(object):

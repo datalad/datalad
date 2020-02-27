@@ -17,7 +17,8 @@ class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
 
-    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None):
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
+                 **kwargs):
         RuntimeError.__init__(self, msg)
         self.cmd = cmd
         self.msg = msg
@@ -25,6 +26,7 @@ class CommandError(RuntimeError):
         self.stdout = stdout
         self.stderr = stderr
         self.cwd = cwd
+        self.kwargs = kwargs
 
     def to_str(self, include_output=True):
         from datalad.utils import (
@@ -54,6 +56,9 @@ class CommandError(RuntimeError):
             to_str += " [out: '{}']".format(ensure_unicode(self.stdout))
         if self.stderr:
             to_str += " [err: '{}']".format(ensure_unicode(self.stderr))
+        if self.kwargs:
+            to_str += " [info keys: {}]".format(
+                ', '.join(self.kwargs.keys()))
         return to_str
 
     def __str__(self):
