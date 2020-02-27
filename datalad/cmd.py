@@ -256,7 +256,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             # The way we log is to stay consistent with Runner.
             # TODO: later we might just log in a single entry, without
             # fd_name prefix
-            lgr.log(9, "%s| %s " % (fd_name, log_data))
+            lgr.log(5, "%s| %s " % (fd_name, log_data))
 
     def connection_made(self, transport):
         self.transport = transport
@@ -603,7 +603,7 @@ class Runner(object):
     def _log_err(self, line, expected=False):
         if line and self.log_outputs:
             self.log("stderr| " + line.rstrip('\n'),
-                     level={True: 9,
+                     level={True: 5,
                             False: 11}[expected])
 
     def _get_output_online(self, proc,
@@ -763,15 +763,15 @@ class Runner(object):
             Normally, having stderr output is a signal of a problem and thus it
             gets logged at level 11.  But some utilities, e.g. wget, use
             stderr for their progress output.  Whenever such output is expected,
-            set it to True and output will be logged at level 9 unless
+            set it to True and output will be logged at level 5 unless
             exit status is non-0 (in non-online mode only, in online -- would
-            log at 9)
+            log at 5)
 
         expect_fail: bool, optional
             Normally, if command exits with non-0 status, it is considered an
             error and logged at level 11 (above DEBUG). But if the call intended
             for checking routine, such messages are usually not needed, thus
-            it will be logged at level 9.
+            it will be logged at level 5.
 
         cwd : string, optional
             Directory under which run the command (passed to Popen)
@@ -899,7 +899,7 @@ class Runner(object):
                         stderr=out[1],
                         cwd=popen_cwd,
                     )
-                    lgr.log(9 if expect_fail else 11, str(exc))
+                    lgr.log(5 if expect_fail else 11, str(exc))
                     raise exc
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
@@ -975,10 +975,10 @@ class Runner(object):
     def log(self, msg, *args, **kwargs):
         """log helper
 
-        Logs at level 9 by default and adds "Protocol:"-prefix in order to
+        Logs at level 5 by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
-        level = kwargs.pop('level', 9)
+        level = kwargs.pop('level', 5)
         if isinstance(self.protocol, NullProtocol):
             lgr.log(level, msg, *args, **kwargs)
         else:
