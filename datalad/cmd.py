@@ -256,7 +256,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         The result set for the `done` future must be a dict with keys
         that do not unintentionally conflict with the API of
         CommandError, as the result dict is passed to this exception
-        class as kwargs pon error. The Runner will overwrite 'cmd' and
+        class as kwargs on error. The Runner will overwrite 'cmd' and
         'cwd' on error, if they are present in the result.
         """
         return_code = self.transport.get_returncode()
