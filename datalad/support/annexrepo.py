@@ -3388,7 +3388,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         # there is a standard mechanism that is uniform between Git
         # Annex repos to decide on the behavior on a case-by-case
         # basis
-        # TODO have a dedicated test for this
         options = ['--include-dotfiles']
         # if None -- leave it to annex to decide
         if git is not None:

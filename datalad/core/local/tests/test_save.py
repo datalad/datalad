@@ -14,6 +14,7 @@ import os.path as op
 from datalad.utils import (
     on_windows,
     assure_list,
+    Path,
     rmtree,
 )
 from datalad.tests.utils import (
@@ -750,3 +751,40 @@ def test_save_obscure_name(path):
     # Just check that we don't fail with a unicode error.
     with swallow_outputs():
         ds.save(path=fname, result_renderer="default")
+
+
+@with_tree(tree={
+    ".dot": "ab", "nodot": "cd",
+    "nodot-subdir": {".dot": "ef", "nodot": "gh"},
+    ".dot-subdir": {".dot": "ij", "nodot": "kl"}})
+def check_save_dotfiles(to_git, save_path, path):
+    # Note: Take relpath to work with Travis "TMPDIR=/var/tmp/sym\ link" run.
+    paths = [Path(op.relpath(op.join(root, fname), path))
+             for root, _, fnames in os.walk(op.join(path, save_path or ""))
+             for fname in fnames]
+    ok_(paths)
+    ds = Dataset(path).create(force=True)
+    ds.save(save_path, to_git=to_git)
+    if save_path is None:
+        assert_repo_status(ds.path)
+    repo = ds.repo
+    annexinfo = repo.get_content_annexinfo()
+
+    def _check(fn, p):
+        fn("key", annexinfo[repo.pathobj / p], p)
+
+    if to_git:
+        def check(p):
+            _check(assert_not_in, p)
+    else:
+        def check(p):
+            _check(assert_in, p)
+
+    for path in paths:
+        check(path)
+
+
+def test_save_dotfiles():
+    for git in [True, False, None]:
+        for save_path in [None, "nodot-subdir"]:
+            yield check_save_dotfiles, git, save_path
