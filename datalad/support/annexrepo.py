@@ -1519,7 +1519,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 out, err = self._run_annex_command(
                     'lookupkey',
                     files=[files],
-                    expect_fail=True
+                    expect_fail=True,
+                    runner="gitwitless",
                 )
             except CommandError as e:
                 if e.code == 1:
@@ -1622,7 +1623,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
 
         std_out, std_err = self._run_annex_command(
-            'unannex', annex_options=options, files=files
+            'unannex', annex_options=options, files=files, runner="gitwitless",
         )
         return [line.split()[1] for line in std_out.splitlines()
                 if line.split()[0] == 'unannex' and line.split()[-1] == 'ok']
@@ -1661,11 +1662,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             for f in files:
                 try:
-                    obj, er = self._run_annex_command(
+                    obj, _ = self._run_annex_command(
                         'find', files=[f],
                         annex_options=["--print0"],
                         expect_fail=True,
-                        merge_annex_branches=False
+                        merge_annex_branches=False,
+                        runner="gitwitless",
                     )
                     items = obj.rstrip("\0").split("\0")
                     objects[f] = items[0] if len(items) == 1 else items
@@ -2543,7 +2545,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             if with_content_only:
                 args.extend(['--in', '.'])
         out, err = self._run_annex_command(
-            'find', annex_options=args, merge_annex_branches=False
+            'find', annex_options=args, merge_annex_branches=False,
+            runner="gitwitless",
         )
         # TODO: JSON
         return out.splitlines()
@@ -2687,7 +2690,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             try:
                 out, err = self._run_annex_command('contentlocation',
                                                    annex_options=[key],
-                                                   expect_fail=True)
+                                                   expect_fail=True,
+                                                   runner="gitwitless")
                 return out.rstrip(linesep).splitlines()[0]
             except CommandError:
                 return ''
@@ -2730,7 +2734,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             try:
                 out, err = self._run_annex_command('checkpresentkey',
                                                    annex_options=list(annex_input),
-                                                   expect_fail=True)
+                                                   expect_fail=True,
+                                                   runner="gitwitless")
                 assert(not out)
                 return True
             except CommandError:
