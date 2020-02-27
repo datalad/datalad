@@ -991,7 +991,7 @@ class Runner(object):
 
 class GitRunnerBase(object):
     """
-    Runner to be used to run git and git annex commands
+    Mix-in class for *Runners to be used to run git and git annex commands
 
     Overloads the runner class to check & update GIT_DIR and
     GIT_WORK_TREE environment variables set to the absolute path
@@ -1062,12 +1062,15 @@ class GitRunnerBase(object):
 
 
 class GitRunner(Runner, GitRunnerBase):
+    """A Runner for git and git-annex commands.
+
+    See GitRunnerBase it mixes in for more details
+    """
 
     @borrowdoc(Runner)
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._check_git_path()
-
 
     def run(self, cmd, env=None, *args, **kwargs):
         out, err = super().run(
@@ -1080,6 +1083,10 @@ class GitRunner(Runner, GitRunnerBase):
 
 
 class GitWitlessRunner(WitlessRunner, GitRunnerBase):
+    """A WitlessRunner for git and git-annex commands.
+
+    See GitRunnerBase it mixes in for more details
+    """
 
     @borrowdoc(WitlessRunner)
     def __init__(self, *args, **kwargs):
