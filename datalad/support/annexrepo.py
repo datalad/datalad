@@ -1000,16 +1000,29 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
-        expect_fail = False
         if runner == "gitwitless":
             class _protocol(WitlessProtocol):
                 # TODO: guard for callables being passed as values
-                proc_out = bool(kwargs.pop('log_stdout', False))
-                proc_err = bool(kwargs.pop('log_stderr', False))
-            # Not yet sure if that is needed
-            # if not (_protocol.proc_out or _protocol.proc_err):
-            #    _protocol = KillOutput
-            expect_fail = kwargs.pop('expect_fail', False)
+                proc_out = bool(kwargs.pop('log_stdout', True))
+                proc_err = bool(kwargs.pop('log_stderr', True))
+            # expect_fail and expect_stderr were all about deciding level
+            # at which to log if error or stderr output.  With WitlessRunner
+            # and all the handling "from upstairs" we simply would do nothing
+            # special about it. But that ATM poses a risk of non-disclosing
+            # underlying problems to the user if caller of this is not handling
+            # out, err returned values anyhow.
+            # But decision making on either report stderr is "difficult" outside
+            # since annex --debug output also goes to stderr, thus occluding
+            # errors messages.  This is the point when we know that --debug
+            # is enabled, and probably need
+            # TODOs:
+            #  - convert all functions to generators/functions returning the
+            #    records (pass them up)
+            #  - upon debug, sanitize stderr output to exclude debug lines
+            #    (they start with [ISODATETIME]), and include those into
+            #    record
+            kwargs.pop('expect_fail', False)
+            kwargs.pop('expect_stderr', False)
             run_func = GitWitlessRunner(cwd=self.path, env=env).run
             kwargs['protocol'] = _protocol
         elif runner is None:
@@ -1032,9 +1045,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                                "Unknown command:"
                                                " 'git-annex %s'" % annex_cmd,
                                                e.code, e.stdout, e.stderr)
-            else:
-                if not expect_fail:
-                    raise
+            raise
 
     def _run_simple_annex_command(self, *args, **kwargs):
         """Run an annex command and return its output, of which expect 1 line
@@ -1785,13 +1796,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         try:
+            # TODO: outputs are nohow used/displayed. Eventually convert to
+            # to a generator style yielding our "dict records"
             self._run_annex_command(
                 'enableremote',
                 annex_options=[name] + ensure_list(options),
                 runner="gitwitless",
-                expect_fail=True,
-                log_stdout=True,
-                log_stderr=True,
                 env=env)
         except CommandError as e:
             if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
