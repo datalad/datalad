@@ -49,6 +49,13 @@ from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import known_failure_windows
 
 
+def filter_fsck_error_msg(dicts):
+    # Filter keys that have expected differences when comparing target.fsck()
+    # to fsck(remote=target).
+    return [{k: v for k, v in d.items() if k not in ["note"]}
+            for d in dicts]
+
+
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_invalid_call(origin, tdir):
@@ -494,8 +501,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     # data integrity check looks identical from all perspectives
     # minus "note" statements from git-annex
     eq_(source.repo.fsck(),
-        [{k: v for k, v in i.items() if k != 'note'}
-         for i in source.repo.fsck(remote='target')])
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
     eq_(target.fsck(), source.repo.fsck(remote='target'))
 
 
