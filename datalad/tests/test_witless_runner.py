@@ -46,10 +46,10 @@ def test_runner(tempfile):
     runner = Runner()
     content = 'Testing äöü東 real run'
     cmd = ['sh', '-c', 'echo %s > %r' % (content, tempfile)]
-    out, err = runner.run(cmd)
+    res = runner.run(cmd)
     # no capture of any kind, by default
-    ok_(not out)
-    ok_(not err)
+    ok_(not res['stdout'])
+    ok_(not res['stderr'])
     ok_file_has_content(tempfile, content, strip=True)
     os.unlink(tempfile)
 
@@ -57,23 +57,23 @@ def test_runner(tempfile):
 def test_runner_stderr_capture():
     runner = Runner()
     test_msg = "stderr-Message"
-    out, err = runner.run(py2cmd(
+    res = runner.run(py2cmd(
         'import sys; print(%r, file=sys.stderr)' % test_msg),
         protocol=StdOutErrCapture,
     )
-    eq_(err.rstrip(), test_msg)
-    ok_(not out)
+    eq_(res['stderr'].rstrip(), test_msg)
+    ok_(not res['stdout'])
 
 
 def test_runner_stdout_capture():
     runner = Runner()
     test_msg = "stdout-Message"
-    out, err = runner.run(py2cmd(
+    res = runner.run(py2cmd(
         'import sys; print(%r, file=sys.stdout)' % test_msg),
         protocol=StdOutErrCapture,
     )
-    eq_(out.rstrip(), test_msg)
-    ok_(not err)
+    eq_(res['stdout'].rstrip(), test_msg)
+    ok_(not res['stderr'])
 
 
 @with_tempfile(mkdir=True)
@@ -91,11 +91,11 @@ def test_runner_fix_PWD(path):
     env = os.environ.copy()
     env['PWD'] = orig_cwd = os.getcwd()
     runner = Runner(cwd=path, env=env)
-    out, err = runner.run(
+    res = runner.run(
         py2cmd('import os; print(os.environ["PWD"])'),
         protocol=StdOutCapture,
     )
-    eq_(out.strip(), path)  # was fixed up to point to point to cwd's path
+    eq_(res['stdout'].strip(), path)  # was fixed up to point to point to cwd's path
     eq_(env['PWD'], orig_cwd)  # no side-effect
 
 
@@ -120,9 +120,30 @@ def test_runner_stdin(path):
     # go for diffcult content
     fakestdin.write_text(OBSCURE_FILENAME)
 
-    out, err = runner.run(
+    res = runner.run(
         py2cmd('import fileinput; print(fileinput.input().readline())'),
         stdin=fakestdin.open(),
         protocol=StdOutCapture,
     )
-    assert_in(OBSCURE_FILENAME, out)
+    assert_in(OBSCURE_FILENAME, res['stdout'])
+
+
+def test_runner_parametrized_protocol():
+    runner = Runner()
+
+    # protocol returns a given value whatever it receives
+    class ProtocolInt(StdOutCapture):
+        def __init__(self, done_future, value):
+            self.value = value
+            super().__init__(done_future)
+
+        def pipe_data_received(self, fd, data):
+            super().pipe_data_received(fd, self.value)
+
+    res = runner.run(
+        py2cmd('print(1)'),
+        protocol=ProtocolInt,
+        # value passed to protocol constructor
+        value=b'5',
+    )
+    eq_(res['stdout'], '5')
