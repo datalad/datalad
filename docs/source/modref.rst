@@ -77,6 +77,7 @@ Plumbing commands
    api.diff
    api.download_url
    api.ls
+   api.push
    api.sshrun
    api.siblings
    api.subdatasets
