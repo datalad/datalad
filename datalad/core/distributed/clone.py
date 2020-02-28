@@ -533,7 +533,7 @@ def postclonecfg_ria(ds, props):
     # and was enabled (there could be RIA stores that actually only have repos)
     # make this function be a generator
     ria_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
-                   if s.get('annex-externaltype', None) == 'ria'
+                   if s.get('annex-externaltype', None) == 'ora'
     ]
     if not ria_remotes:
         lgr.debug("Found no RIA special remote")

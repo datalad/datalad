@@ -55,7 +55,7 @@ def setup_archive_remote(repo, archive_path):
                       ''.format(archive_path.as_posix())}
     else:
         cfg = {'url': 'ria+{}'.format(archive_path.as_uri())}
-    initexternalremote(repo, 'archive', 'ria', config=cfg)
+    initexternalremote(repo, 'archive', 'ora', config=cfg)
 
 
 def populate_dataset(ds):

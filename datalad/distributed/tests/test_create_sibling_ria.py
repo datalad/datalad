@@ -92,8 +92,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     git_config = Path(base_path) / ds.id[:3] / ds.id[3:] / 'config'
     assert git_config.exists()
     content = git_config.read_text()
-    assert_in("[datalad \"ria-remote\"]", content)
-    super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-ria'))
+    assert_in("[datalad \"ora-remote\"]", content)
+    super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-storage'))
     assert_in("uuid = {}".format(super_uuid), content)
 
     # implicit test of success by ria-installing from store:

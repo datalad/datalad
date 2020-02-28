@@ -22,7 +22,7 @@ from datalad.customremotes.tests.ria_utils import (
 def test_gitannex_localio_url(path, objtree):
     ds = create(path)
     initexternalremote(
-        ds.repo, 'ria-local', 'ria',
+        ds.repo, 'ria-local', 'ora',
         config={'url': "ria+{}".format(Path(objtree).as_uri())})
     ds.repo._run_annex_command(
         'testremote',
@@ -39,7 +39,7 @@ def test_gitannex_localio_url(path, objtree):
 def test_gitannex_remoteio_url(path, objtree):
     ds = create(path)
     initexternalremote(
-        ds.repo, 'ria-remote', 'ria',
+        ds.repo, 'ria-remote', 'ora',
         config={'url': "ria+ssh://datalad-test:{}".format(objtree)})
     ds.repo._run_annex_command(
         'testremote',

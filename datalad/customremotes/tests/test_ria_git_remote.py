@@ -68,7 +68,7 @@ def test_bare_git(origin, remote_base_path):
         f.write('1')
 
     # Now, add the ria remote:
-    initexternalremote(ds.repo, 'riaremote', 'ria', config={'base-path': str(remote_base_path)})
+    initexternalremote(ds.repo, 'riaremote', 'ora', config={'base-path': str(remote_base_path)})
     # fsck to make availability known
     assert_status(
         'ok',
@@ -131,7 +131,7 @@ def test_create_as_bare(origin, remote_base_path, remote_base_url, public, consu
     #       However, this is specific to the test environment!
     with open(str(remote_base_path / 'ria-layout-version'), 'w') as f:
         f.write('1')
-    initexternalremote(ds.repo, 'riaremote', 'ria', config={'base-path': str(remote_base_path)})
+    initexternalremote(ds.repo, 'riaremote', 'ora', config={'base-path': str(remote_base_path)})
     # pretty much any annex command that talks to that remote should now trigger the actual creation on the remote end:
     assert_status(
         'ok',

@@ -231,8 +231,8 @@ class SSHRemoteIO(IOBase):
     """
 
     # output markers to detect possible command failure as well as end of output from a particular command:
-    REMOTE_CMD_FAIL = "ria-remote: end - fail"
-    REMOTE_CMD_OK = "ria-remote: end - ok"
+    REMOTE_CMD_FAIL = "ora-remote: end - fail"
+    REMOTE_CMD_OK = "ora-remote: end - ok"
 
     def __init__(self, host):
         """
@@ -577,10 +577,10 @@ class RIARemote(SpecialRemote):
         # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
         # version mismatch.
         self.force_write = _get_gitcfg(
-            gitdir, 'annex.ria-remote.{}.force-write'.format(name))
+            gitdir, 'annex.ora-remote.{}.force-write'.format(name))
 
         # whether to ignore config flags set at the remote end
-        self.ignore_remote_config = _get_gitcfg(gitdir, 'annex.ria-remote.{}.ignore-remote-config'.format(name))
+        self.ignore_remote_config = _get_gitcfg(gitdir, 'annex.ora-remote.{}.ignore-remote-config'.format(name))
 
     def _verify_config(self, gitdir, fail_noid=True):
         # try loading all needed info from (git) config
@@ -715,7 +715,7 @@ class RIARemote(SpecialRemote):
 
         read_only_msg = "Setting remote to read-only usage in order to prevent damage by putting things into an " \
                         "unknown version of the target layout. You can overrule this by configuring " \
-                        "'annex.ria-remote.<name>.force-write'."
+                        "'annex.ora-remote.<name>.force-write'."
 
         # 1. check dataset tree version
         try:
@@ -723,7 +723,7 @@ class RIARemote(SpecialRemote):
             if self.remote_dataset_tree_version not in self.known_versions_dst:
                 # Note: In later versions, condition might change in order to deal with older versions
                 self._info("Remote dataset tree reports version {}. Supported versions are: {}. Consider upgrading "
-                           "git-annex-ria-remote or fix the structure on the remote end."
+                           "datalad or fix the structure on the remote end."
                            "".format(self.remote_dataset_tree_version, self.known_versions_dst))
                 self._set_read_only(read_only_msg)
 
@@ -740,7 +740,7 @@ class RIARemote(SpecialRemote):
             else:
                 # directory is there, but no version file. We don't know what that is. Treat the same way as if there
                 # was an unknown version on record
-                self._info("Remote doesn't report any dataset tree version. Consider upgrading git-annex-ria-remote or "
+                self._info("Remote doesn't report any dataset tree version. Consider upgrading datalad or "
                            "fix the structure on the remote end.")
                 self._set_read_only(read_only_msg)
 
@@ -749,7 +749,7 @@ class RIARemote(SpecialRemote):
             self.remote_object_tree_version = self._get_version_config(object_tree_version_file)
             if self.remote_object_tree_version not in self.known_versions_objt:
                 self._info("Remote object tree reports version {}. Supported versions are {}. Consider upgrading "
-                           "git-annex-ria-remote.".format(self.remote_object_tree_version, self.known_versions_objt))
+                           "datalad.".format(self.remote_object_tree_version, self.known_versions_objt))
                 self._set_read_only(read_only_msg)
         except (RemoteError, FileNotFoundError):
             if not self.io.exists(object_tree_version_file.parent):
@@ -758,7 +758,7 @@ class RIARemote(SpecialRemote):
                 self.io.mkdir(object_tree_version_file.parent / 'archives')
                 self.io.write_file(object_tree_version_file, self.object_tree_version + '\n')
             else:
-                self._info("Remote doesn't report any object tree version. Consider upgrading git-annex-ria-remote or "
+                self._info("Remote doesn't report any object tree version. Consider upgrading datalad or "
                            "fix the structure on the remote end.")
                 self._set_read_only(read_only_msg)
 
@@ -800,7 +800,7 @@ class RIARemote(SpecialRemote):
     def transfer_store(self, key, filename):
         if self.read_only:
             raise RemoteError("Remote was set to read-only. "
-                              "Configure 'ria-remote.<name>.force-write' to overrule this.")
+                              "Configure 'ora-remote.<name>.force-write' to overrule this.")
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
@@ -816,7 +816,7 @@ class RIARemote(SpecialRemote):
         # checkpresent fail while the transfer is still in progress
         # and furthermore not interfere with administrative tasks in annex/objects
         # In addition include uuid, to not interfere with parallel uploads from different remotes
-        transfer_dir = self.remote_git_dir / "ria-remote-{}".format(self.uuid) / "transfer"
+        transfer_dir = self.remote_git_dir / "ora-remote-{}".format(self.uuid) / "transfer"
         self.io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 
@@ -868,7 +868,7 @@ class RIARemote(SpecialRemote):
     def remove(self, key):
         if self.read_only:
             raise RIARemoteError("Remote was set to read-only. "
-                                 "Configure 'ria-remote.<name>.force-write' to overrule this.")
+                                 "Configure 'ora-remote.<name>.force-write' to overrule this.")
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path

@@ -122,7 +122,7 @@ class CreateSiblingRia(Interface):
     issue with which dataset. Because logging can potentially leak personal
     data (like local file paths for example), it can be disabled client-side
     by setting the configuration variable
-    "annex.ria-remote.<storage-sibling-name>.ignore-remote-config".
+    "annex.ora-remote.<storage-sibling-name>.ignore-remote-config".
     """
 
     # TODO: description?
@@ -449,7 +449,7 @@ def _create_sibling_ria(
         lgr.debug('init special remote {}'.format(storage_name))
         special_remote_options = [
             'type=external',
-            'externaltype=ria',
+            'externaltype=ora',
             'encryption=none',
             'autoenable=true',
             'url={}'.format(url)]
@@ -545,7 +545,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            ssh("cd {rootdir} && git config datalad.ria-remote.uuid {uuid}"
+            ssh("cd {rootdir} && git config datalad.ora-remote.uuid {uuid}"
                 "".format(rootdir=quote_cmdlinearg(str(repo_path)),
                           uuid=uuid))
 
@@ -566,7 +566,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            gr.config.add("datalad.ria-remote.uuid", uuid, where='local')
+            gr.config.add("datalad.ora-remote.uuid", uuid, where='local')
 
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
