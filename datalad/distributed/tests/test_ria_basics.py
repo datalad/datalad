@@ -23,6 +23,7 @@ from datalad.tests.utils import (
     assert_true,
     skip_ssh,
     swallow_logs,
+    turtle,
     with_tempfile
 )
 from datalad.customremotes.ria_remote import (
@@ -360,3 +361,52 @@ def _test_version_check(host, dspath, store):
 def test_version_check():
     yield skip_ssh(_test_version_check), 'datalad-test'
     yield _test_version_check, None
+
+
+@with_tempfile
+@with_tempfile
+def _test_gitannex(host, store, dspath):
+
+    from datalad.cmd import (
+        GitRunner,
+        WitlessRunner
+    )
+    store = Path(store)
+
+    dspath = Path(dspath)
+    store = Path(store)
+
+    ds = Dataset(dspath).create()
+    populate_dataset(ds)
+    ds.save()
+    assert_repo_status(ds.path)
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    if host:
+        store_url = "ria+ssh://{host}{path}".format(host=host,
+                                                    path=store)
+    else:
+        store_url = "ria+{}".format(store.as_uri())
+
+    create_store(io, store, '1')
+
+    # TODO: Re-establish test for version 1
+    # version 2: dirhash
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # add special remote
+    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    # run git-annex-testremote
+    # note, that we don't want to capture output. If something goes wrong we
+    # want to see it in test build's output log.
+    WitlessRunner(cwd=dspath, env=GitRunner.get_git_environ_adjusted()).run(
+        ['git', 'annex', 'testremote', 'store']
+    )
+
+
+def test_gitannex():
+    yield turtle(skip_ssh(_test_gitannex)), 'datalad-test'
+    yield _test_gitannex, None
