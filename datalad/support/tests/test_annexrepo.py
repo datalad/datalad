@@ -2049,10 +2049,7 @@ def test_is_special(path):
 
     assert_false(ar.is_special_annex_remote("imspecial",
                                             check_if_known=False))
-    # FIXME: ar.enable_remote() doesn't support specifying options, but we need
-    # to specify directory= here.
-    ar._run_annex_command("enableremote",
-                          annex_options=["imspecial", dir_arg])
+    ar.enable_remote("imspecial", options=[dir_arg])
     ok_(ar.is_special_annex_remote("imspecial"))
 
     # With a mis-configured remote, give warning and return false.

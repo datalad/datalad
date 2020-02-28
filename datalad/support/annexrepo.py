@@ -47,22 +47,26 @@ from datalad.dochelpers import (
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
-    linux_distribution_name,
-    auto_repr,
-    on_windows,
     assure_list,
+    auto_repr,
+    ensure_list,
+    linux_distribution_name,
     make_tempfile,
+    on_windows,
     partition,
-    unlink,
     quote_cmdlinearg,
     split_cmdline,
+    unlink,
 )
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
-    GitRunner,
     BatchedCommand,
-    SafeDelCloseMixin,
+    GitRunner,
+    GitWitlessRunner,
+    # KillOutput,
     run_gitcommand_on_file_list_chunks,
+    SafeDelCloseMixin,
+    WitlessProtocol,
 )
 
 # imports from same module:
@@ -949,6 +953,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                            backend=None, jobs=None,
                            files=None,
                            merge_annex_branches=True,
+                           runner=None,
                            **kwargs):
         """Helper to run actual git-annex calls
 
@@ -975,8 +980,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             If False, annex.merge-annex-branches=false config will be set for
             git-annex call.  Useful for operations which are not intended to
             benefit from updating information about remote git-annexes
+        runner: {None, "gitwitless"}, optional
+            Use specified runner class instead of the bound Runner instance.
         **kwargs
-            these are passed as additional kwargs to datalad.cmd.Runner.run()
+            these are passed as additional kwargs to .run() of the runner
 
         Raises
         ------
@@ -1013,22 +1020,52 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
+        if runner == "gitwitless":
+            class _protocol(WitlessProtocol):
+                # TODO: guard for callables being passed as values
+                proc_out = bool(kwargs.pop('log_stdout', True))
+                proc_err = bool(kwargs.pop('log_stderr', True))
+            # expect_fail and expect_stderr were all about deciding level
+            # at which to log if error or stderr output.  With WitlessRunner
+            # and all the handling "from upstairs" we simply would do nothing
+            # special about it. But that ATM poses a risk of non-disclosing
+            # underlying problems to the user if caller of this is not handling
+            # out, err returned values anyhow.
+            # But decision making on either report stderr is "difficult" outside
+            # since annex --debug output also goes to stderr, thus occluding
+            # errors messages.  This is the point when we know that --debug
+            # is enabled, and probably need
+            # TODOs:
+            #  - convert all functions to generators/functions returning the
+            #    records (pass them up)
+            #  - upon debug, sanitize stderr output to exclude debug lines
+            #    (they start with [ISODATETIME]), and include those into
+            #    record
+            kwargs.pop('expect_fail', False)
+            kwargs.pop('expect_stderr', False)
+            run_func = GitWitlessRunner(cwd=self.path, env=env).run
+            kwargs['protocol'] = _protocol
+        elif runner is None:
+            run_func = self.cmd_call_wrapper.run
+            kwargs['env'] = env
+        else:
+            raise ValueError("Unknown runner %r" % runner)
+
         try:
             # TODO: RF to use --batch where possible instead of splitting
             # into multiple invocations
             return run_gitcommand_on_file_list_chunks(
-                self.cmd_call_wrapper.run,
+                run_func,
                 cmd_list,
                 files,
-                env=env, **kwargs)
+                **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
                                                "Unknown command:"
                                                " 'git-annex %s'" % annex_cmd,
                                                e.code, e.stdout, e.stderr)
-            else:
-                raise
+            raise
 
     def _run_simple_annex_command(self, *args, **kwargs):
         """Run an annex command and return its output, of which expect 1 line
@@ -1134,8 +1171,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cmd="git-annex indirect",
                 msg="Can't switch to indirect mode on that filesystem.")
 
-        self._run_annex_command('direct' if enable_direct_mode else 'indirect',
-                                expect_stderr=True)
+        self._run_annex_command(
+            'direct' if enable_direct_mode else 'indirect',
+            expect_stderr=True,
+            runner="gitwitless"
+        )
         self.config.reload()
 
         # For paranoid we will just re-request
@@ -1499,7 +1539,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 out, err = self._run_annex_command(
                     'lookupkey',
                     files=[files],
-                    expect_fail=True
+                    expect_fail=True,
+                    runner="gitwitless",
                 )
             except CommandError as e:
                 if e.code == 1:
@@ -1578,7 +1619,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                      'version that supports unlocked pointers'))
 
         options = options[:] if options else to_options(unlock=True)
-        self._run_annex_command('adjust', annex_options=options)
+        self._run_annex_command('adjust', annex_options=options, runner="gitwitless")
 
     @normalize_paths
     def unannex(self, files, options=None):
@@ -1602,7 +1643,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
 
         std_out, std_err = self._run_annex_command(
-            'unannex', annex_options=options, files=files
+            'unannex', annex_options=options, files=files, runner="gitwitless",
         )
         return [line.split()[1] for line in std_out.splitlines()
                 if line.split()[0] == 'unannex' and line.split()[-1] == 'ok']
@@ -1641,11 +1682,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             for f in files:
                 try:
-                    obj, er = self._run_annex_command(
+                    obj, _ = self._run_annex_command(
                         'find', files=[f],
                         annex_options=["--print0"],
                         expect_fail=True,
-                        merge_annex_branches=False
+                        merge_annex_branches=False,
+                        runner="gitwitless",
                     )
                     items = obj.rstrip("\0").split("\0")
                     objects[f] = items[0] if len(items) == 1 else items
@@ -1765,24 +1807,30 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TODO: figure out consistent way for passing options + document
 
-        self._run_annex_command('initremote', annex_options=[name] + options)
+        self._run_annex_command(
+            'initremote',
+            annex_options=[name] + options,
+            runner="gitwitless",
+        )
         self.config.reload()
 
-    def enable_remote(self, name, env=None):
+    def enable_remote(self, name, options=None, env=None):
         """Enables use of an existing special remote
 
         Parameters
         ----------
         name: str
             name, the special remote was created with
+        options: list, optional
         """
 
         try:
+            # TODO: outputs are nohow used/displayed. Eventually convert to
+            # to a generator style yielding our "dict records"
             self._run_annex_command(
                 'enableremote',
-                annex_options=[name],
-                expect_fail=True,
-                log_stderr=True,
+                annex_options=[name] + ensure_list(options),
+                runner="gitwitless",
                 env=env)
         except CommandError as e:
             if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
@@ -1848,7 +1896,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                all=all,
                                fast=fast))
         args.extend(assure_list(remotes))
-        self._run_annex_command('sync', annex_options=args)
+        self._run_annex_command('sync', annex_options=args, runner="gitwitless")
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
@@ -2000,7 +2048,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         url: str
         """
 
-        self._run_annex_command('rmurl', files=[file_, url])
+        self._run_annex_command('rmurl', files=[file_, url], runner="gitwitless")
 
     @normalize_path
     def get_urls(self, file_, key=False, batch=False):
@@ -2517,7 +2565,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             if with_content_only:
                 args.extend(['--in', '.'])
         out, err = self._run_annex_command(
-            'find', annex_options=args, merge_annex_branches=False
+            'find', annex_options=args, merge_annex_branches=False,
+            runner="gitwitless",
         )
         # TODO: JSON
         return out.splitlines()
@@ -2661,7 +2710,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             try:
                 out, err = self._run_annex_command('contentlocation',
                                                    annex_options=[key],
-                                                   expect_fail=True)
+                                                   expect_fail=True,
+                                                   runner="gitwitless")
                 return out.rstrip(linesep).splitlines()[0]
             except CommandError:
                 return ''
@@ -2704,7 +2754,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             try:
                 out, err = self._run_annex_command('checkpresentkey',
                                                    annex_options=list(annex_input),
-                                                   expect_fail=True)
+                                                   expect_fail=True,
+                                                   runner="gitwitless")
                 assert(not out)
                 return True
             except CommandError:
@@ -2790,7 +2841,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "Command 'migrate' is not available in direct mode.")
         self._run_annex_command('migrate',
                                 annex_options=files,
-                                backend=backend)
+                                backend=backend,
+                                runner="gitwitless")
 
     @classmethod
     def get_key_backend(cls, key):
