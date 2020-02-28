@@ -9,184 +9,320 @@
 
 import shutil
 import subprocess
-import logging
-from datalad.interface.results import annexjson2result
-from datalad.api import (
-    create,
-)
 
-from datalad.utils import (
-    Path,
-    swallow_logs
-)
+import logging
+from datalad.api import Dataset
+from datalad.utils import Path
 from datalad.tests.utils import (
+    assert_equal,
+    assert_in,
+    assert_not_in,
     assert_raises,
     assert_repo_status,
     assert_status,
-    eq_,
-    skip_if_on_windows,
-    with_tempfile,
+    assert_true,
+    skip_ssh,
+    swallow_logs,
+    with_tempfile
 )
-
+from datalad.customremotes.ria_remote import (
+    LocalIO,
+    SSHRemoteIO
+)
 from datalad.support.exceptions import (
+    CommandError,
     IncompleteResultsError
 )
-
 from datalad.distributed.tests.ria_utils import (
     get_all_files,
     initexternalremote,
     populate_dataset,
-    setup_archive_remote,
+)
+from datalad.customremotes.ria_utils import (
+    create_store,
+    create_ds_in_store,
+    get_layout_locations
 )
 
 
-@skip_if_on_windows
-@with_tempfile(mkdir=True)
-@with_tempfile()
-@with_tempfile()
-def test_archive_layout(path, objtree, archivremote):
-    ds = create(path)
-    setup_archive_remote(ds.repo, objtree)
+common_init_opts = ["encryption=none", "type=external", "externaltype=ria"]
+
+
+# Note, that exceptions to test for are generally CommandError since we are
+# talking to the special remote via annex.
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def _test_initremote_basic(host, ds_path, store, link):
+
+    ds_path = Path(ds_path)
+    store = Path(store)
+    link = Path(link)
+    ds = Dataset(ds_path).create()
+    populate_dataset(ds)
+    ds.save()
+
+    if host:
+        url = "ria+ssh://{host}{path}".format(host=host,
+                                              path=store)
+    else:
+        url = "ria+{}".format(store.as_uri())
+    init_opts = common_init_opts + ['url={}'.format(url)]
+
+    # fails on non-existing storage location
+    assert_raises(CommandError,
+                  ds.repo.init_remote, 'ria-remote', options=init_opts)
+    # Doesn't actually create a remote if it fails
+    assert_not_in('ria-remote',
+                  [cfg['name']
+                   for uuid, cfg in ds.repo.get_special_remotes().items()]
+                  )
+
+    # fails on non-RIA URL
+    assert_raises(CommandError, ds.repo.init_remote, 'ria-remote',
+                  options=common_init_opts + ['url={}'.format(store.as_uri())]
+                  )
+    # Doesn't actually create a remote if it fails
+    assert_not_in('ria-remote',
+                  [cfg['name']
+                   for uuid, cfg in ds.repo.get_special_remotes().items()]
+                  )
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    create_store(io, store, '1')
+    # still fails, since ds isn't setup in the store
+    assert_raises(CommandError,
+                  ds.repo.init_remote, 'ria-remote', options=init_opts)
+    # Doesn't actually create a remote if it fails
+    assert_not_in('ria-remote',
+                  [cfg['name']
+                   for uuid, cfg in ds.repo.get_special_remotes().items()]
+                  )
+    # set up the dataset as well
+    create_ds_in_store(io, store, ds.id, '2', '1')
+    # now should work
+    ds.repo.init_remote('ria-remote', options=init_opts)
+    assert_in('ria-remote',
+              [cfg['name']
+               for uuid, cfg in ds.repo.get_special_remotes().items()]
+              )
+    assert_repo_status(ds.path)
+    # git-annex:remote.log should have:
+    #   - url
+    #   - common_init_opts
+    #   - archive_id (which equals ds id)
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    assert_in("url={}".format(url), remote_log)
+    [assert_in(c, remote_log) for c in common_init_opts]
+    assert_in("archive-id={}".format(ds.id), remote_log)
+
+    # re-configure with invalid URL should fail:
+    assert_raises(CommandError,
+                  ds.repo.call_git,
+                  ['annex', 'enableremote', 'ria-remote'] + common_init_opts +
+                  ['url=ria+file:///non-existing']
+                  )
+    # but re-configure with valid URL should work
+    link.symlink_to(store)
+    new_url = 'ria+{}'.format(link.as_uri())
+    ds.repo.call_git(['annex', 'enableremote', 'ria-remote'] +
+                     common_init_opts +
+                     ['url={}'.format(new_url)])
+    # git-annex:remote.log should have:
+    #   - url
+    #   - common_init_opts
+    #   - archive_id (which equals ds id)
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    assert_in("url={}".format(new_url), remote_log)
+    [assert_in(c, remote_log) for c in common_init_opts]
+    assert_in("archive-id={}".format(ds.id), remote_log)
+
+    # TODO: How about old configs? Still support them?
+
+    # TODO: - check output of failures to verify it's failing the right way
+    #       - might require to run initremote directly to get the output
+
+
+def test_initremote_basic():
+
+    yield skip_ssh(_test_initremote_basic), 'datalad-test'
+    yield _test_initremote_basic, None
+
+
+@with_tempfile
+@with_tempfile
+def _test_initremote_rewrite(host, ds_path, store):
+
+    # rudimentary repetition of test_initremote_basic, but
+    # with url.<base>.insteadOf config, which should not only
+    # be respected, but lead to the rewritten URL stored in
+    # git-annex:remote.log
+
+    ds_path = Path(ds_path)
+    store = Path(store)
+    ds = Dataset(ds_path).create()
     populate_dataset(ds)
     ds.save()
     assert_repo_status(ds.path)
 
-    # copy files into the RIA archive
-    ds.repo.copy_to('.', 'archive')
+    url = "mystore:"
+    init_opts = common_init_opts + ['url={}'.format(url)]
+
+    if host:
+        replacement = "ria+ssh://{host}{path}".format(host=host,
+                                              path=store)
+    else:
+        replacement = "ria+{}".format(store.as_uri())
+
+    ds.config.set("url.{}.insteadOf".format(replacement), url, where='local')
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    create_store(io, store, '1')
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # run initremote and check what's stored:
+    ds.repo.init_remote('ria-remote', options=init_opts)
+    assert_in('ria-remote',
+              [cfg['name']
+               for uuid, cfg in ds.repo.get_special_remotes().items()]
+              )
+    # git-annex:remote.log should have:
+    #   - rewritten url
+    #   - common_init_opts
+    #   - archive_id (which equals ds id)
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    assert_in("url={}".format(replacement), remote_log)
+    [assert_in(c, remote_log) for c in common_init_opts]
+    assert_in("archive-id={}".format(ds.id), remote_log)
+
+
+def test_initremote_rewrite():
+    yield skip_ssh(_test_initremote_rewrite), 'datalad-test'
+    yield _test_initremote_rewrite, None
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def _test_remote_layout(host, dspath, store, archiv_store):
+
+    dspath = Path(dspath)
+    store = Path(store)
+    archiv_store = Path(archiv_store)
+    ds = Dataset(dspath).create()
+    populate_dataset(ds)
+    ds.save()
+    assert_repo_status(ds.path)
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    if host:
+        store_url = "ria+ssh://{host}{path}".format(host=host,
+                                                    path=store)
+        arch_url = "ria+ssh://{host}{path}".format(host=host,
+                                                   path=archiv_store)
+    else:
+        store_url = "ria+{}".format(store.as_uri())
+        arch_url = "ria+{}".format(archiv_store.as_uri())
+
+    create_store(io, store, '1')
+
+    # TODO: Re-establish test for version 1
+    # version 2: dirhash
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # add special remote
+    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    # copy files into the RIA store
+    ds.repo.copy_to('.', 'store')
 
     # we should see the exact same annex object tree
-    arxiv_files = get_all_files(objtree)
-    # anything went there at all?
-    assert len(arxiv_files) > 1
-    # minus the two layers for the archive path the content is identically
-    # structured, except for the two additional version files at the root of the entire tree and at the dataset level
-    assert len([p for p in arxiv_files if p.name == 'ria-layout-version']) == 2
+    dsgit_dir, archive_dir, dsobj_dir = \
+        get_layout_locations(1, store, ds.id)
+    store_objects = get_all_files(dsobj_dir)
+    local_objects = get_all_files(ds.pathobj / '.git' / 'annex' / 'objects')
+    assert_equal(len(store_objects), 2)
+    assert_equal(sorted([p for p in store_objects]),
+                 sorted([p for p in local_objects])
+                 )
 
-    if not ds.repo.is_managed_branch():
-        # with managed branches the local repo uses hashdirlower
-        eq_(
-            sorted([
-                p.parts[-4:]
-                for p in arxiv_files
-                if p.name != 'ria-layout-version']),
-            # Note: datalad-master has ds.repo.dot_git Path object.
-            # Not in 0.12.0rc6 though. This would also resolve .git-files,
-            # which pathlib obv. can't. If we test more sophisticated
-            # structures, we'd need to account for that
-            sorted([
-                p.parts
-                for p in get_all_files(ds.pathobj / '.git' / 'annex' / 'objects')])
-        )
-
-    # we can simply pack up the content of the directory remote into a
+    # we can simply pack up the content of the remote into a
     # 7z archive and place it in the right location to get a functional
-    # special remote
+    # archive remote
     whereis = ds.repo.whereis('one.txt')
-    targetpath = Path(archivremote) / ds.id[:3] / ds.id[3:] / 'archives'
-    ds.ria_export_archive(targetpath / 'archive.7z')
-    initexternalremote(ds.repo, '7z', 'ora', config={'base-path': archivremote})
+    dsgit_dir, archive_dir, dsobj_dir = \
+        get_layout_locations(1, archiv_store, ds.id)
+    ds.ria_export_archive(archive_dir / 'archive.7z')
+    init_opts = common_init_opts + ['url={}'.format(arch_url)]
+    ds.repo.init_remote('archive', options=init_opts)
     # now fsck the new remote to get the new special remote indexed
-    ds.repo.fsck(remote='7z', fast=True)
-    if not ds.repo.is_managed_branch():
-        # TODO everything is working, and even the `fsck` above reports the file
-        # but for an unknown reason neither the following, nor a direct call
-        # to `git annex whereis` report the file as available
-        eq_(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
+    ds.repo.fsck(remote='archive', fast=True)
+    assert_equal(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
 
 
-@skip_if_on_windows
-@with_tempfile(mkdir=True)
-@with_tempfile()
-@with_tempfile()
-def test_backup_archive(path, objtree, archivremote):
-    # Similar to test_archive_layout(), but not focused on
-    # compatibility with the directory-type special remote. Instead,
-    # it tests build a second RIA remote from an existing one, e.g.
-    # for backup purposes.
+def test_remote_layout():
+    yield skip_ssh(_test_remote_layout), 'datalad-test'
+    yield _test_remote_layout, None
 
-    ds = create(path)
-    setup_archive_remote(ds.repo, objtree)
+
+@with_tempfile
+@with_tempfile
+def _test_version_check(host, dspath, store):
+
+    dspath = Path(dspath)
+    store = Path(store)
+
+    ds = Dataset(dspath).create()
     populate_dataset(ds)
     ds.save()
     assert_repo_status(ds.path)
 
-    # copy files into the RIA archive
-    ds.repo.copy_to('.', 'archive')
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    if host:
+        store_url = "ria+ssh://{host}{path}".format(host=host,
+                                                    path=store)
+    else:
+        store_url = "ria+{}".format(store.as_uri())
 
-    targetpath = Path(archivremote) / ds.id[:3] / ds.id[3:] / 'archives'
-    targetpath.mkdir(parents=True)
-    subprocess.run(
-        ['7z', 'u', str(targetpath / 'archive.7z'), '.'],
-        cwd=str(Path(objtree) / ds.id[:3] / ds.id[3:] / 'annex' / 'objects'),
-    )
-    initexternalremote(ds.repo, '7z', 'ora', config={'base-path': archivremote})
-    # wipe out the initial RIA remote (just for testing if the upcoming
-    # one can fully take over)
+    create_store(io, store, '1')
 
-    # Note: Due to gh-4203 we can't kill everything and expect fsck to find out.
-    # However, point of the test is the archive taking over, so killing the
-    # annex objects should suffice.
-    # shutil.rmtree(objtree)
-    shutil.rmtree(str(Path(objtree) / ds.id[:3] / ds.id[3:] / 'annex' / 'objects'))
+    # TODO: Re-establish test for version 1
+    # version 2: dirhash
+    create_ds_in_store(io, store, ds.id, '2', '1')
 
-    # fsck to make git-annex aware of the loss
-    assert_status(
-        'error',
-        [annexjson2result(r, ds)
-         for r in ds.repo.fsck(remote='archive', fast=True)])
-    # now only available "here"
-    eq_(len(ds.repo.whereis('one.txt')), 1)
+    # add special remote
+    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    ds.repo.init_remote('store', options=init_opts)
+    ds.repo.copy_to('.', 'store')
 
-    # make the backup archive known
-    initexternalremote(
-        ds.repo, 'backup', 'ora', config={'base-path': archivremote})
-    # now fsck the new remote to get the new special remote indexed
-    assert_status(
-        'ok',
-        [annexjson2result(r, ds)
-         for r in ds.repo.fsck(remote='backup', fast=True)])
-    eq_(len(ds.repo.whereis('one.txt')), 2)
+    # check version files
+    remote_ds_tree_version_file = store / 'ria-layout-version'
+    dsgit_dir, archive_dir, dsobj_dir = \
+        get_layout_locations(1, store, ds.id)
+    remote_obj_tree_version_file = dsgit_dir / 'ria-layout-version'
 
-    # now we can drop all content locally, reobtain it, and survive an
-    # fsck
-    ds.drop('.')
-    ds.get('.')
-    assert_status('ok', [annexjson2result(r, ds) for r in ds.repo.fsck()])
-
-
-@skip_if_on_windows
-@with_tempfile(mkdir=True)
-@with_tempfile()
-def test_version_check(path, objtree):
-
-    ds = create(path)
-    setup_archive_remote(ds.repo, objtree)
-    populate_dataset(ds)
-    ds.save()
-    assert_repo_status(ds.path)
-
-    remote_ds_tree_version_file = Path(objtree) / 'ria-layout-version'
-    remote_obj_tree_version_file = Path(objtree) / ds.id[:3] / ds.id[3:] / 'ria-layout-version'
-
-    # creation is done by initremote ATM, so should exist:
-    assert remote_ds_tree_version_file.exists()
-    assert remote_obj_tree_version_file.exists()
-
-    # Now copy everything to remote. This should create the structure including those version files
-    ds.repo.copy_to('.', 'archive')
-    assert remote_ds_tree_version_file.exists()
-    assert remote_obj_tree_version_file.exists()
+    assert_true(remote_ds_tree_version_file.exists())
+    assert_true(remote_obj_tree_version_file.exists())
 
     with open(str(remote_ds_tree_version_file), 'r') as f:
-        eq_(f.read().strip(), '1')
+        assert_equal(f.read().strip(), '1')
     with open(str(remote_obj_tree_version_file), 'r') as f:
-        eq_(f.read().strip(), '2')
+        assert_equal(f.read().strip(), '2')
 
-    # Accessing the remote should not yield any output regarding versioning, since it's the "correct" version
-    # Note that "fsck" is an arbitrary choice. We need just something to talk to the special remote
+    # Accessing the remote should not yield any output regarding versioning,
+    # since it's the "correct" version. Note that "fsck" is an arbitrary choice.
+    # We need just something to talk to the special remote.
     with swallow_logs(new_level=logging.INFO) as cml:
-        ds.repo.fsck(remote='archive', fast=True)
-        assert not cml.out  # TODO: For some reason didn't get cml.assert_logged to assert "nothing was logged"
+        ds.repo.fsck(remote='store', fast=True)
+        # TODO: For some reason didn't get cml.assert_logged to assert
+        #       "nothing was logged"
+        assert not cml.out
 
     # Now fake-change the version
     with open(str(remote_obj_tree_version_file), 'w') as f:
@@ -194,9 +330,13 @@ def test_version_check(path, objtree):
 
     # Now we should see a message about it
     with swallow_logs(new_level=logging.INFO) as cml:
-        ds.repo.fsck(remote='archive', fast=True)
-        cml.assert_logged(level="INFO", msg="Remote object tree reports version X", regex=False)
-        cml.assert_logged(level="INFO", msg="Setting remote to read-only usage", regex=False)
+        ds.repo.fsck(remote='store', fast=True)
+        cml.assert_logged(level="INFO",
+                          msg="Remote object tree reports version X",
+                          regex=False)
+        cml.assert_logged(level="INFO",
+                          msg="Setting remote to read-only usage",
+                          regex=False)
 
     # reading still works:
     ds.drop('.')
@@ -207,9 +347,16 @@ def test_version_check(path, objtree):
         f.write("arbitrary addition")
     ds.save(message="Add a new_file")
 
-    # TODO: use self.annex.error and see whether we get an actual error result
-    assert_raises(IncompleteResultsError, ds.repo.copy_to, 'new_file', 'archive')
+    # TODO: use self.annex.error in special remote and see whether we get an
+    #       actual error result
+    assert_raises(IncompleteResultsError,
+                  ds.repo.copy_to, 'new_file', 'store')
 
     # However, we can force it by configuration
     ds.config.add("annex.ora-remote.archive.force-write", "true", where='local')
     ds.repo.copy_to('new_file', 'archive')
+
+
+def test_version_check():
+    yield skip_ssh(_test_version_check), 'datalad-test'
+    yield _test_version_check, None
