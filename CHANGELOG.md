@@ -20,7 +20,13 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- `datalad export-to-figshare` failed to export if the generated title
+  was fewer than three characters.  It now queries the caller for the
+  title and guards against titles that are too short.  ([#4140][])
+
+- At verbose logging levels, DataLad requests that git-annex display
+  debugging information too.  Work around a bug in git-annex that
+  prevented that from happening.  ([#4212][])
 
 ### Enhancements and new features
 
@@ -2397,3 +2403,5 @@ publishing
 [#4070]: https://github.com/datalad/datalad/issues/4070
 [#4073]: https://github.com/datalad/datalad/issues/4073
 [#4078]: https://github.com/datalad/datalad/issues/4078
+[#4140]: https://github.com/datalad/datalad/issues/4140
+[#4212]: https://github.com/datalad/datalad/issues/4212
