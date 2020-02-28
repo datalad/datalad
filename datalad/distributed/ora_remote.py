@@ -805,52 +805,7 @@ class RIARemote(SpecialRemote):
             if not self.archive_id:
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
-
-        # TODO: The following block needs to be replaced by get_store() or even
-        #       prepare() only, so initremote would expect an existing remote
-        #       end, while creation has to go completely outside special remote
-        #       itself.
-        #############################
-
-        from .ria_utils import create_store, create_ds_in_store
-
-        # cache remote layout directories
-        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.store_base_path, self.archive_id)
-
-        # TODO: read-only prob. is superfluous here. Anything writing to the
-        #       remote should come after a call to prepare AFAIK.
-        read_only_msg = "Setting remote to read-only usage in order to" \
-                        "prevent damage by putting things into an unknown " \
-                        "version of the target layout. You can overrule this " \
-                        "by configuring 'annex.ria-remote.<name>.force-write'."
-        try:
-            self.verify_store()
-        except (FileNotFoundError, NoLayoutVersion):
-            create_store(self.io, self.store_base_path,
-                         self.dataset_tree_version)
-        except UnknownLayoutVersion:
-            self._info("Remote dataset tree reports version {}. Supported"
-                       "versions are: {}. Consider upgrading datalad or "
-                       "fix the structure on the remote end."
-                       "".format(self.remote_dataset_tree_version,
-                                 self.known_versions_dst))
-            self._set_read_only(read_only_msg)
-
-        try:
-            self.verify_ds_in_store()
-        except (FileNotFoundError, NoLayoutVersion):
-            create_ds_in_store(self.io, self.store_base_path, self.archive_id,
-                               self.object_tree_version,
-                               self.dataset_tree_version)
-        except UnknownLayoutVersion:
-            self._info("Remote object tree reports version {}. Supported"
-                       "versions are {}. Consider upgrading datalad."
-                       "".format(self.remote_object_tree_version,
-                                 self.known_versions_objt))
-            self._set_read_only(read_only_msg)
-
-        ##############################
+        self.get_store()
 
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
