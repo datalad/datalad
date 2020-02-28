@@ -35,10 +35,6 @@ bet we will fix some bugs and make a world even a better place.
 - `AnnexRepo.get_size_from_key` incorrectly handled file chunks.
   ([#4081][])
 
-- `datalad export-to-figshare` failed to export if the generated title
-  was fewer than three characters.  It now queries the caller for the
-  title and guards against titles that are too short.  ([#4140][])
-
 - [create-sibling][] would too readily clobber existing paths when
   called with `--existing=replace`.  It now gets confirmation from the
   user before doing so if running interactively and unconditionally
@@ -100,6 +96,28 @@ bet we will fix some bugs and make a world even a better place.
   clean to make it more obvious that no results being rendered
   corresponds to a clean state.  ([#4106][])
 
+
+## 0.12.3 (??? ??, 2020) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- `datalad export-to-figshare` failed to export if the generated title
+  was fewer than three characters.  It now queries the caller for the
+  title and guards against titles that are too short.  ([#4140][])
+
+- At verbose logging levels, DataLad requests that git-annex display
+  debugging information too.  Work around a bug in git-annex that
+  prevented that from happening.  ([#4212][])
+
+### Enhancements and new features
+
+?
 
 ## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
 
@@ -2496,3 +2514,4 @@ publishing
 [#4174]: https://github.com/datalad/datalad/issues/4174
 [#4175]: https://github.com/datalad/datalad/issues/4175
 [#4187]: https://github.com/datalad/datalad/issues/4187
+[#4212]: https://github.com/datalad/datalad/issues/4212
