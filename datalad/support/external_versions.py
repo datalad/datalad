@@ -63,7 +63,7 @@ def _get_annex_version():
 
 def _get_git_version():
     """Return version of git we use (might be bundled)"""
-    return __get_git_version(_git_runner)
+    return __get_git_version()
 
 
 def _get_system_git_version():
