@@ -21,12 +21,18 @@ import functools
 import tempfile
 from locale import getpreferredencoding
 import asyncio
-from collections import namedtuple
+from collections import (
+    defaultdict,
+    namedtuple,
+    OrderedDict,
+)
 
-from collections import OrderedDict
-from .support import path as op
 from .consts import GIT_SSH_COMMAND
-from .dochelpers import exc_str
+from .dochelpers import (
+    borrowdoc,
+    exc_str,
+)
+from .support import path as op
 from .support.exceptions import CommandError
 from .support.protocol import (
     NullProtocol,
@@ -34,15 +40,14 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    assure_unicode,
-    get_tempfile_kwargs,
     assure_bytes,
-    unlink,
+    assure_unicode,
     auto_repr,
-    split_cmdline,
     generate_file_chunks,
+    get_tempfile_kwargs,
+    split_cmdline,
+    unlink,
 )
-from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -128,19 +133,37 @@ def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
     else:
         file_chunks = generate_file_chunks(files, cmd)
 
-    out, err = [], []
+    results = []
     for i, file_chunk in enumerate(file_chunks):
         if file_chunk:
             lgr.debug('Process file list chunk %i (length %i)',
                       i, len(file_chunk))
-            out_, err_ = func(cmd + ['--'] + file_chunk, *args, **kwargs)
+            results.append(func(cmd + ['--'] + file_chunk, *args, **kwargs))
         else:
-            out_, err_ = func(cmd, *args, **kwargs)
-        if out_:
-            out.append(out_)
-        if err_:
-            err.append(err_)
-    return ''.join(out), ''.join(err)
+            results.append(func(cmd, *args, **kwargs))
+    # if it was a WitlessRunner.run -- we would get dicts.
+    # If old Runner -- stdout, stderr strings
+    if results:
+        if isinstance(results[0], dict):
+            result = defaultdict(str)
+            for r in results:
+                for k, v in r.items():
+                    if k in ('stdout', 'stderr'):
+                        result[k] += v
+                    elif k == 'status':
+                        if k:
+                            # this wrapper expects commands to succeed or exception
+                            # being thrown
+                            raise RuntimeError(
+                                "Running %s with WitlessRunner resulted in "
+                                "exit %d but there were no exception" % (cmd, k))
+                    elif v:
+                        raise RuntimeError(
+                            "Have no clue what to do about %s=%r" % (k, v))
+            return result['stdout'], result['stderr']
+        else:
+            return ''.join(r[0] for r in results), \
+                   ''.join(r[1] for r in results)
 
 
 async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
