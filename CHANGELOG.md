@@ -20,6 +20,8 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
+- Updates for compatibility with git-annex version 8.20200226. ([#4214][])
+
 - `datalad export-to-figshare` failed to export if the generated title
   was fewer than three characters.  It now queries the caller for the
   title and guards against titles that are too short.  ([#4140][])
@@ -27,6 +29,10 @@ bet we will fix some bugs and make a world even a better place.
 - At verbose logging levels, DataLad requests that git-annex display
   debugging information too.  Work around a bug in git-annex that
   prevented that from happening.  ([#4212][])
+
+- The internal command runner looked in the wrong place for some
+  configuration variables, including `datalad.log.outputs`, resulting
+  in the default value always being used.  ([#4194][])
 
 ### Enhancements and new features
 
@@ -2404,4 +2410,6 @@ publishing
 [#4073]: https://github.com/datalad/datalad/issues/4073
 [#4078]: https://github.com/datalad/datalad/issues/4078
 [#4140]: https://github.com/datalad/datalad/issues/4140
+[#4194]: https://github.com/datalad/datalad/issues/4194
 [#4212]: https://github.com/datalad/datalad/issues/4212
+[#4214]: https://github.com/datalad/datalad/issues/4214
