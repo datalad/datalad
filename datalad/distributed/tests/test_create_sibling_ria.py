@@ -57,7 +57,7 @@ def test_invalid_calls(path):
 
     # same name for git- and special remote:
     assert_raises(ValueError, ds.create_sibling_ria, 'ria+file:///some/where',
-                  name='some', ria_remote_name='some')
+                  name='some', ora_remote_name='some')
 
 
 @skip_if_on_windows  # running into short path issues; same as gh-4131
@@ -91,7 +91,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     git_config = Path(base_path) / ds.id[:3] / ds.id[3:] / 'config'
     assert git_config.exists()
     content = git_config.read_text()
-    assert_in("[datalad \"ria-remote\"]", content)
+    assert_in("[datalad \"ora-remote\"]", content)
     super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-ria'))
     assert_in("uuid = {}".format(super_uuid), content)
 

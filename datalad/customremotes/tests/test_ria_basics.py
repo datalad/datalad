@@ -68,7 +68,7 @@ def test_archive_layout(path, objtree, archivremote):
     whereis = ds.repo.whereis('one.txt')
     targetpath = Path(archivremote) / ds.id[:3] / ds.id[3:] / 'archives'
     ds.ria_export_archive(targetpath / 'archive.7z')
-    initexternalremote(ds.repo, '7z', 'ria', config={'base-path': archivremote})
+    initexternalremote(ds.repo, '7z', 'ora', config={'base-path': archivremote})
     # now fsck the new remote to get the new special remote indexed
     ds.repo.fsck(remote='7z', fast=True)
     eq_(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
@@ -99,7 +99,7 @@ def test_backup_archive(path, objtree, archivremote):
         ['7z', 'u', str(targetpath / 'archive.7z'), '.'],
         cwd=str(Path(objtree) / ds.id[:3] / ds.id[3:] / 'annex' / 'objects'),
     )
-    initexternalremote(ds.repo, '7z', 'ria', config={'base-path': archivremote})
+    initexternalremote(ds.repo, '7z', 'ora', config={'base-path': archivremote})
     # wipe out the initial RIA remote (just for testing if the upcoming
     # one can fully take over)
     shutil.rmtree(objtree)
@@ -113,7 +113,7 @@ def test_backup_archive(path, objtree, archivremote):
 
     # make the backup archive known
     initexternalremote(
-        ds.repo, 'backup', 'ria', config={'base-path': archivremote})
+        ds.repo, 'backup', 'ora', config={'base-path': archivremote})
     # now fsck the new remote to get the new special remote indexed
     assert_status(
         'ok',
@@ -186,5 +186,5 @@ def test_version_check(path, objtree):
     assert_raises(IncompleteResultsError, ds.repo.copy_to, 'new_file', 'archive')
 
     # However, we can force it by configuration
-    ds.config.add("annex.ria-remote.archive.force-write", "true", where='local')
+    ds.config.add("annex.ora-remote.archive.force-write", "true", where='local')
     ds.repo.copy_to('new_file', 'archive')

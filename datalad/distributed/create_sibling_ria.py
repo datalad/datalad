@@ -90,7 +90,7 @@ class CreateSiblingRia(Interface):
     <dataset id>.<annex uuid of the remote>.log showing 'who' ran into this
     issue with what dataset. Since this logging can potentially leak personal
     data (like local file paths for example) it can be disabled from the client
-    side via "annex.ria-remote.<RIAREMOTE>.ignore-remote-config".
+    side via "annex.ora-remote.<ORAREMOTE>.ignore-remote-config".
 
     Todo
     ----
@@ -138,12 +138,12 @@ class CreateSiblingRia(Interface):
             the subdatasets' siblings.""",
             constraints=EnsureStr() | EnsureNone(),
             required=True),
-        ria_remote_name=Parameter(
-            args=("--ria-remote-name",),
+        ora_remote_name=Parameter(
+            args=("--ora-remote-name",),
             metavar="NAME",
-            doc="""Name of the RIA remote (a git-annex special remote).
+            doc="""Name of the ORA remote (a git-annex special remote).
             Must not be identical to the sibling name. If not specified,
-            defaults to the sibling name plus a '-ria' suffix.""",
+            defaults to the sibling name plus a '-ora' suffix.""",
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
@@ -164,10 +164,10 @@ class CreateSiblingRia(Interface):
             doc="""Filesystem group for the repository. Specifying the group is
             crucial when [CMD: --shared=group CMD][PY: shared="group" PY]""",
             constraints=EnsureStr() | EnsureNone()),
-        ria_remote=Parameter(
-            args=("--no-ria-remote",),
+        ora_remote=Parameter(
+            args=("--no-ora-remote",),
             dest='ria_remote',
-            doc="""Flag to disable establishing remote indexed archive (RIA)
+            doc="""Flag to disable establishing optional remote archive (ORA)
             capabilities for the created sibling. If enabled, git-annex special
             remote access will be configured to enable regular git-annex key
             storage, and also retrieval of keys from (compressed) 7z archives
@@ -204,11 +204,11 @@ class CreateSiblingRia(Interface):
     def __call__(url,
                  name,
                  dataset=None,
-                 ria_remote_name=None,
+                 ora_remote_name=None,
                  post_update_hook=False,
                  shared=None,
                  group=None,
-                 ria_remote=True,
+                 ora_remote=True,
                  existing='error',
                  trust_level=None,
                  recursive=False,
@@ -228,15 +228,15 @@ class CreateSiblingRia(Interface):
                 "Repository at {} is not a DataLad dataset, "
                 "run 'datalad create [--force]' first.".format(ds.path))
 
-        if not ria_remote and ria_remote_name:
+        if not ora_remote and ora_remote_name:
             lgr.warning(
-                "RIA remote setup disabled, but a ria-remote name was provided"
+                "ORA remote setup disabled, but an ora-remote name was provided"
             )
 
-        if ria_remote and not ria_remote_name:
-            ria_remote_name = "{}-ria".format(name)
+        if ora_remote and not ora_remote_name:
+            ora_remote_name = "{}-ria".format(name)
 
-        if ria_remote and name == ria_remote_name:
+        if ora_remote and name == ora_remote_name:
             # leads to unresolvable, circular dependency with publish-depends
             raise ValueError("sibling names must not be equal")
 
@@ -289,11 +289,11 @@ class CreateSiblingRia(Interface):
                     failed = True
                     yield res
                     continue
-                if ria_remote_name and r['name'] == ria_remote_name:
+                if ora_remote_name and r['name'] == ora_remote_name:
                     res = get_status_dict(
                         status='error',
                         message="a sibling '{}' is already configured in "
-                        "dataset {}".format(ria_remote_name, r['path']),
+                        "dataset {}".format(ora_remote_name, r['path']),
                         **res_kwargs,
                     )
                     failed = True
@@ -310,8 +310,8 @@ class CreateSiblingRia(Interface):
             ds,
             url,
             name,
-            ria_remote,
-            ria_remote_name,
+            ora_remote,
+            ora_remote_name,
             existing,
             shared,
             group,
@@ -332,8 +332,8 @@ class CreateSiblingRia(Interface):
                     subds,
                     url,
                     name,
-                    ria_remote,
-                    ria_remote_name,
+                    ora_remote,
+                    ora_remote_name,
                     existing,
                     shared,
                     group,
@@ -445,7 +445,7 @@ def _create_sibling_ria(
     if ria_remote:
         lgr.debug('init special remote {}'.format(ria_remote_name))
         ria_remote_options = ['type=external',
-                              'externaltype=ria',
+                              'externaltype=ora',
                               'encryption=none',
                               'autoenable=true',
                               'url={}'.format(url)]
@@ -541,7 +541,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            ssh("cd {rootdir} && git config datalad.ria-remote.uuid {uuid}"
+            ssh("cd {rootdir} && git config datalad.ora-remote.uuid {uuid}"
                 "".format(rootdir=quote_cmdlinearg(str(repo_path)),
                           uuid=uuid))
 
@@ -562,7 +562,7 @@ def _create_sibling_ria(
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
             # fallback URL
-            gr.config.add("datalad.ria-remote.uuid", uuid, where='local')
+            gr.config.add("datalad.ora-remote.uuid", uuid, where='local')
 
         if post_update_hook:
             disabled_hook.rename(enabled_hook)

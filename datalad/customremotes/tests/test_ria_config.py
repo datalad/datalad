@@ -32,14 +32,14 @@ def test_site_archive_location_config(path, objtree, objtree_alt):
     assert_raises(
         CommandError,
         initexternalremote,
-        ds.repo, 'archive', 'ria',
+        ds.repo, 'archive', 'ora',
         config=None,
     )
     # specify archive location via config (could also be system-wide
     # config setting, done locally here for a simple test setup)
     ds.config.set('annex.ria-remote.archive.base-path', objtree, where='local')
     initexternalremote(
-        ds.repo, 'archive', 'ria',
+        ds.repo, 'archive', 'ora',
     )
     # put some stuff in and check if it flies
     populate_dataset(ds)
@@ -60,14 +60,14 @@ def test_site_archive_url_config(path, objtree, objtree_alt):
     assert_raises(
         CommandError,
         initexternalremote,
-        ds.repo, 'archive', 'ria',
+        ds.repo, 'archive', 'ora',
         config=None,
     )
     # specify archive location via URL + configured label (url...insteadOf) for reconfiguration
     ds.config.set('url.ria+{}.insteadOf'.format(Path(objtree).as_uri()),
                   'localstore:', where='local')
     initexternalremote(
-        ds.repo, 'archive', 'ria', config={'url': 'localstore:'}
+        ds.repo, 'archive', 'ora', config={'url': 'localstore:'}
     )
     # put some stuff in and check if it flies
     populate_dataset(ds)
