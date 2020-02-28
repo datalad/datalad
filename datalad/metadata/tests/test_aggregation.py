@@ -265,6 +265,7 @@ def _get_referenced_objs(ds):
                 for f in ('content_info', 'dataset_info')])
 
 
+@known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregate_removal(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
@@ -358,6 +359,7 @@ def test_update_strategy(path):
     eq_(target_meta, base.metadata(return_type='list'))
 
 
+@known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
 @with_tree({
     'this': 'that',
     'sub1': {'here': 'there'},

@@ -135,6 +135,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None
+    _version_kludges = {}
 
     # Class wide setting to allow insecure URLs. Used during testing, since
     # git annex 6.20180626 those will by default be not allowed for security
@@ -226,7 +227,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # initialize
         self._uuid = None
-        self._annex_common_options = []
+        self._annex_common_options = ["-c", "annex.dotfiles=true"]
 
         if annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git-annex and/or "
@@ -591,6 +592,25 @@ class AnnexRepo(GitRepo, RepoInterface):
                 key_remap[k]: list(map(int, v.strip().split()))
                 for k, v in kvs if k in key_remap}
         return cls.repository_versions
+
+    @classmethod
+    def _check_version_kludges(cls, key):
+        """Cache some annex-version-specific kludges in one go.
+
+        Return the kludge under `key`.
+        """
+        assert key in {"has-include-dotfiles"}
+        kludges = cls._version_kludges
+        if kludges:
+            return kludges[key]
+
+        if cls.git_annex_version is None:
+            cls._check_git_annex_version()
+
+        ver = cls.git_annex_version
+        kludges["has-include-dotfiles"] = ver <= "7.20200226"
+        cls._version_kludges = kludges
+        return kludges[key]
 
     @staticmethod
     def get_size_from_key(key):
@@ -1374,7 +1394,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 '-c',
                 'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
             ]
-            if git:
+            if git and self._check_version_kludges("has-include-dotfiles"):
                 # to maintain behaviour similar to git
                 options += ['--include-dotfiles']
 
@@ -3388,8 +3408,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # there is a standard mechanism that is uniform between Git
         # Annex repos to decide on the behavior on a case-by-case
         # basis
-        # TODO have a dedicated test for this
-        options = ['--include-dotfiles']
+        options = []
+        if self._check_version_kludges("has-include-dotfiles"):
+            options.append('--include-dotfiles')
         # if None -- leave it to annex to decide
         if git is not None:
             options += [

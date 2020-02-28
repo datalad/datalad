@@ -173,6 +173,11 @@ def test_py2_unicode_command(path):
 @with_tempfile(mkdir=True)
 def test_sidecar(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        if not ds.repo._check_version_kludges("has-include-dotfiles"):
+            # FIXME(annex.dotfiles)
+            ds.repo.config.set("annex.dotfiles", "true",
+                               where="local", reload=True)
     # Simple sidecar message checks.
     ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
