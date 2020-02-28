@@ -963,7 +963,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         runner: {None, "gitwitless"}, optional
             Use specified runner class instead of the bound Runner instance.
         **kwargs
-            these are passed as additional kwargs to the *Runner.run()
+            these are passed as additional kwargs to .run() of the runner
 
         Raises
         ------

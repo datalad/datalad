@@ -1014,7 +1014,7 @@ class Runner(object):
 
 class GitRunnerBase(object):
     """
-    Mix-in class for *Runners to be used to run git and git annex commands
+    Mix-in class for Runners to be used to run git and git annex commands
 
     Overloads the runner class to check & update GIT_DIR and
     GIT_WORK_TREE environment variables set to the absolute path
