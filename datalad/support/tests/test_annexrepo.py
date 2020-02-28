@@ -1513,9 +1513,12 @@ def test_annex_add_no_dotfiles(path):
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
-    # no file is being added, as dotfiles/directories are ignored by default
-    ar.add('.', git=False)
+    if ar._check_version_kludges("has-include-dotfiles"):
+        assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
+        # no file is being added, as dotfiles/directories are ignored by default
+        ar.add('.', git=False)
+        # ^ Note: No longer true as of 8.20200226, which does _not_ skip
+        # dotfiles.
     # double check, still dirty
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
