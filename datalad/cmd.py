@@ -553,7 +553,7 @@ class Runner(object):
             adapter = self._LOG_OPTS_ADAPTERS.get(opt, None)
             self._log_opts[opt] = \
                 (cfg.getbool if not adapter else cfg.get_value)(
-                    'datalad.log.cmd', opt, default=default)
+                    'datalad.log', opt, default=default)
             if adapter:
                 self._log_opts[opt] = adapter(self._log_opts[opt])
             return self._log_opts[opt]
