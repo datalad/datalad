@@ -1161,6 +1161,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
+        kwargs:
+          Passed to the Repo class constructor.
         """
 
         if 'repo' in kwargs:
