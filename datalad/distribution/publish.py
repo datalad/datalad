@@ -33,7 +33,9 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.sshconnector import sh_quote
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+)
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
 from datalad.utils import assure_list
@@ -259,6 +261,15 @@ def _check_and_update_remote_server_info(ds, remote):
     return False
 
 
+def _maybe_fetch(repo, remote):
+    if repo.config.get("remote.{}.fetch".format(remote)):
+        repo.fetch(remote=remote)
+    else:
+        # Fetching would lead to "Couldn't find remote ref HEAD" if no
+        # branch" error.  See gh-4199 for an example.
+        lgr.warning("Remote %s has no configured refspec", remote)
+
+
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
                      transfer_data='auto', **kwargs):
     remote_branch_name = _get_remote_branch(ds, refspec)
@@ -288,7 +299,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     for r in publish_depends + [remote]:
         if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
             lgr.debug("Obtain remote annex info from '%s'", r)
-            ds.repo.fetch(remote=r)
+            _maybe_fetch(ds.repo, r)
             # in order to be able to use git's config to determine what to push,
             # we need to annex merge first. Otherwise a git push might be
             # rejected if involving all matching branches for example.
@@ -420,7 +431,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # even if we already fetched above we need to do it again
         if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
-            ds.repo.fetch(remote=remote)
+            _maybe_fetch(ds.repo, remote)
             ds.repo.merge_annex(remote)
 
         # Note: git's push.default is 'matching', which doesn't work for first
