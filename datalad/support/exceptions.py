@@ -53,9 +53,9 @@ class CommandError(RuntimeError):
             return to_str
 
         if self.stdout:
-            to_str += " [out: '{}']".format(ensure_unicode(self.stdout))
+            to_str += " [out: '{}']".format(ensure_unicode(self.stdout).strip())
         if self.stderr:
-            to_str += " [err: '{}']".format(ensure_unicode(self.stderr))
+            to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
         if self.kwargs:
             to_str += " [info keys: {}]".format(
                 ', '.join(self.kwargs.keys()))
