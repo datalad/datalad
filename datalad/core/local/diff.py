@@ -277,7 +277,7 @@ def diff_dataset(
             origpaths=None if not path else OrderedDict(path),
             untracked=untracked,
             annexinfo=annex,
-            eval_file_type=True,
+            eval_file_type=eval_file_type,
             cache=content_info_cache,
             order=reporting_order):
         res.update(
