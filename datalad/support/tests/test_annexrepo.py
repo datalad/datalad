@@ -35,7 +35,6 @@ from urllib.parse import urljoin
 from urllib.parse import urlsplit
 
 import git
-from git import GitCommandError
 from unittest.mock import patch
 import gc
 
@@ -131,12 +130,10 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     ok_(os.path.exists(os.path.join(dst, '.git', 'annex')))
 
-    # do it again should raise GitCommandError since git will notice
+    # do it again should raise ValueError since git will notice
     # there's already a git-repo at that path and therefore can't clone to `dst`
     with swallow_logs(new_level=logging.WARN) as cm:
-        assert_raises(GitCommandError, AnnexRepo.clone, src, dst)
-        if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
-            assert("already exists" in cm.out)
+        assert_raises(ValueError, AnnexRepo.clone, src, dst)
 
 
 @assert_cwd_unchanged
@@ -168,17 +165,19 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     ar = AnnexRepo.clone(src, dst)
 
     # fake git-annex entries in .git/config:
-    writer = ar.repo.config_writer()
-    writer.set_value("annex", "crippledfilesystem", True)
-    writer.release()
+    ar.config.set(
+        "annex.crippledfilesystem",
+        'true',
+        where='local')
     ok_(ar.is_crippled_fs())
-    writer.set_value("annex", "crippledfilesystem", False)
-    writer.release()
+    ar.config.set(
+        "annex.crippledfilesystem",
+        'false',
+        where='local')
     assert_false(ar.is_crippled_fs())
     # since we can't remove the entry, just rename it to fake its absence:
-    writer.rename_section("annex", "removed")
-    writer.set_value("annex", "something", "value")
-    writer.release()
+    ar.config.rename_section("annex", "removed", where='local')
+    ar.config.set("annex.something", "value", where='local')
     assert_false(ar.is_crippled_fs())
 
 
@@ -523,6 +522,11 @@ def test_find_batch_equivalence(path):
     # If we give a subdirectory, we split that output.
     eq_(set(ar.find(["subdir"])["subdir"]), {"subdir/d", "subdir/e"})
     eq_(ar.find(["subdir"]), ar.find(["subdir"], batch=True))
+    # manually ensure that no annex batch processes are around anymore
+    # that make the test cleanup break on windows.
+    # story at https://github.com/datalad/datalad/issues/4190
+    # even an explicit `del ar` does not get it done
+    ar._batched.close()
 
 
 @with_tempfile(mkdir=True)
@@ -1237,7 +1241,7 @@ def test_annex_remove(path1, path2):
     if repo.is_direct_mode():
         assert_raises(CommandError, repo.remove, "rm-test.dat")
     else:
-        assert_raises(GitCommandError, repo.remove, "rm-test.dat")
+        assert_raises(ValueError, repo.remove, "rm-test.dat")
     assert_in("rm-test.dat", repo.get_annexed_files())
 
     # now force:
@@ -1252,7 +1256,7 @@ def test_annex_remove(path1, path2):
 def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
-    version = annex.repo.config_reader().get_value('annex', 'version')
+    version = int(annex.config.get('annex.version'))
     # Since git-annex 7.20181031, v6 repos upgrade to v7.
     supported_versions = AnnexRepo.check_repository_versions()["supported"]
     v6_lands_on = next(i for i in supported_versions if i >= 6)
@@ -1261,14 +1265,14 @@ def test_repo_version(path1, path2, path3):
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
-        version = annex.repo.config_reader().get_value('annex', 'version')
+        version = int(annex.config.get('annex.version'))
         eq_(version, v6_lands_on)
 
         # Assuming specified version is a supported version...
         if 5 in supported_versions:
             # ...parameter `version` still has priority over default config:
             annex = AnnexRepo(path3, create=True, version=5)
-            version = annex.repo.config_reader().get_value('annex', 'version')
+            version = int(annex.config.get('annex.version'))
             eq_(version, 5)
 
 
@@ -1509,9 +1513,12 @@ def test_annex_add_no_dotfiles(path):
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
-    # no file is being added, as dotfiles/directories are ignored by default
-    ar.add('.', git=False)
+    if ar._check_version_kludges("has-include-dotfiles"):
+        assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
+        # no file is being added, as dotfiles/directories are ignored by default
+        ar.add('.', git=False)
+        # ^ Note: No longer true as of 8.20200226, which does _not_ skip
+        # dotfiles.
     # double check, still dirty
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
@@ -2042,10 +2049,7 @@ def test_is_special(path):
 
     assert_false(ar.is_special_annex_remote("imspecial",
                                             check_if_known=False))
-    # FIXME: ar.enable_remote() doesn't support specifying options, but we need
-    # to specify directory= here.
-    ar._run_annex_command("enableremote",
-                          annex_options=["imspecial", dir_arg])
+    ar.enable_remote("imspecial", options=[dir_arg])
     ok_(ar.is_special_annex_remote("imspecial"))
 
     # With a mis-configured remote, give warning and return false.
@@ -2060,8 +2064,8 @@ def test_fake_dates(path):
     ar = AnnexRepo(path, create=True, fake_dates=True)
     timestamp = ar.config.obtain("datalad.fake-dates-start") + 1
     # Commits from the "git annex init" call are one second ahead.
-    for commit in ar.get_branch_commits("git-annex"):
-        eq_(timestamp, commit.committed_date)
+    for commit in ar.get_branch_commits_("git-annex"):
+        eq_(timestamp, int(ar.format_commit('%ct', commit)))
     assert_in("timestamp={}s".format(timestamp),
               ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
 
@@ -2133,9 +2137,7 @@ def check_commit_annex_commit_changed(unlock, path):
     unannex = False
 
     ar = AnnexRepo(path, create=True)
-    ar.add('.gitattributes')
-    ar.add('.')
-    ar.commit("initial commit")
+    ar.save("initial commit")
     ok_clean_git(path)
     # Now let's change all but commit only some
     files = [op.basename(p) for p in glob(op.join(path, '*'))]
@@ -2162,7 +2164,7 @@ def check_commit_annex_commit_changed(unlock, path):
           ['alwaysbig', 'tobechanged-annex', 'untracked', 'willgetshort']
     )
 
-    ar.commit("message", files=['alwaysbig', 'willgetshort'])
+    ar.save("message", paths=['alwaysbig', 'willgetshort'])
     ok_clean_git(
         path
         , index_modified=['tobechanged-git', 'tobechanged-annex']
@@ -2174,7 +2176,7 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'willgetshort',
                       annexed=external_versions['cmd:annex']<'7.20191009')
 
-    ar.commit("message2", options=['-a']) # commit all changed
+    ar.save("message2", untracked='no') # commit all changed
     ok_clean_git(
         path
         , untracked=['untracked']

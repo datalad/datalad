@@ -29,6 +29,7 @@ from datalad.support.exceptions import (
 )
 from datalad.utils import (
     chpwd,
+    Path,
     _path_,
 )
 from datalad.tests.utils import (
@@ -55,6 +56,13 @@ from datalad.tests.utils import (
     with_testrepos,
     with_tree,
 )
+
+
+def filter_fsck_error_msg(dicts):
+    # Filter keys that have expected differences when comparing target.fsck()
+    # to fsck(remote=target).
+    return [{k: v for k, v in d.items() if k not in ["error-messages", "note"]}
+            for d in dicts]
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -133,8 +141,8 @@ def test_publish_simple(origin, src_path, dst_path):
 
     ok_clean_git(source.repo, annex=None)
     ok_clean_git(target, annex=None)
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
 
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
@@ -143,10 +151,10 @@ def test_publish_simple(origin, src_path, dst_path):
 
     ok_clean_git(source.repo, annex=None)
     ok_clean_git(target, annex=None)
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_("git-annex")),
+        list(source.repo.get_branch_commits_("git-annex")))
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `to`:
@@ -163,17 +171,18 @@ def test_publish_simple(origin, src_path, dst_path):
     eq_(res, [source])
 
     ok_clean_git(dst_path, annex=None)
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
     # Since git-annex 6.20170220, post-receive hook gets triggered
     # which results in entry being added for that repo into uuid.log on remote
     # end since then finally git-annex senses that it needs to init that remote,
     # so it might have 1 more commit than local.
     # see https://github.com/datalad/datalad/issues/1319
-    ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
-        set(target.get_branch_commits("git-annex"))))
+    ok_(set(source.repo.get_branch_commits_("git-annex")).issubset(
+        set(target.get_branch_commits_("git-annex"))))
 
-    eq_(source.repo.fsck(), source.repo.fsck(remote='target'))
+    eq_(filter_fsck_error_msg(source.repo.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
 @with_testrepos('basic_git', flavors=['local'])
@@ -198,8 +207,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
 
     ok_clean_git(source.repo, annex=None)
     ok_clean_git(target, annex=None)
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
 
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
@@ -208,8 +217,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
 
     ok_clean_git(source.repo, annex=None)
     ok_clean_git(target, annex=None)
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
 
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
@@ -222,8 +231,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     eq_(res, [source])
 
     ok_clean_git(dst_path, annex=None)
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
 
     # amend and change commit msg in order to test for force push:
     source.repo.commit("amended", options=['--amend'])
@@ -299,23 +308,23 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     eq_({r['path'] for r in res},
         {src_path, sub1.path, sub2.path})
 
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
-    eq_(list(sub1_target.get_branch_commits("master")),
-        list(sub1.get_branch_commits("master")))
-    eq_(list(sub1_target.get_branch_commits("git-annex")),
-        list(sub1.get_branch_commits("git-annex")))
-    eq_(list(sub2_target.get_branch_commits("master")),
-        list(sub2.get_branch_commits("master")))
-    eq_(list(sub2_target.get_branch_commits("git-annex")),
-        list(sub2.get_branch_commits("git-annex")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_("git-annex")),
+        list(source.repo.get_branch_commits_("git-annex")))
+    eq_(list(sub1_target.get_branch_commits_("master")),
+        list(sub1.get_branch_commits_("master")))
+    eq_(list(sub1_target.get_branch_commits_("git-annex")),
+        list(sub1.get_branch_commits_("git-annex")))
+    eq_(list(sub2_target.get_branch_commits_("master")),
+        list(sub2.get_branch_commits_("master")))
+    eq_(list(sub2_target.get_branch_commits_("git-annex")),
+        list(sub2.get_branch_commits_("git-annex")))
 
     # we are tracking origin but origin has different git-annex, since we
     # cloned from it, so it is not aware of our git-annex
-    neq_(list(origin.repo.get_branch_commits("git-annex")),
-         list(source.repo.get_branch_commits("git-annex")))
+    neq_(list(origin.repo.get_branch_commits_("git-annex")),
+         list(source.repo.get_branch_commits_("git-annex")))
     # So if we first publish to it recursively, we would update
     # all sub-datasets since git-annex branch would need to be pushed
     res_ = publish(dataset=source, recursive=True)
@@ -323,8 +332,8 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_result_count(res_, 1, status='ok', path=sub1.path)
     assert_result_count(res_, 1, status='ok', path=sub2.path)
     # and now should carry the same state for git-annex
-    eq_(list(origin.repo.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    eq_(list(origin.repo.get_branch_commits_("git-annex")),
+        list(source.repo.get_branch_commits_("git-annex")))
 
     # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
@@ -444,8 +453,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     eq_(set(res), set([opj(source.path, 'test-annex.dat'), source.path]))
     # XXX master was not checked out in dst!
 
-    eq_(list(target.get_branch_commits("master")),
-        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits_("master")),
+        list(source.repo.get_branch_commits_("master")))
     # TODO: last commit in git-annex branch differs. Probably fine,
     # but figure out, when exactly to expect this for proper testing:
     # yoh: they differ because local annex records information about now
@@ -454,8 +463,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     # different commits.  I do not observe such behavior of remote having git-annex
     # automagically updated in older clones
     # which do not have post-receive hook on remote side
-    eq_(list(target.get_branch_commits("git-annex"))[1:],
-        list(source.repo.get_branch_commits("git-annex"))[1:])
+    eq_(list(target.get_branch_commits_("git-annex"))[1:],
+        list(source.repo.get_branch_commits_("git-annex"))[1:])
 
     # we need compare target/master:
     target.checkout("master")
@@ -501,10 +510,10 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 
     # data integrity check looks identical from all perspectives
     # minus "note" statements from git-annex
-    eq_(source.repo.fsck(),
-        [{k: v for k, v in i.items() if k != 'note'}
-         for i in source.repo.fsck(remote='target')])
-    eq_(target.fsck(), source.repo.fsck(remote='target'))
+    eq_(filter_fsck_error_msg(source.repo.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
+    eq_(filter_fsck_error_msg(target.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
 @skip_if_on_windows  # create_sibling incompatible with win servers
@@ -713,3 +722,18 @@ def test_gh1811(srcpath, clonepath):
         path=clone.path, type='dataset', action='publish',
         status='impossible',
         message=('Cannot determine remote branch name from %s', 'HEAD'))
+
+
+@with_tempfile(mkdir=True)
+def test_publish_no_fetch_refspec_configured(path):
+    from datalad.cmd import GitRunner
+
+    path = Path(path)
+    GitRunner(cwd=str(path)).run(["git", "init", "--bare", "empty-remote"])
+    ds = Dataset(path / "ds").create()
+    ds.repo.add_remote("origin", str(ds.pathobj.parent / "empty-remote"))
+    # Mimic a situation that can happen with an LFS remote. See gh-4199.
+    ds.repo.config.unset("remote.origin.fetch", where="local")
+    (ds.repo.pathobj / "foo").write_text("a")
+    ds.save()
+    ds.publish(to="origin")

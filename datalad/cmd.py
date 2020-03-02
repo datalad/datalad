@@ -21,12 +21,18 @@ import functools
 import tempfile
 from locale import getpreferredencoding
 import asyncio
-from collections import namedtuple
+from collections import (
+    defaultdict,
+    namedtuple,
+    OrderedDict,
+)
 
-from collections import OrderedDict
-from .support import path as op
 from .consts import GIT_SSH_COMMAND
-from .dochelpers import exc_str
+from .dochelpers import (
+    borrowdoc,
+    exc_str,
+)
+from .support import path as op
 from .support.exceptions import CommandError
 from .support.protocol import (
     NullProtocol,
@@ -34,15 +40,14 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    assure_unicode,
-    get_tempfile_kwargs,
     assure_bytes,
-    unlink,
+    assure_unicode,
     auto_repr,
-    split_cmdline,
     generate_file_chunks,
+    get_tempfile_kwargs,
+    split_cmdline,
+    unlink,
 )
-from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -128,22 +133,41 @@ def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
     else:
         file_chunks = generate_file_chunks(files, cmd)
 
-    out, err = [], []
+    results = []
     for i, file_chunk in enumerate(file_chunks):
         if file_chunk:
             lgr.debug('Process file list chunk %i (length %i)',
                       i, len(file_chunk))
-            out_, err_ = func(cmd + ['--'] + file_chunk, *args, **kwargs)
+            results.append(func(cmd + ['--'] + file_chunk, *args, **kwargs))
         else:
-            out_, err_ = func(cmd, *args, **kwargs)
-        if out_:
-            out.append(out_)
-        if err_:
-            err.append(err_)
-    return ''.join(out), ''.join(err)
+            results.append(func(cmd, *args, **kwargs))
+    # if it was a WitlessRunner.run -- we would get dicts.
+    # If old Runner -- stdout, stderr strings
+    if results:
+        if isinstance(results[0], dict):
+            result = defaultdict(str)
+            for r in results:
+                for k, v in r.items():
+                    if k in ('stdout', 'stderr'):
+                        result[k] += v
+                    elif k == 'status':
+                        if k:
+                            # this wrapper expects commands to succeed or exception
+                            # being thrown
+                            raise RuntimeError(
+                                "Running %s with WitlessRunner resulted in "
+                                "exit %d but there were no exception" % (cmd, k))
+                    elif v:
+                        raise RuntimeError(
+                            "Have no clue what to do about %s=%r" % (k, v))
+            return result['stdout'], result['stderr']
+        else:
+            return ''.join(r[0] for r in results), \
+                   ''.join(r[1] for r in results)
 
 
-async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
+async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
+                        **kwargs):
     """Run a command in a subprocess managed by asyncio
 
     This implementation has been inspired by
@@ -161,6 +185,8 @@ async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
       with the subprocess.
     stdin : file-like or None
       Passed to the subprocess as its standard input.
+    protocol_kwargs : dict, optional
+      Passed to the Protocol class constructor.
     kwargs : Pass to `subprocess_exec`, will typically be parameters
       supported by `subprocess.Popen`.
 
@@ -172,8 +198,10 @@ async def run_async_cmd(loop, cmd, protocol, stdin, **kwargs):
     """
     lgr.debug('Async run %s', cmd)
 
+    if protocol_kwargs is None:
+        protocol_kwargs = {}
     cmd_done = asyncio.Future(loop=loop)
-    factory = functools.partial(protocol, cmd_done)
+    factory = functools.partial(protocol, cmd_done, **protocol_kwargs)
     proc = loop.subprocess_exec(
         factory,
         *cmd,
@@ -228,30 +256,67 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         self.pid = None
         super().__init__()
 
+        self._log_outputs = False
+        if lgr.isEnabledFor(5):
+            try:
+                from . import cfg
+                self._log_outputs = cfg.getbool('datalad.log', 'outputs', default=False)
+            except ImportError:
+                pass
+            self._log = self._log_summary
+        else:
+            self._log = self._log_nolog
+
+    def _log_nolog(self, *args):
+        pass
+
+    def _log_summary(self, fd, data):
+        fd_name = self.FD_NAMES[fd]
+        lgr.log(5, 'Read %i bytes from %i[%s]%s',
+                len(data), self.pid, fd_name, ':' if self._log_outputs else '')
+        if self._log_outputs:
+            log_data = assure_unicode(data)
+            # The way we log is to stay consistent with Runner.
+            # TODO: later we might just log in a single entry, without
+            # fd_name prefix
+            lgr.log(5, "%s| %s " % (fd_name, log_data))
+
     def connection_made(self, transport):
         self.transport = transport
         self.pid = transport.get_pid()
         lgr.debug('Process %i started', self.pid)
 
     def pipe_data_received(self, fd, data):
-        if lgr.isEnabledFor(5):
-            lgr.log(
-                5,
-                'Read %i bytes from %i[%s]',
-                len(data), self.pid, self.FD_NAMES[fd])
+        self._log(fd, data)
         # store received output if stream was to be captured
         if self.buffer[fd - 1] is not None:
             self.buffer[fd - 1].extend(data)
 
     def process_exited(self):
+        """Prepares the final result to be returned to the runner
+
+        Note for derived classes overwriting this method:
+
+        The result set for the `done` future must be a dict with keys
+        that do not unintentionally conflict with the API of
+        CommandError, as the result dict is passed to this exception
+        class as kwargs on error. The Runner will overwrite 'cmd' and
+        'cwd' on error, if they are present in the result.
+        """
         return_code = self.transport.get_returncode()
         lgr.debug(
             'Process %i exited with return code %i',
             self.pid, return_code)
-        # give captured process output back to the runner as bytestring(s)
-        results = [bytes(byt) if byt else None for byt in self.buffer]
+        # give captured process output back to the runner as string(s)
+        results = {
+            name:
+            bytes(byt).decode(getpreferredencoding(do_setlocale=False))
+            if byt else ''
+            for name, byt in zip(self.FD_NAMES[1:], self.buffer)
+        }
+        results['code'] = return_code
         # actually fulfill the future promise and let the execution finish
-        self.done.set_result((return_code, results))
+        self.done.set_result(results)
 
 
 class NoCapture(WitlessProtocol):
@@ -323,7 +388,7 @@ class WitlessRunner(object):
             # a potential PWD setting
             self.env['PWD'] = self.cwd
 
-    def run(self, cmd, protocol=None, stdin=None):
+    def run(self, cmd, protocol=None, stdin=None, **kwargs):
         """Execute a command and communicate with it.
 
         Parameters
@@ -339,12 +404,15 @@ class WitlessRunner(object):
         stdin : byte stream, optional
           File descriptor like, used as stdin for the process. Passed
           verbatim to subprocess.Popen().
+        kwargs :
+          Passed to the Protocol class constructor.
 
         Returns
         -------
-        stdout, stderr
-          Unicode string with the cumulative standard output and error
-          of the process.
+        dict
+          At minimum there will be keys 'stdout', 'stderr' with
+          unicode strings of the cumulative standard output and error
+          of the process as values.
 
         Raises
         ------
@@ -373,12 +441,13 @@ class WitlessRunner(object):
             event_loop = asyncio.SelectorEventLoop()
         asyncio.set_event_loop(event_loop)
         # include the subprocess manager in the asyncio event loop
-        return_code, results = event_loop.run_until_complete(
+        results = event_loop.run_until_complete(
             run_async_cmd(
                 event_loop,
                 cmd,
                 protocol,
                 stdin,
+                protocol_kwargs=kwargs,
                 cwd=self.cwd,
                 env=self.env,
             )
@@ -386,26 +455,26 @@ class WitlessRunner(object):
         # terminate the event loop, cannot be undone, hence we start a fresh
         # one each time (see BlockingIOError notes above)
         event_loop.close()
-        # when we are here the process finished, take output from bytes to string
-        output = tuple(
-            o.decode(getpreferredencoding(do_setlocale=False))
-            if o else ''
-            for o in results)
 
-        if return_code not in [0, None]:
-            msg = "Failed to run %r%s." % (
-                cmd,
-                (" at %r" % self.cwd) if self.cwd else '',
-            )
+        # log before any exception is raised
+        lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
+
+        # make it such that we always blow if a protocol did not report
+        # a return code at all
+        if results.get('code', True) not in [0, None]:
+            # the runner has a better idea, doc string warns Protocol
+            # implementations not to return these
+            results.pop('cmd', None)
+            results.pop('cwd', None)
             raise CommandError(
-                cmd=str(cmd),
-                msg=msg,
-                code=return_code,
-                stdout=output[0],
-                stderr=output[1],
+                # whatever the results were, we carry them forward
+                cmd=cmd,
+                cwd=self.cwd,
+                **results,
             )
-        lgr.log(8, "Finished running %r with status %s", cmd, return_code)
-        return output
+        # denoise, must be zero at this point
+        results.pop('code', None)
+        return results
 
 
 class Runner(object):
@@ -528,7 +597,7 @@ class Runner(object):
             adapter = self._LOG_OPTS_ADAPTERS.get(opt, None)
             self._log_opts[opt] = \
                 (cfg.getbool if not adapter else cfg.get_value)(
-                    'datalad.log.cmd', opt, default=default)
+                    'datalad.log', opt, default=default)
             if adapter:
                 self._log_opts[opt] = adapter(self._log_opts[opt])
             return self._log_opts[opt]
@@ -557,7 +626,7 @@ class Runner(object):
     def _log_err(self, line, expected=False):
         if line and self.log_outputs:
             self.log("stderr| " + line.rstrip('\n'),
-                     level={True: 9,
+                     level={True: 5,
                             False: 11}[expected])
 
     def _get_output_online(self, proc,
@@ -717,15 +786,15 @@ class Runner(object):
             Normally, having stderr output is a signal of a problem and thus it
             gets logged at level 11.  But some utilities, e.g. wget, use
             stderr for their progress output.  Whenever such output is expected,
-            set it to True and output will be logged at level 9 unless
+            set it to True and output will be logged at level 5 unless
             exit status is non-0 (in non-online mode only, in online -- would
-            log at 9)
+            log at 5)
 
         expect_fail: bool, optional
             Normally, if command exits with non-0 status, it is considered an
             error and logged at level 11 (above DEBUG). But if the call intended
             for checking routine, such messages are usually not needed, thus
-            it will be logged at level 9.
+            it will be logged at level 5.
 
         cwd : string, optional
             Directory under which run the command (passed to Popen)
@@ -846,12 +915,15 @@ class Runner(object):
                         self._log_err(out[1], expected=expect_stderr)
 
                 if status not in [0, None]:
-                    msg = "Failed to run %r%s. Exit code=%d.%s%s" \
-                        % (cmd, " under %r" % (popen_cwd), status,
-                           "" if log_online else " out=%s" % out[0],
-                           "" if log_online else " err=%s" % out[1])
-                    lgr.log(9 if expect_fail else 11, msg)
-                    raise CommandError(str(cmd), msg, status, out[0], out[1])
+                    exc = CommandError(
+                        cmd=cmd,
+                        code=status,
+                        stdout=out[0],
+                        stderr=out[1],
+                        cwd=popen_cwd,
+                    )
+                    lgr.log(5 if expect_fail else 11, str(exc))
+                    raise exc
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
@@ -926,10 +998,10 @@ class Runner(object):
     def log(self, msg, *args, **kwargs):
         """log helper
 
-        Logs at level 9 by default and adds "Protocol:"-prefix in order to
+        Logs at level 5 by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
-        level = kwargs.pop('level', 9)
+        level = kwargs.pop('level', 5)
         if isinstance(self.protocol, NullProtocol):
             lgr.log(level, msg, *args, **kwargs)
         else:
@@ -940,20 +1012,15 @@ class Runner(object):
             )
 
 
-class GitRunner(Runner):
+class GitRunnerBase(object):
     """
-    Runner to be used to run git and git annex commands
+    Mix-in class for Runners to be used to run git and git annex commands
 
     Overloads the runner class to check & update GIT_DIR and
     GIT_WORK_TREE environment variables set to the absolute path
     if is defined and is relative path
     """
     _GIT_PATH = None
-
-    @borrowdoc(Runner)
-    def __init__(self, *args, **kwargs):
-        super(GitRunner, self).__init__(*args, **kwargs)
-        self._check_git_path()
 
     @staticmethod
     def _check_git_path():
@@ -962,7 +1029,7 @@ class GitRunner(Runner):
         Thus we will store _GIT_PATH a path to git in the same directory as annex
         if found.  If it is empty (but not None), we do nothing
         """
-        if GitRunner._GIT_PATH is None:
+        if GitRunnerBase._GIT_PATH is None:
             from distutils.spawn import find_executable
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
@@ -970,14 +1037,14 @@ class GitRunner(Runner):
                     in ('1', 'on', 'true', 'yes')):
                 git_fpath = find_executable("git")
                 if git_fpath:
-                    GitRunner._GIT_PATH = ''
+                    GitRunnerBase._GIT_PATH = ''
                     lgr.log(9, "Will use default git %s", git_fpath)
                     return  # we are done - there is a default git avail.
                 # if not -- we will look for a bundled one
-            GitRunner._GIT_PATH = GitRunner._get_bundled_path()
+            GitRunnerBase._GIT_PATH = GitRunnerBase._get_bundled_path()
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
-                       "string)", GitRunner._GIT_PATH)
-            assert(GitRunner._GIT_PATH is not None)  # we made the decision!
+                       "string)", GitRunnerBase._GIT_PATH)
+            assert(GitRunnerBase._GIT_PATH is not None)  # we made the decision!
 
     @staticmethod
     def _get_bundled_path():
@@ -998,10 +1065,10 @@ class GitRunner(Runner):
         """
         # if env set copy else get os environment
         git_env = env.copy() if env else os.environ.copy()
-        if GitRunner._GIT_PATH:
-            git_env['PATH'] = op.pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+        if GitRunnerBase._GIT_PATH:
+            git_env['PATH'] = op.pathsep.join([GitRunnerBase._GIT_PATH, git_env['PATH']]) \
                 if 'PATH' in git_env \
-                else GitRunner._GIT_PATH
+                else GitRunnerBase._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
@@ -1016,12 +1083,41 @@ class GitRunner(Runner):
 
         return git_env
 
+
+class GitRunner(Runner, GitRunnerBase):
+    """A Runner for git and git-annex commands.
+
+    See GitRunnerBase it mixes in for more details
+    """
+
+    @borrowdoc(Runner)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._check_git_path()
+
     def run(self, cmd, env=None, *args, **kwargs):
-        out, err = super(GitRunner, self).run(
-            cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
+        out, err = super().run(
+            cmd,
+            env=self.get_git_environ_adjusted(env),
+            *args, **kwargs)
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
         return assure_unicode(out), assure_unicode(err)
+
+
+class GitWitlessRunner(WitlessRunner, GitRunnerBase):
+    """A WitlessRunner for git and git-annex commands.
+
+    See GitRunnerBase it mixes in for more details
+    """
+
+    @borrowdoc(WitlessRunner)
+    def __init__(self, *args, **kwargs):
+        kwargs['env'] = GitRunnerBase.get_git_environ_adjusted(
+            env=kwargs.get('env', None)
+        )
+        super().__init__(*args, **kwargs)
+        self._check_git_path()
 
 
 def readline_rstripped(stdout):
@@ -1072,7 +1168,7 @@ class BatchedCommand(SafeDelCloseMixin):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=self._stderr_out,
-            env=GitRunner.get_git_environ_adjusted(),
+            env=GitRunnerBase.get_git_environ_adjusted(),
             cwd=self.path,
             bufsize=1,
             universal_newlines=True  # **kwargs

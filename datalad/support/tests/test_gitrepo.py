@@ -65,7 +65,6 @@ from datalad.support.sshconnector import get_connection_hash
 
 from datalad.support.gitrepo import (
     _normalize_path,
-    GitCommandError,
     gitpy,
     GitRepo,
     guard_BadName,
@@ -105,13 +104,13 @@ def test_GitRepo_instance_from_clone(src, dst):
                        "Failed to instantiate GitPython Repo object.")
     ok_(op.exists(op.join(dst, '.git')))
 
-    # do it again should raise GitCommandError since git will notice there's
+    # do it again should raise ValueError since git will notice there's
     # already a git-repo at that path and therefore can't clone to `dst`
     # Note: Since GitRepo is now a WeakSingletonRepo, this is prevented from
     # happening atm. Disabling for now:
 #    raise SkipTest("Disabled for RF: WeakSingletonRepo")
     with swallow_logs() as logs:
-        assert_raises(GitCommandError, GitRepo.clone, src, dst)
+        assert_raises(ValueError, GitRepo.clone, src, dst)
 
 
 @assert_cwd_unchanged
@@ -154,9 +153,7 @@ def test_GitRepo_instance_from_not_existing(path, path2):
 def test_GitRepo_init_options(path):
     # passing an option, not explicitly defined in GitRepo class:
     gr = GitRepo(path, create=True, bare=True)
-
-    cfg = gr.repo.config_reader()
-    ok_(cfg.get_value(section="core", option="bare"))
+    ok_(gr.config.getbool(section="core", option="bare"))
 
 
 @skip_if(external_versions['cmd:git'] < '2.14.0')
@@ -670,7 +667,10 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
     # correct commit message in remote:
     assert_in("amended",
-              list(remote_repo.get_branch_commits('ssh-test'))[-1].summary)
+              remote_repo.format_commit(
+                  '%s',
+                  list(remote_repo.get_branch_commits_('ssh-test'))[-1]
+              ))
 
 
 @with_tempfile
@@ -900,7 +900,7 @@ def test_GitRepo_get_merge_base(src):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_git_get_branch_commits(src):
+def test_GitRepo_git_get_branch_commits_(src):
 
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
@@ -908,20 +908,10 @@ def test_GitRepo_git_get_branch_commits(src):
     repo.add('*')
     repo.commit('committing')
 
-    commits_default = list(repo.get_branch_commits())
-    commits = list(repo.get_branch_commits('master'))
+    commits_default = list(repo.get_branch_commits_())
+    commits = list(repo.get_branch_commits_('master'))
     eq_(commits, commits_default)
-
     eq_(len(commits), 1)
-    commits_stop0 = list(repo.get_branch_commits(stop=commits[0].hexsha))
-    eq_(commits_stop0, [])
-    commits_hexsha = list(repo.get_branch_commits(value='hexsha'))
-    commits_hexsha_left = list(repo.get_branch_commits(value='hexsha', limit='left-only'))
-    eq_([commits[0].hexsha], commits_hexsha)
-    # our unittest is rudimentary ;-)
-    eq_(commits_hexsha_left, commits_hexsha)
-    repo.precommit()  # to stop all the batched processes for swallow_outputs
-    raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 
 @with_testrepos(flavors=['local'])
@@ -1087,6 +1077,32 @@ def test_to_options():
         ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
 
 
+def test_to_options_from_gitpython():
+    """Imported from GitPython and modified.
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+    eq_(["-s"], to_options(**{'s': True}))
+    eq_(["-s", "5"], to_options(**{'s': 5}))
+    eq_([], to_options(**{'s': None}))
+
+    eq_(["--max-count"], to_options(**{'max_count': True}))
+    eq_(["--max-count=5"], to_options(**{'max_count': 5}))
+    eq_(["--max-count=0"], to_options(**{'max_count': 0}))
+    eq_([], to_options(**{'max_count': None}))
+
+    # Multiple args are supported by using lists/tuples
+    eq_(["-L", "1-3", "-L", "12-18"], to_options(**{'L': ('1-3', '12-18')}))
+    eq_(["-C", "-C"], to_options(**{'C': [True, True, None, False]}))
+
+    # order is undefined
+    res = to_options(**{'s': True, 't': True})
+    eq_({'-s', '-t'}, set(res))
+
+
 @with_tempfile
 def test_GitRepo_count_objects(repo_path):
 
@@ -1097,50 +1113,6 @@ def test_GitRepo_count_objects(repo_path):
     empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
                    'size': 0, 'size-garbage': 0, 'size-pack': 0}
     eq_(empty_count, repo.count_objects)
-
-
-@with_tempfile
-def test_get_missing(path):
-    repo = GitRepo(path, create=True)
-    os.makedirs(op.join(path, 'deep'))
-    with open(op.join(path, 'test1'), 'w') as f:
-        f.write('some')
-    with open(op.join(path, 'deep', 'test2'), 'w') as f:
-        f.write('some more')
-    # no files tracked yet, so nothing changed
-    eq_(repo.get_changed_files(), [])
-    repo.add('.')
-    # still no differences between worktree and staged
-    eq_(repo.get_changed_files(), [])
-    eq_(set(repo.get_changed_files(staged=True)),
-        {'test1', op.join('deep', 'test2')})
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD')),
-        {'test1', op.join('deep', 'test2')})
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['test1'])),
-        {'test1'})
-    # providing 'files' pointing to subdirectory lists files within
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['deep'])),
-        {op.join('deep', 'test2')})
-    # empty list should cause no files being reported in either scenario
-    eq_(repo.get_changed_files(staged=True, files=[]), [])
-    eq_(repo.get_changed_files(staged=False, files=[]), [])
-    eq_(repo.get_changed_files(staged=True, diff_filter='D'), [])
-    repo.commit()
-    eq_(repo.get_changed_files(), [])
-    eq_(repo.get_changed_files(staged=True), [])
-    ok_clean_git(path, annex=False)
-    unlink(op.join(path, 'test1'))
-    eq_(repo.get_missing_files(), ['test1'])
-    rmtree(op.join(path, 'deep'))
-    eq_(sorted(repo.get_missing_files()), [op.join('deep', 'test2'), 'test1'])
-    # nothing is actually known to be deleted
-    eq_(repo.get_deleted_files(), [])
-    # do proper removal
-    repo.remove(op.join(path, 'test1'))
-    # no longer missing
-    eq_(repo.get_missing_files(), [op.join('deep', 'test2')])
-    # but deleted
-    eq_(repo.get_deleted_files(), ['test1'])
 
 
 # this is simply broken on win, but less important
@@ -1186,6 +1158,7 @@ def test_optimized_cloning(path):
 @with_tempfile
 @with_tempfile
 def test_GitRepo_gitpy_injection(path, path2):
+    from git import GitCommandError
 
     gr = GitRepo(path, create=True)
     gr._GIT_COMMON_OPTIONS.extend(['test-option'])
@@ -1512,9 +1485,10 @@ def test_custom_runner_protocol(path):
     gr.add("foo")
     check(prev_len, prot, "add")
 
-    prev_len = len(prot)
-    gr.commit("commit foo")
-    check(prev_len, prot, "commit")
+    # commit no longer uses a Runner with protocol capabilities
+    #prev_len = len(prot)
+    #gr.commit("commit foo")
+    #check(prev_len, prot, "commit")
 
     ok_(all(p['duration'] >= 0 for p in prot))
 

@@ -1870,7 +1870,7 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
             if on_windows else OSError
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
-        ntrials = 50 if on_windows else 3
+        ntrials = 100 if on_windows else 10
 
     assert increment_type in {None, 'exponential'}
 

@@ -30,7 +30,10 @@ from datalad.tests.utils import (
     with_testsui,
     with_tree,
 )
-from datalad.utils import swallow_logs
+from datalad.utils import (
+    swallow_logs,
+    Path
+)
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
@@ -493,6 +496,17 @@ def test_dataset_systemglobal_mode(path):
         assert_in('user.name', cfg)
         assert_not_in('datalad.dataset.id', cfg)
         assert_not_in('annex.version', cfg)
+
+
+def test_global_config():
+
+    # from within tests, global config should be read from faked $HOME (see
+    # setup_package)
+    from datalad import cfg
+    glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
+    assert any(glb_cfg_file.samefile(Path(p)) for p in cfg._cfgfiles)
+    assert_equal(cfg.get("user.name"), "DataLad Tester")
+    assert_equal(cfg.get("user.email"), "test@example.com")
 
 
 @with_tempfile()

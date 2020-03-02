@@ -14,55 +14,126 @@ __docformat__ = 'restructuredtext'
 from distutils.version import LooseVersion
 from glob import glob
 import logging
-from os.path import join as opj, relpath, normpath, dirname, curdir
+import os
+from os.path import (
+    curdir,
+    dirname,
+    join as opj,
+    normpath,
+    relpath,
+)
 
 import datalad
 from datalad import ssh_manager
-from datalad.cmd import CommandError
-from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
-from datalad.consts import TIMESTAMP_FMT
+
+from datalad.ui import ui
+
+from datalad.cmd import (
+    CommandError,
+    Runner,
+)
+from datalad.consts import (
+    TIMESTAMP_FMT,
+    WEB_HTML_DIR,
+    WEB_META_LOG
+)
 from datalad.dochelpers import exc_str
-from datalad.distribution.siblings import Siblings
-from datalad.distribution.siblings import _DelayedSuper
-from datalad.distribution.dataset import EnsureDataset, Dataset, \
-    datasetmethod, require_dataset
+from datalad.distribution.siblings import (
+    _DelayedSuper,
+    Siblings,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    EnsureDataset,
+    resolve_path,
+    require_dataset,
+)
 from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.base import (
+    build_doc,
+    Interface,
+)
 from datalad.interface.utils import eval_results
-from datalad.interface.common_opts import recursion_limit, recursion_flag
-from datalad.interface.common_opts import as_common_datasrc
-from datalad.interface.common_opts import publish_by_default
-from datalad.interface.common_opts import publish_depends
-from datalad.interface.common_opts import inherit_opt
-from datalad.interface.common_opts import annex_wanted_opt
-from datalad.interface.common_opts import annex_group_opt
-from datalad.interface.common_opts import annex_groupwanted_opt
+from datalad.interface.common_opts import (
+    annex_group_opt,
+    annex_groupwanted_opt,
+    annex_wanted_opt,
+    as_common_datasrc,
+    inherit_opt,
+    publish_by_default,
+    publish_depends,
+    recursion_flag,
+    recursion_limit,
+)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
-from datalad.support.constraints import EnsureChoice
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.network import RI
-from datalad.support.network import is_ssh
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    MissingExternalDependency,
+)
+from datalad.support.external_versions import external_versions
+from datalad.support.network import (
+    is_ssh,
+    PathRI,
+    RI,
+)
 from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
-from datalad.utils import make_tempfile
-from datalad.utils import _path_
-from datalad.utils import slash_join
-from datalad.utils import assure_list
-
+from datalad.utils import (
+    make_tempfile,
+    _path_,
+    slash_join,
+    assure_list,
+    quote_cmdlinearg,
+)
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
+
+
+class _RunnerAdapter(Runner):
+    """An adapter to use interchanegably with SSH connection"""
+
+    def get_git_version(self):
+        return external_versions['cmd:git']
+
+    def get_annex_version(self):
+        return external_versions['cmd:annex']
+
+    def put(self, source, destination, recursive=False,
+            preserve_attrs=False):
+        import shutil
+        copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
+        if recursive:
+            args = source, destination
+            kwargs = {"copy_function": copy_fn}
+            try:
+                shutil.copytree(*args, **kwargs)
+            except FileExistsError:
+                # SSHConnection.put() is okay with copying a tree if the
+                # destination directory already exists. With Python 3.8, we can
+                # make copytree() do the same with dirs_exist_ok=True. But for
+                # now, just rely on `cp`.
+                cmd = ["cp", "--recursive"]
+                if preserve_attrs:
+                    cmd.append("--preserve")
+                self(cmd + [quote_cmdlinearg(a) for a in args])
+        else:
+            copy_fn(source, destination)
 
 
 def _create_dataset_sibling(
         name,
         ds,
         hierarchy_basepath,
-        ssh,
+        shell,
         replicate_local_structure,
-        ssh_url,
+        ri,
         target_dir,
         target_url,
         target_pushurl,
@@ -99,20 +170,21 @@ def _create_dataset_sibling(
         remoteds_path = normpath(opj(target_dir, ds_name))
 
     # construct a would-be ssh url based on the current dataset's path
-    ssh_url.path = remoteds_path
-    ds_sshurl = ssh_url.as_str()
+    ri.path = remoteds_path
+    ds_url = ri.as_str()
     # configure dataset's git-access urls
     ds_target_url = target_url.replace('%RELNAME', ds_name) \
-        if target_url else ds_sshurl
+        if target_url else ds_url
     # push, configure only if needed
     ds_target_pushurl = None
-    if ds_target_url != ds_sshurl:
+    if ds_target_url != ds_url:
         # not guaranteed that we can push via the primary URL
         ds_target_pushurl = target_pushurl.replace('%RELNAME', ds_name) \
-            if target_pushurl else ds_sshurl
+            if target_pushurl else ds_url
 
     lgr.info("Considering to create a target dataset {0} at {1} of {2}".format(
-        localds_path, remoteds_path, ssh_url.hostname))
+        localds_path, remoteds_path,
+        "localhost" if isinstance(ri, PathRI) else ri.hostname))
     # Must be set to True only if exists and existing='reconfigure'
     # otherwise we might skip actions if we say existing='reconfigure'
     # but it did not even exist before
@@ -120,27 +192,20 @@ def _create_dataset_sibling(
     if remoteds_path != '.':
         # check if target exists
         # TODO: Is this condition valid for != '.' only?
-        path_exists = True
-        try:
-            out, err = ssh("ls {}".format(sh_quote(remoteds_path)))
-        except CommandError as e:
-            if "No such file or directory" in e.stderr and \
-                    remoteds_path in e.stderr:
-                path_exists = False
-            else:
-                raise  # It's an unexpected failure here
+        path_children = _ls_remote_path(shell, remoteds_path)
+        path_exists = path_children is not None
 
         if path_exists:
             _msg = "Target path %s already exists." % remoteds_path
-            # path might be existing but be an empty directory, which should be
-            # ok to remove
+        if path_exists and not path_children:
+            # path should be an empty directory, which should be ok to remove
             try:
                 lgr.debug(
-                    "Trying to rmdir %s on remote since might be an empty dir",
+                    "Trying to rmdir %s on remote since seems to be an empty dir",
                     remoteds_path
                 )
                 # should be safe since should not remove anything unless an empty dir
-                ssh("rmdir {}".format(sh_quote(remoteds_path)))
+                shell("rmdir {}".format(sh_quote(remoteds_path)))
                 path_exists = False
             except CommandError as e:
                 # If fails to rmdir -- either contains stuff no permissions
@@ -163,11 +228,33 @@ def _create_dataset_sibling(
                 lgr.info(_msg + " Skipping")
                 return
             elif existing == 'replace':
+                remove = False
+                if path_children:
+                    has_git = '.git' in path_children
+                    _msg_stats = _msg \
+                                 + " It is %sa git repository and has %d files/dirs." % (
+                                     "" if has_git else "not ", len(path_children)
+                                 )
+                    if ui.is_interactive:
+                        remove = ui.yesno(
+                            "Do you really want to remove it?",
+                            title=_msg_stats,
+                            default=False
+                        )
+                    else:
+                        raise RuntimeError(
+                            _msg_stats +
+                            " Remove it manually first or rerun datalad in "
+                            "interactive shell to confirm this action.")
+                if not remove:
+                    raise RuntimeError(_msg)
+                # Remote location might already contain a git repository or be
+                # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
-                ssh("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
+                shell("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
                 # remove target at path
-                ssh("rm -rf {}".format(sh_quote(remoteds_path)))
+                shell("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
                 path_exists = False
                 # Since it is gone now, git-annex also should forget about it
@@ -193,7 +280,7 @@ def _create_dataset_sibling(
                         repr(existing)))
 
         if not path_exists:
-            ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
+            shell("mkdir -p {}".format(sh_quote(remoteds_path)))
 
     delayed_super = _DelayedSuper(ds)
     if inherit and delayed_super.super:
@@ -201,35 +288,35 @@ def _create_dataset_sibling(
             # here we must analyze current_ds's super, not the super_ds
             # inherit from the setting on remote end
             shared = CreateSibling._get_ds_remote_shared_setting(
-                delayed_super, name, ssh)
+                delayed_super, name, shell)
 
         if not install_postupdate_hook:
             # Even though directive from above was False due to no UI explicitly
             # requested, we were asked to inherit the setup, so we might need
             # to install the hook, if super has it on remote
             install_postupdate_hook = CreateSibling._has_active_postupdate(
-                delayed_super, name, ssh)
+                delayed_super, name, shell)
 
 
 
     if group:
         # Either repository existed before or a new directory was created for it,
         # set its group to a desired one if was provided with the same chgrp
-        ssh("chgrp -R {} {}".format(
+        shell("chgrp -R {} {}".format(
             sh_quote(str(group)),
             sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
         # init git and possibly annex repo
         if not CreateSibling.init_remote_repo(
-                remoteds_path, ssh, shared, ds,
+                remoteds_path, shell, shared, ds,
                 description=target_url):
             return
 
         if target_url and not is_ssh(target_url):
             # we are not coming in via SSH, hence cannot assume proper
             # setup for webserver access -> fix
-            ssh('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
+            shell('git -C {} update-server-info'.format(sh_quote(remoteds_path)))
     else:
         # TODO -- we might still want to reconfigure 'shared' setting!
         pass
@@ -252,15 +339,16 @@ def _create_dataset_sibling(
         annex_wanted=annex_wanted,
         annex_group=annex_group,
         annex_groupwanted=annex_groupwanted,
-        inherit=inherit
+        inherit=inherit,
+        result_renderer=None,
     )
 
     # check git version on remote end
     lgr.info("Adjusting remote git configuration")
-    if ssh.get_git_version() and ssh.get_git_version() >= LooseVersion("2.4"):
+    if shell.get_git_version() and shell.get_git_version() >= LooseVersion("2.4"):
         # allow for pushing to checked out branch
         try:
-            ssh("git -C {} config receive.denyCurrentBranch updateInstead".format(
+            shell("git -C {} config receive.denyCurrentBranch updateInstead".format(
                 sh_quote(remoteds_path)))
         except CommandError as e:
             lgr.error("git config failed at remote location %s.\n"
@@ -272,14 +360,14 @@ def _create_dataset_sibling(
                   " of receive.denyCurrentBranch - you will not be able to"
                   " publish updates to this repository. Upgrade your git"
                   " and run with --existing=reconfigure",
-                  ssh.get_git_version())
+                  shell.get_git_version())
 
     if install_postupdate_hook:
         # enable metadata refresh on dataset updates to publication server
         lgr.info("Enabling git post-update hook ...")
         try:
             CreateSibling.create_postupdate_hook(
-                remoteds_path, ssh, ds)
+                remoteds_path, shell, ds)
         except CommandError as e:
             lgr.error("Failed to add json creation command to post update "
                       "hook.\nError: %s" % exc_str(e))
@@ -287,13 +375,33 @@ def _create_dataset_sibling(
     return remoteds_path
 
 
+def _ls_remote_path(ssh, path):
+    try:
+        # yoh tried ls on mac
+        out, err = ssh("ls -A1 {}".format(sh_quote(path)))
+        if err:
+            # we might even want to raise an exception, but since it was
+            # not raised, let's just log a warning
+            lgr.warning(
+                "There was some output to stderr while running ls on %s via ssh: %s",
+                path, err
+            )
+    except CommandError as e:
+        if "No such file or directory" in e.stderr and \
+                path in e.stderr:
+            return None
+        else:
+            raise  # It's an unexpected failure here
+    return [l for l in out.split(os.linesep) if l]
+
+
 @build_doc
 class CreateSibling(Interface):
-    """Create a dataset sibling on a UNIX-like SSH-accessible machine
+    """Create a dataset sibling on a UNIX-like Shell (local or SSH)-accessible machine
 
-    Given a local dataset, and SSH login information this command creates
-    a remote dataset repository and configures it as a dataset sibling to
-    be used as a publication target (see `publish` command).
+    Given a local dataset, and a path or SSH login information this command
+    creates a remote dataset repository and configures it as a dataset sibling
+    to be used as a publication target (see `publish` command).
 
     Various properties of the remote sibling can be configured (e.g. name
     location on the server, read and write access URLs, and access
@@ -325,7 +433,8 @@ class CreateSibling(Interface):
             metavar='SSHURL',
             nargs='?',
             doc="""Login information for the target server. This can be given
-                as a URL (ssh://host/path) or SSH-style (user@host:path).
+                as a URL (ssh://host/path), SSH-style (user@host:path) or just
+                a local path.
                 Unless overridden, this also serves the future dataset's access
                 URL and path on the server.""",
             constraints=EnsureStr()),
@@ -342,10 +451,12 @@ class CreateSibling(Interface):
             args=('--target-dir',),
             metavar='PATH',
             doc="""path to the directory *on the server* where the dataset
-                shall be created. By default the SSH access URL is used to
-                identify this directory. If a relative path is provided here,
-                it is interpreted as being relative to the user's home
-                directory on the server.\n
+                shall be created. By default this is set to the URL (or local
+                path) specified via [PY: `sshurl` PY][CMD: SSHURL CMD]. If a
+                relative path is provided here, it is interpreted as being
+                relative to the user's home directory on the server (or
+                relative to [PY: `sshurl` PY][CMD: SSHURL CMD], when that is a
+                local path).
                 Additional features are relevant for recursive processing of
                 datasets with subdatasets. By default, the local
                 dataset structure is replicated on the server. However, it is
@@ -379,14 +490,20 @@ class CreateSibling(Interface):
         recursion_limit=recursion_limit,
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
             metavar='MODE',
             doc="""action to perform, if a sibling is already configured under the
-            given name and/or a target directory already exists.
-            In this case, a dataset can be skipped ('skip'), an existing target
-            directory be forcefully re-initialized, and the sibling (re-)configured
-            ('replace', implies 'reconfigure'), the sibling configuration be updated
-            only ('reconfigure'), or to error ('error').""",),
+            given name and/or a target (non-empty) directory already exists.
+            In this case, a dataset can be skipped ('skip'), the sibling
+            configuration be updated ('reconfigure'), or process interrupts with
+            error ('error'). DANGER ZONE: If 'replace' is used, an existing target
+            directory will be forcefully removed, re-initialized, and the
+            sibling (re-)configured (thus implies 'reconfigure').
+            `replace` could lead to data loss, so use with care.  To minimize
+            possibility of data loss, in interactive mode DataLad will ask for
+            confirmation, but it would just issue a warning and proceed in
+            non-interactive mode.
+            """,),
         inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
@@ -492,19 +609,19 @@ class CreateSibling(Interface):
             sshurl = slash_join(super_url, relpath(ds.path, super_ds.path))
 
         # check the login URL
-        sshri = RI(sshurl)
-        if not is_ssh(sshri):
+        sibling_ri = RI(sshurl)
+        ssh_sibling = is_ssh(sibling_ri)
+        if not (ssh_sibling or isinstance(sibling_ri, PathRI)):
             raise ValueError(
-                "Unsupported SSH URL: '{0}', "
-                "use ssh://host/path or host:path syntax".format(sshurl))
+                "Unsupported SSH URL or path: '{0}', "
+                "use ssh://host/path, host:path or path syntax".format(sshurl))
 
         if not name:
-            # use the hostname as default remote name
-            name = sshri.hostname
+            name = sibling_ri.hostname if ssh_sibling else "local"
             lgr.debug(
-                "No sibling name given, use URL hostname '%s' as sibling name",
+                "No sibling name given. Using %s'%s' as sibling name",
+                "URL hostname " if ssh_sibling else "",
                 name)
-
         if since == '':
             # consider creating siblings only since the point of
             # the last update
@@ -571,23 +688,30 @@ class CreateSibling(Interface):
                      "or --since if this is unexpected")
             return
 
+        if ssh_sibling:
+            # request ssh connection:
+            lgr.info("Connecting ...")
+            shell = ssh_manager.get_connection(sshurl)
+        else:
+            shell = _RunnerAdapter()
+            sibling_ri.path = str(resolve_path(sibling_ri.path, dataset))
+            if target_dir:
+                target_dir = opj(sibling_ri.path, target_dir)
+
         if target_dir is None:
-            if sshri.path:
-                target_dir = sshri.path
+            if sibling_ri.path:
+                target_dir = sibling_ri.path
             else:
                 target_dir = '.'
 
         # TODO: centralize and generalize template symbol handling
         replicate_local_structure = "%RELNAME" not in target_dir
 
-        # request ssh connection:
-        lgr.info("Connecting ...")
-        assert(sshurl is not None)  # delayed anal verification
-        ssh = ssh_manager.get_connection(sshurl)
-        if not ssh.get_annex_version():
+        if not shell.get_annex_version():
             raise MissingExternalDependency(
                 'git-annex',
-                msg='on the remote system')
+                msg="It's required on the {} machine to create a sibling"
+                    .format('remote' if ssh_sibling else 'local'))
 
         #
         # all checks done and we have a connection, now do something
@@ -607,9 +731,9 @@ class CreateSibling(Interface):
                 name,
                 current_ds,
                 ds.path,
-                ssh,
+                shell,
                 replicate_local_structure,
-                sshri,
+                sibling_ri,
                 target_dir,
                 target_url,
                 target_pushurl,
@@ -639,7 +763,7 @@ class CreateSibling(Interface):
             if current_ds.path == ds.path and ui:
                 lgr.info("Uploading web interface to %s" % path)
                 try:
-                    CreateSibling.upload_web_interface(path, ssh, shared, ui)
+                    CreateSibling.upload_web_interface(path, shell, shared, ui)
                 except CommandError as e:
                     currentds_ap['status'] = 'error'
                     currentds_ap['message'] = (
@@ -656,9 +780,9 @@ class CreateSibling(Interface):
             # Trigger the hook
             lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
-                ssh("cd {} "
-                    "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
-                    "".format(sh_quote(_path_(path, ".git"))))
+                shell("cd {} "
+                      "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                      "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
                 currentds_ap['message'] = (

@@ -10,6 +10,121 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
+## 0.13.0 (??? ??, 2020) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- `datalad add`, which was deprecated in 0.12.0, has been removed.
+  ([#4158][])
+
+- The following `GitRepo` and `AnnexRepo` methods have been removed:
+  `get_changed_files`, `get_missing_files`, and `get_deleted_files`.
+  ([#4169][]) ([#4158][])
+
+- The `get_branch_commits` method of `GitRepo` and `AnnexRepo` has
+  been renamed to `get_branch_commits_`.  ([#3834][])
+
+- The custom `commit` method of `AnnexRepo` has been removed, and
+  `AnnexRepo.commit` now resolves to the parent method,
+  `GitRepo.commit`.  ([#4168][])
+
+### Fixes
+
+- `AnnexRepo.get_size_from_key` incorrectly handled file chunks.
+  ([#4081][])
+
+- [create-sibling][] would too readily clobber existing paths when
+  called with `--existing=replace`.  It now gets confirmation from the
+  user before doing so if running interactively and unconditionally
+  aborts when running non-interactively.  ([#4147][])
+
+- [update][]  ([#4159][])
+  - queried the incorrect branch configuration when updating non-annex
+    repositories.
+  - didn't account for the fact that the local repository can be
+    configured as the upstream "remote" for a branch.
+
+- When the caller included `--bare` as a `git init` option, [create][]
+  crashed creating the bare repository, which is currently
+  unsupported, rather than aborting with an informative error message.
+  ([#4065][])
+
+### Enhancements and new features
+
+- The new command [create-sibling-ria][] provides support for creating
+  a sibling in a [RIA store][handbook-scalable-datastore]. ([#4124][])
+
+- The command examples have been expanded and improved.  ([#4091][])
+
+- The tooling for linking to the [DataLad Handbook][handbook] from
+  DataLad's documentation has been improved.  ([#4046][])
+
+- The `--reckless` parameter of [clone][] and [install][] learned a
+  new "ephemeral" mode, where the .git/annex/ of the cloned repository
+  is symlinked to the local source repository's.  ([#4099][])
+
+- Most of the remaining spots that use GitPython have been rewritten
+  without it.  Most notably, this includes rewrites of the `clone`,
+  `fetch`, and `push` methods of `GitRepo`.  ([#4080][]) ([#4087][])
+  ([#4170][]) ([#4171][]) ([#4175][])
+
+- [update][]  ([#4167][])
+  - learned to disallow non-fast-forward updates when `ff-only` is
+    given to the `--merge` option.
+  - gained a `--follow` option that controls how `--merge` behaves,
+    adding support for merging in the revision that is registered in
+    the parent dataset rather than merging in the configured branch
+    from the sibling.
+  - now provides a result record for merge events.
+
+- [create-sibling][] now supports local paths as targets in addition
+  to SSH URLs.  ([#4187][])
+
+- When `GitRepo.commit` splits its operation across multiple calls to
+  avoid exceeding the maximum command line length, it now amends to
+  initial commit to avoid creating multiple commits.  ([#4156][])
+
+- The rendering of command errors has been improved.  ([#4157][])
+
+- `datalad <subcommand>` learned to point to the [datalad-container][]
+  extension when a subcommand from that extension is given but the
+  extension is not installed.  ([#4174][])
+
+- [save][] now displays a message to signal that the working tree is
+  clean to make it more obvious that no results being rendered
+  corresponds to a clean state.  ([#4106][])
+
+
+## 0.12.3 (??? ??, 2020) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- Updates for compatibility with git-annex version 8.20200226. ([#4214][])
+
+- `datalad export-to-figshare` failed to export if the generated title
+  was fewer than three characters.  It now queries the caller for the
+  title and guards against titles that are too short.  ([#4140][])
+
+- At verbose logging levels, DataLad requests that git-annex display
+  debugging information too.  Work around a bug in git-annex that
+  prevented that from happening.  ([#4212][])
+
+- The internal command runner looked in the wrong place for some
+  configuration variables, including `datalad.log.outputs`, resulting
+  in the default value always being used.  ([#4194][])
+
+### Enhancements and new features
+
+?
+
 ## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
 
 Mostly a bugfix release with various robustifications, but also makes
@@ -2330,6 +2445,7 @@ publishing
 [#3821]: https://github.com/datalad/datalad/issues/3821
 [#3828]: https://github.com/datalad/datalad/issues/3828
 [#3831]: https://github.com/datalad/datalad/issues/3831
+[#3834]: https://github.com/datalad/datalad/issues/3834
 [#3842]: https://github.com/datalad/datalad/issues/3842
 [#3850]: https://github.com/datalad/datalad/issues/3850
 [#3851]: https://github.com/datalad/datalad/issues/3851
@@ -2374,10 +2490,36 @@ publishing
 [#4037]: https://github.com/datalad/datalad/issues/4037
 [#4041]: https://github.com/datalad/datalad/issues/4041
 [#4045]: https://github.com/datalad/datalad/issues/4045
+[#4046]: https://github.com/datalad/datalad/issues/4046
 [#4049]: https://github.com/datalad/datalad/issues/4049
 [#4050]: https://github.com/datalad/datalad/issues/4050
 [#4060]: https://github.com/datalad/datalad/issues/4060
 [#4064]: https://github.com/datalad/datalad/issues/4064
+[#4065]: https://github.com/datalad/datalad/issues/4065
 [#4070]: https://github.com/datalad/datalad/issues/4070
 [#4073]: https://github.com/datalad/datalad/issues/4073
 [#4078]: https://github.com/datalad/datalad/issues/4078
+[#4080]: https://github.com/datalad/datalad/issues/4080
+[#4081]: https://github.com/datalad/datalad/issues/4081
+[#4087]: https://github.com/datalad/datalad/issues/4087
+[#4091]: https://github.com/datalad/datalad/issues/4091
+[#4099]: https://github.com/datalad/datalad/issues/4099
+[#4106]: https://github.com/datalad/datalad/issues/4106
+[#4124]: https://github.com/datalad/datalad/issues/4124
+[#4140]: https://github.com/datalad/datalad/issues/4140
+[#4147]: https://github.com/datalad/datalad/issues/4147
+[#4156]: https://github.com/datalad/datalad/issues/4156
+[#4157]: https://github.com/datalad/datalad/issues/4157
+[#4158]: https://github.com/datalad/datalad/issues/4158
+[#4159]: https://github.com/datalad/datalad/issues/4159
+[#4167]: https://github.com/datalad/datalad/issues/4167
+[#4168]: https://github.com/datalad/datalad/issues/4168
+[#4169]: https://github.com/datalad/datalad/issues/4169
+[#4170]: https://github.com/datalad/datalad/issues/4170
+[#4171]: https://github.com/datalad/datalad/issues/4171
+[#4174]: https://github.com/datalad/datalad/issues/4174
+[#4175]: https://github.com/datalad/datalad/issues/4175
+[#4187]: https://github.com/datalad/datalad/issues/4187
+[#4194]: https://github.com/datalad/datalad/issues/4194
+[#4212]: https://github.com/datalad/datalad/issues/4212
+[#4214]: https://github.com/datalad/datalad/issues/4214

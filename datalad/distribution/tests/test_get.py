@@ -93,10 +93,12 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
-    eq_(f(clone, dict(path=ds_subpath, parentds=t)), [('origin', ds_subpath)])
-    eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=sshurl)),
+    clone_subpath = str(clone.pathobj / 'sub')
+    eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
+        [('origin', ds_subpath)])
+    eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
         [('origin', ds_subpath), ('origin', sshurl)])
-    eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=httpurl)),
+    eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
         [('origin', ds_subpath), ('origin', httpurl)])
 
     # make sure it does meaningful things in an actual clone with an actual
@@ -105,7 +107,6 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
             ('origin', ds_subpath),
-            ('local', clone_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -115,7 +116,6 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
             ('origin', ds_subpath),
-            ('local', clone_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -125,7 +125,6 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             [
                 ('origin', ds_subpath),
                 ('subdataset-source-candidate-bang', 'youredead'),
-                ('local', clone_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -135,7 +134,6 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             [
                 ('origin', ds_subpath),
                 ('subdataset-source-candidate-bang', 'pre-{}-post'.format(sub.id)),
-                ('local', clone_subpath),
         ])
     # now again, but have an additional remote besides origin that
     # actually has the relevant commit
