@@ -9,6 +9,7 @@
 
 """
 
+import os
 import logging
 from os.path import (
     exists,
@@ -544,6 +545,7 @@ def test_publish_depends(
         annex_group='backup',
         name='target1')
     # fails with unknown remote
+    os.system("echo '=== before first create_sibling'; date; ps auxw -H")
     res = source.create_sibling(
         'ssh://datalad-test' + target2_path,
         name='target2',
@@ -557,6 +559,7 @@ def test_publish_depends(
             'unknown sibling(s) specified as publication dependency: %s',
             set(['bogus'])))
     # for real
+    os.system("echo '=== before second create_sibling'; date; ps auxw -H")
     source.create_sibling(
         'ssh://datalad-test' + target2_path,
         name='target2',
