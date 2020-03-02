@@ -29,6 +29,7 @@ from datalad.support.exceptions import (
 )
 from datalad.utils import (
     chpwd,
+    Path,
     _path_,
 )
 from datalad.tests.utils import (
@@ -721,3 +722,18 @@ def test_gh1811(srcpath, clonepath):
         path=clone.path, type='dataset', action='publish',
         status='impossible',
         message=('Cannot determine remote branch name from %s', 'HEAD'))
+
+
+@with_tempfile(mkdir=True)
+def test_publish_no_fetch_refspec_configured(path):
+    from datalad.cmd import GitRunner
+
+    path = Path(path)
+    GitRunner(cwd=str(path)).run(["git", "init", "--bare", "empty-remote"])
+    ds = Dataset(path / "ds").create()
+    ds.repo.add_remote("origin", str(ds.pathobj.parent / "empty-remote"))
+    # Mimic a situation that can happen with an LFS remote. See gh-4199.
+    ds.repo.config.unset("remote.origin.fetch", where="local")
+    (ds.repo.pathobj / "foo").write_text("a")
+    ds.save()
+    ds.publish(to="origin")
