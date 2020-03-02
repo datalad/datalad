@@ -1827,11 +1827,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         try:
             # TODO: outputs are nohow used/displayed. Eventually convert to
             # to a generator style yielding our "dict records"
+            if name == 'target2':
+                import os
+                os.system("echo '==== right before enableremote target2'; date; ps auxw -H")
             self._run_annex_command(
                 'enableremote',
                 annex_options=[name] + ensure_list(options),
                 runner="gitwitless",
                 env=env)
+            if name == 'target2':
+                import os
+                os.system("echo '==== right after enableremote target2'; date; ps auxw -H")
         except CommandError as e:
             if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
                 raise AccessDeniedError(e.stderr)
