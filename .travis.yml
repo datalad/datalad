@@ -129,14 +129,7 @@ script:
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
-  - http_proxy=
-    PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
-      -v -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"
-      --with-doctest
-      --with-cov --cover-package datalad
-      --logging-level=INFO
-      $TESTS_TO_PERFORM
+  - ../tools/ci/stalling-enable-remote.sh
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
   - if [ ${DATALAD_TESTS_SSH:-0} != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
       echo "Testing examples is disabled by configuration";
