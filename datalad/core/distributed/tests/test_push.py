@@ -350,6 +350,38 @@ def test_push_recursive(
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_push_subds_no_recursion(src_path, dst_top, dst_sub, dst_subsub):
+    # dataset with one submodule and one subsubmodule
+    top = Dataset(src_path).create()
+    sub = top.create('sub m')
+    test_file = sub.pathobj / 'subdir' / 'test_file'
+    test_file.parent.mkdir()
+    test_file.write_text('some')
+    subsub = sub.create(sub.pathobj / 'subdir' / 'subsub m')
+    top.save(recursive=True)
+    assert_repo_status(top.path)
+    target_top = mk_push_target(top, 'target', dst_top, annex=True)
+    target_sub = mk_push_target(sub, 'target', dst_sub, annex=True)
+    target_subsub = mk_push_target(subsub, 'target', dst_subsub, annex=True)
+    # now publish, but NO recursion, instead give the parent dir of
+    # both a subdataset and a file in the middle subdataset
+    res = top.push(
+        to='target',
+        # give relative to top dataset to elevate the difficulty a little
+        path=str(test_file.relative_to(top.pathobj).parent))
+    assert_status('ok', res)
+    assert_in_results(res, action='publish', type='dataset', path=top.path)
+    assert_in_results(res, action='publish', type='dataset', path=sub.path)
+    assert_in_results(res, action='copy', type='file', path=str(test_file))
+    # the lowest-level subdataset isn't touched
+    assert_not_in_results(
+        res, action='publish', type='dataset', path=subsub.path)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
 def test_force_datatransfer(srcpath, dstpath):
     src = Dataset(srcpath).create()
     target = mk_push_target(src, 'target', dstpath, annex=True, bare=True)
