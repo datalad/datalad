@@ -51,6 +51,10 @@ bet we will fix some bugs and make a world even a better place.
   unsupported, rather than aborting with an informative error message.
   ([#4065][])
 
+- The logic for automatically propagating the 'origin' remote when
+  cloning a local source could unintentionally triggered a fetch of a
+  non-local remote.  ([#4196][])
+
 ### Enhancements and new features
 
 - The new command [create-sibling-ria][] provides support for creating
@@ -95,6 +99,11 @@ bet we will fix some bugs and make a world even a better place.
 - [save][] now displays a message to signal that the working tree is
   clean to make it more obvious that no results being rendered
   corresponds to a clean state.  ([#4106][])
+
+- Calling [diff][] without `--recursive` but with a path constraint
+  within a subdataset ("<subdataset>/<path>") now traverses into the
+  subdataset, as "<subdataset>/" would, restricting its report to
+  "<subdataset>/<path>".  ([#4235][])
 
 
 ## 0.12.3 (??? ??, 2020) -- will be better than ever
@@ -2521,5 +2530,7 @@ publishing
 [#4175]: https://github.com/datalad/datalad/issues/4175
 [#4187]: https://github.com/datalad/datalad/issues/4187
 [#4194]: https://github.com/datalad/datalad/issues/4194
+[#4196]: https://github.com/datalad/datalad/issues/4196
 [#4212]: https://github.com/datalad/datalad/issues/4212
 [#4214]: https://github.com/datalad/datalad/issues/4214
+[#4235]: https://github.com/datalad/datalad/issues/4235
