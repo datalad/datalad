@@ -1190,6 +1190,16 @@ def test_get_open_files(p):
             os.getpid())
 
     assert not get_open_files(subd)
+
+    if on_windows:
+        # the remainder of the test assume a certain performance.
+        # however, on windows get_open_files() can be very slow
+        # (e.g. the first invocation in this test (above) can easily
+        # take 30-50s). It is not worth slowing the tests to
+        # accomodate this issue, given we have tested proper functioning
+        # in principle already above).
+        return
+
     # if we start a process within that directory, should get informed
     from subprocess import Popen, PIPE
     from time import time

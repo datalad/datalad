@@ -446,6 +446,8 @@ def rmdir(path, *args, **kwargs):
 def get_open_files(path, log_open=False):
     """Get open files under a path
 
+    Note: This function is very slow on Windows.
+
     Parameters
     ----------
     path : str
