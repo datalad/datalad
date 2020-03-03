@@ -58,7 +58,9 @@ from datalad.utils import (
     split_cmdline,
     unlink,
 )
-from datalad.support.json_py import loads as json_loads
+from datalad.log import log_progress
+# must not be loads, because this one would log, and we need to log ourselves
+from datalad.support.json_py import json_loads
 from datalad.cmd import (
     BatchedCommand,
     GitRunner,
@@ -3492,6 +3494,112 @@ class AnnexRepo(GitRepo, RepoInterface):
                 self.call_git(
                     ['branch', '-d', 'synced/{}'.format(orig_branch)],
                 )
+
+
+class AnnexJsonProtocol(WitlessProtocol):
+    """Subprocess communication protocol for `annex ... --json` commands
+
+    Importantly, parsed JSON content is returned as a result, not string output.
+
+    This protocol also handles git-annex's JSON-style progress reporting.
+    """
+    # capture both streams and handle messaging completely
+    proc_out = True
+    proc_err = True
+
+    def __init__(self, done_future):
+        # to collect parsed JSON command output
+        self.json_out = []
+        super().__init__(done_future)
+
+    def connection_made(self, transport):
+        super().connection_made(transport)
+        self._pbars = set()
+
+    def pipe_data_received(self, fd, data):
+        if fd != 1:
+            # let the base class decide what to do with it
+            super().pipe_data_received(fd, data)
+            return
+        # this is where the JSON records come in
+        # json_loads() is already logging any error, which is OK, because
+        # under no circumstances we would expect broken JSON
+        try:
+            j = json_loads(data)
+        except Exception:
+            # TODO turn this into an error result, or put the exception
+            # onto the result future -- needs more thought
+            if data.strip():
+                # do not complain on empty lines
+                lgr.error('Received undecodable JSON output: %s', data)
+            return
+        # check for progress reports and act on them immediately
+        # but only if there is something to build a progress report from
+        if 'action' in j and 'byte-progress' in j:
+            for err_msg in j['action'].pop('error-messages', []):
+                lgr.error(err_msg)
+            # use the action report to build a stable progress bar ID
+            pbar_id = 'annexprogress-{}-{}'.format(
+                id(self),
+                hash(frozenset(j['action'])))
+            if pbar_id in self._pbars and \
+                    j.get('byte-progress', None) == j.get('total-size', None):
+                # take a known pbar down, completion or broken report
+                log_progress(
+                    lgr.info,
+                    pbar_id,
+                    'Finished annex action: {}'.format(j['action']),
+                )
+                self._pbars.discard(pbar_id)
+                # we are done here
+                return
+
+            if pbar_id not in self._pbars and \
+                    j.get('byte-progress', None) != j.get('total-size', None):
+                # init the pbar, the is some progress left to be made
+                # worth it
+                log_progress(
+                    lgr.info,
+                    pbar_id,
+                    'Start annex action: {}'.format(j['action']),
+                    # do not crash if no command is reported
+                    label=j['action'].get('command', ''),
+                    unit=' Bytes',
+                    total=float(j['total-size']),
+                )
+                self._pbars.add(pbar_id)
+            log_progress(
+                lgr.info,
+                pbar_id,
+                j['percent-progress'],
+                update=float(j['byte-progress']),
+            )
+            # do not let progress reports leak into the return value
+            return
+        # don't do anything to the results for now in terms of normalization
+        # TODO the protocol could be made aware of the runner's CWD and
+        # also any dataset the annex command is operating on. This would
+        # enable 'file' property conversion to absolute paths
+        self.json_out.append(j)
+
+    def _prepare_result(self):
+        # first let the base class do its thing
+        results = super()._prepare_result()
+        # now amend the results, make clear in the key-name that these records
+        # came from stdout -- may not be important here or now, but it is easy
+        # to imagine structured output on stderr at some point
+        results['stdout_json'] = self.json_out
+        return results
+
+    def process_exited(self):
+        # take down any progress bars that were not closed orderly
+        for pbar_id in self._pbars:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished',
+            )
+        super().process_exited()
 
 
 # TODO: Why was this commented out?

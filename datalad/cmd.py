@@ -292,7 +292,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         if self.buffer[fd - 1] is not None:
             self.buffer[fd - 1].extend(data)
 
-    def process_exited(self):
+    def _prepare_result(self):
         """Prepares the final result to be returned to the runner
 
         Note for derived classes overwriting this method:
@@ -315,8 +315,11 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             for name, byt in zip(self.FD_NAMES[1:], self.buffer)
         }
         results['code'] = return_code
+        return results
+
+    def process_exited(self):
         # actually fulfill the future promise and let the execution finish
-        self.done.set_result(results)
+        self.done.set_result(self._prepare_result())
 
 
 class NoCapture(WitlessProtocol):

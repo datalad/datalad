@@ -38,7 +38,10 @@ import git
 from unittest.mock import patch
 import gc
 
-from datalad.cmd import Runner
+from datalad.cmd import (
+    Runner,
+    WitlessRunner,
+)
 
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
@@ -64,6 +67,7 @@ from datalad.tests.utils import (
     assert_not_in,
     assert_raises,
     assert_re_in,
+    assert_repo_status,
     assert_result_count,
     assert_true,
     create_tree,
@@ -116,6 +120,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import (
     _get_size_from_perc_complete,
     AnnexRepo,
+    AnnexJsonProtocol,
     ProcessAnnexProgressIndicators,
 )
 from .utils import check_repo_deals_with_inode_change
@@ -2116,6 +2121,40 @@ def test_error_reporting(path):
             'note': 'not found',
             'success': False}]
     )
+
+
+@with_tree(tree={
+    'file1': "content1",
+    'dir1': {'file2': 'content2'},
+})
+def test_annexjson_protocol(path):
+    ar = AnnexRepo(path, create=True)
+    ar.save()
+    assert_repo_status(path)
+    runner = WitlessRunner(cwd=ar.path)
+    # first an orderly execution
+    res = runner.run(
+        ['git', 'annex', 'find', '.', '--json'],
+        protocol=AnnexJsonProtocol)
+    for k in ('stdout', 'stdout_json', 'stderr'):
+        assert_in(k, res)
+    orig_j = res['stdout_json']
+    eq_(len(orig_j), 2)
+    # not meant as an exhaustive check for output structure,
+    # just some assurance that it is not totally alien
+    ok_(all(j['file'] for j in orig_j))
+    # no complaints
+    eq_(res['stderr'], '')
+
+    # now the same, but with a forced error
+    with assert_raises(CommandError) as e:
+        res = runner.run(
+            ['git', 'annex', 'find', '.', 'error', '--json'],
+            protocol=AnnexJsonProtocol)
+        # normal operation is not impaired
+        eq_(e.stdout_json, orig_j)
+        # we get a clue what went wrong
+        assert_in('error not found', e.stderr)
 
 
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
