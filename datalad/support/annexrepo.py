@@ -3524,15 +3524,19 @@ class AnnexJsonProtocol(WitlessProtocol):
         # this is where the JSON records come in
         # json_loads() is already logging any error, which is OK, because
         # under no circumstances we would expect broken JSON
-        try:
-            j = json_loads(data)
-        except Exception:
-            # TODO turn this into an error result, or put the exception
-            # onto the result future -- needs more thought
-            if data.strip():
-                # do not complain on empty lines
-                lgr.error('Received undecodable JSON output: %s', data)
-            return
+        for line in data.splitlines():
+            try:
+                j = json_loads(line)
+            except Exception:
+                # TODO turn this into an error result, or put the exception
+                # onto the result future -- needs more thought
+                if line.strip():
+                    # do not complain on empty lines
+                    lgr.error('Received undecodable JSON output: %s', data)
+                continue
+            self._proc_json_record(j)
+
+    def _proc_json_record(self, j):
         # check for progress reports and act on them immediately
         # but only if there is something to build a progress report from
         if 'action' in j and 'byte-progress' in j:
