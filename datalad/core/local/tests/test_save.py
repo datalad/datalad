@@ -145,8 +145,9 @@ tree_arg = dict(tree={'test.txt': 'some',
 #                  "fatal: tag 'new_sub' already exists"))
 #
 
+# dj: assuming that the file can be created in tmpdir
 def test_save_message_file(tmpdir):
-    path=str(tmpdir)
+    path=str(tmpdir.join("afile.txt"))
     ds = Dataset(path).create()
     with pytest.raises(ValueError):
         ds.save("blah", message="me", message_file="and me")
@@ -161,12 +162,13 @@ def test_save_message_file(tmpdir):
         "add foo")
 
 
+# dj: assuming that the file can be created in tmpdir
 @pytest.mark.parametrize("recursive", [False, True])
 @pytest.mark.parametrize("no_annex", [True, False])
 def test_renamed_file(tmpdir, recursive, no_annex):
     if recursive == True:
         pytest.xfail(reason="TRUE not implemented")
-    path = str(tmpdir)
+    path = str(tmpdir.join("afile.txt"))
     ds = Dataset(path).create(no_annex=no_annex)
     create_tree(path, {'old': ''})
     ds.repo.add('old')
@@ -176,6 +178,7 @@ def test_renamed_file(tmpdir, recursive, no_annex):
 
 
 # dj: since the file doesn't have content, the pytest.tmpdir could be used (?)
+# dj: but just to show a fixture version of with_tempfile
 def test_subdataset_save(with_tempfile_pyt):
     path = with_tempfile_pyt()
     parent = Dataset(path).create()

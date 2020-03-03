@@ -97,6 +97,7 @@ import pytest
 
 
 # dj: if content is None, tmpdir.join("afile.txt") could be used (?)
+# this is a simplified version of with_tempfile
 @pytest.fixture(scope="function")
 def with_tempfile_pyt(tmpdir):
     """Decorator function to provide a temporary file name and remove it at the end
