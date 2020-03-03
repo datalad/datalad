@@ -15,18 +15,25 @@ from ..s3 import S3Authenticator
 from ..s3 import S3Downloader
 from ..providers import Providers  # to test against crcns
 
-from ...tests.utils import swallow_outputs
-from ...tests.utils import SkipTest
-from ...tests.utils import with_tempfile
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_in
-from ...tests.utils import use_cassette
-from ...tests.utils import assert_raises
-from ...tests.utils import skip_if_no_network
-from ...tests.utils import with_testsui
+from ...tests.utils import (
+    assert_equal,
+    assert_raises,
+    skip_if_no_network,
+    SkipTest,
+    swallow_outputs,
+    use_cassette,
+    with_tempfile,
+    with_testsui,
+)
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
 from ...support.exceptions import AccessDeniedError
+
+from ...utils import (
+    md5sum,
+)
+
+from ...support import path as op
 
 try:
     import boto
@@ -42,6 +49,9 @@ url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversion
 url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
 url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
 url_1version_bucketwithdot = 's3://datalad.test1/version1.txt'
+
+url_dandi1 = 's3://dandiarchive/dandiarchive/dandiarchive/data/d8dd3e2b-8f74-494b-9370-9e3a6c69e2b0.csv.gz?versionId=9P7aMTvTT5wynPBOtiQqkV.wvV8zcpLf'
+
 
 @use_cassette('test_s3_download_basic')
 def test_s3_download_basic():
@@ -120,3 +130,31 @@ def test_deny_access():
     with assert_raises(DownloadError):
         with patch.object(downloader, '_download', deny_access):
             downloader.download("doesn't matter")
+
+
+@with_tempfile
+def test_boto_host_specification(tempfile):
+    # This test relies on a yoh-specific set of credentials to access
+    # s3://dandiarchive . Unfortunately it seems that boto (2.49.0-2.1) might
+    # have difficulties to establish a proper connection and would blow
+    # with
+    # The authorization mechanism you have provided is not supported. Please use AWS4-HMAC-SHA256.
+    # Some related discussions:
+    #   https://github.com/jschneier/django-storages/issues/28 which was closed
+    # as superseded by a fix in 2017
+    #   https://github.com/jschneier/django-storages/issues/28 .
+    # In my case I still needed to resort to the workaround of providing
+    # host = 's3.us-east-2.amazonaws.com' to the call.
+    #
+    # Unfortunately I do not know yet how we could establish such tests without
+    # demanding specific credentials. And since we overload HOME for the testing,
+    # the only way to run/test this at least when testing on my laptop is:
+    credfile = '/home/yoh/.config/datalad/providers/dandi.cfg'
+    # Later TODO: manage to reproduce such situation with our dedicated test
+    # bucket, and rely on datalad-test-s3 credential
+    if not op.exists(credfile):
+        raise SkipTest("Test can run only on yoh's setup")
+    providers = Providers.from_config_files([credfile])
+    with swallow_outputs():
+        providers.download(url_dandi1, path=tempfile)
+    assert_equal(md5sum(tempfile), '97f4290b2d369816c052607923e372d4')
