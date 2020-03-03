@@ -306,7 +306,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
         )
     try:
-        lgr.debug("diff %s from '%s' to '%s'", ds, fr, to)
+        lgr.debug("Diff %s from '%s' to '%s'", ds, fr, to)
         diff_state = repo.diffstatus(
             fr,
             to,
@@ -350,10 +350,17 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             parentds=ds.path,
             status='ok',
         )
-        # if a dataset, and given in rsync-style 'ds/' or with sufficient
-        # recursion level left -> dive in
+        # for a dataset we need to decide whether to dive in, or not
         if props.get('type', None) == 'dataset' and (
-                (paths and paths.get(path, False)) or recursion_level != 0):
+                # subdataset path was given in rsync-style 'ds/'
+                (paths and paths.get(path, False))
+                # there is still sufficient recursion level left
+                or recursion_level != 0
+                # no recursion possible anymore, but one of the given
+                # path arguments is in this subdataset
+                or (recursion_level == 0
+                    and paths
+                    and any(path in p.parents for p in paths))):
             subds_state = props.get('state', None)
             if subds_state in ('clean', 'deleted'):
                 # no need to look into the subdataset
@@ -378,7 +385,10 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     # subtract on level on the way down, unless the path
                     # args instructed to go inside this subdataset
                     recursion_level=recursion_level
-                    if paths and paths.get(path, False) else recursion_level - 1,
+                    # protect against dropping below zero (would mean unconditional
+                    # recursion)
+                    if not recursion_level or (paths and paths.get(path, False))
+                    else recursion_level - 1,
                     origpaths=origpaths,
                     untracked=untracked,
                     annexinfo=annexinfo,
