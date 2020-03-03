@@ -22,6 +22,7 @@ from datalad.support.exceptions import (
 from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.cmd import GitRunner
 from datalad.utils import (
+    Path,
     on_windows,
 )
 from datalad.tests.utils import (
@@ -36,6 +37,7 @@ from datalad.tests.utils import (
     get_deeply_nested_structure,
     has_symlink_capability,
     known_failure_githubci_win,
+    neq_,
     OBSCURE_FILENAME,
     ok_,
     SkipTest,
@@ -451,7 +453,7 @@ def test_diff_rsync_syntax(path):
     # three nested datasets
     ds = Dataset(path).create()
     subds = ds.create('sub')
-    subsubds = subds.create('deep')
+    subsubds = subds.create(Path('subdir', 'deep'))
     justtop = ds.diff(fr=PRE_INIT_COMMIT_SHA, path='sub')
     # we only get a single result, the subdataset in question
     assert_result_count(justtop, 1)
@@ -463,6 +465,16 @@ def test_diff_rsync_syntax(path):
     assert_result_count(inside, 1, type='dataset', path=subds.path)
     assert_result_count(inside, 1, type='dataset', path=subsubds.path)
     assert_result_count(inside, 0, type='file', parentds=subsubds.path)
+    # if we point to the subdir in 'sub' the reporting wrt the subsubds
+    # doesn't change. It is merely a path constraint within the queried
+    # subds, but because the subsubds is still underneath it, nothing changes
+    inside_subdir = ds.diff(fr=PRE_INIT_COMMIT_SHA, path=op.join('sub', 'subdir'))
+    assert_result_count(inside_subdir, 2, type='dataset')
+    assert_result_count(inside_subdir, 1, type='dataset', path=subds.path)
+    assert_result_count(inside_subdir, 1, type='dataset', path=subsubds.path)
+    assert_result_count(inside_subdir, 0, type='file', parentds=subsubds.path)
+    # but the rest is different (e.g. all the stuff in .datalad is gone)
+    neq_(inside, inside_subdir)
     # just for completeness, we get more when going full recursive
     rec = ds.diff(fr=PRE_INIT_COMMIT_SHA, recursive=True, path='sub' + os.sep)
     assert(len(inside) < len(rec))
