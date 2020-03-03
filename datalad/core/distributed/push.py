@@ -267,16 +267,17 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             # - this dataset with explicitely requested by path
             #   -> should get a dedicated dataset record -- even without recursion
             # - a path within an existing subdataset was given
-            #   -> TODO verify that this causes a dedicated dataset record
             # - a path within an non-existing subdataset was given
             #   locally or not)
-            # -> it should be ignored, but should not cause the branch in the
+            #   -> it should be ignored, but should not cause the branch in the
             #   superdataset not to be pushed, if this was the only change
             p = Path(res['path'])
+            # was given as an explicit path argument
             if any(arg == p for arg in paths) and \
                     not GitRepo.is_valid_repo(res['path']):
                 raise ValueError(
                     'Cannot publish subdataset, not present: {}'.format(res['path']))
+
         if parentds != cur_ds:
             if ds_res:
                 # we switch to another dataset, yield this one so outside
@@ -642,6 +643,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
         # for the entire dataset
         yield dict(
             res_kwargs,
+            action='copy',
             status='impossible'
             if force in ('all', 'datatransfer')
             else 'notneeded',
@@ -720,5 +722,5 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
                 lgr.debug('Received unexpected %s from `annex copy`: %s',
                           c, res[c])
         for j in res['stdout_json']:
-            yield annexjson2result(j, ds)
+            yield annexjson2result(j, ds, type='file')
     return
