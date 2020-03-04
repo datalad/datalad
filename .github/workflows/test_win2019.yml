@@ -12,18 +12,14 @@ jobs:
       matrix:
         # group modules to get a job runtime of ~15min
         module: [
-            datalad.core,
-            datalad.local datalad.distributed datalad.support,
-            datalad.customremotes datalad.downloaders datalad.plugin,
-            datalad.distribution,
-            datalad.interface,
-            datalad.metadata datalad.tests datalad.ui datalad.cmdline
+            "datalad.core.distributed.tests.test_clone:test_cfg_originorigin",
         ]
     steps:
     - name: Set up environment
       run: |
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
+        git config --global core.fscache false
     - uses: actions/checkout@v1
     - name: Set up Python 3.7
       uses: actions/setup-python@v1
@@ -45,6 +41,8 @@ jobs:
         datalad wtf
         dir
     - name: ${{ matrix.module }} tests
+      env:
+        GIT_TEST_FSCACHE: 0
       run: |
         mkdir -p __testhome__
         cd __testhome__
