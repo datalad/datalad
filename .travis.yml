@@ -100,6 +100,9 @@ matrix:
   - python: 3.5
     # Test some under NFS mount  (only selected sub-set)
     env:
+    # do not run SSH-based tests due to stall(s)
+    # https://github.com/datalad/datalad/pull/4172
+    - DATALAD_TESTS_SSH=0
     - TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad.tests datalad.support"
   #
