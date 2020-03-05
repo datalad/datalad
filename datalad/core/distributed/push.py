@@ -15,7 +15,8 @@ __docformat__ = 'restructuredtext'
 import logging
 from tempfile import TemporaryFile
 
-from datalad.cmd import WitlessRunner
+from datalad.consts import PRE_INIT_COMMIT_SHA
+from datalad.cmd import GitWitlessRunner
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -76,7 +77,7 @@ class Push(Interface):
     a particular "historic" state is only supported in conjunction with a
     specified reference dataset. Change sets are also evaluated recursively, i.e.
     only those subdatasets are pushed where a change was recorded that is
-    reflected in to current state of the top-level reference dataset.
+    reflected in the current state of the top-level reference dataset.
     See "since" option for more information.
 
     Only a push of saved changes is supported.
@@ -106,7 +107,7 @@ class Push(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""specifies commit (treeish, tag, etc.) from which to look for
+            doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
             changes to decide whether pushing is necessary.
             If an empty string is given, the last state of the current branch
             at the sibling is taken as a starting point."""),
@@ -121,7 +122,10 @@ class Push(Interface):
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
             doc="""force particular operations, overruling automatic decision
-            making: ...""",
+            making: use --force with git-push ('gitpush'); do not use --fast
+            with git-annex copy (datatransfer); do not attempt to copy annex'ed
+            file content (no-datatransfer); combine force modes 'gitpush' and
+            'datatransfer' (all).""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
         recursive=recursion_flag,
@@ -182,26 +186,32 @@ class Push(Interface):
 
         ds = require_dataset(
             dataset, check_installed=True, purpose='pushing')
+        ds_repo = ds.repo
 
         if since:
             # will blow with ValueError if unusable
-            ds.repo.get_hexsha(since)
+            ds_repo.get_hexsha(since)
 
         if not since and since is not None:
-            # TODO figure out state of remote branch and set `since`
-            pass
+            # special case: --since=''
+            # figure out state of remote branch and set `since`
+            since = _get_corresponding_remote_state(ds_repo, to)
+            if not since:
+                lgr.info(
+                    "No tracked remote for active branch,
+                    detection of last pushed state not in effect.")
 
         # obtain a generator for information on the datasets to process
         # idea is to turn the `paths` argument into per-dataset
         # content listings that can be acted upon
-        if since:
-            ds_spec = _datasets_since_(
-                # important to pass unchanged dataset arg
-                dataset, since, paths, recursive, recursion_limit)
-        else:
-            ds_spec = _datasets_no_since_(
-                # important to pass unchanged dataset arg
-                dataset, paths, recursive, recursion_limit)
+        ds_spec = _datasets_since_(
+            # important to pass unchanged dataset arg
+            dataset,
+            # use the diff "since before time"
+            since if since else PRE_INIT_COMMIT_SHA,
+            paths,
+            recursive,
+            recursion_limit)
 
         res_kwargs = dict(
             action='publish',
@@ -314,15 +324,6 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         yield (cur_ds, ds_res)
 
 
-def _datasets_no_since_(dataset, paths, recursive, recursion_limit):
-    """Generator"""
-    # TODO can we do better an cheaper?
-    from datalad.consts import PRE_INIT_COMMIT_SHA
-    # use the diff "since before time"
-    return _datasets_since_(
-        dataset, PRE_INIT_COMMIT_SHA, paths, recursive, recursion_limit)
-
-
 def _push(dspath, content, target, force, jobs, res_kwargs,
           done_fetch=None):
     if not done_fetch:
@@ -392,7 +393,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         lgr.debug("Discovered publication dependencies for '%s': %s'",
                   target, publish_depends)
 
-    # anything that follows will not change the repo type, cache.
+    # cache repo type
     is_annex_repo = isinstance(ds.repo, AnnexRepo)
 
     # TODO prevent this when `target` is a special remote
@@ -412,10 +413,12 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         # if an upstream branch is set, go with it
         p['from_ref']
         if ds.config.get(
-            'branch.{}.remote'.format(p['from_ref'][len('refs/heads/'):]),
+            # refs come in as refs/heads/<branchname>
+            # need to cut the prefix
+            'branch.{}.remote'.format(p['from_ref'][11:]),
             None) == target and ds.config.get(
-            'branch.{}.merge'.format(p['from_ref'][len('refs/heads/'):]),
-            None)
+                'branch.{}.merge'.format(p['from_ref'][11:]),
+                None)
         # if not, define target refspec explicitly to avoid having to
         # set an upstream branch, which would happen implicitly from
         # a users POV, and may also be hard to decide when publication
@@ -444,12 +447,13 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
                 'branch'
             )
             return
-        if is_annex_repo and repo.is_managed_branch(active_branch):
-            # a managed branch, in which case we need to determine
-            # the actual one and make sure it is sync'ed with the managed
-            # one, and push that one instead
+        if is_annex_repo:
+            # we could face a managed branch, in which case we need to
+            # determine the actual one and make sure it is sync'ed with the
+            # managed one, and push that one instead. following methods can
+            # be called unconditionally
             active_branch = repo.get_corresponding_branch(active_branch)
-            _sync_annex(repo, target, active_branch)
+            repo.localsync(target)
         refspecs2push.append(
             # same dance as above
             active_branch
@@ -540,7 +544,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
                         "Sync local annex branch from pushurl after remote "
                         'availability update.')
                 repo.call_git(fetch_cmd)
-                _sync_annex(repo, target)
+                repo.localsync(target)
             except CommandError as e:
                 # it is OK if the remote doesn't have a git-annex branch yet
                 # (e.g. fresh repo)
@@ -560,25 +564,6 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
                 force,
                 res_kwargs.copy(),
             )
-
-
-def _sync_annex(repo, target, corresponding_branch=None):
-    if not corresponding_branch:
-        corresponding_branch = repo.get_corresponding_branch()
-    synced_branch = 'synced/{}'.format(corresponding_branch)
-    had_synced_branch = synced_branch in repo.get_branches()
-    repo.call_git([
-        'annex', 'sync',
-        # there is no way to do this in a purely local fashion
-        # although this is what we want here, emulate...
-        target,
-        # disable any external interaction and other magic
-        '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge',
-    ])
-    if not had_synced_branch:
-        # cleanup after sync, simply remove the sync branch and not
-        # use 'sync --cleanup' to further limit remote interaction
-        repo.call_git(['branch', '-D', synced_branch])
 
 
 def _push_refspecs(repo, target, refspecs, force, res_kwargs):
@@ -709,9 +694,9 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
         file_list.seek(0)
         # and go
         # TODO try-except and yield what was captured before the crash
-        res = WitlessRunner(
+        #res = GitWitlessRunner(
+        res = GitWitlessRunner(
             cwd=ds.path,
-            # TODO env
         ).run(
             cmd,
             # TODO report how many in total, and give global progress too
@@ -724,3 +709,21 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
         for j in res['stdout_json']:
             yield annexjson2result(j, ds, type='file')
     return
+
+
+def _get_corresponding_remote_state(repo, to):
+    since = None
+    active_branch = repo.get_active_branch()
+    if to:
+        # XXX here we assume one to one mapping of names from local branches
+        # to the remote
+        since = '%s/%s' % (to, active_branch)
+    else:
+        # take tracking remote for the active branch
+        tracked_remote, tracked_refspec = repo.get_tracking_branch()
+        if tracked_remote:
+            if tracked_refspec.startswith('refs/heads/'):
+                tracked_refspec = tracked_refspec[len('refs/heads/'):]
+            #to = tracked_remote
+            since = '%s/%s' % (tracked_remote, tracked_refspec)
+    return since
