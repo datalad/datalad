@@ -3476,24 +3476,55 @@ class AnnexRepo(GitRepo, RepoInterface):
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
             message, status, partial_commit)
-        # check if we have to deal with adjusted branch
+        # then sync potential managed branches
+        self.localsync()
+
+    def localsync(self, remote=None):
+        """Consolidate the local git-annex branch and/or managed branches.
+
+        This method calls `git annex sync` to perform purely local operations
+        that:
+
+        1. Update the corresponding branch of any managed branch.
+
+        2. Synchronize the local 'git-annex' branch with respect to particular
+           or all remotes (as currently reflected in the local state of their
+           remote 'git-annex' branches).
+
+        If a repository has git-annex's 'synced/...' branches these will be
+        updated.  Otherwise, such branches that are created by `git annex sync`
+        are removed again after the sync is complete.
+
+        Parameters
+        ----------
+        remote : str or list, optional
+          If given, specifies the name of one or more remotes to sync against.
+          If not given, all remotes are considered.
+        """
         branch = self.get_active_branch()
-        adjusted_match = ADJUSTED_BRANCH_EXPR.match(branch if branch else '')
-        if adjusted_match:
-            orig_branch = adjusted_match.group('name')
-            synced_branch = 'synced/{}'.format(orig_branch)
-            had_synced_branch = synced_branch in self.get_branches()
-            lgr.debug(
-                "Git-annex adjusted branch detected, sync'ing %s",
-                orig_branch)
+        corresponding_branch = self.get_corresponding_branch(branch)
+        if branch == corresponding_branch:
+            # nothing to sync
+            return
+
+        lgr.debug(
+            "Git-annex adjusted branch detected, sync'ing %s",
+            corresponding_branch)
+
+        synced_branch = 'synced/{}'.format(branch)
+        had_synced_branch = synced_branch in self.get_branches()
+        cmd = ['annex', 'sync']
+        if remote:
+            cmd.extend(assure_list(remote))
+        cmd.extend([
+            # disable any external interaction and other magic
+            '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge'])
+        self.call_git(cmd)
+        # cleanup sync'ed branch if we caused it
+        if had_synced_branch:
             self.call_git(
-                ['annex', 'sync', '--no-commit', '--no-push', '--no-pull'],
+                ['branch', '-d', 'synced/{}'.format(branch)],
             )
-            # cleanup sync'ed branch if we caused it
-            if not had_synced_branch:
-                self.call_git(
-                    ['branch', '-d', 'synced/{}'.format(orig_branch)],
-                )
 
 
 class AnnexJsonProtocol(WitlessProtocol):
