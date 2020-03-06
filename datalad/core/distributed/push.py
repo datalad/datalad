@@ -351,9 +351,9 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         if not len(target):
             yield dict(
                 res_kwargs,
-                status='error',
+                status='impossible',
                 message='No push target given, and none could be '
-                        'auto-detected',
+                        'auto-detected, please specific via --to',
             )
             return
         elif len(target) > 1:
@@ -378,8 +378,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
             res_kwargs,
             status='error',
             message=(
-                "Dataset %s does not know of a sibling '%s' to push to.",
-                ds, target))
+                "Unknown target sibling '%s'.", target))
         return
 
     lgr.debug("Attempt to push to '%s'", target)

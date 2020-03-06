@@ -50,7 +50,7 @@ from datalad.core.distributed.push import Push
 def test_invalid_call(origin, tdir):
     ds = Dataset(origin).create()
     # no target
-    assert_status('error', ds.push(on_failure='ignore'))
+    assert_status('impossible', ds.push(on_failure='ignore'))
     # no dataset
     with chpwd(tdir):
         assert_raises(InsufficientArgumentsError, Push.__call__)
@@ -115,8 +115,9 @@ def check_push(annex, src_path, dst_path):
     res = src.push(on_failure='ignore')
     assert_result_count(res, 1)
     assert_in_results(
-        res, status='error',
-        message='No push target given, and none could be auto-detected')
+        res, status='impossible',
+        message='No push target given, and none could be auto-detected, '
+        'please specific via --to')
     # target sibling
     target = mk_push_target(src, 'target', dst_path, annex=annex)
 
@@ -249,8 +250,8 @@ def test_push_recursive(
     for d in (sub, subsub, subnoannex):
         assert_in_results(
             res, status='error', type='dataset', path=d.path,
-            message=("Dataset %s does not know of a sibling '%s' to push to.",
-                     d, 'target'))
+            message=("Unknown target sibling '%s'.",
+                     'target'))
     # now fix that and set up targets for the submodules
     target_sub = mk_push_target(sub, 'target', dst_sub, annex=True)
     target_subnoannex = mk_push_target(
