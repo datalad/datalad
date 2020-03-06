@@ -3466,9 +3466,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         super(AnnexRepo, self)._save_post(
             message, status, partial_commit)
         # then sync potential managed branches
-        self.localsync()
+        self.localsync(managed_only=True)
 
-    def localsync(self, remote=None):
+    def localsync(self, remote=None, managed_only=False):
         """Consolidate the local git-annex branch and/or managed branches.
 
         This method calls `git annex sync` to perform purely local operations
@@ -3489,11 +3489,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         remote : str or list, optional
           If given, specifies the name of one or more remotes to sync against.
           If not given, all remotes are considered.
+        managed_only : bool, optional
+          Only perform a sync if a managed branch with a corresponding branch
+          is detected. By default, a sync is always performed.
         """
         branch = self.get_active_branch()
         corresponding_branch = self.get_corresponding_branch(branch)
 
         have_corresponding_branch = branch != corresponding_branch
+
+        if managed_only and not have_corresponding_branch:
+            lgr.debug('No sync necessary, no corresponding branch detected')
+            return
 
         lgr.debug(
             "Sync local 'git-annex' branch%s%s%s.",
