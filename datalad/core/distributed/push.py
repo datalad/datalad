@@ -94,7 +94,7 @@ class Push(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to push""",
+            doc="""specify the dataset to push""",
             constraints=EnsureDataset() | EnsureNone()),
         to=Parameter(
             args=("--to",),
@@ -123,9 +123,9 @@ class Push(Interface):
             args=("-f", "--force",),
             doc="""force particular operations, overruling automatic decision
             making: use --force with git-push ('gitpush'); do not use --fast
-            with git-annex copy (datatransfer); do not attempt to copy annex'ed
-            file content (no-datatransfer); combine force modes 'gitpush' and
-            'datatransfer' (all).""",
+            with git-annex copy ('datatransfer'); do not attempt to copy
+            annex'ed file content ('no-datatransfer'); combine force modes
+            'gitpush' and 'datatransfer' ('all').""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
         recursive=recursion_flag,
