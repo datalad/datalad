@@ -46,10 +46,21 @@ class S3Authenticator(Authenticator):
     allows_anonymous = True
     DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, host=None, **kwargs):
+        """
+
+        Parameters
+        ----------
+        host: str, optional
+          In some cases it is necessary to provide host to connect to. Passed
+          to boto.connect_s3
+        """
         super(S3Authenticator, self).__init__(*args, **kwargs)
         self.connection = None
         self.bucket = None
+        self._conn_kwargs = {}
+        if host:
+            self._conn_kwargs['host'] = host
 
     def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
@@ -72,7 +83,7 @@ class S3Authenticator(Authenticator):
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
-        conn_kwargs = {}
+        conn_kwargs = self._conn_kwargs.copy()
         if bucket_name.lower() != bucket_name:
             # per http://stackoverflow.com/a/19089045/1265472
             conn_kwargs['calling_format'] = OrdinaryCallingFormat()
@@ -87,7 +98,7 @@ class S3Authenticator(Authenticator):
             conn_args = []
             conn_kwargs['anon'] = True
         if '.' in bucket_name:
-            conn_kwargs['calling_format']=OrdinaryCallingFormat()
+            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
 
         lgr.info(
             "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
