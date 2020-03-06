@@ -33,13 +33,13 @@ from datalad.tests.utils import (
     assert_not_equal,
     assert_not_in,
     assert_raises,
+    assert_repo_status,
     assert_result_count,
     assert_status,
     create_tree,
     eq_,
     get_mtimes_and_digests,
     ok_,
-    ok_clean_git,
     ok_endswith,
     ok_exists,
     ok_file_has_content,
@@ -440,7 +440,7 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
     # get a new subdataset and make sure it is committed in the super
     source.create('brandnew')
     eq_(len(source.subdatasets()), 3)
-    ok_clean_git(source.path)
+    assert_repo_status(source.path)
 
     # and now we create a sibling for the new subdataset only
     assert_create_sshwebserver(

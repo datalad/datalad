@@ -26,8 +26,10 @@ from datalad.utils import (
 )
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
-from datalad.support.exceptions import CommandError
-from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.exceptions import (
+    CommandError,
+    InvalidGitRepositoryError,
+)
 from datalad.version import __version__, __full_version__
 
 lgr = logging.getLogger('datalad.plugin.wtf')

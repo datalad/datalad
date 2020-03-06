@@ -31,6 +31,7 @@ from datalad.tests.utils import (
     assert_not_in,
     assert_raises,
     assert_re_in,
+    assert_repo_status,
     assert_result_values_cond,
     assert_true,
     create_tree,
@@ -39,7 +40,6 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     ok_,
     ok_archives_caches,
-    ok_clean_git,
     ok_file_under_git,
     serve_path_via_http,
     slow,
@@ -510,7 +510,7 @@ class TestAddArchiveOptions():
                 opj('subdir', '1.tar'),
                 delete_after=True,
                 drop_after=True)
-            ok_clean_git(self.annex.path)
+            assert_repo_status(self.annex.path)
             commits_after_master = list(self.annex.get_branch_commits_())
             commits_after = list(self.annex.get_branch_commits_('git-annex'))
             # There should be a single commit for all additions +1 to
@@ -533,7 +533,7 @@ class TestAddArchiveOptions():
                 delete_after=True,
                 drop_after=True,
                 allow_dirty=True)
-            ok_clean_git(self.annex.path, untracked=['dummy.txt'])
+            assert_repo_status(self.annex.path, untracked=['dummy.txt'])
             assert_equal(len(list(self.annex.get_branch_commits_())),
                          len(commits_prior_master))
 

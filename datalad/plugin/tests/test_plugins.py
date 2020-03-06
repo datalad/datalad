@@ -29,13 +29,13 @@ from datalad.utils import assure_unicode
 from datalad.tests.utils import (
     assert_in,
     assert_not_in,
+    assert_repo_status,
     assert_status,
     chpwd,
     create_tree,
     eq_,
     known_failure_githubci_win,
     OBSCURE_FILENAME,
-    ok_clean_git,
     ok_startswith,
     skip_if_no_module,
     SkipTest,
@@ -168,7 +168,7 @@ def test_wtf(topdir):
 @with_tempfile(mkdir=True)
 def test_no_annex(path):
     ds = create(path)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     create_tree(
         ds.path,
         {'code': {
@@ -180,7 +180,7 @@ def test_no_annex(path):
     no_annex(pattern=['code/**', 'README'], dataset=ds.path)
     # add inannex and README post configuration
     ds.save([opj('code', 'notinannex'), 'README'])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed
     eq_([opj('code', 'inannex')],
@@ -212,7 +212,7 @@ def test_add_readme(path):
     ds = Dataset(path).create(force=True)
     ds.save()
     ds.aggregate_metadata()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     assert_status('ok', ds.add_readme())
     # should use default name
     eq_(

@@ -38,12 +38,12 @@ from datalad.tests.utils import (
     assert_in,
     assert_raises,
     assert_re_in,
+    assert_repo_status,
     assert_result_count,
     assert_status,
     assert_true,
     eq_,
     known_failure_githubci_win,
-    ok_clean_git,
     slow,
     swallow_logs,
     with_tempfile,
@@ -127,7 +127,7 @@ def test_aggregation(path):
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                         where='dataset')
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
     res = ds.aggregate_metadata(recursive=True, update_mode='all')
@@ -137,7 +137,7 @@ def test_aggregation(path):
     assert_result_count(res, 3, status='ok', action='aggregate_metadata')
     assert_result_count(res, 3, status='ok', action='save')
     # nice and tidy
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # quick test of aggregate report
     aggs = ds.metadata(get_aggregates=True)

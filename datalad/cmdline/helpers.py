@@ -212,7 +212,7 @@ def get_repo_instance(path=curdir, class_=None):
     """
 
     from os.path import ismount, exists, normpath, isabs
-    from git.exc import InvalidGitRepositoryError
+    from datalad.support.exceptions import InvalidGitRepositoryError
     from ..utils import expandpath
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo

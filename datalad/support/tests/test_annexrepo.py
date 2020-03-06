@@ -34,7 +34,6 @@ from datalad.tests.utils import assert_not_is_instance
 from urllib.parse import urljoin
 from urllib.parse import urlsplit
 
-import git
 from unittest.mock import patch
 import gc
 
@@ -80,7 +79,6 @@ from datalad.tests.utils import (
     OBSCURE_FILENAME,
     ok_,
     ok_annex_get,
-    ok_clean_git,
     ok_file_has_content,
     ok_file_under_git,
     ok_git_config_not_empty,
@@ -101,7 +99,6 @@ from datalad.tests.utils import (
 from datalad.support.exceptions import (
     AnnexBatchCommandError,
     CommandError,
-    CommandNotAvailableError,
     FileInGitError,
     FileNotInAnnexError,
     FileNotInRepositoryError,
@@ -112,7 +109,6 @@ from datalad.support.exceptions import (
     OutOfSpaceError,
     RemoteNotAvailableError,
 )
-from datalad.support.external_versions import external_versions
 
 from datalad.support.gitrepo import GitRepo
 
@@ -123,8 +119,6 @@ from datalad.support.annexrepo import (
     AnnexJsonProtocol,
     ProcessAnnexProgressIndicators,
 )
-from .utils import check_repo_deals_with_inode_change
-
 
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
@@ -782,10 +776,10 @@ def test_AnnexRepo_commit(path):
         f.write("File to add to git")
     ds.add(filename, git=True)
 
-    assert_raises(AssertionError, ok_clean_git, path, annex=True)
+    assert_raises(AssertionError, assert_repo_status, path, annex=True)
 
     ds.commit("test _commit")
-    ok_clean_git(path, annex=True)
+    assert_repo_status(path, annex=True)
 
     # nothing to commit doesn't raise by default:
     ds.commit()
@@ -811,7 +805,7 @@ def test_AnnexRepo_add_to_annex(path):
     # clone as provided by with_testrepos:
     repo = AnnexRepo(path, create=False, init=True)
 
-    ok_clean_git(repo, annex=True, ignore_submodules=True)
+    assert_repo_status(repo, annex=True)
     filename = get_most_obscure_supported_name()
     filename_abs = opj(repo.path, filename)
     with open(filename_abs, "w") as f:
@@ -831,7 +825,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.dirty)
 
     repo.commit("Added file to annex.")
-    ok_clean_git(repo, annex=True, ignore_submodules=True)
+    assert_repo_status(repo, annex=True)
 
     # now using commit/msg options:
     filename = "another.txt"
@@ -845,7 +839,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.file_has_content(filename))
 
     # and committed:
-    ok_clean_git(repo, annex=True, ignore_submodules=True)
+    assert_repo_status(repo, annex=True)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -858,7 +852,7 @@ def test_AnnexRepo_add_to_git(path):
     # clone as provided by with_testrepos:
     repo = AnnexRepo(path, create=False, init=True)
 
-    ok_clean_git(repo, annex=True, ignore_submodules=True)
+    assert_repo_status(repo, annex=True)
     filename = get_most_obscure_supported_name()
     with open(opj(repo.path, filename), "w") as f:
         f.write("some")
@@ -869,7 +863,7 @@ def test_AnnexRepo_add_to_git(path):
     # uncommitted:
     ok_(repo.dirty)
     repo.commit("Added file to annex.")
-    ok_clean_git(repo, annex=True, ignore_submodules=True)
+    assert_repo_status(repo, annex=True)
 
     # now using commit/msg options:
     filename = "another.txt"
@@ -882,7 +876,7 @@ def test_AnnexRepo_add_to_git(path):
     assert_raises(FileInGitError, repo.get_file_key, filename)
 
     # and committed:
-    ok_clean_git(repo, annex=True, ignore_submodules=True)
+    assert_repo_status(repo, annex=True)
 
 
 @with_testrepos('.*annex.*', flavors=['local'])
@@ -1260,7 +1254,7 @@ def test_annex_remove(path1, path2):
 @with_tempfile
 def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
-    ok_clean_git(path1, annex=True)
+    assert_repo_status(path1, annex=True)
     version = int(annex.config.get('annex.version'))
     # Since git-annex 7.20181031, v6 repos upgrade to v7.
     supported_versions = AnnexRepo.check_repository_versions()["supported"]
@@ -1753,8 +1747,8 @@ def test_AnnexRepo_add_submodule(source, path):
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
 
-    ok_clean_git(top_repo, annex=True)
-    ok_clean_git(opj(path, 'sub'), annex=False)
+    assert_repo_status(top_repo, annex=True)
+    assert_repo_status(opj(path, 'sub'), annex=False)
 
 
 def test_AnnexRepo_update_submodule():
@@ -1826,9 +1820,6 @@ def test_AnnexRepo_dirty(path):
     ok_(not repo.dirty)
 
 
-# TODO: test/utils ok_clean_git
-
-
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_set_remote_url(path):
 
@@ -1894,7 +1885,7 @@ def test_AnnexRepo_metadata(path):
         })
     ar.add('.', git=False)
     ar.commit('content')
-    ok_clean_git(path)
+    assert_repo_status(path)
     # fugue
     # doesn't do anything if there is nothing to do
     ar.set_metadata('up.dat')
@@ -2024,13 +2015,6 @@ def test_AnnexRepo_is_managed_branch(path):
     if ar.supports_unlocked_pointers:
         ar.adjust()
         ok_(ar.is_managed_branch())
-
-
-@with_tempfile(mkdir=True)
-@with_tempfile()
-def test_AnnexRepo_flyweight_monitoring_inode(path, store):
-    # testing for issue #1512
-    check_repo_deals_with_inode_change(AnnexRepo, path, store)
 
 
 @with_tempfile(mkdir=True)
@@ -2177,7 +2161,7 @@ def check_commit_annex_commit_changed(unlock, path):
 
     ar = AnnexRepo(path, create=True)
     ar.save("initial commit")
-    ok_clean_git(path)
+    assert_repo_status(path)
     # Now let's change all but commit only some
     files = [op.basename(p) for p in glob(op.join(path, '*'))]
     if unlock:
@@ -2195,18 +2179,18 @@ def check_commit_annex_commit_changed(unlock, path):
         }
         , remove_existing=True
     )
-    ok_clean_git(
+    assert_repo_status(
         path
-        , index_modified=files if not unannex else ['tobechanged-git']
+        , modified=files if not unannex else ['tobechanged-git']
         , untracked=['untracked'] if not unannex else
           # all but the one in git now
           ['alwaysbig', 'tobechanged-annex', 'untracked', 'willgetshort']
     )
 
     ar.save("message", paths=['alwaysbig', 'willgetshort'])
-    ok_clean_git(
+    assert_repo_status(
         path
-        , index_modified=['tobechanged-git', 'tobechanged-annex']
+        , modified=['tobechanged-git', 'tobechanged-annex']
         , untracked=['untracked']
     )
     ok_file_under_git(path, 'alwaysbig', annexed=True)
@@ -2216,7 +2200,7 @@ def check_commit_annex_commit_changed(unlock, path):
                       annexed=external_versions['cmd:annex']<'7.20191009')
 
     ar.save("message2", untracked='no') # commit all changed
-    ok_clean_git(
+    assert_repo_status(
         path
         , untracked=['untracked']
     )

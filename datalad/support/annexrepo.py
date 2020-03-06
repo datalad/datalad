@@ -35,8 +35,6 @@ from os.path import (
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
-from git import InvalidGitRepositoryError
-
 from datalad import ssh_manager
 from datalad.consts import ADJUSTED_BRANCH_EXPR
 from datalad.dochelpers import (
@@ -75,7 +73,6 @@ from datalad.cmd import (
 from .repo import RepoInterface
 from .gitrepo import (
     GitRepo,
-    NoSuchPathError,
     _normalize_path,
     normalize_path,
     normalize_paths,
@@ -95,10 +92,12 @@ from .exceptions import (
     BrokenExternalDependency,
     OutdatedExternalDependency,
     MissingExternalDependency,
+    NoSuchPathError,
     IncompleteResultsError,
     AccessDeniedError,
     AccessFailedError,
     InvalidAnnexRepositoryError,
+    InvalidGitRepositoryError,
     DirectModeNoLongerSupportedError
 )
 
@@ -3039,8 +3038,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           Returns a the annex UUID, if there is any, or `None` otherwise.
         """
         if not self._uuid:
-            if not self.repo:
-                return None
             self._uuid = self.config.get('annex.uuid', default=None)
         return self._uuid
 

@@ -28,7 +28,6 @@ from datalad.utils import (
     getpwd,
     on_windows,
     rmtree,
-    unlink,
 )
 from datalad.tests.utils import (
     assert_cwd_unchanged,
@@ -37,7 +36,7 @@ from datalad.tests.utils import (
     assert_in_results,
     assert_not_in,
     assert_raises,
-    assert_re_in,
+    assert_repo_status,
     create_tree,
     eq_,
     get_most_obscure_supported_name,
@@ -46,7 +45,6 @@ from datalad.tests.utils import (
     local_testrepo_flavors,
     neq_,
     ok_,
-    ok_clean_git,
     skip_if,
     skip_if_no_network,
     skip_if_on_windows,
@@ -57,31 +55,24 @@ from datalad.tests.utils import (
     with_testrepos,
     with_tree,
 )
-from datalad.tests.utils_testrepos import BasicAnnexTestRepo
-
-from datalad.dochelpers import exc_str
-
 from datalad.support.sshconnector import get_connection_hash
 
 from datalad.support.gitrepo import (
     _normalize_path,
-    gitpy,
     GitRepo,
-    guard_BadName,
-    InvalidGitRepositoryError,
     normalize_paths,
-    NoSuchPathError,
     to_options,
 )
 from datalad.support.exceptions import (
     CommandError,
     DeprecatedError,
     FileNotInRepositoryError,
+    InvalidGitRepositoryError,
     PathKnownToRepositoryError,
+    NoSuchPathError,
 )
 from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
-from .utils import check_repo_deals_with_inode_change
 
 
 @with_tempfile(mkdir=True)
@@ -100,8 +91,6 @@ def test_GitRepo_instance_from_clone(src, dst):
 
     gr = GitRepo.clone(src, dst)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
-    assert_is_instance(gr.repo, gitpy.Repo,
-                       "Failed to instantiate GitPython Repo object.")
     ok_(op.exists(op.join(dst, '.git')))
 
     # do it again should raise ValueError since git will notice there's
@@ -140,13 +129,13 @@ def test_GitRepo_instance_from_not_existing(path, path2):
     gr = GitRepo(path2, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path2, '.git')))
-    ok_clean_git(path2, annex=False)
+    assert_repo_status(path2, annex=False)
 
     # 4. create=True, path exists, but no git repo:
     gr = GitRepo(path, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path, '.git')))
-    ok_clean_git(path, annex=False)
+    assert_repo_status(path, annex=False)
 
 
 @with_tempfile
@@ -223,7 +212,7 @@ def test_GitRepo_add(src, path):
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
-    ok_clean_git(path)
+    assert_repo_status(path)
 
 
 @assert_cwd_unchanged
@@ -259,7 +248,7 @@ def test_GitRepo_commit(path):
 
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
-    ok_clean_git(gr)
+    assert_repo_status(gr)
     eq_("Testing GitRepo.commit().",
         gr.format_commit("%B").strip())
 
@@ -273,7 +262,7 @@ def test_GitRepo_commit(path):
 
     # commit with empty message:
     gr.commit()
-    ok_clean_git(gr)
+    assert_repo_status(gr)
 
     # nothing to commit doesn't raise by default:
     gr.commit()
@@ -515,7 +504,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit['ref'] for commit in fetched])
 
-    ok_clean_git(clone.path, annex=False)
+    assert_repo_status(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(op.exists(op.join(clone_path, filename)))  # not checked out
@@ -560,7 +549,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     fetched = repo.fetch(remote="ssh-remote")
     assert_in('ssh-remote/master', [commit['ref'] for commit in fetched])
-    ok_clean_git(repo)
+    assert_repo_status(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -599,7 +588,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 
     # pull changes:
     repo.pull(remote="ssh-remote", refspec=remote_repo.get_active_branch())
-    ok_clean_git(repo.path, annex=False)
+    assert_repo_status(repo.path, annex=False)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -970,7 +959,7 @@ def test_submodule_deinit(path):
     # using force should work:
     top_repo.deinit_submodule('subm 1', force=True)
 
-    ok_(not top_repo.repo.submodule('subm 1').module_exists())
+    ok_(not GitRepo.is_valid_repo(str(top_repo.pathobj / 'subm 1')))
 
 
 @with_testrepos(".*basic_git.*", flavors=['local'])
@@ -982,8 +971,8 @@ def test_GitRepo_add_submodule(source, path):
     top_repo.add_submodule('sub', name='sub', url=source)
     top_repo.commit('submodule added')
     eq_([s.name for s in top_repo.get_submodules()], ['sub'])
-    ok_clean_git(path)
-    ok_clean_git(op.join(path, 'sub'))
+    assert_repo_status(path)
+    assert_repo_status(op.join(path, 'sub'))
 
 
 def test_GitRepo_update_submodule():
@@ -1127,7 +1116,7 @@ def test_optimized_cloning(path):
         f.write('some')
     repo.add('test')
     repo.commit('init')
-    ok_clean_git(originpath, annex=False)
+    assert_repo_status(originpath, annex=False)
     from glob import glob
 
     def _get_inodes(repo):
@@ -1155,30 +1144,6 @@ def test_optimized_cloning(path):
         # return the original object in second run
 
 
-@with_tempfile
-@with_tempfile
-def test_GitRepo_gitpy_injection(path, path2):
-    from git import GitCommandError
-
-    gr = GitRepo(path, create=True)
-    gr._GIT_COMMON_OPTIONS.extend(['test-option'])
-
-    with assert_raises(GitCommandError) as cme:
-        gr.repo.git.unknown_git_command()
-    assert_in('test-option', exc_str(cme.exception))
-
-    # once set, these option should be persistent across git calls:
-    with assert_raises(GitCommandError) as cme:
-        gr.repo.git.another_unknown_git_command()
-    assert_in('test-option', exc_str(cme.exception))
-
-    # but other repos should not be affected:
-    gr2 = GitRepo(path2, create=True)
-    with assert_raises(GitCommandError) as cme:
-        gr2.repo.git.unknown_git_command()
-    assert_not_in('test-option', exc_str(cme.exception))
-
-
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_GitRepo_flyweight(path1, path2):
@@ -1199,13 +1164,6 @@ def test_GitRepo_flyweight(path1, path2):
 
     # and realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)
-
-
-@with_tempfile(mkdir=True)
-@with_tempfile()
-def test_GitRepo_flyweight_monitoring_inode(path, store):
-    # testing for issue #1512
-    check_repo_deals_with_inode_change(GitRepo, path, store)
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
@@ -1443,26 +1401,6 @@ def test_fake_dates(path):
     gr.commit("commit baz")
     eq_(gr.get_active_branch(), "other")
     eq_(seconds_initial + 3, gr.get_commit_date())
-
-
-def test_guard_BadName():
-    from gitdb.exc import BadName
-
-    calls = []
-
-    class Vulnerable(object):
-        def precommit(self):
-            calls.append('precommit')
-
-        @guard_BadName
-        def __call__(self, x, y=2):
-            if not calls:
-                calls.append(1)
-                raise BadName
-            return x+y
-    v = Vulnerable()
-    eq_(v(1, y=3), 4)
-    eq_(calls, [1, 'precommit'])
 
 
 @with_tree(tree={"foo": "foo content"})
