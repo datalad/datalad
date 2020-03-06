@@ -198,8 +198,8 @@ class Push(Interface):
             since = _get_corresponding_remote_state(ds_repo, to)
             if not since:
                 lgr.info(
-                    "No tracked remote for active branch,
-                    detection of last pushed state not in effect.")
+                    "No tracked remote for active branch, "
+                    "detection of last pushed state not in effect.")
 
         # obtain a generator for information on the datasets to process
         # idea is to turn the `paths` argument into per-dataset
