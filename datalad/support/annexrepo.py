@@ -1843,19 +1843,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise e
         self.config.reload()
 
-    def merge_annex(self, remote=None):
-        """Merge git-annex branch
-
-        Merely calls `sync` with the appropriate arguments.
-
-        Parameters
-        ----------
-        remote: str, optional
-          Name of a remote to be "merged".
-        """
-        self.sync(
-            remotes=remote, push=False, pull=False, commit=False, content=False,
-            all=False)
+    def merge_annex(self, remote=None):  # do not use anymore, use localsync()
+        self.localsync(remote)
 
     def sync(self, remotes=None, push=True, pull=True, commit=True,
              content=False, all=False, fast=False):

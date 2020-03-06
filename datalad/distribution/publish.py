@@ -313,7 +313,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # each fetch could give evidence that there is an annex
             # somewhere and replace the repo class...
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.merge_annex(r)
+                ds.repo.localsync(r)
     ds.config.reload()
 
     # anything that follows will not change the repo type anymore, cache
@@ -438,7 +438,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
             _maybe_fetch(ds.repo, remote)
-            ds.repo.merge_annex(remote)
+            ds.repo.localsync(remote)
 
         # Note: git's push.default is 'matching', which doesn't work for first
         # time publication (a branch, that doesn't exist on remote yet)
