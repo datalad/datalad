@@ -190,6 +190,14 @@ def test_clone_simple_local(src, path):
         uuid_before = ds.repo.uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
+    # make sure we do not have any adjusted branch configured
+    # for push or as destination
+    for v in ('branch.adjusted/master(unlocked).remote',
+              'branch.adjusted/master(unlocked).merge'):
+        assert_not_in(v, ds.config)
+    eq_(ds.config.get('branch.master.remote'), 'origin')
+    eq_(ds.config.get('branch.master.merge'), 'refs/heads/master')
+
     # installing it again, shouldn't matter:
     res = clone(src, path, result_xfm=None, return_type='list')
     assert_result_values_equal(res, 'source_url', [src])
