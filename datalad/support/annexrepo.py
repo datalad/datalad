@@ -227,7 +227,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # initialize
         self._uuid = None
-        self._annex_common_options = ["-c", "annex.dotfiles=true"]
+        self._annex_common_options = []
 
         if annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git-annex and/or "
@@ -297,6 +297,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
+        self._set_annex_dotfiles(do_init)
+
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
 
@@ -350,6 +352,29 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
             self.config.set('annex.backends', backend, where='local')
+
+    def _set_annex_dotfiles(self, at_init=False):
+        config = self.config
+        try:
+            dotfiles = config.getbool("annex", "dotfiles")
+        except KeyError:
+            if not at_init:
+                # This is happening outside of initialization, so let the user
+                # know that we are making a persistent change to an existing
+                # repository.
+                lgr.warning(
+                    "Setting annex.dotfiles=true in .git/config for %s",
+                    self.path)
+            config.set("annex.dotfiles", "true", where="local")
+        else:
+            if not dotfiles:
+                # The user has explicitly set annex.dotfiles=false in this
+                # repo. Don't override that, but warn about potential issues.
+                lgr.warning(
+                    "%s has annex.dotfiles set to false, "
+                    "which can lead to dotfiles that DataLad adds to the annex "
+                    "switching to regular git files",
+                    self.path)
 
     def __del__(self):
 
