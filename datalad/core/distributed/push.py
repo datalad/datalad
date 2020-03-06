@@ -452,8 +452,8 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
             # determine the actual one and make sure it is sync'ed with the
             # managed one, and push that one instead. following methods can
             # be called unconditionally
+            repo.localsync(managed_only=True)
             active_branch = repo.get_corresponding_branch(active_branch)
-            repo.localsync(target)
         refspecs2push.append(
             # same dance as above
             active_branch
