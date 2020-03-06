@@ -501,69 +501,73 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
 
     # git-annex data move
     #
-    if is_annex_repo:
-        if force == 'no-datatransfer':
-            lgr.debug("Data transfer to '%s' disabled by argument", target)
-        else:
-            yield from _push_data(
-                ds,
-                target,
-                content,
-                force,
-                jobs,
-                res_kwargs.copy(),
-            )
-            # after file transfer the remote might have different commits to
-            # the annex branch. They have to be merged locally, otherwise a
-            # push of it further down will fail
-            try:
-                # fetch remote, let annex sync them locally, so that the push
-                # later on works.
-                # We have to fetch via the push url (if there is any),
-                # not a pull url.
-                # The latter might be dumb and without the execution of a
-                # post-update hook we might not be able to retrieve the
-                # server-side git-annex branch updates (and git-annex does
-                # not trigger the hook on copy), but we know we have
-                # full access via the push url -- we have just used it to copy.
-                fetch_cmd = ['fetch', target, 'git-annex']
-                pushurl = repo.config.get(
-                    'remote.{}.pushurl'.format(target), None)
-                if pushurl:
-                    # for some reason overwriting remote.{target}.url
-                    # does not have any effect...
-                    fetch_cmd = [
-                        '-c',
-                        'url.{}.insteadof={}'.format(
-                            pushurl,
-                            repo.config.get(
-                                'remote.{}.url'.format(target), None)
-                        )
-                    ] + fetch_cmd
-                    lgr.debug(
-                        "Sync local annex branch from pushurl after remote "
-                        'availability update.')
-                repo.call_git(fetch_cmd)
-                repo.localsync(target)
-            except CommandError as e:
-                # it is OK if the remote doesn't have a git-annex branch yet
-                # (e.g. fresh repo)
-                # TODO is this possible? we just copied? Maybe check if anything
-                # was actually copied?
-                if "fatal: couldn't find remote ref git-annex" not in e.stderr:
-                    raise
-                lgr.debug('Remote does not have a git-annex branch: %s', e)
-            # and push the annex branch to announce local availability info
-            # too
-            yield from _push_refspecs(
-                repo,
-                target,
-                ['git-annex'
-                 if ds.config.get('branch.git-annex.merge', None)
-                 else 'git-annex:git-annex'],
-                force,
-                res_kwargs.copy(),
-            )
+    if not is_annex_repo:
+        return
+
+    if force == 'no-datatransfer':
+        lgr.debug("Data transfer to '%s' disabled by argument", target)
+        return
+
+    yield from _push_data(
+        ds,
+        target,
+        content,
+        force,
+        jobs,
+        res_kwargs.copy(),
+    )
+    # after file transfer the remote might have different commits to
+    # the annex branch. They have to be merged locally, otherwise a
+    # push of it further down will fail
+    try:
+        # fetch remote, let annex sync them locally, so that the push
+        # later on works.
+        # We have to fetch via the push url (if there is any),
+        # not a pull url.
+        # The latter might be dumb and without the execution of a
+        # post-update hook we might not be able to retrieve the
+        # server-side git-annex branch updates (and git-annex does
+        # not trigger the hook on copy), but we know we have
+        # full access via the push url -- we have just used it to copy.
+        lgr.debug("Fetch 'git-annex' branch updates from '%s'", target)
+        fetch_cmd = ['fetch', target, 'git-annex']
+        pushurl = repo.config.get(
+            'remote.{}.pushurl'.format(target), None)
+        if pushurl:
+            # for some reason overwriting remote.{target}.url
+            # does not have any effect...
+            fetch_cmd = [
+                '-c',
+                'url.{}.insteadof={}'.format(
+                    pushurl,
+                    repo.config.get(
+                        'remote.{}.url'.format(target), None)
+                )
+            ] + fetch_cmd
+            lgr.debug(
+                "Sync local annex branch from pushurl after remote "
+                'availability update.')
+        repo.call_git(fetch_cmd)
+        repo.localsync(target)
+    except CommandError as e:
+        # it is OK if the remote doesn't have a git-annex branch yet
+        # (e.g. fresh repo)
+        # TODO is this possible? we just copied? Maybe check if anything
+        # was actually copied?
+        if "fatal: couldn't find remote ref git-annex" not in e.stderr:
+            raise
+        lgr.debug('Remote does not have a git-annex branch: %s', e)
+    # and push the annex branch to announce local availability info
+    # too
+    yield from _push_refspecs(
+        repo,
+        target,
+        ['git-annex'
+         if ds.config.get('branch.git-annex.merge', None)
+         else 'git-annex:git-annex'],
+        force,
+        res_kwargs.copy(),
+    )
 
 
 def _push_refspecs(repo, target, refspecs, force, res_kwargs):
