@@ -1842,19 +1842,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise e
         self.config.reload()
 
-    def merge_annex(self, remote=None):
-        """Merge git-annex branch
-
-        Merely calls `sync` with the appropriate arguments.
-
-        Parameters
-        ----------
-        remote: str, optional
-          Name of a remote to be "merged".
-        """
-        self.sync(
-            remotes=remote, push=False, pull=False, commit=False, content=False,
-            all=False)
+    def merge_annex(self, remote=None):  # do not use anymore, use localsync()
+        self.localsync(remote)
 
     def sync(self, remotes=None, push=True, pull=True, commit=True,
              content=False, all=False, fast=False):
@@ -3473,24 +3462,63 @@ class AnnexRepo(GitRepo, RepoInterface):
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
             message, status, partial_commit)
-        # check if we have to deal with adjusted branch
+        # then sync potential managed branches
+        self.localsync(managed_only=True)
+
+    def localsync(self, remote=None, managed_only=False):
+        """Consolidate the local git-annex branch and/or managed branches.
+
+        This method calls `git annex sync` to perform purely local operations
+        that:
+
+        1. Update the corresponding branch of any managed branch.
+
+        2. Synchronize the local 'git-annex' branch with respect to particular
+           or all remotes (as currently reflected in the local state of their
+           remote 'git-annex' branches).
+
+        If a repository has git-annex's 'synced/...' branches these will be
+        updated.  Otherwise, such branches that are created by `git annex sync`
+        are removed again after the sync is complete.
+
+        Parameters
+        ----------
+        remote : str or list, optional
+          If given, specifies the name of one or more remotes to sync against.
+          If not given, all remotes are considered.
+        managed_only : bool, optional
+          Only perform a sync if a managed branch with a corresponding branch
+          is detected. By default, a sync is always performed.
+        """
         branch = self.get_active_branch()
-        adjusted_match = ADJUSTED_BRANCH_EXPR.match(branch if branch else '')
-        if adjusted_match:
-            orig_branch = adjusted_match.group('name')
-            synced_branch = 'synced/{}'.format(orig_branch)
-            had_synced_branch = synced_branch in self.get_branches()
-            lgr.debug(
-                "Git-annex adjusted branch detected, sync'ing %s",
-                orig_branch)
+        corresponding_branch = self.get_corresponding_branch(branch)
+
+        have_corresponding_branch = branch != corresponding_branch
+
+        if managed_only and not have_corresponding_branch:
+            lgr.debug('No sync necessary, no corresponding branch detected')
+            return
+
+        lgr.debug(
+            "Sync local 'git-annex' branch%s%s%s.",
+            ", and corresponding '" if have_corresponding_branch else '',
+            corresponding_branch if have_corresponding_branch else '',
+            "' branch")
+
+        synced_branch = 'synced/{}'.format(branch)
+        had_synced_branch = synced_branch in self.get_branches()
+        cmd = ['annex', 'sync']
+        if remote:
+            cmd.extend(assure_list(remote))
+        cmd.extend([
+            # disable any external interaction and other magic
+            '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge'])
+        self.call_git(cmd)
+        # cleanup sync'ed branch if we caused it
+        if had_synced_branch:
             self.call_git(
-                ['annex', 'sync', '--no-commit', '--no-push', '--no-pull'],
+                ['branch', '-d', 'synced/{}'.format(branch)],
             )
-            # cleanup sync'ed branch if we caused it
-            if not had_synced_branch:
-                self.call_git(
-                    ['branch', '-d', 'synced/{}'.format(orig_branch)],
-                )
 
 
 class AnnexJsonProtocol(WitlessProtocol):

@@ -1680,7 +1680,7 @@ def test_get_description(path1, path2):
     # add a little probe file to make sure it stays untracked
     create_tree(path1, {'probe': 'probe'})
     assert_not_in('probe', annex2.get_indexed_files())
-    annex2.merge_annex('annex1')
+    annex2.localsync('annex1')
     assert_not_in('probe', annex2.get_indexed_files())
     # but let's remove the remote
     annex2.remove_remote('annex1')
