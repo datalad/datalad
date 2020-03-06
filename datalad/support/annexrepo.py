@@ -3500,10 +3500,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             return
 
         lgr.debug(
-            "Sync local 'git-annex' branch%s%s%s.",
-            ", and corresponding '" if have_corresponding_branch else '',
-            corresponding_branch if have_corresponding_branch else '',
-            "' branch")
+            "Sync local 'git-annex' branch%s.",
+            ", and corresponding '{}' branch".format(corresponding_branch)
+            if have_corresponding_branch else '')
 
         synced_branch = 'synced/{}'.format(branch)
         had_synced_branch = synced_branch in self.get_branches()
