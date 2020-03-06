@@ -116,6 +116,7 @@ class BasicAnnexTestRepo(TestRepo):
         self.repo.add_url_to_file("test-annex.dat", fileurl)
         self.repo.commit("Adding a rudimentary git-annex load file")
         self.repo.drop("test-annex.dat")  # since available from URL
+        self.repo.localsync()
 
     def create_info_file(self):
         annex_version = external_versions['cmd:annex']
