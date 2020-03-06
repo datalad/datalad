@@ -219,11 +219,6 @@ def test_uninstall_subdataset(src, dst):
 
     for subds in ds.subdatasets(result_xfm='datasets'):
         # uninstall subds itself:
-        if os.environ.get('DATALAD_TESTS_DATALADREMOTE') \
-                and external_versions['git'] < '2.0.9':
-            raise SkipTest(
-                "Known problem with GitPython. See "
-                "https://github.com/gitpython-developers/GitPython/pull/521")
         # simulate a cmdline invocation pointing to the subdataset
         # with a relative path from outside the superdataset to catch
         # https://github.com/datalad/datalad/issues/4001
