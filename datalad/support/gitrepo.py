@@ -1125,6 +1125,48 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # get ourselves a repository instance
         gr = cls(path, *args, **kwargs)
+
+        # figure out, if this is an adjusted branch.
+        # this does anticipate that there could be no branch at all (detached head)
+        # NOTE: we cannot use get_corresponding_branch(), because right after clone
+        # this is always a GitRepo instance, and it would always return None
+        act_branch = gr.get_active_branch()
+        adjusted = ADJUSTED_BRANCH_EXPR.match(act_branch) if act_branch else None
+        if adjusted:
+            # it looks like we have cloned from an annex repo in adjusted
+            # mode. Switch back to the corresponding branch, even if a later
+            # git-annex init would undo this switch. This gives us a sane
+            # and uniform starting point regardless of the clone source
+            # (bare repo, normal mode repo, adjusted mode repo).
+            corr_branch = adjusted.group(1)
+            # test whether just switching to the corresponding branch could
+            # have negative side effects (test for a diff, which wouldn't
+            # exist if the remote was 'datalad save'ed
+            remote_corr_branch = 'origin/{}'.format(corr_branch)
+            if any(
+                v.get('state', None) != 'clean'
+                for v in gr.diffstatus(
+                    'HEAD',
+                    remote_corr_branch,
+                    paths=None,
+                    untracked='no',
+                    eval_submodule_state='no',
+                    eval_file_type=False).values()):
+                # remove warning when AnnexRepo initialization can detect and
+                # rectify this case
+                lgr.warning(
+                    'Clone from repository in adjusted mode with outdated '
+                    'corresponding branch, checkout may not have the latest '
+                    'state')
+            # check out the corresponding branch
+            gr.call_git([
+                'checkout',
+                '-t',
+                remote_corr_branch])
+            # remove local adjusted branch, can be unconditional, without a previously
+            # active branch we would not have gotten here
+            gr.call_git(['branch', '-d', act_branch])
+
         if fix_annex:
             # cheap check whether we deal with an AnnexRepo - we can't check the class of `gr` itself, since we then
             # would need to import our own subclass
