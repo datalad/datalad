@@ -65,56 +65,65 @@ lgr = logging.getLogger('datalad.distributed.create_sibling_ria')
 class CreateSiblingRia(Interface):
     """Creates a sibling to a dataset in a RIA store
 
-    This creates a representation of a dataset in a ria-remote compliant
-    storage location. For access to it two siblings are configured for the
-    dataset by default. A "regular" one and a RIA remote (git-annex
-    special remote). Furthermore, the former is configured to have a
-    publication dependency on the latter. If not given a default name for
-    the RIA remote is derived from the sibling's name by appending "-ria".
+    Communication with a dataset in a RIA store is implemented via two
+    siblings. A regular Git remote (repository siblings) and a git-annex
+    special remote for data transfer (storage sibling) -- with the former
+    having a publication dependency on the latter. By default, the name of the
+    storage sibling is derived from the repository sibling's name by appending
+    "-storage".
 
-    The store's base path currently is expected to either:
+    The store's base path is expected to not exist, be an empty directory,
+    or a valid RIA store.
 
-      - not yet exist or
-      - be empty or
-      - have a valid "ria-layout-version" file and an "error_logs" directory.
+    RIA store layout
+    ----------------
 
-    In the first two cases, said file and directory are created by this
-    command. Alternatively you can manually create the third case, of course.
-    Please note, that "ria-layout-version" needs to contain a line stating the
-    version (currently "1") and optionally enable error logging (append a pipe
-    symbol and an "l"  in that case). Currently, this line MUST end with a newline!
+    A RIA store is a directory tree with a dedicated subdirectory for each
+    dataset in the store. The subdirectory name is constructed from the
+    DataLad dataset ID, e.g. '124/68afe-59ec-11ea-93d7-f0d5bf7b5561', where
+    the first three characters of the ID are used for an intermediate
+    subdirectory in order to mitigate files system limitations for stores
+    containing a large number of datasets.
 
-    Error logging will create files in the "error_log" directory whenever the
-    RIA special remote (storage sibling) raises an exception, storing the
-    python traceback of it. The logfiles are named according to the scheme
-    <dataset id>.<annex uuid of the remote>.log showing 'who' ran into this
-    issue with what dataset. Since this logging can potentially leak personal
-    data (like local file paths for example) it can be disabled from the client
-    side via "annex.ria-remote.<RIAREMOTE>.ignore-remote-config".
+    Each dataset subdirectory contains a standard bare Git repository for
+    the dataset.
 
-    Todo
-    ----
-    Where to put the description of a RIA store (see below)?
+    In addition, a subdirectory 'annex' hold a standard Git-annex object
+    store. However, instead of using the 'dirhashlower' naming scheme for
+    the object directories, like Git-annex would do, a 'dirhashmixed'
+    layout is used -- the same as for non-bare Git repositories or regular
+    DataLad datasets.
 
-    The targeted layout of such a store is a tree of directories containing
-    datasets at the lowest level, starting at the configured base path.
-    First level of subdirectories are named for the first three characters of
-    the datasets' id, second level is the remainder of those ids.
-    The thereby created dataset directories contain a bare git repository.
-    Those bare repositories are slightly different from plain git-annex bare
-    repositories in that they use the standard dirhashmixed layout beneath
-    annex/objects as opposed to dirhashlower, which is git-annex's default for
-    bare repositories. Furthermore, there is an additional directory 'archives'
-    within the dataset directories, which may or may not contain archives with
-    annexed content.
-    Note, that this helps to reduce the number of inodes consumed (no checkout
-    + potential archive) as well as it allows to resolve dependencies (that is
-    (sub)datasets) merely by their id.  Finally, there is a file
-    "ria-layout-version" put beneath the store's base path, determining the
-    version of the dataset tree layout and a file of the same name per each
-    dataset directory determining object tree layout version (we already switch
-    from dirhashlower to dirhashmixed for example) and an additional directory
-    "error_logs" at the toplevel."""
+    Optionally, there can be a further subdirectory 'archives' with
+    (compressed) 7z archives of annex objects. The storage remote is able to
+    pull annex objects from these archives, if it cannot find in the regular
+    annex object store. This feature can be useful for storing large
+    collections of rarely changing data on systems that limit the number of
+    files that can be stored.
+
+    Each dataset directory also contains a 'ria-layout-version' file that
+    identifies the data organization (as, for example, described above).
+
+    Lastly, there is a global 'ria-layout-version' file at the store's
+    base path that identifies where dataset subdirectories themselves are
+    located. At present, this file must contain a single line stating the
+    version (currently "1"). This line MUST end with a newline character.
+
+    Error logging
+    -------------
+
+    To enable error logging at the remote end, append a pipe symbol and an "l"
+    to the version number in ria-layout-version (like so '1|l\n').
+
+    Error logging will create files in an "error_log" directory whenever the
+    git-annex special remote (storage sibling) raises an exception, storing the
+    Python traceback of it. The logfiles are named according to the scheme
+    '<dataset id>.<annex uuid of the remote>.log' showing "who" ran into this
+    issue with which dataset. Because logging can potentially leak personal
+    data (like local file paths for example), it can be disabled client-side
+    by setting the configuration variable
+    "annex.ria-remote.<storage-sibling-name>.ignore-remote-config".
+    """
 
     # TODO: description?
     _params_ = dict(
@@ -138,12 +147,12 @@ class CreateSiblingRia(Interface):
             the subdatasets' siblings.""",
             constraints=EnsureStr() | EnsureNone(),
             required=True),
-        ria_remote_name=Parameter(
-            args=("--ria-remote-name",),
+        storage_name=Parameter(
+            args=("--storage-name",),
             metavar="NAME",
-            doc="""Name of the RIA remote (a git-annex special remote).
+            doc="""Name of the storage sibling (git-annex special remote).
             Must not be identical to the sibling name. If not specified,
-            defaults to the sibling name plus a '-ria' suffix.""",
+            defaults to the sibling name plus '-storage' suffix.""",
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
@@ -164,22 +173,17 @@ class CreateSiblingRia(Interface):
             doc="""Filesystem group for the repository. Specifying the group is
             crucial when [CMD: --shared=group CMD][PY: shared="group" PY]""",
             constraints=EnsureStr() | EnsureNone()),
-        ria_remote=Parameter(
-            args=("--no-ria-remote",),
-            dest='ria_remote',
-            doc="""Flag to disable establishing remote indexed archive (RIA)
-            capabilities for the created sibling. If enabled, git-annex special
-            remote access will be configured to enable regular git-annex key
-            storage, and also retrieval of keys from (compressed) 7z archives
-            that might be provided by the dataset store. If disabled, git-annex
-            is instructed to ignore the sibling.""",
+        storage_sibling=Parameter(
+            args=("--no-storage-sibling",),
+            dest='storage_sibling',
+            doc="""Flag to disable establishing a storage sibling.""",
             action="store_false"),
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice(
                 'skip', 'error', 'reconfigure') | EnsureNone(),
             metavar='MODE',
-            doc="""Action to perform, if a sibling or ria-remote is already
+            doc="""Action to perform, if a (storage) sibling is already
             configured under the given name and/or a target already exists.
             In this case, a dataset can be skipped ('skip'), an existing target
             repository be forcefully re-initialized, and the sibling
@@ -192,10 +196,8 @@ class CreateSiblingRia(Interface):
             metavar="TRUST-LEVEL",
             constraints=EnsureChoice(
                 'trust', 'semitrust', 'untrust') | EnsureNone(),
-            doc="""specify a trust level for the RIA sibling. Internally this
-            will call the respective git-annex command. If not specified
-            nothing will be explicitly done, thereby defaulting to git-annex'
-            default.""",),
+            doc="""specify a trust level for the storage sibling. If not
+            specified, the default git-annex trust level is used.""",),
     )
 
     @staticmethod
@@ -204,11 +206,11 @@ class CreateSiblingRia(Interface):
     def __call__(url,
                  name,
                  dataset=None,
-                 ria_remote_name=None,
+                 storage_name=None,
                  post_update_hook=False,
                  shared=None,
                  group=None,
-                 ria_remote=True,
+                 storage_sibling=True,
                  existing='error',
                  trust_level=None,
                  recursive=False,
@@ -228,15 +230,16 @@ class CreateSiblingRia(Interface):
                 "Repository at {} is not a DataLad dataset, "
                 "run 'datalad create [--force]' first.".format(ds.path))
 
-        if not ria_remote and ria_remote_name:
+        if not storage_sibling and storage_name:
             lgr.warning(
-                "RIA remote setup disabled, but a ria-remote name was provided"
+                "Storage sibling setup disabled, but a storage sibling name "
+                "was provided"
             )
 
-        if ria_remote and not ria_remote_name:
-            ria_remote_name = "{}-ria".format(name)
+        if storage_sibling and not storage_name:
+            storage_name = "{}-storage".format(name)
 
-        if ria_remote and name == ria_remote_name:
+        if storage_sibling and name == storage_name:
             # leads to unresolvable, circular dependency with publish-depends
             raise ValueError("sibling names must not be equal")
 
@@ -289,11 +292,11 @@ class CreateSiblingRia(Interface):
                     failed = True
                     yield res
                     continue
-                if ria_remote_name and r['name'] == ria_remote_name:
+                if storage_name and r['name'] == storage_name:
                     res = get_status_dict(
                         status='error',
                         message="a sibling '{}' is already configured in "
-                        "dataset {}".format(ria_remote_name, r['path']),
+                        "dataset {}".format(storage_name, r['path']),
                         **res_kwargs,
                     )
                     failed = True
@@ -310,8 +313,8 @@ class CreateSiblingRia(Interface):
             ds,
             url,
             name,
-            ria_remote,
-            ria_remote_name,
+            storage_sibling,
+            storage_name,
             existing,
             shared,
             group,
@@ -332,8 +335,8 @@ class CreateSiblingRia(Interface):
                     subds,
                     url,
                     name,
-                    ria_remote,
-                    ria_remote_name,
+                    storage_sibling,
+                    storage_name,
                     existing,
                     shared,
                     group,
@@ -346,8 +349,8 @@ def _create_sibling_ria(
         ds,
         url,
         name,
-        ria_remote,
-        ria_remote_name,
+        storage_sibling,
+        storage_name,
         existing,
         shared,
         group,
@@ -382,7 +385,7 @@ def _create_sibling_ria(
     # Figure whether we are supposed to skip this very dataset
     if existing == 'skip' and (
             name in ds_siblings or (
-                ria_remote_name and ria_remote_name in ds_siblings)):
+                storage_name and storage_name in ds_siblings)):
         yield get_status_dict(
             status='notneeded',
             message="Skipped on existing sibling",
@@ -438,21 +441,22 @@ def _create_sibling_ria(
                 return
 
     lgr.info("create sibling{} '{}'{} ...".format(
-        's' if ria_remote_name else '',
+        's' if storage_name else '',
         name,
-        " and '{}'".format(ria_remote_name) if ria_remote_name else '',
+        " and '{}'".format(storage_name) if storage_name else '',
     ))
-    if ria_remote:
-        lgr.debug('init special remote {}'.format(ria_remote_name))
-        ria_remote_options = ['type=external',
-                              'externaltype=ria',
-                              'encryption=none',
-                              'autoenable=true',
-                              'url={}'.format(url)]
+    if storage_sibling:
+        lgr.debug('init special remote {}'.format(storage_name))
+        special_remote_options = [
+            'type=external',
+            'externaltype=ria',
+            'encryption=none',
+            'autoenable=true',
+            'url={}'.format(url)]
         try:
             ds.repo.init_remote(
-                ria_remote_name,
-                options=ria_remote_options)
+                storage_name,
+                options=special_remote_options)
         except CommandError as e:
             if existing == 'reconfigure' \
                     and 'git-annex: There is already a special remote' \
@@ -461,14 +465,14 @@ def _create_sibling_ria(
                 lgr.debug(
                     "special remote '%s' already exists. "
                     "Run enableremote instead.",
-                    ria_remote_name)
+                    storage_name)
                 # TODO: Use AnnexRepo.enable_remote (which needs to get
                 #       `options` first)
                 cmd = [
                     'git',
                     'annex',
                     'enableremote',
-                    ria_remote_name] + ria_remote_options
+                    storage_name] + special_remote_options
                 subprocess.run(cmd, cwd=quote_cmdlinearg(ds.repo.path))
             else:
                 yield get_status_dict(
@@ -496,12 +500,12 @@ def _create_sibling_ria(
         #         instantiate a RIARemote object
         lgr.debug("initializing object store")
         ds.repo.fsck(
-            remote=ria_remote_name,
+            remote=storage_name,
             fast=True,
             annex_options=['--exclude=*/*'])
 
         if trust_level:
-            ds.repo.call_git(['annex', trust_level, ria_remote_name])
+            ds.repo.call_git(['annex', trust_level, storage_name])
 
     else:
         # with no special remote we currently need to create the
@@ -574,8 +578,8 @@ def _create_sibling_ria(
         if ssh_host
         else str(repo_path),
         recursive=False,
-        # Note, that this should be None if ria_remote was not set
-        publish_depends=ria_remote_name,
+        # Note, that this should be None if storage_sibling was not set
+        publish_depends=storage_name,
         result_renderer=None,
         # Note, that otherwise a subsequent publish will report
         # "notneeded".
