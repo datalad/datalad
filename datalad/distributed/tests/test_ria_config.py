@@ -1,14 +1,20 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
 from datalad.api import (
     create,
 )
-import shutil
 import subprocess
 from datalad.tests.utils import (
     assert_in,
     assert_raises,
-    assert_status,
     skip_if_on_windows,
-    skip_ssh,
     with_tempfile,
 )
 from datalad.support.exceptions import CommandError

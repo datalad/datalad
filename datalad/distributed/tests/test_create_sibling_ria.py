@@ -1,3 +1,12 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
 import os.path as op
 
 from datalad import cfg
@@ -6,13 +15,13 @@ from datalad.api import (
     Dataset
 )
 from datalad.tests.utils import (
+    attr,
     assert_in,
     assert_raises,
     assert_repo_status,
     assert_result_count,
     chpwd,
     eq_,
-    skip_if_no_module,
     skip_if_on_windows,
     skip_ssh,
     with_tempfile,
@@ -20,7 +29,6 @@ from datalad.tests.utils import (
 )
 from datalad.utils import Path
 from functools import wraps
-from nose.plugins.attrib import attr
 
 
 def with_store_insteadof(func):

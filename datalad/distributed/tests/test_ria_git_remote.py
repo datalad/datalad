@@ -1,4 +1,12 @@
-from pathlib import Path
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
 import os.path as op
 import subprocess
 from datalad.interface.results import annexjson2result
@@ -20,6 +28,7 @@ from datalad.distributed.tests.ria_utils import (
     populate_dataset,
     skip_non_ssh
 )
+from datalad.utils import Path
 
 
 @skip_if_on_windows

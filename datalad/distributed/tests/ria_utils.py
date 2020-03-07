@@ -1,17 +1,25 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
 import os
 import inspect
 from glob import glob
 from functools import wraps
-from six import iteritems
 
 
 from datalad.utils import Path
 from datalad.tests.utils import (
+    attr,
     create_tree,
+    SkipTest,
 )
 
-from nose import SkipTest
-from nose.plugins.attrib import attr
 
 example_payload = {
     'one.txt': 'content1',
@@ -32,7 +40,7 @@ def get_all_files(path):
 def initremote(repo, name, encryption=None, config=None):
     cfg = dict(config) if config else {}
     cfg['encryption'] = encryption if encryption else 'none'
-    args = ['{}={}'.format(k, v) for k, v in iteritems(cfg)]
+    args = ['{}={}'.format(k, v) for k, v in cfg.items()]
     repo.init_remote(name, args)
 
 

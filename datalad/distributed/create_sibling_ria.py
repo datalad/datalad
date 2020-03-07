@@ -41,7 +41,6 @@ from datalad.distribution.dataset import (
 from datalad.utils import (
     Path,
     quote_cmdlinearg,
-    rmtree,
 )
 from datalad.support.exceptions import (
     CommandError
