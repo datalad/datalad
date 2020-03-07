@@ -301,6 +301,11 @@ class Siblings(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+        # should we attempt to remove an unknown sibling, complain like Git does
+        if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
+            ui.message(
+                'Warning: No sibling "{name}" in dataset {path}'.format(**res))
+            return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
             # logging complained about this already
             return
