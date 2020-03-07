@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
-from hashlib import md5
+import shutil
 import subprocess
 from argparse import REMAINDER
 
@@ -154,6 +154,7 @@ class RIAExportArchive(Interface):
             unit=' Keys',
         )
 
+        link_fx = os.link
         for keypath in keypaths:
             key = keypath.name
             hashdir = op.join(keypath.parts[-4], keypath.parts[-3])
@@ -165,7 +166,16 @@ class RIAExportArchive(Interface):
                 increment=True)
             keydir = exportdir / hashdir / key
             keydir.mkdir(parents=True, exist_ok=True)
-            os.link(str(keypath), str(keydir / key))
+            try:
+                link_fx(str(keypath), str(keydir / key))
+            except OSError:
+                lgr.warning(
+                    'No hard links supported at %s, will copy files instead',
+                    str(keydir))
+                # no hard links supported
+                # switch function after first error
+                link_fx = shutil.copyfile
+                link_fx(str(keypath), str(keydir / key))
 
         log_progress(
             lgr.info,
