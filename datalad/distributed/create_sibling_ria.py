@@ -66,7 +66,7 @@ class CreateSiblingRia(Interface):
     """Creates a sibling to a dataset in a RIA store
 
     Communication with a dataset in a RIA store is implemented via two
-    siblings. A regular Git remote (repository siblings) and a git-annex
+    siblings. A regular Git remote (repository sibling) and a git-annex
     special remote for data transfer (storage sibling) -- with the former
     having a publication dependency on the latter. By default, the name of the
     storage sibling is derived from the repository sibling's name by appending
