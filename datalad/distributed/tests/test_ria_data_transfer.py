@@ -24,8 +24,7 @@ def test_binary_data_local(dspath, store):
     # accidentally involve any decode/encode etc.
 
     url = "https://github.com/psychoinformatics-de/studyforrest-data-phase2"
-    file = Path("sub-01/ses-movie/func/sub-01_ses-movie_task-movie_run-1_bold"
-                ".nii.gz")
+    file = Path("code/stimulus/visualarea_localizer/img/body01.png")
 
     ds = clone(url, dspath)
     ds.get(file)
@@ -47,8 +46,7 @@ def test_binary_data_ssh(dspath, store):
     # accidentally involve any decode/encode etc.
 
     url = "https://github.com/psychoinformatics-de/studyforrest-data-phase2"
-    file = Path("sub-01/ses-movie/func/sub-01_ses-movie_task-movie_run-1_bold"
-                ".nii.gz")
+    file = Path("code/stimulus/visualarea_localizer/img/body01.png")
 
     ds = clone(url, dspath)
     ds.get(str(file))
