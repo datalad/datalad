@@ -585,6 +585,10 @@ class RIARemote(SpecialRemote):
     def _verify_config(self, gitdir, fail_noid=True):
         # try loading all needed info from (git) config
         name = self.annex.getconfig('name')
+        if not name:
+            raise RIARemoteError(
+                "Cannot determine special remote name, got: {}".format(
+                    repr(name)))
         # get store url:
         self.ria_store_url = self.annex.getconfig('url')
         if self.ria_store_url:
