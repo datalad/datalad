@@ -76,7 +76,7 @@ class CreateSiblingRia(Interface):
     or a valid RIA store.
 
     RIA store layout
-    ----------------
+    ~~~~~~~~~~~~~~~~
 
     A RIA store is a directory tree with a dedicated subdirectory for each
     dataset in the store. The subdirectory name is constructed from the
@@ -110,10 +110,10 @@ class CreateSiblingRia(Interface):
     version (currently "1"). This line MUST end with a newline character.
 
     Error logging
-    -------------
+    ~~~~~~~~~~~~~
 
     To enable error logging at the remote end, append a pipe symbol and an "l"
-    to the version number in ria-layout-version (like so '1|l\n').
+    to the version number in ria-layout-version (like so '1|l\\n').
 
     Error logging will create files in an "error_log" directory whenever the
     git-annex special remote (storage sibling) raises an exception, storing the
