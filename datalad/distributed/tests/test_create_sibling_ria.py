@@ -56,7 +56,7 @@ def test_invalid_calls(path):
 
     # same name for git- and special remote:
     assert_raises(ValueError, ds.create_sibling_ria, 'ria+file:///some/where',
-                  name='some', ria_remote_name='some')
+                  name='some', storage_name='some')
 
 
 @skip_if_on_windows  # running into short path issues; same as gh-4131
@@ -74,14 +74,15 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     ds.save(recursive=True)
     assert_repo_status(ds.path)
 
-    # don't specify special remote. By default should be git-remote + "-ria"
+    # don't specify special remote. By default should be git-remote + "-storage"
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore")
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
     # remotes exist, but only in super
     siblings = ds.siblings(result_renderer=None)
-    eq_({'datastore', 'datastore-ria', 'here'}, {s['name'] for s in siblings})
+    eq_({'datastore', 'datastore-storage', 'here'},
+        {s['name'] for s in siblings})
     sub_siblings = subds.siblings(result_renderer=None)
     eq_({'here'}, {s['name'] for s in sub_siblings})
 
@@ -119,9 +120,10 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 
     # remotes now exist in super and sub
     siblings = ds.siblings(result_renderer=None)
-    eq_({'datastore', 'datastore-ria', 'here'}, {s['name'] for s in siblings})
+    eq_({'datastore', 'datastore-storage', 'here'},
+        {s['name'] for s in siblings})
     sub_siblings = subds.siblings(result_renderer=None)
-    eq_({'datastore', 'datastore-ria', 'here'},
+    eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in sub_siblings})
 
     # for testing trust_level parameter, redo for each label:
@@ -131,7 +133,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
                               existing='reconfigure',
                               trust_level=trust)
         res = ds.repo.repo_info()
-        assert_in('[datastore-ria]',
+        assert_in('[datastore-storage]',
                   [r['description']
                    for r in res['{}ed repositories'.format(trust)]])
 
