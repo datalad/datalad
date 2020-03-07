@@ -10,7 +10,7 @@ from datalad.tests.utils import (
     with_tempfile,
 )
 
-from datalad.customremotes.tests.ria_utils import (
+from datalad.distributed.tests.ria_utils import (
     skip_non_ssh,
 )
 
@@ -35,7 +35,7 @@ def test_binary_data_local(dspath, store):
 
     ds.publish(to="datastore", transfer_data="all")
     ds.drop(file)
-    ds.get(file, source="datastore-ria")
+    ds.get(file, source="datastore-storage")
 
 
 @skip_ssh
@@ -59,4 +59,4 @@ def test_binary_data_ssh(dspath, store):
 
     ds.publish(to="datastore", transfer_data="all")
     ds.drop(str(file))
-    ds.get(file, source="datastore-ria")
+    ds.get(file, source="datastore-storage")

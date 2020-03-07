@@ -74,7 +74,7 @@ _group_misc = (
         ('datalad.core.local.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
         ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
-        ('datalad.customremotes.ria_export_archive', 'RIAExportArchive',
+        ('datalad.distributed.ria_export_archive', 'RIAExportArchive',
          'ria-export-archive')
     ])
 

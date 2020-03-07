@@ -9,7 +9,7 @@ from datalad.tests.utils import (
     skip_ssh,
     turtle
 )
-from datalad.customremotes.tests.ria_utils import (
+from datalad.distributed.tests.ria_utils import (
     initexternalremote,
     skip_non_ssh,
 )

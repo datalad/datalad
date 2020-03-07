@@ -15,7 +15,7 @@ from datalad.tests.utils import (
     SkipTest,
     with_tempfile,
 )
-from datalad.customremotes.tests.ria_utils import (
+from datalad.distributed.tests.ria_utils import (
     initexternalremote,
     populate_dataset,
     skip_non_ssh

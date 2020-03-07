@@ -13,7 +13,7 @@ from datalad.tests.utils import (
 )
 from datalad.support.exceptions import CommandError
 
-from datalad.customremotes.tests.ria_utils import (
+from datalad.distributed.tests.ria_utils import (
     get_all_files,
     initexternalremote,
     populate_dataset,

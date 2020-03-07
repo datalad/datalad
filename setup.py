@@ -130,7 +130,7 @@ setup_kwargs = setup_entry_points(
         'datalad': 'datalad.cmdline.main',
         'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
-        'git-annex-remote-ora': 'datalad.customremotes.ria_remote',
+        'git-annex-remote-ora': 'datalad.distributed.ora_remote',
     })
 
 # normal entrypoints for the rest
