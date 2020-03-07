@@ -279,7 +279,9 @@ class SSHRemoteIO(IOBase):
     def _append_end_markers(self, cmd):
         """Append end markers to remote command"""
 
-        return cmd + ' && echo "{}" || echo "{}"\n'.format(self.REMOTE_CMD_OK, self.REMOTE_CMD_FAIL)
+        return cmd + " && printf '%s\\n' {} || printf '%s\\n' {}\n".format(
+            sh_quote(self.REMOTE_CMD_OK),
+            sh_quote(self.REMOTE_CMD_FAIL))
 
     def _get_download_size_from_key(self, key):
         """Get the size of an annex object file from it's key
@@ -379,7 +381,7 @@ class SSHRemoteIO(IOBase):
         #       We could have end marker on stderr instead, but then we need to empty stderr beforehand to not act upon
         #       output from earlier calls. This is a problem with blocking reading, since we need to make sure there's
         #       actually something to read in any case.
-        cmd = 'cat {}'.format(str(src))
+        cmd = 'cat {}'.format(sh_quote(str(src)))
         self.shell.stdin.write(cmd.encode())
         self.shell.stdin.write(b"\n")
         self.shell.stdin.flush()
@@ -431,7 +433,9 @@ class SSHRemoteIO(IOBase):
         loc = str(file_path)
         # query 7z for the specific object location, keeps the output
         # lean, even for big archives
-        cmd = '7z l {} {}'.format(str(archive_path), loc)
+        cmd = '7z l {} {}'.format(
+            sh_quote(str(archive_path)),
+            sh_quote(loc))
 
         # Note: Currently relies on file_path not showing up in case of failure
         # including non-existent archive. If need be could be more sophisticated
@@ -450,7 +454,9 @@ class SSHRemoteIO(IOBase):
         # TODO: We probably need to check exitcode on stderr (via marker). If archive or content is missing we will
         #       otherwise hang forever waiting for stdout to fill `size`
 
-        cmd = '7z x -so {} {}\n'.format(str(archive), str(src))
+        cmd = '7z x -so {} {}\n'.format(
+            sh_quote(str(archive)),
+            sh_quote(str(src)))
         self.shell.stdin.write(cmd.encode())
         self.shell.stdin.flush()
 
@@ -473,7 +479,7 @@ class SSHRemoteIO(IOBase):
 
     def read_file(self, file_path):
 
-        cmd = "cat  {}".format(str(file_path))
+        cmd = "cat  {}".format(sh_quote(str(file_path)))
         try:
             out = self._run(cmd, no_output=False, check=True)
         except RemoteCommandFailedError:
@@ -492,7 +498,10 @@ class SSHRemoteIO(IOBase):
         if not content.endswith('\n'):
             content += '\n'
 
-        cmd = "echo \"{}\" {} {}".format(content, mode, str(file_path))
+        cmd = "printf '%s' {} {} {}".format(
+            sh_quote(content),
+            mode,
+            sh_quote(str(file_path)))
         try:
             self._run(cmd, check=True)
         except RemoteCommandFailedError:
