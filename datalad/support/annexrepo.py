@@ -3511,7 +3511,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd.extend(assure_list(remote))
         cmd.extend([
             # disable any external interaction and other magic
-            '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge'])
+            '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge',
+            '--no-content'])
         self.call_git(cmd)
         # cleanup sync'ed branch if we caused it
         if had_synced_branch:

@@ -41,7 +41,6 @@ from datalad.distribution.dataset import (
 from datalad.utils import (
     Path,
     quote_cmdlinearg,
-    rmtree,
 )
 from datalad.support.exceptions import (
     CommandError
@@ -122,7 +121,7 @@ class CreateSiblingRia(Interface):
     issue with which dataset. Because logging can potentially leak personal
     data (like local file paths for example), it can be disabled client-side
     by setting the configuration variable
-    "annex.ria-remote.<storage-sibling-name>.ignore-remote-config".
+    "annex.ora-remote.<storage-sibling-name>.ignore-remote-config".
     """
 
     # TODO: description?
@@ -362,7 +361,7 @@ def _create_sibling_ria(
 
     # parse target URL
     try:
-        ssh_host, base_path = verify_ria_url(url, ds.config)
+        ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
     except ValueError as e:
         yield get_status_dict(
             status='error',
@@ -449,7 +448,7 @@ def _create_sibling_ria(
         lgr.debug('init special remote {}'.format(storage_name))
         special_remote_options = [
             'type=external',
-            'externaltype=ria',
+            'externaltype=ora',
             'encryption=none',
             'autoenable=true',
             'url={}'.format(url)]
@@ -506,6 +505,8 @@ def _create_sibling_ria(
 
         if trust_level:
             ds.repo.call_git(['annex', trust_level, storage_name])
+        # get uuid for use in bare repo's config
+        uuid = ds.config.get("remote.{}.annex-uuid".format(storage_name))
 
     else:
         # with no special remote we currently need to create the
@@ -538,6 +539,15 @@ def _create_sibling_ria(
             shared=" --shared='{}'".format(
                 quote_cmdlinearg(shared)) if shared else ''
         ))
+
+        if storage_sibling:
+            # write special remote's uuid into git-config, so clone can
+            # which one it is supposed to be and enable it even with
+            # fallback URL
+            ssh("cd {rootdir} && git config datalad.ora-remote.uuid {uuid}"
+                "".format(rootdir=quote_cmdlinearg(str(repo_path)),
+                          uuid=uuid))
+
         if post_update_hook:
             ssh('mv {} {}'.format(quote_cmdlinearg(str(disabled_hook)),
                                   quote_cmdlinearg(str(enabled_hook))))
@@ -548,9 +558,15 @@ def _create_sibling_ria(
             # provided with the same chgrp
             ssh(chgrp_cmd)
     else:
-        GitRepo(repo_path, create=True, bare=True,
-                shared=" --shared='{}'".format(
-                    quote_cmdlinearg(shared)) if shared else None)
+        gr = GitRepo(repo_path, create=True, bare=True,
+                     shared=" --shared='{}'".format(quote_cmdlinearg(shared))
+                     if shared else None)
+        if storage_sibling:
+            # write special remote's uuid into git-config, so clone can
+            # which one it is supposed to be and enable it even with
+            # fallback URL
+            gr.config.add("datalad.ora-remote.uuid", uuid, where='local')
+
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
         if group:

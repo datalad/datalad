@@ -1,3 +1,12 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
 import os.path as op
 
 from datalad import cfg
@@ -6,20 +15,20 @@ from datalad.api import (
     Dataset
 )
 from datalad.tests.utils import (
+    attr,
     assert_in,
     assert_raises,
     assert_repo_status,
     assert_result_count,
     chpwd,
     eq_,
-    skip_if_no_module,
     skip_if_on_windows,
     skip_ssh,
     with_tempfile,
     with_tree,
 )
+from datalad.utils import Path
 from functools import wraps
-from nose.plugins.attrib import attr
 
 
 def with_store_insteadof(func):
@@ -66,7 +75,6 @@ def test_invalid_calls(path):
             'sub': {'other.txt': 'other'}})
 @with_tempfile(mkdir=True)
 def _test_create_store(host, base_path, ds_path, clone_path):
-    skip_if_no_module("ria_remote")  # special remote needs to be installed
 
     ds = Dataset(ds_path).create(force=True)
 
@@ -87,6 +95,14 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     eq_({'here'}, {s['name'] for s in sub_siblings})
 
     # TODO: post-update hook was enabled
+
+    # check bare repo:
+    git_config = Path(base_path) / ds.id[:3] / ds.id[3:] / 'config'
+    assert git_config.exists()
+    content = git_config.read_text()
+    assert_in("[datalad \"ora-remote\"]", content)
+    super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-storage'))
+    assert_in("uuid = {}".format(super_uuid), content)
 
     # implicit test of success by ria-installing from store:
     ds.publish(to="datastore", transfer_data='all')
