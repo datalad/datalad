@@ -635,6 +635,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
             target,
         )
         return
+    res_kwargs['target'] = target
     if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
         # this remote either isn't an annex,
         # or hasn't been properly initialized
@@ -690,6 +691,9 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
 
     lgr.debug("Push data from %s to '%s'", ds, target)
 
+    # input has type=dataset, but now it is about files
+    res_kwargs.pop('type', None)
+
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative
     # to this location
@@ -721,7 +725,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
                 lgr.debug('Received unexpected %s from `annex copy`: %s',
                           c, res[c])
         for j in res['stdout_json']:
-            yield annexjson2result(j, ds, type='file')
+            yield annexjson2result(j, ds, type='file', **res_kwargs)
     return
 
 
