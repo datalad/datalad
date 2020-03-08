@@ -440,7 +440,7 @@ def test_get_local_file_url():
                 # relpaths are special-cased below
                 ('test.txt', 'test.txt'),
             ) + (
-                ('C:\\Windows\\Notepad.exe', 'file://C/Windows/Notepad.exe'),
+                ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
             ) if on_windows else (
                 # static copy of "most_obscore_name"
                 (' "\';a&b&cΔЙקم๗あ `| ',
