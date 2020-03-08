@@ -19,6 +19,7 @@ from datalad.support.exceptions import (
 from datalad.tests.utils import (
     assert_in,
     assert_in_results,
+    assert_not_in,
     assert_not_in_results,
     assert_raises,
     assert_repo_status,
@@ -111,6 +112,7 @@ def check_push(annex, src_path, dst_path):
     src_repo = src.repo
     # push should not add branches to the local dataset
     orig_branches = src_repo.get_branches()
+    assert_not_in('synced/master', orig_branches)
 
     res = src.push(on_failure='ignore')
     assert_result_count(res, 1)
@@ -118,10 +120,13 @@ def check_push(annex, src_path, dst_path):
         res, status='impossible',
         message='No push target given, and none could be auto-detected, '
         'please specific via --to')
+    eq_(orig_branches, src_repo.get_branches())
     # target sibling
     target = mk_push_target(src, 'target', dst_path, annex=annex)
+    eq_(orig_branches, src_repo.get_branches())
 
     res = src.push(to="target")
+    eq_(orig_branches, src_repo.get_branches())
     assert_result_count(res, 2 if annex else 1)
     assert_in_results(
         res,
@@ -140,6 +145,7 @@ def check_push(annex, src_path, dst_path):
     # don't fail when doing it again, no explicit target specification
     # needed anymore
     res = src.push()
+    eq_(orig_branches, src_repo.get_branches())
     # and nothing is pushed
     assert_status('notneeded', res)
 
