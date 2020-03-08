@@ -44,6 +44,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.core.distributed.clone import Clone
 from datalad.core.distributed.push import Push
+from datalad.support.network import get_local_file_url
 
 
 @with_tempfile(mkdir=True)
@@ -448,6 +449,32 @@ def test_force_datatransfer(srcpath, dstpath):
                       path=str(src.pathobj / 'test_mod_annex_file'),
                       action='copy',
                       message='Slated for transport, but no content present')
+
+
+@with_tempfile(mkdir=True)
+@with_tree(tree={'ria-layout-version': '1\n'})
+def test_ria_push(srcpath, dstpath):
+    # complex test involving a git remote, a special remote, and a
+    # publication dependency
+    src = Dataset(srcpath).create()
+    testfile = src.pathobj / 'test_mod_annex_file'
+    testfile.write_text("Heavy stuff.")
+    src.save()
+    assert_status(
+        'ok',
+        src.create_sibling_ria(
+            "ria+{}".format(get_local_file_url(dstpath, compatibility='git')),
+            "datastore"))
+    res = src.push(to='datastore')
+    assert_in_results(
+        res, action='publish', target='datastore', status='ok',
+        refspec='refs/heads/master:refs/heads/master')
+    assert_in_results(
+        res, action='publish', target='datastore', status='ok',
+        refspec='refs/heads/git-annex:refs/heads/git-annex')
+    assert_in_results(
+        res, action='copy', target='datastore-storage', status='ok',
+        path=str(testfile))
 
 
 @with_tempfile(mkdir=True)
