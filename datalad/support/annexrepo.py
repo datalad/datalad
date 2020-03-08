@@ -3515,7 +3515,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             '--no-content'])
         self.call_git(cmd)
         # cleanup sync'ed branch if we caused it
-        if not had_synced_branch:
+        if not had_synced_branch and synced_branch in self.get_branches():
             lgr.debug('Remove previously non-existent %s branch after sync',
                       synced_branch)
             self.call_git(
