@@ -640,6 +640,9 @@ def test_dropkey(batch, path):
     annex.drop_key(tree1_md5e_keys[files[0]], **kw)
     # and a mix with already dropped or not
     annex.drop_key(list(tree1_md5e_keys.values()), **kw)
+    # AnnexRepo is not able to guarantee that all batched processes are
+    # terminated when test cleanup code runs, avoid a crash (i.e. resource busy)
+    annex._batched.close()
 
 
 @with_tree(**tree1args)
