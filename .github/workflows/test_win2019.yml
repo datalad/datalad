@@ -31,7 +31,10 @@ jobs:
         python-version: 3.7
     - name: Set up git-annex
       run: |
-        python -c "import urllib.request as r; r.urlretrieve('https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe', 'C:\\git-annex-installer.exe')"
+        # latest version
+        #python -c "import urllib.request as r; r.urlretrieve('https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe', 'C:\\git-annex-installer.exe')"
+        # specific version mih uses to debug on real win10 box
+        python -c "import urllib.request as r; r.urlretrieve('http://store.datalad.org/git-annex/windows/git-annex_7.20191107-g8ea269ef7.exe', 'C:\\git-annex-installer.exe')"
         7z x -o"C:\\Program Files\Git" C:\\git-annex-installer.exe
     - name: Install dependencies
       run: |
