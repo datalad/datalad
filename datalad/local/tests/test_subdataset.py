@@ -17,6 +17,7 @@ from os.path import (
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
+    clone,
     create,
     subdatasets,
 )
@@ -28,20 +29,31 @@ from datalad.tests.utils import (
     assert_false,
     assert_in,
     assert_not_in,
+    assert_repo_status,
     assert_result_count,
     assert_status,
     eq_,
-    known_failure_windows,
     with_tempfile,
-    with_testrepos,
 )
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:275
-@known_failure_windows
-@with_testrepos('.*nested_submodule.*', flavors=['clone'])
-def test_get_subdatasets(path):
-    ds = Dataset(path)
+@with_tempfile
+@with_tempfile
+def test_get_subdatasets(origpath, path):
+    # setup
+    orig = Dataset(origpath).create()
+    orig_sub = orig.create('sub dataset1')
+    # 2nd-level
+    for s in ('2', 'sub sub dataset1', 'subm 1'):
+        orig_sub.create(s)
+    # 3rd-level
+    for s in ('2', 'subm 1'):
+        orig_sub.create(Path('sub sub dataset1', s))
+    orig.save(recursive=True)
+    assert_repo_status(orig.path)
+
+    # tests
+    ds = clone(source=origpath, path=path)
     # one more subdataset with a name that could ruin config option parsing
     dots = str(Path('subdir') / '.lots.of.dots.')
     ds.create(dots)
