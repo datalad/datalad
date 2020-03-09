@@ -1736,17 +1736,20 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: Also provide option to look for key instead of path
 
         def quick_check(filename):
-            filepath = opj(self.path, filename)
+            filepath = self.pathobj / filename
             # MIH wonders why it cannot just return exists(filepath)...
-            return exists(filepath) and (
-                    islink(filepath)
-                    # TODO: checks for being not outside of this repository
-                    # Note: ben removed '.git/' from '.git/annex/objects',
-                    # since it is not true for submodules, whose '.git' is a
-                    # symlink and being resolved to some
-                    # '.git/modules/.../annex/objects'
-                    and opj('annex', 'objects') in os.readlink(filepath)  # realpath OK
-                )
+            # this test must not use op.path.exists(), because automagic
+            # IO patches it to return True for any symlink pointing into
+            # the annex
+            return filepath.exists() and (
+                filepath.is_symlink()
+                # TODO: checks for being not outside of this repository
+                # Note: ben removed '.git/' from '.git/annex/objects',
+                # since it is not true for submodules, whose '.git' is a
+                # symlink and being resolved to some
+                # '.git/modules/.../annex/objects'
+                and opj('annex', 'objects') in os.readlink(str(filepath))  # realpath OK
+            )
 
         return self._check_files(self.find, quick_check,
                                  files, allow_quick, batch)
