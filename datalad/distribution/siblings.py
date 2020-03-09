@@ -523,7 +523,6 @@ def _configure_remote(
             # we need to check if added sibling an annex, and try to enable it
             # another part of the fix for #463 and #432
             try:
-                exc = None
                 if not ds.config.obtain(
                         'remote.{}.annex-ignore'.format(name),
                         default=False,
