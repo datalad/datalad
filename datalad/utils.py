@@ -542,11 +542,29 @@ def rmtemp(f, *args, **kwargs):
             lgr.debug("Path %s does not exist, so can't be removed" % f)
             return
         lgr.log(5, "Removing temp file: %s" % f)
-        # Can also be a directory
-        if os.path.isdir(f):
-            rmtree(f, *args, **kwargs)
-        else:
-            unlink(f)
+        # we have issues with not-yet closed git-annex processes.
+        # but a timing issue and a conceptual test failure are two different
+        # things, hence spend a few attempts and a couple of seconds to
+        # let an issue resolve itself
+        removed = False
+        last_exc = None
+        for attempt in range(5):
+            try:
+                # Can also be a directory
+                if os.path.isdir(f):
+                    rmtree(f, *args, **kwargs)
+                else:
+                    unlink(f)
+                removed = True
+                break
+            except PermissionError as e:
+                lgr.warn(
+                    'Attempt %i to remove temp location failed: %s',
+                    attempt + 1, e)
+                last_exc = e
+                time.sleep(2)
+        if not removed:
+            raise last_exc
     else:
         lgr.info("Keeping temp file: %s" % f)
 
