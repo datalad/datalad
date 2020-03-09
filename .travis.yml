@@ -15,6 +15,7 @@ env:
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
+    - DATALAD_LOG_LEVEL=2
     - TESTS_TO_PERFORM=datalad/support/tests/test_annexrepo.py:test_annex_ssh
     - NOSE_OPTS=-s
     - NOSE_SELECTION="integration or usecase or slow"
