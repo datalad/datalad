@@ -765,8 +765,10 @@ def check_save_dotfiles(to_git, save_path, path):
     ok_(paths)
     ds = Dataset(path).create(force=True)
     if not to_git and ds.repo.is_managed_branch():
-        if not ds.repo._check_version_kludges("has-include-dotfiles"):
-            # FIXME(annex.dotfiles)
+        if "8" < ds.repo.git_annex_version < "8.20200309":
+            # git-annex's 1978a2420 (2020-03-09) fixed a bug where
+            # annexed dotfiles could switch when annex.dotfiles=true
+            # was not set in .git/config or git-annex:config.log.
             ds.repo.config.set("annex.dotfiles", "true",
                                where="local", reload=True)
     ds.save(save_path, to_git=to_git)
