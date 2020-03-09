@@ -41,7 +41,7 @@ from itertools import tee
 import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix
-from os.path import curdir, basename, exists, realpath, islink, join as opj
+from os.path import curdir, basename, exists, islink, join as opj
 from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
@@ -369,6 +369,30 @@ from pathlib import (
     PurePosixPath,
 )
 
+if sys.version_info.major == 3 and sys.version_info.minor < 6:
+    # Path.resolve() doesn't have strict=False until 3.6
+    # monkey patch it -- all code imports this class from this
+    # module
+    Path._datalad_moved_resolve = Path.resolve
+
+    def _resolve_without_strict(self, strict=False):
+        if strict or self.exists():
+            # this is pre 3.6 behavior
+            return self._datalad_moved_resolve()
+
+        # if strict==False, find the closest component
+        # that actually exists and resolve that one
+        for p in self.parents:
+            if not p.exists():
+                continue
+            resolved = p._datalad_moved_resolve()
+            # append the rest that did not exist
+            return resolved / self.relative_to(p)
+        # pathlib return the unresolved if nothing resolved
+        return self
+
+    Path.resolve = _resolve_without_strict
+
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -466,7 +490,7 @@ def get_open_files(path, log_open=False):
     files = {}
     # since the ones returned by psutil would not be aware of symlinks in the
     # path we should also get realpath for path
-    path = realpath(path)
+    path = str(Path(path).resolve())
     for proc in psutil.process_iter():
         try:
             open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
@@ -595,14 +619,15 @@ else:
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
         Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
-        rfilepath = realpath(filepath)
-        if islink(filepath) and exists(rfilepath):
+        filepath = Path(filepath)
+        rfilepath = filepath.resolve()
+        if filepath.is_symlink() and rfilepath.exists():
             # trust noone - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
                     rfilepath, mtime)
-            os.utime(rfilepath, (time.time(), mtime))
+            os.utime(str(rfilepath), (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
@@ -1465,7 +1490,7 @@ def getpwd():
                 raise
         try:
             pwd = os.environ['PWD']
-            pwd_real = op.realpath(pwd)
+            pwd_real = str(Path(pwd).resolve())
             # This logic would fail to catch the case where chdir did happen
             # to the directory where current PWD is pointing to, e.g.
             # $> ls -ld $PWD
@@ -1677,11 +1702,15 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-    filename = realpath(filename)
+    filename = Path(filename).resolve()
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
-            f.write(content)
+        (filename.write_bytes
+         if isinstance(content, bytes)
+         else filename.write_text)(content)
+
+    # TODO globbing below can also be done with pathlib
+    filename = str(filename)
 
     if __debug__:
         # TODO mkdir

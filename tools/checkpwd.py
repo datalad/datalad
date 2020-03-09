@@ -24,7 +24,8 @@ def getpwd():
     cwd = os.getcwd()
     try:
         env_pwd = os.environ['PWD']
-        if op.realpath(env_pwd) != op.realpath(cwd):
+        from datalad.utils import Path
+        if Path(env_pwd).resolve() != Path(cwd).resolve():
             # uses os.chdir directly, pwd is not updated
             # could be an option to fail (tp not allow direct chdir)
             return cwd

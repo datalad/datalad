@@ -14,9 +14,8 @@ from os.path import (
     curdir,
     exists,
     join as opj,
-    normpath, isabs,
+    normpath,
     pardir,
-    realpath,
 )
 from weakref import WeakValueDictionary
 import wrapt
@@ -156,9 +155,27 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         return "<Dataset path=%s>" % self.path
 
     def __eq__(self, other):
-        if not hasattr(other, 'path'):
+        if not hasattr(other, 'pathobj'):
             return False
-        return realpath(self.path) == realpath(other.path)
+        # Ben: https://github.com/datalad/datalad/pull/4057#discussion_r370153586
+        # It's pointing to the same thing, while not being the same object
+        # (in opposition to the *Repo classes). So `ds1 == ds2`,
+        # `but ds1 is not ds2.` I thought that's a useful distinction. On the
+        # other hand, I don't think we use it anywhere outside tests yet.
+        me_exists = self.pathobj.exists()
+        other_exists = other.pathobj.exists()
+        if me_exists != other_exists:
+            # no chance this could be the same
+            return False
+        elif me_exists:
+            # check on filesystem
+            return self.pathobj.samefile(other.pathobj)
+        else:
+            # we can only do lexical comparison.
+            # this will fail to compare a long and a shortpath.
+            # on windows that could actually point to the same thing
+            # if it would exists, but this is how far we go with this.
+            return self.pathobj == other.pathobj
 
     def __getattr__(self, attr):
         # Assure that we are not just missing some late binding
@@ -234,7 +251,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # Also note, that this could be forged into a single big condition, but
         # that is hard to read and we should be well aware of the actual
         # criteria here:
-        if self._repo is not None and realpath(self.path) == self._repo.path:
+        if self._repo is not None and self.pathobj.resolve() == self._repo.pathobj:
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex

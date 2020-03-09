@@ -53,6 +53,7 @@ from datalad.utils import (
     on_windows,
     rmtree,
     unlink,
+    Path,
 )
 from datalad.tests.utils import (
     assert_cwd_unchanged,
@@ -639,6 +640,9 @@ def test_dropkey(batch, path):
     annex.drop_key(tree1_md5e_keys[files[0]], **kw)
     # and a mix with already dropped or not
     annex.drop_key(list(tree1_md5e_keys.values()), **kw)
+    # AnnexRepo is not able to guarantee that all batched processes are
+    # terminated when test cleanup code runs, avoid a crash (i.e. resource busy)
+    annex._batched.close()
 
 
 @with_tree(**tree1args)
@@ -959,22 +963,22 @@ def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
     key_location = annex.get_contentlocation(key, batch=batch)
     assert(key_location)
     # they both should point to the same location eventually
-    eq_(os.path.realpath(opj(annex.path, fname)),
-        os.path.realpath(opj(annex.path, key_location)))
+    eq_((annex.pathobj / fname).resolve(),
+        (annex.pathobj / key_location).resolve())
 
     # test how it would look if done under a subdir of the annex:
     with chpwd(opj(annex.path, 'subdir'), mkdir=True):
         key_location = annex.get_contentlocation(key, batch=batch)
         # they both should point to the same location eventually
-        eq_(os.path.realpath(opj(annex.path, fname)),
-            os.path.realpath(opj(annex.path, key_location)))
+        eq_((annex.pathobj / fname).resolve(),
+            (annex.pathobj / key_location).resolve())
 
     # test how it would look if done under a dir outside of the annex:
     with chpwd(work_dir_outside, mkdir=True):
         key_location = annex.get_contentlocation(key, batch=batch)
         # they both should point to the same location eventually
-        eq_(os.path.realpath(opj(annex.path, fname)),
-            os.path.realpath(opj(annex.path, key_location)))
+        eq_((annex.pathobj / fname).resolve(),
+            (annex.pathobj / key_location).resolve())
 
 
 def test_AnnexRepo_get_contentlocation():
@@ -1723,12 +1727,12 @@ def test_AnnexRepo_flyweight(path1, path2):
 @with_tempfile
 def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
 
-    reporeal = realpath(repo)
+    reporeal = str(Path(repo).resolve())
     eq_(AnnexRepo.get_toppath(repo, follow_up=False), reporeal)
     eq_(AnnexRepo.get_toppath(repo), repo)
     # Generate some nested directory
     AnnexRepo(repo2, create=True)
-    repo2real = realpath(repo2)
+    repo2real = str(Path(repo2).resolve())
     nested = opj(repo2, "d1", "d2")
     os.makedirs(nested)
     eq_(AnnexRepo.get_toppath(nested, follow_up=False), repo2real)

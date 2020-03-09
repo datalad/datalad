@@ -31,7 +31,6 @@ from os.path import (
     isabs,
     commonprefix,
     relpath,
-    realpath,
     dirname,
     basename,
     curdir,
@@ -184,18 +183,20 @@ def _normalize_path(base_dir, path):
     """
     if not path:
         return path
+    pathobj = Path(path)
 
-    base_dir = realpath(base_dir)  # realpath OK
+    base_dir = str(Path(base_dir).resolve())  # realpath OK
+
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
     # correct base.
 
-    if isabs(path):
+    if pathobj.is_absolute():
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
+        path = str(pathobj.parent.resolve() / pathobj.name)  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -205,7 +206,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-        path = normpath(opj(realpath(getpwd()), path))  # realpath OK
+        path = str(Path(getpwd()).resolve() / pathobj)  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -213,7 +214,7 @@ def _normalize_path(base_dir, path):
 
     if commonprefix([path, base_dir]) != base_dir:
         raise FileNotInRepositoryError(msg="Path outside repository: %s"
-                                           % path, filename=path)
+                                           % base_dir, filename=path)
 
     return relpath(path, start=base_dir)
 
@@ -1298,7 +1299,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             path_ = path
             path_prev = ""
             while path_ and path_ != path_prev:  # on top /.. = /
-                if realpath(path_) == toppath:
+                if str(Path(path_).resolve()) == toppath:
                     toppath = path_
                     break
                 path_prev = path_
@@ -3358,7 +3359,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # readlink will fail if the symlink reported by ls-files is
                     # not in the working tree (it could be removed or
                     # unlocked). Fall back to a slower method.
-                    return op.realpath(path)
+                    return str(Path(path).resolve())
 
             _get_link_target = try_readlink
 

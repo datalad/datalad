@@ -40,8 +40,6 @@ from os.path import (
     curdir,
     exists,
     join as opj,
-    pardir,
-    realpath,
     relpath,
     split as pathsplit,
 )
@@ -359,7 +357,7 @@ def _prep_file_under_git(path, filename):
     # path to the file within the repository
     # repo.path is a "realpath" so to get relpath working correctly
     # we need to realpath our path as well
-    path = op.realpath(path)  # intentional realpath to match GitRepo behavior
+    path = str(Path(path).resolve())  # intentional realpath to match GitRepo behavior
     file_repo_dir = op.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
@@ -378,16 +376,16 @@ def ok_symlink(path):
 
 def ok_good_symlink(path):
     ok_symlink(path)
-    rpath = realpath(path)
-    ok_(exists(rpath),
+    rpath = Path(path).resolve()
+    ok_(rpath.exists(),
         msg="Path {} seems to be missing.  Symlink {} is broken".format(
                 rpath, path))
 
 
 def ok_broken_symlink(path):
     ok_symlink(path)
-    rpath = realpath(path)
-    assert_false(exists(rpath),
+    rpath = Path(path).resolve()
+    assert_false(rpath.exists(),
             msg="Path {} seems to be present.  Symlink {} is not broken".format(
                     rpath, path))
 

@@ -379,7 +379,7 @@ def test_getpwd_change_mode(tdir):
     # Just testing the logic of switching to cwd mode and issuing a warning
     with swallow_logs(new_level=logging.WARNING) as cml:
         pwd = getpwd()
-        eq_(pwd, os.path.realpath(pwd))  # might have symlinks, thus realpath
+        eq_(pwd, str(Path(pwd).resolve()))  # might have symlinks, thus realpath
     assert_in("symlinks in the paths will be resolved", cml.out)
     eq_(utils._pwd_mode, 'cwd')
 
@@ -1178,18 +1178,19 @@ def test_dlabspath(path):
 
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
 def test_get_open_files(p):
+    pobj = Path(p)
     skip_if_no_module('psutil')
     eq_(get_open_files(p), {})
-    f1 = opj(p, '1')
-    subd = opj(p, 'd')
-    with open(f1) as f:
+    f1 = pobj / '1'
+    subd = pobj / 'd'
+    with f1.open() as f:
         # since lsof does not care about PWD env var etc, paths
         # will not contain symlinks, we better realpath them
         # all before comparison
-        eq_(get_open_files(p, log_open=40)[op.realpath(f1)].pid,
+        eq_(get_open_files(p, log_open=40)[str(f1.resolve())].pid,
             os.getpid())
 
-    assert not get_open_files(subd)
+    assert not get_open_files(str(subd))
 
     if on_windows:
         # the remainder of the test assume a certain performance.
@@ -1208,14 +1209,14 @@ def test_get_open_files(p):
                   r'import sys; sys.stdout.write("OK\n"); sys.stdout.flush();'
                   r'import time; time.sleep(10)'],
                  stdout=PIPE,
-                 cwd=subd)
+                 cwd=str(subd))
     # Assure that it started and we read the OK
     eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
-    eq_(get_open_files(p)[op.realpath(subd)].pid, proc.pid)
-    eq_(get_open_files(subd)[op.realpath(subd)].pid, proc.pid)
+    eq_(get_open_files(p)[str(subd.resolve())].pid, proc.pid)
+    eq_(get_open_files(subd)[str(subd.resolve())].pid, proc.pid)
     proc.terminate()
-    assert not get_open_files(subd)
+    assert not get_open_files(str(subd))
 
 
 def test_map_items():
