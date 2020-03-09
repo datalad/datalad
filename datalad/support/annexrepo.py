@@ -1736,17 +1736,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: Also provide option to look for key instead of path
 
         def quick_check(filename):
-            filepath = self.pathobj / filename
-            if filepath.is_symlink():                    # if symlink
-                # find abspath of node pointed to by symlink
-                target_path = filepath.resolve()  # realpath OK
-                # TODO: checks for being not outside of this repository
-                # Note: ben removed '.git/' from '.git/annex/objects',
-                # since it is not true for submodules, whose '.git' is a
-                # symlink and being resolved to some
-                # '.git/modules/.../annex/objects'
-                return target_path.exists() and 'annex/objects' in str(target_path)
-            return False
+            filepath = opj(self.path, filename)
+            # MIH wonders why it cannot just return exists(filepath)...
+            return exists(filepath) and (
+                    islink(filepath)
+                    # TODO: checks for being not outside of this repository
+                    # Note: ben removed '.git/' from '.git/annex/objects',
+                    # since it is not true for submodules, whose '.git' is a
+                    # symlink and being resolved to some
+                    # '.git/modules/.../annex/objects'
+                    and opj('annex', 'objects') in os.readlink(filepath)  # realpath OK
+                )
 
         return self._check_files(self.find, quick_check,
                                  files, allow_quick, batch)
@@ -1783,17 +1783,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self.info([f for f in files if not isdir(f)],
                              fast=True, **kwargs)
 
-        # XXX near duplicate to helper in file_has_content()
         def quick_check(filename):
-            filepath = self.pathobj / filename
+            filepath = opj(self.path, filename)
             # todo checks for being not outside of this repository
             # Note: ben removed '.git/' from '.git/annex/objects',
             # since it is not true for submodules, whose '.git' is a
             # symlink and being resolved to some
             # '.git/modules/.../annex/objects'
             return (
-                filepath.is_symlink()
-                and 'annex/objects' in str(filepath.resolve())  # realpath OK
+                islink(filepath)
+                and opj('annex', 'objects') in os.readlink(filepath)  # realpath OK
             )
 
         return self._check_files(check, quick_check,
