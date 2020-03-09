@@ -22,6 +22,7 @@ env:
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
+    - _DL_DEVEL_ANNEX=1
   matrix:
 ##1    - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
