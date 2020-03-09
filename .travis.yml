@@ -16,7 +16,7 @@ env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - DATALAD_LOG_LEVEL=2
-    - TESTS_TO_PERFORM=datalad/support/tests/test_annexrepo.py:test_annex_ssh
+    - TESTS_TO_PERFORM=../datalad/support/tests/test_annexrepo.py:test_annex_ssh
     - NOSE_OPTS=-s
     - NOSE_SELECTION="integration or usecase or slow"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
@@ -255,17 +255,6 @@ script:
       --with-cov --cover-package datalad
       --logging-level=INFO
       $TESTS_TO_PERFORM
-  # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  - if [ ${DATALAD_TESTS_SSH:-0} != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
-      echo "Testing examples is disabled by configuration";
-    else
-      $NOSE_WRAPPER ../tools/testing/run_doc_examples;
-    fi
-  - cd ..
-  # Run javascript tests
-  - grunt test --verbose
-  # Report WTF information using system wide installed version
-  - datalad wtf
 
 after_success:
   # submit only what we have covered in the PRs
