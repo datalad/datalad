@@ -87,9 +87,9 @@ test_script:
   # first sign of life
   - datalad wtf
   # and now this... [keep appending tests that should work!!]
+  - "python -m nose -s -v --with-cov --cover-package datalad datalad.core datalad.local datalad.distributed"
   # one call per datalad component for now -- to better see what is being tested
   # everything in core/ must work
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.core"
   # cmdline
   - "python -m nose -s -v --with-cov --cover-package datalad datalad.cmdline"
   # remaining fails: test_archives.test_basic_scenario test_datalad.test_basic_scenario_local_url
