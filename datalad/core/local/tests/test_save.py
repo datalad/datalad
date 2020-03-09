@@ -179,6 +179,13 @@ def test_renamed_file():
 def test_subdataset_save(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')
+    # make sure the parent tracks the subdataset state in the persistent
+    # corresponding branch, and no a to-be-rebased managed branch
+    eq_(parent.repo.status(paths=[sub.path])[sub.pathobj]['gitshasum'],
+        sub.repo.get_hexsha(sub.repo.get_corresponding_branch()))
+    # even if there is a managed branch checkout out, the subdataset
+    # should be reported clean, if there is no diff to the corresponding
+    # branch
     assert_repo_status(parent.path)
     create_tree(parent.path, {
         "untracked": 'ignore',
