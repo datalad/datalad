@@ -52,7 +52,6 @@ def _get_nested_collections(path):
 
 
 # doesn't actually need gitlab and exercises most of the decision logic
-@known_failure_githubci_win
 @with_tempfile
 def test_dryrun(path):
     ctlg = _get_nested_collections(path)
@@ -157,7 +156,7 @@ def test_dryrun(path):
         # http://site/dir/dir/dir/_repo_.git
         # as a balance between readibility and name conflict minimization
         project='secret/{}/_repo_'.format(
-            ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)),
+            ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj).as_posix()),
     )
     # we get the same result with an explicit layout request
     expl_res = ctlg['root'].create_sibling_gitlab(
