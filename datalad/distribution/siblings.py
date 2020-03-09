@@ -74,6 +74,8 @@ from .dataset import (
     EnsureDataset,
     datasetmethod,
 )
+import datalad.support.ansi_colors as ac
+
 
 lgr = logging.getLogger('datalad.distribution.siblings')
 
@@ -304,7 +306,10 @@ class Siblings(Interface):
         # should we attempt to remove an unknown sibling, complain like Git does
         if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
             ui.message(
-                'Warning: No sibling "{name}" in dataset {path}'.format(**res))
+                '{warn}: No sibling "{name}" in dataset {path}'.format(
+                    warn=ac.color_word('Warning', ac.LOG_LEVEL_COLORS['WARNING']),
+                    **res)
+            )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
             # logging complained about this already
