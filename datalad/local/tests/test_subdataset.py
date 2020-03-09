@@ -23,7 +23,9 @@ from datalad.api import (
 )
 from datalad.utils import (
     chpwd,
+    on_windows,
     Path,
+    PurePosixPath,
 )
 from datalad.tests.utils import (
     assert_false,
@@ -35,6 +37,10 @@ from datalad.tests.utils import (
     eq_,
     with_tempfile,
 )
+
+
+def _p(rpath):
+    return str(Path(PurePosixPath(rpath)))
 
 
 @with_tempfile
@@ -55,16 +61,21 @@ def test_get_subdatasets(origpath, path):
     # tests
     ds = clone(source=origpath, path=path)
     # one more subdataset with a name that could ruin config option parsing
-    dots = str(Path('subdir') / '.lots.of.dots.')
+    # no trailing dots on windows!
+    dots = str(Path('subdir') / ('.lots.of.dots'
+                                  if on_windows
+                                  else '.lots.of.dots.'))
     ds.create(dots)
+    # mitigate https://github.com/datalad/datalad/issues/4267
+    ds.save()
     eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1'
     ])
     ds.get('sub dataset1')
     eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
-        'sub dataset1/2',
-        'sub dataset1/sub sub dataset1',
-        'sub dataset1/subm 1',
+        _p('sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1'),
+        _p('sub dataset1/subm 1'),
     ])
     # obtain key subdataset, so all leaf subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
@@ -73,12 +84,12 @@ def test_get_subdatasets(origpath, path):
         [(path, opj(path, 'sub dataset1')),
          (path, opj(path, dots))])
     all_subs = [
-        'sub dataset1',
-        'sub dataset1/2',
-        'sub dataset1/sub sub dataset1',
-        'sub dataset1/sub sub dataset1/2',
-        'sub dataset1/sub sub dataset1/subm 1',
-        'sub dataset1/subm 1',
+        _p('sub dataset1'),
+        _p('sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1'),
+        _p('sub dataset1/sub sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1/subm 1'),
+        _p('sub dataset1/subm 1'),
         dots,
     ]
     eq_(ds.subdatasets(recursive=True, result_xfm='relpaths'), all_subs)
@@ -93,13 +104,13 @@ def test_get_subdatasets(origpath, path):
     # redo, but limit to specific paths
     eq_(
         ds.subdatasets(
-            path=['sub dataset1/2', 'sub dataset1/sub sub dataset1'],
+            path=[_p('sub dataset1/2'), _p('sub dataset1/sub sub dataset1')],
             recursive=True, result_xfm='relpaths'),
         [
-            'sub dataset1/2',
-            'sub dataset1/sub sub dataset1',
-            'sub dataset1/sub sub dataset1/2',
-            'sub dataset1/sub sub dataset1/subm 1',
+            _p('sub dataset1/2'),
+            _p('sub dataset1/sub sub dataset1'),
+            _p('sub dataset1/sub sub dataset1/2'),
+            _p('sub dataset1/sub sub dataset1/subm 1'),
         ]
     )
     eq_(
@@ -107,12 +118,12 @@ def test_get_subdatasets(origpath, path):
             path=['sub dataset1'],
             recursive=True, result_xfm='relpaths'),
         [
-            'sub dataset1',
-            'sub dataset1/2',
-            'sub dataset1/sub sub dataset1',
-            'sub dataset1/sub sub dataset1/2',
-            'sub dataset1/sub sub dataset1/subm 1',
-            'sub dataset1/subm 1',
+            _p('sub dataset1'),
+            _p('sub dataset1/2'),
+            _p('sub dataset1/sub sub dataset1'),
+            _p('sub dataset1/sub sub dataset1/2'),
+            _p('sub dataset1/sub sub dataset1/subm 1'),
+            _p('sub dataset1/subm 1'),
         ]
     )
     with chpwd(str(ds.pathobj / 'subdir')):
@@ -130,37 +141,37 @@ def test_get_subdatasets(origpath, path):
                         path=None,
                         recursive=True,
                         result_xfm='relpaths'),
-            ['sub dataset1',
-             'sub dataset1/2',
-             'sub dataset1/sub sub dataset1',
-             'sub dataset1/sub sub dataset1/2',
-             'sub dataset1/sub sub dataset1/subm 1',
-             'sub dataset1/subm 1',
+            [_p('sub dataset1'),
+             _p('sub dataset1/2'),
+             _p('sub dataset1/sub sub dataset1'),
+             _p('sub dataset1/sub sub dataset1/2'),
+             _p('sub dataset1/sub sub dataset1/subm 1'),
+             _p('sub dataset1/subm 1'),
              dots]
         )
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, bottomup=True, result_xfm='relpaths'), [
-        'sub dataset1/2',
-        'sub dataset1/sub sub dataset1/2',
-        'sub dataset1/sub sub dataset1/subm 1',
-        'sub dataset1/sub sub dataset1',
-        'sub dataset1/subm 1',
-        'sub dataset1',
+        _p('sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1/subm 1'),
+        _p('sub dataset1/sub sub dataset1'),
+        _p('sub dataset1/subm 1'),
+        _p('sub dataset1'),
         dots,
     ])
     eq_(ds.subdatasets(recursive=True, fulfilled=True, result_xfm='relpaths'), [
-        'sub dataset1',
-        'sub dataset1/sub sub dataset1',
+        _p('sub dataset1'),
+        _p('sub dataset1/sub sub dataset1'),
         dots,
     ])
     eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
         (os.curdir, 'sub dataset1'),
-        ('sub dataset1', 'sub dataset1/2'),
-        ('sub dataset1', 'sub dataset1/sub sub dataset1'),
-        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/2'),
-        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
-        ('sub dataset1', 'sub dataset1/subm 1'),
+        ('sub dataset1', _p('sub dataset1/2')),
+        ('sub dataset1', _p('sub dataset1/sub sub dataset1')),
+        (_p('sub dataset1/sub sub dataset1'), _p('sub dataset1/sub sub dataset1/2')),
+        (_p('sub dataset1/sub sub dataset1'), _p('sub dataset1/sub sub dataset1/subm 1')),
+        ('sub dataset1', _p('sub dataset1/subm 1')),
         (os.curdir, dots),
     ])
     # uses slow, flexible query
@@ -168,14 +179,14 @@ def test_get_subdatasets(origpath, path):
         [])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=1, result_xfm='relpaths'),
-        ['sub dataset1', dots])
+        ['sub dataset1', _p(dots)])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=2, result_xfm='relpaths'),
         [
         'sub dataset1',
-        'sub dataset1/2',
-        'sub dataset1/sub sub dataset1',
-        'sub dataset1/subm 1',
+        _p('sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1'),
+        _p('sub dataset1/subm 1'),
         dots,
     ])
     res = ds.subdatasets(recursive=True)
@@ -219,7 +230,7 @@ def test_get_subdatasets(origpath, path):
     #
     # test --contains
     #
-    target_sub = 'sub dataset1/sub sub dataset1/subm 1'
+    target_sub = _p('sub dataset1/sub sub dataset1/subm 1')
     # give the closest direct subdataset
     eq_(ds.subdatasets(contains=opj(target_sub, 'something_inside'),
                        result_xfm='relpaths'),
@@ -229,21 +240,21 @@ def test_get_subdatasets(origpath, path):
                        contains=opj(target_sub, 'something_inside'),
                        result_xfm='relpaths'),
         ['sub dataset1',
-         'sub dataset1/sub sub dataset1',
-         'sub dataset1/sub sub dataset1/subm 1'])
+         _p('sub dataset1/sub sub dataset1'),
+         _p('sub dataset1/sub sub dataset1/subm 1')])
     # doesn't affect recursion limit
     eq_(ds.subdatasets(recursive=True, recursion_limit=2,
                        contains=opj(target_sub, 'something_inside'),
                        result_xfm='relpaths'),
         ['sub dataset1',
-         'sub dataset1/sub sub dataset1'])
+         _p('sub dataset1/sub sub dataset1')])
     # for a direct dataset path match, return the matching dataset
     eq_(ds.subdatasets(recursive=True,
                        contains=target_sub,
                        result_xfm='relpaths'),
         ['sub dataset1',
-         'sub dataset1/sub sub dataset1',
-         'sub dataset1/sub sub dataset1/subm 1'])
+         _p('sub dataset1/sub sub dataset1'),
+         _p('sub dataset1/sub sub dataset1/subm 1')])
     # but it has to be a subdataset, otherwise no match
     # which is what get_containing_subdataset() used to do
     assert_status('impossible',
@@ -262,12 +273,12 @@ def test_get_subdatasets(origpath, path):
 
     eq_(ds.subdatasets(
         recursive=True,
-        contains=[target_sub, 'sub dataset1/2'],
+        contains=[target_sub, _p('sub dataset1/2')],
         result_xfm='relpaths'), [
         'sub dataset1',
-        'sub dataset1/2',
-        'sub dataset1/sub sub dataset1',
-        'sub dataset1/sub sub dataset1/subm 1',
+        _p('sub dataset1/2'),
+        _p('sub dataset1/sub sub dataset1'),
+        _p('sub dataset1/sub sub dataset1/subm 1'),
     ])
 
 
