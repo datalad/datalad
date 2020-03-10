@@ -1914,6 +1914,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 raise e
         return out.strip()[11:]  # strip refs/heads/
 
+    def get_corresponding_branch(self, branch=None):
+        """Always returns None, a plain GitRepo has no managed branches"""
+        return None
+
     def get_branches(self):
         """Get all branches of the repo.
 

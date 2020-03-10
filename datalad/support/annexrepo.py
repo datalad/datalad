@@ -465,25 +465,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         return False
 
     def get_corresponding_branch(self, branch=None):
-        """In case of a managed branch, get the corresponding one.
-
-        If `branch` is not a managed branch, return that branch without any
-        changes.
-
-        Note: Since default for `branch` is the active branch,
-        `get_corresponding_branch()` is equivalent to `get_active_branch()` if
-        the active branch is not a managed branch.
+        """Get the name of a potential corresponding branch.
 
         Parameters
         ----------
-        branch: str
-          name of the branch; defaults to active branch
+        branch: str, optional
+          Name of the branch to report a corresponding branch for;
+          defaults to active branch
 
         Returns
         -------
-        str
-          name of the corresponding branch if there is any, name of the queried
-          branch otherwise.
+        str or None
+          Name of the corresponding branch, or `None` if there is no
+          corresponding branch.
         """
 
         if branch is None:
@@ -509,7 +503,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return cor_branch
 
         else:
-            return branch
+            return None
 
     def get_tracking_branch(self, branch=None, remote_only=False,
                             corresponding=True):
@@ -539,9 +533,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
 
         return super(AnnexRepo, self).get_tracking_branch(
-                        remote_only=remote_only,
-                        branch=self.get_corresponding_branch(branch)
-                        if corresponding else branch)
+            remote_only=remote_only,
+            branch=(self.get_corresponding_branch(branch) or branch)
+            if corresponding else branch)
 
     @classmethod
     def _check_git_annex_version(cls):
@@ -1241,7 +1235,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 self.config.sections()]
         for sct in sections_to_preserve:
             orig_branch = sct[7:]
-            new_branch = self.get_corresponding_branch(orig_branch)
+            new_branch = \
+                self.get_corresponding_branch(orig_branch) or orig_branch
             new_section = "branch.{}".format(new_branch)
             for opt in self.config.options(sct):
                 orig_value = self.config.get_value(sct, opt)
@@ -3494,17 +3489,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         branch = self.get_active_branch()
         corresponding_branch = self.get_corresponding_branch(branch)
+        branch = corresponding_branch or branch
 
-        have_corresponding_branch = branch != corresponding_branch
-
-        if managed_only and not have_corresponding_branch:
+        if managed_only and not corresponding_branch:
             lgr.debug('No sync necessary, no corresponding branch detected')
             return
 
         lgr.debug(
             "Sync local 'git-annex' branch%s.",
             ", and corresponding '{}' branch".format(corresponding_branch)
-            if have_corresponding_branch else '')
+            if corresponding_branch else '')
 
         synced_branch = 'synced/{}'.format(corresponding_branch)
         had_synced_branch = synced_branch in self.get_branches()

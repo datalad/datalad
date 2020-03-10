@@ -1984,7 +1984,7 @@ def test_AnnexRepo_get_corresponding_branch(path):
     ar = AnnexRepo(path)
 
     # we should be on master.
-    eq_('master', ar.get_corresponding_branch())
+    eq_('master', ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
     if ar.supports_unlocked_pointers:

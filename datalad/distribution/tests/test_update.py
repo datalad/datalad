@@ -756,8 +756,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # the explicit revision fetch fails.
     (ds_src_s1.pathobj / "bar").write_text("bar content")
     ds_src.save(recursive=True)
-    ds_src_s1.repo.checkout(
-        ds_src_s1.repo.get_corresponding_branch("master"))
+    ds_src_s1.repo.checkout('master')
     # This is the default, but just in case:
     ds_src_s1.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
                               where="local")
