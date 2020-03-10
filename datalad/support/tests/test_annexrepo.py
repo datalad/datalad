@@ -1152,6 +1152,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     # connection to 'datalad-test' should be known to ssh manager:
     assert_in(socket_1, list(map(str, ssh_manager._connections)))
     # but socket was not touched:
+    print("SOCKET: %s OPEN: %s" % (socket_1, datalad_test_was_open))
     if datalad_test_was_open:
         ok_(exists(socket_1))
     else:
@@ -1164,10 +1165,23 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     for host in 'localhost', 'datalad-test':
         print("SSH: %s" % host)
         runner.run(['which', 'ssh'])
-        runner.run(['ssh', '-v', '-v', '-v', host]
-                   + ["-S",".git/annex/ssh/datalad-test","-o","ControlMaster=auto","-o","ControlPersist=yes","-o","ControlMaster=auto","-S",socket_1,"-n","-T",
-                      "git-annex-shell 'configlist' '%s' '--debug' '--' 'autoinit=1' '--'" % ar.path],
-                   cwd=ar.path)
+        ssh = '/usr/lib/git-annex.linux/shimmed/ssh/ssh'
+        ssh = '/usr/bin/ssh'
+        runner.run([ssh,
+                    '-v', '-v', '-v',
+                    host]
+                   + ["-S",".git/annex/ssh/datalad-test","-o","ControlMaster=auto","-o","ControlPersist=yes","-o","ControlMaster=auto","-S", socket_1,
+                      "-n",
+                      "-T",
+                      "git-annex-shell 'configlist' '%s' '--' 'autoinit=1' '--'" % ar.path],
+                   cwd=ar.path,
+                   expect_stderr=True,
+                   #log_stdout=False,
+                   #log_stderr=False,
+                   log_online=True,
+                   log_stdout=True,
+                   log_stderr=True,
+                   )
 
     from datalad import lgr
     # remote interaction causes socket to be created:
