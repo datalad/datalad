@@ -19,6 +19,7 @@ import os
 import atexit
 import functools
 import tempfile
+from select import select
 
 from collections import OrderedDict
 from .support import path as op
@@ -98,6 +99,41 @@ def _cleanup_output(stream, std):
         std.close()
 
 
+def select_read(f, bs=100000, timeout=0):
+    """Use select.select to determine if there is anything left to read
+
+    Exits right away if nothing was read (thus nothing was left for us)
+
+    Following wonderful recipe of https://stackoverflow.com/a/21429655/1265472
+
+    This should avoid hanging with proc.stdout.read() and alike
+
+    Parameters
+    ----------
+    f: file
+    bs: int, optional
+      block size to read
+
+    """
+    out = None  # so we stay consistent with data type of os.read, while
+                # returning None if truly nothing was read
+    while True:
+        r, w, e = select([f], [], [], timeout)
+        if f in r:
+            lgr.log(5, "select_read: trying to read from %s", f)
+            out_ = os.read(f.fileno(), bs)
+            lgr.log(2, "select_read: read %d from %s", len(out_), f)
+            if not out_:
+                break
+            if out is None:
+                out = out_
+            else:
+                out += out_
+        else:
+            break
+    return out
+
+
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
@@ -114,6 +150,9 @@ class Runner(object):
 
     __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol',
                  '_log_opts']
+
+    _final_timeout = 1  # Seconds for timeout on final .read() or .communicate()
+
 
     def __init__(self, cwd=None, env=None, protocol=None, log_outputs=None):
         """
@@ -315,13 +354,13 @@ class Runner(object):
             # communicate() after we partially read the stream will return
             # empty output.
             stdout += self._process_remaining_output(
-                outputstream, proc.stdout.read(), *stdout_args)
+                outputstream, select_read(proc.stdout, timeout=self._final_timeout), *stdout_args)
             stderr += self._process_remaining_output(
-                errstream, proc.stderr.read(), *stderr_args)
+                errstream, select_read(proc.stderr, timeout=self._final_timeout), *stderr_args)
         # Since the process is already dead, we don't need to wait
         # too long:
         try:
-            stdout_, stderr_ = proc.communicate(timeout=1)
+            stdout_, stderr_ = proc.communicate(timeout=self._final_timeout)
         except subprocess.TimeoutExpired as exc:
             stdout_ = exc.stdout
             stderr_ = exc.stderr
