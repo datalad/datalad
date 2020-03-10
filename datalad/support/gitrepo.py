@@ -101,6 +101,7 @@ from .repo import (
     PathBasedFlyweight,
     RepoInterface
 )
+from datalad.core.local.repo import repo_from_path
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -2847,9 +2848,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd = ['submodule', 'add', '--name', name]
         if branch is not None:
             cmd += ['-b', branch]
+
+        subm = None
         if url is None:
             # repo must already exist locally
-            subm = GitRepo(op.join(self.path, path), create=False, init=False)
+            subm = repo_from_path(self.pathobj / path)
             # check that it has a commit, and refuse
             # to operate on it otherwise, or we would get a bastard
             # submodule that cripples git operations
@@ -2871,10 +2874,26 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 url = path
         cmd += [url, Path(path).as_posix()]
         self.call_git(cmd)
+
+        if subm is None:
+            # in case it did not happen above
+            subm = repo_from_path(self.pathobj / path)
+
+        subm_cbranch = subm.get_corresponding_branch()
+        if subm_cbranch:
+            lgr.debug(
+                'Found submodule in git-annex adjusted mode, recording state '
+                'of corresponding branch %s instead',
+                subm_cbranch)
+            self.call_git([
+                'update-index', '--add', '--replace', '--cacheinfo',
+                '160000',
+                subm.get_hexsha(subm_cbranch),
+                path])
+
         # record dataset ID if possible for comprehesive metadata on
         # dataset components within the dataset itself
-        subm_id = GitRepo(op.join(self.path, path)).config.get(
-            'datalad.dataset.id', None)
+        subm_id = subm.config.get('datalad.dataset.id', None)
         if subm_id:
             self.call_git(
                 ['config', '--file', '.gitmodules', '--replace-all',
@@ -3699,8 +3718,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # but had subsequent modifications done to it that are
                     # unstaged. Such file would presently show up as 'added'
                     # ATM I think this is OK, but worth stating...
-                    state='modified' if f.exists() or \
-                    f.is_symlink() else 'deleted',
+                    # re `None`: if we face a dataset that git reports to
+                    # have a changed state, we cannot rely on this judgement
+                    # with subdatasets that are potentially in adjusted mode.
+                    # Setting the `state` to None will queue this record for
+                    # further processing below.
+                    state=(None
+                           if to_state_r['type'] == 'dataset'
+                           else 'modified')
+                    if (f.exists() or f.is_symlink())
+                    else 'deleted',
                     # TODO record before and after state for diff-like use
                     # cases
                     type=to_state_r['type'],
@@ -3710,15 +3737,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     state not in ('clean', None):
                 # any modification means globally 'modified'
                 return 'modified'
-            if state in ('clean', 'added', 'modified'):
+            if state in ('clean', 'added', 'modified', None):
                 props['gitshasum'] = to_state_r['gitshasum']
                 if 'bytesize' in to_state_r:
                     # if we got this cheap, report it
                     props['bytesize'] = to_state_r['bytesize']
-                elif props['state'] == 'clean' and 'bytesize' in fr_state:
+                elif props.get('state', None) == 'clean' and 'bytesize' in fr_state:
                     # no change, we can take this old size info
                     props['bytesize'] = fr_state['bytesize']
-            if state in ('clean', 'modified', 'deleted'):
+            if state not in ('added', 'untracked'):
                 props['prev_gitshasum'] = fr_state['gitshasum']
             status[f] = props
 
@@ -3737,7 +3764,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if eval_state == 'global':
                     return 'modified'
 
-        if to is not None or eval_state == 'no':
+        if (to is not None or eval_state == 'no') and not any(
+                # detect anything that doesn't have an evaluated state yet
+                # (which would be a subdataset that git reported modified
+                # but we still have to check for potential cleanlyness
+                # of a corresponding branch).
+                s.get('state', None) is None for s in status.values()):
             # if we have `to` we are specifically comparing against
             # a recorded state, and this function only attempts
             # to label the state of a subdataset, not investigate
@@ -3752,18 +3784,40 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # loop over all subdatasets and look for additional modifications
         for f, st in status.items():
-            if 'state' in st or not st['type'] == 'dataset':
-                # no business here
+            if st.get('state', None) or not st['type'] == 'dataset':
+                # no business here, we already know a state
                 continue
             if not GitRepo.is_valid_repo(f):
                 # submodule is not present, no chance for a conflict
                 st['state'] = 'clean'
                 continue
             # we have to recurse into the dataset and get its status
-            subrepo = GitRepo(f)
-            subrepo_commit = subrepo.get_hexsha()
+            subrepo = repo_from_path(f)
+            # figure out what we should compare against (in the face
+            # of a potential adjusted branch situation)
+            subm_cbranch = subrepo.get_corresponding_branch()
+            if subm_cbranch:
+                # this is actually an AnnexRepo in adjusted mode.
+                # now we have two choices:
+                # 1) run a diff of the adjusted branch against the
+                #    corresponding branch, and proceed with the
+                #    corresponding if the diff is clean, or label the
+                #    dataset 'modified' if not.
+                # 2) run an unconditional localsync() and therefor
+                #    enforce a clean diff between adjusted and
+                #    corresponding branch.
+                # Going with (2) due to implementation simplicity, but
+                # without having tested performance differences on complex
+                # datasets
+                lgr.debug(
+                    'Sync corresponding branch %s at %s prior repository '
+                    'state evaluation', subm_cbranch, f)
+                subrepo.localsync(managed_only=True)
+            # the corresponding branch is the reference. Without an
+            # adjusted branch, this is None, and None is the active branch,
+            # or the present commit sha
+            subrepo_commit = subrepo.get_hexsha(subm_cbranch)
             st['gitshasum'] = subrepo_commit
-            # subdataset records must be labeled clean up to this point
             # test if current commit in subdataset deviates from what is
             # recorded in the dataset
             st['state'] = 'modified' \
@@ -3979,6 +4033,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         str(cand_sm.relative_to(self.pathobj)),
                         url=None,
                         name=None,
+                        # MIH: this looks strange, why would we want to check
+                        # out a branch that matches the name of a branch
+                        # in the parentds, we don't even know if there is
+                        # such a branch...
                         branch=adjusted_match.group('name') if adjusted_match
                         else branch
                     )
@@ -4021,6 +4079,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         self,
                         to_stage_submodules,
                         git_opts=None):
+                    # _save_add doesn't know better, but we know that
+                    # we only passed submodule records
+                    r['type'] = 'dataset'
+                    r.pop('key', None)
                     yield r
 
         if added_submodule or vanished_subds:
@@ -4056,6 +4118,19 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                        if k in (('git',) if hasattr(self, 'annexstatus')
                                 else tuple())}):
                 yield r
+
+        # and lastly fixup subdataset states
+        for sub in [f for f, props in status.items()
+                    if props.get('state', None) in ('modified', 'untracked')
+                    and props.get('type', None) == 'dataset']:
+            subm = repo_from_path(sub)
+            subm_cbranch = subm.get_corresponding_branch()
+            if subm_cbranch:
+                self.call_git([
+                    'update-index', '--add', '--replace', '--cacheinfo',
+                    '160000',
+                    subm.get_hexsha(subm_cbranch),
+                    str(subm.pathobj.relative_to(self.pathobj))])
 
         self._save_post(message, status, need_partial_commit)
         # TODO yield result for commit, prev helper checked hexsha pre
