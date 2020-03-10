@@ -67,6 +67,7 @@ from datalad.tests.utils import (
     with_tempfile,
     with_testrepos,
     with_tree,
+    SkipTest,
 )
 from datalad.core.distributed.clone import (
     _get_installationpath_from_url,
