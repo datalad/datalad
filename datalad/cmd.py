@@ -318,7 +318,14 @@ class Runner(object):
                 outputstream, proc.stdout.read(), *stdout_args)
             stderr += self._process_remaining_output(
                 errstream, proc.stderr.read(), *stderr_args)
-        stdout_, stderr_ = proc.communicate()
+        # Since the process is already dead, we don't need to wait
+        # too long:
+        try:
+            stdout_, stderr_ = proc.communicate(timeout=1)
+        except subprocess.TimeoutExpired as exc:
+            stdout_ = exc.stdout
+            stderr_ = exc.stderr
+
         # ??? should we condition it on log_stdout in {'offline'} ???
         stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
         stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
