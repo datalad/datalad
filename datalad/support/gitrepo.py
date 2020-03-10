@@ -3655,14 +3655,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         status = OrderedDict()
         for f, to_state_r in to_state.items():
             props = None
-            if f not in from_state:
+            fr_state = from_state.get(f, {})
+            if not fr_state:
                 # this is new, or rather not known to the previous state
                 props = dict(
                     state='added' if to_state_r['gitshasum'] else 'untracked',
                 )
                 if 'type' in to_state_r:
                     props['type'] = to_state_r['type']
-            elif to_state_r['gitshasum'] == from_state[f]['gitshasum'] and \
+            elif to_state_r['gitshasum'] == fr_state['gitshasum'] and \
                     (modified is None or f not in modified):
                 if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
@@ -3690,7 +3691,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         # report the shasum that we know, for further
                         # wrangling of subdatasets below
                         props['gitshasum'] = to_state_r['gitshasum']
-                        props['prev_gitshasum'] = from_state[f]['gitshasum']
+                        props['prev_gitshasum'] = fr_state['gitshasum']
             else:
                 # change in git record, or on disk
                 props = dict(
@@ -3714,16 +3715,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if 'bytesize' in to_state_r:
                     # if we got this cheap, report it
                     props['bytesize'] = to_state_r['bytesize']
-                elif props['state'] == 'clean' and 'bytesize' in from_state[f]:
+                elif props['state'] == 'clean' and 'bytesize' in fr_state:
                     # no change, we can take this old size info
-                    props['bytesize'] = from_state[f]['bytesize']
+                    props['bytesize'] = fr_state['bytesize']
             if state in ('clean', 'modified', 'deleted'):
-                props['prev_gitshasum'] = from_state[f]['gitshasum']
+                props['prev_gitshasum'] = fr_state['gitshasum']
             status[f] = props
 
         for f, from_state_r in from_state.items():
             if f not in to_state:
-                # we new this, but now it is gone and Git is not complaining
+                # we knew this, but now it is gone and Git is not complaining
                 # about it being missing -> properly deleted and deletion
                 # stages
                 status[f] = dict(
@@ -3751,7 +3752,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # loop over all subdatasets and look for additional modifications
         for f, st in status.items():
-            f = str(f)
             if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
