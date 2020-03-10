@@ -1157,24 +1157,16 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
-    from datalad import lgr
+    run_kwargs = dict(
+        expect_stderr=True,
+        log_online=True,
+        log_stdout=True,
+        log_stderr=True,
+        expect_fail=True
+    )
     # remote interaction causes socket to be created:
     try:
-        # Note: For some reason, it hangs if log_stdout/err True
-        # TODO: Figure out what's going on
-        #  yoh: I think it is because of what is "TODOed" within cmd.py --
-        #       trying to log/obtain both through PIPE could lead to lock
-        #       downs.
-        # here we use our swallow_logs to overcome a problem of running under
-        # nosetests without -s, when nose then tries to swallow stdout by
-        # mocking it with StringIO, which is not fully compatible with Popen
-        # which needs its .fileno()
-        with swallow_outputs():
-            ar._run_annex_command('sync',
-                                  expect_stderr=True,
-                                  log_stdout=False,
-                                  log_stderr=False,
-                                  expect_fail=True)
+        ar._run_annex_command('sync', **run_kwargs)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
@@ -1198,12 +1190,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # sync with the new remote:
     try:
-        with swallow_outputs():
-            ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
-                                  expect_stderr=True,
-                                  log_stdout=False,
-                                  log_stderr=False,
-                                  expect_fail=True)
+        ar._run_annex_command('sync', annex_options=['ssh-remote-2'], **run_kwargs)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
