@@ -46,6 +46,9 @@ def repo_from_path(path):
     from datalad.support.gitrepo import GitRepo
     from datalad.support.annexrepo import AnnexRepo
 
+    # until we shed PY35
+    path = str(path)
+
     repo = None
     for cls, ckw, kw in (
             # Non-initialized is okay. We want to figure the correct instance
