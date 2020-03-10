@@ -1157,6 +1157,15 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
+    from datalad.cmd import GitRunner
+    runner = GitRunner()
+    print("LS:")
+    runner.run('ls -al ~', shell=True)
+    for host in 'localhost', 'datalad-test':
+        print("SSH: %s" % host)
+        runner.run(['which', 'ssh'])
+        runner.run(['ssh', '-v', '-v', '-v', host, 'ls', '-al'])
+
     from datalad import lgr
     # remote interaction causes socket to be created:
     try:
