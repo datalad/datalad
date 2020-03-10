@@ -346,10 +346,7 @@ def test_path_diff(_path, linkpath):
         path = _path
 
     ds = Dataset(path)
-    if not on_windows:
-        # TODO test should also be has_symlink_capability(), but
-        # something in the repo base class is not behaving yet
-        # check the premise of this test
+    if has_symlink_capability():
         assert ds.pathobj != ds.repo.pathobj
 
     plain_recursive = ds.diff(recursive=True, annex='all', result_renderer=None)

@@ -19,6 +19,7 @@ from datalad.distribution.dataset import (
 )
 from datalad.api import create
 from datalad.support.exceptions import CommandError
+from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import (
     chpwd,
     on_windows,
@@ -34,6 +35,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_status,
     eq_,
+    has_symlink_capability,
     OBSCURE_FILENAME,
     ok_,
     swallow_outputs,
@@ -161,18 +163,23 @@ def test_create_curdir(path, path2):
 
 
 @with_tempfile
-def test_create(path):
+@with_tempfile
+def test_create(probe, path):
+    # only as a probe whether this FS is a crippled one
+    ar = AnnexRepo(probe, create=True)
+
     ds = Dataset(path)
     ds.create(
         description="funny",
         # custom git init option
-        initopts=dict(shared='world'))
+        initopts=dict(shared='world') if not ar.is_managed_branch() else None)
     ok_(ds.is_installed())
     assert_repo_status(ds.path, annex=True)
 
     # check default backend
     eq_(ds.config.get("annex.backends"), 'MD5E')
-    eq_(ds.config.get("core.sharedrepository"), '2')
+    if not ar.is_managed_branch():
+        eq_(ds.config.get("core.sharedrepository"), '2')
     runner = Runner()
     # check description in `info`
     cmd = ['git', 'annex', 'info']
@@ -493,7 +500,7 @@ def test_create_relpath_semantics():
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_gh2927(path, linkpath):
-    if not on_windows:
+    if has_symlink_capability():
         # make it more complicated by default
         Path(linkpath).symlink_to(path, target_is_directory=True)
         path = linkpath

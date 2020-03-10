@@ -301,7 +301,7 @@ def test_gh2043p1(path):
         ds.path,
         # on windows we are in an unlocked branch by default, hence
         # we would see no change
-        modified=[] if on_windows else ['1'],
+        modified=[] if ds.repo.is_managed_branch() else ['1'],
         untracked=['2', '3'])
     # save(.) should recommit unlocked file, and not touch anything else
     # this tests the second issue in #2043
