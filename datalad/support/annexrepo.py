@@ -612,7 +612,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cls._check_git_annex_version()
 
         ver = cls.git_annex_version
-        kludges["has-include-dotfiles"] = ver <= "7.20200226"
+        kludges["has-include-dotfiles"] = ver < "8"
         cls._version_kludges = kludges
         return kludges[key]
 

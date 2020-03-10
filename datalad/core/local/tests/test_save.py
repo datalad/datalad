@@ -32,6 +32,7 @@ from datalad.tests.utils import (
     known_failure_windows,
     OBSCURE_FILENAME,
     ok_,
+    SkipTest,
     skip_wo_symlink_capability,
     swallow_outputs,
     with_tempfile,
@@ -771,10 +772,16 @@ def check_save_dotfiles(to_git, save_path, path):
     ok_(paths)
     ds = Dataset(path).create(force=True)
     if not to_git and ds.repo.is_managed_branch():
-        if not ds.repo._check_version_kludges("has-include-dotfiles"):
-            # FIXME(annex.dotfiles)
+        ver = ds.repo.git_annex_version
+        if "8" < ver < "8.20200309":
+            # git-annex's 1978a2420 (2020-03-09) fixed a bug where
+            # annexed dotfiles could switch when annex.dotfiles=true
+            # was not set in .git/config or git-annex:config.log.
             ds.repo.config.set("annex.dotfiles", "true",
                                where="local", reload=True)
+        elif ver < "8" and save_path is None:
+            raise SkipTest("Fails with annex version below v8.*")
+
     ds.save(save_path, to_git=to_git)
     if save_path is None:
         assert_repo_status(ds.path)
