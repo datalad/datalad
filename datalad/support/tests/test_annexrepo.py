@@ -1165,16 +1165,11 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
         #  yoh: I think it is because of what is "TODOed" within cmd.py --
         #       trying to log/obtain both through PIPE could lead to lock
         #       downs.
-        # here we use our swallow_logs to overcome a problem of running under
-        # nosetests without -s, when nose then tries to swallow stdout by
-        # mocking it with StringIO, which is not fully compatible with Popen
-        # which needs its .fileno()
-        with swallow_outputs():
-            ar._run_annex_command('sync',
-                                  expect_stderr=True,
-                                  log_stdout=False,
-                                  log_stderr=False,
-                                  expect_fail=True)
+        ar._run_annex_command('sync',
+                              expect_stderr=True,
+                              log_stdout=False,
+                              log_stderr=False,
+                              expect_fail=True)
     # sync should return exit code 1, since it can not merge
     # doesn't matter for the purpose of this test
     except CommandError as e:
