@@ -3714,24 +3714,22 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             else:
                 # change in git record, or on disk
                 props = dict(
-                    # TODO we could have a new file that is already staged
-                    # but had subsequent modifications done to it that are
-                    # unstaged. Such file would presently show up as 'added'
-                    # ATM I think this is OK, but worth stating...
-                    # re `None`: if we face a dataset that git reports to
-                    # have a changed state, we cannot rely on this judgement
-                    # with subdatasets that are potentially in adjusted mode.
-                    # Setting the `state` to None will queue this record for
-                    # further processing below.
-                    state=(None
-                           if to_state_r['type'] == 'dataset'
-                           else 'modified')
-                    if (f.exists() or f.is_symlink())
-                    else 'deleted',
                     # TODO record before and after state for diff-like use
                     # cases
                     type=to_state_r['type'],
                 )
+                # TODO we could have a new file that is already staged
+                # but had subsequent modifications done to it that are
+                # unstaged. Such file would presently show up as 'added'
+                # ATM I think this is OK, but worth stating...
+                # re `None`: if we face a dataset that git reports to
+                # have a changed state, we cannot rely on this judgement
+                # with subdatasets that are potentially in adjusted mode.
+                # Setting the `state` to None will queue this record for
+                # further processing below.
+                if to_state_r['type'] != 'dataset':
+                    props['state'] = 'modified' if (
+                        f.exists() or f.is_symlink()) else 'deleted'
             state = props.get('state', None)
             if eval_state == 'global' and \
                     state not in ('clean', None):
@@ -3764,7 +3762,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if eval_state == 'global':
                     return 'modified'
 
-        if (to is not None or eval_state == 'no') and not any(
+        if eval_state == 'no':
+            if eval_state == 'global':
+                return 'clean'
+            else:
+                return status
+
+        if to is not None and not any(
                 # detect anything that doesn't have an evaluated state yet
                 # (which would be a subdataset that git reported modified
                 # but we still have to check for potential cleanlyness
