@@ -22,23 +22,19 @@ import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
-from datalad.dochelpers import exc_str
+from datalad.core.local.repo import repo_from_path
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 # DueCredit
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
-    InvalidAnnexRepositoryError,
-    InvalidGitRepositoryError,
     NoDatasetArgumentFound,
-    NoSuchPathError,
 )
 from datalad.support.gitrepo import (
     GitRepo,
 )
 from datalad.support.repo import PathBasedFlyweight
-from datalad.support.network import RI
 from datalad.support import path as op
 
 import datalad.utils as ut
@@ -284,34 +280,16 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # be the last reference, which would lead to those objects being
         # destroyed and therefore the constructor call would result in an
         # actually new instance. This is unnecessarily costly.
-        valid = False
-        for cls, ckw, kw in (
-                # Non-initialized is okay. We want to figure the correct instance to represent what's there - that's it.
-                (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                (GitRepo, {}, {})
-        ):
-            if cls.is_valid_repo(self._path, **ckw):
-                try:
-                    lgr.log(5, "Detected %s at %s", cls, self._path)
-                    self._repo = cls(self._path, create=False, **kw)
-                    valid = True
-                    break
-                except (InvalidGitRepositoryError, NoSuchPathError,
-                        InvalidAnnexRepositoryError) as exc:
-                    lgr.log(5,
-                            "Oops -- guess on repo type was wrong?: %s",
-                            exc_str(exc))
-
-        if not valid:
-            self._repo = None
-
-        if self._repo is None:
-            # Often .repo is requested to 'sense' if anything is installed
-            # under, and if so -- to proceed forward. Thus log here only
-            # at DEBUG level and if necessary "complaint upstairs"
+        try:
+            self._repo = repo_from_path(self._path)
+        except ValueError:
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
-        elif due.active:
-            # TODO: Figure out, when exactly this is needed. Don't think it makes sense to do this for every dataset,
+            self._repo = None
+            return
+
+        if due.active:
+            # TODO: Figure out, when exactly this is needed. Don't think it
+            #       makes sense to do this for every dataset,
             #       no matter what => we want .repo to be as cheap as it gets.
             # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
