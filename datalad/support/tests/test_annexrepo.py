@@ -1164,7 +1164,10 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     for host in 'localhost', 'datalad-test':
         print("SSH: %s" % host)
         runner.run(['which', 'ssh'])
-        runner.run(['ssh', '-v', '-v', '-v', host, 'ls', '-al'])
+        runner.run(['ssh', '-v', '-v', '-v', host]
+                   + ["-S",".git/annex/ssh/datalad-test","-o","ControlMaster=auto","-o","ControlPersist=yes","-o","ControlMaster=auto","-S",socket_1,"-n","-T",
+                      "git-annex-shell 'configlist' '%s' '--debug' '--' 'autoinit=1' '--'" % ar.path],
+                   cwd=ar.path)
 
     from datalad import lgr
     # remote interaction causes socket to be created:
