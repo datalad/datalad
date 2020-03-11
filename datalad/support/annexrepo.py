@@ -3398,11 +3398,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._check_version_kludges("has-include-dotfiles"):
             options.append('--include-dotfiles')
         # if None -- leave it to annex to decide
-        if git is not None:
-            options += [
-                '-c',
-                'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
-            ]
+        if git is False:
+            options.extend(['-c', 'annex.largefiles=anything'])
         if on_windows:
             # git-annex ignores symlinks on windows
             # https://github.com/datalad/datalad/issues/2955
@@ -3427,27 +3424,30 @@ class AnnexRepo(GitRepo, RepoInterface):
             # progressbar info, hence save the stat calls
             expected_additions = {p: self.get_file_size(p) for p in files}
 
-        for r in self._run_annex_command_json(
-                'add',
-                opts=options,
-                files=list(files.keys()),
-                backend=None,
-                expect_fail=True,
-                # TODO
-                jobs=None,
-                expected_entries=expected_additions,
-                expect_stderr=True):
-            yield get_status_dict(
-                action=r.get('command', 'add'),
-                refds=self.pathobj,
-                type='file',
-                path=(self.pathobj / ut.PurePosixPath(r['file']))
-                if 'file' in r else None,
-                status='ok' if r.get('success', None) else 'error',
-                key=r.get('key', None),
-                message='\n'.join(r['error-messages'])
-                if 'error-messages' in r else None,
-                logger=lgr)
+        if git is True:
+            yield from GitRepo._save_add(self, files, git_opts=git_opts)
+        else:
+            for r in self._run_annex_command_json(
+                    'add',
+                    opts=options,
+                    files=list(files.keys()),
+                    backend=None,
+                    expect_fail=True,
+                    # TODO
+                    jobs=None,
+                    expected_entries=expected_additions,
+                    expect_stderr=True):
+                yield get_status_dict(
+                    action=r.get('command', 'add'),
+                    refds=self.pathobj,
+                    type='file',
+                    path=(self.pathobj / ut.PurePosixPath(r['file']))
+                    if 'file' in r else None,
+                    status='ok' if r.get('success', None) else 'error',
+                    key=r.get('key', None),
+                    message='\n'.join(r['error-messages'])
+                    if 'error-messages' in r else None,
+                    logger=lgr)
 
     def _save_post(self, message, status, partial_commit):
         # first do standard GitRepo business
