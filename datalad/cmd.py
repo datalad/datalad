@@ -375,6 +375,7 @@ class Runner(object):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
         out = bytes()
+        lgr.log(5, "Process remaining output from %s", stream)
         if isinstance(stream, file_class) and \
                 _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
