@@ -1478,16 +1478,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         }
 
         # if None -- leave it to annex to decide
-        if git is not None:
-            options += [
-                '-c',
-                'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
-            ]
-            if git and self._check_version_kludges("has-include-dotfiles"):
-                # to maintain behaviour similar to git
-                options += ['--include-dotfiles']
+        if git is False:
+            options.extend(['-c', 'annex.largefiles=anything'])
 
-        if git and update:
+        if git:
             # explicitly use git-add with --update instead of git-annex-add
             # TODO: This might still need some work, when --update AND files
             # are specified!
