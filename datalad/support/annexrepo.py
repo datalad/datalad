@@ -3500,7 +3500,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             ", and corresponding '{}' branch".format(corresponding_branch)
             if corresponding_branch else '')
 
-        synced_branch = 'synced/{}'.format(corresponding_branch)
+        synced_branch = 'synced/{}'.format(branch)
         had_synced_branch = synced_branch in self.get_branches()
         cmd = ['annex', 'sync']
         if remote:

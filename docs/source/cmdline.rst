@@ -95,6 +95,7 @@ Plumbing commands
    generated/man/datalad-clone
    generated/man/datalad-create-test-dataset
    generated/man/datalad-diff
+   generated/man/datalad-push
    generated/man/datalad-sshrun
    generated/man/datalad-siblings
    generated/man/datalad-status
