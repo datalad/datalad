@@ -397,7 +397,10 @@ class Runner(object):
                           expected=False, line=None, suf=None):
         if line is None:
             lgr.log(3, "Reading line from %s", out_type)
-            line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
+            f = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type]
+            r, w, e = select([f], [], [], 1)
+            if f in r:
+                line = f.readline()
         else:
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
