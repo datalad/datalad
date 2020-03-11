@@ -52,7 +52,7 @@ def test_runnin_on_empty(path):
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def test_status_basics(path, linkpath, otherdir):
-    if not on_windows:
+    if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(path, target_is_directory=True)
         path = linkpath
@@ -115,10 +115,7 @@ def test_status(_path, linkpath):
         path = _path
 
     ds = Dataset(path)
-    if not on_windows:
-        # TODO test should also be has_symlink_capability(), but
-        # something in the repo base class is not behaving yet
-        # check the premise of this test
+    if has_symlink_capability():
         assert ds.pathobj != ds.repo.pathobj
 
     # spotcheck that annex status reporting and availability evaluation
@@ -131,8 +128,8 @@ def test_status(_path, linkpath):
         has_content=True,
         objloc=str(ds.repo.pathobj / '.git' / 'annex' / 'objects' /
         # hashdir is different on windows
-        ('f33' if on_windows else '7p') /
-        ('94b' if on_windows else 'gp') /
+        ('f33' if ds.repo.is_managed_branch() else '7p') /
+        ('94b' if ds.repo.is_managed_branch() else 'gp') /
         'MD5E-s5--275876e34cf609db118f3d84b799a790.txt' /
         'MD5E-s5--275876e34cf609db118f3d84b799a790.txt'))
 

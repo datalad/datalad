@@ -53,7 +53,9 @@ def test_basics(src, dst):
         where='local',
     )
     # a smoke test to see if a hook definition without any call args works too
-    clone.config.set('datalad.result-hook.wtf.call-json', 'wtf', where='local')
+    clone.config.set('datalad.result-hook.wtf.call-json',
+                     'wtf {{"result_renderer": "disabled"}}',
+                     where='local')
     clone.config.set(
         'datalad.result-hook.wtf.match-json',
         '{"type":"dataset","action":"install","status":["eq", "ok"]}',
@@ -98,16 +100,16 @@ def test_basics(src, dst):
     eq_(clone_sub2.config.get('datalad.metadata.nativetype'), 'bids')
 
     # hook auto-unlocks the file
-    if not on_windows:
+    if not clone.repo.is_managed_branch():
         ok_((clone.pathobj / 'file1').is_symlink())
     res = clone.get('file1')
-    if not on_windows:
+    if not clone.repo.is_managed_branch():
         # we get to see the results from the hook too!
         assert_result_count(
             res, 1, action='unlock', path=str(clone.pathobj / 'file1'))
     ok_(not (clone.pathobj / 'file1').is_symlink())
 
-    if not on_windows:
+    if not clone.repo.is_managed_branch():
         # different hook places annoying file next to a file that was already present
         annoyed_file = clone.pathobj / 'file1_annoyed'
         ok_(not annoyed_file.exists())

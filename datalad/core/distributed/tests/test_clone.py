@@ -67,6 +67,7 @@ from datalad.tests.utils import (
     with_tempfile,
     with_testrepos,
     with_tree,
+    SkipTest,
 )
 from datalad.core.distributed.clone import (
     _get_installationpath_from_url,
@@ -780,6 +781,9 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
     file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
 
     origin = Dataset(origin_path).create(force=True)
+    if origin.repo.is_managed_branch():
+        raise SkipTest('Ephemeral clones cannot use adjusted mode repos')
+
     origin.save()
     # 1. clone via path
     clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
