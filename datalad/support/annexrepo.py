@@ -603,7 +603,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Return the kludge under `key`.
         """
-        assert key in {"has-include-dotfiles"}
         kludges = cls._version_kludges
         if kludges:
             return kludges[key]
