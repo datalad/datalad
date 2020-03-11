@@ -11,6 +11,7 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
+import io
 import time
 import subprocess
 import sys
@@ -115,6 +116,8 @@ def select_read(f, bs=100000, timeout=0):
       block size to read
 
     """
+    if isinstance(f, io.BufferedReader):
+        return f.read()
     out = None  # so we stay consistent with data type of os.read, while
                 # returning None if truly nothing was read
     while True:
@@ -338,10 +341,10 @@ class Runner(object):
             # it stalls
             # Monitor if anything was output and if nothing, sleep a bit
             stdout_, stderr_ = None, None
-            if log_stdout_:
+            if log_stdout_ and not proc.stdout.closed:
                 stdout_ = self._process_one_line(*stdout_args)
                 stdout += stdout_
-            if log_stderr_:
+            if log_stderr_ and not proc.stderr.closed:
                 stderr_ = self._process_one_line(*stderr_args)
                 stderr += stderr_
             if stdout_ is None and stderr_ is None:
@@ -349,25 +352,29 @@ class Runner(object):
                 time.sleep(0.001)
 
         # Handle possible remaining output
-        if log_stdout_ and log_stderr_:
+        if log_stdout_ and not proc.stdout.closed: #  and log_stderr_: # not proc.stdout.closed:#  and log_stderr_:
             # If Popen was called with more than two pipes, calling
             # communicate() after we partially read the stream will return
             # empty output.
             stdout += self._process_remaining_output(
                 outputstream, select_read(proc.stdout, timeout=self._final_timeout), *stdout_args)
+        if log_stderr_ and not proc.stderr.closed:
             stderr += self._process_remaining_output(
                 errstream, select_read(proc.stderr, timeout=self._final_timeout), *stderr_args)
-        # Since the process is already dead, we don't need to wait
-        # too long:
-        try:
-            stdout_, stderr_ = proc.communicate(timeout=self._final_timeout)
-        except subprocess.TimeoutExpired as exc:
-            stdout_ = exc.stdout
-            stderr_ = exc.stderr
 
+        #     # Since the process is already dead, we don't need to wait
+        #     # too long:
+        #     try:
+        #         stdout_, stderr_ = proc.communicate(timeout=self._final_timeout)
+        #     except subprocess.TimeoutExpired as exc:
+        #         stdout_ = exc.stdout
+        #         stderr_ = exc.stderr
+        #
         # ??? should we condition it on log_stdout in {'offline'} ???
-        stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
-        stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
+        if log_stdout == 'offline':
+            stdout += self._process_remaining_output(outputstream, None, *stdout_args)
+        if log_stderr == 'offline':
+            stderr += self._process_remaining_output(errstream, None, *stderr_args)
 
         return stdout, stderr
 
@@ -399,9 +406,12 @@ class Runner(object):
         if line is None:
             lgr.log(3, "Reading line from %s", out_type)
             f = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type]
-            r, w, e = select([f], [], [], 1)
-            if f in r:
+            if isinstance(f, io.BufferedReader):
                 line = f.readline()
+            else:
+                r, w, e = select([f], [], [], 1)
+                if f in r:
+                    line = f.readline()
         else:
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
