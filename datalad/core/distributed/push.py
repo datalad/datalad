@@ -565,7 +565,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         # (e.g. fresh repo)
         # TODO is this possible? we just copied? Maybe check if anything
         # was actually copied?
-        if "fatal: couldn't find remote ref git-annex" not in e.stderr:
+        if "fatal: couldn't find remote ref git-annex" not in e.stderr.lower():
             raise
         lgr.debug('Remote does not have a git-annex branch: %s', e)
     # and push the annex branch to announce local availability info
