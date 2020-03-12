@@ -254,7 +254,7 @@ def test_run_from_subds_gh3551(path):
     assert_repo_status(ds.path)
     subds = Dataset(op.join(ds.path, subds_path))
     ok_exists(op.join(subds.path, "f"))
-    if ds.repo.is_managed_branch():  # FIXME
+    if not ds.repo.is_managed_branch():  # FIXME
         # This check fails on Windows:
         # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
         ok_(subds.repo.file_has_content("f"))
