@@ -34,9 +34,18 @@ bet we will fix some bugs and make a world even a better place.
   configuration variables, including `datalad.log.outputs`, resulting
   in the default value always being used.  ([#4194][])
 
+- [publish][] failed when trying to publish to a git-lfs special
+  remote for the first time.  ([#4200][])
+
+- `AnnexRepo.set_remote_url` is supposed to establish shared SSH
+  connections but failed to do so.  ([#4262][])
+
 ### Enhancements and new features
 
-?
+- The "aws-s3" authentication type now allows specifying the host
+  through "aws-s3_host", which was needed to work around an
+  authorization error due to a longstanding upstream bug.  ([#4239][])
+
 
 ## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
 
@@ -2411,5 +2420,8 @@ publishing
 [#4078]: https://github.com/datalad/datalad/issues/4078
 [#4140]: https://github.com/datalad/datalad/issues/4140
 [#4194]: https://github.com/datalad/datalad/issues/4194
+[#4200]: https://github.com/datalad/datalad/issues/4200
 [#4212]: https://github.com/datalad/datalad/issues/4212
 [#4214]: https://github.com/datalad/datalad/issues/4214
+[#4239]: https://github.com/datalad/datalad/issues/4239
+[#4262]: https://github.com/datalad/datalad/issues/4262
