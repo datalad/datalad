@@ -33,8 +33,8 @@ env:
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
 #    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
 
-#matrix:
-#  include:
+matrix:
+  include:
 #  # Additional custom ones
 #  - python: 3.7
 #    # Single run for Python 3.7
@@ -55,10 +55,10 @@ env:
 #    env:
 #    - DATALAD_REPO_VERSION=6
 #    - NOSE_SELECTION_OP=not
-#  - python: 3.5
-#    env:
+  - python: 3.5
+    env:
 #    - DATALAD_REPO_VERSION=6
-#    - NOSE_SELECTION_OP=""
+    - NOSE_SELECTION_OP=""
 #  - python: 3.5
 #    # Run slow etc tests under a single tricky scenario
 #    env:
