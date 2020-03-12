@@ -17,7 +17,7 @@ env:
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_OUTPUTS=1
-    - TESTS_TO_PERFORM=../datalad/support/tests/test_annexrepo.py:test_annex_ssh
+    - TESTS_TO_PERFORM=datalad
     - NOSE_OPTS=-s
     - NOSE_SELECTION="integration or usecase or slow"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
