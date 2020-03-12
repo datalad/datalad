@@ -7,9 +7,6 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import shutil
-import subprocess
-
 import logging
 from datalad.api import Dataset
 from datalad.utils import Path
@@ -26,7 +23,7 @@ from datalad.tests.utils import (
     turtle,
     with_tempfile
 )
-from datalad.customremotes.ria_remote import (
+from datalad.distributed.ora_remote import (
     LocalIO,
     SSHRemoteIO
 )
@@ -36,7 +33,6 @@ from datalad.support.exceptions import (
 )
 from datalad.distributed.tests.ria_utils import (
     get_all_files,
-    initexternalremote,
     populate_dataset,
 )
 from datalad.customremotes.ria_utils import (
@@ -46,7 +42,7 @@ from datalad.customremotes.ria_utils import (
 )
 
 
-common_init_opts = ["encryption=none", "type=external", "externaltype=ria"]
+common_init_opts = ["encryption=none", "type=external", "externaltype=ora"]
 
 
 # Note, that exceptions to test for are generally CommandError since we are

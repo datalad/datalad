@@ -1,4 +1,4 @@
-from datalad.customremotes.ria_remote import (
+from datalad.distributed.ora_remote import (
     LocalIO,
     SSHRemoteIO
 )
