@@ -563,7 +563,10 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     if dataset is None:  # possible scenario of cmdline calls
         dspath = get_dataset_root(getpwd())
         if not dspath:
-            raise NoDatasetArgumentFound("No dataset found")
+            raise NoDatasetArgumentFound(
+                "No dataset found.  You must either specify or 'cd' to the "
+                "(super)dataset containing your path(s) and reissue the "
+                "command.")
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
