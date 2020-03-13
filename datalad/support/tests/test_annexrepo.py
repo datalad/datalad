@@ -1157,6 +1157,13 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
+    # TODO: figure it out, and possibly remove while merginging into
+    # master if WitlessRunner performs fine
+    if external_versions['cmd:annex'] >= '8.20200226':
+        # This is not necessarily the version where it started to hang
+        # See https://github.com/datalad/datalad/pull/4265 for more info
+        raise SkipTest("Version of git-annex might cause us to stall.")
+
     from datalad import lgr
     # remote interaction causes socket to be created:
     try:
