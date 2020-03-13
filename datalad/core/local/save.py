@@ -135,7 +135,7 @@ class Save(Interface):
             not be annexed in a subsequent save operation.
             If not specified, it will be up to git-annex to decide how
             a file is tracked, based on a dataset's configuration
-            to track track particular paths,
+            to track particular paths,
             file types, or file sizes with either Git or git-annex.
             (see https://git-annex.branchable.com/tips/largefiles).
             """),
