@@ -34,7 +34,7 @@ from datalad.utils import (
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
-    NoDatasetArgumentFound,
+    NoDatasetFound,
     CommandError,
 )
 from datalad.api import (
@@ -76,7 +76,7 @@ from datalad.tests.utils import (
 def test_invalid_call(path):
     with chpwd(path):
         # no dataset, no luck
-        assert_raises(NoDatasetArgumentFound, run, 'doesntmatter')
+        assert_raises(NoDatasetFound, run, 'doesntmatter')
         # dirty dataset
         ds = Dataset(path).create()
         create_tree(ds.path, {'this': 'dirty'})
