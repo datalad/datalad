@@ -20,6 +20,10 @@ jobs:
             datalad.metadata datalad.tests datalad.ui datalad.cmdline
         ]
     steps:
+    - name: Configure windows system
+      run: |
+        # https://support.microsoft.com/en-us/help/121007/how-to-disable-8-3-file-name-creation-on-ntfs-partitions
+        fsutil.exe behavior set disable8dot3 1
     - name: Set up environment
       run: |
         git config --global user.email "test@github.land"
