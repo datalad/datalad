@@ -130,14 +130,15 @@ class Save(Interface):
             args=("--to-git",),
             action='store_true',
             doc="""flag whether to add data directly to Git, instead of
-            tracking data identity only.  Usually this is not desired,
-            as it inflates dataset sizes and impacts flexibility of data
-            transport. If not specified - it will be up to git-annex to
-            decide, possibly on .gitattributes options. Use this flag
-            with a simultaneous selection of paths to save. In general,
-            it is better to pre-configure a dataset to track particular paths,
+            tracking data identity only.  Use with caution, there is no
+            guarantee that a file put directly into Git like this will
+            not be annexed in a subsequent save operation.
+            If not specified, it will be up to git-annex to decide how
+            a file is tracked, based on a dataset's configuration
+            to track track particular paths,
             file types, or file sizes with either Git or git-annex.
-            See https://git-annex.branchable.com/tips/largefiles/"""),
+            (see https://git-annex.branchable.com/tips/largefiles).
+            """),
     )
 
     @staticmethod
