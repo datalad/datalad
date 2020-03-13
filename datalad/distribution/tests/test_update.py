@@ -720,7 +720,18 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
 
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
+    ds_clone_s0 = Dataset(ds_clone.pathobj / "s0")
     ds_clone_s1 = Dataset(ds_clone.pathobj / "s0" / "s1")
+    if on_adjusted:
+        # after https://github.com/datalad/datalad/pull/4252 a clone of an
+        # adjusted dataset onto a capable filesystem will not be in adjusted
+        # mode automatically, but fall back (or forward) to more the flexible
+        # standard mode
+        # redo adjusting in the clone for the sake of this test
+        _adjust(ds_clone.repo)
+        _adjust(ds_clone_s0.repo)
+        _adjust(ds_clone_s1.repo)
+        ds_clone.save(recursive=True)
 
     ds_src_s1.repo.checkout("master^0")
     (ds_src_s1.pathobj / "foo").write_text("foo content")
