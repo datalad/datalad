@@ -29,7 +29,7 @@ from datalad.tests.utils import (
 )
 from datalad.support.exceptions import (
     IncompleteResultsError,
-    NoDatasetArgumentFound,
+    NoDatasetFound,
 )
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
@@ -58,7 +58,7 @@ def test_status_basics(path, linkpath, otherdir):
         path = linkpath
 
     with chpwd(path):
-        assert_raises(NoDatasetArgumentFound, status)
+        assert_raises(NoDatasetFound, status)
     ds = Dataset(path).create()
     # outcome identical between ds= and auto-discovery
     with chpwd(path):

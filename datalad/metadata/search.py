@@ -44,7 +44,7 @@ from datalad.utils import (
     get_suggestions_msg,
     unique,
 )
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import NoDatasetFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
 from datalad.dochelpers import exc_str
@@ -191,7 +191,7 @@ def _search_from_virgin_install(dataset, query):
     exc_info = sys.exc_info()
     if dataset is None:
         if not ui.is_interactive:
-            raise NoDatasetArgumentFound(
+            raise NoDatasetFound(
                 "No DataLad dataset found. Specify a dataset to be "
                 "searched, or run interactively to get assistance "
                 "installing a queriable superdataset."
@@ -212,7 +212,7 @@ def _search_from_virgin_install(dataset, query):
                 else:
                     raise exc_info[1]
             else:
-                raise NoDatasetArgumentFound(
+                raise NoDatasetFound(
                     "No DataLad dataset found at current location. "
                     "The DataLad superdataset location %r exists, "
                     "but does not contain an dataset."
@@ -1207,11 +1207,11 @@ class Search(Interface):
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
-                raise NoDatasetArgumentFound(
+                raise NoDatasetFound(
                     "This does not seem to be a dataset (no DataLad dataset ID "
                     "found). 'datalad create --force %s' can initialize "
                     "this repository as a DataLad dataset" % ds.path)
-        except NoDatasetArgumentFound:
+        except NoDatasetFound:
             for r in _search_from_virgin_install(dataset, query):
                 yield r
             return

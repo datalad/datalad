@@ -16,7 +16,7 @@ import os
 import os.path as op
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
-    NoDatasetArgumentFound,
+    NoDatasetFound,
 )
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
@@ -154,7 +154,7 @@ def _dirty_results(res):
 @with_tempfile(mkdir=True)
 def test_diff(path, norepo):
     with chpwd(norepo):
-        assert_raises(NoDatasetArgumentFound, diff)
+        assert_raises(NoDatasetFound, diff)
     ds = Dataset(path).create()
     assert_repo_status(ds.path)
     # reports stupid revision input

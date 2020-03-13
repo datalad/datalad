@@ -36,7 +36,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         # which files to look for
         fname_match_regex = self.ds.config.get(
             'datalad.metadata.xmp.fname-match',
-            '.*(jpg|jpeg|pdf|gif|tiff|tif|ps|eps|png|mp3|mp4|avi)$')
+            '.*(jpg|jpeg|pdf|gif|tiff|tif|ps|eps|png|mp3|mp4|avi|wav)$')
         fname_match_regex = re.compile(fname_match_regex)
 
         log_progress(

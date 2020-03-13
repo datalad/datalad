@@ -24,7 +24,7 @@ from datalad.api import (
 from datalad.utils import Path
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
-    NoDatasetArgumentFound,
+    NoDatasetFound,
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
@@ -62,7 +62,7 @@ def test_unlock_raises(path, path2, path3):
     assert_raises(InsufficientArgumentsError,
                   unlock, dataset=None, path=None)
     # no dataset and path not within a dataset:
-    assert_raises(NoDatasetArgumentFound,
+    assert_raises(NoDatasetFound,
                   unlock, dataset=None, path=path2)
 
     create(path=path, no_annex=True)

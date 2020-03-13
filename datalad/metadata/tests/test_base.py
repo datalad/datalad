@@ -51,7 +51,7 @@ from datalad.tests.utils import (
 )
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
-    NoDatasetArgumentFound,
+    NoDatasetFound,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -238,7 +238,7 @@ def test_ignore_nondatasets(path):
 
 @with_tempfile(mkdir=True)
 def test_get_aggregates_fails(path):
-    with chpwd(path), assert_raises(NoDatasetArgumentFound):
+    with chpwd(path), assert_raises(NoDatasetFound):
         metadata(get_aggregates=True)
     ds = Dataset(path).create()
     res = ds.metadata(get_aggregates=True, on_failure='ignore')

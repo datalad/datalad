@@ -29,7 +29,7 @@ from datalad.support.constraints import Constraint
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
-    NoDatasetArgumentFound,
+    NoDatasetFound,
 )
 from datalad.support.gitrepo import (
     GitRepo,
@@ -561,7 +561,11 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     if dataset is None:  # possible scenario of cmdline calls
         dspath = get_dataset_root(getpwd())
         if not dspath:
-            raise NoDatasetArgumentFound("No dataset found")
+            raise NoDatasetFound(
+                "No dataset found at '{}'.  Specify a dataset to work with "
+                "by providing its path via the `dataset` option, "
+                "or change the current working directory to be in a "
+                "dataset.".format(getpwd()))
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
