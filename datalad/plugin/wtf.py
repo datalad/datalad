@@ -335,13 +335,13 @@ class WTF(Interface):
     @eval_results
     def __call__(dataset=None, sensitive=None, sections=None, decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
-        from datalad.support.exceptions import NoDatasetArgumentFound
+        from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict
 
         ds = None
         try:
             ds = require_dataset(dataset, check_installed=False, purpose='reporting')
-        except NoDatasetArgumentFound:
+        except NoDatasetFound:
             # failure is already logged
             pass
         if ds and not ds.is_installed():

@@ -33,7 +33,7 @@ from ..dochelpers import exc_str
 from ..support.annexrepo import AnnexRepo, AnnexBatchCommandError
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
-from ..support.exceptions import NoDatasetArgumentFound
+from ..support.exceptions import NoDatasetFound
 
 from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
@@ -104,7 +104,7 @@ class DownloadURL(Interface):
                 ds = require_dataset(
                     dataset, check_installed=True,
                     purpose='downloading urls')
-            except NoDatasetArgumentFound:
+            except NoDatasetFound:
                 pass
 
         common_report = {"action": "download_url",

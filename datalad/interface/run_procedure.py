@@ -33,7 +33,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import NoDatasetFound
 from datalad.utils import (
     quote_cmdlinearg,
     split_cmdline,
@@ -320,7 +320,7 @@ class RunProcedure(Interface):
             ds = require_dataset(
                 dataset, check_installed=False,
                 purpose='run a procedure')
-        except NoDatasetArgumentFound:
+        except NoDatasetFound:
             ds = None
 
         if discover:

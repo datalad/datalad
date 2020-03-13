@@ -224,6 +224,11 @@ class NoDatasetArgumentFound(InsufficientArgumentsError):
     pass
 
 
+class NoDatasetFound(NoDatasetArgumentFound):
+    """Raised whenever a dataset is required, but none could be determined"""
+    pass
+
+
 class OutOfSpaceError(CommandError):
     """To be raised whenever a command fails if we have no sufficient space
 
