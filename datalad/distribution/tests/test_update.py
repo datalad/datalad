@@ -206,8 +206,8 @@ def test_update_fetch_all(src, remote_1, remote_2):
     rmt2 = AnnexRepo.clone(src, remote_2)
 
     ds = Dataset(src)
-    ds.siblings('add', name="sibling_1", url=remote_1)
-    ds.siblings('add', name="sibling_2", url=remote_2)
+    ds.siblings('add', name="sibling_1", url=remote_1, result_renderer=None)
+    ds.siblings('add', name="sibling_2", url=remote_2, result_renderer=None)
 
     # modify the remotes:
     with open(opj(remote_1, "first.txt"), "w") as f:
@@ -452,8 +452,8 @@ def test_multiway_merge(path):
     ds = Dataset(op.join(path, 'ds_orig')).create()
     r1 = AnnexRepo(path=op.join(path, 'ds_r1'), git_opts={'bare': True})
     r2 = GitRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
-    ds.siblings(action='add', name='r1', url=r1.path)
-    ds.siblings(action='add', name='r2', url=r2.path)
+    ds.siblings(action='add', name='r1', url=r1.path, result_renderer=None)
+    ds.siblings(action='add', name='r2', url=r2.path, result_renderer=None)
     assert_status('ok', ds.publish(to='r1'))
     assert_status('ok', ds.publish(to='r2'))
     # just a fetch should be no issue
