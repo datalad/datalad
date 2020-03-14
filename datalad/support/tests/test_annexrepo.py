@@ -2274,7 +2274,7 @@ def check_files_split(cls, topdir):
     dl.save(dataset=r.path, path=dirs)
 
 
-@known_failure_githubci_win
+@known_failure_windows  # does not find files to add (too long paths?)
 @slow  # 313s  well -- if errors out - only 3 sec
 def test_files_split():
     for cls in GitRepo, AnnexRepo:
