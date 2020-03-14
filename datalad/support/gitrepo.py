@@ -571,7 +571,7 @@ class GitProgress(WitlessProtocol):
             log_progress(
                 lgr.info,
                 pbar_id,
-                message,
+                line,
                 update=float(cur_count),
             )
 
