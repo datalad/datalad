@@ -187,7 +187,9 @@ class PathBasedFlyweight(Flyweight):
         """
         # resolve symlinks to make sure we have exactly one instance per
         # physical repository at a time
-        return str(ut.Path(path).resolve())
+        # do absolute() in addition to always get an absolute path
+        # even with non-existing paths on windows
+        return str(ut.Path(path).resolve().absolute())
 
     def _flyweight_id_from_args(cls, *args, **kwargs):
 

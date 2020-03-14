@@ -185,7 +185,9 @@ def _normalize_path(base_dir, path):
         return path
     pathobj = Path(path)
 
-    base_dir = str(Path(base_dir).resolve())  # realpath OK
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing base_dirs on windows
+    base_dir = str(Path(base_dir).resolve().absolute())  # realpath OK
 
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;

@@ -490,7 +490,9 @@ def get_open_files(path, log_open=False):
     files = {}
     # since the ones returned by psutil would not be aware of symlinks in the
     # path we should also get realpath for path
-    path = str(Path(path).resolve())
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing paths on windows
+    path = str(Path(path).resolve().absolute())
     for proc in psutil.process_iter():
         try:
             open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
@@ -1490,7 +1492,9 @@ def getpwd():
                 raise
         try:
             pwd = os.environ['PWD']
-            pwd_real = str(Path(pwd).resolve())
+            # do absolute() in addition to always get an absolute path
+            # even with non-existing paths on windows
+            pwd_real = str(Path(pwd).resolve().absolute())
             # This logic would fail to catch the case where chdir did happen
             # to the directory where current PWD is pointing to, e.g.
             # $> ls -ld $PWD

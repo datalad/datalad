@@ -357,7 +357,9 @@ def _prep_file_under_git(path, filename):
     # path to the file within the repository
     # repo.path is a "realpath" so to get relpath working correctly
     # we need to realpath our path as well
-    path = str(Path(path).resolve())  # intentional realpath to match GitRepo behavior
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing paths on windows
+    path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
     file_repo_dir = op.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
