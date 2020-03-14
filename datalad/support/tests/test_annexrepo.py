@@ -2167,6 +2167,7 @@ def check_commit_annex_commit_changed(unlock, path):
     unannex = False
 
     ar = AnnexRepo(path, create=True)
+    ar.save(paths=[".gitattributes"], git=True)
     ar.save("initial commit")
     assert_repo_status(path)
     # Now let's change all but commit only some
