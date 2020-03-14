@@ -3121,7 +3121,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         def _format_response(res):
             return (
-                res['file'],
+                str(Path(PurePosixPath(res['file']))),
                 res['fields'] if timestamps else \
                 {k: v for k, v in res['fields'].items()
                  if not k.endswith('lastchanged')}
