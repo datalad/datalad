@@ -19,6 +19,7 @@ from unittest.mock import patch
 from datalad.log import (
     ColorFormatter,
     LoggerHelper,
+    log_progress,
     TraceBack,
 )
 from datalad import cfg
@@ -161,3 +162,21 @@ def test_color_formatter():
 
 
 # TODO: somehow test is stdout/stderr get their stuff
+
+
+@patch("datalad.log.is_interactive", lambda: False)
+def test_log_progress_noninteractive_filter():
+    name = "dl-test"
+    lgr = LoggerHelper(name).get_initialized_logger()
+    pbar_id = "lp_test"
+    with swallow_logs(new_level=logging.INFO, name=name) as cml:
+        log_progress(lgr.info, pbar_id, "Start", label="testing", total=3)
+        log_progress(lgr.info, pbar_id, "THERE0", update=1)
+        log_progress(lgr.info, pbar_id, "NOT", update=1,
+                     noninteractive_level=logging.DEBUG)
+        log_progress(lgr.info, pbar_id, "THERE1", update=1,
+                     noninteractive_level=logging.INFO)
+        log_progress(lgr.info, pbar_id, "Done")
+        for present in ["Start", "THERE0", "THERE1", "Done"]:
+            assert_in(present, cml.out)
+        assert_not_in("NOT", cml.out)

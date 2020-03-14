@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from functools import partial
 import logging
 import os
 import sys
@@ -240,6 +241,11 @@ class OnlyProgressLog(logging.Filter):
         return hasattr(record, 'dlm_progress')
 
 
+def filter_noninteractive_progress(logger, record):
+    level = getattr(record, "dlm_progress_noninteractive_level", None)
+    return level is None or level >= logger.level
+
+
 def log_progress(lgrcall, pid, *args, **kwargs):
     """Helper to emit a log message on the progress of some process
 
@@ -268,6 +274,14 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       To which quantity to advance the progress.
     increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
+    noninteractive_level : int, optional
+      When a level is specified here and progress is being logged
+      non-interactively (i.e. without progress bars), do not log the message if
+      logging is not enabled for the specified level. This is useful when you
+      want all calls to be "logged" via the progress bar, but non-interactively
+      showing a message at the `lgrcall` level for each step would be too much
+      noise. Note that the level here only determines if the record will be
+      dropped; it will still be logged at the level of `lgrcall`.
     """
     d = dict(
         {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
@@ -464,6 +478,9 @@ class LoggerHelper(object):
             # no stream logs of progress messages when interactive
             loghandler.addFilter(NoProgressLog())
             self.lgr.addHandler(phandler)
+        else:
+            loghandler.addFilter(partial(filter_noninteractive_progress,
+                                         self.lgr))
 
         self.set_level()  # set default logging level
         return self.lgr

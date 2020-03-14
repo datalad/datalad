@@ -573,6 +573,7 @@ class GitProgress(WitlessProtocol):
                 pbar_id,
                 line,
                 update=float(cur_count),
+                noninteractive_level=logging.DEBUG,
             )
 
         if done_progress:
@@ -583,6 +584,7 @@ class GitProgress(WitlessProtocol):
                     op_props[0].lower(),
                     op_props[1].lower(),
                 ),
+                noninteractive_level=logging.DEBUG,
             )
             self._pbars.discard(pbar_id)
         return True
