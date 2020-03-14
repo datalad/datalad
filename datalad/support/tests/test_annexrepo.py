@@ -203,11 +203,8 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
     # It is unlikely though that annex would be in direct mode (requires explicit)
     # annex magic, without having annex section under .git/config
     dm = ar.is_direct_mode()
-
-    if ar.is_crippled_fs() or on_windows:
-        ok_(dm)
-    else:
-        assert_false(dm)
+    # no direct mode, ever
+    assert_false(dm)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:473
