@@ -1886,7 +1886,7 @@ def test_AnnexRepo_metadata(path):
         path,
         {
             'up.dat': 'content',
-            'd o"w n': {
+            'd o w n' if on_windows else 'd o"w n': {
                 'd o w n.dat': 'lowcontent'
             }
         })
@@ -1927,7 +1927,7 @@ def test_AnnexRepo_metadata(path):
         dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
     ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
-    playfile = opj('d o"w n', 'd o w n.dat')
+    playfile = opj("d o w n" if on_windows else 'd o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
