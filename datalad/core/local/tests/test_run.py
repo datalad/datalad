@@ -154,7 +154,11 @@ def test_py2_unicode_command(path):
     assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ0.dat"))
 
-    if not on_windows:  # FIXME
+    # somewhat desperate attempt to detect our own Github CI tests on a
+    # crippled filesystem (VFAT) that is so crippled that it doesn't handle
+    # what is needed here. It just goes mad with encoded bytestrings:
+    # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
+    if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
         ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
         assert_repo_status(ds.path)
         ok_exists(op.join(path, u"bβ1.dat"))

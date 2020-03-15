@@ -367,7 +367,6 @@ def test_clone_isnt_a_smartass(origin_path, path):
     eq_(cloned.subdatasets(), [])
 
 
-@skip_if(on_windows or not os.geteuid(), "Will fail under super-user")
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
     pdir = Path(tdir) / 'protected'
@@ -375,6 +374,16 @@ def test_clone_report_permission_issue(tdir):
     # make it read-only
     pdir.chmod(0o555)
     with chpwd(pdir):
+        # first check the premise of the test. If we can write (strangely
+        # mounted/crippled file system, subsequent assumptions are violated
+        # and we can stop
+        probe = Path('probe')
+        try:
+            probe.write_text('should not work')
+            raise SkipTest
+        except PermissionError:
+            # we are indeed in a read-only situation
+            pass
         res = clone('///', result_xfm=None, return_type='list', on_failure='ignore')
         assert_status('error', res)
         assert_result_count(
