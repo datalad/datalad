@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
 from datalad.api import (
     clone,
 )
@@ -17,6 +18,7 @@ from datalad.tests.utils import (
     skip_if_on_windows,
     skip_ssh,
     with_tempfile,
+    SkipTest,
 )
 
 from datalad.distributed.tests.ria_utils import (
@@ -42,6 +44,10 @@ def test_binary_data_local(dspath, store):
                           "datastore")
 
     ds.publish(to="datastore", transfer_data="all")
+    if os.environ.get('TMPDIR', None) == '/crippledfs':
+        raise SkipTest(
+            "ATM drop() doesn't work on crippled FS "
+            "(check https://github.com/datalad/datalad/issues/3368 for status)")
     ds.drop(file)
     ds.get(file, source="datastore-storage")
 
