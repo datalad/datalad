@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     swallow_logs,
     known_failure_githubci_win,
     assert_cwd_unchanged,
+    SkipTest,
 )
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
@@ -48,8 +49,12 @@ from datalad.interface.annotate_paths import (
 from datalad.utils import (
     chpwd,
     getpwd,
+    on_windows,
 )
 from datalad.interface.tests.test_utils import make_demo_hierarchy_datasets
+
+if on_windows:
+    raise SkipTest('Deprecated code, will never work on Windows')
 
 
 __docformat__ = 'restructuredtext'

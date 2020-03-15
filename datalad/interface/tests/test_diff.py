@@ -30,7 +30,13 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     known_failure_githubci_win,
+    SkipTest,
 )
+from datalad.utils import on_windows
+
+
+if on_windows:
+    raise SkipTest('Deprecated code, will never work on Windows')
 
 
 @known_failure_windows

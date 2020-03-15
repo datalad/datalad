@@ -87,14 +87,12 @@ test_script:
   # first sign of life
   - datalad wtf
   # and now this... [keep appending tests that should work!!]
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.core datalad.local datalad.distributed datalad.cmdline datalad.distribution datalad.support datalad.ui"
+  - "python -m nose -s -v --with-cov --cover-package datalad datalad.core datalad.local datalad.distributed datalad.cmdline datalad.distribution datalad.interface datalad.support datalad.ui"
   # one call per datalad component for now -- to better see what is being tested
   # remaining fails: test_archives.test_basic_scenario test_datalad.test_basic_scenario_local_url
   #- python -m nose -s -v datalad.customremotes
   # remaining fails: test_http
   - "python -m nose -s -v --with-cov --cover-package datalad datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3"
-  # remaining fails: test_add_archive_content test_annotate_paths test_diff test_ls_webui test_run test_save test_utils
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.interface.tests.test_base datalad.interface.tests.test_clean datalad.interface.tests.test_docs datalad.interface.tests.test_ls datalad.interface.tests.test_unlock datalad.interface.tests.test_rerun datalad.interface.tests.test_run_procedure"
   # remaining fails: extractors.tests.test_base test_aggregation test_base  datalad.metadata.extractors.tests.test_datacite_xml
   - "python -m nose -s -v --with-cov --cover-package datalad datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822"
   # remaining fails: test_addurls test_export_archive test_plugins"
