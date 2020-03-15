@@ -24,7 +24,7 @@ from ...tests.utils import assert_not_in
 from ...tests.utils import assert_in_results
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
-from ...tests.utils import known_failure_githubci_win
+from ...tests.utils import known_failure_windows
 
 
 def test_download_url_exceptions():
@@ -62,7 +62,7 @@ def test_download_url_existing_dir_no_slash_exception(path):
                        res)
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @assert_cwd_unchanged
 @with_tree(tree=[
     ('file1.txt', 'abc'),
@@ -165,7 +165,6 @@ def test_download_url_dataset(toppath, topurl, path):
     assert_false((ds.pathobj / "file8.txt").exists())
 
 
-@known_failure_githubci_win
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
@@ -177,7 +176,6 @@ def test_download_url_archive(toppath, topurl, path):
                   ds.repo.format_commit("%B"))
 
 
-@known_failure_githubci_win
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
@@ -190,7 +188,6 @@ def test_download_url_archive_from_subdir(toppath, topurl, path):
     ok_(ds.repo.file_has_content(opj("subdir", "archive", "file1.txt")))
 
 
-@known_failure_githubci_win
 @with_tree(tree={"a0.tar.gz": {'f0.txt': 'abc'},
                  "a1.tar.gz": {'f1.txt': 'def'}})
 @serve_path_via_http
