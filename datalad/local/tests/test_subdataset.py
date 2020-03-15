@@ -61,10 +61,8 @@ def test_get_subdatasets(origpath, path):
     # tests
     ds = clone(source=origpath, path=path)
     # one more subdataset with a name that could ruin config option parsing
-    # no trailing dots on windows!
-    dots = str(Path('subdir') / ('.lots.of.dots'
-                                  if on_windows
-                                  else '.lots.of.dots.'))
+    # no trailing dots on windows and its crippled FS mounted on linux!
+    dots = str(Path('subdir') / ('.lots.of.dots'))
     ds.create(dots)
     # mitigate https://github.com/datalad/datalad/issues/4267
     ds.save()
