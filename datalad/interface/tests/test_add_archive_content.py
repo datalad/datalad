@@ -37,7 +37,7 @@ from datalad.tests.utils import (
     create_tree,
     eq_,
     integration,
-    known_failure_githubci_win,
+    known_failure_windows,
     ok_,
     ok_archives_caches,
     ok_file_under_git,
@@ -92,7 +92,7 @@ treeargs = dict(
 )
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**treeargs)
 @serve_path_via_http()
@@ -183,7 +183,7 @@ tree4uargs = dict(
 )
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @slow  # 29.4293s
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
@@ -323,7 +323,6 @@ def test_add_archive_content(path_orig, url, repo_path):
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
-@known_failure_githubci_win
 @integration
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
@@ -345,7 +344,6 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
         ok_archives_caches(repo.path, 0)
 
 
-@known_failure_githubci_win
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
 def test_add_archive_content_zip(repo_path):
@@ -360,7 +358,7 @@ def test_add_archive_content_zip(repo_path):
         ok_archives_caches(repo.path, 0)
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
@@ -380,7 +378,7 @@ def test_add_archive_content_absolute_path(path):
                             annex=repo)
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
@@ -435,13 +433,13 @@ class TestAddArchiveOptions():
         self.annex.precommit()  # so we close any outstanding batch process etc
         rmtemp(self.annex.path)
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_delete(self):
         # To test that .tar gets removed
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete=True)
         assert_false(lexists(opj(self.annex.path, '1.tar')))
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_archive_leading_dir(self):
         import os
         os.mkdir(opj(self.annex.path, 'sub'))
@@ -458,7 +456,7 @@ class TestAddArchiveOptions():
         )
         ok_file_under_git(self.annex.path, opj('sub', '123', 'file.txt'), annexed=True)
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed
         # but that new stuff was added to annex repo.  We know the key since default
@@ -494,7 +492,7 @@ class TestAddArchiveOptions():
         # there should be no .datalad temporary files hanging around
         self.assert_no_trash_left_behind()
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
         mv_out = self.annex.call_git(
@@ -546,7 +544,7 @@ class TestAddArchiveOptions():
             []
         )
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_override_existing_under_git(self):
         create_tree(self.annex.path, {'1.dat': 'load2'})
         self.annex.add('1.dat', git=True)
