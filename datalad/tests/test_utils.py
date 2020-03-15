@@ -704,9 +704,11 @@ def test_get_timestamp_suffix():
     # we need to patch temporarily TZ
     with patch.dict('os.environ', {'TZ': 'GMT'}):
         # skynet DOB
-        assert_equal(get_timestamp_suffix(0), '-1970-01-01T00:00:00+0000')
+        target_ts = '1970-01-01T00:00:00-0000' \
+            if on_windows else '1970-01-01T00:00:00+0000'
+        assert_equal(get_timestamp_suffix(0), '-' + target_ts)
         assert_equal(get_timestamp_suffix(0, prefix="+"),
-                     '+1970-01-01T00:00:00+0000')
+                     '+' + target_ts)
         # yoh found no way to mock things out and didn't want to provide
         # explicit call to anything to get current time with the timezone,
         # so disabling this test for now besides that it should return smth
