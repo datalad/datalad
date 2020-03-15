@@ -418,6 +418,8 @@ def test_add_archive_use_archive_dir(repo_path):
 class TestAddArchiveOptions():
 
     # few tests bundled with a common setup/teardown to minimize boiler plate
+    # nothing here works on windows, no even teardown(), prevent failure at the origin
+    @known_failure_windows
     @with_tree(tree={'1.tar': {'file.txt': 'load',
                                '1.dat': 'load2'}},
                delete=False)
