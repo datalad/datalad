@@ -917,10 +917,13 @@ def get_local_file_url(fname, compatibility='git-annex'):
         setting has no effect.
     """
     # we resolve the path to circumwent potential short paths on unfortunate
-    # platforms that would ruin the URL format
+    # platforms that would ruin the URL format.
+    #path = Path(fname).resolve().absolute()
     path = Path(fname).resolve()
     if on_windows:
-        path = path.as_posix()
+        # in addition we need to absolute(), as on windows resolve() doesn't
+        # imply that
+        path = path.absolute().as_posix()
         furl = 'file://{}{}'.format(
             '/' if compatibility == 'git' else '',
             urlquote(
