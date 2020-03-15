@@ -131,6 +131,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             needs_authentication = self.credential
 
         attempt, incomplete_attempt = 0, 0
+        result = None
         while True:
             attempt += 1
             if attempt > 20:
@@ -139,8 +140,8 @@ class BaseDownloader(object, metaclass=ABCMeta):
             exc_info = None
             msg_types = ''
             supported_auth_types = []
+            used_old_session = False
             try:
-                used_old_session = False
                 used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -169,56 +170,13 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # _get_new_credential that authentication has failed then since there
                 # were no authentication.  We might need a custom exception to
                 # be caught above about that
-                if needs_authentication:
-                    # so we knew it needs authentication
-                    if used_old_session:
-                        # Let's try with fresh ones
-                        allow_old_session = False
-                        continue
-                    else:
-                        # we did use new cookies, we knew that authentication is needed
-                        # but still failed. So possible cases:
-                        #  1. authentication credentials changed/were revoked
-                        #     - allow user to re-enter credentials
-                        #  2. authentication mechanisms changed
-                        #     - we can't do anything here about that
-                        #  3. bug in out code which would render authentication/cookie handling
-                        #     ineffective
-                        #     - not sure what to do about it
-                        if not ui.is_interactive:
-                            lgr.error(
-                                "Interface is non interactive, so we are "
-                                "reraising: %s" % exc_str(e))
-                            raise e
-                        self._enter_credentials(
-                            url,
-                            denied_msg=access_denied,
-                            auth_types=supported_auth_types,
-                            new_provider=False)
-                        allow_old_session = False
-                        continue
-                else:  # None or False
-                    if needs_authentication is False:
-                        # those urls must or should NOT require authentication
-                        # but we got denied
-                        raise DownloadError(
-                            "Failed to download from %s, which must be available"
-                            "without authentication but access was denied. "
-                            "Adjust your configuration for the provider.%s"
-                            % (url, msg_types))
-                    else:
-                        # how could be None or any other non-False bool(False)
-                        assert(needs_authentication is None)
-                        # So we didn't know if authentication necessary, and it
-                        # seems to be necessary, so Let's ask the user to setup
-                        # authentication mechanism for this website
-                        self._enter_credentials(
-                            url,
-                            denied_msg=access_denied,
-                            auth_types=supported_auth_types,
-                            new_provider=True)
-                        allow_old_session = False
-                        continue
+
+                allow_old_session = False  # we will either raise or auth
+                self._handle_authentication(url, needs_authentication, e,
+                                            access_denied, msg_types,
+                                            supported_auth_types,
+                                            used_old_session)
+                continue
 
             except IncompleteDownloadError as e:
                 exc_info = sys.exc_info()
@@ -233,6 +191,53 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 raise
 
         return result
+
+    def _handle_authentication(self, url, needs_authentication, e,
+                               access_denied, msg_types, supported_auth_types,
+                               used_old_session):
+        if needs_authentication:
+            # so we knew it needs authentication
+            if not used_old_session:
+                # we did use new cookies, we knew that authentication is needed
+                # but still failed. So possible cases:
+                #  1. authentication credentials changed/were revoked
+                #     - allow user to re-enter credentials
+                #  2. authentication mechanisms changed
+                #     - we can't do anything here about that
+                #  3. bug in out code which would render
+                #  authentication/cookie handling
+                #     ineffective
+                #     - not sure what to do about it
+                if not ui.is_interactive:
+                    lgr.error(
+                        "Interface is non interactive, so we are "
+                        "reraising: %s" % exc_str(e))
+                    raise e
+                self._enter_credentials(
+                    url,
+                    denied_msg=access_denied,
+                    auth_types=supported_auth_types,
+                    new_provider=False)
+        else:  # None or False
+            if needs_authentication is False:
+                # those urls must or should NOT require authentication
+                # but we got denied
+                raise DownloadError(
+                    "Failed to download from %s, which must be available"
+                    "without authentication but access was denied. "
+                    "Adjust your configuration for the provider.%s"
+                    % (url, msg_types))
+            else:
+                # how could be None or any other non-False bool(False)
+                assert (needs_authentication is None)
+                # So we didn't know if authentication necessary, and it
+                # seems to be necessary, so Let's ask the user to setup
+                # authentication mechanism for this website
+                self._enter_credentials(
+                    url,
+                    denied_msg=access_denied,
+                    auth_types=supported_auth_types,
+                    new_provider=True)
 
     def _setup_new_provider(self, title, url, auth_types=None):
         # Full new provider (TODO move into Providers?)
