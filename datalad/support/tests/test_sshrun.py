@@ -23,6 +23,7 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 
 
+@skip_if_on_windows
 @skip_ssh
 def test_exit_code():
     # will relay actual exit code on CommandError
@@ -38,6 +39,7 @@ def test_exit_code():
     assert_equal(cme.exception.code, 42)
 
 
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(content="123magic")
 def test_no_stdin_swallow(fname):
@@ -52,6 +54,7 @@ def test_no_stdin_swallow(fname):
     assert_equal(out, '')
 
 
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(suffix="1 space", content="magic")
 def test_fancy_quotes(f):

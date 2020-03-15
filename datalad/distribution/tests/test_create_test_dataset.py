@@ -12,19 +12,18 @@
 from glob import glob
 from os.path import join as opj
 
+from datalad.core.local.repo import repo_from_path
 from datalad.tests.utils import (
     with_tempfile,
     assert_raises,
     assert_repo_status,
     ok_,
-    known_failure_githubci_win,
 )
 from datalad.utils import (
     swallow_logs,
     swallow_outputs,
     chpwd,
 )
-from datalad.support.gitrepo import GitRepo
 from datalad.distribution.create_test_dataset import _parse_spec
 
 from datalad.tests.utils import eq_
@@ -73,7 +72,6 @@ def test_new_relpath(topdir):
         assert_repo_status(ds, annex=False)
 
 
-@known_failure_githubci_win
 @with_tempfile()
 def test_hierarchy(topdir):
     # GH 1178
@@ -87,5 +85,6 @@ def test_hierarchy(topdir):
         assert_repo_status(ds, annex=False)
         # each one should have 2 commits (but the last one)-- one for file and
         # another one for sub-dataset
-        repo = GitRepo(ds)
-        eq_(len(list(repo.get_branch_commits_())), 1 + int(ids<2))
+        repo = repo_from_path(ds)
+        if not hasattr(repo, 'is_managed_branch') or not repo.is_managed_branch():
+            eq_(len(list(repo.get_branch_commits_())), 1 + int(ids < 2))

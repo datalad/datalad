@@ -28,11 +28,11 @@ from datalad.tests.utils import (
     with_tempfile,
     ok_,
     eq_,
-    known_failure_githubci_win,
+    known_failure_windows,
 )
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tempfile
 def test_lock_if_check_fails(tempfile):
     # basic test, should never try to lock so filename is not important

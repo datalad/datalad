@@ -203,11 +203,8 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
     # It is unlikely though that annex would be in direct mode (requires explicit)
     # annex magic, without having annex section under .git/config
     dm = ar.is_direct_mode()
-
-    if ar.is_crippled_fs() or on_windows:
-        ok_(dm)
-    else:
-        assert_false(dm)
+    # no direct mode, ever
+    assert_false(dm)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:473
@@ -1889,7 +1886,7 @@ def test_AnnexRepo_metadata(path):
         path,
         {
             'up.dat': 'content',
-            'd o"w n': {
+            'd o w n' if on_windows else 'd o"w n': {
                 'd o w n.dat': 'lowcontent'
             }
         })
@@ -1930,7 +1927,7 @@ def test_AnnexRepo_metadata(path):
         dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
     ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
-    playfile = opj('d o"w n', 'd o w n.dat')
+    playfile = opj("d o w n" if on_windows else 'd o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
@@ -2170,6 +2167,7 @@ def check_commit_annex_commit_changed(unlock, path):
     unannex = False
 
     ar = AnnexRepo(path, create=True)
+    ar.save(paths=[".gitattributes"], git=True)
     ar.save("initial commit")
     assert_repo_status(path)
     # Now let's change all but commit only some
@@ -2276,7 +2274,7 @@ def check_files_split(cls, topdir):
     dl.save(dataset=r.path, path=dirs)
 
 
-@known_failure_githubci_win
+@known_failure_windows  # does not find files to add (too long paths?)
 @slow  # 313s  well -- if errors out - only 3 sec
 def test_files_split():
     for cls in GitRepo, AnnexRepo:
