@@ -605,7 +605,9 @@ class RIARemote(SpecialRemote):
             if self.remote_dataset_tree_version not in self.known_versions_dst:
                 # Note: In later versions, condition might change in order to
                 # deal with older versions.
-                raise UnknownLayoutVersion
+                raise UnknownLayoutVersion(
+                    "RIA store layout version unknown: %s" %
+                    self.remote_dataset_tree_version)
 
         except (RemoteError, FileNotFoundError):
             # Exception class depends on whether self.io is local or SSH.
@@ -616,13 +618,17 @@ class RIARemote(SpecialRemote):
 
             if not self.io.exists(dataset_tree_version_file.parent):
                 # unify exception
-                raise FileNotFoundError
-
+                raise FileNotFoundError(
+                    "RIA store doesn't exist at %s" %
+                    dataset_tree_version_file.parent
+                )
             else:
                 # Directory is there, but no version file. We don't know what
                 # that is. Treat the same way as if there was an unknown version
                 # on record.
-                raise NoLayoutVersion
+                raise NoLayoutVersion(
+                    "RIA store lacks a 'ria-layout-version' file."
+                )
 
     def verify_ds_in_store(self):
         """Check whether the dataset exists in store and reports a layout
