@@ -5,20 +5,8 @@
 #
 # Changelog
 # ---------
-# 0.12.2-548-gdfae1fcd2 (2020/03/15)
-#  - Just a fresh build
-# 0.12.2-174-g180bbd8d4 (2020/02/17)
-#  - Adding rclone and its annexexternal special remote
-# 0.12.2-115-gfd12bdc30 (2020/02/12)
-#  - Update to get a fresh build of master and newer git-annex
-# 0.12.0rc4-239-gba66d1c9f
-#  - Update to get a fresh build of master
-# 0.11.1
-#  - Update to get a fresh build, also with fixed up git-annex
-# 0.10.2
-#  - Update after initial "burn-in" time for 0.10 series
-# 0.10.rc5
-#  - Pre-release
+# 0.12.2-40-g4281360d7 (2020/03/15)
+#  - First maint branch build
 #
 #######################################################################
 
@@ -47,9 +35,9 @@ From:neurodebian:latest
     eatmydata apt-get -y install --no-install-recommends python3-twisted
 
     # little dance because pip cannot handle this url plus [full] in one go
-    wget https://github.com/datalad/datalad/archive/master.zip
-    pip3 install --system master.zip[full]
-    rm -f master.zip
+    wget https://github.com/datalad/datalad/archive/maint.zip
+    pip3 install --system maint.zip[full]
+    rm -f maint.zip
 
     # clean up
     apt-get clean
