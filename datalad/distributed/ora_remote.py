@@ -658,10 +658,10 @@ class RIARemote(SpecialRemote):
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
             self.storage_host = _get_gitcfg(
-                gitdir, 'annex.ria-remote.{}.ssh-host'.format(name))
+                gitdir, 'annex.ora-remote.{}.ssh-host'.format(name))
 
             store_base_path = _get_gitcfg(
-                gitdir, 'annex.ria-remote.{}.base-path'.format(name))
+                gitdir, 'annex.ora-remote.{}.base-path'.format(name))
             self.store_base_path = store_base_path.strip() \
                 if store_base_path else store_base_path
         # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
@@ -765,7 +765,7 @@ class RIARemote(SpecialRemote):
         read_only_msg = "Setting remote to read-only usage in order to" \
                         "prevent damage by putting things into an unknown " \
                         "version of the target layout. You can overrule this " \
-                        "by configuring 'annex.ria-remote.<name>.force-write'."
+                        "by configuring 'annex.ora-remote.<name>.force-write'."
         try:
             self.verify_store()
         except UnknownLayoutVersion:

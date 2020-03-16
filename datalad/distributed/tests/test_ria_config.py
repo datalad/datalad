@@ -43,7 +43,7 @@ def test_site_archive_location_config(path, objtree, objtree_alt):
     )
     # specify archive location via config (could also be system-wide
     # config setting, done locally here for a simple test setup)
-    ds.config.set('annex.ria-remote.archive.base-path', objtree, where='local')
+    ds.config.set('annex.ora-remote.archive.base-path', objtree, where='local')
     initexternalremote(
         ds.repo, 'archive', 'ora',
     )
