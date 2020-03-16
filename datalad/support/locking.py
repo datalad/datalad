@@ -1,6 +1,7 @@
-import fasteners
-import os
-
+from fasteners import (
+    InterProcessLock,
+    try_lock,
+)
 from contextlib import contextmanager
 
 from .path import exists
@@ -83,7 +84,7 @@ def lock_if_check_fails(
         lock_filename += operation + '-'
     lock_filename += 'lck'
 
-    lock = fasteners.InterProcessLock(lock_filename)
+    lock = InterProcessLock(lock_filename)
     try:
         lgr.debug("Acquiring a lock %s", lock_filename)
         lock.acquire(blocking=blocking, **kwargs)
