@@ -8,7 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-from datalad.api import Dataset
+from datalad.api import (
+    Dataset,
+    clone,
+)
 from datalad.utils import Path
 from datalad.tests.utils import (
     assert_equal,
@@ -403,4 +406,56 @@ def _test_gitannex(host, store, dspath):
 
 def test_gitannex():
     yield turtle(skip_ssh(_test_gitannex)), 'datalad-test'
+    yield _test_gitannex, None
+
+
+@with_tempfile
+@with_tempfile
+def _test_binary_data(host, store, dspath):
+    # make sure, special remote deals with binary data and doesn't
+    # accidentally involve any decode/encode etc.
+
+    dspath = Path(dspath)
+    store = Path(store)
+
+    url = "https://github.com/psychoinformatics-de/studyforrest-data-phase2"
+    file = Path("code/stimulus/visualarea_localizer/img/body01.png")
+
+    ds = clone(url, dspath)
+    ds.get(file)
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    if host:
+        store_url = "ria+ssh://{host}{path}".format(host=host,
+                                                    path=store)
+    else:
+        store_url = "ria+{}".format(store.as_uri())
+
+    create_store(io, store, '1')
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # add special remote
+    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    # actual data transfer (both directions)
+    # Note, that we intentionally call annex commands instead of
+    # datalad-publish/-get here. We are testing an annex-special-remote.
+
+    known_sources = [r['name'] for r in ds.repo.whereis(str(file))]
+    assert_in('here', known_sources)
+    assert_not_in('store', known_sources)
+    ds.repo.call_git(['annex', 'move', str(file), '--to', 'store'])
+    known_sources = [r['name'] for r in ds.repo.whereis(str(file))]
+    assert_not_in('here', known_sources)
+    assert_in('store', known_sources)
+    ds.repo.call_git(['annex', 'get', str(file), '--from', 'store'])
+    known_sources = [r['name'] for r in ds.repo.whereis(str(file))]
+    assert_in('here', known_sources)
+    assert_in('store', known_sources)
+
+
+def test_binary_data():
+    yield skip_ssh(_test_gitannex), 'datalad-test'
     yield _test_gitannex, None
