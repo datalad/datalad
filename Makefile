@@ -46,7 +46,7 @@ release-pypi: update-changelog
 	# better safe than sorry
 	test ! -e dist
 	$(PYTHON) setup.py sdist
-	$(PYTHON) setup.py bdist_wheel --universal
+	$(PYTHON) setup.py bdist_wheel
 	twine upload dist/*
 
 docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
