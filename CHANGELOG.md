@@ -106,7 +106,7 @@ bet we will fix some bugs and make a world even a better place.
   "<subdataset>/<path>".  ([#4235][])
 
 
-## 0.12.3 (??? ??, 2020) -- will be better than ever
+## 0.12.4 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -116,11 +116,36 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
+?
+
+### Enhancements and new features
+
+?
+
+
+## 0.12.3 (March 16, 2020) -- .
+
+Updates for compatibility with the latest git-annex, along with a few
+miscellaneous fixes
+
+### Major refactoring and deprecations
+
+- All spots that raised a `NoDatasetArgumentFound` exception now raise
+  a `NoDatasetFound` exception to better reflect the situation: it is
+  the _dataset_ rather than the _argument_ that is not found.  For
+  compatibility, the latter inherits from the former, but new code
+  should prefer the latter.  ([#4285][])
+
+### Fixes
+
 - Updates for compatibility with git-annex version 8.20200226. ([#4214][])
 
 - `datalad export-to-figshare` failed to export if the generated title
   was fewer than three characters.  It now queries the caller for the
   title and guards against titles that are too short.  ([#4140][])
+
+- Authentication was requested multiple times when git-annex launched
+  parallel downloads from the `datalad` special remote. ([#4308][])
 
 - At verbose logging levels, DataLad requests that git-annex display
   debugging information too.  Work around a bug in git-annex that
@@ -138,9 +163,14 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
+- The message provided when a command cannot determine what dataset to
+  operate on has been improved.  ([#4285][])
+
 - The "aws-s3" authentication type now allows specifying the host
   through "aws-s3_host", which was needed to work around an
   authorization error due to a longstanding upstream bug.  ([#4239][])
+
+- The xmp metadata extractor now recognizes ".wav" files.
 
 
 ## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
@@ -2546,3 +2576,5 @@ publishing
 [#4235]: https://github.com/datalad/datalad/issues/4235
 [#4239]: https://github.com/datalad/datalad/issues/4239
 [#4262]: https://github.com/datalad/datalad/issues/4262
+[#4285]: https://github.com/datalad/datalad/issues/4285
+[#4308]: https://github.com/datalad/datalad/issues/4308
