@@ -350,8 +350,8 @@ def _test_version_check(host, dspath, store):
                   ds.repo.copy_to, 'new_file', 'store')
 
     # However, we can force it by configuration
-    ds.config.add("annex.ora-remote.archive.force-write", "true", where='local')
-    ds.repo.copy_to('new_file', 'archive')
+    ds.config.add("annex.ora-remote.store.force-write", "true", where='local')
+    ds.repo.copy_to('new_file', 'store')
 
 
 def test_version_check():
