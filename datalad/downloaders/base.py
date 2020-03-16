@@ -37,6 +37,10 @@ from ..support.exceptions import (
     IncompleteDownloadError,
     UnaccountedDownloadError,
 )
+from ..support.locking import (
+    InterProcessLock,
+    try_lock,
+)
 
 from ..support.network import RI
 
@@ -104,6 +108,11 @@ class BaseDownloader(object, metaclass=ABCMeta):
         self.credential = credential
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
+        self._lock = InterProcessLock(
+            op.join(
+                cfg.obtain('datalad.locations.cache'),
+                'locks',
+                'downloader-auth.lck'))
 
     def access(self, method, url, allow_old_session=True, **kwargs):
         """Generic decorator to manage access to the URL via some method
@@ -129,7 +138,6 @@ class BaseDownloader(object, metaclass=ABCMeta):
             needs_authentication = authenticator.requires_authentication
         else:
             needs_authentication = self.credential
-
         attempt, incomplete_attempt = 0, 0
         result = None
         while True:
@@ -142,7 +150,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
             supported_auth_types = []
             used_old_session = False
             try:
-                used_old_session = self._establish_session(url, allow_old=allow_old_session)
+                with self._lock:
+                    # Locking since it might desire to ask for credentials
+                    used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
                 lgr.log(5, "Calling out into %s for %s" % (method, url))
@@ -172,10 +182,19 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # be caught above about that
 
                 allow_old_session = False  # we will either raise or auth
-                self._handle_authentication(url, needs_authentication, e,
-                                            access_denied, msg_types,
-                                            supported_auth_types,
-                                            used_old_session)
+                # in case of parallel downloaders, one would succeed to get the
+                # lock, ask user if necessary and other processes would just wait
+                # got it to return back
+                with try_lock(self._lock) as got_lock:
+                    if got_lock:
+                        self._handle_authentication(url, needs_authentication, e,
+                                                    access_denied, msg_types,
+                                                    supported_auth_types,
+                                                    used_old_session)
+                    else:
+                        lgr.debug("The lock for downloader authentication was not available.")
+                        # We will just wait for the lock to become available,
+                        # and redo connect/download attempt
                 continue
 
             except IncompleteDownloadError as e:
