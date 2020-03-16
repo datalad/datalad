@@ -35,6 +35,7 @@ from ...tests.utils import skip_if_no_network
 from ...tests.utils import with_testsui
 from ...tests.utils import with_memory_keyring
 from ...tests.utils import known_failure_githubci_win
+from ...utils import ensure_unicode
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -77,7 +78,10 @@ def test_docstring():
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
-def fake_open(write_=None):
+_builtins_open = builtins.open
+
+
+def fake_open(write_=None, skip_regex=None):
     class myfile(object):
         """file which does nothing"""
         if write_:
@@ -86,8 +90,11 @@ def fake_open(write_=None):
         def close(self):
             pass
 
-    def myopen(*args, **kwargs):
-        return myfile
+    def myopen(path, *args, **kwargs):
+        if skip_regex and re.search(skip_regex, ensure_unicode(path)):
+            return _builtins_open(path, *args, **kwargs)
+        else:
+            return myfile
     return myopen
 
 
@@ -146,8 +153,9 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # Some errors handling
     # XXX obscure mocking since impossible to mock write alone
     # and it still results in some warning being spit out
+    # Note: we need to avoid mocking opening of the lock file!
     with swallow_logs(), \
-         patch.object(builtins, 'open', fake_open(write_=_raise_IOError)):
+         patch.object(builtins, 'open', fake_open(write_=_raise_IOError, skip_regex='.*\.lck$')):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
 
     # incomplete download scenario - should have 3 tries
