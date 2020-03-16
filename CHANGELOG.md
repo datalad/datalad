@@ -16,7 +16,11 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- All spots that raised a `NoDatasetArgumentFound` exception now raise
+  a `NoDatasetFound` exception to better reflect the situation: it is
+  the _dataset_ rather than the _argument_ that is not found.  For
+  compatibility, the latter inherits from the former, but new code
+  should prefer the latter.  ([#4285][])
 
 ### Fixes
 
@@ -25,6 +29,9 @@ bet we will fix some bugs and make a world even a better place.
 - `datalad export-to-figshare` failed to export if the generated title
   was fewer than three characters.  It now queries the caller for the
   title and guards against titles that are too short.  ([#4140][])
+
+- Authentication was requested multiple times when git-annex launched
+  parallel downloads from the `datalad` special remote. ([#4308][])
 
 - At verbose logging levels, DataLad requests that git-annex display
   debugging information too.  Work around a bug in git-annex that
@@ -42,9 +49,14 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
+- The message provided when a command cannot determine what dataset to
+  operate on has been improved.  ([#4285][])
+
 - The "aws-s3" authentication type now allows specifying the host
   through "aws-s3_host", which was needed to work around an
   authorization error due to a longstanding upstream bug.  ([#4239][])
+
+- The xmp metadata extractor now recognizes ".wav" files.
 
 
 ## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
@@ -2425,3 +2437,5 @@ publishing
 [#4214]: https://github.com/datalad/datalad/issues/4214
 [#4239]: https://github.com/datalad/datalad/issues/4239
 [#4262]: https://github.com/datalad/datalad/issues/4262
+[#4285]: https://github.com/datalad/datalad/issues/4285
+[#4308]: https://github.com/datalad/datalad/issues/4308
