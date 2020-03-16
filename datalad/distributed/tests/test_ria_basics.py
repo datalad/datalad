@@ -136,8 +136,6 @@ def _test_initremote_basic(host, ds_path, store, link):
     [assert_in(c, remote_log) for c in common_init_opts]
     assert_in("archive-id={}".format(ds.id), remote_log)
 
-    # TODO: How about old configs? Still support them?
-
     # TODO: - check output of failures to verify it's failing the right way
     #       - might require to run initremote directly to get the output
 
