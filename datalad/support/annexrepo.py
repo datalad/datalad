@@ -1265,7 +1265,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 reload=False)
         self._run_annex_command(
             'init',
-            log_stderr=lambda s: lgr.info(s.rstrip()), log_online=True,
+            runner="gitwitless",
+            protocol=AnnexInitOutput,
             annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
@@ -3639,6 +3640,16 @@ class AnnexJsonProtocol(WitlessProtocol):
                 'Finished',
             )
         super().process_exited()
+
+
+class AnnexInitOutput(WitlessProtocol):
+    proc_out = True
+    proc_err = True
+
+    def pipe_data_received(self, fd, byts):
+        line = byts.decode(self.encoding)
+        if fd == 2:
+            lgr.info(line.strip())
 
 
 # TODO: Why was this commented out?
