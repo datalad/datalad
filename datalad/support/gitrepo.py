@@ -411,7 +411,6 @@ class GitProgress(WitlessProtocol):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self._encoding = getpreferredencoding(do_setlocale=False)
         self._unprocessed = None
 
     def connection_made(self, transport):
@@ -473,7 +472,7 @@ class GitProgress(WitlessProtocol):
         # Compressing objects:  50% (1/2)
         # Compressing objects: 100% (2/2)
         # Compressing objects: 100% (2/2), done.
-        line = line.decode(self._encoding) if isinstance(line, bytes) else line
+        line = line.decode(self.encoding) if isinstance(line, bytes) else line
         if line.startswith(('warning:', 'error:', 'fatal:')):
             return False
 
