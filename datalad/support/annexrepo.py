@@ -1039,10 +1039,17 @@ class AnnexRepo(GitRepo, RepoInterface):
             env = self.add_fake_dates(env)
 
         if runner == "gitwitless":
+            log_streams = (kwargs.pop('log_stdout', True),
+                           kwargs.pop('log_stderr', True))
+            if any(map(callable, log_streams)):
+                raise ValueError(
+                    "gitwitless is incompatible with callable"
+                    "for log_std{out,err}: log_stdout=%r, log_stderr=%r",
+                    log_streams[0], log_streams[1])
+
             class _protocol(WitlessProtocol):
-                # TODO: guard for callables being passed as values
-                proc_out = bool(kwargs.pop('log_stdout', True))
-                proc_err = bool(kwargs.pop('log_stderr', True))
+                proc_out = bool(log_streams[0])
+                proc_err = bool(log_streams[1])
             # expect_fail and expect_stderr were all about deciding level
             # at which to log if error or stderr output.  With WitlessRunner
             # and all the handling "from upstairs" we simply would do nothing

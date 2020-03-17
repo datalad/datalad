@@ -2418,3 +2418,17 @@ def test_get_size_from_key():
 
     for key, value in test_keys.items():
         eq_(AnnexRepo.get_size_from_key(key), value)
+
+
+@with_tempfile(mkdir=True)
+def test_run_annex_gitwitless_invalid_callable(path):
+    ar = AnnexRepo(path, create=True)
+    for log_stdout, log_stderr in [(str, False),
+                                   (False, str),
+                                   (str, str)]:
+        with assert_raises(ValueError):
+            ar._run_annex_command_json(
+                "info",
+                log_stdout=log_stdout,
+                log_stderr=log_stderr,
+                runner="gitwitless")
