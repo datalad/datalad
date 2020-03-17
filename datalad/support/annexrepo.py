@@ -3648,7 +3648,11 @@ class AnnexInitOutput(WitlessProtocol):
 
     def pipe_data_received(self, fd, byts):
         line = byts.decode(self.encoding)
-        if fd == 2:
+        if fd == 1:
+            if "scanning for unlocked files" in line:
+                lgr.info("Scanning for unlocked files "
+                         "(this may take some time)")
+        elif fd == 2:
             lgr.info(line.strip())
 
 
