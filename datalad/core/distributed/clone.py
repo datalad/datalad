@@ -90,12 +90,13 @@ class Clone(Interface):
     Primary differences over a direct `git clone` call are 1) the automatic
     initialization of a dataset annex (pure Git repositories are equally
     supported); 2) automatic registration of the newly obtained dataset as a
-    subdataset (submodule), if a parent dataset is specified; and 3) support
+    subdataset (submodule), if a parent dataset is specified; 3) support
     for additional resource identifiers (DataLad resource identifiers as used
-    on datasets.datalad.org, and RIA store URLs as used for store.datalad.org;
-    see examples); and 4) automatic configurable generation of alternative
-    access URL for common cases (such as appending '.git' to the URL in case
-    the accessing the base URL failed).
+    on datasets.datalad.org, and RIA store URLs as used for store.datalad.org
+    - optionally in specific versions as identified by a branch or a tag; see
+    examples); and 4) automatic configurable generation of alternative access
+    URL for common cases (such as appending '.git' to the URL in case the
+    accessing the base URL failed).
 
     || PYTHON >>By default, the command returns a single Dataset instance for
     an installed dataset, regardless of whether it was newly installed ('ok'
@@ -144,6 +145,11 @@ class Clone(Interface):
         dict(text="Install a dataset identified by its ID from store.datalad.org",
              code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561')",
              code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561"),
+        dict(
+            text="Install a dataset in a specific version as identified by a"
+                 "branch or tag name from store.datalad.org",
+            code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier')",
+            code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier"),
     ]
 
     _params_ = dict(
