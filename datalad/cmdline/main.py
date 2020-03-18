@@ -244,7 +244,10 @@ def setup_parser(
 
         if unparsed_arg not in known_commands:
             # check if might be coming from known extensions
-            from ..interface import _known_extension_commands
+            from ..interface import (
+                _known_extension_commands,
+                _deprecated_commands,
+            )
             extension_commands = {
                 c: e
                 for e, commands in _known_extension_commands.items()
@@ -254,6 +257,10 @@ def setup_parser(
             if unparsed_arg in extension_commands:
                 hint = "Command %s is provided by (not installed) extension %s." \
                       % (unparsed_arg, extension_commands[unparsed_arg])
+            elif unparsed_arg in _deprecated_commands:
+                hint_cmd = _deprecated_commands[unparsed_arg]
+                hint = "Command %r was deprecated" % unparsed_arg
+                hint += (" in favor of %r command." % hint_cmd) if hint_cmd else '.'
             fail_with_short_help(
                 parser,
                 hint=hint,
