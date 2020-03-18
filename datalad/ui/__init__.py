@@ -38,6 +38,7 @@ KNOWN_BACKENDS = {
     'annex': UnderAnnexUI,
     'tests': UnderTestsUI,
     'tests-noninteractive': QuietConsoleLog,
+    'quiet': QuietConsoleLog,
     'no-progress': SilentConsoleLog,
 }
 
@@ -81,7 +82,7 @@ class _UI_Switcher(object):
                 else:
                     backend = 'dialog'
             else:
-                backend = 'dialog' if is_interactive() else 'no-progress'
+                backend = 'dialog' if is_interactive() else 'quiet'
         self._ui = KNOWN_BACKENDS[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend

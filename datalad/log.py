@@ -457,13 +457,12 @@ class LoggerHelper(object):
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
-        if is_interactive():
-            phandler = ProgressHandler()
-            # progress only when interactive
-            phandler.addFilter(OnlyProgressLog())
-            # no stream logs of progress messages when interactive
-            loghandler.addFilter(NoProgressLog())
-            self.lgr.addHandler(phandler)
+        phandler = ProgressHandler()
+        # progress only
+        phandler.addFilter(OnlyProgressLog())
+        # no stream logs of progress
+        loghandler.addFilter(NoProgressLog())
+        self.lgr.addHandler(phandler)
 
         self.set_level()  # set default logging level
         return self.lgr
