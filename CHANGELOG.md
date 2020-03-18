@@ -2177,6 +2177,7 @@ publishing
 [copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
 [create]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
+[create-sibling-ria]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-ria.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
 [datalad-container]: https://github.com/datalad/datalad-container
