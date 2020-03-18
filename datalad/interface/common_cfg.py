@@ -218,6 +218,8 @@ definitions = {
     'datalad.log.outputs': {
         'ui': ('question', {
                'title': 'Used to control whether both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
+        'default': False,
+        'type': EnsureBool(),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
