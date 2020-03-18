@@ -69,11 +69,6 @@ bet we will fix some bugs and make a world even a better place.
   new "ephemeral" mode, where the .git/annex/ of the cloned repository
   is symlinked to the local source repository's.  ([#4099][])
 
-- Most of the remaining spots that use GitPython have been rewritten
-  without it.  Most notably, this includes rewrites of the `clone`,
-  `fetch`, and `push` methods of `GitRepo`.  ([#4080][]) ([#4087][])
-  ([#4170][]) ([#4171][]) ([#4175][])
-
 - [update][]  ([#4167][])
   - learned to disallow non-fast-forward updates when `ff-only` is
     given to the `--merge` option.
@@ -85,10 +80,6 @@ bet we will fix some bugs and make a world even a better place.
 
 - [create-sibling][] now supports local paths as targets in addition
   to SSH URLs.  ([#4187][])
-
-- When `GitRepo.commit` splits its operation across multiple calls to
-  avoid exceeding the maximum command line length, it now amends to
-  initial commit to avoid creating multiple commits.  ([#4156][])
 
 - The rendering of command errors has been improved.  ([#4157][])
 
@@ -104,6 +95,15 @@ bet we will fix some bugs and make a world even a better place.
   within a subdataset ("<subdataset>/<path>") now traverses into the
   subdataset, as "<subdataset>/" would, restricting its report to
   "<subdataset>/<path>".  ([#4235][])
+
+- Most of the remaining spots that use GitPython have been rewritten
+  without it.  Most notably, this includes rewrites of the `clone`,
+  `fetch`, and `push` methods of `GitRepo`.  ([#4080][]) ([#4087][])
+  ([#4170][]) ([#4171][]) ([#4175][])
+
+- When `GitRepo.commit` splits its operation across multiple calls to
+  avoid exceeding the maximum command line length, it now amends to
+  initial commit to avoid creating multiple commits.  ([#4156][])
 
 
 ## 0.12.4 (??? ??, 2020) -- will be better than ever
