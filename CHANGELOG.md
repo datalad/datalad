@@ -10,22 +10,15 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.12.4 (??? ??, 2019) -- will be better than ever
+## 0.12.4 (Mar 19, 2020) -- Windows?!
 ￼
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+The main purpose of this release is to have one on PyPi that has no
+associated wheel to enable a working installation on Windows ([#4315][]).
 
 ### Fixes
 
-?
-
-### Enhancements and new features
-
-?
-
+- Adjust the behavior of the `log.outputs` config switch to make outputs
+  visible. Its description was adjusted accordingly.
 
 ## 0.12.3 (March 16, 2020) -- .
 
@@ -2457,3 +2450,4 @@ publishing
 [#4262]: https://github.com/datalad/datalad/issues/4262
 [#4285]: https://github.com/datalad/datalad/issues/4285
 [#4308]: https://github.com/datalad/datalad/issues/4308
+[#4315]: https://github.com/datalad/datalad/issues/4315
