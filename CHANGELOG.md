@@ -145,7 +145,7 @@ bet we will fix some bugs and make a world even a better place.
   ([#4243][])
 
 
-## 0.12.4 (??? ??, 2020) -- will be better than ever
+## 0.12.5 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -161,6 +161,18 @@ bet we will fix some bugs and make a world even a better place.
 
 ?
 
+
+## 0.12.4 (Mar 19, 2020) -- Windows?!
+￼
+The main purpose of this release is to have one on PyPi that has no
+associated wheel to enable a working installation on Windows ([#4315][]).
+
+### Fixes
+
+- The description of the `log.outputs` config switch did not keep up
+  with code changes and incorrectly stated that the output would be
+  logged at the DEBUG level; logging actually happens at a lower
+  level.  ([#4317][])
 
 ## 0.12.3 (March 16, 2020) -- .
 
@@ -2639,3 +2651,5 @@ publishing
 [#4306]: https://github.com/datalad/datalad/issues/4306
 [#4308]: https://github.com/datalad/datalad/issues/4308
 [#4314]: https://github.com/datalad/datalad/issues/4314
+[#4315]: https://github.com/datalad/datalad/issues/4315
+[#4317]: https://github.com/datalad/datalad/issues/4317
