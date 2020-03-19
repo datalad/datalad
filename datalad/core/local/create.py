@@ -158,10 +158,16 @@ class Create(Interface):
             action='store_true'),
         description=location_description,
         no_annex=Parameter(
-            args=("--no-annex",),
-            doc="""if set, a plain Git repository will be created without any
-            annex""",
+            # hide this from the cmdline parser, replaced by `annex`
+            args=tuple(),
+            doc="""this option is deprecated, use `annex` instead""",
             action='store_true'),
+        annex=Parameter(
+            args=("--no-annex",),
+            dest='annex',
+            doc="""if [CMD: set CMD][PY: disabled PY], a plain Git repository
+            will be created without any annex""",
+            action='store_false'),
         # TODO seems to only cause a config flag to be set, this could be done
         # in a procedure
         fake_dates=Parameter(
@@ -192,9 +198,23 @@ class Create(Interface):
             description=None,
             dataset=None,
             no_annex=False,
+            annex=True,
             fake_dates=False,
             cfg_proc=None
     ):
+        # TODO: introduced with 0.13, remove with 0.14
+        if annex != (not no_annex) and no_annex:
+            # the two mirror options do not agree and the deprecated one is
+            # not at default value
+            lgr.warning("datalad-create's `no_annex` option is deprecated "
+                        "and will be removed in a future release, "
+                        "use the reversed-sign `annex` option instead.")
+            # honor the old option for now
+            annex = not no_annex
+
+        # we only perform negative tests below
+        no_annex = not annex
+
         if dataset:
             if isinstance(dataset, Dataset):
                 ds = dataset
