@@ -63,7 +63,7 @@ raw = dict(return_type='list', result_filter=None, result_xfm=None, on_failure='
 def test_create_raises(path, outside_path):
     ds = Dataset(path)
     # incompatible arguments (annex only):
-    assert_raises(ValueError, ds.create, no_annex=True, description='some')
+    assert_raises(ValueError, ds.create, annex=False, description='some')
 
     with open(op.join(path, "somefile.tst"), 'w') as f:
         f.write("some")
@@ -155,7 +155,7 @@ def test_create_curdir(path, path2):
     assert_repo_status(ds.path, annex=True)
 
     with chpwd(path2, mkdir=True):
-        create(no_annex=True)
+        create(annex=False)
     ds = Dataset(path2)
     ok_(ds.is_installed())
     assert_repo_status(ds.path, annex=False)
@@ -227,7 +227,7 @@ def test_create_sub(path):
     assert_not_in("someother", ds.subdatasets(result_xfm='relpaths'))
 
     # 3. create sub via super:
-    subds3 = ds.create("third", no_annex=True)
+    subds3 = ds.create("third", annex=False)
     ok_(isinstance(subds3, Dataset))
     ok_(subds3.is_installed())
     assert_repo_status(subds3.path, annex=False)

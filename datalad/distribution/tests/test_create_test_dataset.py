@@ -32,7 +32,7 @@ from datalad.tests.utils import eq_
 @with_tempfile(mkdir=True)
 def test_create(outdir):
     from datalad.api import create
-    assert_raises(ValueError, create, outdir, description='Precious data', no_annex=True)
+    assert_raises(ValueError, create, outdir, description='Precious data', annex=False)
 
 
 def test_parse_spec():

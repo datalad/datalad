@@ -65,7 +65,7 @@ def test_unlock_raises(path, path2, path3):
     assert_raises(NoDatasetFound,
                   unlock, dataset=None, path=path2)
 
-    create(path=path, no_annex=True)
+    create(path=path, annex=False)
     ds = Dataset(path)
     # no complaints
     ds.unlock()
