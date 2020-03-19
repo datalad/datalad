@@ -49,7 +49,7 @@ release-pypi: update-changelog
 	# the wheels we would produce are broken on windows, because they
 	# install an incompatible entrypoint script
 	# https://github.com/datalad/datalad/issues/4315
-	#$(PYTHON) setup.py bdist_wheel --universal
+	#$(PYTHON) setup.py bdist_wheel
 	twine upload dist/*
 
 docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
