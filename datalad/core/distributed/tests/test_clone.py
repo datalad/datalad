@@ -10,8 +10,8 @@
 """
 
 import logging
-import os
 import os.path as op
+import stat
 
 from unittest.mock import patch
 
@@ -48,16 +48,13 @@ from datalad.tests.utils import (
     known_failure,
     known_failure_appveyor,
     neq_,
+    nok_,
     ok_,
     ok_file_has_content,
     has_symlink_capability,
-    known_failure,
-    known_failure_appveyor,
     ok_startswith,
     patch_config,
-    patch_config,
     serve_path_via_http,
-    skip_if,
     skip_if_no_network,
     skip_if_on_windows,
     slow,
@@ -325,7 +322,8 @@ def test_failed_clone(dspath):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_reckless(src, top_path):
+@with_tempfile(mkdir=True)
+def test_reckless(src, top_path, sharedpath):
     ds = clone(src, top_path, reckless=True,
                result_xfm='datasets', return_type='item-or-list')
     eq_(ds.config.get('annex.hardlink', None), 'true')
@@ -337,6 +335,16 @@ def test_reckless(src, top_path):
     sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
     eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
     eq_(sub.config.get('annex.hardlink', None), 'true')
+    # the standard setup keeps the annex locks accessible to the user only
+    nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode & stat.S_IWGRP)
+    # but we can set it up for group-shared access too
+    sharedds = clone(
+        src, sharedpath,
+        reckless='shared-group',
+        result_xfm='datasets',
+        return_type='item-or-list')
+    ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+        & stat.S_IWGRP)
 
 
 @with_tempfile

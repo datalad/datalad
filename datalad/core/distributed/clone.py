@@ -10,7 +10,6 @@
 
 
 import logging
-import os
 import re
 from os.path import expanduser
 from collections import OrderedDict
@@ -150,6 +149,12 @@ class Clone(Interface):
                  "branch or tag name from store.datalad.org",
             code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier')",
             code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier"),
+        dict(
+            text="Install a dataset with group-write access permissions",
+            code_py=\
+            "clone(source='http://example.com/dataset', reckless='shared-group')",
+            code_cmd=\
+            "datalad clone http://example.com/dataset --reckless shared-group"),
     ]
 
     _params_ = dict(
@@ -313,8 +318,8 @@ def clone_dataset(
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
-    reckless : {None, 'auto', 'ephemeral'}, optional
-      Mode switch to put cloned dataset into throw-away configurations, i.e.
+    reckless : {None, 'auto', 'ephemeral', 'shared-...'}, optional
+      Mode switch to put cloned dataset into unsafe/throw-away configurations, i.e.
       sacrifice data safety for performance or resource footprint.
     description : str, optional
       Location description for the annex of the dataset clone (if there is any).
@@ -495,6 +500,13 @@ def clone_dataset(
             **result_props)
         return
 
+    # act on --reckless=shared-...
+    # must happen prior git-annex-init, where we can cheaply alter the repo
+    # setup through safe re-init'ing
+    if reckless and reckless.startswith('shared-'):
+        lgr.debug('Reinit %s to enable shared access permissions', destds)
+        destds.repo.call_git(['init', '--shared={}'.format(reckless[7:])])
+
     yield from postclonecfg_annexdataset(
         destds,
         reckless,
@@ -589,7 +601,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     repo = AnnexRepo(ds.path, init=True)
     if not repo.is_initialized() or description:
         repo._init(description=description)
-    if reckless == 'auto':
+    if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
         repo._run_annex_command('untrust', annex_options=['here'])
 
     elif reckless == 'ephemeral':
