@@ -46,7 +46,10 @@ release-pypi: update-changelog
 	# better safe than sorry
 	test ! -e dist
 	$(PYTHON) setup.py sdist
-	$(PYTHON) setup.py bdist_wheel --universal
+	# the wheels we would produce are broken on windows, because they
+	# install an incompatible entrypoint script
+	# https://github.com/datalad/datalad/issues/4315
+	#$(PYTHON) setup.py bdist_wheel --universal
 	twine upload dist/*
 
 docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
