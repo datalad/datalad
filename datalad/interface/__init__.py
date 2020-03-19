@@ -100,3 +100,8 @@ _known_extension_commands = {
     'datalad-crawler': ('crawl', 'crawl-init'),
     'datalad-neuroimaging': ('bids2scidata',)
 }
+
+
+_deprecated_commands = {
+    'add': "save",
+}
