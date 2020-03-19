@@ -34,8 +34,10 @@ associated wheel to enable a working installation on Windows ([#4315][]).
 
 ### Fixes
 
-- Adjust the behavior of the `log.outputs` config switch to make outputs
-  visible. Its description was adjusted accordingly.
+- The description of the `log.outputs` config switch did not keep up
+  with code changes and incorrectly stated that the output would be
+  logged at the DEBUG level; logging actually happens at a lower
+  level.  ([#4317][])
 
 ## 0.12.3 (March 16, 2020) -- .
 
@@ -2468,3 +2470,4 @@ publishing
 [#4285]: https://github.com/datalad/datalad/issues/4285
 [#4308]: https://github.com/datalad/datalad/issues/4308
 [#4315]: https://github.com/datalad/datalad/issues/4315
+[#4317]: https://github.com/datalad/datalad/issues/4317
