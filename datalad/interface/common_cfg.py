@@ -217,7 +217,12 @@ definitions = {
     },
     'datalad.log.outputs': {
         'ui': ('question', {
-               'title': 'Used to control whether both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
+               'title': 'Whether to log stdout and stderr for executed commands',
+               'text': 'When enabled, setting the log level to 5 '
+                       'should catch all execution output, '
+                       'though some output may be logged at higher levels'}),
+        'default': False,
+        'type': EnsureBool(),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
