@@ -335,8 +335,13 @@ def test_reckless(src, top_path, sharedpath):
     sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
     eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
     eq_(sub.config.get('annex.hardlink', None), 'true')
+
+    if ds.repo.is_managed_branch():
+        raise SkipTest("Remainder of test needs proper filesystem permissions")
+
     # the standard setup keeps the annex locks accessible to the user only
-    nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode & stat.S_IWGRP)
+    nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+         & stat.S_IWGRP)
     # but we can set it up for group-shared access too
     sharedds = clone(
         src, sharedpath,
