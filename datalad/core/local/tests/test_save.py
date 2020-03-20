@@ -162,8 +162,8 @@ def test_save_message_file(path):
 
 def test_renamed_file():
     @with_tempfile()
-    def check_renamed_file(recursive, no_annex, path):
-        ds = Dataset(path).create(no_annex=no_annex)
+    def check_renamed_file(recursive, annex, path):
+        ds = Dataset(path).create(annex=annex)
         create_tree(path, {'old': ''})
         ds.repo.add('old')
         ds.repo.call_git(["mv"], files=["old", "new"])
@@ -171,8 +171,8 @@ def test_renamed_file():
         assert_repo_status(path)
 
     for recursive in False,:  #, True TODO when implemented
-        for no_annex in True, False:
-            yield check_renamed_file, recursive, no_annex
+        for annex in True, False:
+            yield check_renamed_file, recursive, annex
 
 
 @with_tempfile(mkdir=True)

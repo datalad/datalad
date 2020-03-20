@@ -167,7 +167,7 @@ def test_get_invalid_call(path, file_outside):
 
     # have a plain git:
     ds = Dataset(path)
-    ds.create(no_annex=True)
+    ds.create(annex=False)
     with open(opj(path, "some.txt"), "w") as f:
         f.write("whatever")
     ds.save("some.txt", to_git=True, message="Initial commit.")
@@ -444,7 +444,7 @@ def test_get_install_missing_subdataset(src, path):
 @with_tempfile(mkdir=True)
 def test_get_mixed_hierarchy(src, path):
 
-    origin = Dataset(src).create(no_annex=True)
+    origin = Dataset(src).create(annex=False)
     origin_sub = origin.create('subds')
     with open(opj(origin.path, 'file_in_git.txt'), "w") as f:
         f.write('no idea')

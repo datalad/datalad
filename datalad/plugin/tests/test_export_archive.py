@@ -102,7 +102,7 @@ def test_archive(path):
 
 @with_tree(_dataset_template)
 def test_zip_archive(path):
-    ds = Dataset(opj(path, 'ds')).create(force=True, no_annex=True)
+    ds = Dataset(opj(path, 'ds')).create(force=True, annex=False)
     ds.save()
     with chpwd(path):
         ds.export_archive(filename='my', archivetype='zip')

@@ -653,7 +653,11 @@ class Interface(object):
             param = cls._params_[arg]
             defaults_idx = ndefaults - len(args) + i
             cmd_args = param.cmd_args
-            if cmd_args is None:
+            if cmd_args == tuple():
+                # explicitly provided an empty sequence of argument names
+                # this shall not appear in the parser
+                continue
+            elif cmd_args is None:
                 cmd_args = []
             if not len(cmd_args):
                 if defaults_idx >= 0:
@@ -727,7 +731,11 @@ class Interface(object):
                            'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
-        kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
+        kwargs = {k: getattr(args, k)
+                  for k in argnames
+                  # some arguments might be Python-only and do not appear in the
+                  # parser Namespace
+                  if hasattr(args, k) and is_api_arg(k)}
         # we are coming from the entry point, this is the toplevel command,
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and

@@ -510,7 +510,7 @@ def test_new_or_modified(path):
         return [op.relpath(ap["path"], path)
                 for ap in new_or_modified(diff_revision(*args, **kwargs))]
 
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).create(force=True, annex=False)
 
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
@@ -760,7 +760,7 @@ def test_run_inputs_outputs(src, path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(no_annex=True)
+    ds = Dataset(path).create(annex=False)
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))

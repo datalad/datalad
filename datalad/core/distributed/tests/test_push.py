@@ -109,7 +109,7 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
 @with_tempfile(mkdir=True)
 def check_push(annex, src_path, dst_path):
     # prepare src
-    src = Dataset(src_path).create(no_annex=not annex)
+    src = Dataset(src_path).create(annex=annex)
     src_repo = src.repo
     # push should not add branches to the local dataset
     orig_branches = src_repo.get_branches()
@@ -236,7 +236,7 @@ def test_push_recursive(
     origin = Dataset(origin_path).create()
     origin_subm1 = origin.create('sub m')
     origin_subm1.create('subsub m')
-    origin.create('subm noannex', no_annex=True)
+    origin.create('subm noannex', annex=False)
     origin.save()
     assert_repo_status(origin.path)
     # prepare src as a fresh clone with all subdatasets checkout out recursively

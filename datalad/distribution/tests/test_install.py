@@ -854,7 +854,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1_ = 'clone1'
         clone2_ = 'clone2'
 
-        origin = create(origin_, no_annex=True)
+        origin = create(origin_, annex=False)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
         clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)

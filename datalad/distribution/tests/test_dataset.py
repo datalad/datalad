@@ -315,7 +315,7 @@ def test_dataset_id(path):
     # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
     # dict isn't a nice approach. May be create needs a fix/RF?
     Dataset._unique_instances.clear()
-    ds.create(no_annex=True, force=True)
+    ds.create(annex=False, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
     #

@@ -183,7 +183,7 @@ def test_update_simple(origin, src_path, dst_path):
 @with_tempfile
 def test_update_git_smoke(src_path, dst_path):
     # Apparently was just failing on git repos for basic lack of coverage, hence this quick test
-    ds = Dataset(src_path).create(no_annex=True)
+    ds = Dataset(src_path).create(annex=False)
     target = install(
         dst_path, source=src_path,
         result_xfm='datasets', return_type='item-or-list')
