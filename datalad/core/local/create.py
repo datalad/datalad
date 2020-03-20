@@ -14,9 +14,9 @@ import os
 import logging
 import random
 import uuid
+import warnings
 from argparse import (
     REMAINDER,
-    ONE_OR_MORE,
 )
 
 from os import listdir
@@ -60,6 +60,12 @@ import datalad.utils as ut
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.core.local.create')
+
+
+# Used for handling the no_annex -> annex option transition
+# remove when done
+class _NoAnnexDefault(object):
+    pass
 
 
 @build_doc
@@ -197,18 +203,19 @@ class Create(Interface):
             force=False,
             description=None,
             dataset=None,
-            no_annex=False,
+            no_annex=_NoAnnexDefault,
             annex=True,
             fake_dates=False,
             cfg_proc=None
     ):
         # TODO: introduced with 0.13, remove with 0.14
-        if annex != (not no_annex) and no_annex:
+        if no_annex is not _NoAnnexDefault:
             # the two mirror options do not agree and the deprecated one is
             # not at default value
-            lgr.warning("datalad-create's `no_annex` option is deprecated "
-                        "and will be removed in a future release, "
-                        "use the reversed-sign `annex` option instead.")
+            warnings.warn("datalad-create's `no_annex` option is deprecated "
+                          "and will be removed in a future release, "
+                          "use the reversed-sign `annex` option instead.",
+                          DeprecationWarning)
             # honor the old option for now
             annex = not no_annex
 
