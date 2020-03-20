@@ -214,6 +214,7 @@ class ProgressHandler(logging.Handler):
                 label=getattr(record, 'dlm_progress_label', ''),
                 unit=getattr(record, 'dlm_progress_unit', ''),
                 total=getattr(record, 'dlm_progress_total', None))
+            pbar.start()
             self.pbars[pid] = pbar
         elif update is None:
             # not an update -> done
