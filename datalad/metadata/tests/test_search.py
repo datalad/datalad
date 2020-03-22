@@ -33,7 +33,7 @@ from datalad.tests.utils import patch_config
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import eq_
 from datalad.tests.utils import known_failure_githubci_win
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import NoDatasetFound
 
 from datalad.api import search
 
@@ -46,7 +46,7 @@ from ..search import _meta2autofield_dict
 def test_search_outside1_noninteractive_ui(tdir):
     # we should raise an informative exception
     with chpwd(tdir):
-        with assert_raises(NoDatasetArgumentFound) as cme:
+        with assert_raises(NoDatasetFound) as cme:
             list(search("bu"))
         assert_in('run interactively', str(cme.exception))
 
@@ -60,7 +60,7 @@ def test_search_outside1(tdir, newhome):
         with patch_config({'datalad.locations.default-dataset': newhome}):
             gen = search("bu", return_type='generator')
             assert_is_generator(gen)
-            assert_raises(NoDatasetArgumentFound, next, gen)
+            assert_raises(NoDatasetFound, next, gen)
 
         # and if we point to some non-existing dataset
         with assert_raises(ValueError):
@@ -94,14 +94,14 @@ def test_search_outside1_install_default_ds(tdir, default_dspath):
             # and what if we say "no" to install?
             ui.add_responses('no')
             mock_install.reset_mock()
-            with assert_raises(NoDatasetArgumentFound):
+            with assert_raises(NoDatasetFound):
                 list(search("."))
 
             # and if path exists and is a valid dataset and we say "no"
             Dataset(default_dspath).create()
             ui.add_responses('no')
             mock_install.reset_mock()
-            with assert_raises(NoDatasetArgumentFound):
+            with assert_raises(NoDatasetFound):
                 list(search("."))
 
 
@@ -173,7 +173,7 @@ def test_our_metadataset_search(tdir):
 def test_search_non_dataset(tdir):
     from datalad.support.gitrepo import GitRepo
     GitRepo(tdir, create=True)
-    with assert_raises(NoDatasetArgumentFound) as cme:
+    with assert_raises(NoDatasetFound) as cme:
         list(search('smth', dataset=tdir))
     # Should instruct user how that repo could become a datalad dataset
     assert_in("datalad create --force", str(cme.exception))

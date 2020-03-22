@@ -10,6 +10,56 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
+## 0.12.3 (March 16, 2020) -- .
+
+Updates for compatibility with the latest git-annex, along with a few
+miscellaneous fixes
+
+### Major refactoring and deprecations
+
+- All spots that raised a `NoDatasetArgumentFound` exception now raise
+  a `NoDatasetFound` exception to better reflect the situation: it is
+  the _dataset_ rather than the _argument_ that is not found.  For
+  compatibility, the latter inherits from the former, but new code
+  should prefer the latter.  ([#4285][])
+
+### Fixes
+
+- Updates for compatibility with git-annex version 8.20200226. ([#4214][])
+
+- `datalad export-to-figshare` failed to export if the generated title
+  was fewer than three characters.  It now queries the caller for the
+  title and guards against titles that are too short.  ([#4140][])
+
+- Authentication was requested multiple times when git-annex launched
+  parallel downloads from the `datalad` special remote. ([#4308][])
+
+- At verbose logging levels, DataLad requests that git-annex display
+  debugging information too.  Work around a bug in git-annex that
+  prevented that from happening.  ([#4212][])
+
+- The internal command runner looked in the wrong place for some
+  configuration variables, including `datalad.log.outputs`, resulting
+  in the default value always being used.  ([#4194][])
+
+- [publish][] failed when trying to publish to a git-lfs special
+  remote for the first time.  ([#4200][])
+
+- `AnnexRepo.set_remote_url` is supposed to establish shared SSH
+  connections but failed to do so.  ([#4262][])
+
+### Enhancements and new features
+
+- The message provided when a command cannot determine what dataset to
+  operate on has been improved.  ([#4285][])
+
+- The "aws-s3" authentication type now allows specifying the host
+  through "aws-s3_host", which was needed to work around an
+  authorization error due to a longstanding upstream bug.  ([#4239][])
+
+- The xmp metadata extractor now recognizes ".wav" files.
+
+
 ## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
 
 Mostly a bugfix release with various robustifications, but also makes
@@ -2381,3 +2431,12 @@ publishing
 [#4070]: https://github.com/datalad/datalad/issues/4070
 [#4073]: https://github.com/datalad/datalad/issues/4073
 [#4078]: https://github.com/datalad/datalad/issues/4078
+[#4140]: https://github.com/datalad/datalad/issues/4140
+[#4194]: https://github.com/datalad/datalad/issues/4194
+[#4200]: https://github.com/datalad/datalad/issues/4200
+[#4212]: https://github.com/datalad/datalad/issues/4212
+[#4214]: https://github.com/datalad/datalad/issues/4214
+[#4239]: https://github.com/datalad/datalad/issues/4239
+[#4262]: https://github.com/datalad/datalad/issues/4262
+[#4285]: https://github.com/datalad/datalad/issues/4285
+[#4308]: https://github.com/datalad/datalad/issues/4308

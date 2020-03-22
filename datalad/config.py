@@ -9,6 +9,7 @@
 """
 """
 
+from functools import lru_cache
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
@@ -54,8 +55,10 @@ _where_reload_doc = """
 
 # we cannot import external_versions here, as the cfg comes before anything
 # and we would have circular imports
-def get_git_version(runner):
+@lru_cache()
+def get_git_version(runner=None):
     """Return version of available git"""
+    runner = runner or GitRunner()
     return runner.run('git version'.split())[0].split()[2]
 
 
@@ -241,7 +244,7 @@ class ConfigManager(object):
         self._runner = GitRunner(**run_kwargs)
         try:
             self._gitconfig_has_showorgin = \
-                LooseVersion(get_git_version(self._runner)) >= '2.8.0'
+                LooseVersion(get_git_version()) >= '2.8.0'
         except Exception:
             # no git something else broken, assume git is present anyway
             # to not delay this, but assume it is old

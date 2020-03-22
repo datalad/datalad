@@ -40,7 +40,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import known_failure_githubci_win
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.exceptions import NoDatasetFound
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -228,7 +228,7 @@ def test_ignore_nondatasets(path):
 
 @with_tempfile(mkdir=True)
 def test_get_aggregates_fails(path):
-    with chpwd(path), assert_raises(NoDatasetArgumentFound):
+    with chpwd(path), assert_raises(NoDatasetFound):
         metadata(get_aggregates=True)
     ds = Dataset(path).create()
     res = ds.metadata(get_aggregates=True, on_failure='ignore')

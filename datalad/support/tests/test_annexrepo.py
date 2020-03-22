@@ -517,6 +517,11 @@ def test_find_batch_equivalence(path):
     # If we give a subdirectory, we split that output.
     eq_(set(ar.find(["subdir"])["subdir"]), {"subdir/d", "subdir/e"})
     eq_(ar.find(["subdir"]), ar.find(["subdir"], batch=True))
+    # manually ensure that no annex batch processes are around anymore
+    # that make the test cleanup break on windows.
+    # story at https://github.com/datalad/datalad/issues/4190
+    # even an explicit `del ar` does not get it done
+    ar._batched.close()
 
 
 @with_tempfile(mkdir=True)
@@ -1152,6 +1157,13 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
+    # TODO: figure it out, and possibly remove while merginging into
+    # master if WitlessRunner performs fine
+    if external_versions['cmd:annex'] >= '8.20200226':
+        # This is not necessarily the version where it started to hang
+        # See https://github.com/datalad/datalad/pull/4265 for more info
+        raise SkipTest("Version of git-annex might cause us to stall.")
+
     from datalad import lgr
     # remote interaction causes socket to be created:
     try:
@@ -1503,9 +1515,12 @@ def test_annex_add_no_dotfiles(path):
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
-    # no file is being added, as dotfiles/directories are ignored by default
-    ar.add('.', git=False)
+    if ar._check_version_kludges("has-include-dotfiles"):
+        assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
+        # no file is being added, as dotfiles/directories are ignored by default
+        ar.add('.', git=False)
+        # ^ Note: No longer true as of 8.20200226, which does _not_ skip
+        # dotfiles.
     # double check, still dirty
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work

@@ -31,7 +31,10 @@ from nose.tools import eq_, ok_, assert_is_instance
 from nose.tools import assert_false as nok_
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos, assert_not_in
-from datalad.utils import _path_
+from datalad.utils import (
+    _path_,
+    Path,
+)
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_not_equal
@@ -47,6 +50,13 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import known_failure_windows
+
+
+def filter_fsck_error_msg(dicts):
+    # Filter keys that have expected differences when comparing target.fsck()
+    # to fsck(remote=target).
+    return [{k: v for k, v in d.items() if k not in ["error-messages", "note"]}
+            for d in dicts]
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -165,7 +175,8 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
         set(target.get_branch_commits("git-annex"))))
 
-    eq_(source.repo.fsck(), source.repo.fsck(remote='target'))
+    eq_(filter_fsck_error_msg(source.repo.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
 @with_testrepos('basic_git', flavors=['local'])
@@ -493,10 +504,10 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 
     # data integrity check looks identical from all perspectives
     # minus "note" statements from git-annex
-    eq_(source.repo.fsck(),
-        [{k: v for k, v in i.items() if k != 'note'}
-         for i in source.repo.fsck(remote='target')])
-    eq_(target.fsck(), source.repo.fsck(remote='target'))
+    eq_(filter_fsck_error_msg(source.repo.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
+    eq_(filter_fsck_error_msg(target.fsck()),
+        filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
 @skip_if_on_windows  # create_sibling incompatible with win servers
@@ -705,3 +716,18 @@ def test_gh1811(srcpath, clonepath):
         path=clone.path, type='dataset', action='publish',
         status='impossible',
         message=('Cannot determine remote branch name from %s', 'HEAD'))
+
+
+@with_tempfile(mkdir=True)
+def test_publish_no_fetch_refspec_configured(path):
+    from datalad.cmd import GitRunner
+
+    path = Path(path)
+    GitRunner(cwd=str(path)).run(["git", "init", "--bare", "empty-remote"])
+    ds = Dataset(path / "ds").create()
+    ds.repo.add_remote("origin", str(ds.pathobj.parent / "empty-remote"))
+    # Mimic a situation that can happen with an LFS remote. See gh-4199.
+    ds.repo.config.unset("remote.origin.fetch", where="local")
+    (ds.repo.pathobj / "foo").write_text("a")
+    ds.save()
+    ds.publish(to="origin")
