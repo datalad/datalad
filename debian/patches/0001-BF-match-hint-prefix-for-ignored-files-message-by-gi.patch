@@ -1,0 +1,72 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: compatibility with 2.26.0.rc2 git
+
+Origin: Debian
+Forwarded: https://github.com/datalad/datalad/pull/4328
+Last-Update: 2020-03-22
+
+From 2e2b1c8dfbb8179547444ef88d10b0849b40bd41 Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Sun, 22 Mar 2020 13:49:34 -0400
+Subject: [PATCH] BF: match "hint: " prefix for ignored files message by git
+
+Detected while trying to build package in Debian which has now git
+2.26.0.rc2 which lead to the following failure
+
+	======================================================================
+	ERROR: datalad.support.tests.test_gitrepo.test_GitRepo_gitignore
+	----------------------------------------------------------------------
+	Traceback (most recent call last):
+	  File "/usr/lib/python3/dist-packages/nose/case.py", line 197, in runTest
+		self.test(*self.arg)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/tests/utils.py", line 559, in newfunc
+		return t(*(arg + (d,)), **kw)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/tests/test_gitrepo.py", line 1235, in test_GitRepo_gitignore
+		gr.add('ignore.me')
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/gitrepo.py", line 316, in newfunc
+		result = func(self, files_new, *args, **kwargs)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/gitrepo.py", line 1161, in add
+		update=update))
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/gitrepo.py", line 1192, in add_
+		to_options(update=update) + ['--verbose']
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/gitrepo.py", line 316, in newfunc
+		result = func(self, files_new, *args, **kwargs)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/gitrepo.py", line 1896, in _git_custom_command
+		expect_fail=expect_fail)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/support/gitrepo.py", line 1933, in _run_command_files_split
+		*args, **kwargs)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/cmd.py", line 711, in run
+		cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
+	  File "/build/datalad-0.12.4/.pybuild/cpython3_3.7_datalad/build/datalad/cmd.py", line 544, in run
+		raise CommandError(str(cmd), msg, status, out[0], out[1])
+	datalad.support.exceptions.CommandError: CommandError: command '['git', '-c', 'annex.largefiles=nothing', 'add', '--verbose', '--', 'ignore.me']' failed with exitcode 1
+	Failed to run ['git', '-c', 'annex.largefiles=nothing', 'add', '--verbose', '--', 'ignore.me'] under '/tmp/datalad_temp_tree_test_GitRepo_gitignorednwh55rq'. Exit code=1. out= err=The following paths are ignored by one of your .gitignore files:
+	ignore.me
+	hint: Use -f if you really want to add them.
+	hint: Turn this message off by running
+	hint: "git config advice.addIgnoredFile false"
+
+which showed that new "hint: " prefix.  In the solution I decided to stay as
+strict (^) and was not sure if groups used for anything, so I had used non-capturing
+group (?:) to capture that hint.
+---
+ datalad/support/exceptions.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/datalad/support/exceptions.py b/datalad/support/exceptions.py
+index 603ea3f7a..45eda0014 100644
+--- a/datalad/support/exceptions.py
++++ b/datalad/support/exceptions.py
+@@ -163,7 +163,8 @@ class GitIgnoreError(CommandError):
+     """
+ 
+     pattern = \
+-        re.compile(r'ignored by one of your .gitignore files:\s*(.*)^Use -f.*$',
++        re.compile(r'ignored by one of your .gitignore files:\s*(.*)'
++                   r'^(?:hint: )?Use -f.*$',
+                    flags=re.MULTILINE | re.DOTALL)
+ 
+     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
+-- 
+2.25.1
+

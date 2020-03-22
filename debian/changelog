@@ -3,6 +3,9 @@ datalad (0.12.4-1) unstable; urgency=medium
   * Fresh upstream maintenance release
     - should fix lots of compatibility issues with bleeding edge git-annex (>=8)
       which broke some API and behavior(s) (Closes: #954728)
+  * debian/patches
+    + 0001-BF-match-hint-prefix-for-ignored-files-message-by-gi.patch
+      to address changes in git 2.26.0.rc2 output messages
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 22 Mar 2020 12:38:30 -0400
 
