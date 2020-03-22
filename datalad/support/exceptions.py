@@ -163,7 +163,8 @@ class GitIgnoreError(CommandError):
     """
 
     pattern = \
-        re.compile(r'ignored by one of your .gitignore files:\s*(.*)^Use -f.*$',
+        re.compile(r'ignored by one of your .gitignore files:\s*(.*)'
+                   r'^(?:hint: )?Use -f.*$',
                    flags=re.MULTILINE | re.DOTALL)
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
