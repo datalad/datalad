@@ -1,3 +1,11 @@
+datalad (0.12.4-1) unstable; urgency=medium
+
+  * Fresh upstream maintenance release
+    - should fix lots of compatibility issues with bleeding edge git-annex (>=8)
+      which broke some API and behavior(s) (Closes: #954728)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 22 Mar 2020 12:38:30 -0400
+
 datalad (0.12.2-2) unstable; urgency=medium
 
   * Just for source only upload
