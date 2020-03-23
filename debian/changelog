@@ -1,3 +1,9 @@
+datalad (0.12.4-2) unstable; urgency=medium
+
+  * Add python3-distro to Depends of python3-datalad (needed for python>=3.8).
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 23 Mar 2020 13:26:07 -0400
+
 datalad (0.12.4-1) unstable; urgency=medium
 
   * Fresh upstream maintenance release
