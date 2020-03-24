@@ -1058,6 +1058,73 @@ def line_profile(func):
     return newfunc
 
 
+@optional_args
+def collect_method_callstats(func):
+    """Figure out methods which call the method repeatedly on the same instance
+
+    Use case(s):
+      - .repo is expensive since does all kinds of checks.
+      - .config is expensive transitively since it calls .repo each time
+
+
+    TODO:
+    - fancy one could look through the stack for the same id(self) to see if
+      that location is already in memo.  That would hint to the cases where object
+      is not passed into underlying functions, causing them to redo the same work
+      over and over again
+    - ATM might flood with all "1 lines" calls which are not that informative.
+      The underlying possibly suboptimal use might be coming from their callers.
+      It might or not relate to the previous TODO
+    """
+    from collections import defaultdict
+    import traceback
+    from time import time
+    memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
+    # gross timing
+    times = []
+    toppath = op.dirname(__file__) + op.sep
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            self = args[0]
+            stack = traceback.extract_stack()
+            caller = stack[-2]
+            stack_sig = \
+                "{relpath}:{s.name}".format(
+                    s=caller, relpath=op.relpath(caller.filename, toppath))
+            sig = (id(self), stack_sig)
+            # we will count based on id(self) + wherefrom
+            memo[sig][caller.lineno] += 1
+            t0 = time()
+            return func(*args, **kwargs)
+        finally:
+            times.append(time() - t0)
+            pass
+
+    def print_stats():
+        print("The cost of property {}:".format(func.__name__))
+        if not memo:
+            print("None since no calls")
+            return
+        # total count
+        counts = {k: sum(v.values()) for k,v in memo.items()}
+        total = sum(counts.values())
+        ids = {self_id for (self_id, _) in memo}
+        print(" Total: {} calls from {} objects with {} contexts taking {:.2f} sec"
+              .format(total, len(ids), len(memo), sum(times)))
+        # now we need to sort by value
+        for (self_id, caller), count in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+            print("  {} {}: {} from {} lines"
+                  .format(self_id, caller, count, len(memo[(self_id, caller)])))
+
+    # Upon total exit we print the stats
+    import atexit
+    atexit.register(print_stats)
+
+    return newfunc
+
+
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
 def never_fail(f):
     """Assure that function never fails -- all exceptions are caught
