@@ -37,15 +37,13 @@ from datalad.support.exceptions import (
 from datalad.distributed.tests.ria_utils import (
     get_all_files,
     populate_dataset,
+    common_init_opts
 )
 from datalad.customremotes.ria_utils import (
     create_store,
     create_ds_in_store,
     get_layout_locations
 )
-
-
-common_init_opts = ["encryption=none", "type=external", "externaltype=ora"]
 
 
 # Note, that exceptions to test for are generally CommandError since we are
