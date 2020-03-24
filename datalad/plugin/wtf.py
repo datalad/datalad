@@ -347,6 +347,16 @@ class WTF(Interface):
             # failure is already logged
             pass
         if ds and not ds.is_installed():
+            # warn that the dataset is bogus
+            yield dict(
+                action='wtf',
+                path=ds.path,
+                status='impossible',
+                message=(
+                'No dataset found at %s. Reporting on the dataset is '
+                'not attempted.', ds.path),
+                logger=lgr
+            )
             # we don't deal with absent datasets
             ds = None
         if sensitive:
