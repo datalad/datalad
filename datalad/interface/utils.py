@@ -578,8 +578,10 @@ def _process_results(
             pass
         elif result_renderer == 'default':
             trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
-            if trimmed_result == last_result:
-                # this is a similar report, suppress, but count
+            if res.get('status', None) != 'notneeded' \
+                    and trimmed_result == last_result:
+                # this is a similar report, suppress, but count it
+                # do not attempt
                 result_repetitions += 1
             else:
                 # this one is new, first report on any prev. suppressed results
