@@ -255,6 +255,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         )
         self.pid = None
         super().__init__()
+        self.encoding = getpreferredencoding(do_setlocale=False)
 
         self._log_outputs = False
         if lgr.isEnabledFor(5):
@@ -310,7 +311,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         # give captured process output back to the runner as string(s)
         results = {
             name:
-            bytes(byt).decode(getpreferredencoding(do_setlocale=False))
+            bytes(byt).decode(self.encoding)
             if byt else ''
             for name, byt in zip(self.FD_NAMES[1:], self.buffer)
         }

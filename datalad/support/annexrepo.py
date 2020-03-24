@@ -972,6 +972,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                            files=None,
                            merge_annex_branches=True,
                            runner=None,
+                           protocol=None,
                            **kwargs):
         """Helper to run actual git-annex calls
 
@@ -1000,6 +1001,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             benefit from updating information about remote git-annexes
         runner: {None, "gitwitless"}, optional
             Use specified runner class instead of the bound Runner instance.
+        protocol : WitlessProtocol, optional
+            Protocol class to pass to GitWitlessRunner.run(). This is ignored
+            if `runner` is not "gitwitless".
         **kwargs
             these are passed as additional kwargs to .run() of the runner
 
@@ -1039,10 +1043,20 @@ class AnnexRepo(GitRepo, RepoInterface):
             env = self.add_fake_dates(env)
 
         if runner == "gitwitless":
-            class _protocol(WitlessProtocol):
-                # TODO: guard for callables being passed as values
-                proc_out = bool(kwargs.pop('log_stdout', True))
-                proc_err = bool(kwargs.pop('log_stderr', True))
+            if protocol:
+                _protocol = protocol
+            else:
+                log_streams = (kwargs.pop('log_stdout', True),
+                               kwargs.pop('log_stderr', True))
+                if any(map(callable, log_streams)):
+                    raise ValueError(
+                        "gitwitless is incompatible with callable"
+                        "for log_std{out,err}: log_stdout=%r, log_stderr=%r",
+                        log_streams[0], log_streams[1])
+
+                class _protocol(WitlessProtocol):
+                    proc_out = bool(log_streams[0])
+                    proc_err = bool(log_streams[1])
             # expect_fail and expect_stderr were all about deciding level
             # at which to log if error or stderr output.  With WitlessRunner
             # and all the handling "from upstairs" we simply would do nothing
@@ -1251,7 +1265,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 reload=False)
         self._run_annex_command(
             'init',
-            log_stderr=lambda s: lgr.info(s.rstrip()), log_online=True,
+            runner="gitwitless",
+            protocol=AnnexInitOutput,
             annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
@@ -3627,6 +3642,20 @@ class AnnexJsonProtocol(WitlessProtocol):
                 'Finished',
             )
         super().process_exited()
+
+
+class AnnexInitOutput(WitlessProtocol):
+    proc_out = True
+    proc_err = True
+
+    def pipe_data_received(self, fd, byts):
+        line = byts.decode(self.encoding)
+        if fd == 1:
+            if "scanning for unlocked files" in line:
+                lgr.info("Scanning for unlocked files "
+                         "(this may take some time)")
+        elif fd == 2:
+            lgr.info(line.strip())
 
 
 # TODO: Why was this commented out?

@@ -1282,6 +1282,22 @@ def test_repo_version(path1, path2, path3):
             eq_(version, 5)
 
 
+@with_tempfile
+def test_init_scanning_message(path):
+    # | begin kludge
+    # Before git-annex v7.20190912 (specifically f6fb4b8cd), the "scanning for
+    # unlocked files" won't be shown for an empty tree. We can drop this once
+    # GIT_ANNEX_MIN_VERSION is at or above that version.
+    gr = GitRepo(path, create=True)
+    (gr.pathobj / "foo").write_text("foo")
+    gr.add("foo")
+    gr.commit(msg="add foo")
+    # | end kludge
+    with swallow_logs(new_level=logging.INFO) as cml:
+        AnnexRepo(path, create=True, version=7)
+        assert_in("for unlocked", cml.out)
+
+
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:330
 @known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -2418,3 +2434,17 @@ def test_get_size_from_key():
 
     for key, value in test_keys.items():
         eq_(AnnexRepo.get_size_from_key(key), value)
+
+
+@with_tempfile(mkdir=True)
+def test_run_annex_gitwitless_invalid_callable(path):
+    ar = AnnexRepo(path, create=True)
+    for log_stdout, log_stderr in [(str, False),
+                                   (False, str),
+                                   (str, str)]:
+        with assert_raises(ValueError):
+            ar._run_annex_command_json(
+                "info",
+                log_stdout=log_stdout,
+                log_stderr=log_stderr,
+                runner="gitwitless")
