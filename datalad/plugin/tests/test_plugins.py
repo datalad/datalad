@@ -72,7 +72,7 @@ def test_wtf(topdir):
     path = opj(topdir, OBSCURE_FILENAME)
     # smoke test for now
     with swallow_outputs() as cmo:
-        wtf(dataset=path)
+        wtf(dataset=path, on_failure="ignore")
         assert_not_in('## dataset', cmo.out)
         assert_in('## configuration', cmo.out)
         # Those sections get sensored out by default now
