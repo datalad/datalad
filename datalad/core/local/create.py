@@ -404,10 +404,11 @@ class Create(Interface):
         # Note, that Dataset property `id` will change when we unset the
         # respective config. Therefore store it before:
         tbds_id = tbds.id
-        if id_var in tbds.config:
+        tbds_config = tbds.config
+        if id_var in tbds_config:
             # make sure we reset this variable completely, in case of a
             # re-create
-            tbds.config.unset(id_var, where='dataset')
+            tbds_config.unset(id_var, where='dataset')
 
         if _seed is None:
             # just the standard way
@@ -415,7 +416,7 @@ class Create(Interface):
         else:
             # Let's generate preseeded ones
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
-        tbds.config.add(
+        tbds_config.add(
             id_var,
             tbds_id if tbds_id is not None else uuid_id,
             where='dataset',
@@ -427,11 +428,11 @@ class Create(Interface):
         # a dedicated argument, because it is sufficient for the cmdline
         # and unnecessary for the Python API (there could simply be a
         # subsequence ds.config.add() call)
-        for k, v in tbds.config.overrides.items():
-            tbds.config.add(k, v, where='local', reload=False)
+        for k, v in tbds_config.overrides.items():
+            tbds_config.add(k, v, where='local', reload=False)
 
         # all config manipulation is done -> fll reload
-        tbds.config.reload()
+        tbds_config.reload()
 
         # must use the repo.pathobj as this will have resolved symlinks
         add_to_git[tbrepo.pathobj / '.datalad'] = {
