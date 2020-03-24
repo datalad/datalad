@@ -617,6 +617,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
             target=pr['remote'],
             refspec=refspec,
             operations=ops,
+            hints=pr.get('hints', None),
             # seems like a good idea to pass on Git's native message
             # TODO maybe implement a dedicated result renderer, instead
             # of duplicating information only so that the default one
