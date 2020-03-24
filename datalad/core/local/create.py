@@ -365,7 +365,7 @@ class Create(Interface):
             tbrepo.set_default_backend(
                 cfg.obtain('datalad.repo.backend'),
                 persistent=True, commit=False)
-            add_to_git[tbds.repo.pathobj / '.gitattributes'] = {
+            add_to_git[tbrepo.pathobj / '.gitattributes'] = {
                 'type': 'file',
                 'state': 'added'}
             # make sure that v6 annex repos never commit content under .datalad
@@ -375,7 +375,7 @@ class Create(Interface):
                 ('metadata/objects/**', 'annex.largefiles',
                  '({})'.format(cfg.obtain(
                      'datalad.metadata.create-aggregate-annex-limit'))))
-            attrs = tbds.repo.get_gitattributes(
+            attrs = tbrepo.get_gitattributes(
                 [op.join('.datalad', i[0]) for i in attrs_cfg])
             set_attrs = []
             for p, k, v in attrs_cfg:
@@ -383,18 +383,18 @@ class Create(Interface):
                         op.join('.datalad', p), {}).get(k, None) == v:
                     set_attrs.append((p, {k: v}))
             if set_attrs:
-                tbds.repo.set_gitattributes(
+                tbrepo.set_gitattributes(
                     set_attrs,
                     attrfile=op.join('.datalad', '.gitattributes'))
 
             # prevent git annex from ever annexing .git* stuff (gh-1597)
-            attrs = tbds.repo.get_gitattributes('.git')
+            attrs = tbrepo.get_gitattributes('.git')
             if not attrs.get('.git', {}).get(
                     'annex.largefiles', None) == 'nothing':
-                tbds.repo.set_gitattributes([
+                tbrepo.set_gitattributes([
                     ('**/.git*', {'annex.largefiles': 'nothing'})])
                 # must use the repo.pathobj as this will have resolved symlinks
-                add_to_git[tbds.repo.pathobj / '.gitattributes'] = {
+                add_to_git[tbrepo.pathobj / '.gitattributes'] = {
                     'type': 'file',
                     'state': 'untracked'}
 
@@ -434,14 +434,14 @@ class Create(Interface):
         tbds.config.reload()
 
         # must use the repo.pathobj as this will have resolved symlinks
-        add_to_git[tbds.repo.pathobj / '.datalad'] = {
+        add_to_git[tbrepo.pathobj / '.datalad'] = {
             'type': 'directory',
             'state': 'untracked'}
 
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent
         # but cannot until we have a first commit
-        tbds.repo.save(
+        tbrepo.save(
             message='[DATALAD] new dataset',
             git=True,
             # we have to supply our own custom status, as the repo does
