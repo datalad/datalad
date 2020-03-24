@@ -226,3 +226,34 @@ def test_report_absent_keys(path):
                 eval_availability=True)):
         assert_in(testfile, ai)
         assert_equal(ai[testfile]['has_content'], False)
+
+
+@with_tempfile
+def test_annexinfo_init(path):
+    ds = Dataset(path).create()
+    foo = ds.pathobj / "foo"
+    foo_cont = b"foo content"
+    foo.write_bytes(foo_cont)
+    bar = ds.pathobj / "bar"
+    bar.write_text(u"bar content")
+    ds.save()
+
+    # Custom init limits report, with original dict getting updated.
+    cinfo_custom_init = ds.repo.get_content_annexinfo(
+        init={foo: {"bytesize": 0,
+                    "this-is-surely-only-here": "right?"}})
+    assert_not_in(bar, cinfo_custom_init)
+    assert_in(foo, cinfo_custom_init)
+    assert_equal(cinfo_custom_init[foo]["bytesize"], len(foo_cont))
+    assert_equal(cinfo_custom_init[foo]["this-is-surely-only-here"],
+                 "right?")
+
+    # "git" injects get_content_info() values.
+    cinfo_init_git = ds.repo.get_content_annexinfo(init="git")
+    assert_in("gitshasum", cinfo_init_git[foo])
+
+    # init=None, on the other hand, does not.
+    cinfo_init_none = ds.repo.get_content_annexinfo(init=None)
+    assert_in(foo, cinfo_init_none)
+    assert_in(bar, cinfo_init_none)
+    assert_not_in("gitshasum", cinfo_init_none[foo])

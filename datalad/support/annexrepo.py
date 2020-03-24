@@ -3342,9 +3342,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         for j in self._run_annex_command_json(cmd, opts=opts, files=files):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
-            if init is not None and rec is None:
-                # init constraint knows nothing about this path -> skip
-                continue
+            if rec is None:
+                if init is not None:
+                    # init constraint knows nothing about this path -> skip
+                    continue
+                rec = {}
             rec.update({'{}{}'.format(key_prefix, k): j[k]
                        for k in j if k != 'file'})
             if 'bytesize' in rec:
