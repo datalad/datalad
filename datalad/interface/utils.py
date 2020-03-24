@@ -392,7 +392,7 @@ def eval_results(func):
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
-            do_custom_result_summary = result_renderer in('tailored', 'default') \
+            do_custom_result_summary = result_renderer in ('tailored', 'default') \
                 and hasattr(wrapped_class, 'custom_result_summary_renderer')
 
             # process main results

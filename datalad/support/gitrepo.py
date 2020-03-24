@@ -2508,7 +2508,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             pi['remote'] = remote
                         # There were errors, but Git provided hints
                         if 'error' in pi['operations']:
-                            pi['hints'] = hints if hints is not '' else None
+                            pi['hints'] = hints or None
                         yield pi
                     except Exception:
                         # it is not progress and no push info
