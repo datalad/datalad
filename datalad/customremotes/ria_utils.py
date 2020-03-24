@@ -19,6 +19,7 @@ known_versions_objt = ['1', '2']
 known_versions_dst = ['1']
 
 
+# TODO: This is wrong and should consider both versions (store+dataset)
 def get_layout_locations(version, base_path, dsid):
     """Return dataset-related path in a RIA store
 

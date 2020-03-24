@@ -44,15 +44,17 @@ from datalad.customremotes.ria_utils import (
 
 @with_tempfile()
 @with_tempfile(mkdir=True)
-def _test_bare_git(host, dspath, store):
+def _test_bare_git_version_1(host, dspath, store):
     # This test should take a dataset and create a bare repository at the remote
     # end from it.
     # Given, that it is placed correctly within a tree of dataset, that remote
     # thing should then be usable as an ora-remote as well as as a git-type
     # remote.
-    # TODO: Usability of git remote by annex depends on dataset layout version
+    # Note: Usability of git remote by annex depends on dataset layout version
     #       (dirhashlower vs. -mixed).
-    #       Add test for version 1 (dirhash lower).
+    #       For version 1 (lower) upload and consumption should be
+    #       interchangeable. It doesn't matter which remote is used for what
+    #       direction.
     ds_path = Path(dspath)
     store = Path(store)
     ds = Dataset(ds_path).create()
@@ -77,7 +79,7 @@ def _test_bare_git(host, dspath, store):
     io = SSHRemoteIO(host) if host else LocalIO()
     create_store(io, store, '1')
     # set up the dataset location, too.
-    # Note: Dataset layout version 2 (dirhash mixed):
+    # Note: Dataset layout version 1 (dirhash lower):
     create_ds_in_store(io, store, ds.id, '1', '1')
 
     # Now, let's have the bare repo as a git remote and use it with annex
@@ -127,14 +129,101 @@ def _test_bare_git(host, dspath, store):
                                 '** was expected to be present, '
                                 'but its content is missing.')
     eq_(len(ds.repo.whereis('one.txt')), 1)
+    # and the other way around: upload via ora-remote and have it available via
+    # git-remote:
+    ds.repo.copy_to('.', 'ora-remote')
+    # fsck to make availability known
+    assert_status(
+        'ok',
+        [annexjson2result(r, ds)
+         for r in ds.repo.fsck(remote='bare-git', fast=True)])
+    eq_(len(ds.repo.whereis('one.txt')), 3)
 
 
-def test_bare_git():
-    yield skip_ssh(_test_bare_git), 'datalad-test'
-    yield _test_bare_git, None
+def test_bare_git_version_1():
+    yield skip_ssh(_test_bare_git_version_1), 'datalad-test'
+    yield _test_bare_git_version_1, None
 
 
+@with_tempfile()
+@with_tempfile(mkdir=True)
+def _test_bare_git_version_2(host, dspath, store):
+    # Similarly to test_bare_git_version_2, this should ensure a bare git repo
+    # at the store location for a dataset doesn't conflict with the ORA remote.
+    # Note: Usability of git remote by annex depends on dataset layout version
+    #       (dirhashlower vs. -mixed).
+    #       For version 2 (mixed) upload via ORA and consumption via git should
+    #       work. But not the other way around, since git-annex uses
+    #       dirhashlower with bare repos.
 
+    ds_path = Path(dspath)
+    store = Path(store)
+    ds = Dataset(ds_path).create()
+    populate_dataset(ds)
+    ds.save()
+
+    bare_repo_path, _, _ = get_layout_locations(1, store, ds.id)
+    # Use git to make sure the remote end is what git thinks a bare clone of it
+    # should look like
+    subprocess.run(['git', 'clone', '--bare',
+                    quote_cmdlinearg(str(dspath)),
+                    quote_cmdlinearg(str(bare_repo_path))
+                    ])
+
+    if host:
+        url = "ria+ssh://{host}{path}".format(host=host,
+                                              path=store)
+    else:
+        url = "ria+{}".format(store.as_uri())
+    init_opts = common_init_opts + ['url={}'.format(url)]
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    create_store(io, store, '1')
+    # set up the dataset location, too.
+    # Note: Dataset layout version 2 (dirhash mixed):
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # Now, let's have the bare repo as a git remote
+    git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
+        if host else bare_repo_path.as_uri()
+    ds.repo.add_remote('bare-git', git_url)
+    ds.repo.enable_remote('bare-git')
+    # and the ORA remote in addition:
+    ds.repo.init_remote('ora-remote', options=init_opts)
+    # upload keys via ORA:
+    ds.repo.copy_to('.', 'ora-remote')
+    # bare-git doesn't know yet:
+    eq_(len(ds.repo.whereis('one.txt')), 2)
+    # fsck to make availability known
+    assert_status(
+        'ok',
+        [annexjson2result(r, ds)
+         for r in ds.repo.fsck(remote='bare-git', fast=True)])
+    eq_(len(ds.repo.whereis('one.txt')), 3)
+    ds.drop('.')
+    eq_(len(ds.repo.whereis('one.txt')), 2)
+    # actually consumable via git remote:
+    ds.repo.call_git(['annex', 'move', 'one.txt', '--from', 'bare-git'])
+    eq_(len(ds.repo.whereis('one.txt')), 2)
+    # now, move back via git - shouldn't be consumable via ORA
+    ds.repo.call_git(['annex', 'move', 'one.txt', '--to', 'bare-git'])
+    # fsck to make availability known, but there's nothing from POV of ORA:
+    fsck_res = [annexjson2result(r, ds)
+                for r in ds.repo.fsck(remote='ora-remote', fast=True)]
+    assert_result_count(fsck_res,
+                        1,
+                        status='error',
+                        message='** Based on the location log, one.txt\n'
+                                '** was expected to be present, '
+                                'but its content is missing.')
+    assert_result_count(fsck_res, 1, status='ok')
+    eq_(len(fsck_res), 2)
+    eq_(len(ds.repo.whereis('one.txt')), 1)
+
+
+def test_bare_git_version_2():
+    yield skip_ssh(_test_bare_git_version_2), 'datalad-test'
+    yield _test_bare_git_version_2, None
 
 # TODO: Double check the following one:
 
