@@ -16,8 +16,14 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
+- The `no_annex` parameter of [create][], which is exposed in the
+  Python API but not the command line, is deprecated and will be
+  removed in a later release.  Use the new `annex` argument instead,
+  flipping the value.  Command-line callers that use `--no-annex` are
+  unaffected.  ([#4321][])
+
 - `datalad add`, which was deprecated in 0.12.0, has been removed.
-  ([#4158][])
+  ([#4158][]) ([#4319][])
 
 - The following `GitRepo` and `AnnexRepo` methods have been removed:
   `get_changed_files`, `get_missing_files`, and `get_deleted_files`.
@@ -69,6 +75,11 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
+- The default result renderer learned to elide a chain of results
+  after seeing ten consecutive results that it considers similar,
+  which improves the display of actions that have many results (e.g.,
+  saving hundreds of files).  ([#4337][])
+
 - The new command [create-sibling-ria][] provides support for creating
   a sibling in a [RIA store][handbook-scalable-datastore]. ([#4124][])
 
@@ -86,9 +97,12 @@ bet we will fix some bugs and make a world even a better place.
 - The tooling for linking to the [DataLad Handbook][handbook] from
   DataLad's documentation has been improved.  ([#4046][])
 
-- The `--reckless` parameter of [clone][] and [install][] learned a
-  new "ephemeral" mode, where the .git/annex/ of the cloned repository
-  is symlinked to the local source repository's.  ([#4099][])
+- The `--reckless` parameter of [clone][] and [install][] learned two
+  new modes:
+  - "ephemeral", where the .git/annex/ of the cloned repository is
+    symlinked to the local source repository's.  ([#4099][])
+  - "shared-{group|all|...}" that can be used to set up datasets for
+    collaborative write access.  ([#4324][])
 
 - [update][]  ([#4167][])
   - learned to disallow non-fast-forward updates when `ff-only` is
@@ -102,8 +116,11 @@ bet we will fix some bugs and make a world even a better place.
 - [create-sibling][] now supports local paths as targets in addition
   to SSH URLs.  ([#4187][])
 
-- [siblings][] now shows a warning if the caller requests to delete a
-  sibling that does not exist.  ([#4257][])
+- [siblings][] now
+  - shows a warning if the caller requests to delete a sibling that
+    does not exist.  ([#4257][])
+  - phrases its warning about non-annex repositories in a less
+    alarming way.  ([#4323][])
 
 - The rendering of command errors has been improved.  ([#4157][])
 
@@ -121,6 +138,13 @@ bet we will fix some bugs and make a world even a better place.
   within a subdataset ("<subdataset>/<path>") now traverses into the
   subdataset, as "<subdataset>/" would, restricting its report to
   "<subdataset>/<path>".  ([#4235][])
+
+- [wtf][] now shows warns when the specified dataset does not exist.
+  ([#4331][])
+
+- DataLad now lets the caller know that `git annex init` is scanning
+  for unlocked files, as this operation can be slow in some
+  repositories.  ([#4316][])
 
 - All of the remaining spots that use GitPython have been rewritten
   without it.  Most notably, this includes rewrites of the `clone`,
@@ -2659,7 +2683,14 @@ publishing
 [#4308]: https://github.com/datalad/datalad/issues/4308
 [#4314]: https://github.com/datalad/datalad/issues/4314
 [#4315]: https://github.com/datalad/datalad/issues/4315
+[#4316]: https://github.com/datalad/datalad/issues/4316
 [#4317]: https://github.com/datalad/datalad/issues/4317
+[#4319]: https://github.com/datalad/datalad/issues/4319
+[#4321]: https://github.com/datalad/datalad/issues/4321
+[#4323]: https://github.com/datalad/datalad/issues/4323
+[#4324]: https://github.com/datalad/datalad/issues/4324
 [#4326]: https://github.com/datalad/datalad/issues/4326
 [#4328]: https://github.com/datalad/datalad/issues/4328
 [#4330]: https://github.com/datalad/datalad/issues/4330
+[#4331]: https://github.com/datalad/datalad/issues/4331
+[#4337]: https://github.com/datalad/datalad/issues/4337
