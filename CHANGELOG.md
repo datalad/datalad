@@ -20,7 +20,14 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Our `log_progress` helper mishandled the initial display and step of
+  the progress bar.  ([#4326][])
+
+- `AnnexRepo.get_content_annexinfo` is designed to accept `init=None`,
+  but passing that led to an error.  ([#4330][])
+
+- Update a regular expression to handle an output change in Git
+  v2.26.0.  ([#4328][])
 
 ### Enhancements and new features
 
@@ -2471,3 +2478,6 @@ publishing
 [#4308]: https://github.com/datalad/datalad/issues/4308
 [#4315]: https://github.com/datalad/datalad/issues/4315
 [#4317]: https://github.com/datalad/datalad/issues/4317
+[#4326]: https://github.com/datalad/datalad/issues/4326
+[#4328]: https://github.com/datalad/datalad/issues/4328
+[#4330]: https://github.com/datalad/datalad/issues/4330
