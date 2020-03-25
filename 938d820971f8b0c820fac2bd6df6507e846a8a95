@@ -1,0 +1,42 @@
+Update 0.12.4-562-g7ca08e6f7c:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    4e93477eb05b9ef5e7c8a778a5c28f544e55c0f1..7ca08e6f7c5d2abdab3cfbfb6b4a0d58fc629cbd
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  BF: Stop building wheels in release helper Makefile target
+   e3207142e6^-1
+-  Merge branch 'maint'
+   659f70f41b^-1
++  Merge pull request #4323 from adswa/doc-sibling
+   6ddb1718fa^-1
++* Merge pull request #4319 from yarikoptic/enh-add-hint
+   403c2c5e6f^-1
+-  Merge branch 'maint'
+   4b98d2eeff^-1
++  Merge pull request #4321 from mih/bf-4207
+   482a617e44^-1
++  Merge pull request #4324 from mih/bf-1146
+   b518b5f409^-1
+-  Merge branch 'maint'
+   7bb986644f^-1
+-  Merge branch 'maint'
+   9d4bb692cf^-1
+-  Merge pull request #4332 from mih/bf-4032
+   22cfcb790f^-1
++  Merge pull request #4331 from adswa/ux-4100
+   c1485d74b2^-1
++  Merge pull request #4316 from kyleam/init-relay-annex-unlock
+   9b30ac204d^-1
+-  Merge pull request #4339 from kyleam/wtf-fixup
+   e49e39d458^-1
++  Merge pull request #4337 from mih/bf-2620
+   8d4f2d0803^-1
+-  Merge branch 'maint'
+   7ca08e6f7c^-1
