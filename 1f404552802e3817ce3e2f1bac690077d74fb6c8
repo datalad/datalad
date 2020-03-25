@@ -1,0 +1,22 @@
+Update 0.12.4-2-gd6d7ab1e29:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    d6d7ab1e293d02d87da77e5a4beac8f6a8230ce2..da53a49ef90b9986aff022456a3179cb48b81efa
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4326 from kyleam/log-progress-start
+   b2a5e7e066^-1
+-  [DATALAD RUNCMD] Update our CONTRIBUTORS
+   5d5e8b7e46^-1
++  Merge pull request #4328 from yarikoptic/bf-git2.26.0.rc2
+   55809c6a11^-1
++  Merge pull request #4330 from kyleam/annex-contentinfo-init-none
+   cc7e62771f^-1
+-  ENH: Prevent releases or doc updates with left-over changelog placeholders
+   da53a49ef9^-1
