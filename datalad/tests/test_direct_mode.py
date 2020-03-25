@@ -59,6 +59,9 @@ def test_direct_cfg(path1, path2):
         raise SkipTest(
             "Rest of test requires direct mode support in git-annex")
 
+    # TODO: Remove the rest of this test once GIT_ANNEX_MIN_VERSION is
+    # at least 7.20190912 (which dropped direct mode support).
+
     if ar.config.obtain("datalad.repo.version") >= 6:
         raise SkipTest("Created repo not v5, cannot test detection of direct mode repos")
     # and if repo existed before and was in direct mode, we fail too
