@@ -39,11 +39,13 @@ linkissues-changelog:
 	tools/link_issues_CHANGELOG
 
 update-changelog: linkissues-changelog
+	# test if the changelog still contains a release placeholder
+	git grep -q '^##.*??? ??' -- CHANGELOG.md && exit 1 || true
 	@echo ".. This file is auto-converted from CHANGELOG.md (make update-changelog) -- do not edit\n\nChange log\n**********" > docs/source/changelog.rst
 	pandoc -t rst CHANGELOG.md >> docs/source/changelog.rst
 
 release-pypi: update-changelog
-	# better safe than sorry
+	# avoid upload of stale builds
 	test ! -e dist
 	$(PYTHON) setup.py sdist
 	# the wheels we would produce are broken on windows, because they
