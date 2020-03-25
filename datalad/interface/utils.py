@@ -524,6 +524,18 @@ def _process_results(
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
+
+    # used to track repeated messages in the default renderer
+    last_result = None
+    # which result dict keys to inspect for changes to discover repetions
+    # of similar messages
+    repetition_keys = set(('action', 'status', 'type', 'refds'))
+    # counter for detected repetitions
+    result_repetitions = 0
+    # how many repetitions to show, before suppression kicks in
+    render_n_repetitions = 10
+    result_suppression_msg = '  [{} similar messages have been suppressed]'
+
     for res in results:
         if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
@@ -567,7 +579,22 @@ def _process_results(
         if result_renderer is None or result_renderer == 'disabled':
             pass
         elif result_renderer == 'default':
-            default_result_renderer(res)
+            trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
+            if res.get('status', None) != 'notneeded' \
+                    and trimmed_result == last_result:
+                # this is a similar report, suppress if too many, but count it
+                if result_repetitions < render_n_repetitions:
+                    default_result_renderer(res)
+                result_repetitions += 1
+            else:
+                # this one is new, first report on any prev. suppressed results
+                # by number, and then render this fresh one
+                if result_repetitions:
+                    ui.message(result_suppression_msg.format(
+                        result_repetitions - render_n_repetitions))
+                default_result_renderer(res)
+                result_repetitions = 0
+            last_result = trimmed_result
         elif result_renderer in ('json', 'json_pp'):
             ui.message(json.dumps(
                 {k: v for k, v in res.items()
@@ -598,6 +625,10 @@ def _process_results(
                 # raise will happen after the loop
                 break
         yield res
+    # make sure to report on any issues that we had suppressed
+    if result_repetitions:
+        ui.message(result_suppression_msg.format(
+            result_repetitions - render_n_repetitions))
 
 
 def keep_result(res, rfilter, **kwargs):
