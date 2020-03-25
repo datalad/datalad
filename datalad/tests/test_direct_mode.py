@@ -84,7 +84,7 @@ def test_direct_cfg(path1, path2):
     del ar2; del ar2sub1; AnnexRepo._unique_instances.clear()  # fight flyweight
 
     ar2 = AnnexRepo(path2)
-    ar2.get_submodules()
+    list(ar2.get_submodules_())
 
     # And what if we are trying to add pre-cloned repo in direct mode?
     ar2sub2 = AnnexRepo.clone(path1, op.join(path2, 'sub2'))

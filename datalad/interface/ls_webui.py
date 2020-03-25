@@ -220,8 +220,8 @@ def fs_traverse(path, repo, parent=None,
     subdatasets = subdatasets or []
     fs = fs_extract(path, repo, basepath=basepath or path)
     dataset = Dataset(repo.path)
-    submodules = {sm.path: sm
-                  for sm in repo.get_submodules()}
+    submodules = {str(sm["path"].relative_to(repo.pathobj)): sm
+                  for sm in repo.get_submodules_()}
     # TODO:  some submodules might not even have a local empty directory
     # (git doesn't care about those), so us relying on listdir here and
     # for _traverse_handle_subds might not work out.
@@ -263,7 +263,7 @@ def fs_traverse(path, repo, parent=None,
                     json=json
                 )
                 # Enhance it with external url if available
-                submod_url = submodules[node_relpath].url
+                submod_url = submodules[node_relpath]["gitmodule_url"]
                 if submod_url and is_datalad_compat_ri(submod_url):
                     subds['url'] = submod_url
                 children.append(subds)
