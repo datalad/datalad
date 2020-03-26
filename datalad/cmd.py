@@ -707,7 +707,10 @@ class GitRunner(Runner):
         # We are parsing error messages and hints. For those to work more
         # reliably we are doomed to sacrifice i18n effort of git, and enforce
         # consistent language of the messages
-        git_env['LC_ALL'] = 'C'
+        git_env['LC_MESSAGES'] = 'C'
+		# But since LC_ALL takes precedence, over LC_MESSAGES, we cannot
+		# "leak" that one inside, and are doomed to pop it
+        git_env.pop('LC_ALL', None)
 
         return git_env
 
