@@ -936,7 +936,8 @@ def test_submodule_deinit(path):
     from datalad.support.annexrepo import AnnexRepo
 
     top_repo = AnnexRepo(path, create=False)
-    eq_({'subm 1', '2'}, {s.name for s in top_repo.get_submodules()})
+    eq_({'subm 1', '2'},
+        {s["gitmodule_name"] for s in top_repo.get_submodules_()})
     # note: here init=True is ok, since we are using it just for testing
     with swallow_logs(new_level=logging.WARN) as cml:
         top_repo.update_submodule('subm 1', init=True)
@@ -947,8 +948,8 @@ def test_submodule_deinit(path):
     # TODO: old assertion above if non-bare? (can't use "direct mode" in test_gitrepo)
     # Alternatively: New testrepo (plain git submodules) and have a dedicated
     # test for annexes in addition
-    ok_(all([GitRepo.is_valid_repo(op.join(top_repo.path, s.path))
-             for s in top_repo.get_submodules()]))
+    ok_(all(GitRepo.is_valid_repo(s["path"])
+            for s in top_repo.get_submodules_()))
 
     # modify submodule:
     with open(op.join(top_repo.path, 'subm 1', 'file_ut.dat'), "w") as f:
@@ -970,7 +971,8 @@ def test_GitRepo_add_submodule(source, path):
 
     top_repo.add_submodule('sub', name='sub', url=source)
     top_repo.commit('submodule added')
-    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
+    eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
+        ['sub'])
     assert_repo_status(path)
     assert_repo_status(op.join(path, 'sub'))
 
@@ -1033,7 +1035,7 @@ def test_get_submodules_parent_on_unborn_branch(path):
     subrepo = GitRepo(op.join(path, "sub"), create=True)
     subrepo.commit(msg="s", options=["--allow-empty"])
     repo.add_submodule(path="sub")
-    eq_([s.name for s in repo.get_submodules()],
+    eq_([s["gitmodule_name"] for s in repo.get_submodules_()],
         ["sub"])
 
 

@@ -3315,7 +3315,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # we need to get their within repo elements since ls-tree
                 # for paths within submodules returns nothing!
                 # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
-                submodules = [s.path for s in self.get_submodules()]
+                submodules = [str(s["path"].relative_to(self.pathobj))
+                              for s in self.get_submodules_()]
                 path_strs = get_parent_paths(path_strs, submodules)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']

@@ -1768,7 +1768,8 @@ def test_AnnexRepo_add_submodule(source, path):
 
     top_repo.add_submodule('sub', name='sub', url=source)
     top_repo.commit('submodule added')
-    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
+    eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
+        ['sub'])
 
     assert_repo_status(top_repo, annex=True)
     assert_repo_status(opj(path, 'sub'), annex=False)

@@ -94,8 +94,8 @@ class supers(SampleSuperDatasetBenchmarks):
         next(self.ds.subdatasets(recursive=True, return_type='generator'))
 
     def time_uninstall(self):
-        for subm in self.ds.repo.get_submodules():
-            self.ds.uninstall(subm.path, recursive=True, check=False)
+        for subm in self.ds.repo.get_submodules_():
+            self.ds.uninstall(subm["path"], recursive=True, check=False)
 
     def time_remove(self):
         remove(self.ds.path, recursive=True)
