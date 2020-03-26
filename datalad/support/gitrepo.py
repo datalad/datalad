@@ -2492,6 +2492,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             e.stderr,
                             re.DOTALL | re.MULTILINE):
                         output = getattr(e, info_from)
+                        hints = ' '.join([l[6:] for l in e.stderr.splitlines()
+                                          if l.startswith('hint: ')])
                         if output is None:
                             output = ''
                     else:
@@ -2503,6 +2505,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         pi = info_cls._from_line(line)
                         if add_remote:
                             pi['remote'] = remote
+                        # There were errors, but Git provided hints
+                        if 'error' in pi['operations']:
+                            pi['hints'] = hints or None
                         yield pi
                     except Exception:
                         # it is not progress and no push info

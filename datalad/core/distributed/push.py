@@ -234,6 +234,23 @@ class Push(Interface):
                 path=ds.path,
             )
 
+    @staticmethod
+    def custom_result_summary_renderer(results):  # pragma: more cover
+        # report on any hints at the end
+        # get all unique hints
+        hints = set([r.get('hints', None) for r in results])
+        hints = [hint for hint in hints if hint is not None]
+        if hints:
+            from datalad.ui import ui
+            from datalad.support import ansi_colors
+            intro = ansi_colors.color_word(
+                "Potential hints to solve encountered errors: ",
+                ansi_colors.YELLOW)
+            ui.message(intro)
+            [ui.message("{}: {}".format(
+                ansi_colors.color_word(id + 1, ansi_colors.YELLOW), hint))
+                for id, hint in enumerate(hints)]
+
 
 def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
     """Generator"""
@@ -617,6 +634,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
             target=pr['remote'],
             refspec=refspec,
             operations=ops,
+            hints=pr.get('hints', None),
             # seems like a good idea to pass on Git's native message
             # TODO maybe implement a dedicated result renderer, instead
             # of duplicating information only so that the default one

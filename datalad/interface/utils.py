@@ -392,7 +392,7 @@ def eval_results(func):
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
-            do_custom_result_summary = result_renderer == 'tailored' \
+            do_custom_result_summary = result_renderer in ('tailored', 'default') \
                 and hasattr(wrapped_class, 'custom_result_summary_renderer')
 
             # process main results
@@ -479,7 +479,7 @@ def eval_results(func):
                     # any processing
                     results = list(results)
                 # render summaries
-                if not result_xfm and result_renderer == 'tailored':
+                if not result_xfm and result_renderer in ('tailored', 'default'):
                     # cannot render transformed results
                     if hasattr(wrapped_class, 'custom_result_summary_renderer'):
                         wrapped_class.custom_result_summary_renderer(results)
@@ -602,7 +602,7 @@ def _process_results(
                 sort_keys=True,
                 indent=2 if result_renderer.endswith('_pp') else None,
                 default=lambda x: str(x)))
-        elif result_renderer == 'tailored':
+        elif result_renderer in ('tailored', 'default'):
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
