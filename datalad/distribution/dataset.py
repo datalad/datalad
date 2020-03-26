@@ -337,8 +337,8 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         -------
         ConfigManager
         """
-
-        if self.repo is None:
+        repo = self.repo  # local binding
+        if repo is None:
             # if there's no repo (yet or anymore), we can't read/write config at
             # dataset level, but only at user/system level
             # However, if this was the case before as well, we don't want a new
@@ -348,7 +348,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
                 self._cfg_bound = False
 
         else:
-            self._cfg = self.repo.config
+            self._cfg = repo.config
             self._cfg_bound = True
 
         return self._cfg
