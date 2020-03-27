@@ -778,9 +778,16 @@ class _EGrepCSSearch(_Search):
             #         return '{}'.format(s)
             #     except UnicodeEncodeError:
             #         return assure_unicode(s).encode('utf-8')
+
+            def if_repr(v):
+                if isinstance(v, str) and v.startswith('<<') and v.endswith('>>'):
+                    return v[1:-1]  # strip one <> on each side
+                else:
+                    return repr(v)
+
             stat.uvals_str = assure_unicode(
                 "{} unique values: {}".format(
-                    len(stat.uvals), ', '.join(map(repr, uvals))))
+                    len(stat.uvals), ', '.join(map(if_repr, uvals))))
             if mode == 'short':
                 if len(stat.uvals) > 10:
                     stat.uvals_str += ', ...'
@@ -834,19 +841,27 @@ class _EGrepCSSearch(_Search):
                 keys[k].ndatasets += 1
                 if mode == 'name':
                     continue
-                try:
-                    kvals_set = assure_iter(kvals, set)
-                except TypeError:
-                    # TODO: may be do show hashable ones???
-                    nunhashable = sum(
-                        isinstance(x, collections.Hashable) for x in kvals
-                    )
-                    kvals_set = {
-                        'unhashable %d out of %d entries'
-                        % (nunhashable, len(kvals))
-                    }
-                keys[k].uvals |= kvals_set
+                keys[k].uvals |= self.get_uvalues(kvals)
         return keys
+
+    def get_uvalues(self, kvals):
+        kvals_set = set()
+        if not kvals:
+            return kvals_set
+        for v in (kvals if hasattr(kvals, '__iter__') else [kvals]):
+            try:
+                # if isinstance(v, list):
+                #     kvals_set.add(tuple(v))
+                # else:
+                kvals_set.add(v)
+            except TypeError:
+                # unhashable - let's try repr
+                v_repr = repr(v)
+                if len(v_repr) > 40:
+                    v_repr = v_repr[:20] + '... trimmed: %d chars long' % len(v_repr)
+                v_repr = "<<%s>>" % v_repr
+                kvals_set.add(v_repr)
+        return kvals_set
 
     def get_query(self, query):
         query = assure_list(query)
