@@ -214,17 +214,25 @@ class TestUtils(Interface):
             doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
-            constraints=EnsureDataset() | EnsureNone()),)
+            constraints=EnsureDataset() | EnsureNone()),
+        result_fn=Parameter(
+            args=tuple(),   # Hide this from the cmdline parser.
+            doc="""Generate the result records with this function
+            rather than using the default logic. `number` will be
+            passed as an argument."""),)
 
     @staticmethod
     @datasetmethod(name='fake_command')
     @eval_results
-    def __call__(number, dataset=None):
-
-        for i in range(number):
-            # this dict will need to have the minimum info required by
-            # eval_results
-            yield {'path': 'some', 'status': 'ok', 'somekey': i, 'action': 'off'}
+    def __call__(number, dataset=None, result_fn=None):
+        if result_fn:
+            yield from result_fn(number)
+        else:
+            for i in range(number):
+                # this dict will need to have the minimum info
+                # required by eval_results
+                yield {'path': 'some', 'status': 'ok', 'somekey': i,
+                       'action': 'off'}
 
 
 def test_eval_results_plus_build_doc():
@@ -273,8 +281,10 @@ def test_eval_results_plus_build_doc():
 
     # test signature:
     from datalad.utils import getargspec
-    assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
-    assert_equal(getargspec(TestUtils.__call__)[0], ['number', 'dataset'])
+    assert_equal(getargspec(Dataset.fake_command)[0],
+                 ['number', 'dataset', 'result_fn'])
+    assert_equal(getargspec(TestUtils.__call__)[0],
+                 ['number', 'dataset', 'result_fn'])
 
 
 def test_result_filter():
