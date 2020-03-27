@@ -814,9 +814,9 @@ class _EGrepCSSearch(_Search):
                     len(stat.uvals), '; '.join(sorted(uvals))))
             if mode == 'short':
                 if len(stat.uvals) > 10:
-                    stat.uvals_str += ', ...'
+                    stat.uvals_str += ', ++%d entries' % (len(stat.uvals) - 10)
                 if len(stat.uvals_str) > maxl:
-                    stat.uvals_str = stat.uvals_str[:maxl-4] + ' ....'
+                    stat.uvals_str = stat.uvals_str[:maxl-9] + ' ++%d chars' % (len(stat.uvals_str) - (maxl-9))
             elif mode == 'full':
                 pass
             else:
