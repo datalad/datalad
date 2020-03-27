@@ -396,14 +396,17 @@ def test_utils_suppress_similar():
     with swallow_outputs() as cmo:
         list(tu(9, result_fn=n_foo, result_renderer="default"))
         assert_in("path8", cmo.out)
+        assert_not_in("suppressed", cmo.out)
 
     with swallow_outputs() as cmo:
         list(tu(10, result_fn=n_foo, result_renderer="default"))
         assert_in("path9", cmo.out)
+        assert_not_in("suppressed", cmo.out)
 
     with swallow_outputs() as cmo:
         list(tu(11, result_fn=n_foo, result_renderer="default"))
         assert_not_in("path10", cmo.out)
+        assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
 
     # Check a chain of similar messages, split in half by a distinct one.
 
@@ -422,8 +425,10 @@ def test_utils_suppress_similar():
         list(tu(20, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
         assert_in("path10", cmo.out)
         assert_in("path19", cmo.out)
+        assert_not_in("suppressed", cmo.out)
 
     with swallow_outputs() as cmo:
         list(tu(21, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
         assert_in("path10", cmo.out)
         assert_not_in("path20", cmo.out)
+        assert_re_in("[^-0-9]1 .* suppressed", cmo.out, match=False)

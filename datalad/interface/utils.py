@@ -589,9 +589,9 @@ def _process_results(
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
-                if result_repetitions:
-                    ui.message(result_suppression_msg.format(
-                        result_repetitions - render_n_repetitions))
+                n_suppressed = result_repetitions - render_n_repetitions + 1
+                if n_suppressed > 0:
+                    ui.message(result_suppression_msg.format(n_suppressed))
                 default_result_renderer(res)
                 result_repetitions = 0
             last_result = trimmed_result
@@ -626,9 +626,9 @@ def _process_results(
                 break
         yield res
     # make sure to report on any issues that we had suppressed
-    if result_repetitions:
-        ui.message(result_suppression_msg.format(
-            result_repetitions - render_n_repetitions))
+    n_suppressed = result_repetitions - render_n_repetitions + 1
+    if n_suppressed > 0:
+        ui.message(result_suppression_msg.format(n_suppressed))
 
 
 def keep_result(res, rfilter, **kwargs):
