@@ -39,10 +39,12 @@ from datalad.support.constraints import EnsureInt
 
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import (
-    assure_list, assure_iter, unicode_srctypes, as_unicode,
+    as_unicode,
+    assure_list,
     assure_unicode,
     get_suggestions_msg,
-    unique,
+    shortened_repr,
+    unicode_srctypes,
 )
 from datalad.support.exceptions import NoDatasetFound
 from datalad.ui import ui
@@ -875,13 +877,7 @@ class _EGrepCSSearch(_Search):
             if hasattr(kvals, '__iter__') and not isinstance(kvals, (str, bytes))
             else [kvals]
         )
-        for v in kvals_iter:
-            v_repr = repr(v)
-            if len(v_repr) > 40:
-                v_repr = v_repr[:20] + '... trimmed: %d chars long' % len(
-                    v_repr)
-            kvals_set.add(v_repr)
-        return kvals_set
+        return set(map(shortened_repr, kvals_iter))
 
     def get_query(self, query):
         query = assure_list(query)
