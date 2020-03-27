@@ -430,7 +430,7 @@ def test_auto_repr():
 
     assert_equal(
         repr(buga()),
-        "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<WithoutReprClass>)"
+        "buga(a=1, b=<<[0, 1, 2, 3, 4++372 chars++ 99]>>, c=<WithoutReprClass>)"
     )
     assert_equal(buga().some(), "some")
 
