@@ -512,6 +512,14 @@ def default_result_renderer(res):
                 if res.get('message', None) else ''))
 
 
+def _display_suppressed_message(nsimilar, ndisplayed):
+    # +1 because there was the original result + nsimilar displayed.
+    n_suppressed = nsimilar - ndisplayed + 1
+    if n_suppressed > 0:
+        ui.message('  [{} similar messages have been suppressed]'
+                   .format(n_suppressed))
+
+
 def _process_results(
         results,
         cmd_class,
@@ -534,7 +542,6 @@ def _process_results(
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
     render_n_repetitions = 10
-    result_suppression_msg = '  [{} similar messages have been suppressed]'
 
     for res in results:
         if not res or 'action' not in res:
@@ -589,9 +596,8 @@ def _process_results(
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
-                n_suppressed = result_repetitions - render_n_repetitions + 1
-                if n_suppressed > 0:
-                    ui.message(result_suppression_msg.format(n_suppressed))
+                _display_suppressed_message(
+                    result_repetitions, render_n_repetitions)
                 default_result_renderer(res)
                 result_repetitions = 0
             last_result = trimmed_result
@@ -626,9 +632,8 @@ def _process_results(
                 break
         yield res
     # make sure to report on any issues that we had suppressed
-    n_suppressed = result_repetitions - render_n_repetitions + 1
-    if n_suppressed > 0:
-        ui.message(result_suppression_msg.format(n_suppressed))
+    _display_suppressed_message(
+        result_repetitions, render_n_repetitions)
 
 
 def keep_result(res, rfilter, **kwargs):
