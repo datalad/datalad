@@ -42,8 +42,10 @@ from datalad.utils import (
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
-from datalad.dochelpers import exc_str
-
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -516,8 +518,11 @@ def _display_suppressed_message(nsimilar, ndisplayed):
     # +1 because there was the original result + nsimilar displayed.
     n_suppressed = nsimilar - ndisplayed + 1
     if n_suppressed > 0:
-        ui.message('  [{} similar messages have been suppressed]'
-                   .format(n_suppressed))
+        ui.message('  [{} similar {} been suppressed]'
+                   .format(n_suppressed,
+                           single_or_plural("message has",
+                                            "messages have",
+                                            n_suppressed, False)))
 
 
 def _process_results(
