@@ -583,9 +583,9 @@ def _process_results(
             if res.get('status', None) != 'notneeded' \
                     and trimmed_result == last_result:
                 # this is a similar report, suppress if too many, but count it
+                result_repetitions += 1
                 if result_repetitions < render_n_repetitions:
                     default_result_renderer(res)
-                result_repetitions += 1
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
