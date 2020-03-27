@@ -42,6 +42,9 @@ matrix:
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
+    # To test https://github.com/datalad/datalad/pull/4342 fix.
+    # From our testing in that PR seems to have no effect, but kept around since should not hurt.
+    - LC_ALL=ru_RU.UTF-8
   - python: 3.6
     # Single run for Python 3.6
     env:
@@ -58,6 +61,9 @@ matrix:
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=""
+    # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
+    # From our testing in that PR seems to have no effect, but kept around since should not hurt.
+    - LANG=bg_BG.UTF-8
   - python: 3.5
     # Run slow etc tests under a single tricky scenario
     env:
