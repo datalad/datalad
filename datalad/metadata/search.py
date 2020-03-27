@@ -252,7 +252,15 @@ class _Search(object):
     def __call__(self, query, max_nresults=None):
         raise NotImplementedError
 
-    def show_keys(self, *args):
+    @classmethod
+    def _key_matches(cls, k, regexes):
+        """Return which regex the key matches
+        """
+        for regex in regexes:
+            if re.search(regex, k):
+                return regex
+
+    def show_keys(self, *args, **kwargs):
         raise NotImplementedError(args)
 
     def get_query(self, query):
@@ -280,13 +288,23 @@ class _WhooshSearch(_Search):
         self.index_dir = opj(str(self.ds.repo.dot_git), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
-    def show_keys(self, mode):
+    def show_keys(self, mode, regexes=None):
+        """
+
+        Parameters
+        ----------
+        mode: {"name"}
+        regexes: list of regex
+          Which keys to bother working on
+        """
         if mode != 'name':
             raise NotImplementedError(
                 "ATM %s can show only names, so please use show_keys with 'name'"
                 % self.__class__.__name__
             )
         for k in self.idx_obj.schema.names():
+            if regexes and not self._key_matches(k, regexes):
+                continue
             print(u'{}'.format(k))
 
     def get_query(self, query):
@@ -753,7 +771,15 @@ class _EGrepCSSearch(_Search):
                     )
                     break
 
-    def show_keys(self, mode=None):
+    def show_keys(self, mode=None, regexes=None):
+        """
+
+        Parameters
+        ----------
+        mode: {"name", "short", "full"}
+        regexes: list of regex
+          Which keys to bother working on
+        """
         maxl = 100  # maximal line length for unique values in mode=short
         # use a dict already, later we need to map to a definition
         # meanwhile map to the values
@@ -761,6 +787,8 @@ class _EGrepCSSearch(_Search):
         keys = self._get_keys(mode)
 
         for k in sorted(keys):
+            if regexes and not self._key_matches(k, regexes):
+                continue
             if mode == 'name':
                 print(k)
                 continue
@@ -781,7 +809,7 @@ class _EGrepCSSearch(_Search):
 
             stat.uvals_str = assure_unicode(
                 "{} unique values: {}".format(
-                    len(stat.uvals), '; '.join(uvals)))
+                    len(stat.uvals), '; '.join(sorted(uvals))))
             if mode == 'short':
                 if len(stat.uvals) > 10:
                     stat.uvals_str += ', ...'
@@ -1104,9 +1132,10 @@ class Search(Interface):
     Examples:
 
       List names of search index fields (auto-discovered from the set of
-      indexed datasets)::
+      indexed datasets) which either have a field starting with "age" or
+      "gender"::
 
-        % datalad search --mode autofield --show-keys name
+        % datalad search --mode autofield --show-keys name '\.age' '\.gender'
 
       Fuzzy search for datasets with an author that is specified in a particular
       metadata field::
@@ -1184,6 +1213,8 @@ class Search(Interface):
             only the name is printed one per line. If 'short' or 'full',
             statistics (in how many datasets, and how many unique values) are
             printed. 'short' truncates the listing of unique values.
+            QUERY, if provided, is regular expressions any of which keys should
+            contain.
             No other action is performed (except for reindexing), even if other
             arguments are given. Each key is accompanied by a term definition in
             parenthesis (TODO). In most cases a definition is given in the form
@@ -1243,7 +1274,7 @@ class Search(Interface):
         searcher = searcher(ds, force_reindex=force_reindex)
 
         if show_keys:
-            searcher.show_keys(show_keys)
+            searcher.show_keys(show_keys, regexes=query)
             return
 
         if not query:

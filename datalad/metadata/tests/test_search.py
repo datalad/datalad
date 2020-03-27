@@ -12,6 +12,7 @@
 import logging
 from shutil import copy
 from unittest.mock import patch
+import os
 from os import makedirs
 from os.path import join as opj
 from os.path import dirname
@@ -249,6 +250,27 @@ parentds
 path
 type
 """
+
+    # test default behavior while limiting set of keys reported
+    with swallow_outputs() as cmo:
+        ds.search(['\.id', 'artist$'], show_keys='short')
+        out_lines = [l for l in cmo.out.split(os.linesep) if l]
+        # test that only the ones matching were returned
+        assert_equal(
+            [l for l in out_lines if not l.startswith(' ')],
+            ['audio.music-artist', 'datalad_core.id']
+        )
+        # more specific test which would also test formatting
+        assert_equal(
+            out_lines,
+            ['audio.music-artist',
+             ' in  1 datasets', " has 1 unique values: 'dlartist'",
+             'datalad_core.id',
+             ' in  1 datasets',
+             # we have them sorted
+             " has 1 unique values: '%s'" % ds.id
+             ]
+        )
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:
