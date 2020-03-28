@@ -606,7 +606,7 @@ class CreateSibling(Interface):
             # for now assuming hierarchical setup
             # (TODO: to be able to destinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
-            sshurl = slash_join(super_url, relpath(ds.path, super_ds.path))
+            sshurl = slash_join(super_url, relpath(refds_path, super_ds.path))
 
         # check the login URL
         sibling_ri = RI(sshurl)
@@ -730,7 +730,7 @@ class CreateSibling(Interface):
             path = _create_dataset_sibling(
                 name,
                 current_ds,
-                ds.path,
+                refds_path,
                 shell,
                 replicate_local_structure,
                 sibling_ri,
@@ -760,7 +760,7 @@ class CreateSibling(Interface):
             remote_repos_to_run_hook_for.append((path, currentds_ap))
 
             # publish web-interface to root dataset on publication server
-            if current_ds.path == ds.path and ui:
+            if current_ds.path == refds_path and ui:
                 lgr.info("Uploading web interface to %s" % path)
                 try:
                     CreateSibling.upload_web_interface(path, shell, shared, ui)
