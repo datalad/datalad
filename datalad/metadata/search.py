@@ -782,7 +782,7 @@ class _EGrepCSSearch(_Search):
         regexes: list of regex
           Which keys to bother working on
         """
-        maxl = 100  # maximal line length for unique values in mode=short
+        maxl = 100  # approx maximal line length for unique values in mode=short
         # use a dict already, later we need to map to a definition
         # meanwhile map to the values
 
@@ -797,31 +797,33 @@ class _EGrepCSSearch(_Search):
 
             # do a bit more
             stat = keys[k]
-            uvals = stat.uvals
-            if mode == 'short':
-                # show only up to X uvals
-                if len(stat.uvals) > 10:
-                    uvals = {v for i, v in enumerate(uvals) if i < 10}
-            # all unicode still scares yoh -- he will just use repr
-            # def conv(s):
-            #     try:
-            #         return '{}'.format(s)
-            #     except UnicodeEncodeError:
-            #         return assure_unicode(s).encode('utf-8')
+            all_uvals = uvals = sorted(stat.uvals)
 
             stat.uvals_str = assure_unicode(
-                "{} unique values: {}".format(
-                    len(stat.uvals), '; '.join(sorted(uvals))))
+                "{} unique values: ".format(len(all_uvals))
+            )
+
             if mode == 'short':
-                if len(stat.uvals) > 10:
-                    stat.uvals_str += ', ++%d entries' % (len(stat.uvals) - 10)
-                if len(stat.uvals_str) > maxl:
-                    stat.uvals_str = stat.uvals_str[:maxl-9] + ' ++%d chars' % (len(stat.uvals_str) - (maxl-9))
+                # show only up until we fill maxl
+                uvals_str = ''
+                uvals = []
+                for v in all_uvals:
+                    appendix = ('; ' if uvals else '') + v
+                    if len(uvals_str) + len(appendix) > maxl - len(stat.uvals_str):
+                        break
+                    uvals.append(v)
+                    uvals_str += appendix
             elif mode == 'full':
                 pass
             else:
                 raise ValueError(
                     "Unknown value for stats. Know full and short")
+
+            stat.uvals_str += '; '.join(uvals)
+
+            if len(all_uvals) > len(uvals):
+                stat.uvals_str += \
+                    '; +%s' % single_or_plural("value", "values", len(all_uvals) - len(uvals), True)
 
             print(
                 u'{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
@@ -877,7 +879,7 @@ class _EGrepCSSearch(_Search):
             if hasattr(kvals, '__iter__') and not isinstance(kvals, (str, bytes))
             else [kvals]
         )
-        return set(map(shortened_repr, kvals_iter))
+        return set(shortened_repr(x, 50) for x in kvals_iter)
 
     def get_query(self, query):
         query = assure_list(query)
