@@ -792,3 +792,36 @@ def test_local_path_target_dir(path):
         sshurl=str(path / "e"), target_dir="d%RELNAME")
     ok_((path / "e" / "d").exists())
     ok_((path / "e" / "d-subds").exists())
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_non_master_branch(path):
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    # Rename rather than checking out another branch so that master
+    # doesn't exist in any state.
+    ds_a.repo.call_git(["branch", "-m", "master", "other"])
+    (ds_a.pathobj / "afile").write_text("content")
+    sa = ds_a.create("sub-a")
+    sa.repo.checkout("other-sub", ["-b"])
+    ds_a.create("sub-b")
+
+    ds_a.save()
+    ds_a.create_sibling(name="sib", sshurl=str(path / "b"), recursive=True)
+    ds_a.publish(to="sib", transfer_data="all")
+
+    ds_b = Dataset(path / "b")
+
+    def get_branch(repo):
+        return repo.get_corresponding_branch() or repo.get_active_branch()
+
+    # The HEAD for the create-sibling matches what the branch was in
+    # the original repo.
+    eq_(get_branch(ds_b.repo), "other")
+    ok_((ds_b.pathobj / "afile").exists())
+
+    eq_(get_branch(Dataset(path / "b" / "sub-a").repo),
+        "other-sub")
+    eq_(get_branch(Dataset(path / "b" / "sub-b").repo),
+        "master")
