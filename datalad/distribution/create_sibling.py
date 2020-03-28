@@ -169,6 +169,7 @@ def _create_dataset_sibling(
         # see gh-1188
         remoteds_path = normpath(opj(target_dir, ds_name))
 
+    ds_repo = ds.repo
     # construct a would-be ssh url based on the current dataset's path
     ri.path = remoteds_path
     ds_url = ri.as_str()
@@ -258,7 +259,7 @@ def _create_dataset_sibling(
                 # if we succeeded in removing it
                 path_exists = False
                 # Since it is gone now, git-annex also should forget about it
-                remotes = ds.repo.get_remotes()
+                remotes = ds_repo.get_remotes()
                 if name in remotes:
                     # so we had this remote already, we should announce it dead
                     # XXX what if there was some kind of mismatch and this name
@@ -268,9 +269,9 @@ def _create_dataset_sibling(
                         "Announcing existing remote %s dead to annex and removing",
                         name
                     )
-                    if isinstance(ds.repo, AnnexRepo):
-                        ds.repo.set_remote_dead(name)
-                    ds.repo.remove_remote(name)
+                    if isinstance(ds_repo, AnnexRepo):
+                        ds_repo.set_remote_dead(name)
+                    ds_repo.remove_remote(name)
             elif existing == 'reconfigure':
                 lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
