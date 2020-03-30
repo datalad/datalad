@@ -1,0 +1,20 @@
+Update 0.12.4-12-g1f40455280:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    1f404552802e3817ce3e2f1bac690077d74fb6c8..7dde9343e6606fe653f992cfbed96da908b440ca
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4341 from yarikoptic/opt-no-dup-calls
+   09d7b659e1^-1
++  Merge pull request #4342 from yarikoptic/bf-git-lang
+   841480c90a^-1
++  Merge pull request #4361 from bpoldrack/bf-load-json-stream
+   240cd6322b^-1
+-  Merge pull request #4358 from yarikoptic/bf-no-asv-submodule
+   7dde9343e6^-1
