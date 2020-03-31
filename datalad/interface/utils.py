@@ -42,8 +42,10 @@ from datalad.utils import (
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
-from datalad.dochelpers import exc_str
-
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -512,6 +514,17 @@ def default_result_renderer(res):
                 if res.get('message', None) else ''))
 
 
+def _display_suppressed_message(nsimilar, ndisplayed):
+    # +1 because there was the original result + nsimilar displayed.
+    n_suppressed = nsimilar - ndisplayed + 1
+    if n_suppressed > 0:
+        ui.message('  [{} similar {} been suppressed]'
+                   .format(n_suppressed,
+                           single_or_plural("message has",
+                                            "messages have",
+                                            n_suppressed, False)))
+
+
 def _process_results(
         results,
         cmd_class,
@@ -534,7 +547,6 @@ def _process_results(
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
     render_n_repetitions = 10
-    result_suppression_msg = '  [{} similar messages have been suppressed]'
 
     for res in results:
         if not res or 'action' not in res:
@@ -583,15 +595,14 @@ def _process_results(
             if res.get('status', None) != 'notneeded' \
                     and trimmed_result == last_result:
                 # this is a similar report, suppress if too many, but count it
+                result_repetitions += 1
                 if result_repetitions < render_n_repetitions:
                     default_result_renderer(res)
-                result_repetitions += 1
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
-                if result_repetitions:
-                    ui.message(result_suppression_msg.format(
-                        result_repetitions - render_n_repetitions))
+                _display_suppressed_message(
+                    result_repetitions, render_n_repetitions)
                 default_result_renderer(res)
                 result_repetitions = 0
             last_result = trimmed_result
@@ -626,9 +637,8 @@ def _process_results(
                 break
         yield res
     # make sure to report on any issues that we had suppressed
-    if result_repetitions:
-        ui.message(result_suppression_msg.format(
-            result_repetitions - render_n_repetitions))
+    _display_suppressed_message(
+        result_repetitions, render_n_repetitions)
 
 
 def keep_result(res, rfilter, **kwargs):

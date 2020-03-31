@@ -23,6 +23,7 @@ from datalad.tests.utils import (
     assert_not_equal,
     assert_not_in,
     assert_raises,
+    assert_re_in,
     assert_repo_status,
     assert_true,
     ok_,
@@ -31,6 +32,7 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import swallow_logs
+from datalad.utils import swallow_outputs
 from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
@@ -214,17 +216,25 @@ class TestUtils(Interface):
             doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
-            constraints=EnsureDataset() | EnsureNone()),)
+            constraints=EnsureDataset() | EnsureNone()),
+        result_fn=Parameter(
+            args=tuple(),   # Hide this from the cmdline parser.
+            doc="""Generate the result records with this function
+            rather than using the default logic. `number` will be
+            passed as an argument."""),)
 
     @staticmethod
     @datasetmethod(name='fake_command')
     @eval_results
-    def __call__(number, dataset=None):
-
-        for i in range(number):
-            # this dict will need to have the minimum info required by
-            # eval_results
-            yield {'path': 'some', 'status': 'ok', 'somekey': i, 'action': 'off'}
+    def __call__(number, dataset=None, result_fn=None):
+        if result_fn:
+            yield from result_fn(number)
+        else:
+            for i in range(number):
+                # this dict will need to have the minimum info
+                # required by eval_results
+                yield {'path': 'some', 'status': 'ok', 'somekey': i,
+                       'action': 'off'}
 
 
 def test_eval_results_plus_build_doc():
@@ -273,8 +283,10 @@ def test_eval_results_plus_build_doc():
 
     # test signature:
     from datalad.utils import getargspec
-    assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
-    assert_equal(getargspec(TestUtils.__call__)[0], ['number', 'dataset'])
+    assert_equal(getargspec(Dataset.fake_command)[0],
+                 ['number', 'dataset', 'result_fn'])
+    assert_equal(getargspec(TestUtils.__call__)[0],
+                 ['number', 'dataset', 'result_fn'])
 
 
 def test_result_filter():
@@ -367,3 +379,56 @@ def test_discover_ds_trace(path, otherdir):
         spec = {}
         discover_dataset_trace_to_targets(ds.path, input, [], spec, includeds=eds)
         assert_dict_equal(spec, goal)
+
+
+def test_utils_suppress_similar():
+    tu = TestUtils()
+
+    # Check suppression boundary for straight chain of similar
+    # messages.
+
+    def n_foo(number):
+        for i in range(number):
+            yield dict(action="foo",
+                       status="ok",
+                       path="path{}".format(i))
+
+    with swallow_outputs() as cmo:
+        list(tu(9, result_fn=n_foo, result_renderer="default"))
+        assert_in("path8", cmo.out)
+        assert_not_in("suppressed", cmo.out)
+
+    with swallow_outputs() as cmo:
+        list(tu(10, result_fn=n_foo, result_renderer="default"))
+        assert_in("path9", cmo.out)
+        assert_not_in("suppressed", cmo.out)
+
+    with swallow_outputs() as cmo:
+        list(tu(11, result_fn=n_foo, result_renderer="default"))
+        assert_not_in("path10", cmo.out)
+        assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
+
+    # Check a chain of similar messages, split in half by a distinct one.
+
+    def n_foo_split_by_a_bar(number):
+        half = number // 2 - 1
+        for i in range(number):
+            yield dict(action="foo",
+                       status="ok",
+                       path="path{}".format(i))
+            if i == half:
+                yield dict(action="bar",
+                           status="ok",
+                           path="path")
+
+    with swallow_outputs() as cmo:
+        list(tu(20, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
+        assert_in("path10", cmo.out)
+        assert_in("path19", cmo.out)
+        assert_not_in("suppressed", cmo.out)
+
+    with swallow_outputs() as cmo:
+        list(tu(21, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
+        assert_in("path10", cmo.out)
+        assert_not_in("path20", cmo.out)
+        assert_re_in("[^-0-9]1 .* suppressed", cmo.out, match=False)
