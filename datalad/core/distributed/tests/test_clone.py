@@ -768,3 +768,49 @@ def test_ria_http_storedataladorg(path):
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)
 
+
+@with_tempfile(mkdir=True)
+def test_clone_unborn_head(path):
+    ds_origin = Dataset(op.join(path, "a")).create()
+    ds_origin.repo.call_git(["branch", "-m", "master", "abc"])
+    ds_origin.repo.commit("c0", options=["--allow-empty"])
+    ds_origin.repo.commit("c1", options=["--allow-empty"])
+    ds_origin.repo.call_git(["checkout", "-b", "chooseme", "abc~2"])
+    (ds_origin.pathobj / "foo").write_text("content")
+    ds_origin.save()
+    ds_origin.repo.commit("c2", options=["--allow-empty"])
+    # Try to make git-annex branch is most recently updated ref so that we test
+    # that it is skipped.
+    ds_origin.drop("foo", check=False)
+    ds_origin.repo.checkout("master", options=["--orphan"])
+
+    ds = clone(ds_origin.path, op.join(path, "b"))
+    # We landed on the branch with the most recent commit, ignoring the
+    # git-annex branch.
+    eq_(ds.repo.get_active_branch(), "chooseme")
+    eq_(ds_origin.repo.get_hexsha("chooseme"),
+        ds.repo.get_hexsha("chooseme"))
+
+
+@with_tempfile(mkdir=True)
+def test_clone_unborn_head_no_other_ref(path):
+    # TODO: On master, update to use annex=False.
+    ds_origin = Dataset(op.join(path, "a")).create(no_annex=True)
+    ds_origin.repo.call_git(["update-ref", "-d", "refs/heads/master"])
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        clone(source=ds_origin.path, path=op.join(path, "b"))
+        assert_in("could not find a branch with commits", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def test_clone_unborn_head_sub(path):
+    ds_origin = Dataset(op.join(path, "a")).create()
+    ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
+    ds_origin_sub.repo.call_git(["branch", "-m", "master", "other"])
+    ds_origin.save()
+    ds_origin_sub.repo.checkout("master", options=["--orphan"])
+
+    ds_cloned = clone(source=ds_origin.path, path=op.join(path, "b"))
+    ds_cloned_sub = ds_cloned.get(
+        "sub", result_xfm="datasets", return_type="item-or-list")
+    eq_(ds_cloned_sub.repo.get_active_branch(), "other")
