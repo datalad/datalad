@@ -78,15 +78,20 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
-    Dataset(path).create()
+    ds = Dataset(path).create()
     # nothing set, nothing found
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    assert_equal(get_metadata_type(ds), [])
     # got section, but no setting
     open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata"]\n')
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    # not relying on automagical pick up of changes done
+    # by external powers to the config
+    # see https://github.com/datalad/datalad/issues/4363 for more info
+    ds.config.reload()
+    assert_equal(get_metadata_type(ds), [])
     # minimal setting
     open(opj(path, '.datalad', 'config'), 'w+').write('[datalad "metadata"]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), 'mamboschwambo')
+    ds.config.reload()
+    assert_equal(get_metadata_type(ds), 'mamboschwambo')
 
 
 def _compare_metadata_helper(origres, compds):
