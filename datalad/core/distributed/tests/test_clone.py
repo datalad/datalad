@@ -529,13 +529,13 @@ def test_cfg_originorigin(path):
     # Clone another level, this time with a relative path. Drop content from
     # lev2 so that origin is the only place that the file is available from.
     clone_lev2.drop("file1.txt")
-    with chpwd(path), swallow_logs(new_level=9) as cml:
+    with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*Running: \[('git', 'annex'|'git-annex'), "
+        cml.assert_logged(msg=r"[^[]*Async run \[('git', 'annex'|'git-annex'), "
                               r"'init'",
                           match=False,
-                          level='Level 9')
+                          level='DEBUG')
     assert_result_count(
         clone_lev3.get('file1.txt', on_failure='ignore'),
         1,
