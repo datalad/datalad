@@ -586,10 +586,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
 
-    # we have just cloned the repo, so it has 'origin', configure any
-    # reachable origin of origins
-    yield from configure_origins(ds, ds)
-
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
     # If such an instance already exists, its __init__ will not be executed.
@@ -733,6 +729,11 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
+
+    # we have just cloned the repo, so it has 'origin', configure any
+    # reachable origin of origins
+    yield from configure_origins(ds, ds)
+
 
 _handle_possible_annex_dataset = postclonecfg_annexdataset
 

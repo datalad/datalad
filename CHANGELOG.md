@@ -188,6 +188,13 @@ bet we will fix some bugs and make a world even a better place.
 - Update a regular expression to handle an output change in Git
   v2.26.0.  ([#4328][])
 
+- We now set `LC_MESSAGES` to 'C' while running git to avoid failures
+  when parsing output that is marked for translation.  ([#4342][])
+
+- The helper for decoding JSON streams loaded the last line of input
+  without decoding it if the line didn't end with a new line, a
+  regression introduced in the 0.12.0 release.  ([#4361][])
+
 ### Enhancements and new features
 
 ?
@@ -2694,3 +2701,5 @@ publishing
 [#4330]: https://github.com/datalad/datalad/issues/4330
 [#4331]: https://github.com/datalad/datalad/issues/4331
 [#4337]: https://github.com/datalad/datalad/issues/4337
+[#4342]: https://github.com/datalad/datalad/issues/4342
+[#4361]: https://github.com/datalad/datalad/issues/4361
