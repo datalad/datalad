@@ -10,6 +10,23 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
+## 0.12.6 (??? ??, 2020) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
+
 ## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
 ￼
 Fix some bugs and make the world an even better place.
