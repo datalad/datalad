@@ -67,7 +67,6 @@ from datalad.config import (
 
 from datalad.consts import (
     GIT_SSH_COMMAND,
-    ADJUSTED_BRANCH_EXPR,
 )
 from datalad.dochelpers import exc_str
 import datalad.utils as ut
@@ -3829,16 +3828,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
             for cand_sm in to_add_submodules:
-                branch = self.get_active_branch()
-                adjusted_match = ADJUSTED_BRANCH_EXPR.match(
-                    branch if branch else '')
                 try:
                     self.add_submodule(
                         str(cand_sm.relative_to(self.pathobj)),
                         url=None,
                         name=None,
-                        branch=adjusted_match.group('name') if adjusted_match
-                        else branch
                     )
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
