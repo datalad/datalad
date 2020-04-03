@@ -98,6 +98,7 @@ def _create_dataset_sibling(
         # see gh-1188
         remoteds_path = normpath(opj(target_dir, ds_name))
 
+    ds_repo = ds.repo
     # construct a would-be ssh url based on the current dataset's path
     ssh_url.path = remoteds_path
     ds_sshurl = ssh_url.as_str()
@@ -171,7 +172,7 @@ def _create_dataset_sibling(
                 # if we succeeded in removing it
                 path_exists = False
                 # Since it is gone now, git-annex also should forget about it
-                remotes = ds.repo.get_remotes()
+                remotes = ds_repo.get_remotes()
                 if name in remotes:
                     # so we had this remote already, we should announce it dead
                     # XXX what if there was some kind of mismatch and this name
@@ -181,9 +182,9 @@ def _create_dataset_sibling(
                         "Announcing existing remote %s dead to annex and removing",
                         name
                     )
-                    if isinstance(ds.repo, AnnexRepo):
-                        ds.repo.set_remote_dead(name)
-                    ds.repo.remove_remote(name)
+                    if isinstance(ds_repo, AnnexRepo):
+                        ds_repo.set_remote_dead(name)
+                    ds_repo.remove_remote(name)
             elif existing == 'reconfigure':
                 lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
@@ -273,6 +274,20 @@ def _create_dataset_sibling(
                   " publish updates to this repository. Upgrade your git"
                   " and run with --existing=reconfigure",
                   ssh.get_git_version())
+
+    branch = ds_repo.get_active_branch()
+    if branch is not None:
+        if hasattr(ds_repo, "get_corresponding_branch"):
+            # ^ TODO: Drop this when this change hits master, where GitRepo has
+            # a .get_corresponding_branch method.
+            branch = ds_repo.get_corresponding_branch(branch) or branch
+        if branch != "master":
+            # Setting the HEAD for the created sibling to the original
+            # repo's current branch should be unsurprising, and it
+            # helps with consumers that don't properly handle the
+            # default master with no commits. See gh-4349.
+            ssh("git -C {} symbolic-ref HEAD refs/heads/{}"
+                .format(sh_quote(remoteds_path), branch))
 
     if install_postupdate_hook:
         # enable metadata refresh on dataset updates to publication server
@@ -489,7 +504,7 @@ class CreateSibling(Interface):
             # for now assuming hierarchical setup
             # (TODO: to be able to destinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
-            sshurl = slash_join(super_url, relpath(ds.path, super_ds.path))
+            sshurl = slash_join(super_url, relpath(refds_path, super_ds.path))
 
         # check the login URL
         sshri = RI(sshurl)
@@ -606,7 +621,7 @@ class CreateSibling(Interface):
             path = _create_dataset_sibling(
                 name,
                 current_ds,
-                ds.path,
+                refds_path,
                 ssh,
                 replicate_local_structure,
                 sshri,
@@ -636,7 +651,7 @@ class CreateSibling(Interface):
             remote_repos_to_run_hook_for.append((path, currentds_ap))
 
             # publish web-interface to root dataset on publication server
-            if current_ds.path == ds.path and ui:
+            if current_ds.path == refds_path and ui:
                 lgr.info("Uploading web interface to %s" % path)
                 try:
                     CreateSibling.upload_web_interface(path, ssh, shared, ui)

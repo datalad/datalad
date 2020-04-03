@@ -168,12 +168,18 @@ class Update(Interface):
             # NOTE if any further acces to `repo` is needed, reevaluate
             # ds.repo again, as it might have be converted from an GitRepo
             # to an AnnexRepo
-            if merge:
-                for fr in _update_repo(ds, sibling_, reobtain_data):
-                    yield fr
             res['status'] = 'ok'
+            if merge:
+                if ds.repo.commit_exists("HEAD"):
+                    for fr in _update_repo(ds, sibling_, reobtain_data):
+                        yield fr
+                    save_paths.append(ds.path)
+                else:
+                    res["status"] = "impossible"
+                    res["message"] = ("No commits on branch '%s'",
+                                      repo.get_active_branch())
             yield res
-            save_paths.append(ds.path)
+
         # we need to save updated states only if merge was requested -- otherwise
         # it was a pure fetch
         if merge and recursive:

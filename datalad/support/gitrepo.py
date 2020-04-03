@@ -2738,7 +2738,18 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if GitRepo.is_valid_repo(self.pathobj / path):
             subrepo = GitRepo(self.pathobj / path, create=False)
             subbranch = subrepo.get_active_branch() if subrepo else None
-            subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
+            try:
+                subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
+            except ValueError:
+                if subrepo.commit_exists("HEAD"):
+                    # Not what we thought it was. Reraise.
+                    raise
+                else:
+                    raise ValueError(
+                        "Cannot add submodule that has an unborn branch "
+                        "checked out: {}"
+                        .format(subrepo.path))
+
         else:
             subrepo = None
             subbranch = None

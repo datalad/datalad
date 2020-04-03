@@ -1023,6 +1023,19 @@ def test_GitRepo_update_submodule_init_adjust_branch():
     yield check_update_submodule_init_adjust_branch, False
 
 
+@with_tempfile
+def test_update_submodules_sub_on_unborn_branch(path):
+    repo = GitRepo(path, create=True)
+    repo.commit(msg="c0", options=["--allow-empty"])
+    subrepo = GitRepo(op.join(path, "sub"), create=True)
+    subrepo.commit(msg="s c0", options=["--allow-empty"])
+    repo.add_submodule(path="sub")
+    subrepo.checkout("other", options=["--orphan"])
+    with assert_raises(ValueError) as cme:
+        repo.update_submodule(path="sub")
+    assert_in("unborn branch", str(cme.exception))
+
+
 def test_GitRepo_get_submodules():
     raise SkipTest("TODO")
 
