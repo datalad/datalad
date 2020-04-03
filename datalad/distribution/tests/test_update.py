@@ -794,3 +794,29 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
 def test_merge_follow_parentds_subdataset_detached():
     yield check_merge_follow_parentds_subdataset_detached, True
     yield check_merge_follow_parentds_subdataset_detached, False
+
+
+@with_tempfile(mkdir=True)
+def test_update_unborn_master(path):
+    ds_a = Dataset(op.join(path, "ds-a")).create()
+    ds_a.repo.call_git(["branch", "-m", "master", "other"])
+    ds_a.repo.checkout("master", options=["--orphan"])
+    ds_b = install(source=ds_a.path, path=op.join(path, "ds-b"))
+
+    ds_a.repo.checkout("other")
+    (ds_a.pathobj / "foo").write_text("content")
+    ds_a.save()
+
+    # clone() will try to switch away from an unborn branch if there
+    # is another ref available.  Reverse these efforts so that we can
+    # test that update() fails reasonably here because we should still
+    # be able to update from remotes that datalad didn't clone.
+    ds_b.repo.update_ref("HEAD", "refs/heads/master", symbolic=True)
+    assert_false(ds_b.repo.commit_exists("HEAD"))
+    assert_status("impossible",
+                  ds_b.update(merge=True, on_failure="ignore"))
+
+    ds_b.repo.checkout("other")
+    assert_status("ok",
+                  ds_b.update(merge=True, on_failure="ignore"))
+    eq_(ds_a.repo.get_hexsha(), ds_b.repo.get_hexsha())

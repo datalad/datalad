@@ -59,9 +59,6 @@ from datalad.config import (
     _parse_gitconfig_dump
 )
 
-from datalad.consts import (
-    ADJUSTED_BRANCH_EXPR,
-)
 from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
@@ -2896,7 +2893,18 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if GitRepo.is_valid_repo(self.pathobj / path):
             subrepo = GitRepo(self.pathobj / path, create=False)
             subbranch = subrepo.get_active_branch() if subrepo else None
-            subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
+            try:
+                subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
+            except ValueError:
+                if subrepo.commit_exists("HEAD"):
+                    # Not what we thought it was. Reraise.
+                    raise
+                else:
+                    raise ValueError(
+                        "Cannot add submodule that has an unborn branch "
+                        "checked out: {}"
+                        .format(subrepo.path))
+
         else:
             subrepo = None
             subbranch = None
@@ -3938,16 +3946,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
             for cand_sm in to_add_submodules:
-                branch = self.get_active_branch()
-                adjusted_match = ADJUSTED_BRANCH_EXPR.match(
-                    branch if branch else '')
                 try:
                     self.add_submodule(
                         str(cand_sm.relative_to(self.pathobj)),
                         url=None,
                         name=None,
-                        branch=adjusted_match.group('name') if adjusted_match
-                        else branch
                     )
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(

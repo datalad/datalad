@@ -169,13 +169,26 @@ bet we will fix some bugs and make a world even a better place.
   ([#4243][])
 
 
-## 0.12.5 (??? ??, 2020) -- will be better than ever
+## 0.12.6 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
 - hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
+
+## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
+￼
+Fix some bugs and make the world an even better place.
 
 ### Fixes
 
@@ -195,9 +208,8 @@ bet we will fix some bugs and make a world even a better place.
   without decoding it if the line didn't end with a new line, a
   regression introduced in the 0.12.0 release.  ([#4361][])
 
-### Enhancements and new features
-
-?
+- The clone command failed to git-annex-init a fresh clone whenever
+  it considered to add the origin of the origin as a remote.  ([#4367][])
 
 
 ## 0.12.4 (Mar 19, 2020) -- Windows?!
@@ -2703,3 +2715,4 @@ publishing
 [#4337]: https://github.com/datalad/datalad/issues/4337
 [#4342]: https://github.com/datalad/datalad/issues/4342
 [#4361]: https://github.com/datalad/datalad/issues/4361
+[#4367]: https://github.com/datalad/datalad/issues/4367

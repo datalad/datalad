@@ -191,7 +191,11 @@ def shortened_repr(value, l=30):
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
             if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s...>>" % (value_repr[:l - 8])
+                value_repr = "<<%s++%d chars++%s>>" % (
+                    value_repr[:l - 16],
+                    len(value_repr) - (l - 16 + 4),
+                    value_repr[-4:]
+                )
             elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
                 raise ValueError("I hate those useless long reprs")
         else:

@@ -403,8 +403,6 @@ def test_add_subdataset(path, other):
         path=op.join(ds.path, 'dir'),
         gitmodule_url='./dir',
         gitmodule_name='dir',
-        # but also the branch, by default
-        gitmodule_branch='master',
     )
     #  create another one
     other = create(other)
