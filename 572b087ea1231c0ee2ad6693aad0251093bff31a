@@ -1,0 +1,18 @@
+Update 0.12.5-1-gf9cfd111b1:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    f9cfd111b1a13d57f2844a7351569b8c489820dc..9186ff1fb331595baf223f1c479b4ac1ba077646
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++* Merge pull request #4354 from yarikoptic/enh-list-keys
+   86487e12da^-1
++  Merge pull request #4370 from kyleam/unborn-ref-fixes
+   8755469ff1^-1
++  Merge pull request #4375 from kyleam/gitmodules-branch
+   9186ff1fb3^-1
