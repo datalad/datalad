@@ -1,0 +1,36 @@
+Update 0.12.5-595-gf83cf291a9:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    938d820971f8b0c820fac2bd6df6507e846a8a95..f83cf291a907534d7c9d66dc6a425a2abe6f8cd6
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4348 from kyleam/get-submodules-no-compat-use
+   6b28f4b26d^-1
+-  Merge pull request #4346 from kyleam/changelog-todo
+   a559448345^-1
++* Merge pull request #4338 from adswa/enh-hints
+   4a3035ade1^-1
+-  Merge pull request #4350 from kyleam/direct-mode-comment
+   cedcb9e69f^-1
+-  Merge branch 'maint'
+   7a4abb204c^-1
+-  Merge branch 'maint'
+   8ed1f5d611^-1
+-  Merge pull request #4362 from kyleam/fetch-protocol-v2
+   dbabe208a2^-1
+-  Merge pull request #4353 from kyleam/suppress-res-fixup
+   2a1e96c114^-1
+-  Merge pull request #4365 from yarikoptic/bf-config-alt
+   6ef7851b83^-1
+-  Merge branch 'maint'
+   91ca220ad5^-1
+-  TST: clone: Adjust test from 2bf27841b3 for change in master
+   507353d34a^-1
+-  Merge maint into master
+   f83cf291a9^-1
