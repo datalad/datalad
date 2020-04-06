@@ -73,12 +73,19 @@ bet we will fix some bugs and make a world even a better place.
   cloning a local source could unintentionally triggered a fetch of a
   non-local remote.  ([#4196][])
 
+- All remaining `get_submodules()` call sites that relied on the
+  temporary compatibility layer added in v0.12.0 have been updated.
+  (#4348)
+
 ### Enhancements and new features
 
 - The default result renderer learned to elide a chain of results
   after seeing ten consecutive results that it considers similar,
   which improves the display of actions that have many results (e.g.,
   saving hundreds of files).  ([#4337][])
+
+- The default result renderer, in addition to "tailored" result
+  renderer, now triggers the custom summary renderer, if any.  (#4338)
 
 - The new command [create-sibling-ria][] provides support for creating
   a sibling in a [RIA store][handbook-scalable-datastore]. ([#4124][])
