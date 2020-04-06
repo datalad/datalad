@@ -20,11 +20,23 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Staring with v0.12.0, `datalad save` recorded the current branch of
+  a parent dataset as the `branch` value in the .gitmodules entry for
+  a subdataset.  This behavior is problematic for a few reasons and
+  has been reverted.  ([#4375][])
+
+- Various commands have been adjusted to better handle the case where
+  a remote's HEAD ref points to an unborn branch.  ([#4370][])
+
+- [search] `--show-keys short` gave incorrect information about the
+  number of unhashable entries.  This issue has been addressed by
+  using the `repr` of values rather than reporting on unhashable
+  entries.  ([#4354][])
 
 ### Enhancements and new features
 
-?
+- [search] learned to use the query as a regular expression that
+  restricts the keys that are shown for `--show-keys short`. ([#4354][])
 
 
 ## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
@@ -2501,5 +2513,8 @@ publishing
 [#4328]: https://github.com/datalad/datalad/issues/4328
 [#4330]: https://github.com/datalad/datalad/issues/4330
 [#4342]: https://github.com/datalad/datalad/issues/4342
+[#4354]: https://github.com/datalad/datalad/issues/4354
 [#4361]: https://github.com/datalad/datalad/issues/4361
 [#4367]: https://github.com/datalad/datalad/issues/4367
+[#4370]: https://github.com/datalad/datalad/issues/4370
+[#4375]: https://github.com/datalad/datalad/issues/4375
