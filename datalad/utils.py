@@ -793,18 +793,24 @@ def ensure_unicode(s, encoding=None, confidence=None):
         return s.decode(encoding)
 
 
-def ensure_bool(s):
+def ensure_bool(s, short=True):
     """Convert value into boolean following convention for strings
 
-    to recognize on,True,yes as True, off,False,no as False
+    to recognize on,True,yes as True, off,False,no as False.
+
+    Parameters
+    ----------
+    short: bool, optional
+       If `short` is True (default) we also accept 'y' for True and 'n' for False
+       for compatibility.
     """
     if isinstance(s, str):
         if s.isdigit():
             return bool(int(s))
         sl = s.lower()
-        if sl in {'y', 'yes', 'true', 'on'}:
+        if sl in {'yes', 'true', 'on'} or (short and sl == 'y'):
             return True
-        elif sl in {'n', 'no', 'false', 'off'}:
+        elif sl in {'no', 'false', 'off'} or (short and sl == 'n'):
             return False
         else:
             raise ValueError("Do not know how to treat %r as a boolean" % s)
