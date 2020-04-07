@@ -810,7 +810,7 @@ def ensure_bool(s, *, short=True):
         sl = s.lower()
         if sl in {'yes', 'true', 'on'} or (short and sl == 'y'):
             return True
-        elif sl in {'no', 'false', 'off'} or (short and sl == 'n'):
+        elif sl in {'no', 'false', 'off', ''} or (short and sl == 'n'):
             return False
     elif isinstance(s, bool):
         return s
