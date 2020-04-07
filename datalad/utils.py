@@ -812,9 +812,13 @@ def ensure_bool(s, *, short=True):
             return True
         elif sl in {'no', 'false', 'off'} or (short and sl == 'n'):
             return False
-        else:
-            raise ValueError("Do not know how to treat %r as a boolean" % s)
-    return bool(s)
+    elif isinstance(s, bool):
+        return s
+    elif isinstance(s, int):
+        return bool(s)
+    elif s is None:
+        return False
+    raise ValueError("Do not know how to treat %s as a boolean" % repr(s))
 
 
 def as_unicode(val, cast_types=object):
