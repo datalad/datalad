@@ -499,8 +499,7 @@ def test_assure_bool():
     ]:
         for v in values:
             eq_(assure_bool(v), t)
-    assert_raises(ValueError, assure_bool, 'y', short=False)
-    for v in "unknown", "1.0", "-1.0", " ":
+    for v in "unknown", "1.0", "-1.0", " ", "y", "n":
         with assert_raises(ValueError):
             assure_bool(v)
             assert False, "Exception is not raised for %s" % repr(v)
