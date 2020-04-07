@@ -107,7 +107,7 @@ def test_something(path, new_home):
     assert_equal(cfg.getint('something', 'myint'), 3)
     assert_equal(cfg.getbool('something', 'myint'), True)
     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
-    assert_raises(TypeError, cfg.getbool, 'something', 'user')
+    assert_raises(ValueError, cfg.getbool, 'something', 'user')
 
     # gitpython-style access
     assert_equal(cfg.get('something.myint'), cfg.get_value('something', 'myint'))

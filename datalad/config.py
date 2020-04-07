@@ -18,6 +18,7 @@ from datalad.consts import (
 from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
 from distutils.version import LooseVersion
+from datalad.utils import ensure_bool
 
 import re
 import os
@@ -117,19 +118,11 @@ def _parse_env(store):
     return store
 
 
+# Adapter used in hirni-toolbox and datalad-hirni
 def anything2bool(val):
-    if hasattr(val, 'lower'):
-        val = val.lower()
-    if val in {"off", "no", "false", "0"} or not bool(val):
-        return False
-    elif val in {"on", "yes", "true", True} \
-            or (hasattr(val, 'isdigit') and val.isdigit() and int(val)) \
-            or isinstance(val, int) and val:
-        return True
-    else:
-        raise TypeError(
-            "Got value %s which could not be interpreted as a boolean"
-            % repr(val))
+    # We do not allow short version here for consistency with git.
+    # Otherwise - should be similar to git
+    return ensure_bool(val, short=False)
 
 
 class ConfigManager(object):
