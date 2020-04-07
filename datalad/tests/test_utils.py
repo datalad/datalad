@@ -494,12 +494,16 @@ def test_assure_dict_from_str():
 
 def test_assure_bool():
     for values, t in [
-        (['True', 1, '1', 'yes', 'on'], True),
+        (['True', 1, '1', 'yes', 'on', '-1', '-2'], True),
         (['False', 0, '0', 'no', 'off'], False)
     ]:
         for v in values:
             eq_(assure_bool(v), t)
-    assert_raises(ValueError, assure_bool, "unknown")
+    assert_raises(ValueError, assure_bool, 'y', short=False)
+    for v in "unknown", "1.0", "-1.0":
+        with assert_raises(ValueError):
+            assure_bool(v)
+            assert False, "Exception is not raised for %s" % repr(v)
 
 
 def test_generate_chunks():
