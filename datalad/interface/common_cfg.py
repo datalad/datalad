@@ -248,6 +248,17 @@ definitions = {
         'destination': 'global',
         'default': None,
     },
+    'datalad.annex.retry': {
+        'ui': ('question',
+               {'title': 'Value for annex.retry to use for git-annex calls',
+                'text': 'On transfer failure, annex.retry (sans "datalad.") '
+                        'controls the number of times that git-annex retries. '
+                        'DataLad will call git-annex with annex.retry set '
+                        'to the value here unless the annex.retry '
+                        'is explicitly configured'}),
+        'type': EnsureInt(),
+        'default': 3,
+    },
     'datalad.repo.backend': {
         'ui': ('question', {
                'title': 'git-annex backend',

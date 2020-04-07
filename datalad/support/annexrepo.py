@@ -306,6 +306,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
 
+        if config.get("annex.retry") is None:
+            self._annex_common_options.extend(
+                ["-c",
+                 "annex.retry={}".format(
+                     config.obtain("datalad.annex.retry"))])
+
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
 
