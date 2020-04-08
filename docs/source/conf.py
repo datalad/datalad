@@ -24,7 +24,7 @@ def setup(sphinx):
     sys.path.insert(0, os.path.abspath('utils'))  # travis
     sys.path.insert(0, os.path.abspath(opj(pardir, 'utils')))  # RTD
     from pygments_ansi_color import AnsiColorLexer
-    sphinx.add_lexer("ansi-color", AnsiColorLexer())
+    sphinx.add_lexer("ansi-color", AnsiColorLexer)
 
 
 # If extensions (or modules to document with autodoc) are in another directory,
