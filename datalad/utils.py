@@ -796,9 +796,10 @@ def ensure_unicode(s, encoding=None, confidence=None):
 def ensure_bool(s):
     """Convert value into boolean following convention for strings
 
-    to recognize on,True,yes as True, off,False,no as False.
+    "on", True, and "yes" are considered as True. "off", False, and
+    "no" are considered as False.
 
-    As of 0.13.0 does not handle short versions 'y' and 'n'
+    As of 0.13.0, short versions 'y' and 'n' are not accepted.
     """
     if isinstance(s, str):
         if s.isdigit() or (len(s) > 1 and s[0] == '-' and s[1:].isdigit()):
