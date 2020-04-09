@@ -33,19 +33,19 @@ associated with.
 Global user configuration
 =========================
 
-.. include:: generated/cfginfo/global.rst
+.. include:: generated/cfginfo/global.rst.in
 
 Local repository configuration
 ==============================
 
-.. include:: generated/cfginfo/local.rst
+.. include:: generated/cfginfo/local.rst.in
 
 Sticky dataset configuration
 =============================
 
-.. include:: generated/cfginfo/dataset.rst
+.. include:: generated/cfginfo/dataset.rst.in
 
 Miscellaneous configuration
 ===========================
 
-.. include:: generated/cfginfo/misc.rst
+.. include:: generated/cfginfo/misc.rst.in
