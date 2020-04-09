@@ -24,6 +24,12 @@ def setup(sphinx):
     sys.path.insert(0, os.path.abspath('utils'))  # travis
     sys.path.insert(0, os.path.abspath(opj(pardir, 'utils')))  # RTD
     from pygments_ansi_color import AnsiColorLexer
+    # TODO: remove when sphinx < 3 is no longer in use.
+    # Older sphinx needs an instance not a class
+    import sphinx as sphinx_mod
+    sphinx_ver = int(sphinx_mod.__version__.split('.')[0])
+    if sphinx_ver < 3:
+        AnsiColorLexer = AnsiColorLexer()
     sphinx.add_lexer("ansi-color", AnsiColorLexer)
 
 
