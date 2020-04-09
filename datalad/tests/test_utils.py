@@ -503,6 +503,10 @@ def test_assure_bool():
         with assert_raises(ValueError):
             assure_bool(v)
             assert False, "Exception is not raised for %s" % repr(v)
+    # by default we cast
+    assert_false(assure_bool([]))
+    assert_true(assure_bool([1]))
+    assert_raises(ValueError, assure_bool, [], cast=False)
 
 
 def test_generate_chunks():

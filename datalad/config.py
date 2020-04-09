@@ -118,8 +118,11 @@ def _parse_env(store):
     return store
 
 
-# Compatibility binding: used in hirni-toolbox and datalad-hirni
-anything2bool = ensure_bool
+# Adapter used in hirni-toolbox and datalad-hirni
+def anything2bool(val):
+    # We do not allow casting here to avoid incorrect treatment of multiple
+    # values etc.  Otherwise - should be similar to git
+    return ensure_bool(val, cast=False)
 
 
 class ConfigManager(object):

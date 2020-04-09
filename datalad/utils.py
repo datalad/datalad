@@ -793,7 +793,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
         return s.decode(encoding)
 
 
-def ensure_bool(s):
+def ensure_bool(s, cast=True):
     """Convert value into boolean following convention for strings
 
     "on", True, and "yes" are considered as True. "off", False, and
@@ -811,7 +811,7 @@ def ensure_bool(s):
             return False
     elif isinstance(s, bool):
         return s
-    elif isinstance(s, int):
+    elif isinstance(s, int) or cast:
         return bool(s)
     elif s is None:
         return False
