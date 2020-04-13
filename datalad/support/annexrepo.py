@@ -260,8 +260,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         self.always_commit = always_commit
 
+        config = self.config
         if version is None:
-            version = self.config.get("datalad.repo.version", None)
+            version = config.get("datalad.repo.version", None)
             # we might get an empty string here
             # TODO: if we use obtain() instead, we get an error complaining
             # '' cannot be converted to int (via Constraint as defined for
@@ -287,7 +288,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "Git configuration reports repository being in direct mode"
             )
 
-        if self.config.getbool("datalad", "repo.direct", default=False):
+        if config.getbool("datalad", "repo.direct", default=False):
             raise DirectModeNoLongerSupportedError(
                 self,
                 "datalad.repo.direct configuration instructs to use direct mode"
@@ -304,6 +305,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
+
+        if config.get("annex.retry") is None:
+            self._annex_common_options.extend(
+                ["-c",
+                 "annex.retry={}".format(
+                     config.obtain("datalad.annex.retry"))])
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
