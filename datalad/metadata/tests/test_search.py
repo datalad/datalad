@@ -23,7 +23,10 @@ from datalad.utils import (
     swallow_logs,
     swallow_outputs,
 )
-from datalad.tests.utils import assert_in
+from datalad.tests.utils import (
+    assert_in,
+    assert_re_in,
+)
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
@@ -240,6 +243,12 @@ type
              " has 1 unique values: '%s'" % ds.id
              ]
         )
+
+    with assert_raises(ValueError) as cme:
+        ds.search('*wrong')
+    assert_re_in(
+        r"regular expression '\(\?i\)\*wrong' \(original: '\*wrong'\) is incorrect: ",
+        str(cme.exception))
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:
