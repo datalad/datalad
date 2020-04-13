@@ -27,6 +27,7 @@ from datalad.utils import (
 from datalad.tests.utils import (
     assert_equal,
     assert_in,
+    assert_re_in,
     assert_is_generator,
     assert_raises,
     assert_repo_status,
@@ -147,37 +148,6 @@ def _check_mocked_install(default_dspath, mock_install):
 
 
 @with_tempfile
-def test_our_metadataset_search(tdir):
-    # TODO renable when a dataset with new aggregated metadata is
-    # available at some public location
-    raise SkipTest
-    # smoke test for basic search operations on our super-megadataset
-    # expensive operation but ok
-    #ds = install(
-    #    path=tdir,
-    #    # TODO renable test when /// metadata actually conforms to the new metadata
-    #    #source="///",
-    #    source="smaug:/mnt/btrfs/datasets-meta6-4/datalad/crawl",
-    #    result_xfm='datasets', return_type='item-or-list')
-    assert list(ds.search('haxby'))
-    assert_result_count(
-        ds.search('id:873a6eae-7ae6-11e6-a6c8-002590f97d84', mode='textblob'),
-        1,
-        type='dataset',
-        path=opj(ds.path, 'crcns', 'pfc-2'))
-
-    # there is a problem with argparse not decoding into utf8 in PY2
-    from datalad.cmdline.tests.test_main import run_main
-    # TODO: make it into an independent lean test
-    from datalad.cmd import Runner
-    out, err = Runner(cwd=ds.path)('datalad search Buzsáki')
-    assert_in('crcns/pfc-2 ', out)  # has it in description
-    # and then another aspect: this entry it among multiple authors, need to
-    # check if aggregating them into a searchable entity was done correctly
-    assert_in('crcns/hc-1 ', out)
-
-
-@with_tempfile
 def test_search_non_dataset(tdir):
     from datalad.support.gitrepo import GitRepo
     GitRepo(tdir, create=True)
@@ -278,6 +248,12 @@ type
              " has 1 unique values: '%s'" % ds.id
              ]
         )
+
+    with assert_raises(ValueError) as cme:
+        ds.search('*wrong')
+    assert_re_in(
+        r"regular expression '\(\?i\)\*wrong' \(original: '\*wrong'\) is incorrect: ",
+        str(cme.exception))
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:

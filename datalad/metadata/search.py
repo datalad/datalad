@@ -904,8 +904,8 @@ class _EGrepCSSearch(_Search):
             self._queried_keys.append(None)
         # expand matches, compile expressions
         query = [
-            {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
-            if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
+            {k: self._compile_query(v) for k, v in q.groupdict().items()}
+            if hasattr(q, 'groupdict') else self._compile_query(q)
             for q in query_rec_matches
         ]
 
@@ -920,6 +920,19 @@ class _EGrepCSSearch(_Search):
     def _xfm_query(self, q):
         # implement potential transformations of regex before they get compiled
         return q
+
+    def _compile_query(self, q):
+        """xfm and compile the query, with informative exception if query is incorrect
+        """
+        q_xfmed = self._xfm_query(q)
+        try:
+            return re.compile(q_xfmed)
+        except re.error as exc:
+            omsg = " (original: '%s')" % q if q != q_xfmed else ''
+            raise ValueError(
+                "regular expression '%s'%s is incorrect: %s"
+                % (q_xfmed, omsg, exc)
+            )
 
     def get_nohits_msg(self):
         """Given the query and performed search, provide recommendation
