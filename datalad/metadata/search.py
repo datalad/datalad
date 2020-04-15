@@ -30,6 +30,19 @@ from datalad.support.constraints import EnsureInt
 
 from datalad.support.exceptions import NoDatasetFound
 
+from datalad import cfg
+
+
+# TODO: RF to delay all those imports altogether.
+
+_KNOWN_MODES = {
+  'egrep':  _EGrepSearch,
+  'egrepcs':  _EGrepCSSearch,
+  'textblob':  _BlobSearch,
+  'autofield':  _AutofieldSearch,
+  'pyeval': _PyEvalSearch,
+}
+
 
 @build_doc
 class Search(Interface):
@@ -263,10 +276,11 @@ class Search(Interface):
             constraints=EnsureInt() | EnsureNone()),
         mode=Parameter(
             args=("--mode",),
-            # TODO egrepcs is missing
-            choices=('egrep', 'textblob', 'autofield', 'pyeval'),
+            choices=sorted(_KNOWN_MODES.keys()),
             doc="""Mode of search index structure and content. See section
-            SEARCH MODES for details."""),
+            SEARCH MODES for details. Default value is provided by
+            'datalad.search.default-mode' config variable, which is %r ATM."""
+            % cfg.obtain('datalad.search.default-mode')),
         full_record=Parameter(
             args=("--full-record", '-f'),
             action='store_true',
@@ -329,17 +343,8 @@ class Search(Interface):
             # default
             mode = ds.config.obtain('datalad.search.default-mode')
 
-        # RF avail from spagetti - we grew too many ;)
-        if mode == 'egrep':
-            searcher = _EGrepSearch
-        elif mode == 'egrepcs':
-            searcher = _EGrepCSSearch
-        elif mode == 'textblob':
-            searcher = _BlobSearch
-        elif mode == 'autofield':
-            searcher = _AutofieldSearch
-        elif mode == 'pyeval':
-            searcher = _PyEvalSearch
+        if mode in _KNOWN_MODES:
+            searcher = _KNOWN_MODES[mode]
         else:
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
