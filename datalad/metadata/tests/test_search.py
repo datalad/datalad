@@ -41,8 +41,7 @@ from datalad.support.exceptions import NoDatasetFound
 
 from datalad.api import search
 
-from ..search import _listdict2dictlist
-from ..search import _meta2autofield_dict
+from ..search_base import _listdict2dictlist, _meta2autofield_dict
 
 
 @with_testsui(interactive=False)
