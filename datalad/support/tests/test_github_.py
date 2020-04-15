@@ -21,20 +21,24 @@ from ...tests.utils import (
     assert_raises,
     eq_,
     patch_config,
+    skip_if,
     skip_if_no_network,
 )
 from ...consts import (
     CONFIG_HUB_TOKEN_FIELD,
-    GITHUB_LOGIN_URL,
 )
-from ...downloaders.tests.utils import get_test_providers
 from ...utils import swallow_logs
 
 from .. import github_
 from ..github_ import (
     _gen_github_entity,
+    _get_github_cred,
     get_repo_url,
 )
+
+
+skip_if_no_github_cred = skip_if(cond=not _get_github_cred().is_known)
+
 
 def test_get_repo_url():
     from collections import namedtuple
@@ -127,8 +131,8 @@ def test__make_github_repos():
 
 
 @skip_if_no_network
+@skip_if_no_github_cred
 def test__gen_github_entity_organization():
-    get_test_providers(GITHUB_LOGIN_URL)
     # to test effectiveness of the fix, we need to provide some
     # token which would not work
     with patch_config({CONFIG_HUB_TOKEN_FIELD: "ed51111111111111111111111111111111111111"}):
