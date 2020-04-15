@@ -160,8 +160,12 @@ def test_within_ds_file_search(path):
     except ImportError:
         raise SkipTest
     ds = Dataset(path).create(force=True)
+    index_query_modes = ('textblob', 'autofield')
+    # simple query modes, where we currently do not search
+    # unique values and the queries aiming at files will just return files
+    loopy_query_modes = ('egrep', 'pyeval')
     # override default and search for datasets and files for this test
-    for m in ('egrep', 'textblob', 'autofield'):
+    for m in index_query_modes + loopy_query_modes:
         ds.config.add(
             'datalad.search.index-{}-documenttype'.format(m), 'all',
             where='dataset')
@@ -284,6 +288,12 @@ type
          'audio\.+:mp3',
          opj('stim', 'stim1.mp3'),
          {'audio.format': 'mp3'}),
+        ## pyeval
+        ('pyeval',
+         'audio["format"].endswith("mp3")',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        ## textblob
         # random keyword query
         ('textblob',
          'mp3',
@@ -314,13 +324,19 @@ type
             # each file must report the ID of the dataset it is from, critical for
             # discovering related content
             dsid=ds.id)
-        # in egrep we currently do not search unique values
-        # and the queries above aim at files
-        assert_result_count(res, 1 if mode == 'egrep' else 2)
-        if mode != 'egrep':
+        assert_result_count(res, 1 if mode in loopy_query_modes else 2)
+        if mode in index_query_modes:
             assert_result_count(
                 res, 1, type='dataset', path=ds.path, dsid=ds.id)
         # test the key and specific value of the match
+        if mode == 'pyeval':
+            # TODO: ATM we do not provide "query_matched" since we do not even
+            #   know what has matched, and not sure if feasible to figure it
+            #   out.  Historical note: IIRC "query_matched" was introduced to
+            #   provide at least some resamblance to a user-friendly output of
+            #   original old "search" which would have output (and highlighted?)
+            #   fields which has matched the query.
+            continue
         for matched_key, matched_val in matched.items():
             assert_in(matched_key, res[-1]['query_matched'])
             assert_equal(res[-1]['query_matched'][matched_key], matched_val)
