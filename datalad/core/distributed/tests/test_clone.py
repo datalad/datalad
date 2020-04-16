@@ -779,8 +779,8 @@ def test_clone_unborn_head(path):
     (ds_origin.pathobj / "foo").write_text("content")
     ds_origin.save()
     ds_origin.repo.commit("c2", options=["--allow-empty"])
-    # Try to make git-annex branch is most recently updated ref so that we test
-    # that it is skipped.
+    # Try to make the git-annex branch the most recently updated ref so that we
+    # test that it is skipped.
     ds_origin.drop("foo", check=False)
     ds_origin.repo.checkout("master", options=["--orphan"])
 
