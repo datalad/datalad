@@ -707,23 +707,22 @@ def test_AnnexRepo_always_commit(path):
                        if commit.startswith('commit')])
     eq_(num_commits, 3)
 
-    repo.always_commit = False
-    repo.add(file2)
+    with patch.object(repo, "always_commit", False):
+        repo.add(file2)
 
-    # No additional git commit:
-    out, err = runner.run(['git', 'log', 'git-annex'])
-    num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split('\n')
-                       if commit.startswith('commit')])
-    eq_(num_commits, 3)
+        # No additional git commit:
+        out, err = runner.run(['git', 'log', 'git-annex'])
+        num_commits = len([commit
+                           for commit in out.rstrip(os.linesep).split('\n')
+                           if commit.startswith('commit')])
+        eq_(num_commits, 3)
 
-    out, err = repo._run_annex_command('log')
+        out, err = repo._run_annex_command('log')
 
-    # And we see only the file before always_commit was set to false:
-    assert_in(file1, out)
-    assert_not_in(file2, out)
+        # And we see only the file before always_commit was set to false:
+        assert_in(file1, out)
+        assert_not_in(file2, out)
 
-    repo.always_commit = True
     # With always_commit back to True, do something that will trigger a commit
     # on the annex branches.
     repo.sync()
