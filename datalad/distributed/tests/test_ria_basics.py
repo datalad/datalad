@@ -168,7 +168,7 @@ def _test_initremote_rewrite(host, ds_path, store):
 
     if host:
         replacement = "ria+ssh://{host}{path}".format(host=host,
-                                              path=store)
+                                                      path=store)
     else:
         replacement = "ria+{}".format(store.as_uri())
 

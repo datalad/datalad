@@ -21,7 +21,8 @@ from datalad.tests.utils import (
 )
 
 
-common_init_opts = ["encryption=none", "type=external", "externaltype=ora"]
+common_init_opts = ["encryption=none", "type=external", "externaltype=ora",
+                    "autoenable=true"]
 
 example_payload = {
     'one.txt': 'content1',
