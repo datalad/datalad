@@ -682,7 +682,12 @@ def test_AnnexRepo_get_file_backend(src, dst):
 def test_AnnexRepo_always_commit(path):
 
     repo = AnnexRepo(path)
-    runner = Runner(cwd=path)
+
+    def get_annex_commit_counts():
+        return len(repo.get_revisions("git-annex"))
+
+    n_annex_commits_initial = get_annex_commit_counts()
+
     file1 = get_most_obscure_supported_name() + "_1"
     file2 = get_most_obscure_supported_name() + "_2"
     with open(opj(path, file1), 'w') as f:
@@ -701,21 +706,13 @@ def test_AnnexRepo_always_commit(path):
     # check git log of git-annex branch:
     # expected: initial creation, update (by annex add) and another
     # update (by annex log)
-    out, err = runner.run(['git', 'log', 'git-annex'])
-    num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split('\n')
-                       if commit.startswith('commit')])
-    eq_(num_commits, 3)
+    eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
     with patch.object(repo, "always_commit", False):
         repo.add(file2)
 
         # No additional git commit:
-        out, err = runner.run(['git', 'log', 'git-annex'])
-        num_commits = len([commit
-                           for commit in out.rstrip(os.linesep).split('\n')
-                           if commit.startswith('commit')])
-        eq_(num_commits, 3)
+        eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
         out, err = repo._run_annex_command('log')
 
@@ -732,11 +729,7 @@ def test_AnnexRepo_always_commit(path):
     assert_in(file2, out)
 
     # Now git knows as well:
-    out, err = runner.run(['git', 'log', 'git-annex'])
-    num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split('\n')
-                       if commit.startswith('commit')])
-    eq_(num_commits, 4)
+    eq_(get_annex_commit_counts(), n_annex_commits_initial + 2)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:445
