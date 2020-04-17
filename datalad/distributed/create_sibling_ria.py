@@ -517,7 +517,7 @@ def _create_sibling_ria(
         if ssh_host:
             ssh('mkdir -p {}'.format(quote_cmdlinearg(str(repo_path))))
         else:
-            repo_path.mkdir(parents=True)
+            repo_path.mkdir(parents=True)  # TODO: exist_ok?
 
     # 2. create a bare repository in-store:
 
@@ -559,8 +559,7 @@ def _create_sibling_ria(
             ssh(chgrp_cmd)
     else:
         gr = GitRepo(repo_path, create=True, bare=True,
-                     shared=" --shared='{}'".format(quote_cmdlinearg(shared))
-                     if shared else None)
+                     shared=shared if shared else None)
         if storage_sibling:
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
