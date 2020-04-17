@@ -910,3 +910,21 @@ def test_clone_unborn_head_sub(path):
     ds_cloned_sub = ds_cloned.get(
         "sub", result_xfm="datasets", return_type="item-or-list")
     eq_(ds_cloned_sub.repo.get_active_branch(), "other")
+
+
+@skip_if_no_network
+@with_tempfile
+def test_gin_cloning(path):
+    # can we clone a public ds anoynmously from gin and retrieve content
+    ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
+    ok_(ds.is_installed())
+    annex_path = op.join('annex', 'two')
+    git_path = op.join('git', 'one')
+    eq_(ds.repo.file_has_content(annex_path), False)
+    eq_(ds.repo.is_under_annex(git_path), False)
+    result = ds.get(annex_path)
+    assert_result_count(result, 1)
+    assert_status('ok', result)
+    eq_(result[0]['path'], op.join(ds.path, annex_path))
+    ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
+    ok_file_has_content(op.join(ds.path, git_path), 'one\n')
