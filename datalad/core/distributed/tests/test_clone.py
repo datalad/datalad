@@ -872,9 +872,15 @@ def test_ria_postclonecfg():
 
         # test cloning via ria+file://
         yield _test_ria_postclonecfg, Path(store).as_uri(), id
-        # test cloning via ria+http://
-        with HTTPPath(store) as url:
-            yield _test_ria_postclonecfg, url, id
+
+        # Note: HTTP disabled for now. Requires proper implementation in ORA
+        #       remote. See
+        # https://github.com/datalad/datalad/pull/4203#discussion_r410284649
+
+        # # test cloning via ria+http://
+        # with HTTPPath(store) as url:
+        #     yield _test_ria_postclonecfg, url, id
+
         # test cloning via ria+ssh://
         yield skip_ssh(_test_ria_postclonecfg), \
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id

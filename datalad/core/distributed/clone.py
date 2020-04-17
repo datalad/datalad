@@ -613,12 +613,7 @@ def postclonecfg_ria(ds, props):
             #     lgr.debug("Failed to get config file from source:\n%s",
             #               exc_str(e))
 
-            # config_content still None should lead to skip everything special
-            # remote related. Instead enable origin to deliver annex keys via
-            # HTTP:
-            lgr.debug("Trying to enable remote origin for git-annex")
-            ds.repo.enable_remote('origin')
-            ds.repo.fsck(remote='origin', fast=True)
+            lgr.debug("No ORA reconfiguration for HTTP implemented yet")
 
         elif scheme == 'ssh':
 
@@ -650,8 +645,8 @@ def postclonecfg_ria(ds, props):
                 lgr.debug("Failed to get config file from source:\n%s",
                           e)
         else:
-            lgr.debug("Unknown URL-Scheme in %s. Can handle HTTP, SSH or FILE.",
-                      props['source'])
+            lgr.debug("Unknown URL-Scheme in %s. Can currently handle SSH or "
+                      "FILE scheme URLs.", props['source'])
 
         # 3. And read it
         org_uuid = None
