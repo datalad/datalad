@@ -402,9 +402,14 @@ def _test_gitannex(host, store, dspath):
     )
 
 
-def test_gitannex():
-    yield turtle(skip_ssh(_test_gitannex)), 'datalad-test'
-    yield _test_gitannex, None
+@turtle
+@skip_ssh
+def test_gitannex_ssh():
+    _test_gitannex('datalad-test')
+
+
+def test_gitannex_local():
+    _test_gitannex()
 
 
 @with_tempfile
