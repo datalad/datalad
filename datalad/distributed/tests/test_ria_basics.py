@@ -253,7 +253,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
     whereis = ds.repo.whereis('one.txt')
     dsgit_dir, archive_dir, dsobj_dir = \
         get_layout_locations(1, archiv_store, ds.id)
-    ds.ria_export_archive(archive_dir / 'archive.7z')
+    ds.ora_export_archive(archive_dir / 'archive.7z')
     init_opts = common_init_opts + ['url={}'.format(arch_url)]
     ds.repo.init_remote('archive', options=init_opts)
     # now fsck the new remote to get the new special remote indexed

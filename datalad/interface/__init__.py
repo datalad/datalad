@@ -75,8 +75,8 @@ _group_misc = (
         ('datalad.core.local.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
         ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
-        ('datalad.distributed.ria_export_archive', 'RIAExportArchive',
-         'ria-export-archive')
+        ('datalad.distributed.ora_export_archive', 'ORAExportArchive',
+         'ora-export-archive')
     ])
 
 _group_plumbing = (
