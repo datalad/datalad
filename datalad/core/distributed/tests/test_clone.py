@@ -869,24 +869,48 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
 @with_tempfile(mkdir=True)
 def test_clone_unborn_head(path):
     ds_origin = Dataset(op.join(path, "a")).create()
-    ds_origin.repo.call_git(["branch", "-m", "master", "abc"])
-    ds_origin.repo.commit("c0", options=["--allow-empty"])
-    ds_origin.repo.commit("c1", options=["--allow-empty"])
-    ds_origin.repo.call_git(["checkout", "-b", "chooseme", "abc~2"])
-    (ds_origin.pathobj / "foo").write_text("content")
-    ds_origin.save()
-    ds_origin.repo.commit("c2", options=["--allow-empty"])
-    # Try to make git-annex branch is most recently updated ref so that we test
-    # that it is skipped.
-    ds_origin.drop("foo", check=False)
+    repo = ds_origin.repo
+    managed = repo.is_managed_branch()
+
+    # The setup below is involved, mostly because it's accounting for adjusted
+    # branches. The scenario itself isn't so complicated, though:
+    #
+    #   * a checked out master branch with no commits
+    #   * a (potentially adjusted) "abc" branch with commits.
+    #   * a (potentially adjusted) "chooseme" branch whose tip commit has a
+    #     more recent commit than any in "abc".
+    (ds_origin.pathobj / "foo").write_text("foo content")
+    ds_origin.save(message="foo")
+    for res in repo.for_each_ref_(fields="refname"):
+        ref = res["refname"]
+        if "master" in ref:
+            repo.update_ref(ref.replace("master", "abc"), ref)
+            repo.call_git(["update-ref", "-d", ref])
+    repo.update_ref("HEAD",
+                    "refs/heads/{}".format(
+                        "adjusted/abc(unlocked)" if managed else "abc"),
+                    symbolic=True)
+    repo.call_git(["checkout", "-b", "chooseme", "abc~1"])
+    if managed:
+        repo.adjust()
+    (ds_origin.pathobj / "bar").write_text("bar content")
+    ds_origin.save(message="bar")
+    # Try to make the git-annex branch the most recently updated ref so that we
+    # test that it is skipped.
+    ds_origin.drop("bar", check=False)
     ds_origin.repo.checkout("master", options=["--orphan"])
 
     ds = clone(ds_origin.path, op.join(path, "b"))
     # We landed on the branch with the most recent commit, ignoring the
     # git-annex branch.
-    eq_(ds.repo.get_active_branch(), "chooseme")
+    branch = ds.repo.get_active_branch()
+    eq_(ds.repo.get_corresponding_branch(branch) or branch,
+        "chooseme")
     eq_(ds_origin.repo.get_hexsha("chooseme"),
         ds.repo.get_hexsha("chooseme"))
+    # In the context of this test, the clone should be on an adjusted branch if
+    # the source landed there initially because we're on the same file system.
+    eq_(managed, ds.repo.is_managed_branch())
 
 
 @with_tempfile(mkdir=True)
@@ -902,6 +926,7 @@ def test_clone_unborn_head_no_other_ref(path):
 def test_clone_unborn_head_sub(path):
     ds_origin = Dataset(op.join(path, "a")).create()
     ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
+    managed = ds_origin_sub.repo.is_managed_branch()
     ds_origin_sub.repo.call_git(["branch", "-m", "master", "other"])
     ds_origin.save()
     ds_origin_sub.repo.checkout("master", options=["--orphan"])
@@ -909,7 +934,13 @@ def test_clone_unborn_head_sub(path):
     ds_cloned = clone(source=ds_origin.path, path=op.join(path, "b"))
     ds_cloned_sub = ds_cloned.get(
         "sub", result_xfm="datasets", return_type="item-or-list")
-    eq_(ds_cloned_sub.repo.get_active_branch(), "other")
+
+    branch = ds_cloned_sub.repo.get_active_branch()
+    eq_(ds_cloned_sub.repo.get_corresponding_branch(branch) or branch,
+        "other")
+    # In the context of this test, the clone should be on an adjusted branch if
+    # the source landed there initially because we're on the same file system.
+    eq_(managed, ds_cloned_sub.repo.is_managed_branch())
 
 
 @skip_if_no_network
