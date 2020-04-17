@@ -150,7 +150,7 @@ def test_url_eq():
 
 def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     """just a helper to carry out few checks on urls"""
-    with swallow_logs(new_level=logging.DEBUG) as cml:
+    with swallow_logs(new_level=5) as cml:
         ri_ = cls(**fields)
         murl = RI(ri)
         eq_(murl.__class__, cls)  # not just a subclass
@@ -321,13 +321,15 @@ def test_url_samples():
 
     # actually this one is good enough to trigger a warning and I still don't know
     # what it should exactly be!?
-    with swallow_logs(new_level=logging.DEBUG) as cml:
+    with swallow_logs(new_level=5) as cml:
         weired_str = 'weired://'
         weired_url = RI(weired_str)
         repr(weired_url)
         cml.assert_logged(
             'Parsed version of SSHRI .weired:/. '
-            'differs from original .weired://.'
+            'differs from original .weired://.',
+            level="Level 5",
+            match=False
         )
         # but we store original str
         eq_(str(weired_url), weired_str)
