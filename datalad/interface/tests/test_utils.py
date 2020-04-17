@@ -417,6 +417,14 @@ def test_utils_suppress_similar():
         assert_not_in("path10", cmo.out)
         assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
 
+    with _swallow_outputs() as cmo:
+        list(tu(13, result_fn=n_foo, result_renderer="default"))
+        assert_not_in("path10", cmo.out)
+        # We see an update for each result.
+        assert_re_in(r"1 .* suppressed", cmo.out, match=False)
+        assert_re_in(r"2 .* suppressed", cmo.out, match=False)
+        assert_re_in(r"3 .* suppressed", cmo.out, match=False)
+
     with _swallow_outputs(isatty=False) as cmo:
         list(tu(11, result_fn=n_foo, result_renderer="default"))
         assert_in("path10", cmo.out)

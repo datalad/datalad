@@ -514,7 +514,7 @@ def default_result_renderer(res):
                 if res.get('message', None) else ''))
 
 
-def _display_suppressed_message(nsimilar, ndisplayed):
+def _display_suppressed_message(nsimilar, ndisplayed, final=False):
     # +1 because there was the original result + nsimilar displayed.
     n_suppressed = nsimilar - ndisplayed + 1
     if n_suppressed > 0:
@@ -522,7 +522,8 @@ def _display_suppressed_message(nsimilar, ndisplayed):
                    .format(n_suppressed,
                            single_or_plural("message has",
                                             "messages have",
-                                            n_suppressed, False)))
+                                            n_suppressed, False)),
+                   cr="\n" if final else "\r")
 
 
 def _process_results(
@@ -598,11 +599,15 @@ def _process_results(
                 result_repetitions += 1
                 if result_repetitions < render_n_repetitions:
                     default_result_renderer(res)
+                else:
+                    _display_suppressed_message(
+                        result_repetitions, render_n_repetitions)
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
                 _display_suppressed_message(
-                    result_repetitions, render_n_repetitions)
+                    result_repetitions, render_n_repetitions,
+                    final=True)
                 default_result_renderer(res)
                 result_repetitions = 0
             last_result = trimmed_result
@@ -638,7 +643,7 @@ def _process_results(
         yield res
     # make sure to report on any issues that we had suppressed
     _display_suppressed_message(
-        result_repetitions, render_n_repetitions)
+        result_repetitions, render_n_repetitions, final=True)
 
 
 def keep_result(res, rfilter, **kwargs):
