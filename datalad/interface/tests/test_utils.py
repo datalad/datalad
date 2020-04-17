@@ -10,7 +10,7 @@
 
 """
 
-
+from contextlib import contextmanager
 import logging
 from os.path import (
     exists,
@@ -381,6 +381,14 @@ def test_discover_ds_trace(path, otherdir):
         assert_dict_equal(spec, goal)
 
 
+@contextmanager
+def _swallow_outputs(isatty=True):
+    with swallow_outputs() as cmo:
+        stdout = cmo.handles[0]
+        stdout.isatty = lambda: isatty
+        yield cmo
+
+
 def test_utils_suppress_similar():
     tu = TestUtils()
 
@@ -393,20 +401,25 @@ def test_utils_suppress_similar():
                        status="ok",
                        path="path{}".format(i))
 
-    with swallow_outputs() as cmo:
+    with _swallow_outputs() as cmo:
+        cmo.isatty = lambda: True
         list(tu(9, result_fn=n_foo, result_renderer="default"))
         assert_in("path8", cmo.out)
         assert_not_in("suppressed", cmo.out)
 
-    with swallow_outputs() as cmo:
+    with _swallow_outputs() as cmo:
         list(tu(10, result_fn=n_foo, result_renderer="default"))
         assert_in("path9", cmo.out)
         assert_not_in("suppressed", cmo.out)
 
-    with swallow_outputs() as cmo:
+    with _swallow_outputs() as cmo:
         list(tu(11, result_fn=n_foo, result_renderer="default"))
         assert_not_in("path10", cmo.out)
         assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
+
+    with _swallow_outputs(isatty=False) as cmo:
+        list(tu(11, result_fn=n_foo, result_renderer="default"))
+        assert_in("path10", cmo.out)
 
     # Check a chain of similar messages, split in half by a distinct one.
 
@@ -421,13 +434,13 @@ def test_utils_suppress_similar():
                            status="ok",
                            path="path")
 
-    with swallow_outputs() as cmo:
+    with _swallow_outputs() as cmo:
         list(tu(20, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
         assert_in("path10", cmo.out)
         assert_in("path19", cmo.out)
         assert_not_in("suppressed", cmo.out)
 
-    with swallow_outputs() as cmo:
+    with _swallow_outputs() as cmo:
         list(tu(21, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
         assert_in("path10", cmo.out)
         assert_not_in("path20", cmo.out)

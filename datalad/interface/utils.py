@@ -546,7 +546,7 @@ def _process_results(
     # counter for detected repetitions
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
-    render_n_repetitions = 10
+    render_n_repetitions = 10 if sys.stdout.isatty() else float("inf")
 
     for res in results:
         if not res or 'action' not in res:
