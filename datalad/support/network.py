@@ -443,13 +443,13 @@ class RI(object):
         self._set_from_fields(**fields)
 
         # If was initialized from a string representation
-        if self._str is not None:
+        if lgr.isEnabledFor(5) and self._str is not None:
             # well -- some ris might not unparse identically back
             # strictly speaking, but let's assume they do
             ri_ = self.as_str()
             if ri != ri_:
-                lgr.debug("Parsed version of %s %r differs from original %r",
-                          self.__class__.__name__, ri_, ri)
+                lgr.log(5, "Parsed version of %s %r differs from original %r",
+                        self.__class__.__name__, ri_, ri)
 
     @classmethod
     def _get_blank_fields(cls, **fields):
