@@ -582,20 +582,19 @@ def postclonecfg_ria(ds, props):
     # and was enabled (there could be RIA stores that actually only have repos)
     # make this function be a generator
     ria_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
-                   if s.get('annex-externaltype', None) == 'ora'
-    ]
+                   if s.get('annex-externaltype', None) == 'ora']
     if not ria_remotes:
         # nothing autoenabled. Let's check origin's config for
         # datalad.ora-remote.uuid as stored by create-sibling-ria and enable try
         # enabling that one.
-        lgr.debug("Found no autoenabled ORA special remote. Trying to look it"
+        lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
                   "up in source config ...")
 
         # First figure whether we cloned via SSH, HTTP or local path and then
         # get that config file the same way:
 
         config_content = None
-        scheme = props['source'].split(':')[0][4:]
+        scheme = props['source'].split(':')[0][len("ria+"):]
         if scheme == 'http':
 
             # Note: Following outcommented code was proof how to check via HTTP.
@@ -633,12 +632,10 @@ def postclonecfg_ria(ds, props):
             cfg_path = PurePosixPath(URL(props['giturl']).path) / 'config'
             op = SSHRemoteIO(props['giturl'])
             try:
-                # TODO: double-check path
-                response = op.read_file(cfg_path)
-                config_content = response
+                config_content = op.read_file(cfg_path)
             except RIARemoteError as e:
-                lgr.debug("Failed to get config file from source:\n%s",
-                          exc_str(e))
+                lgr.debug("Failed to get config file from source: %s",
+                          e)
 
         elif scheme == 'file':
 
@@ -648,15 +645,13 @@ def postclonecfg_ria(ds, props):
             from datalad.support.network import URL
             cfg_path = Path(URL(props['giturl']).localpath) / 'config'
             try:
-                # TODO: double-check path
-                response = op.read_file(cfg_path)
-                config_content = response
-            except RIARemoteError as e:
+                config_content = op.read_file(cfg_path)
+            except (RIARemoteError, OSError) as e:
                 lgr.debug("Failed to get config file from source:\n%s",
-                          exc_str(e))
+                          e)
         else:
-            lgr.debug("Unknown URL-Scheme in %s. Can handle HTTP, SSH or FILE."
-                      "", props['source'])
+            lgr.debug("Unknown URL-Scheme in %s. Can handle HTTP, SSH or FILE.",
+                      props['source'])
 
         # 3. And read it
         org_uuid = None
@@ -679,33 +674,50 @@ def postclonecfg_ria(ds, props):
                     org_uuid = result['stdout'].strip()
                 except CommandError:
                     # doesn't contain what we are looking for
-                    lgr.debug("Found nothing in source config.")
+                    lgr.debug("Found no UUID for ORA special remote at "
+                              "'origin'")
 
         # Now, enable it. If annex-init didn't fail to enable it as stored, we
         # wouldn't end up here, so enable with store URL as suggested by the URL
         # we cloned from.
         if org_uuid:
             srs = ds.repo.get_special_remotes()
+            if org_uuid in srs.keys():
+                # TODO: - Double-check autoenable value and only do this when
+                #         true?
+                #       - What if still fails? -> Annex shouldn't change config
+                #         in that case
 
-            # TODO: - Double-check autoenable value and only do this when true?
-            #       - What if still fails? -> Annex shouldn't change config in
-            #         that case
-
-            new_url = props['source'].split('#')[0]  # we only need the store
-            ds.repo.enable_remote(srs[org_uuid]['name'],
-                                  options=['url={}'.format(new_url)]
-                                  )
-
-    elif len(ria_remotes) == 1:
-        yield from ds.siblings('configure',
-                               name='origin',
-                               publish_depends=ria_remotes[0]['name'],
-                               result_filter=None,
-                               result_renderer='disabled')
-    else:
-        lgr.warning("Found multiple ORA remotes. Couldn't decide which "
-                    "publishing to origin should depend on: %s",
-                    [r['name'] for r in ria_remotes])
+                # we only need the store:
+                new_url = props['source'].split('#')[0]
+                try:
+                    ds.repo.enable_remote(srs[org_uuid]['name'],
+                                          options=['url={}'.format(new_url)]
+                                          )
+                    # update ria_remotes for considering publication dependency
+                    # below
+                    ria_remotes = [s for s in
+                                   ds.siblings('query',
+                                               result_renderer='disabled')
+                                   if s.get('annex-externaltype', None) ==
+                                   'ora']
+                except CommandError as e:
+                    lgr.debug("Failed to reconfigure ORA special remote: %s",
+                              e)
+            else:
+                lgr.debug("Unknown ORA special remote uuid at 'origin': %s",
+                          org_uuid)
+    if ria_remotes:
+        if len(ria_remotes) == 1:
+            yield from ds.siblings('configure',
+                                   name='origin',
+                                   publish_depends=ria_remotes[0]['name'],
+                                   result_filter=None,
+                                   result_renderer='disabled')
+        else:
+            lgr.warning("Found multiple ORA remotes. Couldn't decide which "
+                        "publishing to origin should depend on: %s",
+                        [r['name'] for r in ria_remotes])
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None):
