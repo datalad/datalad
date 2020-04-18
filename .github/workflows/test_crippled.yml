@@ -40,11 +40,11 @@ jobs:
       run: |
         datalad wtf
         mount
-    - name: Run benchmarks
+    - name: Run on crippled FS
       env:
         # forces all test repos/paths into the VFAT FS
         TMPDIR: /crippledfs
       run: |
         mkdir -p __testhome__
         cd __testhome__
-        python -m nose -s -v datalad.core datalad.local datalad.distributed
+        python -m nose -s -v -A "not (turtle)" datalad.core datalad.local datalad.distributed
