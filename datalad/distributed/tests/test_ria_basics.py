@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_true,
     skip_ssh,
+    slow,
     swallow_logs,
     turtle,
     with_tempfile
@@ -408,8 +409,9 @@ def test_gitannex_ssh():
     _test_gitannex('datalad-test')
 
 
+@slow
 def test_gitannex_local():
-    _test_gitannex()
+    _test_gitannex(None)
 
 
 @with_tempfile
@@ -460,5 +462,5 @@ def _test_binary_data(host, store, dspath):
 
 
 def test_binary_data():
-    yield skip_ssh(_test_gitannex), 'datalad-test'
-    yield _test_gitannex, None
+    yield skip_ssh(_test_binary_data), 'datalad-test'
+    yield _test_binary_data, None
