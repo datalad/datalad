@@ -21,6 +21,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_status,
     assert_true,
+    has_symlink_capability,
     skip_ssh,
     slow,
     swallow_logs,
@@ -124,19 +125,21 @@ def _test_initremote_basic(host, ds_path, store, link):
                   ['url=ria+file:///non-existing']
                   )
     # but re-configure with valid URL should work
-    link.symlink_to(store)
-    new_url = 'ria+{}'.format(link.as_uri())
-    ds.repo.call_git(['annex', 'enableremote', 'ria-remote'] +
-                     common_init_opts +
-                     ['url={}'.format(new_url)])
-    # git-annex:remote.log should have:
-    #   - url
-    #   - common_init_opts
-    #   - archive_id (which equals ds id)
-    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
-    assert_in("url={}".format(new_url), remote_log)
-    [assert_in(c, remote_log) for c in common_init_opts]
-    assert_in("archive-id={}".format(ds.id), remote_log)
+    if has_symlink_capability():
+        link.symlink_to(store)
+        new_url = 'ria+{}'.format(link.as_uri())
+        ds.repo.call_git(['annex', 'enableremote', 'ria-remote'] +
+                         common_init_opts +
+                         ['url={}'.format(new_url)])
+        # git-annex:remote.log should have:
+        #   - url
+        #   - common_init_opts
+        #   - archive_id (which equals ds id)
+        remote_log = ds.repo.call_git(['cat-file', 'blob',
+                                       'git-annex:remote.log'])
+        assert_in("url={}".format(new_url), remote_log)
+        [assert_in(c, remote_log) for c in common_init_opts]
+        assert_in("archive-id={}".format(ds.id), remote_log)
 
     # TODO: - check output of failures to verify it's failing the right way
     #       - might require to run initremote directly to get the output
