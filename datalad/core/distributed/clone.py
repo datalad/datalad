@@ -592,9 +592,8 @@ def postclonecfg_ria(ds, props):
 
         # First figure whether we cloned via SSH, HTTP or local path and then
         # get that config file the same way:
-
         config_content = None
-        scheme = props['source'].split(':')[0][len("ria+"):]
+        scheme = props['giturl'].split(':')[0]
         if scheme == 'http':
 
             # Note: Following outcommented code was proof how to check via HTTP.
