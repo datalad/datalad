@@ -758,8 +758,10 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
     with swallow_logs(new_level=logging.INFO) as cml:
         # First, the super ds:
         riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
-        cml.assert_logged(msg=r".*sibling store-storage not auto-enabled.*",
-                          level="INFO")
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
 
     # However, we now can retrieve content since clone should have enabled the
     # special remote with new URL (or origin in case of HTTP).
@@ -777,8 +779,10 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
         riaclonesub = riaclone.get(
             op.join('subdir', 'subds'), get_data=False,
             result_xfm='datasets', return_type='item-or-list')
-        cml.assert_logged(msg=r".*sibling store-storage not auto-enabled.*",
-                          level="INFO")
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
     res = riaclonesub.get('testsub.txt')
     assert_result_count(res, 1,
                         status='ok',
