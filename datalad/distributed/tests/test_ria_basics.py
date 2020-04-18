@@ -448,17 +448,22 @@ def _test_binary_data(host, store, dspath):
     # Note, that we intentionally call annex commands instead of
     # datalad-publish/-get here. We are testing an annex-special-remote.
 
-    known_sources = [r['name'] for r in ds.repo.whereis(str(file))]
-    assert_in('here', known_sources)
-    assert_not_in('store', known_sources)
+    store_uuid = ds.siblings(name='store',
+                             return_type='item-or-list')['annex-uuid']
+    here_uuid = ds.siblings(name='here',
+                            return_type='item-or-list')['annex-uuid']
+
+    known_sources = ds.repo.whereis(str(file))
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
     ds.repo.call_git(['annex', 'move', str(file), '--to', 'store'])
-    known_sources = [r['name'] for r in ds.repo.whereis(str(file))]
-    assert_not_in('here', known_sources)
-    assert_in('store', known_sources)
+    known_sources = ds.repo.whereis(str(file))
+    assert_not_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
     ds.repo.call_git(['annex', 'get', str(file), '--from', 'store'])
-    known_sources = [r['name'] for r in ds.repo.whereis(str(file))]
-    assert_in('here', known_sources)
-    assert_in('store', known_sources)
+    known_sources = ds.repo.whereis(str(file))
+    assert_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
 
 
 def test_binary_data():
