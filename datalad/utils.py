@@ -1501,7 +1501,7 @@ _pwd_mode = None
 def _switch_to_getcwd(msg, *args):
     global _pwd_mode
     _pwd_mode = 'cwd'
-    lgr.warning(
+    lgr.debug(
         msg + ". From now on will be returning os.getcwd(). Directory"
                " symlinks in the paths will be resolved",
         *args
