@@ -377,7 +377,7 @@ def test_getpwd_change_mode(tdir):
     # The evil plain chdir call
     os.chdir(tdir)
     # Just testing the logic of switching to cwd mode and issuing a warning
-    with swallow_logs(new_level=logging.WARNING) as cml:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
         pwd = getpwd()
         eq_(pwd, str(Path(pwd).resolve()))  # might have symlinks, thus realpath
     assert_in("symlinks in the paths will be resolved", cml.out)
