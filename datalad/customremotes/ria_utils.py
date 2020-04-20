@@ -114,6 +114,9 @@ def create_store(io, base_path, version):
             # Note, that a config flag after pipe symbol is fine.
             raise ValueError("Conflicting version found at target: {}"
                              "".format(existing_version))
+        else:
+            # already exists, recorded version fits - nothing to do
+            return
 
     # Note, that the following does create the base-path dir as well, since
     # mkdir has parents=True:
