@@ -16,7 +16,9 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- The value of `datalad.support.annexrep.N_AUTO_JOBS` is no longer
+  considered.  The variable will be removed in a later release.
+  ([#4409][])
 
 ### Fixes
 
@@ -25,13 +27,26 @@ bet we will fix some bugs and make a world even a better place.
   a subdataset.  This behavior is problematic for a few reasons and
   has been reverted.  ([#4375][])
 
+- The default for the `--jobs` option, "auto", instructed DataLad to
+  pass a value to git-annex's `--jobs` equal to `min(8, max(3, <number
+  of CPUs>))`, which could lead to issues due to the large number of
+  child processes spawned and file descriptors opened.  To avoid this
+  behavior, `--jobs=auto` now results in git-annex being called with
+  `--jobs=1` by default.  Configure the new option
+  `datalad.runtime.max-annex-jobs` to control the maximum value that
+  will be considered when `--jobs='auto'`.  ([#4409][])
+
 - Various commands have been adjusted to better handle the case where
   a remote's HEAD ref points to an unborn branch.  ([#4370][])
 
-- [search] `--show-keys short` gave incorrect information about the
-  number of unhashable entries.  This issue has been addressed by
-  using the `repr` of values rather than reporting on unhashable
-  entries.  ([#4354][])
+- [search]
+  - learned to use the query as a regular expression that restricts
+    the keys that are shown for `--show-keys short`. ([#4354][])
+  - gives a more helpful message when query is an invalid regular
+    expression.  ([#4398][])
+
+- The code for parsing Git configuration did not follow Git's behavior
+  of accepting a key with no value as shorthand for key=true.  ([#4421][])
 
 ### Enhancements and new features
 
@@ -2518,3 +2533,6 @@ publishing
 [#4367]: https://github.com/datalad/datalad/issues/4367
 [#4370]: https://github.com/datalad/datalad/issues/4370
 [#4375]: https://github.com/datalad/datalad/issues/4375
+[#4398]: https://github.com/datalad/datalad/issues/4398
+[#4409]: https://github.com/datalad/datalad/issues/4409
+[#4421]: https://github.com/datalad/datalad/issues/4421
