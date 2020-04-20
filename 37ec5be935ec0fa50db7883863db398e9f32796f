@@ -1,0 +1,28 @@
+Update 0.12.5-19-g572b087ea1:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    572b087ea1231c0ee2ad6693aad0251093bff31a..a271d5259fae391aeed5e4510782da584c3e9d46
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4386 from kyleam/sphinx-lexer-class
+   14faab4ad3^-1
+-  Merge pull request #4399 from yarikoptic/enh-strip-skipped
+   964b10d0e4^-1
++  Merge pull request #4398 from yarikoptic/enh-wrong-re
+   aa2da5c316^-1
+-  Merge pull request #4405 from kyleam/annexrepo-always-commit
+   d667d1232d^-1
+-  Merge pull request #4407 from kyleam/unborn-adjusted
+   6b8493b9df^-1
+-  Merge pull request #4423 from kyleam/ri-str-cast
+   3fff632b68^-1
++  Merge pull request #4421 from yarikoptic/bf-bool-novalue
+   f6d9561b7d^-1
++  Merge pull request #4409 from mih/bf-4404
+   a271d5259f^-1
