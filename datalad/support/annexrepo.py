@@ -98,8 +98,9 @@ from .exceptions import (
 
 lgr = logging.getLogger('datalad.annex')
 
-# Limit to # of CPUs and up to 8, but at least 3 to start with
-N_AUTO_JOBS = min(8, max(3, cpu_count()))
+# TODO Constant is no longer used, but left defined to avoid breakage in
+# dependent code. Remove in 0.14 release.
+N_AUTO_JOBS = 1
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -299,6 +300,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
+
+        # will be evaluated lazily
+        self._n_auto_jobs = None
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
@@ -2144,7 +2148,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             annex_options += ['--json-progress']
 
         if jobs == 'auto':
-            jobs = N_AUTO_JOBS
+            # Limit to # of CPUs (but at least 3 to start with)
+            # and also an additional config constraint (by default 1
+            # due to https://github.com/datalad/datalad/issues/4404)
+            jobs = self._n_auto_jobs or min(
+                self.config.obtain('datalad.runtime.max-annex-jobs'),
+                max(3, cpu_count()))
+            # cache result to avoid repeated calls to cpu_count()
+            self._n_auto_jobs = jobs
         if jobs and jobs != 1:
             annex_options += ['-J%d' % jobs]
         if opts:
