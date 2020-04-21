@@ -850,7 +850,7 @@ def _postclonetest_prepare(lcl, storepath, link):
                                 'autoenable=false'])
         d.push('.', to='store')
         store_loc, _, _ = get_layout_locations(1, storepath, d.id)
-        Runner(cwd=store_loc).run(['git', 'update-server-info'])
+        Runner(cwd=str(store_loc)).run(['git', 'update-server-info'])
 
     link.unlink()
     # We should now have a store with datasets that have an autoenabled ORA

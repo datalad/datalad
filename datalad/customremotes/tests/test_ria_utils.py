@@ -35,7 +35,7 @@ def _test_setup_store(io, store):
     assert_equal([f for f in error_logs.iterdir()], [])
 
     # empty target directory should work as well:
-    rmtree(store)
+    rmtree(str(store))
     store.mkdir(exist_ok=False)
     create_store(io, store, '1')
     assert_true(version_file.exists())
@@ -94,7 +94,7 @@ def _test_setup_ds_in_store(io, store):
     # Note: The only difference between version 1 and 2 are supposed to be the
     #       key paths (dirhashlower vs mixed), which has nothing to do with
     #       setup routine.
-    rmtree(store)
+    rmtree(str(store))
     create_store(io, store, '1')
     create_ds_in_store(io, store, dsid, '2', '1')
     for p in [ds_path, archives, objects]:
