@@ -289,6 +289,9 @@ class Clone(Interface):
                 yield r
 
 
+def clone_dataset_list(*args, **kwargs):
+    return list(clone_dataset(*args, **kwargs))
+
 def clone_dataset(
         srcs,
         destds,

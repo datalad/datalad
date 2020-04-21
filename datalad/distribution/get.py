@@ -71,7 +71,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.core.distributed.clone import clone_dataset
+from datalad.core.distributed.clone import clone_dataset, clone_dataset_list
 from datalad.distribution.utils import _get_flexible_source_candidates
 
 __docformat__ = 'restructuredtext'
@@ -437,36 +437,38 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
 
     # XXX the following should obtain subdatasets in parallel, but core-dumps
     #
-    #from concurrent.futures import (
-    #    ThreadPoolExecutor,
-    #    as_completed,
-    #)
+    from concurrent.futures import (
+       ThreadPoolExecutor,
+       ProcessPoolExecutor,
+       as_completed,
+    )
     #with ThreadPoolExecutor(max_workers=5) as executor:
-    #    clone_res = {
-    #        executor.submit(
-    #            clone_dataset,
-    #            urls,
-    #            sub['path'],
-    #            reckless=reckless,
-    #            description=description):
-    #        (sub, url_info, urls)
-    #        for sub, url_info, urls in to_install
-    #    }
-    #    for future in as_completed(clone_res):
-    #        ti = clone_res[future]
-    #        res = future.result()
-    #        # fixup and register all subdatasets in the parent, must be done
-    #        # in serial fashion to avoid locking issues
-    #        yield from _post_install_subds(
-    #            ds, res, ti[0]['path'], ti[1])
+    with ProcessPoolExecutor(max_workers=5) as executor:
+       clone_res = {
+           executor.submit(
+               clone_dataset_list,
+               urls,
+               sub['path'],
+               reckless=reckless,
+               description=description):
+           (sub, url_info, urls)
+           for sub, url_info, urls in to_install
+       }
+       for future in as_completed(clone_res):
+           ti = clone_res[future]
+           res = future.result()
+           # fixup and register all subdatasets in the parent, must be done
+           # in serial fashion to avoid locking issues
+           yield from _post_install_subds(
+               ds, res, ti[0]['path'], ti[1])
 
-    # serial instead
-    for sub, url_info, urls in to_install:
-        yield from clone_dataset(
-            urls,
-            sub['path'],
-            reckless=reckless,
-            description=description)
+    # # serial instead
+    # for sub, url_info, urls in to_install:
+    #     yield from clone_dataset(
+    #         urls,
+    #         sub['path'],
+    #         reckless=reckless,
+    #         description=description)
 
     # check and recurse, if needed
     for sub in chain((s[0] for s in to_install), to_recurse_only):
