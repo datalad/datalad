@@ -149,7 +149,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         return self._pathobj
 
     def __repr__(self):
-        return 'Dataset({})'.format(quote_cmdlinearg(self.path))
+        return 'Dataset({!r})'.format(self.path)
 
     def __eq__(self, other):
         if not hasattr(other, 'pathobj'):

@@ -1145,7 +1145,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self._cfg = None
 
     def __repr__(self):
-        return 'GitRepo({})'.format(quote_cmdlinearg(self.path))
+        return '{}({!r})'.format(self.__class__.__name__, self.path)
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
