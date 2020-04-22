@@ -227,7 +227,8 @@ class ProgressHandler(logging.Handler):
             # an update
             self.pbars[pid].update(
                 update,
-                increment=getattr(record, 'dlm_progress_increment', False))
+                increment=getattr(record, 'dlm_progress_increment', False),
+                total=getattr(record, 'dlm_progress_total', None))
             # Check for an updated label.
             label = getattr(record, 'dlm_progress_label', None)
             if label is not None:

@@ -260,8 +260,16 @@ try:
             if self._pbar is None:
                 self._pbar = self._tqdm(**self._pbar_params)
 
-        def update(self, size, increment=False):
+        def update(self, size, increment=False, total=None):
             self._create()
+            if total is not None:
+                # only a reset can change the total of an existing pbar
+                self._pbar.reset(total)
+                # we need to (re-)advance the pbar back to the old state
+                self._pbar.update(self.current)
+                # an update() does not (reliably) trigger a refresh, hence
+                # without the next, the pbar may still show zero progress
+                self._pbar.refresh()
             if not size:
                 return
             inc = size - self.current
