@@ -213,7 +213,9 @@ class ProgressHandler(logging.Handler):
             pbar = ui.get_progressbar(
                 label=getattr(record, 'dlm_progress_label', ''),
                 unit=getattr(record, 'dlm_progress_unit', ''),
-                total=getattr(record, 'dlm_progress_total', None))
+                total=getattr(record, 'dlm_progress_total', None,),
+                initial=getattr(record, 'dlm_progress_initial', 0)
+            )
             pbar.start()
             self.pbars[pid] = pbar
         elif update is None:
@@ -275,6 +277,8 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       To which quantity to advance the progress.
     increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
+    initial : int
+      If set, start value for progress bar
     noninteractive_level : int, optional
       When a level is specified here and progress is being logged
       non-interactively (i.e. without progress bars), do not log the message if

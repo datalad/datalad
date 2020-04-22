@@ -32,7 +32,7 @@ class ProgressBarBase(object):
         self.total = total
         self.unit = unit
         self.out = out
-        self._current = initial
+        self._current = self._initial = initial
 
     def refresh(self):
         """Force update"""
@@ -55,8 +55,8 @@ class ProgressBarBase(object):
         assert value >= 0, "Total cannot be negative"
         self._current = value
 
-    def start(self, initial=0):
-        self._current = initial
+    def start(self, initial=None):
+        self._current = initial if initial is not None else self._initial
 
     def finish(self, partial=False):
         """
@@ -210,7 +210,7 @@ try:
 
         def __init__(self, label='', fill_text=None,
                      total=None, unit='B', out=sys.stdout, leave=False,
-                     frontend=None):
+                     frontend=None, initial=0):
             """
 
             Parameters
@@ -223,8 +223,12 @@ try:
             leave
             frontend: (None, 'ipython'), optional
               tqdm module to use.  Could be tqdm_notebook if under IPython
+            initial: (0, int), where to start the progress bar
             """
-            super(tqdmProgressBar, self).__init__(label=label, total=total, unit=unit)
+            super(tqdmProgressBar, self).__init__(label=label,
+                                                  total=total,
+                                                  unit=unit,
+                                                  initial=initial)
 
             if frontend not in self._frontends:
                 raise ValueError(
@@ -248,7 +252,7 @@ try:
                 self._default_pbar_params,
                 dict(desc=label, unit=unit,
                      unit_scale=True, total=total, file=out,
-                     leave=leave
+                     leave=leave, initial=initial,
                      ))
             self._pbar = None
 
