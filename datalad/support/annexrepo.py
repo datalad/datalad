@@ -975,7 +975,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return srs
 
     def __repr__(self):
-        return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
+        return 'AnnexRepo({})'.format(quote_cmdlinearg(self.path))
 
     def _run_annex_command(self, annex_cmd,
                            git_options=None, annex_options=None,

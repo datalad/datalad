@@ -72,6 +72,7 @@ from datalad.utils import (
     ensure_dir,
     generate_file_chunks,
     ensure_unicode,
+    quote_cmdlinearg,
     split_cmdline,
 )
 
@@ -1144,7 +1145,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self._cfg = None
 
     def __repr__(self):
-        return "<GitRepo path=%s (%s)>" % (self.path, type(self))
+        return 'GitRepo({})'.format(quote_cmdlinearg(self.path))
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
