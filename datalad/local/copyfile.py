@@ -6,35 +6,33 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Copy files and their metadata (from one dataset to another)"""
+"""Copy files (from one dataset to another)"""
 
 __docformat__ = 'restructuredtext'
 
 
-import itertools
 import logging
 import os.path as op
 from shutil import copyfile
+import sys
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
 from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
 from datalad.support.param import Parameter
-from datalad.support.exceptions import CommandError
 from datalad.distribution.dataset import (
     Dataset,
     require_dataset,
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import GitRepo
 from datalad.utils import (
     assure_list,
     get_dataset_root,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -43,11 +41,11 @@ from datalad.distribution.dataset import (
     resolve_path,
 )
 
-lgr = logging.getLogger('datalad.local.copy')
+lgr = logging.getLogger('datalad.local.copyfiles')
 
 
 @build_doc
-class Copy(Interface):
+class CopyFile(Interface):
     """
     """
     _params_ = dict(
@@ -75,6 +73,14 @@ class Copy(Interface):
             metavar='DIRECTORY',
             doc="""copy all PATH arguments into DIRECTORY""",
             constraints=EnsureStr() | EnsureNone()),
+        specs_from=Parameter(
+            args=('--specs-from',),
+            metavar='SOURCE',
+            doc="""read list of source and destination path names from a given
+            file, or stdin (with '-'). Each line defines either a source
+            path, or a source/destination path pair (separated by a null byte
+            character).[PY:  Alternatively, a list of 2-tuples with
+            source/destination pairs can be given provided. PY]."""),
     )
 
     @staticmethod
@@ -85,7 +91,8 @@ class Copy(Interface):
             dataset=None,
             recursive=False,
             # TODO needs message
-            target_dir=None):
+            target_dir=None,
+            specs_from=None):
         # Concept
         #
         # Loosely model after the POSIX cp command
@@ -108,13 +115,17 @@ class Copy(Interface):
             target_dir = target = resolve_path(target_dir, dataset)
         else:
             # it must be the last item in the path list
-            if len(paths) < 2:
+            if len(paths) < 2 and not specs_from:
                 raise ValueError("No target directory was given to `copy`.")
             target = paths.pop(-1)
             # target could be a directory, or even an individual file
             if len(paths) > 2:
                 # must be a directory
                 target_dir = target
+                if specs_from:
+                    raise ValueError(
+                        "Multiple source paths AND a files-from specified, "
+                        "this is not supported.")
             else:
                 # single source, target be an explicit destination filename
                 target_dir = target if target.is_dir() else target.parent
@@ -123,22 +134,6 @@ class Copy(Interface):
             action='copy',
             logger=lgr,
         )
-
-        # warn about directory sources when there will be no recursion
-        if not recursive:
-            np = []
-            for src in paths:
-                if src.is_dir():
-                    yield dict(
-                        path=str(src),
-                        status='impossible',
-                        message='recursion not enabled, omitting directory',
-                        **res_kwargs
-                    )
-                else:
-                    np.append(src)
-            paths = np
-            del np
 
         target_ds = get_dataset_root(target_dir)
         if not target_ds:
@@ -151,18 +146,6 @@ class Copy(Interface):
             return
 
         target_ds = Dataset(target_ds)
-        target_repo = target_ds.repo
-
-        # TODO figure out when it is best to verify that a target AnnexRepo
-        # has a properly configured 'datalad' special remote setup
-
-        # lookup cache for dir to ds mappings
-        dir_cache = {
-            target_repo.pathobj: dict(
-                repo=target_repo,
-                srinfo=_extract_special_remote_info(target_repo)
-            ),
-        }
 
         if dataset:
             ds = require_dataset(dataset, check_installed=True,
@@ -178,39 +161,55 @@ class Copy(Interface):
                     **res_kwargs
                 )
                 return
-            dir_cache[ds.pathobj] = dict(ds=ds)
         else:
             ds = None
 
         lgr.debug('Attempt to copy files into %s', target_ds)
 
-        # make sure the target dir exists. We can use this to distinguish
-        # a file from a dir target later on
-
-        target_is_dir = target == target_dir
-
-        if target_is_dir:
-            # do it once upfront
-            target.mkdir(parents=True, exist_ok=True)
-
-        # get a space to place to be inject annex keys into
-        (target_ds.pathobj / '.git' / 'tmp' / 'datalad-copy').mkdir(
-            exist_ok=True, parents=True)
-
-        # TODO at the moment only a single destination repo is considered
-        # but eventually it should be possible to populate a nested
-        # hierarchy of datasets
+        # lookup cache for dir to repo mappings, and as a DB for cleaning
+        # things up
+        repo_cache = {}
+        # which paths to pass on to save
         to_save = []
-        for src, dest in itertools.chain.from_iterable(
-                _yield_src_dest(p, target, p.parent if p.is_dir() else None, recursive)
-                for p in paths):
-            for res in _copy_file(src, dest, target_repo, cache=dir_cache):
-                yield dict(
-                    res,
-                    **res_kwargs
-                )
-                if res.get('status', None) == 'ok':
-                    to_save.append(res['destination'])
+        try:
+            for src_path, dest_path in _yield_specs(
+                    specs_from if specs_from else paths):
+                src_path = Path(src_path)
+                dest_path = target_dir if dest_path is None else Path(dest_path)
+                if not recursive and src_path.is_dir():
+                    yield dict(
+                        path=str(src_path),
+                        status='impossible',
+                        message='recursion not enabled, omitting directory',
+                        **res_kwargs
+                    )
+                    continue
+
+                for src_file, dest_file in _yield_src_dest_filepaths(
+                        src_path, dest_path):
+                    for res in _copy_file(src_file, dest_file, cache=repo_cache):
+                        yield dict(
+                            res,
+                            **res_kwargs
+                        )
+                        if res.get('status', None) == 'ok':
+                            to_save.append(res['destination'])
+        finally:
+            # cleanup time
+            # TODO this could also be the place to stop lingering batch processes
+            done = set()
+            for _, repo_rec in repo_cache.items():
+                repo = repo_rec['repo']
+                if not repo or repo.pathobj in done:
+                    continue
+                tmp = repo_rec.get('tmp', None)
+                if tmp:
+                    try:
+                        tmp.rmdir()
+                    except OSError as e:
+                        lgr.warning(
+                            'Failed to clean up temporary directory: %s', e)
+                done.add(repo.pathobj)
 
         if not to_save:
             # nothing left to do
@@ -222,26 +221,80 @@ class Copy(Interface):
             recursive=False,
         )
 
-        # TODO cleanup tmp
 
-
-def _yield_src_dest(start, target, base, recursive):
-    if start.is_dir():
-        if recursive:
-            for p in start.iterdir():
-                yield from _yield_src_dest(p, target, base, recursive)
-        else:
-            # we hit a directory and are told to not recurse
-            return
+def _yield_specs(specs):
+    if specs == '-':
+        iter = sys.stdin
+    elif isinstance(specs, (list, tuple)):
+        iter = specs
     else:
-        # reflect src hierarchy if target is a directory, otherwise
-        yield start, target / (start.relative_to(base) if base else start.name)
+        iter = specs.open('r')
+
+    for spec in iter:
+        if isinstance(spec, (list, tuple)):
+            src = spec[0]
+            dest = spec[1]
+        elif isinstance(spec, Path):
+            src = spec
+            dest = None
+        else:
+            # deal with trailing newlines and such
+            spec = spec.rstrip()
+            spec = spec.split('\0')
+            src = spec[0]
+            dest = None if len(spec) == 1 else spec[1]
+        yield src, dest
 
 
-def _copy_file(src, dest, dest_repo, cache):
+def _yield_src_dest_filepaths(src, dest, src_base=None):
+    """Yield src/dest path pairs
+
+    Parameters
+    ----------
+
+    src : Path
+      Source file or directory. If a directory, yields files from this
+      directory recursively.
+    dest : Path
+      Destination path. Either a complete file path, or a base directory
+      (see `src_base`).
+    src_base : Path
+      If given, the destination path will be `dest`/`src.relative_to(src_base)`
+
+    Yields
+    ------
+    src, dest
+      Path instances
+    """
+    if src.is_dir():
+        for p in src.iterdir():
+            yield from _yield_src_dest_filepaths(p, dest, src_base)
+    else:
+        # reflect src hierarchy if dest is a directory, otherwise
+        yield src, dest / (src.relative_to(src_base) if src_base else src.name)
+
+
+def _get_repo_record(fpath, cache):
+    fdir = fpath.parent
+    # get the repository, if there is any.
+    # `src_repo` will be None, if there is none, and can serve as a flag
+    # for further processing
+    repo_rec = cache.get(fdir, None)
+    if repo_rec is None:
+        repo_root = get_dataset_root(fdir)
+        repo_rec = dict(
+            repo=None if repo_root is None else Dataset(repo_root).repo,
+            # this is different from repo.pathobj which resolves symlinks
+            repo_root=Path(repo_root) if repo_root else None)
+        cache[fdir] = repo_rec
+    return repo_rec
+
+
+def _copy_file(src, dest, cache):
     str_src = str(src)
     str_dest = str(dest)
     if not op.lexists(str_src):
+        print(repr(str_src))
         yield dict(
             path=str_src,
             status='impossible',
@@ -251,19 +304,14 @@ def _copy_file(src, dest, dest_repo, cache):
 
     # at this point we know that there is something at `src`,
     # and it must be a file
-    src_dir = src.parent
-    # get the source dataset, if any
-    # `src_ds` will be None, if there is none, and can serve as a flag
+    # get the source repository, if there is any.
+    # `src_repo` will be None, if there is none, and can serve as a flag
     # for further processing
-    src_ds_rec = cache.get(src_dir, None)
-    if src_ds_rec is None:
-        src_ds = get_dataset_root(src_dir)
-        src_ds_rec = dict(ds=src_ds if src_ds is None else Dataset(src_ds))
-        cache[src_dir] = src_ds_rec
-    src_ds = src_ds_rec['ds'] if src_ds_rec else None
-
-    # get the repo shortcut
-    src_repo = src_ds.repo if src_ds else None
+    src_repo_rec = _get_repo_record(src, cache)
+    src_repo = src_repo_rec['repo']
+    # same for the destination repo
+    dest_repo_rec = _get_repo_record(dest, cache)
+    dest_repo = dest_repo_rec['repo']
 
     # whenever there is no annex (remember an AnnexRepo is also a GitRepo)
     if src_repo is None or not isinstance(src_repo, AnnexRepo):
@@ -285,7 +333,7 @@ def _copy_file(src, dest, dest_repo, cache):
 
     # now we know that we are copying from an AnnexRepo dataset
     # look for URLs on record
-    rpath = str(src.relative_to(src_ds.pathobj))
+    rpath = str(src.relative_to(src_repo_rec['repo_root']))
 
     # pull what we know about this file from the source repo
     finfo = src_repo.get_content_annexinfo(
@@ -324,13 +372,6 @@ def _copy_file(src, dest, dest_repo, cache):
     # at this point we are copying an annexed file into an annex repo
     src_key = finfo['key']
 
-    # TODO
-    # 3. if there are URLs defined in the source repo, add them through
-    #    `annex registerurl`, possibly followup with `setpresentkey`
-    #    for the datalad special remote
-    # 4. if a key is known to be available from a non-datalad-type special
-    #    remote, import this remote config, enable it, and `setpresentkey`
-    #    it
     # make an attempt to compute a key in the target repo, this will hopefully
     # become more relevant once "salted backends" are possible
     # https://github.com/datalad/datalad/issues/3357 that could prevent
@@ -352,7 +393,14 @@ def _copy_file(src, dest, dest_repo, cache):
     if 'objloc' in finfo:
         # we have the chance to place the actual content into the target annex
         # put in a tmp location, git-annex will move from there
-        tmploc = dest_repo.pathobj / '.git' / 'tmp' / 'datalad-copy' / dest_key
+        tmploc = dest_repo_rec.get('tmp', None)
+        if not tmploc:
+            tmploc = dest_repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
+            tmploc.mkdir(exist_ok=True, parents=True)
+            # put in cache for later clean/lookup
+            dest_repo_rec['tmp'] = tmploc
+
+        tmploc = tmploc / dest_key
         _replace_file(finfo['objloc'], tmploc, str(tmploc), follow_symlinks=False)
 
         dest_repo._run_annex_command(
@@ -372,17 +420,18 @@ def _copy_file(src, dest, dest_repo, cache):
     if urls_by_sr:
         # some URLs are on record in the for this file
         # obtain information on special remotes
-        src_srinfo = src_ds_rec.get('srinfo', None)
+        src_srinfo = src_repo_rec.get('srinfo', None)
         if src_srinfo is None:
             src_srinfo = _extract_special_remote_info(src_repo)
             # put in cache
-            src_ds_rec['srinfo'] = src_srinfo
+            src_repo_rec['srinfo'] = src_srinfo
         # TODO generalize to more than one unique dest_repo
         dest_srinfo = _extract_special_remote_info(dest_repo)
 
         for src_rid, urls in urls_by_sr.items():
             if not (src_rid == '00000000-0000-0000-0000-000000000001' or
                     src_srinfo.get(src_rid, {}).get('externaltype', None) == 'datalad'):
+                # TODO generalize to any special remote
                 lgr.warn(
                     'Ignore URL for presently unsupported special remote'
                 )

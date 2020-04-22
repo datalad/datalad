@@ -47,7 +47,7 @@ _group_dataset = (
          'create-sibling-ria'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.core.local.save', 'Save', 'save'),
-        ('datalad.local.copy', 'Copy', 'copy'),
+        ('datalad.local.copyfile', 'CopyFile', 'copyfile'),
     ])
 
 _group_metadata = (
