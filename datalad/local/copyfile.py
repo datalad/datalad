@@ -41,7 +41,7 @@ from datalad.distribution.dataset import (
     resolve_path,
 )
 
-lgr = logging.getLogger('datalad.local.copyfiles')
+lgr = logging.getLogger('datalad.local.copyfile')
 
 
 @build_doc
@@ -84,7 +84,7 @@ class CopyFile(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='copy')
+    @datasetmethod(name='copyfile')
     @eval_results
     def __call__(
             path,
@@ -119,7 +119,7 @@ class CopyFile(Interface):
                 raise ValueError("No target directory was given to `copy`.")
             target = paths.pop(-1)
             # target could be a directory, or even an individual file
-            if len(paths) > 2:
+            if len(paths) > 1:
                 # must be a directory
                 target_dir = target
                 if specs_from:
@@ -150,7 +150,8 @@ class CopyFile(Interface):
         if dataset:
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='copying into')
-            if ds.pathobj not in target_ds.pathobj.parents:
+            if not (ds.pathobj == target_ds.pathobj
+                    or ds.pathobj in target_ds.pathobj.parents):
                 yield dict(
                     path=ds.path,
                     status='error',
