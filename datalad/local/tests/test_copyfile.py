@@ -30,6 +30,7 @@ from datalad.utils import (
 from datalad.tests.utils import (
     assert_false,
     assert_in,
+    assert_in_results,
     assert_not_in,
     assert_raises,
     assert_repo_status,
@@ -42,6 +43,7 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
+from datalad.consts import DATALAD_SPECIAL_REMOTE
 
 
 @with_tempfile(mkdir=True)
@@ -93,8 +95,6 @@ def test_copyfile(workdir, webdir, weburl):
                     target_dir=git_ds.pathobj)
 
 
-
-
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -119,3 +119,43 @@ def test_copyfile_errors(dspath1, dspath2, nondspath):
     # use no reference ds to excercise a different code path
     assert_status(
         'impossible', copyfile([nondspath, dspath1], on_failure='ignore'))
+
+
+@with_tempfile(mkdir=True)
+@with_tree(tree={
+    'webfile1': '123',
+})
+@serve_path_via_http
+def test_copyfile_datalad_specialremote(workdir, webdir, weburl):
+    workdir = Path(workdir)
+    src_ds = Dataset(workdir / 'src').create()
+    # enable datalad special remote
+    src_ds.repo.init_remote(
+        DATALAD_SPECIAL_REMOTE,
+        ['encryption=none', 'type=external',
+         'externaltype={}'.format(DATALAD_SPECIAL_REMOTE),
+         'autoenable=true'])
+    # put a file into the dataset by URL
+    src_ds.download_url('/'.join((weburl, 'webfile1')),
+                        path='myfile1.txt')
+    # approx test that the file is known to a remote
+    # that is not the web remote
+    assert_in_results(
+        src_ds.repo.whereis('myfile1.txt', output='full').values(),
+        here=False,
+        description='[{}]'.format(DATALAD_SPECIAL_REMOTE),
+    )
+    # now a new dataset
+    dest_ds = Dataset(workdir / 'dest').create()
+    # no special remotes
+    eq_(dest_ds.repo.get_special_remotes(), {})
+    copyfile([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
+    # we have an special remote in the destination dataset now
+    assert_in_results(
+        dest_ds.repo.get_special_remotes().values(),
+        externaltype=DATALAD_SPECIAL_REMOTE,
+    )
+    # and it works
+    dest_ds.drop('myfile1.txt')
+    dest_ds.repo.get('myfile1.txt', remote='datalad')
+    ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
