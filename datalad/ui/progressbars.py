@@ -274,12 +274,20 @@ try:
                 self._pbar.update(self.current)
                 # an update() does not (reliably) trigger a refresh, hence
                 # without the next, the pbar may still show zero progress
-                self._pbar.refresh()
+                if not size:
+                    # whenever a total is changed, we need a refresh. If there is
+                    # no progress update, we do it here, else we'll do it after
+                    # the progress update
+                    self._pbar.refresh()
+                # if we set a new total and also advance the progress bar:
             if not size:
                 return
             inc = size - self.current
             try:
                 self._pbar.update(size if increment else inc)
+                if total:
+                    # refresh to new total and progress
+                    self._pbar.refresh()
             except ValueError:
                 # Do not crash entire process because of some glitch with
                 # progressbar update
