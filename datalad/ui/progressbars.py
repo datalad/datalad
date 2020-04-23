@@ -38,7 +38,9 @@ class ProgressBarBase(object):
         """Force update"""
         pass
 
-    def update(self, size, increment=False):
+    def update(self, size, increment=False, total=None):
+        if total:
+            self.total = total
         if not size:
             return
         if increment:
@@ -283,7 +285,9 @@ try:
                 # progressbar update
                 # TODO: issue a warning?
                 pass
-            super(tqdmProgressBar, self).update(size, increment=increment)
+            super(tqdmProgressBar, self).update(size,
+                                                increment=increment,
+                                                total=total)
 
         def start(self):
             super(tqdmProgressBar, self).start()
