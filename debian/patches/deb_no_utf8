@@ -71,8 +71,8 @@ Last-Update: 2018-06-05
  @skip_if_on_windows  # likely would fail
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -45,7 +45,7 @@ user = name=Jane Doe
- user = email=jd@example.com
+@@ -52,7 +52,7 @@ novalue
+ empty =
  myint = 3
  
 -[onemore "complicated の beast with.dot"]
@@ -80,7 +80,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -71,16 +71,16 @@ def test_something(path, new_home):
+@@ -78,16 +78,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -89,7 +89,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_option('something', 'user'))
      assert_false(cfg.has_option('something', 'us?er'))
      assert_false(cfg.has_option('some?thing', 'user'))
-     assert_equal(sorted(cfg.options('something')), ['myint', 'user'])
+     assert_equal(sorted(cfg.options('something')), ['empty', 'myint', 'novalue', 'user'])
 -    assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
 +    assert_equal(cfg.options(u'onemore.complicated nounicode beast with.dot'), ['findme'])
  
@@ -97,10 +97,10 @@ Last-Update: 2018-06-05
          sorted(cfg.items()),
 -        [(u'onemore.complicated の beast with.dot.findme', '5.0'),
 +        [(u'onemore.complicated nounicode beast with.dot.findme', '5.0'),
+          ('something.empty', ''),
           ('something.myint', '3'),
-          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
-     assert_equal(
-@@ -93,7 +93,7 @@ def test_something(path, new_home):
+          ('something.novalue', None),
+@@ -104,7 +104,7 @@ def test_something(path, new_home):
          cfg.get('something.user'),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -108,8 +108,8 @@ Last-Update: 2018-06-05
 +    assert_equal(cfg.getfloat(u'onemore.complicated nounicode beast with.dot', 'findme'), 5.0)
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
-     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
-@@ -106,8 +106,8 @@ def test_something(path, new_home):
+     # git demands a key without value at all to be used as a flag, thus True
+@@ -123,8 +123,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -249,7 +249,7 @@ Last-Update: 2018-06-05
  # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
 --- a/datalad/core/local/tests/test_diff.py
 +++ b/datalad/core/local/tests/test_diff.py
-@@ -475,9 +475,12 @@ def test_diff_rsync_syntax(path):
+@@ -472,9 +472,12 @@ def test_diff_rsync_syntax(path):
  
  @with_tempfile(mkdir=True)
  def test_diff_nonexistent_ref_unicode(path):

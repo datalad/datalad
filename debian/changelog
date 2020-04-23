@@ -1,3 +1,12 @@
+datalad (0.12.6-1) unstable; urgency=medium
+
+  * Fresh upstream release:
+    - should resolve possible issues with an upcoming release of git-annex
+  * debian/patches
+    - CPed 0001* was removed, deb_no_utf8 was updated
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 23 Apr 2020 16:43:05 -0400
+
 datalad (0.12.4-2) unstable; urgency=medium
 
   * Add python3-distro to Depends of python3-datalad (needed for python>=3.8).
