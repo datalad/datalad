@@ -125,7 +125,6 @@ def test_copyfile_errors(dspath1, dspath2, nondspath):
         'impossible', copyfile(['funky', dspath1], on_failure='ignore'))
 
 
-
 @with_tempfile(mkdir=True)
 @with_tree(tree={
     'webfile1': '123',
@@ -186,3 +185,20 @@ def test_copyfile_into_nonannex(workdir):
         copyfile([src_ds.pathobj / 'gone.txt', dest_ds.pathobj],
                  on_failure='ignore')
     )
+
+
+@with_tree(tree={
+    'subdir': {
+        'file1': '123',
+        'file2': 'abc',
+    },
+})
+@with_tempfile(mkdir=True)
+def test_copyfile_recursion(srcdir, destdir):
+    src_ds = Dataset(srcdir).create(force=True)
+    src_ds.save()
+    dest_ds = Dataset(destdir).create()
+    copyfile([src_ds.pathobj / 'subdir', dest_ds.pathobj], recursive=True)
+    # structure is mirrored
+    ok_file_has_content(dest_ds.pathobj / 'subdir' / 'file1', '123')
+    ok_file_has_content(dest_ds.pathobj / 'subdir' / 'file2', 'abc')

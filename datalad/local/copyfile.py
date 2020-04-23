@@ -268,6 +268,10 @@ def _yield_src_dest_filepaths(src, dest, src_base=None):
       Path instances
     """
     if src.is_dir():
+        if src_base is None:
+            # TODO maybe an unconditional .parent isn't a good idea,
+            # if someone wants to copy a whole drive...
+            src_base = src.parent
         for p in src.iterdir():
             yield from _yield_src_dest_filepaths(p, dest, src_base)
     else:
