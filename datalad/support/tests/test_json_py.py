@@ -47,6 +47,7 @@ def test_load_unicode_line_separator(fname):
     result = list(load_stream(fname))
     eq_(len(result), 2)
     eq_(result[0]["key0"], u"a b")
+    eq_(result[1]["key1"], u"plain")
 
 
 def test_loads():

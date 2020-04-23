@@ -682,7 +682,12 @@ def test_AnnexRepo_get_file_backend(src, dst):
 def test_AnnexRepo_always_commit(path):
 
     repo = AnnexRepo(path)
-    runner = Runner(cwd=path)
+
+    def get_annex_commit_counts():
+        return len(repo.get_revisions("git-annex"))
+
+    n_annex_commits_initial = get_annex_commit_counts()
+
     file1 = get_most_obscure_supported_name() + "_1"
     file2 = get_most_obscure_supported_name() + "_2"
     with open(opj(path, file1), 'w') as f:
@@ -701,46 +706,30 @@ def test_AnnexRepo_always_commit(path):
     # check git log of git-annex branch:
     # expected: initial creation, update (by annex add) and another
     # update (by annex log)
-    out, err = runner.run(['git', 'log', 'git-annex'])
-    num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split('\n')
-                       if commit.startswith('commit')])
-    eq_(num_commits, 3)
+    eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
-    repo.always_commit = False
-    repo.add(file2)
+    with patch.object(repo, "always_commit", False):
+        repo.add(file2)
 
-    # No additional git commit:
-    out, err = runner.run(['git', 'log', 'git-annex'])
-    num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split('\n')
-                       if commit.startswith('commit')])
-    eq_(num_commits, 3)
+        # No additional git commit:
+        eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
-    repo.always_commit = True
+        out, err = repo._run_annex_command('log')
 
-    # Still one commit only in git-annex log,
-    # but 'git annex log' was called when always_commit was true again,
-    # so it should commit the addition at the end. Calling it again should then
-    # show two commits.
-    out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).splitlines()
-    eq_(len(out_list), 2, "Output:\n%s" % out_list)
-    assert_in(file1, out_list[0])
-    assert_in("recording state in git", out_list[1])
+        # And we see only the file before always_commit was set to false:
+        assert_in(file1, out)
+        assert_not_in(file2, out)
+
+    # With always_commit back to True, do something that will trigger a commit
+    # on the annex branches.
+    repo.sync()
 
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).splitlines()
-    eq_(len(out_list), 2, "Output:\n%s" % out_list)
-    assert_in(file1, out_list[0])
-    assert_in(file2, out_list[1])
+    assert_in(file1, out)
+    assert_in(file2, out)
 
     # Now git knows as well:
-    out, err = runner.run(['git', 'log', 'git-annex'])
-    num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split('\n')
-                       if commit.startswith('commit')])
-    eq_(num_commits, 4)
+    eq_(get_annex_commit_counts(), n_annex_commits_initial + 2)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:445

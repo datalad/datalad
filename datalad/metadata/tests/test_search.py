@@ -12,6 +12,7 @@
 import logging
 from shutil import copy
 from unittest.mock import patch
+import os
 from os import makedirs
 from os.path import join as opj
 from os.path import dirname
@@ -22,7 +23,10 @@ from datalad.utils import (
     swallow_logs,
     swallow_outputs,
 )
-from datalad.tests.utils import assert_in
+from datalad.tests.utils import (
+    assert_in,
+    assert_re_in,
+)
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
@@ -139,37 +143,6 @@ def _check_mocked_install(default_dspath, mock_install):
 
 
 @with_tempfile
-def test_our_metadataset_search(tdir):
-    # TODO renable when a dataset with new aggregated metadata is
-    # available at some public location
-    raise SkipTest
-    # smoke test for basic search operations on our super-megadataset
-    # expensive operation but ok
-    #ds = install(
-    #    path=tdir,
-    #    # TODO renable test when /// metadata actually conforms to the new metadata
-    #    #source="///",
-    #    source="smaug:/mnt/btrfs/datasets-meta6-4/datalad/crawl",
-    #    result_xfm='datasets', return_type='item-or-list')
-    assert list(ds.search('haxby'))
-    assert_result_count(
-        ds.search('id:873a6eae-7ae6-11e6-a6c8-002590f97d84', mode='textblob'),
-        1,
-        type='dataset',
-        path=opj(ds.path, 'crcns', 'pfc-2'))
-
-    # there is a problem with argparse not decoding into utf8 in PY2
-    from datalad.cmdline.tests.test_main import run_main
-    # TODO: make it into an independent lean test
-    from datalad.cmd import Runner
-    out, err = Runner(cwd=ds.path)('datalad search Buzsáki')
-    assert_in('crcns/pfc-2 ', out)  # has it in description
-    # and then another aspect: this entry it among multiple authors, need to
-    # check if aggregating them into a searchable entity was done correctly
-    assert_in('crcns/hc-1 ', out)
-
-
-@with_tempfile
 def test_search_non_dataset(tdir):
     from datalad.support.gitrepo import GitRepo
     GitRepo(tdir, create=True)
@@ -249,6 +222,33 @@ parentds
 path
 type
 """
+
+    # test default behavior while limiting set of keys reported
+    with swallow_outputs() as cmo:
+        ds.search(['\.id', 'artist$'], show_keys='short')
+        out_lines = [l for l in cmo.out.split(os.linesep) if l]
+        # test that only the ones matching were returned
+        assert_equal(
+            [l for l in out_lines if not l.startswith(' ')],
+            ['audio.music-artist', 'datalad_core.id']
+        )
+        # more specific test which would also test formatting
+        assert_equal(
+            out_lines,
+            ['audio.music-artist',
+             ' in  1 datasets', " has 1 unique values: 'dlartist'",
+             'datalad_core.id',
+             ' in  1 datasets',
+             # we have them sorted
+             " has 1 unique values: '%s'" % ds.id
+             ]
+        )
+
+    with assert_raises(ValueError) as cme:
+        ds.search('*wrong')
+    assert_re_in(
+        r"regular expression '\(\?i\)\*wrong' \(original: '\*wrong'\) is incorrect: ",
+        str(cme.exception))
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:

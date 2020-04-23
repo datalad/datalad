@@ -505,8 +505,13 @@ def test_cfg_originorigin(path):
     # Clone another level, this time with a relative path. Drop content from
     # lev2 so that origin is the only place that the file is available from.
     clone_lev2.drop("file1.txt")
-    with chpwd(path):
+    with chpwd(path), swallow_logs(new_level=9) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
+        # we called git-annex-init; see gh-4367:
+        cml.assert_logged(msg=r"[^[]*Running: \[('git', 'annex'|'git-annex'), "
+                              r"'init'",
+                          match=False,
+                          level='Level 9')
     assert_result_count(
         clone_lev3.get('file1.txt', on_failure='ignore'),
         1,
@@ -763,3 +768,80 @@ def test_ria_http_storedataladorg(path):
     ok_(ds.is_installed())
     eq_(ds.id, datalad_store_testds_id)
 
+
+@with_tempfile(mkdir=True)
+def test_clone_unborn_head(path):
+    ds_origin = Dataset(op.join(path, "a")).create()
+    repo = ds_origin.repo
+    managed = repo.is_managed_branch()
+
+    # The setup below is involved, mostly because it's accounting for adjusted
+    # branches. The scenario itself isn't so complicated, though:
+    #
+    #   * a checked out master branch with no commits
+    #   * a (potentially adjusted) "abc" branch with commits.
+    #   * a (potentially adjusted) "chooseme" branch whose tip commit has a
+    #     more recent commit than any in "abc".
+    (ds_origin.pathobj / "foo").write_text("foo content")
+    ds_origin.save(message="foo")
+    for res in repo.for_each_ref_(fields="refname"):
+        ref = res["refname"]
+        if "master" in ref:
+            repo.update_ref(ref.replace("master", "abc"), ref)
+            repo.call_git(["update-ref", "-d", ref])
+    repo.update_ref("HEAD",
+                    "refs/heads/{}".format(
+                        "adjusted/abc(unlocked)" if managed else "abc"),
+                    symbolic=True)
+    repo.call_git(["checkout", "-b", "chooseme", "abc~1"])
+    if managed:
+        repo.adjust()
+    (ds_origin.pathobj / "bar").write_text("bar content")
+    ds_origin.save(message="bar")
+    # Try to make the git-annex branch the most recently updated ref so that we
+    # test that it is skipped.
+    ds_origin.drop("bar", check=False)
+    ds_origin.repo.checkout("master", options=["--orphan"])
+
+    ds = clone(ds_origin.path, op.join(path, "b"))
+    # We landed on the branch with the most recent commit, ignoring the
+    # git-annex branch.
+    branch = ds.repo.get_active_branch()
+    eq_(ds.repo.get_corresponding_branch(branch) or branch,
+        "chooseme")
+    eq_(ds_origin.repo.get_hexsha("chooseme"),
+        ds.repo.get_hexsha("chooseme"))
+    # In the context of this test, the clone should be on an adjusted branch if
+    # the source landed there initially because we're on the same file system.
+    eq_(managed, ds.repo.is_managed_branch())
+
+
+@with_tempfile(mkdir=True)
+def test_clone_unborn_head_no_other_ref(path):
+    # TODO: On master, update to use annex=False.
+    ds_origin = Dataset(op.join(path, "a")).create(no_annex=True)
+    ds_origin.repo.call_git(["update-ref", "-d", "refs/heads/master"])
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        clone(source=ds_origin.path, path=op.join(path, "b"))
+        assert_in("could not find a branch with commits", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def test_clone_unborn_head_sub(path):
+    ds_origin = Dataset(op.join(path, "a")).create()
+    ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
+    managed = ds_origin_sub.repo.is_managed_branch()
+    ds_origin_sub.repo.call_git(["branch", "-m", "master", "other"])
+    ds_origin.save()
+    ds_origin_sub.repo.checkout("master", options=["--orphan"])
+
+    ds_cloned = clone(source=ds_origin.path, path=op.join(path, "b"))
+    ds_cloned_sub = ds_cloned.get(
+        "sub", result_xfm="datasets", return_type="item-or-list")
+
+    branch = ds_cloned_sub.repo.get_active_branch()
+    eq_(ds_cloned_sub.repo.get_corresponding_branch(branch) or branch,
+        "other")
+    # In the context of this test, the clone should be on an adjusted branch if
+    # the source landed there initially because we're on the same file system.
+    eq_(managed, ds_cloned_sub.repo.is_managed_branch())

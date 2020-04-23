@@ -91,6 +91,7 @@ _group_plumbing = (
 
 # Some known extensions and their commands to suggest whenever lookup fails
 _known_extension_commands = {
+    'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
     'datalad-neuroimaging': ('bids2scidata',)
 }

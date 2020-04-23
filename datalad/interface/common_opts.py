@@ -146,7 +146,9 @@ jobs_opt = Parameter(
     metavar="NJOBS",
     default='auto',
     constraints=EnsureInt() | EnsureNone() | EnsureChoice('auto'),
-    doc="""how many parallel jobs (where possible) to use.""")
+    doc="""how many parallel jobs (where possible) to use. "auto" corresponds
+    to the number defined by 'datalad.runtime.max-annex-jobs' configuration
+    item""")
 
 verbose = Parameter(
     args=("-v", "--verbose",),

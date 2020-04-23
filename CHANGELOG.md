@@ -10,6 +10,84 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
+## 0.12.6 (April 23, 2020) -- .
+
+### Major refactoring and deprecations
+
+- The value of `datalad.support.annexrep.N_AUTO_JOBS` is no longer
+  considered.  The variable will be removed in a later release.
+  ([#4409][])
+
+### Fixes
+
+- Staring with v0.12.0, `datalad save` recorded the current branch of
+  a parent dataset as the `branch` value in the .gitmodules entry for
+  a subdataset.  This behavior is problematic for a few reasons and
+  has been reverted.  ([#4375][])
+
+- The default for the `--jobs` option, "auto", instructed DataLad to
+  pass a value to git-annex's `--jobs` equal to `min(8, max(3, <number
+  of CPUs>))`, which could lead to issues due to the large number of
+  child processes spawned and file descriptors opened.  To avoid this
+  behavior, `--jobs=auto` now results in git-annex being called with
+  `--jobs=1` by default.  Configure the new option
+  `datalad.runtime.max-annex-jobs` to control the maximum value that
+  will be considered when `--jobs='auto'`.  ([#4409][])
+
+- Various commands have been adjusted to better handle the case where
+  a remote's HEAD ref points to an unborn branch.  ([#4370][])
+
+- [search]
+  - learned to use the query as a regular expression that restricts
+    the keys that are shown for `--show-keys short`. ([#4354][])
+  - gives a more helpful message when query is an invalid regular
+    expression.  ([#4398][])
+
+- The code for parsing Git configuration did not follow Git's behavior
+  of accepting a key with no value as shorthand for key=true.  ([#4421][])
+
+- `AnnexRepo.info` needed a compatibility update for a change in how
+  git-annex reports file names.  ([#4431][])
+
+- [create-sibling-github][] did not gracefully handle a token that did
+  not have the necessary permissions.  ([#4400][])
+
+### Enhancements and new features
+
+- [search] learned to use the query as a regular expression that
+  restricts the keys that are shown for `--show-keys short`. ([#4354][])
+
+- `datalad <subcommand>` learned to point to the [datalad-container][]
+  extension when a subcommand from that extension is given but the
+  extension is not installed.  ([#4400][]) ([#4174][])
+
+
+## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
+￼
+Fix some bugs and make the world an even better place.
+
+### Fixes
+
+- Our `log_progress` helper mishandled the initial display and step of
+  the progress bar.  ([#4326][])
+
+- `AnnexRepo.get_content_annexinfo` is designed to accept `init=None`,
+  but passing that led to an error.  ([#4330][])
+
+- Update a regular expression to handle an output change in Git
+  v2.26.0.  ([#4328][])
+
+- We now set `LC_MESSAGES` to 'C' while running git to avoid failures
+  when parsing output that is marked for translation.  ([#4342][])
+
+- The helper for decoding JSON streams loaded the last line of input
+  without decoding it if the line didn't end with a new line, a
+  regression introduced in the 0.12.0 release.  ([#4361][])
+
+- The clone command failed to git-annex-init a fresh clone whenever
+  it considered to add the origin of the origin as a remote.  ([#4367][])
+
+
 ## 0.12.4 (Mar 19, 2020) -- Windows?!
 ￼
 The main purpose of this release is to have one on PyPi that has no
@@ -17,8 +95,10 @@ associated wheel to enable a working installation on Windows ([#4315][]).
 
 ### Fixes
 
-- Adjust the behavior of the `log.outputs` config switch to make outputs
-  visible. Its description was adjusted accordingly.
+- The description of the `log.outputs` config switch did not keep up
+  with code changes and incorrectly stated that the output would be
+  logged at the DEBUG level; logging actually happens at a lower
+  level.  ([#4317][])
 
 ## 0.12.3 (March 16, 2020) -- .
 
@@ -2442,6 +2522,7 @@ publishing
 [#4073]: https://github.com/datalad/datalad/issues/4073
 [#4078]: https://github.com/datalad/datalad/issues/4078
 [#4140]: https://github.com/datalad/datalad/issues/4140
+[#4174]: https://github.com/datalad/datalad/issues/4174
 [#4194]: https://github.com/datalad/datalad/issues/4194
 [#4200]: https://github.com/datalad/datalad/issues/4200
 [#4212]: https://github.com/datalad/datalad/issues/4212
@@ -2451,3 +2532,18 @@ publishing
 [#4285]: https://github.com/datalad/datalad/issues/4285
 [#4308]: https://github.com/datalad/datalad/issues/4308
 [#4315]: https://github.com/datalad/datalad/issues/4315
+[#4317]: https://github.com/datalad/datalad/issues/4317
+[#4326]: https://github.com/datalad/datalad/issues/4326
+[#4328]: https://github.com/datalad/datalad/issues/4328
+[#4330]: https://github.com/datalad/datalad/issues/4330
+[#4342]: https://github.com/datalad/datalad/issues/4342
+[#4354]: https://github.com/datalad/datalad/issues/4354
+[#4361]: https://github.com/datalad/datalad/issues/4361
+[#4367]: https://github.com/datalad/datalad/issues/4367
+[#4370]: https://github.com/datalad/datalad/issues/4370
+[#4375]: https://github.com/datalad/datalad/issues/4375
+[#4398]: https://github.com/datalad/datalad/issues/4398
+[#4400]: https://github.com/datalad/datalad/issues/4400
+[#4409]: https://github.com/datalad/datalad/issues/4409
+[#4421]: https://github.com/datalad/datalad/issues/4421
+[#4431]: https://github.com/datalad/datalad/issues/4431

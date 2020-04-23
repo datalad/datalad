@@ -428,7 +428,8 @@ class RI(object):
         ----------
         ri: str, optional
           String version of a resource specific for this class.  If you would like
-          a type of the resource be deduced, use RI(ri)
+          a type of the resource be deduced, use RI(ri). Note that this value
+          will be passed to str(), so you do not have to cast it yourself.
         **fields: dict, optional
           The values for the fields defined in _FIELDS class variable.
         """
@@ -439,11 +440,12 @@ class RI(object):
 
         self._fields = self._get_blank_fields()
         if ri is not None:
+            ri = str(ri)
             fields = self._str_to_fields(ri)
         self._set_from_fields(**fields)
 
         # If was initialized from a string representation
-        if self._str is not None:
+        if lgr.isEnabledFor(logging.DEBUG) and self._str is not None:
             # well -- some ris might not unparse identically back
             # strictly speaking, but let's assume they do
             ri_ = self.as_str()

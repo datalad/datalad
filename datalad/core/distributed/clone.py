@@ -451,6 +451,9 @@ def clone_dataset(
             # next candidate
             continue
 
+        if not cand.get("version"):
+            postclone_check_head(destds)
+
         # perform any post-processing that needs to know details of the clone
         # source
         if cand['type'] == 'ria':
@@ -504,6 +507,34 @@ def clone_dataset(
     # subdataset clone down below will not alter the Git-state of the
     # parent
     yield get_status_dict(status='ok', **result_props)
+
+
+def postclone_check_head(ds):
+    repo = ds.repo
+    if not repo.commit_exists("HEAD"):
+        # HEAD points to an unborn branch. A likely cause of this is that the
+        # remote's main branch is something other than master but HEAD wasn't
+        # adjusted accordingly.
+        #
+        # Let's choose the most recently updated remote ref (according to
+        # commit date). In the case of a submodule, switching to a ref with
+        # commits prevents .update_submodule() from failing. It is likely that
+        # the ref includes the registered commit, but we don't have the
+        # information here to know for sure. If it doesn't, .update_submodule()
+        # will check out a detached HEAD.
+        remote_branches = (
+            b["refname:strip=2"] for b in repo.for_each_ref_(
+                fields="refname:strip=2", sort="-committerdate",
+                pattern="refs/remotes/origin"))
+        for rbranch in remote_branches:
+            if rbranch in ["origin/git-annex", "HEAD"]:
+                continue
+            repo.call_git(["checkout", "-b", rbranch[7:],  # drop "origin/"
+                           "--track", rbranch])
+            lgr.debug("Checked out local branch from %s", rbranch)
+            return
+        lgr.warning("Cloned %s but could not find a branch "
+                    "with commits", ds.path)
 
 
 def postclonecfg_ria(ds, props):
@@ -563,10 +594,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             reload=False)
         ds.config.set(
             'annex.hardlink', 'true', where='local', reload=True)
-
-    # we have just cloned the repo, so it has 'origin', configure any
-    # reachable origin of origins
-    yield from configure_origins(ds, ds)
 
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
@@ -642,6 +669,11 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
+
+    # we have just cloned the repo, so it has 'origin', configure any
+    # reachable origin of origins
+    yield from configure_origins(ds, ds)
+
 
 _handle_possible_annex_dataset = postclonecfg_annexdataset
 

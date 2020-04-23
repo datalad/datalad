@@ -98,8 +98,9 @@ from .exceptions import (
 
 lgr = logging.getLogger('datalad.annex')
 
-# Limit to # of CPUs and up to 8, but at least 3 to start with
-N_AUTO_JOBS = min(8, max(3, cpu_count()))
+# TODO Constant is no longer used, but left defined to avoid breakage in
+# dependent code. Remove in 0.14 release.
+N_AUTO_JOBS = 1
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -299,6 +300,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
+
+        # will be evaluated lazily
+        self._n_auto_jobs = None
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
@@ -2144,7 +2148,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             annex_options += ['--json-progress']
 
         if jobs == 'auto':
-            jobs = N_AUTO_JOBS
+            # Limit to # of CPUs (but at least 3 to start with)
+            # and also an additional config constraint (by default 1
+            # due to https://github.com/datalad/datalad/issues/4404)
+            jobs = self._n_auto_jobs or min(
+                self.config.obtain('datalad.runtime.max-annex-jobs'),
+                max(3, cpu_count()))
+            # cache result to avoid repeated calls to cpu_count()
+            self._n_auto_jobs = jobs
         if jobs and jobs != 1:
             annex_options += ['-J%d' % jobs]
         if opts:
@@ -2418,7 +2429,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         # and that they all have 'file' equal to the passed one
         out = {}
         for j, f in zip(json_objects, files):
-            assert(j.pop('file') == f)
+            # Starting with version of annex 8.20200330-100-g957a87b43
+            # annex started to normalize relative paths.
+            # ref: https://github.com/datalad/datalad/issues/4431
+            # Use normpath around each side to ensure it is the same file
+            assert normpath(j.pop('file')) == normpath(f)
             if not j['success']:
                 j = None
             else:
@@ -3346,9 +3361,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         for j in self._run_annex_command_json(cmd, opts=opts, files=files):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
-            if init is not None and rec is None:
-                # init constraint knows nothing about this path -> skip
-                continue
+            if rec is None:
+                if init is not None:
+                    # init constraint knows nothing about this path -> skip
+                    continue
+                rec = {}
             rec.update({'{}{}'.format(key_prefix, k): j[k]
                        for k in j if k != 'file'})
             if 'bytesize' in rec:
