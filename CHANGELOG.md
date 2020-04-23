@@ -48,10 +48,20 @@ bet we will fix some bugs and make a world even a better place.
 - The code for parsing Git configuration did not follow Git's behavior
   of accepting a key with no value as shorthand for key=true.  ([#4421][])
 
+- `AnnexRepo.info` needed a compatibility update for a change in how
+  git-annex reports file names.  ([#4431][])
+
+- [create-sibling-github][] did not gracefully handle a token that did
+  not have the necessary permissions.  ([#4400][])
+
 ### Enhancements and new features
 
 - [search] learned to use the query as a regular expression that
   restricts the keys that are shown for `--show-keys short`. ([#4354][])
+
+- `datalad <subcommand>` learned to point to the [datalad-container][]
+  extension when a subcommand from that extension is given but the
+  extension is not installed.  ([#4400][]) ([#4174][])
 
 
 ## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
@@ -2514,6 +2524,7 @@ publishing
 [#4073]: https://github.com/datalad/datalad/issues/4073
 [#4078]: https://github.com/datalad/datalad/issues/4078
 [#4140]: https://github.com/datalad/datalad/issues/4140
+[#4174]: https://github.com/datalad/datalad/issues/4174
 [#4194]: https://github.com/datalad/datalad/issues/4194
 [#4200]: https://github.com/datalad/datalad/issues/4200
 [#4212]: https://github.com/datalad/datalad/issues/4212
@@ -2534,5 +2545,7 @@ publishing
 [#4370]: https://github.com/datalad/datalad/issues/4370
 [#4375]: https://github.com/datalad/datalad/issues/4375
 [#4398]: https://github.com/datalad/datalad/issues/4398
+[#4400]: https://github.com/datalad/datalad/issues/4400
 [#4409]: https://github.com/datalad/datalad/issues/4409
 [#4421]: https://github.com/datalad/datalad/issues/4421
+[#4431]: https://github.com/datalad/datalad/issues/4431
