@@ -120,6 +120,11 @@ def test_copyfile_errors(dspath1, dspath2, nondspath):
     assert_status(
         'impossible', copyfile([nondspath, dspath1], on_failure='ignore'))
 
+    # attempt to copy a file that doesn't exist
+    assert_status(
+        'impossible', copyfile(['funky', dspath1], on_failure='ignore'))
+
+
 
 @with_tempfile(mkdir=True)
 @with_tree(tree={

@@ -295,7 +295,6 @@ def _copy_file(src, dest, cache):
     str_src = str(src)
     str_dest = str(dest)
     if not op.lexists(str_src):
-        print(repr(str_src))
         yield dict(
             path=str_src,
             status='impossible',
