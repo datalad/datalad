@@ -268,12 +268,22 @@ def path_based_str_repr(cls):
     # 62 ns ± 0.345 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
     # and similarly 58ns vs 97ns for %r vs !r
     def __str__(self):
-        return '%s(%s)' % (self.__class__.__name__, ut.quote_cmdlinearg(self.path))
+        s = self._str
+        if s is None:
+            s = self._str = \
+                '%s(%s)' % (self.__class__.__name__, ut.quote_cmdlinearg(self.path))
+        return s
 
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.path)
+        s = self._repr
+        if s is None:
+            s = self._repr = \
+                '%s(%r)' % (self.__class__.__name__, self.path)
+        return s
 
+    cls._str = None
     cls.__str__ = __str__
+    cls._repr = None
     cls.__repr__ = __repr__
     return cls
 
