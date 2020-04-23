@@ -72,14 +72,17 @@ def test_copyfile(workdir, webdir, weburl):
     dest_ds.copyfile(src_ds.pathobj / 'myfile1.txt', target_dir=dest_ds.pathobj)
     dest_ds.get('myfile1.txt')
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
-    # doing it again works fine, using different call style
-    # (source+dest pair)
     # purposefully pollute the employed tmp folder to check that we do not trip
     # over such a condition
     tmploc = dest_ds.pathobj / '.git' / 'tmp' / 'datalad-copy' / 'some'
     tmploc.parent.mkdir(parents=True)
     tmploc.touch()
-    dest_ds.copyfile([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
+    # copy again, but to different target file name
+    # (source+dest pair now)
+    dest_ds.copyfile(
+        [src_ds.pathobj / 'myfile1.txt',
+         dest_ds.pathobj / 'renamed.txt'])
+    ok_file_has_content(dest_ds.pathobj / 'renamed.txt', '123')
     # copying more than one at once
     dest_ds.copyfile([
         src_ds.pathobj / 'myfile1.txt',
@@ -105,11 +108,11 @@ def test_copyfile_errors(dspath1, dspath2, nondspath):
     # using multiple sources and --specs-from
     assert_raises(ValueError, ds1.copyfile, ['1', '2', '3'], specs_from='-')
     # trying to copy to a dir that is not in a dataset
+    ds1.create()
     assert_status(
         'error',
         ds1.copyfile('somepath', target_dir=nondspath, on_failure='ignore'))
     # copy into a dataset that is not in the reference dataset
-    ds1.create()
     ds2 = Dataset(dspath2).create()
     assert_status(
         'error',

@@ -87,7 +87,7 @@ class CopyFile(Interface):
     @datasetmethod(name='copyfile')
     @eval_results
     def __call__(
-            path,
+            path=None,
             dataset=None,
             recursive=False,
             # TODO needs message
@@ -107,65 +107,71 @@ class CopyFile(Interface):
         # by one sequentially. Utilize lookup caching to make things faster,
         # instead of making the procedure itself more complicated.
 
-        # turn into list of absolute paths
-        paths = [resolve_path(p, dataset) for p in assure_list(path)]
+        if path and specs_from:
+            raise ValueError(
+                "Path argument(s) AND a specs-from specified, "
+                "this is not supported.")
 
-        # determine the destination path
+        ds = None
+        if dataset:
+            ds = require_dataset(dataset, check_installed=True,
+                                 purpose='copying into')
+
         if target_dir:
-            target_dir = target = resolve_path(target_dir, dataset)
-        else:
-            # it must be the last item in the path list
-            if len(paths) < 2 and not specs_from:
-                raise ValueError("No target directory was given to `copy`.")
-            target = paths.pop(-1)
-            # target could be a directory, or even an individual file
-            if len(paths) > 1:
-                # must be a directory
-                target_dir = target
-                if specs_from:
-                    raise ValueError(
-                        "Multiple source paths AND a files-from specified, "
-                        "this is not supported.")
-            else:
-                # single source, target be an explicit destination filename
-                target_dir = target if target.is_dir() else target.parent
+            target_dir = resolve_path(target_dir, dataset)
+        # TODO should we use ds.pathobj as target_dir, if none is given
+
+        if path:
+            # turn into list of absolute paths
+            paths = [resolve_path(p, dataset) for p in assure_list(path)]
+
+            # we already checked that there are no specs_from
+            if not target_dir:
+                if len(paths) == 1:
+                    raise ValueError("No target directory was given to `copy`.")
+                elif len(paths) == 2:
+                    # single source+dest combo
+                    if paths[-1].is_dir():
+                        # check if we need to set target_dir, in case dest
+                        # is a dir
+                        target_dir = paths.pop(-1)
+                    else:
+                        specs_from = [paths]
+                else:
+                    target_dir = paths.pop(-1)
+
+            if not specs_from:
+                # in all other cases we have a plain source list
+                specs_from = paths
 
         res_kwargs = dict(
             action='copy',
             logger=lgr,
         )
 
-        target_ds = get_dataset_root(target_dir)
-        if not target_ds:
-            yield dict(
-                path=str(target),
-                status='error',
-                message='copy destination not within a dataset',
-                **res_kwargs
-            )
-            return
-
-        target_ds = Dataset(target_ds)
-
-        if dataset:
-            ds = require_dataset(dataset, check_installed=True,
-                                 purpose='copying into')
-            if not (ds.pathobj == target_ds.pathobj
-                    or ds.pathobj in target_ds.pathobj.parents):
+        if target_dir:
+            target_dspath = get_dataset_root(target_dir)
+            if not target_dspath:
+                yield dict(
+                    path=str(target_dir),
+                    status='error',
+                    message='copy destination not within a dataset',
+                    **res_kwargs
+                )
+                return
+            target_dspath = Path(target_dspath)
+            if ds and not (ds.pathobj == target_dspath
+                           or ds.pathobj in target_dspath.parents):
                 yield dict(
                     path=ds.path,
                     status='error',
                     message=(
                         'reference dataset does not contain '
-                        'destination dataset: %s',
-                        target_ds),
+                        'destination dataset at: %s',
+                        target_dspath),
                     **res_kwargs
                 )
                 return
-        else:
-            ds = None
-
-        lgr.debug('Attempt to copy files into %s', target_ds)
 
         # lookup cache for dir to repo mappings, and as a DB for cleaning
         # things up
@@ -173,10 +179,11 @@ class CopyFile(Interface):
         # which paths to pass on to save
         to_save = []
         try:
-            for src_path, dest_path in _yield_specs(
-                    specs_from if specs_from else paths):
+            for src_path, dest_path in _yield_specs(specs_from):
                 src_path = Path(src_path)
-                dest_path = target_dir if dest_path is None else Path(dest_path)
+                dest_path = None if dest_path is None else Path(dest_path)
+                lgr.debug('Processing copy specification: %s -> %s',
+                          src_path, dest_path)
                 if not recursive and src_path.is_dir():
                     yield dict(
                         path=str(src_path),
@@ -187,7 +194,7 @@ class CopyFile(Interface):
                     continue
 
                 for src_file, dest_file in _yield_src_dest_filepaths(
-                        src_path, dest_path):
+                        src_path, dest_path, target_dir=target_dir):
                     for res in _copy_file(src_file, dest_file, cache=repo_cache):
                         yield dict(
                             res,
@@ -212,11 +219,11 @@ class CopyFile(Interface):
                             'Failed to clean up temporary directory: %s', e)
                 done.add(repo.pathobj)
 
-        if not to_save:
+        if not (ds or target_dir) or not to_save:
             # nothing left to do
             return
 
-        yield from (ds if ds else target_ds).save(
+        yield from (ds if ds else Dataset(target_dspath)).save(
             path=to_save,
             # we provide an explicit file list
             recursive=False,
@@ -247,7 +254,7 @@ def _yield_specs(specs):
         yield src, dest
 
 
-def _yield_src_dest_filepaths(src, dest, src_base=None):
+def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
     """Yield src/dest path pairs
 
     Parameters
@@ -256,7 +263,7 @@ def _yield_src_dest_filepaths(src, dest, src_base=None):
     src : Path
       Source file or directory. If a directory, yields files from this
       directory recursively.
-    dest : Path
+    dest : Path or None
       Destination path. Either a complete file path, or a base directory
       (see `src_base`).
     src_base : Path
@@ -268,15 +275,20 @@ def _yield_src_dest_filepaths(src, dest, src_base=None):
       Path instances
     """
     if src.is_dir():
+        # special case: not yet a file to copy
         if src_base is None:
             # TODO maybe an unconditional .parent isn't a good idea,
             # if someone wants to copy a whole drive...
             src_base = src.parent
         for p in src.iterdir():
-            yield from _yield_src_dest_filepaths(p, dest, src_base)
-    else:
+            yield from _yield_src_dest_filepaths(p, dest, src_base, target_dir)
+        return
+
+    if not dest:
+        # no explicit destination given, build one from src and target_dir
         # reflect src hierarchy if dest is a directory, otherwise
-        yield src, dest / (src.relative_to(src_base) if src_base else src.name)
+        dest = target_dir / (src.relative_to(src_base) if src_base else src.name)
+    yield src, dest
 
 
 def _get_repo_record(fpath, cache):
@@ -296,6 +308,7 @@ def _get_repo_record(fpath, cache):
 
 
 def _copy_file(src, dest, cache):
+    lgr.debug("Attempt to copy: %s -> %s", src, dest)
     str_src = str(src)
     str_dest = str(dest)
     if not op.lexists(str_src):
