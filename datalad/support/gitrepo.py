@@ -97,7 +97,8 @@ from .network import (
 from .path import get_parent_paths
 from .repo import (
     PathBasedFlyweight,
-    RepoInterface
+    RepoInterface,
+    path_based_str_repr,
 )
 
 # shortcuts
@@ -781,6 +782,7 @@ class PushInfo(dict):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
+@path_based_str_repr
 class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
@@ -1143,9 +1145,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
         # stalls etc
         self._cfg = None
-
-    def __repr__(self):
-        return '{}({!r})'.format(self.__class__.__name__, self.path)
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.

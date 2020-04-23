@@ -31,6 +31,7 @@ from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
+from datalad.support.repo import path_based_str_repr
 from datalad.support.gitrepo import (
     GitRepo,
 )
@@ -56,6 +57,7 @@ lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
 
 
+@path_based_str_repr
 class Dataset(object, metaclass=PathBasedFlyweight):
     """Representation of a DataLad dataset/repository
 
@@ -147,9 +149,6 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         if not self._pathobj:
             self._pathobj = ut.Path(self._path)
         return self._pathobj
-
-    def __repr__(self):
-        return 'Dataset({!r})'.format(self.path)
 
     def __eq__(self, other):
         if not hasattr(other, 'pathobj'):
