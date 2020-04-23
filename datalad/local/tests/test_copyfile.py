@@ -159,3 +159,25 @@ def test_copyfile_datalad_specialremote(workdir, webdir, weburl):
     dest_ds.drop('myfile1.txt')
     dest_ds.repo.get('myfile1.txt', remote='datalad')
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
+
+
+@with_tempfile(mkdir=True)
+def test_copyfile_into_nonannex(workdir):
+    workdir = Path(workdir)
+    src_ds = Dataset(workdir / 'src').create()
+    (src_ds.pathobj / 'present.txt').write_text('123')
+    (src_ds.pathobj / 'gone.txt').write_text('abc')
+    src_ds.save()
+    src_ds.drop('gone.txt', check=False)
+
+    # destination has no annex
+    dest_ds = Dataset(workdir / 'dest').create(annex=False)
+    # no issue copying a file that has content
+    copyfile([src_ds.pathobj / 'present.txt', dest_ds.pathobj])
+    # but cannot handle a dropped file, no chance to register
+    # availability info in an annex
+    assert_status(
+        'impossible',
+        copyfile([src_ds.pathobj / 'gone.txt', dest_ds.pathobj],
+                 on_failure='ignore')
+    )
