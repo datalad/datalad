@@ -56,7 +56,10 @@ class ProgressBarBase(object):
         self._current = value
 
     def start(self, initial=None):
-        self._current = initial if initial is not None else self._initial
+        if initial is not None:
+            self._initial = initial
+        self._current = self._initial
+
 
     def finish(self, partial=False):
         """
