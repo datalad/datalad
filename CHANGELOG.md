@@ -131,10 +131,6 @@ bet we will fix some bugs and make a world even a better place.
 
 - The rendering of command errors has been improved.  ([#4157][])
 
-- `datalad <subcommand>` learned to point to the [datalad-container][]
-  extension when a subcommand from that extension is given but the
-  extension is not installed.  ([#4174][])
-
 - [save][] now
   - displays a message to signal that the working tree is clean to
     make it more obvious that no results being rendered corresponds to
@@ -176,7 +172,7 @@ bet we will fix some bugs and make a world even a better place.
   ([#4243][])
 
 
-## 0.12.6 (??? ??, 2020) -- will be better than ever
+## 0.12.7 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -186,23 +182,63 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
+?
+
+### Enhancements and new features
+
+?
+
+
+## 0.12.6 (April 23, 2020) -- .
+
+### Major refactoring and deprecations
+
+- The value of `datalad.support.annexrep.N_AUTO_JOBS` is no longer
+  considered.  The variable will be removed in a later release.
+  ([#4409][])
+
+### Fixes
+
 - Staring with v0.12.0, `datalad save` recorded the current branch of
   a parent dataset as the `branch` value in the .gitmodules entry for
   a subdataset.  This behavior is problematic for a few reasons and
   has been reverted.  ([#4375][])
 
+- The default for the `--jobs` option, "auto", instructed DataLad to
+  pass a value to git-annex's `--jobs` equal to `min(8, max(3, <number
+  of CPUs>))`, which could lead to issues due to the large number of
+  child processes spawned and file descriptors opened.  To avoid this
+  behavior, `--jobs=auto` now results in git-annex being called with
+  `--jobs=1` by default.  Configure the new option
+  `datalad.runtime.max-annex-jobs` to control the maximum value that
+  will be considered when `--jobs='auto'`.  ([#4409][])
+
 - Various commands have been adjusted to better handle the case where
   a remote's HEAD ref points to an unborn branch.  ([#4370][])
 
-- [search] `--show-keys short` gave incorrect information about the
-  number of unhashable entries.  This issue has been addressed by
-  using the `repr` of values rather than reporting on unhashable
-  entries.  ([#4354][])
+- [search]
+  - learned to use the query as a regular expression that restricts
+    the keys that are shown for `--show-keys short`. ([#4354][])
+  - gives a more helpful message when query is an invalid regular
+    expression.  ([#4398][])
+
+- The code for parsing Git configuration did not follow Git's behavior
+  of accepting a key with no value as shorthand for key=true.  ([#4421][])
+
+- `AnnexRepo.info` needed a compatibility update for a change in how
+  git-annex reports file names.  ([#4431][])
+
+- [create-sibling-github][] did not gracefully handle a token that did
+  not have the necessary permissions.  ([#4400][])
 
 ### Enhancements and new features
 
 - [search] learned to use the query as a regular expression that
   restricts the keys that are shown for `--show-keys short`. ([#4354][])
+
+- `datalad <subcommand>` learned to point to the [datalad-container][]
+  extension when a subcommand from that extension is given but the
+  extension is not installed.  ([#4400][]) ([#4174][])
 
 
 ## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
@@ -2738,3 +2774,8 @@ publishing
 [#4367]: https://github.com/datalad/datalad/issues/4367
 [#4370]: https://github.com/datalad/datalad/issues/4370
 [#4375]: https://github.com/datalad/datalad/issues/4375
+[#4398]: https://github.com/datalad/datalad/issues/4398
+[#4400]: https://github.com/datalad/datalad/issues/4400
+[#4409]: https://github.com/datalad/datalad/issues/4409
+[#4421]: https://github.com/datalad/datalad/issues/4421
+[#4431]: https://github.com/datalad/datalad/issues/4431

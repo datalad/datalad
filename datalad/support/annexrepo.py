@@ -2527,7 +2527,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         # and that they all have 'file' equal to the passed one
         out = {}
         for j, f in zip(json_objects, files):
-            assert(j.pop('file') == f)
+            # Starting with version of annex 8.20200330-100-g957a87b43
+            # annex started to normalize relative paths.
+            # ref: https://github.com/datalad/datalad/issues/4431
+            # Use normpath around each side to ensure it is the same file
+            assert normpath(j.pop('file')) == normpath(f)
             if not j['success']:
                 j = None
             else:

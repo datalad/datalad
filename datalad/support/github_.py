@@ -9,7 +9,10 @@
 """Helpers for interaction with GitHub
 """
 from .. import cfg
-from ..consts import CONFIG_HUB_TOKEN_FIELD
+from ..consts import (
+    CONFIG_HUB_TOKEN_FIELD,
+    GITHUB_LOGIN_URL,
+)
 from ..dochelpers import exc_str
 from ..downloaders.credentials import UserPassword
 from ..ui import ui
@@ -119,10 +122,6 @@ def _gen_github_ses(github_login, github_passwd):
 
     # We got here so time to try credentials
 
-    # make it per user if github_login was provided. People might want to use
-    # different credentials etc
-    cred_identity = "%s@github" % github_login if github_login else "github"
-
     # if login and passwd were provided - try that one first
     try_creds = github_login and github_passwd
     try_login = bool(github_login)
@@ -136,7 +135,9 @@ def _gen_github_ses(github_login, github_passwd):
             user_name = github_login
             try_creds = None
         else:
-            cred = UserPassword(cred_identity, 'https://github.com/login')
+            # make it per user if github_login was provided. People might want
+            # to use different credentials etc
+            cred = _get_github_cred(github_login)
             # if github_login was provided, we should first try it as is,
             # and only ask for password
             if not cred.is_known:
@@ -207,6 +208,12 @@ def _gen_github_ses(github_login, github_passwd):
             break
 
 
+def _get_github_cred(github_login=None):
+    """Helper to create github credential"""
+    cred_identity = "%s@github" % github_login if github_login else "github"
+    return UserPassword(cred_identity, GITHUB_LOGIN_URL)
+
+
 def _get_2fa_token(user):
     one_time_password = ui.question(
         "2FA one time password", hidden=True, repeat=False
@@ -272,12 +279,25 @@ def _gen_github_entity(
     for ses, cred in _gen_github_ses(github_login, github_passwd):
         if github_organization:
             try:
-                yield ses.get_organization(github_organization), cred
+                org = ses.get_organization(github_organization)
+                lgr.info(
+                    "Successfully obtained information about organization %s "
+                    "using %s credential", github_organization, cred
+                )
+                yield org, cred
             except gh.UnknownObjectException as e:
                 # yoh thinks it might be due to insufficient credentials?
                 raise ValueError('unknown organization "{}" [{}]'.format(
                                  github_organization,
                                  exc_str(e)))
+            except gh.BadCredentialsException as e:
+                lgr.warning(
+                    "Having authenticated using %s, we failed (%s) to access "
+                    "information about organization %s. We will try next "
+                    "authentication method (if any left available)",
+                    cred or "token", e, github_organization
+                )
+                continue
         else:
             yield ses.get_user(), cred
 
