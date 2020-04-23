@@ -13,6 +13,7 @@ import os.path as op
 from os import linesep
 
 from distutils.version import LooseVersion
+from itertools import chain
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -133,7 +134,7 @@ class ExternalVersions(object):
 
     UNKNOWN = UnknownVersion()
 
-    CUSTOM = {
+    _CUSTOM = {
         'cmd:annex': _get_annex_version,
         'cmd:git': _get_git_version,
         'cmd:bundled-git': _get_bundled_git_version,
@@ -141,7 +142,7 @@ class ExternalVersions(object):
         'cmd:system-ssh': _get_system_ssh_version,
         'cmd:7z': _get_system_7z_version,
     }
-    INTERESTING = (
+    _INTERESTING = (
         'appdirs',
         'boto',
         'exifread',
@@ -162,6 +163,8 @@ class ExternalVersions(object):
 
     def __init__(self):
         self._versions = {}
+        self.CUSTOM = self._CUSTOM.copy()
+        self.INTERESTING = list(self._INTERESTING)  # make mutable for `add`
 
     @classmethod
     def _deduce_version(klass, value):
@@ -252,6 +255,44 @@ class ExternalVersions(object):
     def __contains__(self, item):
         return bool(self[item])
 
+    def add(self, name, func=None, interesting=True):
+        """Add a version checker
+
+        This method allows third-party libraries to define additional checks.
+        It will not add `name` if already exists.  If `name` exists and `func`
+        is different - it will override with a new `func`.
+
+        Parameters
+        ----------
+        name: str
+          Name of the check (usually a name of the Python module, or an
+          external command prefixed with "cmd:")
+        func: callable, optional
+          Function to be called to obtain version information. This should be
+          defined when checking the version of something that is not a Python
+          module or when this class's method for determining the version of a
+          Python module isn't sufficient.
+        interesting: bool, optional
+          Makes sense only for entries without func - whether it is considered
+          "interesting" and should be included in output of dumps
+           (with query=True).
+        """
+        if func:
+            func_existing = self.CUSTOM.get(name, None)
+            was_known = False
+            if func_existing and func_existing is not func:
+                lgr.debug(
+                    "Adding a new custom version checker %s for %s, "
+                    "old one: %s", func, name, func_existing)
+                was_known = name in self._versions
+            self.CUSTOM[name] = func
+            if was_known:
+                # pop and query it again right away to possibly replace with a new value
+                self._versions.pop(name)
+                _ = self[name]
+        if interesting and name not in self.INTERESTING:
+            self.INTERESTING.append(name)
+
     @property
     def versions(self):
         """Return dictionary (copy) of versions"""
@@ -272,7 +313,7 @@ class ExternalVersions(object):
           get those which weren't queried for yet
         """
         if query:
-            [self[k] for k in tuple(self.CUSTOM) + self.INTERESTING]
+            [self[k] for k in chain(self.CUSTOM, self.INTERESTING)]
         if indent and (indent is True):
             indent = ' '
         items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]

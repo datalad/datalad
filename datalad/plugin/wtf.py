@@ -14,6 +14,7 @@ import logging
 import os
 import os.path as op
 from functools import partial
+from itertools import chain
 from collections import OrderedDict
 
 
@@ -221,7 +222,7 @@ def _describe_metadata_extractors():
 def _describe_dependencies():
     # query all it got
     [external_versions[k]
-     for k in tuple(external_versions.CUSTOM) + external_versions.INTERESTING]
+     for k in chain(external_versions.CUSTOM, external_versions.INTERESTING)]
 
     return {
         k: str(external_versions[k]) for k in external_versions.keys()
