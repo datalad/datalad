@@ -149,30 +149,6 @@ class CopyFile(Interface):
             logger=lgr,
         )
 
-        if target_dir:
-            target_dspath = get_dataset_root(target_dir)
-            if not target_dspath:
-                yield dict(
-                    path=str(target_dir),
-                    status='error',
-                    message='copy destination not within a dataset',
-                    **res_kwargs
-                )
-                return
-            target_dspath = Path(target_dspath)
-            if ds and not (ds.pathobj == target_dspath
-                           or ds.pathobj in target_dspath.parents):
-                yield dict(
-                    path=ds.path,
-                    status='error',
-                    message=(
-                        'reference dataset does not contain '
-                        'destination dataset at: %s',
-                        target_dspath),
-                    **res_kwargs
-                )
-                return
-
         # lookup cache for dir to repo mappings, and as a DB for cleaning
         # things up
         repo_cache = {}
@@ -195,6 +171,21 @@ class CopyFile(Interface):
 
                 for src_file, dest_file in _yield_src_dest_filepaths(
                         src_path, dest_path, target_dir=target_dir):
+                    if ds and ds.pathobj not in dest_file.parents:
+                        # take time to compose proper error
+                        dpath = str(target_dir if target_dir else dest_path)
+                        yield dict(
+                            path=dpath,
+                            status='error',
+                            message=(
+                                'reference dataset does not contain '
+                                'destination path: %s',
+                                dpath),
+                            **res_kwargs
+                        )
+                        # only recursion could yield further results, which would
+                        # all have the same issue, so call it over right here
+                        break
                     for res in _copy_file(src_file, dest_file, cache=repo_cache):
                         yield dict(
                             res,
@@ -219,11 +210,11 @@ class CopyFile(Interface):
                             'Failed to clean up temporary directory: %s', e)
                 done.add(repo.pathobj)
 
-        if not (ds or target_dir) or not to_save:
+        if not (ds and to_save):
             # nothing left to do
             return
 
-        yield from (ds if ds else Dataset(target_dspath)).save(
+        yield from ds.save(
             path=to_save,
             # we provide an explicit file list
             recursive=False,
@@ -329,6 +320,13 @@ def _copy_file(src, dest, cache):
     # same for the destination repo
     dest_repo_rec = _get_repo_record(dest, cache)
     dest_repo = dest_repo_rec['repo']
+    if not dest_repo:
+        yield dict(
+            path=str_dest,
+            status='error',
+            message='copy destination not within a dataset',
+        )
+        return
 
     # whenever there is no annex (remember an AnnexRepo is also a GitRepo)
     if src_repo is None or not isinstance(src_repo, AnnexRepo):
