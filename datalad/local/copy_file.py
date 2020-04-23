@@ -401,6 +401,12 @@ def _copy_file(src, dest, cache):
             str_src)
         dest_key = src_key
 
+    if op.lexists(str_dest):
+        # if the target already exists, we remove it first, because we want to
+        # modify this path (potentially pointing to a new key), rather than
+        # failing next on 'fromkey', due to a key mismatch.
+        # this is more compatible with the nature of 'cp'
+        dest.unlink()
     dest_repo._run_annex_command_json(
         'fromkey',
         # we use force, because in all likelihood there is no content for this key
