@@ -41,7 +41,7 @@ from datalad.distribution.dataset import (
     resolve_path,
 )
 
-lgr = logging.getLogger('datalad.local.copyfile')
+lgr = logging.getLogger('datalad.local.copy_file')
 
 
 @build_doc
@@ -84,7 +84,7 @@ class CopyFile(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='copyfile')
+    @datasetmethod(name='copy_file')
     @eval_results
     def __call__(
             path=None,

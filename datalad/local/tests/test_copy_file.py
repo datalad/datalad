@@ -5,7 +5,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test copyfile command"""
+"""Test copy_file command"""
 
 
 import os
@@ -19,7 +19,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.api import (
     clone,
     create,
-    copyfile,
+    copy_file,
 )
 from datalad.utils import (
     chpwd,
@@ -52,7 +52,7 @@ from datalad.consts import DATALAD_SPECIAL_REMOTE
     'webfile2': 'abc',
 })
 @serve_path_via_http
-def test_copyfile(workdir, webdir, weburl):
+def test_copy_file(workdir, webdir, weburl):
     workdir = Path(workdir)
     webdir = Path(webdir)
     src_ds = Dataset(workdir / 'src').create()
@@ -69,7 +69,7 @@ def test_copyfile(workdir, webdir, weburl):
     # copy the file from the source dataset into it.
     # it must copy enough info to actually put datalad into the position
     # to obtain the file content from the original URL
-    dest_ds.copyfile(src_ds.pathobj / 'myfile1.txt', target_dir=dest_ds.pathobj)
+    dest_ds.copy_file(src_ds.pathobj / 'myfile1.txt', target_dir=dest_ds.pathobj)
     dest_ds.get('myfile1.txt')
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
     # purposefully pollute the employed tmp folder to check that we do not trip
@@ -79,53 +79,53 @@ def test_copyfile(workdir, webdir, weburl):
     tmploc.touch()
     # copy again, but to different target file name
     # (source+dest pair now)
-    dest_ds.copyfile(
+    dest_ds.copy_file(
         [src_ds.pathobj / 'myfile1.txt',
          dest_ds.pathobj / 'renamed.txt'])
     ok_file_has_content(dest_ds.pathobj / 'renamed.txt', '123')
     # copying more than one at once
-    dest_ds.copyfile([
+    dest_ds.copy_file([
         src_ds.pathobj / 'myfile1.txt',
         src_ds.pathobj / 'subdir' / 'myfile2.txt',
         dest_ds.pathobj
     ])
     # copy directly from a non-dataset location
-    dest_ds.copyfile(webdir / 'webfile1', target_dir=dest_ds.pathobj)
+    dest_ds.copy_file(webdir / 'webfile1', target_dir=dest_ds.pathobj)
 
     # copy from annex dataset into gitrepo
     git_ds = Dataset(workdir / 'git').create(annex=False)
-    git_ds.copyfile(src_ds.pathobj / 'subdir' / 'myfile2.txt',
+    git_ds.copy_file(src_ds.pathobj / 'subdir' / 'myfile2.txt',
                     target_dir=git_ds.pathobj)
 
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_copyfile_errors(dspath1, dspath2, nondspath):
+def test_copy_file_errors(dspath1, dspath2, nondspath):
     ds1 = Dataset(dspath1)
     # no target directory given
-    assert_raises(ValueError, ds1.copyfile, 'somefile')
+    assert_raises(ValueError, ds1.copy_file, 'somefile')
     # using multiple sources and --specs-from
-    assert_raises(ValueError, ds1.copyfile, ['1', '2', '3'], specs_from='-')
+    assert_raises(ValueError, ds1.copy_file, ['1', '2', '3'], specs_from='-')
     # trying to copy to a dir that is not in a dataset
     ds1.create()
     assert_status(
         'error',
-        ds1.copyfile('somepath', target_dir=nondspath, on_failure='ignore'))
+        ds1.copy_file('somepath', target_dir=nondspath, on_failure='ignore'))
     # copy into a dataset that is not in the reference dataset
     ds2 = Dataset(dspath2).create()
     assert_status(
         'error',
-        ds1.copyfile('somepath', target_dir=dspath2, on_failure='ignore'))
+        ds1.copy_file('somepath', target_dir=dspath2, on_failure='ignore'))
 
     # attempt to copy from a directory, but no recursion is enabled.
     # use no reference ds to excercise a different code path
     assert_status(
-        'impossible', copyfile([nondspath, dspath1], on_failure='ignore'))
+        'impossible', copy_file([nondspath, dspath1], on_failure='ignore'))
 
     # attempt to copy a file that doesn't exist
     assert_status(
-        'impossible', copyfile(['funky', dspath1], on_failure='ignore'))
+        'impossible', copy_file(['funky', dspath1], on_failure='ignore'))
 
 
 @with_tempfile(mkdir=True)
@@ -133,7 +133,7 @@ def test_copyfile_errors(dspath1, dspath2, nondspath):
     'webfile1': '123',
 })
 @serve_path_via_http
-def test_copyfile_datalad_specialremote(workdir, webdir, weburl):
+def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
     workdir = Path(workdir)
     src_ds = Dataset(workdir / 'src').create()
     # enable datalad special remote
@@ -156,7 +156,7 @@ def test_copyfile_datalad_specialremote(workdir, webdir, weburl):
     dest_ds = Dataset(workdir / 'dest').create()
     # no special remotes
     eq_(dest_ds.repo.get_special_remotes(), {})
-    copyfile([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
+    copy_file([src_ds.pathobj / 'myfile1.txt', dest_ds.pathobj])
     # we have an special remote in the destination dataset now
     assert_in_results(
         dest_ds.repo.get_special_remotes().values(),
@@ -169,7 +169,7 @@ def test_copyfile_datalad_specialremote(workdir, webdir, weburl):
 
 
 @with_tempfile(mkdir=True)
-def test_copyfile_into_nonannex(workdir):
+def test_copy_file_into_nonannex(workdir):
     workdir = Path(workdir)
     src_ds = Dataset(workdir / 'src').create()
     (src_ds.pathobj / 'present.txt').write_text('123')
@@ -180,12 +180,12 @@ def test_copyfile_into_nonannex(workdir):
     # destination has no annex
     dest_ds = Dataset(workdir / 'dest').create(annex=False)
     # no issue copying a file that has content
-    copyfile([src_ds.pathobj / 'present.txt', dest_ds.pathobj])
+    copy_file([src_ds.pathobj / 'present.txt', dest_ds.pathobj])
     # but cannot handle a dropped file, no chance to register
     # availability info in an annex
     assert_status(
         'impossible',
-        copyfile([src_ds.pathobj / 'gone.txt', dest_ds.pathobj],
+        copy_file([src_ds.pathobj / 'gone.txt', dest_ds.pathobj],
                  on_failure='ignore')
     )
 
@@ -197,11 +197,11 @@ def test_copyfile_into_nonannex(workdir):
     },
 })
 @with_tempfile(mkdir=True)
-def test_copyfile_recursion(srcdir, destdir):
+def test_copy_file_recursion(srcdir, destdir):
     src_ds = Dataset(srcdir).create(force=True)
     src_ds.save()
     dest_ds = Dataset(destdir).create()
-    copyfile([src_ds.pathobj / 'subdir', dest_ds.pathobj], recursive=True)
+    copy_file([src_ds.pathobj / 'subdir', dest_ds.pathobj], recursive=True)
     # structure is mirrored
     ok_file_has_content(dest_ds.pathobj / 'subdir' / 'file1', '123')
     ok_file_has_content(dest_ds.pathobj / 'subdir' / 'file2', 'abc')

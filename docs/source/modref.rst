@@ -73,7 +73,7 @@ Plumbing commands
    api.annotate_paths
    api.clean
    api.clone
-   api.copyfile
+   api.copy_file
    api.create_test_dataset
    api.diff
    api.download_url
