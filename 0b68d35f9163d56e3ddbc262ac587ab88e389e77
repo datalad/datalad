@@ -1,0 +1,18 @@
+Update 0.12.5-45-g37ec5be935:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    37ec5be935ec0fa50db7883863db398e9f32796f..d315dad41c379ffcb38ccad4035ade5808c024cd
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4433 from yarikoptic/bf-4431
+   4b79af674f^-1
++  Merge pull request #4400 from yarikoptic/bf-github-org
+   dd883be8c1^-1
++  Merge pull request #4440 from yarikoptic/maint-enhs
+   d315dad41c^-1
