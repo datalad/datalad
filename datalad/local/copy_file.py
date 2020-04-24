@@ -286,6 +286,9 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
             yield from _yield_src_dest_filepaths(p, dest, src_base, target_dir)
         return
 
+    if target_dir is None and not dest:
+        raise ValueError("Neither target_dir nor dest specified")
+
     if not dest:
         # no explicit destination given, build one from src and target_dir
         # reflect src hierarchy if dest is a directory, otherwise
