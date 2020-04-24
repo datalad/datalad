@@ -498,7 +498,7 @@ def _replace_file(str_src, dest, str_dest, follow_symlinks):
         dest.unlink()
     else:
         dest.parent.mkdir(exist_ok=True, parents=True)
-    copyfile(str_src, str_dest, follow_symlinks=False)
+    copyfile(str_src, str_dest, follow_symlinks=follow_symlinks)
 
 
 def _extract_special_remote_info(repo):

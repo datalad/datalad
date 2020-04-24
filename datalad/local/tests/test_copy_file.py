@@ -181,6 +181,7 @@ def test_copy_file_into_nonannex(workdir):
     dest_ds = Dataset(workdir / 'dest').create(annex=False)
     # no issue copying a file that has content
     copy_file([src_ds.pathobj / 'present.txt', dest_ds.pathobj])
+    ok_file_has_content(dest_ds.pathobj / 'present.txt', '123')
     # but cannot handle a dropped file, no chance to register
     # availability info in an annex
     assert_status(
