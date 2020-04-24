@@ -8,33 +8,20 @@
 """Test copy_file command"""
 
 
-import os
 from os.path import (
     join as opj,
-    relpath,
-    pardir,
 )
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
-    clone,
-    create,
     copy_file,
 )
 from datalad.utils import (
-    chpwd,
-    on_windows,
     Path,
-    PurePosixPath,
 )
 from datalad.tests.utils import (
-    assert_false,
-    assert_in,
     assert_in_results,
-    assert_not_in,
     assert_raises,
-    assert_repo_status,
-    assert_result_count,
     assert_status,
     eq_,
     nok_,
