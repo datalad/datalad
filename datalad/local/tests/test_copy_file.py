@@ -249,5 +249,5 @@ def test_copy_file_specs_from(srcdir, destdir):
 
 def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
     ds = Dataset(destdir).create()
-    ds.copy_file(specs_from=specs, **kwargs)
+    ds.copy_file(specs_from=specs, target_dir=ds.path, **kwargs)
     return ds
