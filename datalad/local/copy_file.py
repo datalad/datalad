@@ -133,7 +133,7 @@ class CopyFile(Interface):
             # we already checked that there are no specs_from
             if not target_dir:
                 if len(paths) == 1:
-                    raise ValueError("No target directory was given to `copy`.")
+                    raise ValueError("No target directory was given.")
                 elif len(paths) == 2:
                     # single source+dest combo
                     if paths[-1].is_dir():
