@@ -73,7 +73,9 @@ class CopyFile(Interface):
         target_dir=Parameter(
             args=('--target-dir', '-t'),
             metavar='DIRECTORY',
-            doc="""copy all source files into this DIRECTORY""",
+            doc="""copy all source files into this DIRECTORY. This value
+            is overwritten by any explicit destination path provided via
+            [CMD: --specs-from CMD][PY: 'specs_from' PY].""",
             constraints=EnsureStr() | EnsureNone()),
         specs_from=Parameter(
             args=('--specs-from',),
@@ -405,7 +407,7 @@ def _copy_file(src, dest, cache):
     if finfo.get('has_content', True):
         dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
     else:
-        lgr.warning(
+        lgr.debug(
             'File content not available, forced to reuse previous annex key: %s',
             str_src)
         dest_key = src_key
