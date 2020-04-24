@@ -165,7 +165,9 @@ class CopyFile(Interface):
         try:
             for src_path, dest_path in _yield_specs(specs_from):
                 src_path = Path(src_path)
-                dest_path = None if dest_path is None else Path(dest_path)
+                dest_path = None \
+                if dest_path is None \
+                else resolve_path(dest_path, dataset)
                 lgr.debug('Processing copy specification: %s -> %s',
                           src_path, dest_path)
                 if not recursive and src_path.is_dir():
