@@ -23,6 +23,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
+from datalad.interface.common_opts import save_message_opt
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import (
     Dataset,
@@ -82,6 +83,7 @@ class CopyFile(Interface):
             path, or a source/destination path pair (separated by a null byte
             character).[PY:  Alternatively, a list of 2-tuples with
             source/destination pairs can be given provided. PY]."""),
+        message=save_message_opt,
     )
 
     @staticmethod
@@ -91,9 +93,9 @@ class CopyFile(Interface):
             path=None,
             dataset=None,
             recursive=False,
-            # TODO needs message
             target_dir=None,
-            specs_from=None):
+            specs_from=None,
+            message=None):
         # Concept
         #
         # Loosely model after the POSIX cp command
@@ -219,6 +221,7 @@ class CopyFile(Interface):
             path=to_save,
             # we provide an explicit file list
             recursive=False,
+            message=message,
         )
 
 
