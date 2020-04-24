@@ -74,7 +74,7 @@ class CopyFile(Interface):
             args=('--target-dir', '-t'),
             metavar='DIRECTORY',
             doc="""copy all source files into this DIRECTORY. This value
-            is overwritten by any explicit destination path provided via
+            is overridden by any explicit destination path provided via
             [CMD: --specs-from CMD][PY: 'specs_from' PY].""",
             constraints=EnsureStr() | EnsureNone()),
         specs_from=Parameter(
@@ -84,7 +84,7 @@ class CopyFile(Interface):
             file, or stdin (with '-'). Each line defines either a source
             path, or a source/destination path pair (separated by a null byte
             character).[PY:  Alternatively, a list of 2-tuples with
-            source/destination pairs can be given provided. PY]."""),
+            source/destination pairs can be given. PY]"""),
         message=save_message_opt,
     )
 
