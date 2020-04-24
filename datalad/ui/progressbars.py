@@ -26,13 +26,13 @@ from .. import lgr
 class ProgressBarBase(object):
     """Base class for any progress bar"""
 
-    def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B', initial=0):
+    def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B'):
         self.label = label
         self.fill_text = fill_text
         self.total = total
         self.unit = unit
         self.out = out
-        self._current = self._initial = initial
+        self._current = 0
 
     def refresh(self):
         """Force update"""
@@ -57,11 +57,8 @@ class ProgressBarBase(object):
         assert value >= 0, "Total cannot be negative"
         self._current = value
 
-    def start(self, initial=None):
-        if initial is not None:
-            self._initial = initial
-        self._current = self._initial
-
+    def start(self, initial=0):
+        self._current = initial
 
     def finish(self, partial=False):
         """
@@ -215,7 +212,7 @@ try:
 
         def __init__(self, label='', fill_text=None,
                      total=None, unit='B', out=sys.stdout, leave=False,
-                     frontend=None, initial=0):
+                     frontend=None):
             """
 
             Parameters
@@ -228,12 +225,10 @@ try:
             leave
             frontend: (None, 'ipython'), optional
               tqdm module to use.  Could be tqdm_notebook if under IPython
-            initial: (0, int), where to start the progress bar
             """
             super(tqdmProgressBar, self).__init__(label=label,
                                                   total=total,
-                                                  unit=unit,
-                                                  initial=initial)
+                                                  unit=unit)
 
             if frontend not in self._frontends:
                 raise ValueError(
@@ -257,13 +252,13 @@ try:
                 self._default_pbar_params,
                 dict(desc=label, unit=unit,
                      unit_scale=True, total=total, file=out,
-                     leave=leave, initial=initial,
+                     leave=leave,
                      ))
             self._pbar = None
 
-        def _create(self):
+        def _create(self, initial=0):
             if self._pbar is None:
-                self._pbar = self._tqdm(**self._pbar_params)
+                self._pbar = self._tqdm(initial=initial, **self._pbar_params)
 
         def update(self, size, increment=False, total=None):
             self._create()
@@ -297,9 +292,9 @@ try:
                                                 increment=increment,
                                                 total=total)
 
-        def start(self):
-            super(tqdmProgressBar, self).start()
-            self._create()
+        def start(self, initial=0):
+            super(tqdmProgressBar, self).start(initial=initial)
+            self._create(initial=initial)
 
         def refresh(self):
             super(tqdmProgressBar, self).refresh()
