@@ -147,6 +147,9 @@ class CopyFile(Interface):
                 # in all other cases we have a plain source list
                 specs_from = paths
 
+        if not specs_from:
+            raise ValueError("Neither `paths` nor `specs_from` given.")
+
         res_kwargs = dict(
             action='copy',
             logger=lgr,

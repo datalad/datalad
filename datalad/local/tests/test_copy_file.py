@@ -228,3 +228,26 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
             if r not in ('lvl2', '.gitmodules'))
         for d in (src_ds, dest_ds)
     ])
+
+
+@with_tree(tree={
+    'lvl1': {
+        'file1': '123',
+        'lvl2' : {
+            'file2': 'abc',
+        },
+    },
+})
+@with_tempfile(mkdir=True)
+def test_copy_file_specs_from(srcdir, destdir):
+    srcdir = Path(srcdir)
+    destdir = Path(destdir)
+    files = [p for p in srcdir.glob('**/*') if not p.is_dir()]
+    # plain list of path objects
+    _check_copy_file_specs_from(srcdir, destdir / 'plainlist', files)
+
+
+def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
+    ds = Dataset(destdir).create()
+    ds.copy_file(specs_from=specs, **kwargs)
+    return ds
