@@ -53,16 +53,17 @@ class CopyFile(Interface):
             # not really needed on the cmdline, but for PY to resolve relative
             # paths
             args=("-d", "--dataset"),
-            doc="""target dataset to save copied files into. This may be a
-            superdataset containing the actual destination dataset. In this case,
-            any changes will be save up to this dataset.[PY: This dataset is also
-            the reference for any relative paths. PY].""",
+            doc="""root dataset to save after copy operations are completed.
+            All destination paths must be within this dataset, or its
+            subdatsets. [PY: This dataset is also the reference for any relative
+            paths. PY] If no dataset is given, dataset modifications will be
+            left unsaved.""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar='PATH',
             doc="""paths to copy (and possibly a target path to copy to).""",
-            nargs='+',
+            nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r",),
@@ -71,12 +72,12 @@ class CopyFile(Interface):
         target_dir=Parameter(
             args=('--target-directory', '-t'),
             metavar='DIRECTORY',
-            doc="""copy all PATH arguments into DIRECTORY""",
+            doc="""copy all source files into this DIRECTORY""",
             constraints=EnsureStr() | EnsureNone()),
         specs_from=Parameter(
             args=('--specs-from',),
             metavar='SOURCE',
-            doc="""read list of source and destination path names from a given
+            doc="""read list of source (and destination) path names from a given
             file, or stdin (with '-'). Each line defines either a source
             path, or a source/destination path pair (separated by a null byte
             character).[PY:  Alternatively, a list of 2-tuples with
