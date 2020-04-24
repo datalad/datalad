@@ -179,6 +179,15 @@ class CopyFile(Interface):
                     )
                     continue
 
+                if not (dest_path or target_dir):
+                    yield dict(
+                        path=str(src_path),
+                        status='impossible',
+                        message='need destination path or target directory',
+                        **res_kwargs
+                    )
+                    continue
+
                 for src_file, dest_file in _yield_src_dest_filepaths(
                         src_path, dest_path, target_dir=target_dir):
                     if ds and ds.pathobj not in dest_file.parents:
