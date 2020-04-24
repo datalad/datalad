@@ -22,6 +22,7 @@ from datalad.utils import (
 from datalad.tests.utils import (
     assert_in_results,
     assert_raises,
+    assert_repo_status,
     assert_status,
     eq_,
     nok_,
@@ -195,3 +196,35 @@ def test_copy_file_recursion(srcdir, destdir):
     # structure is mirrored
     ok_file_has_content(dest_ds.pathobj / 'subdir' / 'file1', '123')
     ok_file_has_content(dest_ds.pathobj / 'subdir' / 'file2', 'abc')
+
+
+@with_tree(tree={
+    'lvl1': {
+        'file1': '123',
+        'lvl2' : {
+            'file2': 'abc',
+        },
+    },
+})
+@with_tempfile(mkdir=True)
+def test_copy_file_into_dshierarchy(srcdir, destdir):
+    srcdir = Path(srcdir)
+    src_ds = Dataset(srcdir).create(force=True)
+    src_ds.save()
+    # now build two nested datasets, such that lvl2 ends up in a subdataset
+    dest_ds = Dataset(destdir).create()
+    dest_ds.create(dest_ds.pathobj / 'lvl2')
+    assert_repo_status(dest_ds.path)
+
+    dest_ds.copy_file([src_ds.pathobj / 'lvl1', dest_ds.pathobj], recursive=True)
+    assert_repo_status(dest_ds.path)
+
+    # we get the same structure as the input, just distributed across
+    # nested datasets
+    eq_(*[
+        sorted(
+            r for r in d.status(result_xfm='relpaths', result_renderer=None)
+            # filter out subdataset entry in dest_ds
+            if r not in ('lvl2', '.gitmodules'))
+        for d in (src_ds, dest_ds)
+    ])
