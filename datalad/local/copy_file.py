@@ -285,7 +285,11 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
     if not dest:
         # no explicit destination given, build one from src and target_dir
         # reflect src hierarchy if dest is a directory, otherwise
-        dest = target_dir / (src.relative_to(src_base) if src_base else src.name)
+        if src.is_absolute():
+            dest = target_dir / (src.relative_to(src_base) if src_base else src.name)
+        else:
+            dest = target_dir / src
+
     yield src, dest
 
 
