@@ -71,7 +71,7 @@ class CopyFile(Interface):
             action='store_true',
             doc="""copy directories recursively"""),
         target_dir=Parameter(
-            args=('--target-directory', '-t'),
+            args=('--target-dir', '-t'),
             metavar='DIRECTORY',
             doc="""copy all source files into this DIRECTORY""",
             constraints=EnsureStr() | EnsureNone()),
