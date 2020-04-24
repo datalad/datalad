@@ -163,8 +163,10 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
         externaltype=DATALAD_SPECIAL_REMOTE,
     )
     # and it works
-    dest_ds.drop('myfile1.txt')
-    dest_ds.repo.get('myfile1.txt', remote='datalad')
+    print('AAAAAAAAAAA')
+    print(dest_ds.drop('myfile1.txt'))
+    print('BBBBBBBBBBB')
+    print(dest_ds.repo.get('myfile1.txt', remote='datalad'))
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
 
 
