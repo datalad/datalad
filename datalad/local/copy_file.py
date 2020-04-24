@@ -234,7 +234,7 @@ def _yield_specs(specs):
     elif isinstance(specs, (list, tuple)):
         iter = specs
     else:
-        iter = specs.open('r')
+        iter = Path(specs).open('r')
 
     for spec in iter:
         if isinstance(spec, (list, tuple)):
