@@ -51,10 +51,13 @@ def test_copy_file(workdir, webdir, weburl):
     src_ds.download_url('/'.join((weburl, 'webfile2')),
                         path=opj('subdir', 'myfile2.txt'))
     ok_file_has_content(src_ds.pathobj / 'myfile1.txt', '123')
-    src_ds.drop('myfile1.txt', check=False)
-    nok_(src_ds.repo.file_has_content('myfile1.txt'))
     # now create a fresh dataset
     dest_ds = Dataset(workdir / 'dest').create()
+    if not dest_ds.repo.is_managed_branch():
+        # unless we have a target ds on a cripples FS (where `annex fromkey`
+        # doesn't work), we can even drop the file content in the source repo
+        src_ds.drop('myfile1.txt', check=False)
+        nok_(src_ds.repo.file_has_content('myfile1.txt'))
     # copy the file from the source dataset into it.
     # it must copy enough info to actually put datalad into the position
     # to obtain the file content from the original URL

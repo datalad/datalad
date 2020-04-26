@@ -412,49 +412,16 @@ def _copy_file(src, dest, cache):
         return
 
     # at this point we are copying an annexed file into an annex repo
-    src_key = finfo['key']
-
-    # make an attempt to compute a key in the target repo, this will hopefully
-    # become more relevant once "salted backends" are possible
-    # https://github.com/datalad/datalad/issues/3357 that could prevent
-    # information leakage across datasets
-    if finfo.get('has_content', True):
-        dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
+    if dest_repo.is_managed_branch():
+        res = _place_filekey_managed(
+            finfo, str_src, dest, str_dest, dest_repo_rec)
     else:
-        lgr.debug(
-            'File content not available, forced to reuse previous annex key: %s',
-            str_src)
-        dest_key = src_key
-
-    if op.lexists(str_dest):
-        # if the target already exists, we remove it first, because we want to
-        # modify this path (potentially pointing to a new key), rather than
-        # failing next on 'fromkey', due to a key mismatch.
-        # this is more compatible with the nature of 'cp'
-        dest.unlink()
-    dest_repo._run_annex_command_json(
-        'fromkey',
-        # we use force, because in all likelihood there is no content for this key
-        # yet
-        opts=[dest_key, str_dest, '--force'],
-    )
-    if 'objloc' in finfo:
-        # we have the chance to place the actual content into the target annex
-        # put in a tmp location, git-annex will move from there
-        tmploc = dest_repo_rec.get('tmp', None)
-        if not tmploc:
-            tmploc = dest_repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
-            tmploc.mkdir(exist_ok=True, parents=True)
-            # put in cache for later clean/lookup
-            dest_repo_rec['tmp'] = tmploc
-
-        tmploc = tmploc / dest_key
-        _replace_file(finfo['objloc'], tmploc, str(tmploc), follow_symlinks=False)
-
-        dest_repo._run_annex_command(
-            'reinject',
-            annex_options=[str(tmploc), str_dest],
-        )
+        res = _place_filekey(
+            finfo, str_src, dest, str_dest, dest_repo_rec)
+    if isinstance(res, dict):
+        yield res
+        return
+    dest_key = res
 
     # are there any URLs defined? Get them by special remote
     # query by key to hopefully avoid additional file system interaction
@@ -534,3 +501,80 @@ def _extract_special_remote_info(repo):
         {pk: pv for pk, pv in v.items() if pk != 'timestamp'}
         for k, v in repo.get_special_remotes().items()
     }
+
+
+def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
+    dest_repo = dest_repo_rec['repo']
+    src_key = finfo['key']
+    # make an attempt to compute a key in the target repo, this will hopefully
+    # become more relevant once "salted backends" are possible
+    # https://github.com/datalad/datalad/issues/3357 that could prevent
+    # information leakage across datasets
+    if finfo.get('has_content', True):
+        dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
+    else:
+        lgr.debug(
+            'File content not available, forced to reuse previous annex key: %s',
+            str_src)
+        dest_key = src_key
+
+    if op.lexists(str_dest):
+        # if the target already exists, we remove it first, because we want to
+        # modify this path (potentially pointing to a new key), rather than
+        # failing next on 'fromkey', due to a key mismatch.
+        # this is more compatible with the nature of 'cp'
+        dest.unlink()
+    res = dest_repo._run_annex_command_json(
+        'fromkey',
+        # we use force, because in all likelihood there is no content for this key
+        # yet
+        opts=[dest_key, str_dest, '--force'],
+        # doesn't work in adjusted-unlock mode
+        expect_fail=True,
+    )
+    if any(not r['success'] for r in res):
+        return dict(
+            path=str_dest,
+            status='error',
+            message='; '.join(
+                m for r in res for m in r.get('error-messages', [])),
+        )
+    if 'objloc' in finfo:
+        # we have the chance to place the actual content into the target annex
+        # put in a tmp location, git-annex will move from there
+        tmploc = dest_repo_rec.get('tmp', None)
+        if not tmploc:
+            tmploc = dest_repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
+            tmploc.mkdir(exist_ok=True, parents=True)
+            # put in cache for later clean/lookup
+            dest_repo_rec['tmp'] = tmploc
+
+        tmploc = tmploc / dest_key
+        _replace_file(finfo['objloc'], tmploc, str(tmploc), follow_symlinks=False)
+
+        dest_repo._run_annex_command(
+            'reinject',
+            annex_options=[str(tmploc), str_dest],
+        )
+
+    return dest_key
+
+
+def _place_filekey_managed(finfo, str_src, dest, str_dest, dest_repo_rec):
+    # TODO put in effect, when salted backends are a thing, until then
+    # avoid double-computing the file hash
+    #dest_repo = dest_repo_rec['repo']
+    #if finfo.get('has_content', True):
+    #    dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
+    dest_key = finfo['key']
+    if not finfo.get('has_content', True):
+        return dict(
+            path=str_dest,
+            status='error',
+            message=(
+                'Cannot create file in managed branch without file content.'
+                'Missing for: %s',
+                str_src)
+        )
+    _replace_file(finfo['objloc'], dest, str_dest, follow_symlinks=True)
+    return dest_key
