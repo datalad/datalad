@@ -92,6 +92,8 @@ def test_copy_file(workdir, webdir, weburl):
 @with_tempfile(mkdir=True)
 def test_copy_file_errors(dspath1, dspath2, nondspath):
     ds1 = Dataset(dspath1)
+    # nothing given
+    assert_raises(ValueError, copy_file)
     # no target directory given
     assert_raises(ValueError, ds1.copy_file, 'somefile')
     # using multiple sources and --specs-from
@@ -115,6 +117,11 @@ def test_copy_file_errors(dspath1, dspath2, nondspath):
     # attempt to copy a file that doesn't exist
     assert_status(
         'impossible', copy_file(['funky', dspath1], on_failure='ignore'))
+
+    # attempt to copy a file without a destination given
+    assert_raises(ValueError, copy_file, 'somepath')
+    assert_status(
+        'impossible', copy_file(specs_from=['somepath'], on_failure='ignore'))
 
 
 @with_tempfile(mkdir=True)
