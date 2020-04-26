@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_repo_status,
     assert_status,
+    chpwd,
     eq_,
     nok_,
     ok_file_has_content,
@@ -243,11 +244,53 @@ def test_copy_file_specs_from(srcdir, destdir):
     srcdir = Path(srcdir)
     destdir = Path(destdir)
     files = [p for p in srcdir.glob('**/*') if not p.is_dir()]
-    # plain list of path objects
-    _check_copy_file_specs_from(srcdir, destdir / 'plainlist', files)
+    # plain list of absolute path objects
+    r_srcabs, res = _check_copy_file_specs_from(
+        srcdir, destdir / 'srcabs',
+        files)
+    # same, but with relative paths
+    with chpwd(srcdir):
+        r_srcrel, res = _check_copy_file_specs_from(
+            srcdir, destdir / 'srcrel',
+            [p.relative_to(srcdir) for p in files])
+    # same, but as strings
+    r_srcabs_str, res = _check_copy_file_specs_from(
+        srcdir, destdir / 'srcabs_str',
+        [str(p) for p in files])
+    with chpwd(srcdir):
+        r_srcrel_str, res = _check_copy_file_specs_from(
+            srcdir, destdir / 'srcrel_str',
+            [str(p.relative_to(srcdir)) for p in files])
+    # same, but with src/dest pairs
+    r_srcdestabs_str, res = _check_copy_file_specs_from(
+        srcdir, destdir / 'srcdestabs_str',
+        ['{}\0{}'.format(
+            str(p),
+            str(destdir / 'srcdestabs_str' / p.name))
+         for p in files])
+
+    # all methods lead to the same dataset structure
+    for a, b in ((r_srcabs, r_srcrel),
+                 (r_srcabs, r_srcabs_str),
+                 (r_srcabs, r_srcrel_str),
+                 (r_srcabs, r_srcdestabs_str)):
+        eq_(*[
+            sorted(
+                r for r in d.status(result_xfm='relpaths', result_renderer=None))
+            for d in (a, b)
+        ])
+
+    # fail on destination outside of the dest repo
+    res = copy_file(specs_from=[
+        '{}\0{}'.format(
+            str(p),
+            str(destdir / 'srcdest_wrong' / p.relative_to(srcdir)))
+        for p in files],
+        on_failure='ignore')
+    assert_status('error', res)
 
 
 def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
     ds = Dataset(destdir).create()
-    ds.copy_file(specs_from=specs, target_dir=ds.path, **kwargs)
-    return ds
+    res = ds.copy_file(specs_from=specs, target_dir=ds.path, **kwargs)
+    return ds, res
