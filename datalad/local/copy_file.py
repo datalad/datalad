@@ -304,7 +304,7 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
         if src.is_absolute():
             dest = target_dir / (src.relative_to(src_base) if src_base else src.name)
         else:
-            dest = target_dir / src
+            dest = target_dir / src.name
 
     yield src, dest
 
