@@ -127,6 +127,7 @@ def test_copy_file_errors(dspath1, dspath2, nondspath):
 @with_tempfile(mkdir=True)
 @with_tree(tree={
     'webfile1': '123',
+    'webfile2': 'abc',
 })
 @serve_path_via_http
 def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
@@ -138,9 +139,11 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
         ['encryption=none', 'type=external',
          'externaltype={}'.format(DATALAD_SPECIAL_REMOTE),
          'autoenable=true'])
-    # put a file into the dataset by URL
+    # put files into the dataset by URL
     src_ds.download_url('/'.join((weburl, 'webfile1')),
                         path='myfile1.txt')
+    src_ds.download_url('/'.join((weburl, 'webfile2')),
+                        path='myfile2.txt')
     # approx test that the file is known to a remote
     # that is not the web remote
     assert_in_results(
@@ -164,6 +167,13 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
     print('BBBBBBBBBBB')
     print(dest_ds.repo.get('myfile1.txt', remote='datalad'))
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
+
+    # now replace file in dest with a different content at the same path
+    copy_file([src_ds.pathobj / 'myfile2.txt', dest_ds.pathobj / 'myfile1.txt'])
+    dest_ds.drop('myfile1.txt')
+    dest_ds.repo.get('myfile1.txt', remote='datalad')
+    # no gets the "same path" but yields different content
+    ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', 'abc')
 
 
 @with_tempfile(mkdir=True)
