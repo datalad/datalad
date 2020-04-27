@@ -50,8 +50,8 @@ class CopyFile(Interface):
     """Copy files and their availability metadata from one dataset to another.
 
     The difference to a system copy command is that here additional content
-    availability information, such as registered URLs, are also being copied to
-    the target dataset. Moreover, potentially required git-annex special remote
+    availability information, such as registered URLs, is also copied to the
+    target dataset. Moreover, potentially required git-annex special remote
     configurations are detected in a source dataset and are applied to a target
     dataset in an analogous fashion. It is possible to copy a file for which no
     content is available locally, by just copying the required metadata on
@@ -69,7 +69,7 @@ class CopyFile(Interface):
     || REFLOW >>
     This command can copy files out of and into a hierarchy of nested datasets.
     Unlike with other DataLad command, the [CMD: --recursive CMD][PY: `recursive`
-    PY] switch does not enable recursion into subdirectories, but is analogous
+    PY] switch does not enable recursion into subdatasets, but is analogous
     to the POSIX 'cp' command switch and enables subdirectory recursion, regardless
     of dataset boundaries. It is not necessary to enable recursion in order to
     save changes made to nested target subdatasets.
