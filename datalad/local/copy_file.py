@@ -357,6 +357,10 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
     src, dest
       Path instances
     """
+    if src.name == '.git':
+        # we never want to copy the git repo internals into another repo
+        # this would break the target git in unforseeable ways
+        return
     if src.is_dir():
         # special case: not yet a file to copy
         if src_base is None:
