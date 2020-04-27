@@ -314,3 +314,29 @@ def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
     ds = Dataset(destdir).create()
     res = ds.copy_file(specs_from=specs, target_dir=ds.path, **kwargs)
     return ds, res
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
+    src = Dataset(srcpath).create()
+    sub = src.create('sub')
+    dest = Dataset(destpath).create()
+
+    # recursion doesn't capture .git/
+    dest.copy_file(sub.path, target_dir=destpath, recursive=True)
+    nok_((dest.pathobj / 'sub' / '.git').exists())
+
+    # explicit instruction results in failure
+    assert_status(
+        'impossible',
+        dest.copy_file(sub.pathobj / '.git', target_dir=destpath,
+                       recursive=True, on_failure='ignore'))
+
+    # same when the source has an OK name, but the dest now
+    assert_in_results(
+        dest.copy_file(
+            [sub.pathobj / '.git' / 'config',
+             dest.pathobj / 'some', '.git'], on_failure='ignore'),
+        status='impossible',
+        action='copy')

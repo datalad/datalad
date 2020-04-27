@@ -251,6 +251,15 @@ class CopyFile(Interface):
                     )
                     continue
 
+                if dest_path and dest_path.name == '.git' or src_path.name == '.git':
+                    yield dict(
+                        path=str(src_path),
+                        status='impossible',
+                        message="refuse to place '.git' into destination dataset",
+                        **res_kwargs
+                    )
+                    continue
+
                 if not (dest_path or target_dir):
                     yield dict(
                         path=str(src_path),
@@ -357,11 +366,12 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
     src, dest
       Path instances
     """
-    if src.name == '.git':
-        # we never want to copy the git repo internals into another repo
-        # this would break the target git in unforseeable ways
-        return
     if src.is_dir():
+        # we only get here, when recursion is desired
+        if src.name == '.git':
+            # we never want to copy the git repo internals into another repo
+            # this would break the target git in unforseeable ways
+            return
         # special case: not yet a file to copy
         if src_base is None:
             # TODO maybe an unconditional .parent isn't a good idea,
