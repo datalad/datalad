@@ -27,6 +27,7 @@ import platform
 import gc
 import glob
 import gzip
+import stat
 import string
 import warnings
 import wrapt
@@ -45,7 +46,6 @@ from os.path import curdir, basename, exists, islink, join as opj
 from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
-from os.path import stat
 from os.path import dirname
 from os.path import split as psplit
 import posixpath
