@@ -152,11 +152,10 @@ class CopyFile(Interface):
             datalad copy-file -d path/to/myds -t path/to/myds --specs-from specfile"""
         ),
         dict(
-            text="Read a specification from stdin: Pipe the output of a find "
-                 "command into the copy-file command",
-            code_py="",
+            text="Read a specification from stdin and pipe the output of a find"
+                 " command into the copy-file command",
             code_cmd="""\
-            find <expr> | datalad copy-file -d myds -t path/to/myds --specs-from -"""
+            find <expr> | datalad copy-file -d path/to/myds -t path/to/myds --specs-from -"""
         )
     ]
 
