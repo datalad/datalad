@@ -255,12 +255,13 @@ class ExternalVersions(object):
     def __contains__(self, item):
         return bool(self[item])
 
-    def add(self, name, func=None, interesting=True):
+    def add(self, name, func=None):
         """Add a version checker
 
         This method allows third-party libraries to define additional checks.
         It will not add `name` if already exists.  If `name` exists and `func`
-        is different - it will override with a new `func`.
+        is different - it will override with a new `func`.  Added entries will
+        be included in the output of `dumps(query=True)`.
 
         Parameters
         ----------
@@ -272,10 +273,6 @@ class ExternalVersions(object):
           defined when checking the version of something that is not a Python
           module or when this class's method for determining the version of a
           Python module isn't sufficient.
-        interesting: bool, optional
-          Makes sense only for entries without func - whether it is considered
-          "interesting" and should be included in output of dumps
-           (with query=True).
         """
         if func:
             func_existing = self.CUSTOM.get(name, None)
@@ -290,7 +287,7 @@ class ExternalVersions(object):
                 # pop and query it again right away to possibly replace with a new value
                 self._versions.pop(name)
                 _ = self[name]
-        if interesting and name not in self.INTERESTING:
+        elif name not in self.INTERESTING:
             self.INTERESTING.append(name)
 
     @property
