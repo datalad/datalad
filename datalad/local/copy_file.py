@@ -468,7 +468,8 @@ def _copy_file(src, dest, cache):
         # if it truely is a symlink9not just an annex pointer, we would not
         # want to resolve it
         eval_file_type=True,
-    ).popitem()[1]
+    )
+    finfo = finfo.popitem()[1] if finfo else {}
     if 'key' not in finfo or not isinstance(dest_repo, AnnexRepo):
         lgr.info(
             'Copying non-annexed file or copy into non-annex dataset: %s -> %s',
