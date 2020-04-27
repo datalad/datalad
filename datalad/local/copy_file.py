@@ -47,7 +47,33 @@ lgr = logging.getLogger('datalad.local.copy_file')
 
 @build_doc
 class CopyFile(Interface):
-    """
+    """Copy files and their availability metadata from one dataset to another.
+
+    The difference to a system copy command is that here additional content
+    availability information, such as registered URLs, are also being copied to
+    the target dataset. Moreover, potentially required git-annex special remote
+    configurations are detected in a source dataset and are applied to a target
+    dataset in an analogous fashion. It is possible to copy a file for which no
+    content is available locally, by just copying the required metadata on
+    content identity and availability.
+
+    || REFLOW >>
+    Interface and behavior are modeled after the POSIX 'cp' command, with two
+    main differences. 1) Via [CMD: --specs-from CMD][PY: `specs_from` PY] it is
+    possible to flexibly input source-destination path pairs. 2) Saving changes
+    in a target dataset is conditional upon a specification of
+    [CMD: --dataset CMD][PY: `dataset`, or calling this command as a `Dataset`
+    method PY].
+    << REFLOW ||
+
+    || REFLOW >>
+    This command can copy files out of and into a hierarchy of nested datasets.
+    Unlike with other DataLad command, the [CMD: --recursive CMD][PY: `recursive`
+    PY] switch does not enable recursion into subdirectories, but is analogous
+    to the POSIX 'cp' command switch and enables subdirectory recursion, regardless
+    of dataset boundaries. It is not necessary to enable recursion in order to
+    save changes made to nested target subdatasets.
+    << REFLOW ||
     """
     _params_ = dict(
         dataset=Parameter(
@@ -56,8 +82,7 @@ class CopyFile(Interface):
             args=("-d", "--dataset"),
             doc="""root dataset to save after copy operations are completed.
             All destination paths must be within this dataset, or its
-            subdatsets. [PY: This dataset is also the reference for any relative
-            paths. PY] If no dataset is given, dataset modifications will be
+            subdatasets. If no dataset is given, dataset modifications will be
             left unsaved.""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
