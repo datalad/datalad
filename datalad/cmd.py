@@ -27,6 +27,8 @@ from collections import (
     OrderedDict,
 )
 
+from typing import Optional, Callable
+
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import (
     borrowdoc,
@@ -241,8 +243,8 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     FD_NAMES = ['stdin', 'stdout', 'stderr']
 
-    proc_out = None
-    proc_err = None
+    proc_out: Optional[bool] = None
+    proc_err: Optional[bool] = None
 
     def __init__(self, done_future):
         # future promise to be fulfilled when process exits
