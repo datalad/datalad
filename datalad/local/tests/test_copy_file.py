@@ -339,4 +339,4 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
             [sub.pathobj / '.git' / 'config',
              dest.pathobj / 'some', '.git'], on_failure='ignore'),
         status='impossible',
-        action='copy')
+        action='copy_file')
