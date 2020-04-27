@@ -114,7 +114,7 @@ def test_smth_about_not_supported(p1, p2):
             publish(to='target1', since='HEAD^^', on_failure='ignore'),
             1,
             status='impossible',
-            message="fatal: bad revision 'HEAD^^'")
+            message="fatal: bad revision 'HEAD^^..HEAD'")
         # but now let's add one more commit, we should be able to pusblish
         source.repo.commit("msg", options=['--allow-empty'])
         publish(to='target1', since='HEAD^')  # must not fail now

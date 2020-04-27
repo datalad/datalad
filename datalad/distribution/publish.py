@@ -737,7 +737,7 @@ class Publish(Interface):
                 action='publish',
                 unavailable_path_status='impossible',
                 nondataset_path_status='error',
-                modified=since,
+                modified="%s..HEAD" % since if since else since,
                 return_type='generator',
                 on_failure='ignore',
                 force_no_revision_change_discovery=False, # we cannot publish what was not committed
