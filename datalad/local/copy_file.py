@@ -58,12 +58,10 @@ class CopyFile(Interface):
     content identity and availability.
 
     || REFLOW >>
-    Interface and behavior are modeled after the POSIX 'cp' command, with two
-    main differences. 1) Via [CMD: --specs-from CMD][PY: `specs_from` PY] it is
-    possible to flexibly input source-destination path pairs. 2) Saving changes
-    in a target dataset is conditional upon a specification of
-    [CMD: --dataset CMD][PY: `dataset`, or calling this command as a `Dataset`
-    method PY].
+    The interface is modeled after the POSIX 'cp' command, but with one
+    additional way to specify what to copy where: [CMD: --specs-from CMD][PY:
+    `specs_from` PY] allows the caller to flexibly input source-destination
+    path pairs.
     << REFLOW ||
 
     || REFLOW >>
@@ -224,7 +222,7 @@ class CopyFile(Interface):
             raise ValueError("Neither `paths` nor `specs_from` given.")
 
         res_kwargs = dict(
-            action='copy',
+            action='copy_file',
             logger=lgr,
         )
 
