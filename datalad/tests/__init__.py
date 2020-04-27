@@ -11,12 +11,13 @@ import os
 import shutil
 import tempfile
 from logging import getLogger
+from typing import List
 
 lgr = getLogger("datalad.tests")
 
 # We will delay generation of some test files/directories until they are
 # actually used but then would remove them here
-_TEMP_PATHS_GENERATED = []
+_TEMP_PATHS_GENERATED: List[str] = []
 
 # Give a custom template so we could hunt them down easily
 tempfile.template = os.path.join(tempfile.gettempdir(),
