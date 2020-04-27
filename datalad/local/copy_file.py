@@ -113,6 +113,53 @@ class CopyFile(Interface):
         message=save_message_opt,
     )
 
+    _examples_ = [
+        dict(
+            text="Copy a file into a dataset 'myds' using a path and a target "
+                 "directory specification, and save its addition to 'myds'",
+            code_py="""\
+            copy_file('path/to/myfile', target_dir='path/to/myds/',
+                      dataset='path/to/myds')""",
+            code_cmd="""\
+            datalad copy-file path/to/myfile -t path/to/myds/ -d path/to/myds"""),
+        dict(
+            text="Copy a file to a dataset 'myds' and save it under a new name "
+                 "by providing two paths",
+            code_py="""\
+            copy_file(path=['path/to/myfile', 'path/to/myds/newname'],
+                      dataset='path/to/myds')""",
+            code_cmd="""\
+            datalad copy-file path/to/myfile path/to/myds/new -d path/to/myds"""),
+        dict(
+            text="Copy a file into a dataset without saving it",
+            code_py="copy_file('path/to/myfile', target_dir='path/to/myds/')",
+            code_cmd="datalad copy-file path/to/myfile -t path/to/myds"),
+        dict(
+            text="Copy a directory and its subdirectories into a dataset 'myds'"
+                 " and save the addition in 'myds'",
+            code_py="""\
+            copy_file('path/to/dir/', target_dir='path/to/myds/',
+                      recursive=True, dataset='path/to/myds')""",
+            code_cmd="""\
+            datalad copy-file path/to/dir -t path/to/myds -r -d path/to/myds"""),
+        dict(
+            text="Copy files using a path and optionally target specification "
+                 "from a file",
+            code_py="""\
+            copy_file(dataset='path/to/myds', target_dir='path/to/myds',
+                      specs_from='path/to/specfile')""",
+            code_cmd="""\
+            datalad copy-file -d path/to/myds -t path/to/myds --specs-from specfile"""
+        ),
+        dict(
+            text="Read a specification from stdin: Pipe the output of a find "
+                 "command into the copy-file command",
+            code_py="",
+            code_cmd="""\
+            find <expr> | datalad copy-file -d myds -t path/to/myds --specs-from -"""
+        )
+    ]
+
     @staticmethod
     @datasetmethod(name='copy_file')
     @eval_results
