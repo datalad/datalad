@@ -46,6 +46,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     resolve_path,
 )
+from datalad.log import log_progress
 
 lgr = logging.getLogger('datalad.local.subdatasets')
 
@@ -244,10 +245,16 @@ class Subdatasets(Interface):
         if contains:
             contains = [resolve_path(c, dataset) for c in assure_list(contains)]
         contains_hits = set()
+
+        progress = dict(
+            id=id(Subdatasets) + id(ds),
+            total=0,
+            have_pbar=False,
+        )
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
                 contains, bottomup, set_property, delete_property,
-                refds_path):
+                refds_path, progress):
             # a boat-load of ancient code consumes this and is ignorant of
             # Path objects
             r['path'] = str(r['path'])
@@ -258,6 +265,12 @@ class Subdatasets(Interface):
                 contains_hits.update(r['contains'])
                 r['contains'] = [str(c) for c in r['contains']]
             yield r
+        if progress['have_pbar']:
+            log_progress(
+                lgr.info,
+                progress['id'],
+                'Finished processing subdatasets',
+            )
         if contains:
             for c in set(contains).difference(contains_hits):
                 yield get_status_dict(
@@ -279,13 +292,33 @@ class Subdatasets(Interface):
 # the main command interface with all its decorators again
 def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     contains, bottomup, set_property, delete_property,
-                    refds_path):
+                    refds_path, progress):
     dspath = ds.path
     repo = ds.repo
     if not GitRepo.is_valid_repo(dspath):
         return
+    sm_recs = list(_parse_git_submodules(ds.pathobj, repo, paths))
+    progress['total'] += len(sm_recs)
+    if progress['total']:
+        log_progress(
+            lgr.info,
+            progress['id'],
+            'Update number of to-be-processed subdatasets',
+            label='Subdatasets',
+            update=0,
+            increment=True,
+            total=progress['total'],
+        )
+        progress['have_pbar'] = True
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(ds.pathobj, repo, paths):
+    for sm in sm_recs:
+        log_progress(
+            lgr.info,
+            progress['id'],
+            'Process subdataset',
+            update=1,
+            increment=True,
+        )
         contains_hits = []
         if contains:
             contains_hits = [
@@ -401,7 +434,8 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     bottomup,
                     set_property,
                     delete_property,
-                    refds_path):
+                    refds_path,
+                    progress):
                 yield r
         if to_report and (bottomup and \
                 (fulfilled is None or

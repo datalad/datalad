@@ -201,6 +201,16 @@ class ProgressHandler(logging.Handler):
 
     def emit(self, record):
         from datalad.ui import ui
+        maint = getattr(record, 'dlm_progress_maint', None)
+        if maint == 'clear':
+            # remove the progress bar
+            for pb in self.pbars.values():
+                pb.clear()
+            return
+        elif maint == 'refresh':
+            for pb in self.pbars.values():
+                pb.refresh()
+            return
         pid = getattr(record, 'dlm_progress')
         update = getattr(record, 'dlm_progress_update', None)
         # would be an actual message, not used ATM here,
@@ -287,6 +297,7 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       showing a message at the `lgrcall` level for each step would be too much
       noise. Note that the level here only determines if the record will be
       dropped; it will still be logged at the level of `lgrcall`.
+    maint : {'clear', 'refresh'}
     """
     d = dict(
         {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
