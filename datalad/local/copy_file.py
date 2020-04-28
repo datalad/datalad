@@ -16,6 +16,7 @@ import os.path as op
 from shutil import copyfile
 import sys
 
+from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -318,7 +319,8 @@ class CopyFile(Interface):
                         tmp.rmdir()
                     except OSError as e:
                         lgr.warning(
-                            'Failed to clean up temporary directory: %s', e)
+                            'Failed to clean up temporary directory: %s',
+                            exc_str(e))
                 done.add(repo.pathobj)
 
         if not (ds and to_save):
@@ -398,8 +400,8 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
     if not dest:
         # no explicit destination given, build one from src and target_dir
         # reflect src hierarchy if dest is a directory, otherwise
-        if src.is_absolute():
-            dest = target_dir / (src.relative_to(src_base) if src_base else src.name)
+        if src.is_absolute() and src_base:
+            dest = target_dir / src.relative_to(src_base)
         else:
             dest = target_dir / src.name
 
@@ -459,7 +461,9 @@ def _copy_file(src, dest, cache):
         # we will not care about unlocking or anything like that we just
         # replace whatever is at `dest`, save() must handle the rest.
         # we are not following symlinks, they cannot be annex pointers
-        lgr.info('Copying file from no or non-annex dataset: %s', src)
+        lgr.info(
+            'Copying file from a location which is not an annex dataset: %s',
+            src)
         _replace_file(str_src, dest, str_dest, follow_symlinks=False)
         yield dict(
             path=str_src,
