@@ -253,7 +253,7 @@ class Push(Interface):
             yield dict(
                 res_kwargs,
                 status='notneeded',
-                message='Given constraints did not match any changes to publish',
+                message='Given constraints did not match any changes to push',
                 type='dataset',
                 path=ds.path,
             )
@@ -330,7 +330,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             if any(arg == p for arg in paths) and \
                     not GitRepo.is_valid_repo(res['path']):
                 raise ValueError(
-                    'Cannot publish subdataset, not present: {}'.format(res['path']))
+                    'Cannot push subdataset, not present: {}'.format(res['path']))
 
         if parentds != cur_ds:
             if ds_res:

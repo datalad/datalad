@@ -131,7 +131,7 @@ def check_push(annex, src_path, dst_path):
     assert_result_count(res, 2 if annex else 1)
     assert_in_results(
         res,
-        action='publish', status='ok', target='target',
+        action='push', status='ok', target='target',
         refspec='refs/heads/master:refs/heads/master',
         operations=['new-branch'])
 
@@ -164,7 +164,7 @@ def check_push(annex, src_path, dst_path):
     res = src.push(to='target', since="HEAD~2", jobs=2)
     assert_in_results(
         res,
-        action='publish', status='ok', target='target',
+        action='push', status='ok', target='target',
         refspec='refs/heads/master:refs/heads/master',
         # we get to see what happened
         operations=['fast-forward'])
@@ -201,14 +201,14 @@ def check_push(annex, src_path, dst_path):
         assert_result_count(res, 1)
         assert_in_results(
             res,
-            action='publish', status='error', target='target',
+            action='push', status='error', target='target',
             refspec='refs/heads/master:refs/heads/master',
             operations=['rejected', 'error'])
         # push with force=True works:
         res = src.push(to='target', since='HEAD~2', force='gitpush')
         assert_in_results(
             res,
-            action='publish', status='ok', target='target',
+            action='push', status='ok', target='target',
             refspec='refs/heads/master:refs/heads/master',
             operations=['forced-update'])
         eq_(list(target.get_branch_commits_("master")),
@@ -252,7 +252,7 @@ def test_push_recursive(
     assert_in_results(
         res, path=top.path, type='dataset',
         refspec='refs/heads/master:refs/heads/master',
-        operations=['new-branch'], action='publish', status='ok',
+        operations=['new-branch'], action='push', status='ok',
         target='target')
     for d in (sub, subsub, subnoannex):
         assert_in_results(
@@ -270,7 +270,7 @@ def test_push_recursive(
     # topds skipped
     assert_in_results(
         res, path=top.path, type='dataset',
-        action='publish', status='notneeded', target='target')
+        action='push', status='notneeded', target='target')
     # the rest pushed
     for d in (sub, subsub, subnoannex):
         assert_in_results(
@@ -380,12 +380,12 @@ def test_push_subds_no_recursion(src_path, dst_top, dst_sub, dst_subsub):
         # give relative to top dataset to elevate the difficulty a little
         path=str(test_file.relative_to(top.pathobj).parent))
     assert_status('ok', res)
-    assert_in_results(res, action='publish', type='dataset', path=top.path)
-    assert_in_results(res, action='publish', type='dataset', path=sub.path)
+    assert_in_results(res, action='push', type='dataset', path=top.path)
+    assert_in_results(res, action='push', type='dataset', path=sub.path)
     assert_in_results(res, action='copy', type='file', path=str(test_file))
     # the lowest-level subdataset isn't touched
     assert_not_in_results(
-        res, action='publish', type='dataset', path=subsub.path)
+        res, action='push', type='dataset', path=subsub.path)
 
 
 @with_tempfile(mkdir=True)
@@ -411,10 +411,10 @@ def test_force_datatransfer(srcpath, dstpath):
     # and transferred
     res = src.push(to='target', force=None)
     # no branch change, done before
-    assert_in_results(res, action='publish', status='notneeded',
+    assert_in_results(res, action='push', status='notneeded',
                       refspec='refs/heads/master:refs/heads/master')
     # but availability update
-    assert_in_results(res, action='publish', status='ok',
+    assert_in_results(res, action='push', status='ok',
                       refspec='refs/heads/git-annex:refs/heads/git-annex')
     assert_in_results(res, status='ok',
                       path=str(src.pathobj / 'test_mod_annex_file'),
@@ -432,10 +432,10 @@ def test_force_datatransfer(srcpath, dstpath):
     # now force data transfer
     res = src.push(to='target', force='datatransfer')
     # no branch change, done before
-    assert_in_results(res, action='publish', status='notneeded',
+    assert_in_results(res, action='push', status='notneeded',
                       refspec='refs/heads/master:refs/heads/master')
     # no availability update
-    assert_in_results(res, action='publish', status='notneeded',
+    assert_in_results(res, action='push', status='notneeded',
                       refspec='refs/heads/git-annex:refs/heads/git-annex')
     # but data transfer
     assert_in_results(res, status='ok',
@@ -468,10 +468,10 @@ def test_ria_push(srcpath, dstpath):
             "datastore"))
     res = src.push(to='datastore')
     assert_in_results(
-        res, action='publish', target='datastore', status='ok',
+        res, action='push', target='datastore', status='ok',
         refspec='refs/heads/master:refs/heads/master')
     assert_in_results(
-        res, action='publish', target='datastore', status='ok',
+        res, action='push', target='datastore', status='ok',
         refspec='refs/heads/git-annex:refs/heads/git-annex')
     assert_in_results(
         res, action='copy', target='datastore-storage', status='ok',
@@ -499,7 +499,7 @@ def test_gh1426(origin_path, target_path):
     res = origin.push(to='target')
     assert_result_count(
         res, 1, status='ok', type='dataset', path=origin.path,
-        action='publish', target='target', operations=['fast-forward'])
+        action='push', target='target', operations=['fast-forward'])
     eq_(origin.repo.get_hexsha('master'), target.get_hexsha('master'))
 
 
@@ -567,7 +567,7 @@ def test_gh1811(srcpath, clonepath):
     assert_result_count(res, 1)
     assert_result_count(
         res, 1,
-        path=clone.path, type='dataset', action='publish',
+        path=clone.path, type='dataset', action='push',
         status='impossible',
         message='There is no active branch, cannot determine remote '
                 'branch',
