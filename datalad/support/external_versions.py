@@ -248,8 +248,17 @@ class ExternalVersions(object):
 
         return self._versions.get(modname, self.UNKNOWN)
 
-    def keys(self):
-        """Return names of the known modules"""
+    def keys(self, query=False):
+        """Return names of the known modules
+
+        Parameters
+        ----------
+        query: bool, optional
+          If True, we will first query all CUSTOM and INTERESTING entries
+          to make sure we have them known.
+        """
+        if query:
+            [self[k] for k in chain(self.CUSTOM, self.INTERESTING)]
         return self._versions.keys()
 
     def __contains__(self, item):
@@ -309,11 +318,9 @@ class ExternalVersions(object):
           To query for versions of all "registered" custom externals, so to
           get those which weren't queried for yet
         """
-        if query:
-            [self[k] for k in chain(self.CUSTOM, self.INTERESTING)]
         if indent and (indent is True):
             indent = ' '
-        items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]
+        items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self.keys(query=query))]
         out = "%s" % preamble if preamble else ''
         if indent is not None:
             if preamble:

@@ -220,12 +220,8 @@ def _describe_metadata_extractors():
 
 
 def _describe_dependencies():
-    # query all it got
-    [external_versions[k]
-     for k in chain(external_versions.CUSTOM, external_versions.INTERESTING)]
-
     return {
-        k: str(external_versions[k]) for k in external_versions.keys()
+        k: str(external_versions[k]) for k in external_versions.keys(query=True)
     }
 
 
