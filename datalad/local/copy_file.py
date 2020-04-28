@@ -479,7 +479,7 @@ def _copy_file(src, dest, cache):
         paths=[rpath],
         # a simple `exists()` will not be enough (pointer files, etc...)
         eval_availability=True,
-        # if it truely is a symlink9not just an annex pointer, we would not
+        # if it truely is a symlink, not just an annex pointer, we would not
         # want to resolve it
         eval_file_type=True,
     )
