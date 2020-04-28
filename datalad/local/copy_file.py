@@ -32,7 +32,7 @@ from datalad.distribution.dataset import (
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     get_dataset_root,
     Path,
 )
@@ -200,7 +200,7 @@ class CopyFile(Interface):
 
         if path:
             # turn into list of absolute paths
-            paths = [resolve_path(p, dataset) for p in assure_list(path)]
+            paths = [resolve_path(p, dataset) for p in ensure_list(path)]
 
             # we already checked that there are no specs_from
             if not target_dir:
