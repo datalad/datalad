@@ -196,7 +196,6 @@ class CopyFile(Interface):
 
         if target_dir:
             target_dir = resolve_path(target_dir, dataset)
-        # TODO should we use ds.pathobj as target_dir, if none is given
 
         if path:
             # turn into list of absolute paths
@@ -579,7 +578,7 @@ def _copy_file(src, dest, cache):
             dest_repo._run_annex_command(
                 'setpresentkey', annex_options=[dest_key, dest_rid, '1'])
 
-    # TODO prevent copying .git or .datalad of from other datasets
+    # TODO prevent copying .datalad of from other datasets?
     yield dict(
         path=str_src,
         destination=str_dest,
