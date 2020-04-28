@@ -96,9 +96,11 @@ class CopyFile(Interface):
         target_dir=Parameter(
             args=('--target-dir', '-t'),
             metavar='DIRECTORY',
-            doc="""copy all source files into this DIRECTORY. This value
-            is overridden by any explicit destination path provided via
-            [CMD: --specs-from CMD][PY: 'specs_from' PY].""",
+            doc="""copy all source files into this DIRECTORY. This value is
+            overridden by any explicit destination path provided via [CMD:
+            --specs-from CMD][PY: 'specs_from' PY]. When not given, this
+            defaults to the path of the dataset specified via [CMD: --dataset
+            CMD][PY: 'dataset' PY].""",
             constraints=EnsureStr() | EnsureNone()),
         specs_from=Parameter(
             args=('--specs-from',),
