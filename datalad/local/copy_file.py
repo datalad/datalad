@@ -57,6 +57,9 @@ class CopyFile(Interface):
     content is available locally, by just copying the required metadata on
     content identity and availability.
 
+    Note: URLs for only built-in 'web' and external 'datalad' special remotes
+    are copied ATM.
+
     || REFLOW >>
     The interface is modeled after the POSIX 'cp' command, but with one
     additional way to specify what to copy where: [CMD: --specs-from CMD][PY:
