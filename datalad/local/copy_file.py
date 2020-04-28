@@ -564,6 +564,8 @@ def _copy_file(src, dest, cache):
                 dest_srinfo = _extract_special_remote_info(dest_repo)
             for url in urls:
                 lgr.debug('Register URL for key %s: %s', dest_key, url)
+                # TODO OPT: add .register_url(key, batched=False) to AnnexRepo
+                #  to speed up this step by batching.
                 dest_repo._run_annex_command(
                     'registerurl', annex_options=[dest_key, url])
             dest_rid = src_rid \
