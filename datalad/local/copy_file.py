@@ -116,10 +116,9 @@ class CopyFile(Interface):
             text="Copy a file into a dataset 'myds' using a path and a target "
                  "directory specification, and save its addition to 'myds'",
             code_py="""\
-            copy_file('path/to/myfile', target_dir='path/to/myds/',
-                      dataset='path/to/myds')""",
+            copy_file('path/to/myfile', dataset='path/to/myds')""",
             code_cmd="""\
-            datalad copy-file path/to/myfile -t path/to/myds/ -d path/to/myds"""),
+            datalad copy-file path/to/myfile -d path/to/myds"""),
         dict(
             text="Copy a file to a dataset 'myds' and save it under a new name "
                  "by providing two paths",
@@ -136,24 +135,22 @@ class CopyFile(Interface):
             text="Copy a directory and its subdirectories into a dataset 'myds'"
                  " and save the addition in 'myds'",
             code_py="""\
-            copy_file('path/to/dir/', target_dir='path/to/myds/',
-                      recursive=True, dataset='path/to/myds')""",
+            copy_file('path/to/dir/', recursive=True, dataset='path/to/myds')""",
             code_cmd="""\
-            datalad copy-file path/to/dir -t path/to/myds -r -d path/to/myds"""),
+            datalad copy-file path/to/dir -r -d path/to/myds"""),
         dict(
             text="Copy files using a path and optionally target specification "
                  "from a file",
             code_py="""\
-            copy_file(dataset='path/to/myds', target_dir='path/to/myds',
-                      specs_from='path/to/specfile')""",
+            copy_file(dataset='path/to/myds', specs_from='path/to/specfile')""",
             code_cmd="""\
-            datalad copy-file -d path/to/myds -t path/to/myds --specs-from specfile"""
+            datalad copy-file -d path/to/myds --specs-from specfile"""
         ),
         dict(
             text="Read a specification from stdin and pipe the output of a find"
                  " command into the copy-file command",
             code_cmd="""\
-            find <expr> | datalad copy-file -d path/to/myds -t path/to/myds --specs-from -"""
+            find <expr> | datalad copy-file -d path/to/myds --specs-from -"""
         )
     ]
 
@@ -202,7 +199,10 @@ class CopyFile(Interface):
             # we already checked that there are no specs_from
             if not target_dir:
                 if len(paths) == 1:
-                    raise ValueError("No target directory was given.")
+                    if not ds:
+                        raise ValueError("No target directory was given.")
+                    # we can keep target_dir unset and need not manipulate
+                    # paths, this is all done in a generic fashion below
                 elif len(paths) == 2:
                     # single source+dest combo
                     if paths[-1].is_dir():
@@ -220,6 +220,14 @@ class CopyFile(Interface):
 
         if not specs_from:
             raise ValueError("Neither `paths` nor `specs_from` given.")
+
+        if not target_dir and ds:
+            # no specific target set, but we have to write into a dataset,
+            # and one was given. It seems to make sense to use this dataset
+            # as a target. it is already to reference for any path resolution.
+            # Any explicitely given destination, will take precedence over
+            # a general target_dir setting nevertheless.
+            target_dir = ds.pathobj
 
         res_kwargs = dict(
             action='copy_file',

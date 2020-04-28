@@ -61,7 +61,7 @@ def test_copy_file(workdir, webdir, weburl):
     # copy the file from the source dataset into it.
     # it must copy enough info to actually put datalad into the position
     # to obtain the file content from the original URL
-    dest_ds.copy_file(src_ds.pathobj / 'myfile1.txt', target_dir=dest_ds.pathobj)
+    dest_ds.copy_file(src_ds.pathobj / 'myfile1.txt')
     dest_ds.get('myfile1.txt')
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
     # purposefully pollute the employed tmp folder to check that we do not trip
@@ -82,12 +82,11 @@ def test_copy_file(workdir, webdir, weburl):
         dest_ds.pathobj
     ])
     # copy directly from a non-dataset location
-    dest_ds.copy_file(webdir / 'webfile1', target_dir=dest_ds.pathobj)
+    dest_ds.copy_file(webdir / 'webfile1')
 
     # copy from annex dataset into gitrepo
     git_ds = Dataset(workdir / 'git').create(annex=False)
-    git_ds.copy_file(src_ds.pathobj / 'subdir' / 'myfile2.txt',
-                    target_dir=git_ds.pathobj)
+    git_ds.copy_file(src_ds.pathobj / 'subdir' / 'myfile2.txt')
 
 
 @with_tempfile(mkdir=True)
@@ -165,10 +164,8 @@ def test_copy_file_datalad_specialremote(workdir, webdir, weburl):
         externaltype=DATALAD_SPECIAL_REMOTE,
     )
     # and it works
-    print('AAAAAAAAAAA')
-    print(dest_ds.drop('myfile1.txt'))
-    print('BBBBBBBBBBB')
-    print(dest_ds.repo.get('myfile1.txt', remote='datalad'))
+    dest_ds.drop('myfile1.txt')
+    dest_ds.repo.get('myfile1.txt', remote='datalad')
     ok_file_has_content(dest_ds.pathobj / 'myfile1.txt', '123')
 
     # now replace file in dest with a different content at the same path
@@ -312,7 +309,7 @@ def test_copy_file_specs_from(srcdir, destdir):
 
 def _check_copy_file_specs_from(srcdir, destdir, specs, **kwargs):
     ds = Dataset(destdir).create()
-    res = ds.copy_file(specs_from=specs, target_dir=ds.path, **kwargs)
+    res = ds.copy_file(specs_from=specs, **kwargs)
     return ds, res
 
 
@@ -324,14 +321,14 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
     dest = Dataset(destpath).create()
 
     # recursion doesn't capture .git/
-    dest.copy_file(sub.path, target_dir=destpath, recursive=True)
+    dest.copy_file(sub.path, recursive=True)
     nok_((dest.pathobj / 'sub' / '.git').exists())
 
     # explicit instruction results in failure
     assert_status(
         'impossible',
-        dest.copy_file(sub.pathobj / '.git', target_dir=destpath,
-                       recursive=True, on_failure='ignore'))
+        dest.copy_file(sub.pathobj / '.git', recursive=True,
+                       on_failure='ignore'))
 
     # same when the source has an OK name, but the dest now
     assert_in_results(
