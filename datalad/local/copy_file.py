@@ -248,8 +248,8 @@ class CopyFile(Interface):
             for src_path, dest_path in _yield_specs(specs_from):
                 src_path = Path(src_path)
                 dest_path = None \
-                if dest_path is None \
-                else resolve_path(dest_path, dataset)
+                    if dest_path is None \
+                    else resolve_path(dest_path, dataset)
                 lgr.debug('Processing copy specification: %s -> %s',
                           src_path, dest_path)
                 if not recursive and src_path.is_dir():
@@ -261,7 +261,8 @@ class CopyFile(Interface):
                     )
                     continue
 
-                if dest_path and dest_path.name == '.git' or src_path.name == '.git':
+                if (dest_path and dest_path.name == '.git') \
+                        or src_path.name == '.git':
                     yield dict(
                         path=str(src_path),
                         status='impossible',
@@ -334,13 +335,13 @@ class CopyFile(Interface):
 
 def _yield_specs(specs):
     if specs == '-':
-        iter = sys.stdin
+        specs_it = sys.stdin
     elif isinstance(specs, (list, tuple)):
-        iter = specs
+        specs_it = specs
     else:
-        iter = Path(specs).open('r')
+        specs_it = Path(specs).open('r')
 
-    for spec in iter:
+    for spec in specs_it:
         if isinstance(spec, (list, tuple)):
             src = spec[0]
             dest = spec[1]
@@ -544,7 +545,7 @@ def _copy_file(src, dest, cache):
             if not (src_rid == '00000000-0000-0000-0000-000000000001' or
                     src_srinfo.get(src_rid, {}).get('externaltype', None) == 'datalad'):
                 # TODO generalize to any special remote
-                lgr.warn(
+                lgr.warning(
                     'Ignore URL for presently unsupported special remote'
                 )
                 continue
