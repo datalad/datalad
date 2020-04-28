@@ -301,20 +301,7 @@ class CopyFile(Interface):
         finally:
             # cleanup time
             # TODO this could also be the place to stop lingering batch processes
-            done = set()
-            for _, repo_rec in repo_cache.items():
-                repo = repo_rec['repo']
-                if not repo or repo.pathobj in done:
-                    continue
-                tmp = repo_rec.get('tmp', None)
-                if tmp:
-                    try:
-                        tmp.rmdir()
-                    except OSError as e:
-                        lgr.warning(
-                            'Failed to clean up temporary directory: %s',
-                            exc_str(e))
-                done.add(repo.pathobj)
+            _cleanup_cache(repo_cache)
 
         if not (ds and to_save):
             # nothing left to do
@@ -326,6 +313,23 @@ class CopyFile(Interface):
             recursive=False,
             message=message,
         )
+
+
+def _cleanup_cache(repo_cache):
+    done = set()
+    for _, repo_rec in repo_cache.items():
+        repo = repo_rec['repo']
+        if not repo or repo.pathobj in done:
+            continue
+        tmp = repo_rec.get('tmp', None)
+        if tmp:
+            try:
+                tmp.rmdir()
+            except OSError as e:
+                lgr.warning(
+                    'Failed to clean up temporary directory: %s',
+                    exc_str(e))
+        done.add(repo.pathobj)
 
 
 def _yield_specs(specs):
