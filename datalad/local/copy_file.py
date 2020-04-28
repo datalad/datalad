@@ -253,30 +253,23 @@ class CopyFile(Interface):
                     else resolve_path(dest_path, dataset)
                 lgr.debug('Processing copy specification: %s -> %s',
                           src_path, dest_path)
+
+                # Some checks, first impossibility "wins"
+                msg_impossible = None
                 if not recursive and src_path.is_dir():
-                    yield dict(
-                        path=str(src_path),
-                        status='impossible',
-                        message='recursion not enabled, omitting directory',
-                        **res_kwargs
-                    )
-                    continue
-
-                if (dest_path and dest_path.name == '.git') \
+                    msg_impossible = 'recursion not enabled, omitting directory'
+                elif (dest_path and dest_path.name == '.git') \
                         or src_path.name == '.git':
-                    yield dict(
-                        path=str(src_path),
-                        status='impossible',
-                        message="refuse to place '.git' into destination dataset",
-                        **res_kwargs
-                    )
-                    continue
+                    msg_impossible = \
+                        "refuse to place '.git' into destination dataset"
+                elif not (dest_path or target_dir):
+                    msg_impossible = 'need destination path or target directory'
 
-                if not (dest_path or target_dir):
+                if msg_impossible:
                     yield dict(
                         path=str(src_path),
                         status='impossible',
-                        message='need destination path or target directory',
+                        message=msg_impossible,
                         **res_kwargs
                     )
                     continue
