@@ -40,7 +40,7 @@ jobs:
       run: |
         datalad wtf
         mount
-    - name: Run benchmarks
+    - name: Run tests
       env:
         # forces all test repos/paths into the VFAT FS
         TMPDIR: /crippledfs
