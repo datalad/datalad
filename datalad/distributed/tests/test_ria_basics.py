@@ -252,7 +252,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         # with managed branches the local repo uses hashdirlower instead
         # TODO: However, with dataset layout version 1 this should therefore
         #       work on adjusted branch the same way
-        # TODO: Wonder whether ora-export-archive should account for that and
+        # TODO: Wonder whether export-archive-ora should account for that and
         #       rehash according to target layout.
         assert_equal(sorted([p for p in store_objects]),
                      sorted([p for p in local_objects])
@@ -264,7 +264,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         whereis = ds.repo.whereis('one.txt')
         dsgit_dir, archive_dir, dsobj_dir = \
             get_layout_locations(1, archiv_store, ds.id)
-        ds.ora_export_archive(archive_dir / 'archive.7z')
+        ds.export_archive_ora(archive_dir / 'archive.7z')
         init_opts = common_init_opts + ['url={}'.format(arch_url)]
         ds.repo.init_remote('archive', options=init_opts)
         # now fsck the new remote to get the new special remote indexed

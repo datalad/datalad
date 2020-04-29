@@ -45,11 +45,11 @@ from datalad.dochelpers import (
     exc_str,
 )
 
-lgr = logging.getLogger('datalad.customremotes.ora_export_archive')
+lgr = logging.getLogger('datalad.customremotes.export_archive_ora')
 
 
 @build_doc
-class ORAExportArchive(Interface):
+class ExportArchiveORA(Interface):
     """Export an archive of a local annex object store for the ORA remote.
 
     Keys in the local annex object store are reorganized in a temporary
@@ -86,7 +86,7 @@ class ORAExportArchive(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='ora_export_archive')
+    @datasetmethod(name='export_archive_ora')
     @eval_results
     def __call__(
             target,
@@ -115,7 +115,7 @@ class ORAExportArchive(Interface):
             opts = ['-mx0']
 
         res_kwargs = dict(
-            action="ora-export-archive",
+            action="export-archive-ora",
             logger=lgr,
         )
 
