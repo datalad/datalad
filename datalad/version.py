@@ -41,12 +41,9 @@ if lexists(opj(projdir, '.git')):
         # Just take describe and replace initial '-' with .dev to be more "pythonish"
         # Encoding simply because distutils' LooseVersion compares only StringType
         # and thus misses in __cmp__ necessary wrapping for unicode strings
-        __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1).encode()
+        __full_version__ = line.strip().decode('ascii').replace('-', '.dev', 1)
         # To follow PEP440 we can't have all the git fanciness
-        __version__ = __full_version__.split(b'-')[0]
-        # awkward version specific handling :-/
-        if sys.version_info[0] >= 3:
-            __version__ = __version__.decode()
+        __version__ = __full_version__.split('-')[0]
     except (SyntaxError, AttributeError, IndexError):
         raise
     except:
