@@ -108,6 +108,11 @@ class CreateSiblingRia(Interface):
     located. At present, this file must contain a single line stating the
     version (currently "1"). This line MUST end with a newline character.
 
+    It is possible to define an alias for an individual dataset in a store by
+    placing a symlink to the dataset location into an 'alias/' directory
+    in the root of the store. This enables dataset access via URLs of format:
+    'ria+<protocol>://<storelocation>#~<aliasname>'.
+
     Error logging
     ~~~~~~~~~~~~~
 

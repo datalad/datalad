@@ -141,9 +141,9 @@ class Clone(Interface):
         dict(text="Install the main superdataset from datasets.datalad.org",
              code_py="clone(source='///')",
              code_cmd="datalad clone ///"),
-        dict(text="Install a dataset identified by its ID from store.datalad.org",
-             code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561')",
-             code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561"),
+        dict(text="Install a dataset identified by a literal alias from store.datalad.org",
+             code_py="clone(source='ria+http://store.datalad.org#~hcp-openaccess')",
+             code_cmd="datalad clone ria+http://store.datalad.org#~hcp-openaccess"),
         dict(
             text="Install a dataset in a specific version as identified by a"
                  "branch or tag name from store.datalad.org",
@@ -926,8 +926,16 @@ def decode_source_spec(spec, cfg=None):
         dsid, version = source_ri.fragment.split('@', maxsplit=1) \
             if '@' in source_ri.fragment else (source_ri.fragment, None)
         uuid_regex = r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'
-        if not re.match(uuid_regex, dsid):
-            raise ValueError('RIA URI does not contain a valid dataset ID: {}'.format(spec))
+        if re.match(uuid_regex, dsid):
+            trace = '{}/{}'.format(dsid[:3], dsid[3:])
+            default_destpath = dsid
+        elif dsid.startswith('~'):
+            trace = 'alias/{}'.format(dsid[1:])
+            default_destpath = dsid[1:]
+        else:
+            raise ValueError(
+                'RIA URI not recognized, no valid dataset ID or other supported '
+                'scheme: {}'.format(spec))
         # now we cancel the fragment in the original URL, but keep everthing else
         # in order to be able to support the various combinations of ports, paths,
         # and everything else
@@ -938,13 +946,13 @@ def decode_source_spec(spec, cfg=None):
         source_ri.path = '{urlpath}{urldelim}{trace}'.format(
             urlpath=source_ri.path if source_ri.path else '',
             urldelim='' if not source_ri.path or source_ri.path.endswith('/') else '/',
-            trace='{}/{}'.format(dsid[:3], dsid[3:]),
+            trace=trace,
         )
         props.update(
             type='ria',
             giturl=str(source_ri),
             version=version,
-            default_destpath=dsid,
+            default_destpath=default_destpath,
         )
     else:
         # let's assume that anything else is a URI that Git can handle
