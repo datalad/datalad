@@ -597,7 +597,7 @@ class Get(Interface):
              code_cmd="datalad get <path/to/dir/>"),
         dict(text="Get all contents of the current dataset and its subdatasets",
              code_py="get(dataset='.', recursive=True)",
-             code_cmd="datalad get . --recursive"),
+             code_cmd="datalad get . -r"),
         dict(text="Get (clone) a registered subdataset, but don't retrieve data",
              code_py="get('path/to/subds', get_data=False)",
              code_cmd="datalad get -n <path/to/subds>"),

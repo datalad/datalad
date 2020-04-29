@@ -116,13 +116,13 @@ class Install(Interface):
                      get_data=True)""",
              code_cmd="""\
              datalad install --get-data \\
-             --source https://github.com/datalad-datasets/longnow-podcasts.git"""),
+             -s https://github.com/datalad-datasets/longnow-podcasts.git"""),
         dict(text="Install a dataset with all its subdatasets",
              code_py="""\
              install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
                      recursive=True)""",
              code_cmd="""\
-             datalad install --recursive \\
+             datalad install -r \\
              https://github.com/datalad-datasets/longnow-podcasts.git"""),
     ]
 
