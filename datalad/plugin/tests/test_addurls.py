@@ -627,7 +627,7 @@ class TestAddurls(object):
 
         whereis = ds.repo.whereis(names, output="full")
         for fname, info in whereis.items():
-            eq_(info[ds.repo.WEB_UUID]['urls'],
+            eq_(info[WEB_SPECIAL_REMOTE_UUID]['urls'],
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
 
     @with_tempfile(mkdir=True)

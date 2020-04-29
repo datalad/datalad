@@ -41,7 +41,7 @@ from datalad.cmd import (
     Runner,
     WitlessRunner,
 )
-
+from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
 
@@ -376,18 +376,18 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     with swallow_outputs() as cmo:
         ar.add_urls([testurl])
     l = ar.whereis(testfile)
-    assert_in(ar.WEB_UUID, l)
+    assert_in(WEB_SPECIAL_REMOTE_UUID, l)
     eq_(len(l), 2)
     ok_(ar.file_has_content(testfile))
 
     # output='full'
     lfull = ar.whereis(testfile, output='full')
     eq_(set(lfull), set(l))  # the same entries
-    non_web_remote = l[1 - l.index(ar.WEB_UUID)]
+    non_web_remote = l[1 - l.index(WEB_SPECIAL_REMOTE_UUID)]
     assert_in('urls', lfull[non_web_remote])
     eq_(lfull[non_web_remote]['urls'], [])
-    assert_not_in('uuid', lfull[ar.WEB_UUID])  # no uuid in the records
-    eq_(lfull[ar.WEB_UUID]['urls'], [testurl])
+    assert_not_in('uuid', lfull[WEB_SPECIAL_REMOTE_UUID])  # no uuid in the records
+    eq_(lfull[WEB_SPECIAL_REMOTE_UUID]['urls'], [testurl])
 
     # --all and --key are incompatible
     assert_raises(CommandError, ar.whereis, [], options='--all', output='full', key=True)
@@ -424,7 +424,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     # remove the remote
     ar.rm_url(testfile, testurl)
     l = ar.whereis(testfile)
-    assert_not_in(ar.WEB_UUID, l)
+    assert_not_in(WEB_SPECIAL_REMOTE_UUID, l)
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
@@ -436,14 +436,14 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)
     l = ar.whereis(testfile)
-    assert_in(ar.WEB_UUID, l)
+    assert_in(WEB_SPECIAL_REMOTE_UUID, l)
     eq_(len(l), 2)
     ok_(ar.file_has_content(testfile))
 
     # 2 known copies now; drop should succeed
     ar.drop(testfile)
     l = ar.whereis(testfile)
-    assert_in(ar.WEB_UUID, l)
+    assert_in(WEB_SPECIAL_REMOTE_UUID, l)
     eq_(len(l), 1)
     assert_false(ar.file_has_content(testfile))
     lfull = ar.whereis(testfile, output='full')
@@ -470,7 +470,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     someurl = "http://example.com/someurl"
     ar.add_url_to_file(testfile, someurl, options=['--relaxed'])
     lfull = ar.whereis(testfile, output='full')
-    eq_(set(lfull[ar.WEB_UUID]['urls']), {testurl, someurl})
+    eq_(set(lfull[WEB_SPECIAL_REMOTE_UUID]['urls']), {testurl, someurl})
 
     # and now test with a file in subdirectory
     subdir = opj(dst, 'd')
@@ -478,8 +478,8 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     with swallow_outputs() as cmo:
         ar.add_url_to_file(testfile3, url=testurl3)
     ok_file_has_content(opj(dst, testfile3), 'more stuff')
-    eq_(set(ar.whereis(testfile3)), {ar.WEB_UUID, non_web_remote})
-    eq_(set(ar.whereis(testfile3, output='full').keys()), {ar.WEB_UUID, non_web_remote})
+    eq_(set(ar.whereis(testfile3)), {WEB_SPECIAL_REMOTE_UUID, non_web_remote})
+    eq_(set(ar.whereis(testfile3, output='full').keys()), {WEB_SPECIAL_REMOTE_UUID, non_web_remote})
 
     # and if we ask for both files
     info2 = ar.info([testfile, testfile3])
@@ -488,13 +488,13 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 
     full = ar.whereis([], options='--all', output='full')
     eq_(len(full.keys()), 3)  # we asked for all files -- got 3 keys
-    assert_in(ar.WEB_UUID, full['SHA256E-s10--a978713ea759207f7a6f9ebc9eaebd1b40a69ae408410ddf544463f6d33a30e1.txt'])
+    assert_in(WEB_SPECIAL_REMOTE_UUID, full['SHA256E-s10--a978713ea759207f7a6f9ebc9eaebd1b40a69ae408410ddf544463f6d33a30e1.txt'])
 
     # which would work even if we cd to that subdir, but then we should use explicit curdir
     with chpwd(subdir):
         cur_subfile = opj(curdir, 'sub.txt')
-        eq_(set(ar.whereis(cur_subfile)), {ar.WEB_UUID, non_web_remote})
-        eq_(set(ar.whereis(cur_subfile, output='full').keys()), {ar.WEB_UUID, non_web_remote})
+        eq_(set(ar.whereis(cur_subfile)), {WEB_SPECIAL_REMOTE_UUID, non_web_remote})
+        eq_(set(ar.whereis(cur_subfile, output='full').keys()), {WEB_SPECIAL_REMOTE_UUID, non_web_remote})
         testfiles = [cur_subfile, opj(pardir, testfile)]
         info2_ = ar.info(testfiles)
         # Should maintain original relative file names
@@ -1011,7 +1011,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     eq_(info['size'], 14)
     assert(info['key'])
     # not even added to index yet since we this repo is with default batch_size
-    assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+    assert_not_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -1021,22 +1021,22 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     ar.add_url_to_file(testfile2, testurl2, batch=True)
     assert(ar.info(testfile2))
     # not committed yet
-    # assert_in(ar.WEB_UUID, ar.whereis(testfile2))
+    # assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile2))
 
     # add to an existing and committed annex file
     copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
     ar.add(testfile2_)
     if ar.is_direct_mode():
-        assert_in(ar.WEB_UUID, ar.whereis(testfile))
+        assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile))
     else:
-        assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+        assert_not_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile))
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed
-    assert_in(ar.WEB_UUID, ar.whereis(testfile))
+    assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile))
     assert(not ar.dirty)
     ar.add_url_to_file(testfile2_, testurl2_, batch=True)
     assert(ar.info(testfile2_))
-    assert_in(ar.WEB_UUID, ar.whereis(testfile2_))
+    assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile2_))
 
     # add into a new file
     # filename = 'newfile.dat'
@@ -1055,11 +1055,11 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar2.precommit()  # to possibly stop batch process occupying the stdout
     ar2.commit("added new file")  # would do nothing ATM, but also doesn't fail
     assert_in(filename, ar2.get_files())
-    assert_in(ar.WEB_UUID, ar2.whereis(filename))
+    assert_in(WEB_SPECIAL_REMOTE_UUID, ar2.whereis(filename))
 
     ar.commit("actually committing new files")
     assert_in(filename, ar.get_files())
-    assert_in(ar.WEB_UUID, ar.whereis(filename))
+    assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 
     # and closing the pipes now shoudn't anyhow affect things
