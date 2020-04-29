@@ -85,7 +85,7 @@ class Save(Interface):
         dict(text="""Save any content underneath the current directory, and
              recurse into any potential subdatasets""",
              code_py="save(path='.', recursive=True)",
-             code_cmd="datalad save . --recursive"),
+             code_cmd="datalad save . -r"),
         dict(text="Save any modification of known dataset content in the "
                   "current directory, but leave untracked files (e.g. temporary files) "
                   "untouched",
