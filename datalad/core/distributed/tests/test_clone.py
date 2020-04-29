@@ -635,13 +635,13 @@ def test_decode_source_spec():
     eq_(decode_source_spec('ria+http://example.com#~rootds'),
         {'source': 'ria+http://example.com#~rootds',
          'version': None, 'type': 'ria',
-         'giturl': 'http://example.com/rootds',
+         'giturl': 'http://example.com/alias/rootds',
          'default_destpath': 'rootds'})
     # version etc still works
     eq_(decode_source_spec('ria+http://example.com#~rootds@specialbranch'),
         {'source': 'ria+http://example.com#~rootds@specialbranch',
          'version': 'specialbranch', 'type': 'ria',
-         'giturl': 'http://example.com/rootds',
+         'giturl': 'http://example.com/alias/rootds',
          'default_destpath': 'rootds'})
 
 
