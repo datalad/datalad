@@ -314,13 +314,24 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
 
 
 # TODO: make limit respect config/environment parameter
-# TODO: document, what limit even is about ;-)
 def exc_str(exc=None, limit=None):
     """Enhanced str for exceptions.  Should include original location
 
     Parameters
     ----------
-    Exception to
+    exc: Exception, optional
+      If not provided, information about the last exception caught by except
+      clause (as provided by `sys.exc_info`) will be used.
+    limit: int, optional
+      Number of levels in the traceback stack from the point where exception
+      was raised to include. If `None`, environment variable
+      DATALAD_EXC_STR_TBLIMIT is consulted.
+
+    Returns
+    -------
+    str
+      String representation of the exception with traceback information
+      appended.
     """
     out = str(exc)
     if limit is None:
@@ -339,7 +350,12 @@ def exc_str(exc=None, limit=None):
             assert(exc is value)
         entries = traceback.extract_tb(tb)
         if entries:
-            out += " [%s]" % (','.join(['%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1]) for x in entries[-limit:]]))
+            out += " [%s]" % (
+                ','.join(
+                    '%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1])
+                    for x in entries[-limit:]
+                )
+            )
     except:  # MIH: TypeError?
         return out  # To the best of our abilities
     finally:

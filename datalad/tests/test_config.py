@@ -53,6 +53,8 @@ _config_file_content = """\
 [something]
 user = name=Jane Doe
 user = email=jd@example.com
+novalue
+empty =
 myint = 3
 
 [onemore "complicated の beast with.dot"]
@@ -72,7 +74,7 @@ def test_something(path, new_home):
     assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
-    assert_equal(len(cfg), 3)
+    assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
     assert_equal(len(cfg['something.user']), 2)
@@ -85,17 +87,21 @@ def test_something(path, new_home):
     assert_true(cfg.has_option('something', 'user'))
     assert_false(cfg.has_option('something', 'us?er'))
     assert_false(cfg.has_option('some?thing', 'user'))
-    assert_equal(sorted(cfg.options('something')), ['myint', 'user'])
+    assert_equal(sorted(cfg.options('something')), ['empty', 'myint', 'novalue', 'user'])
     assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
 
     assert_equal(
         sorted(cfg.items()),
         [(u'onemore.complicated の beast with.dot.findme', '5.0'),
+         ('something.empty', ''),
          ('something.myint', '3'),
+         ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
     assert_equal(
         sorted(cfg.items('something')),
-        [('something.myint', '3'),
+        [('something.empty', ''),
+         ('something.myint', '3'),
+         ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
 
     # always get all values
@@ -106,6 +112,12 @@ def test_something(path, new_home):
     assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
     assert_equal(cfg.getbool('something', 'myint'), True)
+    # git demands a key without value at all to be used as a flag, thus True
+    assert_equal(cfg.getbool('something', 'novalue'), True)
+    assert_equal(cfg.get('something.novalue'), None)
+    # empty value is False
+    assert_equal(cfg.getbool('something', 'empty'), False)
+    assert_equal(cfg.get('something.empty'), '')
     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
     assert_raises(TypeError, cfg.getbool, 'something', 'user')
 

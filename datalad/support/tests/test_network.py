@@ -161,7 +161,7 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         eq_(ri, ri_)  # just in case ;)  above should fail first if smth is wrong
         if not exact_str:
             assert_in('Parsed version of', cml.out)
-    (eq_ if exact_str else neq_)(ri, str(ri_))  # that we can reconstruct it EXACTLY on our examples
+    (eq_ if exact_str else neq_)(str(ri), str(ri_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
     nok_(set(fields).difference(set(cls._FIELDS)))
     for f, v in fields.items():
@@ -279,8 +279,8 @@ def test_url_samples():
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
     _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
-    _check_ri(PurePosixPath("f"), PathRI, localpath='f', path='f', exact_str=False)
-    _check_ri(PurePosixPath("f/s1"), PathRI, localpath='f/s1', path='f/s1', exact_str=False)
+    _check_ri(PurePosixPath("f"), PathRI, localpath='f', path='f')
+    _check_ri(PurePosixPath("f/s1"), PathRI, localpath='f/s1', path='f/s1')
     # colons are problematic and might cause confusion into SSHRI
     _check_ri("f/s:1", PathRI, localpath='f/s:1', path='f/s:1')
     _check_ri("f/s:", PathRI, localpath='f/s:', path='f/s:')

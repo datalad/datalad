@@ -5,6 +5,8 @@
 #
 # Changelog
 # ---------
+# 0.12.6-611-g11932b3f4 (2020/04/28)
+#  - Added p7zip-full
 # 0.12.2-548-gdfae1fcd2 (2020/03/15)
 #  - Just a fresh build
 # 0.12.2-174-g180bbd8d4 (2020/02/17)
@@ -41,7 +43,7 @@ From:neurodebian:latest
     # bare essentials to pull everything else in
     eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
 
-    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3 rclone git-annex-remote-rclone
+    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3 rclone git-annex-remote-rclone p7zip-full
 
     # just for scrapy
     eatmydata apt-get -y install --no-install-recommends python3-twisted
