@@ -110,7 +110,7 @@ class Diff(Interface):
              code_cmd="datalad diff --from branch1 --to branch2"),
         dict(text="Show unsaved changes in the dataset and potential subdatasets",
              code_py="diff(recursive=True)",
-             code_cmd="datalad diff --recursive"),
+             code_cmd="datalad diff -r"),
         dict(text="Show unsaved changes made to a particular file",
              code_py="diff(path='path/to/file')",
              code_cmd="datalad diff <path/to/file>"),
