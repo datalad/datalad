@@ -21,6 +21,7 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
+from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import (
@@ -627,7 +628,7 @@ class TestAddurls(object):
 
         whereis = ds.repo.whereis(names, output="full")
         for fname, info in whereis.items():
-            eq_(info[ds.repo.WEB_UUID]['urls'],
+            eq_(info[WEB_SPECIAL_REMOTE_UUID]['urls'],
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
 
     @with_tempfile(mkdir=True)
