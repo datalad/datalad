@@ -249,3 +249,41 @@ class RepoInterface(object):
 
     # Test!
     pass
+
+
+def path_based_str_repr(cls):
+    """A helper decorator for a class to define str and repr based on its .path
+
+    For the rationale/discussion on why to bother distinguishing the two is
+    in https://github.com/datalad/datalad/pull/4439 . The idea  is that
+    `__str__` should provide cut/pasteable to shell representation of the path,
+    with all necessary escapes for characters shell might care about.
+    `__repr__` to provide string representation consumable in Python.
+    """
+
+    # %s is used over .format since it is more performant. In Python 3.7.6 I get
+    # In [2]: %timeit "%s" % ("buga")
+    # 29 ns ± 0.179 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
+    # In [3]: %timeit "{}".format("buga")
+    # 62 ns ± 0.345 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
+    # and similarly 58ns vs 97ns for %r vs !r
+    def __str__(self):
+        s = self._str
+        if s is None:
+            s = self._str = \
+                '%s(%s)' % (self.__class__.__name__, ut.quote_cmdlinearg(self.path))
+        return s
+
+    def __repr__(self):
+        s = self._repr
+        if s is None:
+            s = self._repr = \
+                '%s(%r)' % (self.__class__.__name__, self.path)
+        return s
+
+    cls._str = None
+    cls.__str__ = __str__
+    cls._repr = None
+    cls.__repr__ = __repr__
+    return cls
+
