@@ -21,6 +21,7 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
+from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import (
