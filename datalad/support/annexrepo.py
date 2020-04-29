@@ -35,7 +35,7 @@ from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
 from datalad import ssh_manager
-from datalad.consts import ADJUSTED_BRANCH_EXPR
+from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
     exc_str,
     borrowdoc,
@@ -126,8 +126,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     # End Flyweight:
 
-    # Web remote has a hard-coded UUID we might (ab)use
-    WEB_UUID = "00000000-0000-0000-0000-000000000001"
+    # Web remote UUID, kept here for backward compatibility
+    WEB_UUID = WEB_SPECIAL_REMOTE_UUID
 
     # To be assigned and checked to be good enough upon first call to AnnexRepo
     # 6.20160923 -- --json-progress for get
@@ -2093,7 +2093,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         A list of URLs
         """
         locations = self.whereis(file_, output='full', key=key, batch=batch)
-        return locations.get(AnnexRepo.WEB_UUID, {}).get('urls', [])
+        return locations.get(WEB_SPECIAL_REMOTE_UUID, {}).get('urls', [])
 
     @normalize_paths
     def drop(self, files, options=None, key=False, jobs=None):
@@ -2198,8 +2198,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                                     for x in ('description', 'here', 'urls')
                                     }
                    for remote in j.get('whereis')}
-        if self.WEB_UUID in remotes:
-            assert(remotes[self.WEB_UUID]['description'] == 'web')
+        if WEB_SPECIAL_REMOTE_UUID in remotes:
+            assert(remotes[WEB_SPECIAL_REMOTE_UUID]['description'] == 'web')
         return remotes
 
     def _run_annex_command_json(self, command,
