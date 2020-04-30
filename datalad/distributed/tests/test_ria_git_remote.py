@@ -43,6 +43,7 @@ from datalad.customremotes.ria_utils import (
 )
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def _test_bare_git_version_1(host, dspath, store):
@@ -147,6 +148,7 @@ def test_bare_git_version_1():
     yield _test_bare_git_version_1, None
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def _test_bare_git_version_2(host, dspath, store):

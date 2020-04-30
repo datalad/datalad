@@ -52,6 +52,7 @@ from datalad.customremotes.ria_utils import (
 # Note, that exceptions to test for are generally CommandError since we are
 # talking to the special remote via annex.
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -153,6 +154,7 @@ def test_initremote_basic():
     yield _test_initremote_basic, None
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_initremote_rewrite(host, ds_path, store):
@@ -207,6 +209,7 @@ def test_initremote_rewrite():
     yield _test_initremote_rewrite, None
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -281,6 +284,7 @@ def test_remote_layout():
     yield _test_remote_layout, None
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_version_check(host, dspath, store):
@@ -374,6 +378,7 @@ def test_version_check():
     yield _test_version_check, None
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_gitannex(host, store, dspath):
@@ -430,6 +435,7 @@ def test_gitannex_local():
     _test_gitannex(None)
 
 
+@skip_if_on_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_binary_data(host, store, dspath):
