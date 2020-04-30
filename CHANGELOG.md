@@ -43,6 +43,11 @@ bet we will fix some bugs and make a world even a better place.
   the current branch name when a managed branch is not checked out.
   ([#4274][])
 
+- The special UUID for git-annex web remotes is now available as
+  `datalad.consts.WEB_SPECIAL_REMOTE_UUID`.  It remains accessible as
+  `AnnexRepo.WEB_UUID` for compatibility, but new code should use
+  `consts.WEB_SPECIAL_REMOTE_UUID` ([#4460][]).
+
 ### Fixes
 
 - Widespread improvements of functionality and test coverage on
@@ -99,7 +104,7 @@ bet we will fix some bugs and make a world even a better place.
   ([#4206][])
 
 - The command examples have been expanded and improved.  ([#4091][])
-  ([#4314][])
+  ([#4314][]) ([#4464][])
 
 - The tooling for linking to the [DataLad Handbook][handbook] from
   DataLad's documentation has been improved.  ([#4046][])
@@ -110,6 +115,10 @@ bet we will fix some bugs and make a world even a better place.
     symlinked to the local source repository's.  ([#4099][])
   - "shared-{group|all|...}" that can be used to set up datasets for
     collaborative write access.  ([#4324][])
+
+- [clone][] learned to handle dataset aliases in RIA stores when given
+  a URL of the form `ria+<protocol>://<storelocation>#~<aliasname>`.
+  ([#4459][])
 
 - [update][]  ([#4167][])
   - learned to disallow non-fast-forward updates when `ff-only` is
@@ -142,12 +151,36 @@ bet we will fix some bugs and make a world even a better place.
   subdataset, as "<subdataset>/" would, restricting its report to
   "<subdataset>/<path>".  ([#4235][])
 
+- New option `datalad.annex.retry` controls how many times git-annex
+  will retry on a failed transfer.  It defaults to 3 and can be set to
+  0 to restore the previous behavior.  ([#4382][])
+
 - [wtf][] now warns when the specified dataset does not exist.
   ([#4331][])
+
+- The `repr` and `str` output of the dataset and repo classes got a
+  facelift.  ([#4420][]) ([#4435][]) ([#4439][])
+
+- The DataLad Singularity container now comes with p7zip-full.
+
+- DataLad shows a log message when the current working is resolved to
+  a different location due to a symlink.  This is now logged at the
+  DEBUG rather than WARNING level, as it typically does not indicate a
+  problem.  ([#4426][])
 
 - DataLad now lets the caller know that `git annex init` is scanning
   for unlocked files, as this operation can be slow in some
   repositories.  ([#4316][])
+
+- The `log_progress` helper learned how to set the starting point to a
+  non-zero value and how to update the total on an existing progress
+  bar, two features needed for planned improvements to how some
+  commands display their progress.  ([#4438][])
+
+- The `ExternalVersions` object, which is used to check versions of
+  Python modules and external tools (e.g., git-annex), gained an `add`
+  method that enables DataLad extensions and other third-party code to
+  add other programs of interest.  ([#4441][])
 
 - All of the remaining spots that use GitPython have been rewritten
   without it.  Most notably, this includes rewrites of the `clone`,
@@ -2776,8 +2809,18 @@ publishing
 [#4367]: https://github.com/datalad/datalad/issues/4367
 [#4370]: https://github.com/datalad/datalad/issues/4370
 [#4375]: https://github.com/datalad/datalad/issues/4375
+[#4382]: https://github.com/datalad/datalad/issues/4382
 [#4398]: https://github.com/datalad/datalad/issues/4398
 [#4400]: https://github.com/datalad/datalad/issues/4400
 [#4409]: https://github.com/datalad/datalad/issues/4409
+[#4420]: https://github.com/datalad/datalad/issues/4420
 [#4421]: https://github.com/datalad/datalad/issues/4421
+[#4426]: https://github.com/datalad/datalad/issues/4426
 [#4431]: https://github.com/datalad/datalad/issues/4431
+[#4435]: https://github.com/datalad/datalad/issues/4435
+[#4438]: https://github.com/datalad/datalad/issues/4438
+[#4439]: https://github.com/datalad/datalad/issues/4439
+[#4441]: https://github.com/datalad/datalad/issues/4441
+[#4459]: https://github.com/datalad/datalad/issues/4459
+[#4460]: https://github.com/datalad/datalad/issues/4460
+[#4464]: https://github.com/datalad/datalad/issues/4464
