@@ -349,9 +349,6 @@ def _test_version_check(host, dspath, store):
         cml.assert_logged(level="INFO",
                           msg="Remote object tree reports version X",
                           regex=False)
-        cml.assert_logged(level="INFO",
-                          msg="Setting remote to read-only usage",
-                          regex=False)
 
     # reading still works:
     ds.drop('.')

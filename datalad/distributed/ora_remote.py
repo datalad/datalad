@@ -783,38 +783,42 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
             self.get_layout_locations(self.store_base_path, self.archive_id)
 
-        read_only_msg = "Setting remote to read-only usage in order to" \
+        read_only_msg = "Treating remote as read-only in order to" \
                         "prevent damage by putting things into an unknown " \
                         "version of the target layout. You can overrule this " \
-                        "by configuring 'annex.ora-remote.<name>.force-write'."
+                        "by setting 'annex.ora-remote.<name>.force-write=true'."
         try:
             self.verify_store()
         except UnknownLayoutVersion:
-            self._info("Remote dataset tree reports version {}. Supported"
-                       "versions are: {}. Consider upgrading datalad or "
-                       "fix the structure on the remote end."
-                       "".format(self.remote_dataset_tree_version,
-                                 self.known_versions_dst))
-            self._set_read_only(read_only_msg)
+            reason = "Remote dataset tree reports version {}. Supported " \
+                     "versions are: {}. Consider upgrading datalad or " \
+                     "fix the 'ria-layout-version' file at the RIA store's " \
+                     "root. ".format(self.remote_dataset_tree_version,
+                                     self.known_versions_dst)
+            self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            self._info("Remote doesn't report any dataset tree version."
-                       "Consider upgrading datalad or fix the structure"
-                       "on the remote end.")
-            self._set_read_only(read_only_msg)
+            reason = "Remote doesn't report any dataset tree version." \
+                     "Consider upgrading datalad or add a fitting " \
+                     "'ria-layout-version' file at the RIA store's " \
+                     "root."
+            self._set_read_only(reason + read_only_msg)
 
         try:
             self.verify_ds_in_store()
         except UnknownLayoutVersion:
-            self._info("Remote object tree reports version {}. Supported"
-                       "versions are {}. Consider upgrading datalad."
-                       "".format(self.remote_object_tree_version,
-                                 self.known_versions_objt))
-            self._set_read_only(read_only_msg)
+            reason = "Remote object tree reports version {}. Supported" \
+                     "versions are {}. Consider upgrading datalad or " \
+                     "fix the 'ria-layout-version' file at the remote " \
+                     "dataset root. " \
+                     "".format(self.remote_object_tree_version,
+                               self.known_versions_objt)
+            self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            self._info("Remote doesn't report any object tree version."
-                       "Consider upgrading datalad or fix the structure on"
-                       "the remote end.")
-            self._set_read_only(read_only_msg)
+            reason = "Remote doesn't report any object tree version." \
+                     "Consider upgrading datalad or add a fitting " \
+                     "'ria-layout-version' file at the remote " \
+                     "dataset root. "
+            self._set_read_only(reason + read_only_msg)
 
     @handle_errors
     def initremote(self):
@@ -860,6 +864,12 @@ class RIARemote(SpecialRemote):
         else:
             self._info("Was instructed to force write")
 
+    def _ensure_writeable(self):
+        if self.read_only:
+            raise RIARemoteError("Remote is treated as read-only. "
+                                 "Set 'ora-remote.<name>.force-write=true' to "
+                                 "overrule this.")
+
     @property
     def io(self):
         if not self._io:
@@ -895,9 +905,7 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def transfer_store(self, key, filename):
-        if self.read_only:
-            raise RemoteError("Remote was set to read-only. "
-                              "Configure 'ora-remote.<name>.force-write' to overrule this.")
+        self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
@@ -963,9 +971,7 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def remove(self, key):
-        if self.read_only:
-            raise RIARemoteError("Remote was set to read-only. "
-                                 "Configure 'ora-remote.<name>.force-write' to overrule this.")
+        self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
