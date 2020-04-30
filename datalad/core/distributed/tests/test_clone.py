@@ -631,6 +631,19 @@ def test_decode_source_spec():
     # not a dataset UUID
     assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
 
+    # literal dataset name/location
+    eq_(decode_source_spec('ria+http://example.com#~rootds'),
+        {'source': 'ria+http://example.com#~rootds',
+         'version': None, 'type': 'ria',
+         'giturl': 'http://example.com/alias/rootds',
+         'default_destpath': 'rootds'})
+    # version etc still works
+    eq_(decode_source_spec('ria+http://example.com#~rootds@specialbranch'),
+        {'source': 'ria+http://example.com#~rootds@specialbranch',
+         'version': 'specialbranch', 'type': 'ria',
+         'giturl': 'http://example.com/alias/rootds',
+         'default_destpath': 'rootds'})
+
 
 def _move2store(storepath, d):
     # make a bare clone of it into a local that matches the organization
@@ -743,6 +756,18 @@ def test_ria_http(lcl, storepath, url):
     # update
     eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-origin'),
         'ria+ssh://somelabel#{id}')
+
+    if not has_symlink_capability():
+        return
+    # place a symlink in the store to serve as a dataset alias
+    (storepath / 'alias').mkdir()
+    (storepath / 'alias' / 'myname').symlink_to(storeds_loc)
+    with chpwd(lcl):
+        cloned_by_alias = clone('ria+{}#~{}'.format(url, 'myname'))
+    # still get the same data
+    eq_(cloned_by_alias.id, ds.id)
+    # more sensible default install path
+    eq_(cloned_by_alias.pathobj.name, 'myname')
 
 
 @with_tempfile(mkdir=True)
