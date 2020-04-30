@@ -26,6 +26,7 @@ from datalad.interface.results import (
     get_status_dict,
 )
 from datalad.interface.utils import eval_results
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureBool,
@@ -387,6 +388,15 @@ def _create_sibling_ria(
     # be safe across datasets
     res_kwargs = res_kwargs.copy()
 
+    if not isinstance(ds.repo, AnnexRepo):
+        # No point in dealing with a special remote when there's no annex.
+        # Note, that in recursive invocations this might only apply to some of
+        # the datasets. Therefore dealing with it here rather than one level up.
+        lgr.debug("No annex at %s. Ignoring special remote options.", ds.path)
+        storage_sibling = False
+        storage_name = None
+
+
     # parse target URL
     try:
         ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
@@ -516,17 +526,6 @@ def _create_sibling_ria(
             ds.repo.call_git(['annex', trust_level, storage_name])
         # get uuid for use in bare repo's config
         uuid = ds.config.get("remote.{}.annex-uuid".format(storage_name))
-
-    else:
-        # with no special remote we currently need to create the
-        # required directories
-        # TODO: This should be cleaner once we have access to the
-        #       special remote's RemoteIO classes without
-        #       talking via annex
-        if ssh_host:
-            ssh('mkdir -p {}'.format(quote_cmdlinearg(str(repo_path))))
-        else:
-            repo_path.mkdir(parents=True)
 
     # 2. create a bare repository in-store:
 
