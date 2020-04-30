@@ -24,6 +24,7 @@ from datalad.utils import (
 )
 from datalad.tests.utils import (
     assert_status,
+    skip_if_on_windows,
     skip_ssh,
     with_tempfile
 )
@@ -141,14 +142,15 @@ def _test_bare_git_version_1(host, dspath, store):
 
 
 def test_bare_git_version_1():
-    yield skip_ssh(_test_bare_git_version_1), 'datalad-test'
+    # TODO: Skipped due to gh-4436
+    yield skip_if_on_windows(skip_ssh(_test_bare_git_version_1)), 'datalad-test'
     yield _test_bare_git_version_1, None
 
 
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def _test_bare_git_version_2(host, dspath, store):
-    # Similarly to test_bare_git_version_2, this should ensure a bare git repo
+    # Similarly to test_bare_git_version_1, this should ensure a bare git repo
     # at the store location for a dataset doesn't conflict with the ORA remote.
     # Note: Usability of git remote by annex depends on dataset layout version
     #       (dirhashlower vs. -mixed).
@@ -222,7 +224,8 @@ def _test_bare_git_version_2(host, dspath, store):
 
 
 def test_bare_git_version_2():
-    yield skip_ssh(_test_bare_git_version_2), 'datalad-test'
+    # TODO: Skipped due to gh-4436
+    yield skip_if_on_windows(skip_ssh(_test_bare_git_version_2)), 'datalad-test'
     yield _test_bare_git_version_2, None
 
 # TODO: Double check the following one:

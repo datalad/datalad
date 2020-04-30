@@ -157,7 +157,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 def test_create_simple():
 
     yield _test_create_store, None
-    yield skip_ssh(_test_create_store), 'datalad-test'
+    # TODO: Skipped due to gh-4436
+    yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
 
 
 # TODO: explicit naming of special remote
