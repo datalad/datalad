@@ -142,7 +142,7 @@ bet we will fix some bugs and make a world even a better place.
   subdataset, as "<subdataset>/" would, restricting its report to
   "<subdataset>/<path>".  ([#4235][])
 
-- [wtf][] now shows warns when the specified dataset does not exist.
+- [wtf][] now warns when the specified dataset does not exist.
   ([#4331][])
 
 - DataLad now lets the caller know that `git annex init` is scanning
