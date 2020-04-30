@@ -1,0 +1,58 @@
+Update 0.12.6-603-gfd2f8d65cf:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    1646113f0d9b0bf23c814cceac73cac16c095473..9b1c3d74f538219ff6f65d13e37cc5e7bfdf7b29
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge branch 'maint'
+   a4bea8799e^-1
+-  Merge pull request #4389 from adswa/favicon
+   ab137ea3a1^-1
+-  Merge branch 'maint'
+   c4acd0230f^-1
++  Merge pull request #4382 from kyleam/annex-retry
+   23d7683505^-1
+-  Merge pull request #4408 from adswa/tst-2680
+   9b7da0315b^-1
+-  Merge branch 'maint'
+   537aba5f73^-1
+-  Merge pull request #4422 from kyleam/suppression-feedback
+   d182b92981^-1
++  Merge pull request #4420 from mih/rf-dsrepr
+   0f4112ef8b^-1
+-  Merge branch 'maint'
+   1f9a67c0cc^-1
++  Merge pull request #4426 from mih/bf-4425
+   dc7100ff57^-1
++  Merge pull request #4435 from mih/rf-reporepr
+   30e973eccb^-1
+-  Merge branch 'maint'
+   fd2f8d65cf^-1
++  Merge pull request #4438 from adswa/progress-4390
+   e7eedf02ff^-1
+-  DOC+RF(minor): provide docstring to exc_str, do .join on a generator expression
+   11932b3f4a^-1
++  ENH: Add p7zip-full into singularity images
+   1c872e1174^-1
+-  TST: workflows/test_crippled.yml: Correct pasto
+   8ed044b22e^-1
++  Merge pull request #4441 from yarikoptic/enh-externals
+   f7e2d00ac3^-1
+-  Merge pull request #4457 from yarikoptic/rfs
+   f755a24a53^-1
++  Merge pull request #4439 from yarikoptic/enh-repr
+   809b9dfb7a^-1
++  Merge pull request #4460 from yarikoptic/rf-web-uuid
+   8d6756d510^-1
++  Merge pull request #4459 from mih/enh-4424
+   6b6d671fe7^-1
++  Merge pull request #4464 from andycon/doc-examples-opts-4105
+   422bc597de^-1
+-  Merge branch 'maint'
+   9b1c3d74f5^-1
