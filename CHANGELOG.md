@@ -75,7 +75,7 @@ bet we will fix some bugs and make a world even a better place.
 
 - All remaining `get_submodules()` call sites that relied on the
   temporary compatibility layer added in v0.12.0 have been updated.
-  (#4348)
+  ([#4348][])
 
 ### Enhancements and new features
 
@@ -85,7 +85,7 @@ bet we will fix some bugs and make a world even a better place.
   saving hundreds of files).  ([#4337][])
 
 - The default result renderer, in addition to "tailored" result
-  renderer, now triggers the custom summary renderer, if any.  (#4338)
+  renderer, now triggers the custom summary renderer, if any.  ([#4338][])
 
 - The new command [create-sibling-ria][] provides support for creating
   a sibling in a [RIA store][handbook-scalable-datastore]. ([#4124][])
@@ -2768,7 +2768,9 @@ publishing
 [#4330]: https://github.com/datalad/datalad/issues/4330
 [#4331]: https://github.com/datalad/datalad/issues/4331
 [#4337]: https://github.com/datalad/datalad/issues/4337
+[#4338]: https://github.com/datalad/datalad/issues/4338
 [#4342]: https://github.com/datalad/datalad/issues/4342
+[#4348]: https://github.com/datalad/datalad/issues/4348
 [#4354]: https://github.com/datalad/datalad/issues/4354
 [#4361]: https://github.com/datalad/datalad/issues/4361
 [#4367]: https://github.com/datalad/datalad/issues/4367
