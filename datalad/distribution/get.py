@@ -496,7 +496,7 @@ def _install_targetpath(
     lgr.info(
         "Installing %s%s recursively",
         ds,
-        (" underneath %s" % target_path
+        (" to get %s" % target_path
          if ds.path != target_path
          else ""))
     for res in _recursive_install_subds_underneath(

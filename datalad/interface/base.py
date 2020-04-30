@@ -767,9 +767,6 @@ class Interface(object):
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):
                 ret = list(ret)
-            if args.common_output_format == 'tailored' and \
-                    hasattr(cls, 'custom_result_summary_renderer'):
-                cls.custom_result_summary_renderer(ret)
             return ret
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
