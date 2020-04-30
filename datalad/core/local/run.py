@@ -133,7 +133,7 @@ class Run(Interface):
         dict(text="Run a command and specify a directory as a dependency "
                   "for the run. The contents of the dependency will be retrieved "
                   "prior to running the script",
-             code_cmd="datalad run -m 'run my script' --input 'data/*' "
+             code_cmd="datalad run -m 'run my script' -i 'data/*' "
              "'code/script.sh'",
              code_py="""\
              run(cmd='code/script.sh', message='run my script',
@@ -144,8 +144,8 @@ class Run(Interface):
              run(cmd='code/script.sh', message='run my script',
                  inputs=['data/*'], outputs=['output_dir'])""",
              code_cmd="""\
-             datalad run -m 'run my script' --input 'data/*' \\
-             --output 'output_dir/*' 'code/script.sh'"""),
+             datalad run -m 'run my script' -i 'data/*' \\
+             -o 'output_dir/*' 'code/script.sh'"""),
         dict(text="Specify multiple inputs and outputs",
              code_py="""\
              run(cmd='code/script.sh',
@@ -153,8 +153,8 @@ class Run(Interface):
                  inputs=['data/*', 'datafile.txt'],
                  outputs=['output_dir', 'outfile.txt'])""",
              code_cmd="""\
-             datalad run -m 'run my script' --input 'data/*' \\
-             --input 'datafile.txt' --output 'output_dir/*' --output \\
+             datalad run -m 'run my script' -i 'data/*' \\
+             -i 'datafile.txt' -o 'output_dir/*' -o \\
              'outfile.txt' 'code/script.sh'""")
     ]
 

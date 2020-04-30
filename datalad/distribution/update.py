@@ -79,7 +79,7 @@ class Update(Interface):
              code_py="update(sibling='origin', merge=True, "
                      "follow='parentds', recursive=True)",
              code_cmd="datalad update -s origin --merge "
-                      "--follow=parentds --recursive"),
+                      "--follow=parentds -r"),
     ]
 
     _params_ = dict(
