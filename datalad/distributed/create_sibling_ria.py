@@ -396,7 +396,6 @@ def _create_sibling_ria(
         storage_sibling = False
         storage_name = None
 
-
     # parse target URL
     try:
         ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
@@ -567,8 +566,7 @@ def _create_sibling_ria(
             ssh(chgrp_cmd)
     else:
         gr = GitRepo(repo_path, create=True, bare=True,
-                     shared=" --shared='{}'".format(quote_cmdlinearg(shared))
-                     if shared else None)
+                     shared=shared if shared else None)
         if storage_sibling:
             # write special remote's uuid into git-config, so clone can
             # which one it is supposed to be and enable it even with
