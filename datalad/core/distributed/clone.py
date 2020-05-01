@@ -688,6 +688,8 @@ def postclonecfg_ria(ds, props):
                     ds.repo.enable_remote(srs[org_uuid]['name'],
                                           options=['url={}'.format(new_url)]
                                           )
+                    lgr.info("Reconfigured %s for %s",
+                             srs[org_uuid]['name'], new_url)
                     # update ria_remotes for considering publication dependency
                     # below
                     ria_remotes = [s for s in

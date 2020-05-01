@@ -616,18 +616,33 @@ class RIARemote(SpecialRemote):
             #       and should be handled differently?
             #       Don't think so ATM. -> Reconsider with new execution layer.
 
+            # Note: Error message needs entire URL not just the missing
+            #       path, since it could be due to invalid URL. Path isn't
+            #       telling if it's not clear what system we are looking at.
+            # Note: Case switch due to still supported configs as an
+            #       alternative to ria+ URLs. To be deprecated.
+            if self.ria_store_url:
+                target = self.ria_store_url
+            elif self.storage_host:
+                target = "ria+ssh://{}{}".format(
+                    self.storage_host,
+                    dataset_tree_version_file.parent)
+            else:
+                target = "ria+" + dataset_tree_version_file.parent.as_uri()
+
             if not self.io.exists(dataset_tree_version_file.parent):
-                # unify exception
+                # unify exception to FileNotFoundError
+
                 raise FileNotFoundError(
-                    "RIA store doesn't exist at %s" %
-                    dataset_tree_version_file.parent
+                    "Configured RIA store not found at %s " % target
                 )
             else:
                 # Directory is there, but no version file. We don't know what
                 # that is. Treat the same way as if there was an unknown version
                 # on record.
                 raise NoLayoutVersion(
-                    "RIA store lacks a 'ria-layout-version' file."
+                    "Configured RIA store lacks a 'ria-layout-version' file at"
+                    " %s" % target
                 )
 
     def verify_ds_in_store(self):
