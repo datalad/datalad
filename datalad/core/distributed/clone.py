@@ -581,12 +581,14 @@ def postclonecfg_ria(ds, props):
     # setup publication dependency, if a corresponding special remote exists
     # and was enabled (there could be RIA stores that actually only have repos)
     # make this function be a generator
-    ria_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
+    ora_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
                    if s.get('annex-externaltype', None) == 'ora']
-    if not ria_remotes:
-        # nothing autoenabled. Let's check origin's config for
-        # datalad.ora-remote.uuid as stored by create-sibling-ria and enable try
-        # enabling that one.
+    if not ora_remotes and any(
+            r.get('externaltype', None) == 'ora'
+            for r in ds.repo.get_special_remotes().values()):
+        # no ORA remote autoenabled, but configuration know about at least one.
+        # Let's check origin's config for datalad.ora-remote.uuid as stored by
+        # create-sibling-ria and enable try enabling that one.
         lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
                   "up in source config ...")
 
@@ -690,9 +692,9 @@ def postclonecfg_ria(ds, props):
                                           )
                     lgr.info("Reconfigured %s for %s",
                              srs[org_uuid]['name'], new_url)
-                    # update ria_remotes for considering publication dependency
+                    # update ora_remotes for considering publication dependency
                     # below
-                    ria_remotes = [s for s in
+                    ora_remotes = [s for s in
                                    ds.siblings('query',
                                                result_renderer='disabled')
                                    if s.get('annex-externaltype', None) ==
@@ -703,17 +705,17 @@ def postclonecfg_ria(ds, props):
             else:
                 lgr.debug("Unknown ORA special remote uuid at 'origin': %s",
                           org_uuid)
-    if ria_remotes:
-        if len(ria_remotes) == 1:
+    if ora_remotes:
+        if len(ora_remotes) == 1:
             yield from ds.siblings('configure',
                                    name='origin',
-                                   publish_depends=ria_remotes[0]['name'],
+                                   publish_depends=ora_remotes[0]['name'],
                                    result_filter=None,
                                    result_renderer='disabled')
         else:
             lgr.warning("Found multiple ORA remotes. Couldn't decide which "
                         "publishing to origin should depend on: %s",
-                        [r['name'] for r in ria_remotes])
+                        [r['name'] for r in ora_remotes])
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None):
