@@ -782,32 +782,3 @@ class Get(Interface):
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res
-
-    @staticmethod
-    def custom_result_summary_renderer(res):
-        from datalad.ui import ui
-        from os import linesep
-        if not len(res):
-            ui.message("Got nothing new")
-            return
-
-        nfiles = count_results(res, type='file')
-        nsuccess_file = count_results(res, type='file', status='ok')
-        nfailure = nfiles - nsuccess_file
-        msg = "Tried to get %d %s that had no content yet." % (
-            nfiles, single_or_plural("file", "files", nfiles))
-        if nsuccess_file:
-            msg += " Successfully obtained %d. " % nsuccess_file
-        if nfailure:
-            msg += " %d (failed)." % (nfailure,)
-        ui.message(msg)
-
-        # if just a few or less than initially explicitly requested
-        if len(res) < 10:
-            msg = linesep.join([
-                "{path}{type} ... {suc}".format(
-                    suc=item.get('status'),
-                    path=item.get('path'),
-                    type=' [{}]'.format(item['type']) if 'type' in item else '')
-                for item in res])
-            ui.message(msg)
