@@ -314,52 +314,64 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
 
 
 # TODO: make limit respect config/environment parameter
-def exc_str(exc=None, limit=None):
+class exc_str(object):
     """Enhanced str for exceptions.  Should include original location
-
-    Parameters
-    ----------
-    exc: Exception, optional
-      If not provided, information about the last exception caught by except
-      clause (as provided by `sys.exc_info`) will be used.
-    limit: int, optional
-      Number of levels in the traceback stack from the point where exception
-      was raised to include. If `None`, environment variable
-      DATALAD_EXC_STR_TBLIMIT is consulted.
-
-    Returns
-    -------
-    str
-      String representation of the exception with traceback information
-      appended.
     """
-    out = str(exc)
-    if limit is None:
-        # TODO: config logging.exceptions.traceback_levels = 1
-        limit = int(os.environ.get('DATALAD_EXC_STR_TBLIMIT', '1'))
-    try:
-        exctype, value, tb = sys.exc_info()
-        if not exc:
-            exc = value
-            out = str(exc)
-        if not out:
-            out = repr(exc)
-        # verify that it seems to be the exception we were passed
-        #assert(isinstance(exc, exctype))
-        if exc:
-            assert(exc is value)
-        entries = traceback.extract_tb(tb)
-        if entries:
-            out += " [%s]" % (
-                ','.join(
-                    '%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1])
-                    for x in entries[-limit:]
+    _default_limit = int(os.environ.get('DATALAD_EXC_STR_TBLIMIT', '1'))
+
+    def __init__(self, exc=None, limit=None):
+        """
+        Parameters
+        ----------
+        exc: Exception, optional
+          If not provided, information about the last exception caught by except
+          clause (as provided by `sys.exc_info`) will be used.
+        limit: int, optional
+          Number of levels in the traceback stack from the point where exception
+          was raised to include. If `None`, environment variable
+          DATALAD_EXC_STR_TBLIMIT is consulted.
+
+        Returns
+        -------
+        str
+          String representation of the exception with traceback information
+          appended.
+        """
+        self._exc = exc
+        self._limit = limit if limit is not None else self._default_limit
+
+    def __str__(self):
+        exc = self._exc
+        out = str(exc)
+        limit = self._limit
+        if limit == 0:
+            return out
+
+        try:
+            # TODO: think if we would still be getting correct exception
+            # info
+            exctype, value, tb = sys.exc_info()
+            if not exc:
+                exc = value
+                out = str(exc)
+            if not out:
+                out = repr(exc)
+            # verify that it seems to be the exception we were passed
+            #assert(isinstance(exc, exctype))
+            if exc:
+                assert(exc is value)
+            entries = traceback.extract_tb(tb)
+            if entries:
+                out += " [%s]" % (
+                    ','.join(
+                        '%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1])
+                        for x in entries[-limit:]
+                    )
                 )
-            )
-    except:  # MIH: TypeError?
-        return out  # To the best of our abilities
-    finally:
-        # As the bible teaches us:
-        # https://docs.python.org/2/library/sys.html#sys.exc_info
-        del tb
-    return out
+        except IOError:  # MIH: TypeError?
+            return out  # To the best of our abilities
+        finally:
+            # As the bible teaches us:
+            # https://docs.python.org/2/library/sys.html#sys.exc_info
+            del tb
+        return out

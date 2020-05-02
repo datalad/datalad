@@ -148,7 +148,7 @@ def test_exc_str():
     try:
         raise Exception("my bad")
     except Exception as e:
-        estr = exc_str(e)
+        estr = str(exc_str(e))
     assert_re_in("my bad \[test_dochelpers.py:test_exc_str:...\]", estr)
 
     def f():
@@ -159,15 +159,17 @@ def test_exc_str():
         f()
     except Exception as e:
         # default one:
-        estr2 = exc_str(e, 2)
-        estr1 = exc_str(e, 1)
+        estr2 = str(exc_str(e, 2))
+        estr1 = str(exc_str(e, 1))
         # and we can control it via environ by default
-        with patch.dict('os.environ', {'DATALAD_EXC_STR_TBLIMIT': '3'}):
-            estr3 = exc_str(e)
+        # No longer supported to change at run time
+        #with patch.dict('os.environ', {'DATALAD_EXC_STR_TBLIMIT': '3'}):
+        estr3 = str(exc_str(e, limit=3))
         with patch.dict('os.environ', {}, clear=True):
-            estr_ = exc_str()
+            estr_ = str(exc_str())
 
-    assert_re_in("my bad again \[test_dochelpers.py:test_exc_str:...,test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr3)
+    assert_re_in("my bad again \[test_dochelpers.py:test_exc_str:...,test_dochelpers.py:f:...,"
+                 "test_dochelpers.py:f2:...\]", estr3)
     assert_re_in("my bad again \[test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr2)
     assert_re_in("my bad again \[test_dochelpers.py:f2:...\]", estr1)
     assert_equal(estr_, estr1)
@@ -175,4 +177,4 @@ def test_exc_str():
     try:
         raise NotImplementedError
     except Exception as e:
-        assert_re_in("NotImplementedError\(\) \[test_dochelpers.py:test_exc_str:...\]", exc_str(e))
+        assert_re_in("NotImplementedError\(\) \[test_dochelpers.py:test_exc_str:...\]", str(exc_str(e)))
