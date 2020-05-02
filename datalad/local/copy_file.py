@@ -58,8 +58,9 @@ class CopyFile(Interface):
     content is available locally, by just copying the required metadata on
     content identity and availability.
 
-    Note: URLs for only built-in 'web' and external 'datalad' special remotes
-    are copied ATM.
+    .. note::
+      At the moment, only URLs for the special remotes 'web' (git-annex built-in)
+      and 'datalad' are recognized and transferred.
 
     || REFLOW >>
     The interface is modeled after the POSIX 'cp' command, but with one
