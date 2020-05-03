@@ -510,6 +510,16 @@ def build_doc(cls, **kwargs):
 
     # build standard doc and insert eval_doc
     spec = getattr(cls, '_params_', dict())
+
+    # update defaults for any opts in spec that can override eval_defaults
+    overriders = dict()
+    for opt in spec.keys():
+        if opt in eval_params.keys():
+            overriders[opt] = spec[opt]
+    for opt in overriders.keys():
+        xx = spec.pop(opt)
+    eval_defaults.update(overriders)
+
     # get docs for eval_results parameters:
     spec.update(eval_params)
 
