@@ -92,6 +92,8 @@ def setup_parser(
         cmdlineargs,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False,
+        # Was this triggered by argparse?
+        completing=False,
         # prevent loading of extension entrypoints when --help is requested
         # this is enabled when building docs to avoid pollution of generated
         # manpages with extensions commands (that should appear in their own
@@ -208,7 +210,7 @@ def setup_parser(
     try:
         parsed_args, unparsed_args = parser._parse_known_args(
             cmdlineargs[1:], argparse.Namespace())
-        if not unparsed_args:
+        if not (completing or unparsed_args):
             fail_handler(parser, msg="too few arguments", exit_code=2)
         lgr.debug("Command line args 1st pass. Parsed: %s Unparsed: %s",
                   parsed_args, unparsed_args)
@@ -228,7 +230,7 @@ def setup_parser(
         need_single_subparser = False
         if not help_ignore_extensions:
             add_entrypoints_to_interface_groups(interface_groups)
-    elif unparsed_arg.startswith('-'):  # unknown option
+    elif not completing and unparsed_arg.startswith('-'):  # unknown option
         fail_with_short_help(parser,
                              msg="unrecognized argument %s" % unparsed_arg,
                              exit_code=2)
@@ -261,12 +263,13 @@ def setup_parser(
                 hint_cmd = _deprecated_commands[unparsed_arg]
                 hint = "Command %r was deprecated" % unparsed_arg
                 hint += (" in favor of %r command." % hint_cmd) if hint_cmd else '.'
-            fail_with_short_help(
-                parser,
-                hint=hint,
-                provided=unparsed_arg,
-                known=list(known_commands.keys()) + list(extension_commands.keys())
-            )
+            if not completing:
+                fail_with_short_help(
+                    parser,
+                    hint=hint,
+                    provided=unparsed_arg,
+                    known=list(known_commands.keys()) + list(extension_commands.keys())
+                )
         if need_single_subparser is None:
             need_single_subparser = unparsed_arg
 
@@ -444,7 +447,7 @@ def main(args=None):
         # Possibly present DataLadRIs were stripped of a leading /
         args = [_fix_datalad_ri(s) for s in args]
     # PYTHON_ARGCOMPLETE_OK
-    parser = setup_parser(args)
+    parser = setup_parser(args, completing="_ARGCOMPLETE" in os.environ)
     try:
         import argcomplete
         argcomplete.autocomplete(parser)

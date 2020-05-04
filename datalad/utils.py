@@ -1912,7 +1912,16 @@ def get_dataset_root(path):
     the root dataset containing its parent directory will be reported.
     If none can be found, at a symlink at `path` is pointing to a
     dataset, `path` itself will be reported as the root.
+
+    Parameters
+    ----------
+    path : Path-like
+
+    Returns
+    -------
+    str or None
     """
+    path = str(path)
     suffix = '.git'
     altered = None
     if op.islink(path) or not op.isdir(path):
