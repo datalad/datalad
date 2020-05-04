@@ -510,16 +510,7 @@ def default_result_renderer(res):
         path = str(path)
         # if 'file' in str(res.get('path', '')):
         #     import pdb; pdb.set_trace()
-        reportwd = res.get('reportwd')
-        pref = ""
-        if reportwd:
-            if hasattr(reportwd, 'path'):
-                pref = "-d/"
-                reportwd = reportwd.path
-        else:
-            reportwd = res.get('refds')
-        path_ = pref + relpath(path, reportwd) \
-            if reportwd else path
+        path_ = _get_report_path(path, res.get('reportwd'), res.get('refds'))
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
@@ -532,6 +523,23 @@ def default_result_renderer(res):
                         if isinstance(res['message'], tuple) else res[
                             'message'])
                 if res.get('message', None) else ''))
+
+
+def _get_report_path(path, reportwd, refds):
+    """Return path to report to user.
+
+    if reportwd is a dataset (well, has .path), we take is as the reference
+    to report from.
+
+    TODO: detailed documentation, make not private"""
+    pref = ""
+    if reportwd:
+        if hasattr(reportwd, 'path'):
+            pref = "-d/"
+            reportwd = reportwd.path
+    else:
+        reportwd = refds
+    return pref + relpath(path, reportwd) if reportwd else path
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, final=False):
