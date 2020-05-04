@@ -192,8 +192,7 @@ class Siblings(Interface):
             doc="""Whether to query all information about the annex configurations
             of siblings. Can be disabled if speed is a concern"""),
         recursive=recursion_flag,
-        recursion_limit=recursion_limit,
-        result_renderer=result_renderer)
+        recursion_limit=recursion_limit)
 
     @staticmethod
     @datasetmethod(name='siblings')
