@@ -532,14 +532,20 @@ def _get_report_path(path, reportwd, refds):
     to report from.
 
     TODO: detailed documentation, make not private"""
-    pref = ""
+    make_explicit_relative = True
     if reportwd:
         if hasattr(reportwd, 'path'):
-            pref = "-d/"
+            make_explicit_relative = False
             reportwd = reportwd.path
     else:
         reportwd = refds
-    return pref + relpath(path, reportwd) if reportwd else path
+
+    path_ = path
+    if reportwd:
+        path_ = relpath(path, reportwd)
+        if make_explicit_relative and not path_.startswith(pardir):
+            path_ = op.join(curdir, path_)
+    return path_
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, final=False):
