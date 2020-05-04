@@ -24,7 +24,7 @@ from datalad.utils import (
 )
 from datalad.tests.utils import (
     assert_status,
-    skip_if_on_windows,
+    known_failure_windows,
     skip_ssh,
     with_tempfile
 )
@@ -43,7 +43,7 @@ from datalad.customremotes.ria_utils import (
 )
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def _test_bare_git_version_1(host, dspath, store):
@@ -144,11 +144,12 @@ def _test_bare_git_version_1(host, dspath, store):
 
 def test_bare_git_version_1():
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_bare_git_version_1)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_bare_git_version_1)), \
+          'datalad-test'
     yield _test_bare_git_version_1, None
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def _test_bare_git_version_2(host, dspath, store):
@@ -227,10 +228,13 @@ def _test_bare_git_version_2(host, dspath, store):
 
 def test_bare_git_version_2():
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_bare_git_version_2)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_bare_git_version_2)), \
+          'datalad-test'
     yield _test_bare_git_version_2, None
 
-# TODO: Double check the following one:
+# TODO: Outcommented "old" test from git-annex-ria-remote. This one needs to be
+#       revisited after RF'ing to base ORA on proper command abstractions for
+#       remote execution
 
 # @skip_if_on_windows
 # @with_tempfile

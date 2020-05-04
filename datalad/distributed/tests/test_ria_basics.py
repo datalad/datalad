@@ -22,7 +22,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_true,
     has_symlink_capability,
-    skip_if_on_windows,
+    known_failure_windows,
     skip_ssh,
     slow,
     swallow_logs,
@@ -52,7 +52,7 @@ from datalad.customremotes.ria_utils import (
 # Note, that exceptions to test for are generally CommandError since we are
 # talking to the special remote via annex.
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -150,11 +150,12 @@ def _test_initremote_basic(host, ds_path, store, link):
 def test_initremote_basic():
 
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_initremote_basic)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_initremote_basic)), \
+          'datalad-test'
     yield _test_initremote_basic, None
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_initremote_rewrite(host, ds_path, store):
@@ -205,11 +206,12 @@ def _test_initremote_rewrite(host, ds_path, store):
 
 def test_initremote_rewrite():
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_initremote_rewrite)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_initremote_rewrite)), \
+          'datalad-test'
     yield _test_initremote_rewrite, None
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -280,11 +282,11 @@ def _test_remote_layout(host, dspath, store, archiv_store):
 
 def test_remote_layout():
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_remote_layout)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_remote_layout)), 'datalad-test'
     yield _test_remote_layout, None
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_version_check(host, dspath, store):
@@ -371,11 +373,11 @@ def _test_version_check(host, dspath, store):
 
 def test_version_check():
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_version_check)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_version_check)), 'datalad-test'
     yield _test_version_check, None
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_gitannex(host, store, dspath):
@@ -421,7 +423,7 @@ def _test_gitannex(host, store, dspath):
 
 
 @turtle
-@skip_if_on_windows # TODO: Skipped due to gh-4436
+@known_failure_windows # TODO: Skipped due to gh-4436
 @skip_ssh
 def test_gitannex_ssh():
     _test_gitannex('datalad-test')
@@ -432,7 +434,7 @@ def test_gitannex_local():
     _test_gitannex(None)
 
 
-@skip_if_on_windows  # see gh-4469
+@known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_binary_data(host, store, dspath):
@@ -487,5 +489,5 @@ def _test_binary_data(host, store, dspath):
 
 def test_binary_data():
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_binary_data)), 'datalad-test'
+    yield known_failure_windows(skip_ssh(_test_binary_data)), 'datalad-test'
     yield _test_binary_data, None

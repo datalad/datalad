@@ -15,7 +15,12 @@ class UnknownLayoutVersion(Exception):
     pass
 
 
+# TODO: Make versions a tuple of (label, description)?
+# Object tree versions we introduced so far. This is about the layout within a
+# dataset in a RIA store
 known_versions_objt = ['1', '2']
+# Dataset tree versions we introduced so far. This is about the layout of
+# datasets in a RIA store
 known_versions_dst = ['1']
 
 
@@ -45,7 +50,8 @@ def get_layout_locations(version, base_path, dsid):
         dsobj_dir = dsgit_dir / 'annex' / 'objects'
         return dsgit_dir, archive_dir, dsobj_dir
     else:
-        raise ValueError("Unknown layout version: {}".format(version))
+        raise ValueError("Unknown layout version: {}. Supported: {}"
+                         "".format(version, known_versions_dst))
 
 
 def verify_ria_url(url, cfg):
@@ -89,17 +95,35 @@ def verify_ria_url(url, cfg):
             "Unexpected fragment in RIA-store URL: %s" % url_ri.fragment)
     protocol = url_ri.scheme[4:]
     if protocol not in ['ssh', 'file']:
-        raise ValueError("Unsupported protocol: %s" % protocol)
+        raise ValueError("Unsupported protocol: %s. Supported: ssh, file" %
+                         protocol)
 
     return url_ri.hostname if protocol == 'ssh' else None, url_ri.path, url
 
 
 def create_store(io, base_path, version):
+    """Helper to create a RIA store
+
+    Note, that this is meant as an internal helper and part of intermediate
+    RF'ing. Ultimately should lead to dedicated command or option for
+    create-sibling-ria.
+
+    Parameters
+    ----------
+    io: SSHRemoteIO or LocalIO
+      Respective execution instance.
+      Note: To be replaced by proper command abstraction
+    base_path: Path
+      root path of the store
+    version: str
+      layout version of the store (dataset tree)
+    """
 
     # At store level the only version we know as of now is 1.
     if version not in known_versions_dst:
-        raise UnknownLayoutVersion("store layout version unknown: {}"
-                                   "".format(version))
+        raise UnknownLayoutVersion("RIA store layout version unknown: {}."
+                                   "Supported versions: {}"
+                                   .format(version, known_versions_dst))
 
     error_logs = base_path / 'error_logs'
     version_file = base_path / 'ria-layout-version'
@@ -113,7 +137,7 @@ def create_store(io, base_path, version):
             # record.
             # Note, that a config flag after pipe symbol is fine.
             raise ValueError("Conflicting version found at target: {}"
-                             "".format(existing_version))
+                             .format(existing_version))
         else:
             # already exists, recorded version fits - nothing to do
             return
@@ -125,6 +149,26 @@ def create_store(io, base_path, version):
 
 
 def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
+    """Helper to create a dataset in a RIA store
+
+    Note, that this is meant as an internal helper and part of intermediate
+    RF'ing. Ultimately should lead to a version option for create-sibling-ria
+    in conjunction with a store creation command/option.
+
+    Parameters
+    ----------
+    io: SSHRemoteIO or LocalIO
+      Respective execution instance.
+      Note: To be replaced by proper command abstraction
+    base_path: Path
+      root path of the store
+    dsid: str
+      dataset id
+    store_version: str
+      layout version of the store (dataset tree)
+    obj_version: str
+      layout version of the dataset itself (object tree)
+    """
 
     # TODO: Note for RF'ing, that this is about setting up a valid target
     #       for the special remote not a replacement for create-sibling-ria.
@@ -139,8 +183,9 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
         raise UnknownLayoutVersion(str(e))
 
     if obj_version not in known_versions_objt:
-        raise UnknownLayoutVersion("dataset layout version unknown: {}"
-                                   "".format(obj_version))
+        raise UnknownLayoutVersion("Dataset layout version unknown: {}. "
+                                   "Supported: {}"
+                                   .format(obj_version, known_versions_objt))
 
     version_file = dsgit_dir / 'ria-layout-version'
 
@@ -150,8 +195,8 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
             # We have an already existing location with a conflicting version on
             # record.
             # Note, that a config flag after pipe symbol is fine.
-            raise ValueError("Conflicting version found at target: {}"
-                             "".format(existing_version))
+            raise ValueError("Conflicting dataset layout version found at "
+                             "target: {}".format(existing_version))
 
     io.mkdir(archive_dir)
     io.mkdir(dsobj_dir)
