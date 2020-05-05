@@ -214,23 +214,6 @@ bet we will fix some bugs and make a world even a better place.
   ([#4243][])
 
 
-## 0.12.7 (??? ??, 2020) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
-
-### Fixes
-
-?
-
-### Enhancements and new features
-
-?
-
-
 ## 0.12.6 (April 23, 2020) -- .
 
 ### Major refactoring and deprecations
