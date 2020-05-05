@@ -82,6 +82,11 @@ bet we will fix some bugs and make a world even a better place.
   temporary compatibility layer added in v0.12.0 have been updated.
   ([#4348][])
 
+- The custom result summary renderer for [get][], which was visible
+  with `--output-format=tailored`, displayed incorrect and confusing
+  information in some cases.  The custom renderer has been removed
+  entirely.  ([#4471][])
+
 ### Enhancements and new features
 
 - The default result renderer learned to elide a chain of results
@@ -96,12 +101,16 @@ bet we will fix some bugs and make a world even a better place.
   a sibling in a [RIA store][handbook-scalable-datastore]. ([#4124][])
 
 - DataLad ships with a new special remote, git-annex-remote-ora, for
-  interacting with [RIA stores][handbook-scalable-datastore].
-  ([#4260][])
+  interacting with [RIA stores][handbook-scalable-datastore], and a
+  command [export-archive-ora][] for exporting an archive from a local
+  annex object store.  ([#4260][]) ([#4203][])
 
 - The new command [push][] provides an alternative interface to
   [publish][] for pushing a dataset hierarchy to a sibling.
   ([#4206][])
+
+- The new command [copy-file][] copies files and associated
+  availability information from one dataset to another.  ([#4430][])
 
 - The command examples have been expanded and improved.  ([#4091][])
   ([#4314][]) ([#4464][])
@@ -2363,6 +2372,7 @@ publishing
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
 [configuration]: http://docs.datalad.org/en/latest/config.html
+[copy-file]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-copy-file.html
 [copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
 [create]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
@@ -2374,6 +2384,7 @@ publishing
 [download-url]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-download-url.html
 [diff]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-diff.html
 [drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
+[export-archive-ora]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export-archive-ora.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
 [export_tarball]: http://docs.datalad.org/en/latest/generated/datalad.plugin.export_tarball.html
 [get]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html
@@ -2764,6 +2775,7 @@ publishing
 [#4194]: https://github.com/datalad/datalad/issues/4194
 [#4196]: https://github.com/datalad/datalad/issues/4196
 [#4200]: https://github.com/datalad/datalad/issues/4200
+[#4203]: https://github.com/datalad/datalad/issues/4203
 [#4206]: https://github.com/datalad/datalad/issues/4206
 [#4212]: https://github.com/datalad/datalad/issues/4212
 [#4214]: https://github.com/datalad/datalad/issues/4214
@@ -2816,6 +2828,7 @@ publishing
 [#4420]: https://github.com/datalad/datalad/issues/4420
 [#4421]: https://github.com/datalad/datalad/issues/4421
 [#4426]: https://github.com/datalad/datalad/issues/4426
+[#4430]: https://github.com/datalad/datalad/issues/4430
 [#4431]: https://github.com/datalad/datalad/issues/4431
 [#4435]: https://github.com/datalad/datalad/issues/4435
 [#4438]: https://github.com/datalad/datalad/issues/4438
@@ -2824,3 +2837,4 @@ publishing
 [#4459]: https://github.com/datalad/datalad/issues/4459
 [#4460]: https://github.com/datalad/datalad/issues/4460
 [#4464]: https://github.com/datalad/datalad/issues/4464
+[#4471]: https://github.com/datalad/datalad/issues/4471
