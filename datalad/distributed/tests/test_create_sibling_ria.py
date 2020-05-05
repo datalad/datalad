@@ -72,13 +72,15 @@ def test_invalid_calls(path):
 @with_tempfile
 @with_store_insteadof
 @with_tree({'ds': {'file1.txt': 'some'},
-            'sub': {'other.txt': 'other'}})
+            'sub': {'other.txt': 'other'},
+            'sub2': {'evenmore.txt': 'more'}})
 @with_tempfile(mkdir=True)
 def _test_create_store(host, base_path, ds_path, clone_path):
 
     ds = Dataset(ds_path).create(force=True)
 
     subds = ds.create('sub', force=True)
+    subds2 = ds.create('sub2', force=True, no_annex=True)
     ds.save(recursive=True)
     assert_repo_status(ds.path)
 
@@ -93,6 +95,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
         {s['name'] for s in siblings})
     sub_siblings = subds.siblings(result_renderer=None)
     eq_({'here'}, {s['name'] for s in sub_siblings})
+    sub2_siblings = subds2.siblings(result_renderer=None)
+    eq_({'here'}, {s['name'] for s in sub2_siblings})
 
     # TODO: post-update hook was enabled
 
@@ -131,8 +135,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     # now, again but recursive.
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
                                 recursive=True, existing='reconfigure')
-    eq_(len(res), 2)
-    assert_result_count(res, 2, status='ok', action="create-sibling-ria")
+    eq_(len(res), 3)
+    assert_result_count(res, 3, status='ok', action="create-sibling-ria")
 
     # remotes now exist in super and sub
     siblings = ds.siblings(result_renderer=None)
@@ -141,6 +145,10 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     sub_siblings = subds.siblings(result_renderer=None)
     eq_({'datastore', 'datastore-storage', 'here'},
         {s['name'] for s in sub_siblings})
+    # but no special remote in plain git subdataset:
+    sub2_siblings = subds2.siblings(result_renderer=None)
+    eq_({'datastore', 'here'},
+        {s['name'] for s in sub2_siblings})
 
     # for testing trust_level parameter, redo for each label:
     for trust in ['trust', 'semitrust', 'untrust']:
@@ -157,7 +165,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 def test_create_simple():
 
     yield _test_create_store, None
-    yield skip_ssh(_test_create_store), 'datalad-test'
+    # TODO: Skipped due to gh-4436
+    yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
 
 
 # TODO: explicit naming of special remote

@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Export an archive of a local annex object store, suitable for RIA"""
+"""Export an archive of a local annex object store, suitable for an ORA remote"""
 
 __docformat__ = 'restructuredtext'
 
@@ -45,23 +45,23 @@ from datalad.dochelpers import (
     exc_str,
 )
 
-lgr = logging.getLogger('datalad.customremotes.export_archive')
+lgr = logging.getLogger('datalad.customremotes.export_archive_ora')
 
 
 @build_doc
-class RIAExportArchive(Interface):
-    """Export an archive of a local annex object store for the RIA remote.
+class ExportArchiveORA(Interface):
+    """Export an archive of a local annex object store for the ORA remote.
 
     Keys in the local annex object store are reorganized in a temporary
     directory (using links to avoid storage duplication) to use the
     'hashdirlower' setup used by git-annex for bare repositories and
     the directory-type special remote. This alternative object store is
     then moved into a 7zip archive that is suitable for use in a
-    RIA remote dataset store. Placing such an archive into::
+    ORA remote dataset store. Placing such an archive into::
 
       <dataset location>/archives/archive.7z
 
-    Enables the RIA special remote to locate and retrieve all key contained
+    Enables the ORA special remote to locate and retrieve all key contained
     in the archive.
     """
     _params_ = dict(
@@ -86,7 +86,7 @@ class RIAExportArchive(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='ria_export_archive')
+    @datasetmethod(name='export_archive_ora')
     @eval_results
     def __call__(
             target,
@@ -94,7 +94,7 @@ class RIAExportArchive(Interface):
             dataset=None):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
-            dataset, check_installed=True, purpose='RIA archive export')
+            dataset, check_installed=True, purpose='ORA archive export')
         ds_repo = ds.repo
 
         # TODO remove once datalad 0.12rc7 or later is released
@@ -115,7 +115,7 @@ class RIAExportArchive(Interface):
             opts = ['-mx0']
 
         res_kwargs = dict(
-            action="export-ria-archive",
+            action="export-archive-ora",
             logger=lgr,
         )
 
@@ -128,7 +128,7 @@ class RIAExportArchive(Interface):
             )
             return
 
-        exportdir = ds_repo.dot_git / 'datalad' / 'tmp' / 'ria_archive'
+        exportdir = ds_repo.dot_git / 'datalad' / 'tmp' / 'ora_archive'
         if exportdir.exists():
             yield get_status_dict(
                 ds=ds,
@@ -147,10 +147,10 @@ class RIAExportArchive(Interface):
 
         log_progress(
             lgr.info,
-            'riaarchiveexport',
-            'Start RIA archive export %s', ds,
+            'oraarchiveexport',
+            'Start ORA archive export %s', ds,
             total=len(keypaths),
-            label='RIA archive export',
+            label='ORA archive export',
             unit=' Keys',
         )
 
@@ -160,7 +160,7 @@ class RIAExportArchive(Interface):
             hashdir = op.join(keypath.parts[-4], keypath.parts[-3])
             log_progress(
                 lgr.info,
-                'riaarchiveexport',
+                'oraarchiveexport',
                 'Export key %s to %s', key, hashdir,
                 update=1,
                 increment=True)
@@ -179,7 +179,7 @@ class RIAExportArchive(Interface):
 
         log_progress(
             lgr.info,
-            'riaarchiveexport',
+            'oraarchiveexport',
             'Finished RIA archive export from %s', ds
         )
         try:

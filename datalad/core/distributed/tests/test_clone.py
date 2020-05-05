@@ -57,6 +57,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     skip_if_no_network,
     skip_if_on_windows,
+    skip_ssh,
     slow,
     swallow_logs,
     use_cassette,
@@ -768,6 +769,150 @@ def test_ria_http(lcl, storepath, url):
     eq_(cloned_by_alias.id, ds.id)
     # more sensible default install path
     eq_(cloned_by_alias.pathobj.name, 'myname')
+
+
+@with_tempfile
+def _test_ria_postclonecfg(url, dsid, clone_path):
+    # Test cloning from RIA store while ORA special remote autoenabling failed
+    # due to an invalid URL from the POV of the cloner.
+    # Origin's git-config-file should contain the UUID to enable. This needs to
+    # work via HTTP, SSH and local cloning.
+
+    # Autoenabling should fail initially by git-annex-init and we would report
+    # on INFO level. Only postclone routine would deal with it.
+    with swallow_logs(new_level=logging.INFO) as cml:
+        # First, the super ds:
+        riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
+
+    # However, we now can retrieve content since clone should have enabled the
+    # special remote with new URL (or origin in case of HTTP).
+    res = riaclone.get('test.txt')
+    assert_result_count(res, 1,
+                        status='ok',
+                        path=str(riaclone.pathobj / 'test.txt'),
+                        message="from {}...".format("origin"
+                                                    if url.startswith('http')
+                                                    else "store-storage"))
+
+    # same thing for the sub ds (we don't need a store-url and id - get should
+    # figure those itself):
+    with swallow_logs(new_level=logging.INFO) as cml:
+        riaclonesub = riaclone.get(
+            op.join('subdir', 'subds'), get_data=False,
+            result_xfm='datasets', return_type='item-or-list')
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
+    res = riaclonesub.get('testsub.txt')
+    assert_result_count(res, 1,
+                        status='ok',
+                        path=str(riaclonesub.pathobj / 'testsub.txt'),
+                        message="from {}...".format("origin"
+                                                    if url.startswith('http')
+                                                    else "store-storage"))
+
+
+@with_tempfile
+def _postclonetest_prepare(lcl, storepath, link):
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+        create_ds_in_store,
+        get_layout_locations
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+    create_tree(lcl,
+                tree={
+                        'ds': {
+                            'test.txt': 'some',
+                            'subdir': {
+                                'subds': {'testsub.txt': 'somemore'},
+                            },
+                        },
+                      })
+
+    # create a local dataset with a subdataset
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    link = Path(link)
+    link.symlink_to(storepath)
+    subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
+    subds.save()
+    ds = Dataset(lcl / 'ds').create(force=True)
+    ds.save(version_tag='original')
+    assert_repo_status(ds.path)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+
+    # URL to use for upload. Point is, that this should be invalid for the clone
+    # so that autoenable would fail. Therefore let it be based on a to be
+    # deleted symlink
+    upl_url = "ria+{}".format(link.as_uri())
+
+    for d in (ds, subds):
+
+        # TODO: create-sibling-ria required for config! => adapt to RF'd
+        #       creation (missed on rebase?)
+        create_ds_in_store(io, storepath, d.id, '2', '1')
+        d.create_sibling_ria(upl_url, "store")
+
+        # Now, simulate the problem by reconfiguring the special remote to not
+        # be autoenabled.
+        # Note, however, that the actual intention is a URL, that isn't valid
+        # from the point of view of the clone (doesn't resolve, no credentials,
+        # etc.) and therefore autoenabling on git-annex-init when
+        # datalad-cloning would fail to succeed.
+        Runner(cwd=d.path).run(['git', 'annex', 'enableremote', 'store-storage',
+                                'autoenable=false'])
+        d.push('.', to='store')
+        store_loc, _, _ = get_layout_locations(1, storepath, d.id)
+        Runner(cwd=str(store_loc)).run(['git', 'update-server-info'])
+
+    link.unlink()
+    # We should now have a store with datasets that have an autoenabled ORA
+    # remote relying on an inaccessible URL.
+    # datalad-clone is supposed to reconfigure based on the URL we cloned from.
+    # Test this feature for cloning via HTTP, SSH and FILE URLs.
+
+    return ds.id
+
+
+def test_ria_postclonecfg():
+
+    if not has_symlink_capability():
+        # This is needed to create an ORA remote using an URL for upload,
+        # that is then invalidated later on (delete the symlink it's based on).
+        raise SkipTest("Can't create symlinks")
+
+    from datalad.utils import make_tempfile
+    from datalad.tests.utils import HTTPPath
+
+    with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store:
+        id = _postclonetest_prepare(lcl, store)
+
+        # test cloning via ria+file://
+        yield _test_ria_postclonecfg, Path(store).as_uri(), id
+
+        # Note: HTTP disabled for now. Requires proper implementation in ORA
+        #       remote. See
+        # https://github.com/datalad/datalad/pull/4203#discussion_r410284649
+
+        # # test cloning via ria+http://
+        # with HTTPPath(store) as url:
+        #     yield _test_ria_postclonecfg, url, id
+
+        # test cloning via ria+ssh://
+        yield skip_ssh(_test_ria_postclonecfg), \
+            "ssh://datalad-test:{}".format(Path(store).as_posix()), id
 
 
 @with_tempfile(mkdir=True)

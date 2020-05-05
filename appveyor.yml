@@ -87,22 +87,22 @@ test_script:
   # first sign of life
   - datalad wtf
   # and now this... [keep appending tests that should work!!]
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.core datalad.local datalad.distributed datalad.cmdline datalad.distribution datalad.interface datalad.support datalad.ui"
+  - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.core datalad.local datalad.distributed datalad.cmdline datalad.distribution datalad.interface datalad.support datalad.ui
   # one call per datalad component for now -- to better see what is being tested
   # remaining fails: test_archives.test_basic_scenario test_datalad.test_basic_scenario_local_url
-  #- python -m nose -s -v datalad.customremotes
+  #- python -m nose -s -v -A "not (turtle)" datalad.customremotes
   # remaining fails: test_http
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3"
+  - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3
   # remaining fails: extractors.tests.test_base test_aggregation test_base  datalad.metadata.extractors.tests.test_datacite_xml
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822"
+  - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822
   # remaining fails: test_addurls test_export_archive test_plugins"
   # additional tests need module `dateutil`!!
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.plugin.tests.test_check_dates"
+  - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.plugin.tests.test_check_dates
   # remaining fails: test__main__ test_cmd test_log  test_protocols test_test_utils test_auto
-  - "python -m nose -s -v --with-cov --cover-package datalad datalad.tests.test_utils datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives datalad.tests.test_witless_runner"
+  - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.tests.test_utils datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives datalad.tests.test_witless_runner
  
   # prepare coverage.xml in a separate invocation.  If invoked directly with nose - do not include test_ files themselves
-  - "python -m coverage xml"
+  - python -m coverage xml
 
 after_test:
   - ps: |
