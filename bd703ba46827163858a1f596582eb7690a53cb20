@@ -1,0 +1,22 @@
+Update 0.12.6-644-g59c38f712:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    59c38f7125be6358e33fcf2f32fae48ccedbdf7b..19ef9781deae4c01e0b58ecc6a3b90652f55406f
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  MNT: CONTRIBUTORS: Update
+   1c8c21b97^-1
++  Merge pull request #4471 from kyleam/get-restrict-custom-summary
+   a980a980e^-1
++  Merge pull request #4430 from mih/nf-copy
+   c1a660c6e^-1
+-  Merge branch 'maint'
+   73058aecf^-1
++  Merge pull request #4203 from bpoldrack/rf-ria
+   19ef9781d^-1
