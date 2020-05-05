@@ -10,9 +10,10 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.13.0 (??? ??, 2020) -- will be better than ever
+## 0.13.0rc1 (May 05, 2020) -- .
 
-bet we will fix some bugs and make a world even a better place.
+A handful of new commands, including `copy-file`, `push`, and
+`create-sibling-ria`, along with various fixes and enhancements
 
 ### Major refactoring and deprecations
 
