@@ -50,7 +50,7 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-- Widespread improvements of functionality and test coverage on
+- Widespread improvements in functionality and test coverage on
   Windows and crippled file systems in general.  ([#4057][])
   ([#4245][]) ([#4268][]) ([#4276][]) ([#4291][]) ([#4296][])
   ([#4301][]) ([#4303][]) ([#4304][]) ([#4305][]) ([#4306][])
@@ -75,7 +75,7 @@ bet we will fix some bugs and make a world even a better place.
   ([#4065][])
 
 - The logic for automatically propagating the 'origin' remote when
-  cloning a local source could unintentionally triggered a fetch of a
+  cloning a local source could unintentionally trigger a fetch of a
   non-local remote.  ([#4196][])
 
 - All remaining `get_submodules()` call sites that relied on the
@@ -101,7 +101,7 @@ bet we will fix some bugs and make a world even a better place.
   a sibling in a [RIA store][handbook-scalable-datastore]. ([#4124][])
 
 - DataLad ships with a new special remote, git-annex-remote-ora, for
-  interacting with [RIA stores][handbook-scalable-datastore], and a
+  interacting with [RIA stores][handbook-scalable-datastore] and a new
   command [export-archive-ora][] for exporting an archive from a local
   annex object store.  ([#4260][]) ([#4203][])
 
@@ -150,9 +150,9 @@ bet we will fix some bugs and make a world even a better place.
 - The rendering of command errors has been improved.  ([#4157][])
 
 - [save][] now
-  - displays a message to signal that the working tree is clean to
-    make it more obvious that no results being rendered corresponds to
-    a clean state.  ([#4106][])
+  - displays a message to signal that the working tree is clean,
+    making it more obvious that no results being rendered corresponds
+    to a clean state.  ([#4106][])
   - provides a stronger warning against using `--to-git`.  ([#4290][])
 
 - Calling [diff][] without `--recursive` but with a path constraint
@@ -182,14 +182,14 @@ bet we will fix some bugs and make a world even a better place.
   repositories.  ([#4316][])
 
 - The `log_progress` helper learned how to set the starting point to a
-  non-zero value and how to update the total on an existing progress
+  non-zero value and how to update the total of an existing progress
   bar, two features needed for planned improvements to how some
   commands display their progress.  ([#4438][])
 
 - The `ExternalVersions` object, which is used to check versions of
   Python modules and external tools (e.g., git-annex), gained an `add`
   method that enables DataLad extensions and other third-party code to
-  add other programs of interest.  ([#4441][])
+  include other programs of interest.  ([#4441][])
 
 - All of the remaining spots that use GitPython have been rewritten
   without it.  Most notably, this includes rewrites of the `clone`,
@@ -198,7 +198,7 @@ bet we will fix some bugs and make a world even a better place.
 
 - When `GitRepo.commit` splits its operation across multiple calls to
   avoid exceeding the maximum command line length, it now amends to
-  initial commit to avoid creating multiple commits.  ([#4156][])
+  initial commit rather than creating multiple commits.  ([#4156][])
 
 - `GitRepo` gained a `get_corresponding_branch` method (which always
    returns None), allowing a caller to invoke the method without
