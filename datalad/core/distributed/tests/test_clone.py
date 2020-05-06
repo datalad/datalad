@@ -816,6 +816,15 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
                                                     if url.startswith('http')
                                                     else "store-storage"))
 
+    # finally get the plain git subdataset.
+    # Clone should figure to also clone it from a ria+ URL
+    # (subdataset-source-candidate), notice that there wasn't an autoenabled ORA
+    # remote, but shouldn't stumble upon it, since it's a plain git.
+    res = riaclone.get(op.join('subdir', 'subgit', 'testgit.txt'))
+    assert_result_count(res, 1, status='ok', type='dataset', action='install')
+    assert_result_count(res, 1, status='notneeded', type='file')
+    assert_result_count(res, 2)
+
 
 @with_tempfile
 def _postclonetest_prepare(lcl, storepath, link):
@@ -835,6 +844,7 @@ def _postclonetest_prepare(lcl, storepath, link):
                             'test.txt': 'some',
                             'subdir': {
                                 'subds': {'testsub.txt': 'somemore'},
+                                'subgit': {'testgit.txt': 'even more'}
                             },
                         },
                       })
@@ -846,6 +856,10 @@ def _postclonetest_prepare(lcl, storepath, link):
     link.symlink_to(storepath)
     subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
     subds.save()
+    # add a plain git dataset as well
+    subgit = Dataset(lcl / 'ds' / 'subdir' / 'subgit').create(force=True,
+                                                              no_annex=True)
+    subgit.save()
     ds = Dataset(lcl / 'ds').create(force=True)
     ds.save(version_tag='original')
     assert_repo_status(ds.path)
@@ -858,21 +872,23 @@ def _postclonetest_prepare(lcl, storepath, link):
     # deleted symlink
     upl_url = "ria+{}".format(link.as_uri())
 
-    for d in (ds, subds):
+    for d in (ds, subds, subgit):
 
         # TODO: create-sibling-ria required for config! => adapt to RF'd
         #       creation (missed on rebase?)
         create_ds_in_store(io, storepath, d.id, '2', '1')
         d.create_sibling_ria(upl_url, "store")
 
-        # Now, simulate the problem by reconfiguring the special remote to not
-        # be autoenabled.
-        # Note, however, that the actual intention is a URL, that isn't valid
-        # from the point of view of the clone (doesn't resolve, no credentials,
-        # etc.) and therefore autoenabling on git-annex-init when
-        # datalad-cloning would fail to succeed.
-        Runner(cwd=d.path).run(['git', 'annex', 'enableremote', 'store-storage',
-                                'autoenable=false'])
+        if d is not subgit:
+            # Now, simulate the problem by reconfiguring the special remote to
+            # not be autoenabled.
+            # Note, however, that the actual intention is a URL, that isn't
+            # valid from the point of view of the clone (doesn't resolve, no
+            # credentials, etc.) and therefore autoenabling on git-annex-init
+            # when datalad-cloning would fail to succeed.
+            Runner(cwd=d.path).run(['git', 'annex', 'enableremote',
+                                    'store-storage',
+                                    'autoenable=false'])
         d.push('.', to='store')
         store_loc, _, _ = get_layout_locations(1, storepath, d.id)
         Runner(cwd=str(store_loc)).run(['git', 'update-server-info'])
