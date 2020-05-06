@@ -20,20 +20,23 @@ from datalad.utils import assure_unicode, shortened_repr, assure_list, \
 
 class _EGrepCSSearch(_Search):
     _mode_label = 'egrepcs'
-    _default_documenttype = 'datasets'
 
     def __init__(self, ds, **kwargs):
         super(_EGrepCSSearch, self).__init__(ds, **kwargs)
         self._queried_keys = None  # to be memoized by get_query
 
+    @classmethod
+    def _prep_meta(cls, meta):
+        return _meta2autofield_dict(meta, val2str=True, consider_ucn=False)
+
     # If there were custom "per-search engine" options, we could expose
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
-    def __call__(self, query, max_nresults=None, consider_ucn=False, full_record=True):
+    def __call__(self, query, max_nresults=None, full_record=True):
         if max_nresults is None:
             # no limit by default
             max_nresults = 0
-        query = self.get_query(query)
+        executed_query = self.get_query(query)
 
         nhits = 0
         for res in query_aggregated_metadata(
@@ -48,7 +51,7 @@ class _EGrepCSSearch(_Search):
             # dataset will be reported again
             meta = res.get('metadata', {})
             # produce a flattened metadata dict to search through
-            doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=consider_ucn)
+            doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=False)
             # inject a few basic properties into the dict
             # analog to what the other modes do in their index
             doc.update({
@@ -59,12 +62,12 @@ class _EGrepCSSearch(_Search):
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            lgr.log(7, "Querying %s among %d items", query, len(doc))
+            lgr.log(7, "Querying %s among %d items", executed_query, len(doc))
             t0 = time()
             matches = {(q['query'] if isinstance(q, dict) else q, k):
                        q['query'].search(v) if isinstance(q, dict) else q.search(v)
                        for k, v in doc.items()
-                       for q in query
+                       for q in executed_query
                        if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
             lgr.log(7, "Finished querying in %f sec", dt)
@@ -74,7 +77,7 @@ class _EGrepCSSearch(_Search):
             # across queries matching multiple fields for a single query expression
             # for multiple queries, this makes it consistent with a query that
             # has no field specification
-            if matched and len(query) == len(set(k[0] for k in matches if matches[k])):
+            if matched and len(executed_query) == len(set(k[0] for k in matches if matches[k])):
                 hit = dict(
                     res,
                     action='search',

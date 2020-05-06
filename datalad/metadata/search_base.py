@@ -212,6 +212,8 @@ def _search_from_virgin_install(dataset, query):
 
 
 class _Search(object):
+    _default_documenttype = None  # Abstract: To be specified in subclasses
+
     def __init__(self, ds, **kwargs):
         self.ds = ds
         self.documenttype = self.ds.config.obtain(
@@ -245,3 +247,146 @@ class _Search(object):
         return "No search hits, wrong query? " \
                "See 'datalad search --show-keys name' for known keys " \
                "and 'datalad search --help' on how to prepare your query."
+
+
+class _LoopySearch(_Search):
+    """A search engine implementing providing the base implementation for search
+    via looping through datasets and their metadata
+
+    TODO:
+    - add support for early exits from a loop
+    - parallelize at dataset level
+    - expand with its features and options common to all loopy engines
+    """
+    _default_documenttype = 'datasets'
+
+    # def __init__(self, ds, **kwargs):
+    #     super(_PyEvalSearch, self).__init__(ds, **kwargs)
+    #     #self._queried_keys = None  # to be memoized by get_query
+
+    @classmethod  # insofar
+    def _prep_meta(cls, meta):
+        """Convert metadata to a "doc" usable by backend.
+
+        E.g. it could flatten hierarhical metadata structure.
+        By default - just return a copy of meta so it could be augmented
+        """
+        return meta.copy()
+
+    @classmethod
+    def _prep_key(cls, key):
+        """Possibly sanitize keys. By default - nothing is done"""
+        return key
+
+    def _get_matcher(self, query, executed_query):
+        """
+        Parameters
+        ----------
+        """
+        raise NotImplementedError(
+            "Every engine should provide its own matcher based on its instance parameters and "
+            "given a query"
+        )
+
+    def _prep_search_doc(self, meta, res):
+        """Prepare a document used in search.
+
+        It would rely on additional _prep methods such as `_prep_meta` and `_prep_key`
+        which might be specific to the engine"""
+        # possibly flatten or do other manipulations engine specific
+        doc = self._prep_meta(meta)
+        # inject a few basic properties into the dict
+        # analog to what the other modes do in their index
+        doc.update({
+            # RF: @ replacement specific to pyeval since variable cannot start with @!
+            self._prep_key(k): res[k]
+            for k in ('@id', 'type', 'path', 'parentds')
+            if k in res
+        })
+        return doc
+
+    # TODO2: that loop would be two nested dataset/files so we could
+    #  quickly exit whenever enough per dataset (e.g. 1) found
+    def __call__(self, query, max_nresults=None, full_record=True):
+        from itertools import chain
+        from time import time
+
+        from datalad.utils import ensure_list
+        from datalad.metadata.metadata import query_aggregated_metadata
+
+        query = ensure_list(query)
+        if max_nresults is None:
+            # no limit by default
+            max_nresults = 0
+        # TODO: how to provide engine-specific customizaions into the query?
+        executed_query = self.get_query(query)
+
+
+        # TODO: abstract away matcher!
+        def matcher(doc):
+            try:
+                return eval(executed_query, {}, doc)
+            except (KeyError, NameError) as exc:
+                # lgr.debug("Something was missing in the record -- should be generally ok")
+                # TODO: record if ANY matching resulted in not hitting this.
+                #  If not -- we must have misspecified something, and should
+                #  alert user similarly to get_nohits_msg of egrep.
+                #  So -- we need smth like _queried_keys here as well
+                pass
+            except Exception as exc:
+                # TODO: we could analyze each part of executed_query independently
+                # (if len(query) > 1) to provide a more specific pointer to what part
+                # has caused a failure
+                lgr.info("Failed to match %s: %s", query, exc_str())
+
+        nhits = 0
+        # TODO: That is the most likely target for parallelization
+        # TODO: interface recursion limit? insofar I had no use cases for that
+        for ds in chain([self.ds], self.ds.subdatasets(recursive=True, return_type='generator')]:
+            for res in query_aggregated_metadata(
+                    reporton=self.documenttype,
+                    ds=ds,
+                    aps=[dict(path=ds.path, type='dataset')],
+                    recursive=False):
+                # this assumes that files are reported after each dataset report,
+                # and after a subsequent dataset report no files for the previous
+                # dataset will be reported again
+                meta = res.get('metadata', {})
+                # Metadata record might need to be enhanced with additional keys from res
+                # We will call that structure a 'doc' in good memory of whoosh
+                doc = self._prep_search_doc(meta, res)
+
+                lgr.log(7, "Querying %s among %d items", query, len(doc))
+                t0 = time()
+                is_a_match = matcher(doc)
+                dt = time() - t0
+                lgr.log(7, "Finished querying in %f sec", dt)
+
+                # The rest below seemed to be specific to the grep one, although
+                # TODO: check exactly what was intended
+                # # retain what actually matched
+                # matched = {k[1]: match.group() for k, match in matches.items() if match}
+                # # implement AND behavior across query expressions, but OR behavior
+                # # across queries matching multiple fields for a single query expression
+                # # for multiple queries, this makes it consistent with a query that
+                # # has no field specification
+                # if matched and len(query) == len(set(k[0] for k in matches if matches[k])):
+                if is_a_match:
+                    hit = dict(
+                        res,
+                        action='search',
+                        # query_matched=matched,
+                    )
+                    yield hit
+                    nhits += 1
+                    if max_nresults and nhits == max_nresults:
+                        # report query stats
+                        topstr = '{} top {}'.format(
+                            max_nresults,
+                            single_or_plural('match', 'matches', max_nresults)
+                        )
+                        lgr.info(
+                            "Reached the limit of {}, there could be more which "
+                            "were not reported.".format(topstr)
+                        )
+                        break

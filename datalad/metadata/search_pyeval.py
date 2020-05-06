@@ -22,29 +22,36 @@ class _PyEvalSearch(_Search):
     keys are provided as variables (@id -> id).
     """
     _mode_label = 'pyeval'
-    _default_documenttype = 'datasets'
 
     # def __init__(self, ds, **kwargs):
     #     super(_PyEvalSearch, self).__init__(ds, **kwargs)
     #     #self._queried_keys = None  # to be memoized by get_query
+
+    @classmethod
+    def _prep_key(cls, key):
+        return key.replace('@', ''
 
     # TODO: I feel that we need some base class/mixin like a
     #  _LoopySearch which would implement this main loop in a single location
     #  with uniform treatment of metadata (adding those fields into doc etc)
     # TODO2: that loop whould be two nested dataset/files so we could
     #  quickly exit whenever enough per dataset (e.g. 1) found
+    def get_query(self, query):
+        # separate ones are considered to be independent clauses for "and"
+        executed_query = ' and '.join(['(%s)' % q for q in query])
+        executed_query_ = compile(executed_query, 'query', 'eval')
+        return executed_query_
+
     def __call__(self, query, max_nresults=None, full_record=True):
         query = assure_list(query)
         if max_nresults is None:
             # no limit by default
             max_nresults = 0
-        # separate ones are considered to be independent clauses for "and"
-        composite_query = ' and '.join(['(%s)' % q for q in query])
-        composite_query_ = compile(composite_query, 'query', 'eval')
+        executed_query = self.get_query(query)
 
         def matcher(doc):
             try:
-                return eval(composite_query_, {}, doc)
+                return eval(executed_query, {}, doc)
             except (KeyError, NameError) as exc:
                 # lgr.debug("Something was missing in the record -- should be generally ok")
                 # TODO: record if ANY matching resulted in not hitting this.
@@ -53,7 +60,7 @@ class _PyEvalSearch(_Search):
                 #  So -- we need smth like _queried_keys here as well
                 pass
             except Exception as exc:
-                # TODO: we could analyze each part of composite_query independently
+                # TODO: we could analyze each part of executed_query independently
                 # (if len(query) > 1) to provide a more specific pointer to what part
                 # has caused a failure
                 lgr.info("Failed to match %s: %s", query, exc_str())
