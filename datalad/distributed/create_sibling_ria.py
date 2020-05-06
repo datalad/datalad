@@ -392,6 +392,8 @@ def _create_sibling_ria(
         res_kwargs):
     # be safe across datasets
     res_kwargs = res_kwargs.copy()
+    # update dataset
+    res_kwargs['ds'] = ds
 
     if not isinstance(ds.repo, AnnexRepo):
         # No point in dealing with a special remote when there's no annex.

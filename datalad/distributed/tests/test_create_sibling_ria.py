@@ -136,7 +136,9 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
                                 recursive=True, existing='reconfigure')
     eq_(len(res), 3)
-    assert_result_count(res, 3, status='ok', action="create-sibling-ria")
+    assert_result_count(res, 1, path=str(ds.pathobj), status='ok', action="create-sibling-ria")
+    assert_result_count(res, 1, path=str(subds.pathobj), status='ok', action="create-sibling-ria")
+    assert_result_count(res, 1, path=str(subds2.pathobj), status='ok', action="create-sibling-ria")
 
     # remotes now exist in super and sub
     siblings = ds.siblings(result_renderer=None)
