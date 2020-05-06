@@ -566,6 +566,7 @@ def postclone_check_head(ds):
 
 def postclonecfg_ria(ds, props):
     """Configure a dataset freshly cloned from a RIA store"""
+    repo = ds.repo
     # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
     # ssh) would make it see a bare repo and establish a hashdir lower annex
     # object tree.
@@ -596,7 +597,9 @@ def postclonecfg_ria(ds, props):
                    if s.get('annex-externaltype') == 'ora']
     if not ora_remotes and any(
             r.get('externaltype') == 'ora'
-            for r in ds.repo.get_special_remotes().values()):
+            for r in (repo.get_special_remotes().values()
+                      if hasattr(repo, 'get_special_remotes')
+                      else [])):
         # no ORA remote autoenabled, but configuration known about at least one.
         # Let's check origin's config for datalad.ora-remote.uuid as stored by
         # create-sibling-ria and enable try enabling that one.
@@ -674,7 +677,7 @@ def postclonecfg_ria(ds, props):
         # wouldn't end up here, so enable with store URL as suggested by the URL
         # we cloned from.
         if org_uuid:
-            srs = ds.repo.get_special_remotes()
+            srs = repo.get_special_remotes()
             if org_uuid in srs.keys():
                 # TODO: - Double-check autoenable value and only do this when
                 #         true?
@@ -684,9 +687,9 @@ def postclonecfg_ria(ds, props):
                 # we only need the store:
                 new_url = props['source'].split('#')[0]
                 try:
-                    ds.repo.enable_remote(srs[org_uuid]['name'],
-                                          options=['url={}'.format(new_url)]
-                                          )
+                    repo.enable_remote(srs[org_uuid]['name'],
+                                       options=['url={}'.format(new_url)]
+                                      )
                     lgr.info("Reconfigured %s for %s",
                              srs[org_uuid]['name'], new_url)
                     # update ora_remotes for considering publication dependency
