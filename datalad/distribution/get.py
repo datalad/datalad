@@ -531,7 +531,9 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
         for r in results_from_paths(
                 content, status='notneeded',
                 message="no dataset annex, content already present",
-                action='get', logger=lgr,
+                action='get',
+                type='file',
+                logger=lgr,
                 refds=refds_path):
             yield r
         return
