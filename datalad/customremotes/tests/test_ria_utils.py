@@ -19,7 +19,8 @@ from datalad.tests.utils import (
 
 
 @with_tempfile
-def _test_setup_store(io, store):
+def _test_setup_store(io_cls, io_args, store):
+    io = io_cls(*io_args)
     store = Path(store)
     version_file = store / 'ria-layout-version'
     error_logs = store / 'error_logs'
@@ -54,12 +55,13 @@ def _test_setup_store(io, store):
 
 def test_setup_store():
 
-    yield _test_setup_store, LocalIO()
-    yield skip_ssh(_test_setup_store), SSHRemoteIO('datalad-test')
+    yield _test_setup_store, LocalIO, []
+    yield skip_ssh(_test_setup_store), SSHRemoteIO, ['datalad-test']
 
 
 @with_tempfile
-def _test_setup_ds_in_store(io, store):
+def _test_setup_ds_in_store(io_cls, io_args, store):
+    io = io_cls(*io_args)
     store = Path(store)
     # ATM create_ds_in_store doesn't care what kind of ID is provided
     dsid = "abc123456"
@@ -106,5 +108,5 @@ def _test_setup_ds_in_store(io, store):
 
 def test_setup_ds_in_store():
 
-    yield _test_setup_ds_in_store, LocalIO()
-    yield skip_ssh(_test_setup_ds_in_store), SSHRemoteIO('datalad-test')
+    yield _test_setup_ds_in_store, LocalIO, []
+    yield skip_ssh(_test_setup_ds_in_store), SSHRemoteIO, ['datalad-test']
