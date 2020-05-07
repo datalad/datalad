@@ -22,6 +22,8 @@ env:
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
+    # TEMP
+    - _DL_DEBURL_ANNEX=http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb
   matrix:
 ##1    - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
