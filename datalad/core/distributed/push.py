@@ -719,6 +719,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
     # XXX must not be a SpooledTemporaryFile -- dunno why, but doesn't work
     # otherwise
     with TemporaryFile() as file_list:
+        nfiles = 0
         for c in to_transfer:
             if not c.get('has_content', False):
                 # warned about above, now just skip
@@ -726,9 +727,16 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
             file_list.write(
                 bytes(Path(c['path']).relative_to(ds.pathobj)))
             file_list.write(b'\0')
+            nfiles += 1
 
         # rewind stdin buffer
         file_list.seek(0)
+
+        # tailor the progress protocol with the total number of files
+        # to be transferred
+        class TailoredPushAnnexJsonProtocol(AnnexJsonProtocol):
+            total_res_count = nfiles
+
         # and go
         # TODO try-except and yield what was captured before the crash
         #res = GitWitlessRunner(
@@ -737,7 +745,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
         ).run(
             cmd,
             # TODO report how many in total, and give global progress too
-            protocol=AnnexJsonProtocol,
+            protocol=TailoredPushAnnexJsonProtocol,
             stdin=file_list)
         for c in ('stdout', 'stderr'):
             if res[c]:
