@@ -865,10 +865,9 @@ class Addurls(Interface):
             if row["subpath"]:
                 ds_current = Dataset(os.path.join(ds.path,
                                                   row["subpath"]))
-                ds_filename = os.path.relpath(filename_abs, ds_current.path)
             else:
                 ds_current = ds
-                ds_filename = row["filename"]
+            ds_filename = os.path.relpath(filename_abs, ds_current.path)
             row.update({"filename_abs": filename_abs,
                         "ds": ds_current,
                         "ds_filename": ds_filename})
