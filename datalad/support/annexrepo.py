@@ -3569,11 +3569,24 @@ class AnnexJsonProtocol(WitlessProtocol):
         # to collect parsed JSON command output
         self.json_out = []
         super().__init__(done_future)
+        self._global_pbar_id = 'annexprogress-{}'.format(id(self))
 
     def connection_made(self, transport):
         super().connection_made(transport)
         self._pbars = set()
         self._res_count = 0
+        if self.total_res_count:
+            # init global pbar, do here to be on top of first file
+            log_progress(
+                lgr.info,
+                self._global_pbar_id,
+                'Start annex operation',
+                # do not crash if no command is reported
+                unit=' Files',
+                label='total',
+                total=self.total_res_count,
+            )
+            self._pbars.add(self._global_pbar_id)
 
     def pipe_data_received(self, fd, data):
         if fd != 1:
@@ -3596,19 +3609,6 @@ class AnnexJsonProtocol(WitlessProtocol):
             self._proc_json_record(j)
 
     def _proc_json_record(self, j):
-        global_pbar_id = 'annexprogress-{}'.format(id(self))
-        if self.total_res_count and not self._res_count:
-            # init global pbar, do here to be on top of first file
-            log_progress(
-                lgr.info,
-                global_pbar_id,
-                'Start annex {}'.format(j.get('command', '')),
-                # do not crash if no command is reported
-                unit=' Files',
-                total=self.total_res_count,
-            )
-            self._pbars.add(global_pbar_id)
-
         # check for progress reports and act on them immediately
         # but only if there is something to build a progress report from
         if 'action' in j and 'byte-progress' in j:
@@ -3664,15 +3664,15 @@ class AnnexJsonProtocol(WitlessProtocol):
                 # discard global pbar
                 log_progress(
                     lgr.info,
-                    global_pbar_id,
+                    self._global_pbar_id,
                     'Finished annex {}'.format(j.get('command', '')),
                 )
-                self._pbars.discard(global_pbar_id)
+                self._pbars.discard(self._global_pbar_id)
             else:
                 # log actual progress
                 log_progress(
                     lgr.info,
-                    global_pbar_id,
+                    self._global_pbar_id,
                     j.get('file', ''),
                     update=1,
                     increment=True,
