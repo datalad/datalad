@@ -84,11 +84,11 @@ def test_ssh_open_close(tfile1):
     manager = SSHManager()
 
     path = opj(str(manager.socket_dir),
-               get_connection_hash('localhost', bundled=True))
+               get_connection_hash('datalad-test', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
 
-    c1 = manager.get_connection('ssh://localhost')
+    c1 = manager.get_connection('ssh://datalad-test')
     c1.open()
     # control master exists for sure now
     ok_(exists(path))
@@ -124,30 +124,30 @@ def test_ssh_manager_close():
 
     # check for previously existing sockets:
     existed_before_1 = exists(opj(str(manager.socket_dir),
-                                  get_connection_hash('localhost')))
-    existed_before_2 = exists(opj(str(manager.socket_dir),
                                   get_connection_hash('datalad-test')))
+    existed_before_2 = exists(opj(str(manager.socket_dir),
+                                  get_connection_hash('datalad-test2')))
 
-    manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
+    manager.get_connection('ssh://datalad-test2').open()
 
     if existed_before_1 and existed_before_2:
         # we need one connection to be closed and therefore being opened
         # by `manager`
-        manager.get_connection('ssh://localhost').close()
-        manager.get_connection('ssh://localhost').open()
+        manager.get_connection('ssh://datalad-test').close()
+        manager.get_connection('ssh://datalad-test').open()
 
     ok_(exists(opj(str(manager.socket_dir),
-                   get_connection_hash('localhost', bundled=True))))
-    ok_(exists(opj(str(manager.socket_dir),
                    get_connection_hash('datalad-test', bundled=True))))
+    ok_(exists(opj(str(manager.socket_dir),
+                   get_connection_hash('datalad-test2', bundled=True))))
 
     manager.close()
 
     still_exists_1 = exists(opj(str(manager.socket_dir),
-                                get_connection_hash('localhost')))
-    still_exists_2 = exists(opj(str(manager.socket_dir),
                                 get_connection_hash('datalad-test')))
+    still_exists_2 = exists(opj(str(manager.socket_dir),
+                                get_connection_hash('datalad-test2')))
 
     eq_(existed_before_1, still_exists_1)
     eq_(existed_before_2, still_exists_2)
