@@ -1139,10 +1139,10 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     # check whether we are the first to use these sockets:
     hash_1 = get_connection_hash('datalad-test', bundled=True)
     socket_1 = opj(str(ssh_manager.socket_dir), hash_1)
-    hash_2 = get_connection_hash('localhost', bundled=True)
+    hash_2 = get_connection_hash('datalad-test2', bundled=True)
     socket_2 = opj(str(ssh_manager.socket_dir), hash_2)
     datalad_test_was_open = exists(socket_1)
-    localhost_was_open = exists(socket_2)
+    datalad_test2_was_open = exists(socket_2)
 
     # repo to test:AnnexRepo(repo_path)
     # At first, directly use git to add the remote, which should be recognized
@@ -1193,14 +1193,14 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     ok_(exists(socket_1))
 
     # add another remote:
-    ar.add_remote('ssh-remote-2', "ssh://localhost" + remote_2_path)
+    ar.add_remote('ssh-remote-2', "ssh://datalad-test2" + remote_2_path)
 
-    # now, this connection to localhost was requested:
+    # now, this connection was requested:
     assert_in(socket_2, list(map(str, ssh_manager._connections)))
     ok_(any(hash_1 in opt for opt in ar._annex_common_options))
     ok_(any(hash_2 in opt for opt in ar._annex_common_options))
     # but socket was not touched:
-    if localhost_was_open:
+    if datalad_test2_was_open:
         # FIXME: occasionally(?) fails in V6:
         if not ar.supports_unlocked_pointers:
             ok_(exists(socket_2))
