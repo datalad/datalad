@@ -21,7 +21,6 @@ from os import mkdir
 from os.path import (
     join as opj,
     basename,
-    realpath,
     relpath,
     curdir,
     pardir,
@@ -1159,7 +1158,6 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
         # See https://github.com/datalad/datalad/pull/4265 for more info
         raise SkipTest("Version of git-annex might cause us to stall.")
 
-    from datalad import lgr
     # remote interaction causes socket to be created:
     try:
         # Note: For some reason, it hangs if log_stdout/err True
@@ -2231,7 +2229,6 @@ def test_commit_annex_commit_changed():
 
 @with_tempfile(mkdir=True)
 def check_files_split_exc(cls, topdir):
-    from glob import glob
     r = cls(topdir)
     # absent files -- should not crash with "too long" but some other more
     # meaningful exception
