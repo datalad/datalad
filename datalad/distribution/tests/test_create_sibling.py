@@ -107,18 +107,10 @@ def assert_publish_with_ui(target_path, rootds=False, flat=True):
                         flags=re.DOTALL)
 
 
-# shortcut
-# but we can rely on it ATM only if "server" (i.e. localhost) has
-# recent enough git since then we expect an error msg to be spit out
-from datalad.support.external_versions import external_versions
-# But with custom GIT_PATH pointing to non-bundled annex, which would not be
-# used on remote, so we will compare against system-git
-assert_create_sshwebserver = (
-    assert_no_errors_logged(create_sibling)
-    if (external_versions['cmd:system-git'] >= '2.4' and
-        lgr.getEffectiveLevel() > logging.DEBUG)
-    else create_sibling
-)
+if lgr.getEffectiveLevel() > logging.DEBUG:
+    assert_create_sshwebserver = assert_no_errors_logged(create_sibling)
+else:
+    assert_create_sshwebserver = create_sibling
 
 
 def assert_postupdate_hooks(path, installed=True, flat=False):
