@@ -237,7 +237,7 @@ def test_publish_aggregated(path):
     spath = opj(path, 'remote')
     base.create_sibling(
         name="local_target",
-        sshurl="ssh://localhost",
+        sshurl="ssh://datalad-test",
         target_dir=spath)
     base.publish('.', to='local_target', transfer_data='all')
     remote = Dataset(spath)

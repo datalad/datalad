@@ -46,23 +46,23 @@ def test_ssh_get_connection():
     manager = SSHManager()
     assert manager._socket_dir is None, \
         "Should be unset upon initialization. Got %s" % str(manager._socket_dir)
-    c1 = manager.get_connection('ssh://localhost')
+    c1 = manager.get_connection('ssh://datalad-test')
     assert manager._socket_dir, "Should be set after interactions with the manager"
     assert_is_instance(c1, SSHConnection)
 
     # subsequent call returns the very same instance:
-    ok_(manager.get_connection('ssh://localhost') is c1)
+    ok_(manager.get_connection('ssh://datalad-test') is c1)
 
     # fail on malformed URls (meaning: our fancy URL parser can't correctly
     # deal with them):
     #assert_raises(ValueError, manager.get_connection, 'localhost')
     # we now allow those simple specifications of host to get_connection
-    c2 = manager.get_connection('localhost')
+    c2 = manager.get_connection('datalad-test')
     assert_is_instance(c2, SSHConnection)
 
     # but should fail if it looks like something else
-    assert_raises(ValueError, manager.get_connection, 'localhost/')
-    assert_raises(ValueError, manager.get_connection, ':localhost')
+    assert_raises(ValueError, manager.get_connection, 'datalad-test/')
+    assert_raises(ValueError, manager.get_connection, ':datalad-test')
 
     # we can do what urlparse cannot
     # assert_raises(ValueError, manager.get_connection, 'someone@localhost')
@@ -233,7 +233,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_compound_cmds():
-    ssh = SSHManager().get_connection('ssh://localhost')
+    ssh = SSHManager().get_connection('ssh://datalad-test')
     out, err = ssh('[ 1 = 2 ] && echo no || echo success')
     eq_(out.strip(), 'success')
     ssh.close()  # so we get rid of the possibly lingering connections
@@ -271,11 +271,11 @@ def test_ssh_custom_identity_file():
     with patch_config({"datalad.ssh.identityfile": ifile}):
         with swallow_logs(new_level=logging.DEBUG) as cml:
             manager = SSHManager()
-            ssh = manager.get_connection('ssh://localhost')
+            ssh = manager.get_connection('ssh://datalad-test')
             cmd_out, _ = ssh("echo blah")
             expected_socket = op.join(
                 str(manager.socket_dir),
-                get_connection_hash("localhost", identity_file=ifile,
+                get_connection_hash("datalad-test", identity_file=ifile,
                                     bundled=True))
             ok_(exists(expected_socket))
             manager.close()
@@ -286,7 +286,7 @@ def test_ssh_custom_identity_file():
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_git_props():
-    remote_url = 'ssh://localhost'
+    remote_url = 'ssh://datalad-test'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
     # Note: Avoid comparing these versions directly to the versions in
@@ -304,7 +304,7 @@ def test_ssh_git_props():
 @skip_ssh
 @with_tempfile(mkdir=True)
 def test_bundle_invariance(path):
-    remote_url = 'ssh://localhost'
+    remote_url = 'ssh://datalad-test'
     manager = SSHManager()
     testfile = Path(path) / 'dummy'
     for flag in (True, False):
