@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     eq_,
     get_mtimes_and_digests,
+    get_ssh_port,
     ok_,
     ok_endswith,
     ok_exists,
@@ -170,7 +171,7 @@ def test_invalid_call(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_target_ssh_simple(origin, src_path, target_rootpath):
-
+    port = get_ssh_port("datalad-test")
     # prepare src
     source = install(
         src_path, source=origin,
@@ -181,7 +182,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         create_sibling(
             dataset=source,
             name="local_target",
-            sshurl="ssh://localhost:22",
+            sshurl="ssh://datalad-test:{}".format(port),
             target_dir=target_path,
             ui=True)
         assert_not_in('enableremote local_target failed', cml.out)

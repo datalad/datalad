@@ -82,7 +82,10 @@ from datalad.utils import (
 
 from ..cmd import Runner
 from .. import utils
-from ..support.exceptions import CommandNotAvailableError
+from ..support.exceptions import (
+    CommandError,
+    CommandNotAvailableError,
+)
 from ..support.external_versions import external_versions
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
@@ -1862,6 +1865,49 @@ def skip_wo_symlink_capability(func):
             raise SkipTest("no symlink capabilities")
         return func(*args, **kwargs)
     return newfunc
+
+
+def get_ssh_port(host):
+    """Get port of `host` in ssh_config.
+
+    Our tests depend on the host being defined in ssh_config, including its
+    port. This method can be used by tests that want to check handling of an
+    explicitly specified
+
+    Note that if `host` does not match a host in ssh_config, the default value
+    of 22 is returned.
+
+    Parameters
+    ----------
+    host : str
+
+    Returns
+    -------
+    port (int)
+
+    Raises
+    ------
+    SkipTest if port cannot be found.
+    """
+    out = ''
+    try:
+        out, err = Runner()(["ssh", "-G", host])
+    except Exception as exc:
+        err = str(exc)
+
+    port = None
+    for line in out.splitlines():
+        if line.startswith("port "):
+            try:
+                port = int(line.split()[1])
+            except Exception as exc:
+                err = str(exc)
+            break
+
+    if port is None:
+        raise SkipTest("port for {} could not be determined: {}"
+                       .format(host, err))
+    return port
 
 
 #

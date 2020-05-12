@@ -28,6 +28,7 @@ from datalad.tests.utils import (
     assert_raises,
     eq_,
     get_most_obscure_supported_name,
+    get_ssh_port,
     ok_,
     patch_config,
     skip_if_on_windows,
@@ -184,8 +185,8 @@ def test_ssh_manager_close_no_throw(bogus_socket):
 @with_tempfile(content="one")
 @with_tempfile(content="two")
 def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
-
-    remote_url = 'ssh://localhost:22'
+    port = get_ssh_port('datalad-test')
+    remote_url = 'ssh://datalad-test:{}'.format(port)
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
 
