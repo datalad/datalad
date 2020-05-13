@@ -138,6 +138,12 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
         )
         queried.add(ds.pathobj)
         if recursion_limit and props.get('type', None) == 'dataset':
+            if cpath == ds.pathobj:
+                # ATM can happen if there is something wrong with this repository
+                # We will just skip it here and rely on some other exception to bubble up
+                # See https://github.com/datalad/datalad/pull/4526 for the usecase
+                lgr.debug("Got status for itself, which should not happen, skipping %s", path)
+                continue
             subds = Dataset(str(cpath))
             if subds.is_installed():
                 for r in _yield_status(
