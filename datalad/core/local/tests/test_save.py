@@ -229,12 +229,12 @@ def test_subsuperdataset_save(path):
     # and should fail if we demand recursive operation
     # Fun part: causes RecursionError, not just CommandError ATM but that is IMHO
     # a separate issue, TODO.
-    assert_raises(Exception, parent.save, 'sub1', recursive=True)
+    assert_raises(CommandError, parent.save, 'sub1', recursive=True)
     # and should fail if we request saving while in the parent directory
     # but while not providing a dataset, since operation would run within
     # pointed subdataset
     with chpwd(sub1.path):
-        assert_raises(Exception, save, 'sub2')
+        assert_raises(CommandError, save, 'sub2')
     # but should not fail in the top level superdataset
     with chpwd(parent.path):
         save('sub1')
