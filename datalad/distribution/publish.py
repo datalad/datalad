@@ -573,7 +573,8 @@ class Publish(Interface):
 
     ..note::
       This command is deprecated. It will be removed from DataLad eventually,
-      but no earlier than with the 0.14 release. Use the `push` command instead.
+      but no earlier than with the 0.14 release. Use the `push` and `create-sibling` 
+      (if you used `--missing` flag) commands instead.
 
     This makes the last saved state of a dataset available to a sibling
     or special remote data store of a dataset. Any target sibling must already
