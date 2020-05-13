@@ -208,6 +208,38 @@ def test_subdataset_save(path):
     assert_repo_status(parent.path, untracked=['untracked'], modified=['sub'])
 
 
+@with_tempfile(mkdir=True)
+def test_subsuperdataset_save(path):
+    # Verify that when invoked without recursion save does not
+    # cause querying of subdatasets of the subdataset
+    # see https://github.com/datalad/datalad/issues/4523
+    parent = Dataset(path).create()
+    # Create 3 levels of subdatasets so later to check operation
+    # with or without --dataset being specified
+    sub1 = parent.create('sub1')
+    sub2 = parent.create(sub1.pathobj / 'sub2')
+    sub3 = parent.create(sub2.pathobj / 'sub3')
+    assert_repo_status(path)
+    # now we will lobotomize that sub2 so git would fail if any query is performed.
+    rmtree(str(sub3.pathobj / '.git' / 'objects'))
+    # the call should proceed fine since neither should care about sub3
+    # default is no recursion
+    parent.save('sub1')
+    sub1.save('sub2')
+    # and should fail if we demand recursive operation
+    # Fun part: causes RecursionError, not just CommandError ATM but that is IMHO
+    # a separate issue, TODO.
+    assert_raises(Exception, parent.save, 'sub1', recursive=True)
+    # and should fail if we request saving while in the parent directory
+    # but while not providing a dataset, since operation would run within
+    # pointed subdataset
+    with chpwd(sub1.path):
+        assert_raises(Exception, save, 'sub2')
+    # but should not fail in the top level superdataset
+    with chpwd(parent.path):
+        save('sub1')
+
+
 @skip_wo_symlink_capability
 @with_tempfile(mkdir=True)
 def test_symlinked_relpath(path):
