@@ -188,16 +188,31 @@ class Push(Interface):
             dataset, check_installed=True, purpose='pushing')
         ds_repo = ds.repo
 
-        if to and to not in ds_repo.get_remotes(
-                exclude_special_remotes=False):
+        res_kwargs = dict(
+            action='publish',
+            refds=ds.path,
+            logger=lgr,
+        )
+
+        get_remote_kwargs = {'exclude_special_remotes': False} \
+            if isinstance(ds_repo, AnnexRepo) else {}
+        if to and to not in ds_repo.get_remotes(**get_remote_kwargs):
             # get again for proper error:
-            sr = ds_repo.get_remotes(exclude_special_remotes=False)
-            raise ValueError(
-                "Unknown push target '{}'. {}".format(
+            sr = ds_repo.get_remotes(**get_remote_kwargs)
+            # yield an error result instead of raising a ValueError,
+            # to enable the use case of pushing to a target that
+            # a superdataset doesn't know, but some subdatasets to
+            # (in combination with '--on-failure ignore')
+            yield dict(
+                res_kwargs,
+                status='error',
+                message="Unknown push target '{}'. {}".format(
                     to,
                     'Known targets: {}.'.format(', '.join(repr(s) for s in sr))
                     if sr
                     else 'No targets configured in dataset.'))
+            return
+
         if since:
             # will blow with ValueError if unusable
             ds_repo.get_hexsha(since)
@@ -223,11 +238,6 @@ class Push(Interface):
             recursive,
             recursion_limit)
 
-        res_kwargs = dict(
-            action='publish',
-            refds=ds.path,
-            logger=lgr,
-        )
         # instead of a loop, this could all be done in parallel
         matched_anything = False
         for dspath, dsrecords in ds_spec:
