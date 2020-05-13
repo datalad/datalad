@@ -106,7 +106,7 @@ STATE_COLOR_MAP = {
 
 def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
                   eval_submodule_state, eval_filetype, cache):
-    # take the datase that went in first
+    # take the dataset that went in first
     repo = ds.repo
     repo_path = repo.pathobj
     lgr.debug('query %s.diffstatus() for paths: %s', repo, paths)
