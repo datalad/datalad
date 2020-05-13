@@ -27,9 +27,9 @@ A number of extensions are available that provide additional functionality for
 DataLad. Extensions are separate packages that are to be installed in addition
 to DataLad. In order to install DataLad customized for a particular domain, one
 can simply install an extension directly, and DataLad itself will be
-automatically installed with it. An [annotated list of available
-extensions](http://handbook.datalad.org/extension_pkgs.html) is available in the
-[DataLad handbook](http://handbook.datalad.org).
+automatically installed with it. An [annotated list of
+extensions](http://handbook.datalad.org/extension_pkgs.html) is available in
+the [DataLad handbook](http://handbook.datalad.org).
 
 
 # Support
