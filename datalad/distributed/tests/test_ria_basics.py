@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     has_symlink_capability,
     known_failure_windows,
     skip_ssh,
+    SkipTest,
     slow,
     swallow_logs,
     turtle,
@@ -392,6 +393,13 @@ def _test_gitannex(host, store, dspath):
     store = Path(store)
 
     ds = Dataset(dspath).create()
+
+    if ds.repo.is_managed_branch():
+        # git-annex-testremote is way too slow on crippled FS.
+        # Use is_managed_branch() as a proxy and skip only here
+        # instead of in a decorator
+        raise SkipTest("Test too slow on crippled FS")
+
     populate_dataset(ds)
     ds.save()
     assert_repo_status(ds.path)
@@ -429,7 +437,6 @@ def test_gitannex_ssh():
     _test_gitannex('datalad-test')
 
 
-@slow
 def test_gitannex_local():
     _test_gitannex(None)
 
@@ -444,11 +451,11 @@ def _test_binary_data(host, store, dspath):
     dspath = Path(dspath)
     store = Path(store)
 
-    url = "https://github.com/psychoinformatics-de/studyforrest-data-phase2"
-    file = Path("code/stimulus/visualarea_localizer/img/body01.png")
-
-    ds = clone(url, dspath)
-    ds.get(file)
+    url = "https://github.com/datalad/example-dicom-functional/blob/master/dicoms/MR.1.3.46.670589.11.38317.5.0.4476.2014042516042547586"
+    file = "dicomfile"
+    ds = Dataset(dspath).create()
+    ds.download_url(url, path=file, message="Add DICOM file from github")
+    assert_repo_status(ds.path)
 
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
