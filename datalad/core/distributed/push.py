@@ -188,6 +188,16 @@ class Push(Interface):
             dataset, check_installed=True, purpose='pushing')
         ds_repo = ds.repo
 
+        if to and to not in ds_repo.get_remotes(
+                exclude_special_remotes=False):
+            # get again for proper error:
+            sr = ds_repo.get_remotes(exclude_special_remotes=False)
+            raise ValueError(
+                "Unknown push target '{}'. {}".format(
+                    to,
+                    'Known targets: {}.'.format(', '.join(repr(s) for s in sr))
+                    if sr
+                    else 'No targets configured in dataset.'))
         if since:
             # will blow with ValueError if unusable
             ds_repo.get_hexsha(since)
