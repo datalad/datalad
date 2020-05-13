@@ -27,13 +27,9 @@ A number of extensions are available that provide additional functionality for
 DataLad. Extensions are separate packages that are to be installed in addition
 to DataLad. In order to install DataLad customized for a particular domain, one
 can simply install an extension directly, and DataLad itself will be
-automatically installed with it. Here is a list of known extensions:
-
-- [crawler](https://github.com/datalad/datalad-crawler) -- tracking web resources and automated data distributions [![crawler release](https://img.shields.io/github/release/datalad/datalad-crawler.svg)](https://GitHub.com/datalad/datalad-crawler/releases/)
-- [neuroimaging](https://github.com/datalad/datalad-neuroimaging) -- neuroimaging research data and workflows [![neuroimaging release](https://img.shields.io/github/release/datalad/datalad-neuroimaging.svg)](https://GitHub.com/datalad/datalad-neuroimaging/releases/)
-- [container](https://github.com/datalad/datalad-container) -- support for containerized computational environments [![container release](https://img.shields.io/github/release/datalad/datalad-container.svg)](https://GitHub.com/datalad/datalad-container/releases/)
-
-- [webapp](https://github.com/datalad/datalad-webapp) -- support for exposing selected DataLad API as REST API webapp [tech demo]
+automatically installed with it. An [annotated list of available
+extensions](http://handbook.datalad.org/extension_pkgs.html) is available in the
+[DataLad handbook](http://handbook.datalad.org).
 
 
 # Support
