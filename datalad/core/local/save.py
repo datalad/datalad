@@ -206,6 +206,8 @@ class Save(Interface):
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',
+                # for save without recursion only commit matters
+                eval_subdataset_state='full' if recursive else 'commit',
                 result_renderer='disabled'):
             if s['status'] == 'error':
                 # Downstream code can't do anything with these. Let the caller
