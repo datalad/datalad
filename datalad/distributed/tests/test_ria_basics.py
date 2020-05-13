@@ -444,11 +444,11 @@ def _test_binary_data(host, store, dspath):
     dspath = Path(dspath)
     store = Path(store)
 
-    url = "https://github.com/psychoinformatics-de/studyforrest-data-phase2"
-    file = Path("code/stimulus/visualarea_localizer/img/body01.png")
-
-    ds = clone(url, dspath)
-    ds.get(file)
+    url = "https://github.com/datalad/example-dicom-functional/blob/master/dicoms/MR.1.3.46.670589.11.38317.5.0.4476.2014042516042547586"
+    file = "dicomfile"
+    ds = Dataset(dspath).create()
+    ds.download_url(url, path=file, message="Add DICOM file from github")
+    assert_repo_status(ds.path)
 
     # set up store:
     io = SSHRemoteIO(host) if host else LocalIO()
