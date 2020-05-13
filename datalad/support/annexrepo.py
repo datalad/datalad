@@ -3563,15 +3563,30 @@ class AnnexJsonProtocol(WitlessProtocol):
     # capture both streams and handle messaging completely
     proc_out = True
     proc_err = True
+    total_res_count = None
 
     def __init__(self, done_future):
         # to collect parsed JSON command output
         self.json_out = []
         super().__init__(done_future)
+        self._global_pbar_id = 'annexprogress-{}'.format(id(self))
 
     def connection_made(self, transport):
         super().connection_made(transport)
         self._pbars = set()
+        self._res_count = 0
+        if self.total_res_count:
+            # init global pbar, do here to be on top of first file
+            log_progress(
+                lgr.info,
+                self._global_pbar_id,
+                'Start annex operation',
+                # do not crash if no command is reported
+                unit=' Files',
+                label='total',
+                total=self.total_res_count,
+            )
+            self._pbars.add(self._global_pbar_id)
 
     def pipe_data_received(self, fd, data):
         if fd != 1:
@@ -3637,11 +3652,31 @@ class AnnexJsonProtocol(WitlessProtocol):
             )
             # do not let progress reports leak into the return value
             return
+        self._res_count += 1
         # don't do anything to the results for now in terms of normalization
         # TODO the protocol could be made aware of the runner's CWD and
         # also any dataset the annex command is operating on. This would
         # enable 'file' property conversion to absolute paths
         self.json_out.append(j)
+
+        if self.total_res_count:
+            if self.total_res_count == self._res_count:
+                # discard global pbar
+                log_progress(
+                    lgr.info,
+                    self._global_pbar_id,
+                    'Finished annex {}'.format(j.get('command', '')),
+                )
+                self._pbars.discard(self._global_pbar_id)
+            else:
+                # log actual progress
+                log_progress(
+                    lgr.info,
+                    self._global_pbar_id,
+                    j.get('file', ''),
+                    update=1,
+                    increment=True,
+                )
 
     def _prepare_result(self):
         # first let the base class do its thing
