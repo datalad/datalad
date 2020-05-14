@@ -202,6 +202,7 @@ class Save(Interface):
                 dataset=dataset,
                 path=path,
                 untracked=untracked_mode,
+                eval_subdataset_state='full' if recursive else 'commit',
                 report_filetype=False,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
