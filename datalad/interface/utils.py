@@ -525,20 +525,15 @@ def _get_report_path(path, reportwd, refds):
     to report from.
 
     TODO: detailed documentation, make not private"""
-    make_explicit_relative = True
+    pref = ''
     if reportwd:
         if hasattr(reportwd, 'path'):
-            make_explicit_relative = False
+            pref = '//'
             reportwd = reportwd.path
     else:
         reportwd = refds
 
-    path_ = path
-    if reportwd:
-        path_ = relpath(path, reportwd)
-        path_first = path_.split(op.sep, 1)[0]
-        if make_explicit_relative and path_first not in (pardir, curdir):
-            path_ = op.join(curdir, path_)
+    path_ = pref + relpath(path, reportwd) if reportwd else path
     return path_
 
 
