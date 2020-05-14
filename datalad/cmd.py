@@ -21,6 +21,12 @@ import functools
 import tempfile
 from locale import getpreferredencoding
 import asyncio
+if sys.platform == "win32":
+    # use special event loop that supports subprocesses on windows
+    from asyncio import ProactorEventLoop as WitlessEventLoop
+else:
+    from asyncio import SelectorEventLoop as WitlessEventLoop
+
 from collections import (
     defaultdict,
     namedtuple,
@@ -369,7 +375,7 @@ class WitlessRunner(object):
     It aims to be as simple as possible, providing only essential
     functionality.
     """
-    __slots__ = ['cwd', 'env']
+    __slots__ = ['cwd', 'env', '_loop']
 
     def __init__(self, cwd=None, env=None):
         """
@@ -391,6 +397,7 @@ class WitlessRunner(object):
             # if CWD was provided, we must not make it conflict with
             # a potential PWD setting
             self.env['PWD'] = self.cwd
+        self._loop = None
 
     def run(self, cmd, protocol=None, stdin=None, **kwargs):
         """Execute a command and communicate with it.
@@ -438,12 +445,11 @@ class WitlessRunner(object):
         # It is unclear to me why it happens when reusing an event looped
         # that it stopped from time to time, but starting fresh and doing
         # a full termination seems to address the issue
-        if sys.platform == "win32":
-            # use special event loop that supports subprocesses on windows
-            event_loop = asyncio.ProactorEventLoop()
+        if self._loop is None:
+            self._loop = event_loop = WitlessEventLoop()
+            asyncio.set_event_loop(event_loop)
         else:
-            event_loop = asyncio.SelectorEventLoop()
-        asyncio.set_event_loop(event_loop)
+            event_loop = self._loop
         # include the subprocess manager in the asyncio event loop
         results = event_loop.run_until_complete(
             run_async_cmd(
@@ -458,7 +464,7 @@ class WitlessRunner(object):
         )
         # terminate the event loop, cannot be undone, hence we start a fresh
         # one each time (see BlockingIOError notes above)
-        event_loop.close()
+        # event_loop.close()
 
         # log before any exception is raised
         lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
