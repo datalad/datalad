@@ -117,6 +117,14 @@ matrix:
   # The ones to run only on weekends against master.
   # They will not contribute to coverage etc, but might lead to failed status
   #
+  # run with minimal supported git-annex version as defined in AnnexRepo.GIT_ANNEX_MIN_VERSION
+  # TODO: ATM we do not have that minimal version as a Debian package in
+  # snapshots! When we do match - add a unit-test to guarantee that if
+  # _DL_DEBURL_ANNEX is set, we are using that particular version
+  - python: 3.5
+    env:
+    - _DL_DEBURL_ANNEX=http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb
+    - _DL_CRON=1
   # run if git-annex version in neurodebian -devel differs
   - python: 3.5
     env:
@@ -210,6 +218,7 @@ before_install:
   - if [ ! -z "${_DL_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
   - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || { ex="$?"; if [ "$ex" -eq 99 ]; then exit 0; else exit "$ex"; fi; }; fi
+  - if [ ! -z "${_DL_DEBURL_ANNEX:-}" ]; then wget -O /tmp/git-annex.deb "${_DL_DEBURL_ANNEX}" && sudo dpkg -i /tmp/git-annex.deb; fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
       sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
