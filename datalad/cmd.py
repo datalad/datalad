@@ -375,7 +375,9 @@ class WitlessRunner(object):
     It aims to be as simple as possible, providing only essential
     functionality.
     """
-    __slots__ = ['cwd', 'env', '_loop']
+    __slots__ = ['cwd', 'env']
+
+    _event_loop = None
 
     def __init__(self, cwd=None, env=None):
         """
@@ -397,7 +399,10 @@ class WitlessRunner(object):
             # if CWD was provided, we must not make it conflict with
             # a potential PWD setting
             self.env['PWD'] = self.cwd
-        self._loop = None
+        # First instance binds class-wide event loop
+        if WitlessRunner._event_loop is None:
+            WitlessRunner._event_loop = WitlessEventLoop()
+            asyncio.set_event_loop(WitlessRunner._event_loop)
 
     def run(self, cmd, protocol=None, stdin=None, **kwargs):
         """Execute a command and communicate with it.
@@ -438,22 +443,10 @@ class WitlessRunner(object):
         if protocol is None:
             # by default let all subprocess stream pass through
             protocol = NoCapture
-        # start a new event loop, which we will close again further down
-        # if this is not done events like this will occur
-        #   BlockingIOError: [Errno 11] Resource temporarily unavailable
-        #   Exception ignored when trying to write to the signal wakeup fd:
-        # It is unclear to me why it happens when reusing an event looped
-        # that it stopped from time to time, but starting fresh and doing
-        # a full termination seems to address the issue
-        if self._loop is None:
-            self._loop = event_loop = WitlessEventLoop()
-            asyncio.set_event_loop(event_loop)
-        else:
-            event_loop = self._loop
         # include the subprocess manager in the asyncio event loop
-        results = event_loop.run_until_complete(
+        results = self._event_loop.run_until_complete(
             run_async_cmd(
-                event_loop,
+                self._event_loop,
                 cmd,
                 protocol,
                 stdin,
@@ -462,10 +455,6 @@ class WitlessRunner(object):
                 env=self.env,
             )
         )
-        # terminate the event loop, cannot be undone, hence we start a fresh
-        # one each time (see BlockingIOError notes above)
-        # event_loop.close()
-
         # log before any exception is raised
         lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
 
