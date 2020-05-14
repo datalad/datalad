@@ -829,7 +829,7 @@ class GitTransportRI(RI, RegexBasedURLMixin):
     # Due to poor design, `ri` argument already present in various
     # places intermixed with **kwargs treatment. So we will use RI
     # here instead of ri.
-    _REGEX = re.compile(r'(?P<transport>[^:/@]+)::(?P<RI>.*)$')
+    _REGEX = re.compile(r'(?P<transport>[A-Za-z0-9][A-Za-z0-9+.-]*)::(?P<RI>.*)$')
 
     def as_str(self):
         return '{self.transport}::{self.RI}'.format(self=self)
