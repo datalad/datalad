@@ -536,7 +536,8 @@ def _get_report_path(path, reportwd, refds):
     path_ = path
     if reportwd:
         path_ = relpath(path, reportwd)
-        if make_explicit_relative and not path_.startswith(pardir):
+        path_first = path_.split(op.sep, 1)[0]
+        if make_explicit_relative and path_first not in (pardir, curdir):
             path_ = op.join(curdir, path_)
     return path_
 
