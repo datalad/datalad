@@ -41,23 +41,24 @@ from datalad.tests.utils import (
 )
 
 from datalad.support.network import (
-    same_website,
-    dlurljoin,
-    get_tld,
-    get_url_straight_filename,
-    get_response_disposition_filename,
-    parse_url_opts,
+    DataLadRI,
+    GitTransportRI,
+    PathRI,
     RI,
     SSHRI,
-    PathRI,
-    DataLadRI,
     URL,
     _split_colon,
-    is_url,
-    is_datalad_compat_ri,
+    dlurljoin,
     get_local_file_url,
+    get_response_disposition_filename,
+    get_tld,
+    get_url_straight_filename,
+    is_datalad_compat_ri,
     is_ssh,
+    is_url,
     iso8601_to_epoch,
+    parse_url_opts,
+    same_website,
 )
 
 
@@ -175,6 +176,10 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         with assert_raises(ValueError):
             ri_.localpath
 
+    # This one does not have a path. TODO: either proxy path from its .RI or adjust
+    # hierarchy of classes to make it more explicit
+    if cls == GitTransportRI:
+        return
     # do changes in the path persist?
     old_str = str(ri_)
     ri_.path = newpath = opj(ri_.path, 'sub')
@@ -335,6 +340,18 @@ def test_url_samples():
 
 
     raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
+
+
+def test_git_transport_ri():
+    _check_ri("gcrypt::http://somewhere", GitTransportRI, RI='http://somewhere', transport='gcrypt')
+    # man git-push says
+    #  <transport>::<address>
+    #    where <address> may be a path, a server and path, or an arbitrary URL-like string...
+    # so full path to my.com/... should be ok?
+    _check_ri("http::/my.com/some/path", GitTransportRI, RI='/my.com/some/path', transport='http')
+    # some ssh server.  And we allow for some additional chars in transport.
+    # Git doesn't define since it does not care! we will then be flexible too
+    _check_ri("trans-port::server:path", GitTransportRI, RI='server:path', transport='trans-port')
 
 
 def _test_url_quote_path(cls, clskwargs, target_url):
