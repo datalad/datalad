@@ -318,7 +318,6 @@ def eval_results(func):
       __call__ method of a subclass of Interface,
       i.e. a datalad command definition
     """
-    level = [0]
 
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
@@ -369,9 +368,6 @@ def eval_results(func):
         from datalad.distribution.dataset import Dataset
         ds = dataset_arg if isinstance(dataset_arg, Dataset) \
             else Dataset(dataset_arg) if dataset_arg else None
-        level[0] += 1
-        #print(level[0], wrapped, ds, allkwargs.get('path', None))
-        #import pdb; pdb.set_trace()
         # do not reuse a dataset's existing config manager here
         # they are configured to read the committed dataset configuration
         # too. That means a datalad update can silently bring in new
@@ -470,7 +466,6 @@ def eval_results(func):
                                   for status in sorted(action_summary[act])))
                                 for act in sorted(action_summary))))
 
-            level[0] -= 1
             if incomplete_results:
                 raise IncompleteResultsError(
                     failed=incomplete_results,
@@ -508,8 +503,6 @@ def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res['path']
         path = str(path)
-        # if 'file' in str(res.get('path', '')):
-        #     import pdb; pdb.set_trace()
         path_ = _get_report_path(path, res.get('reportwd'), res.get('refds'))
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
@@ -602,8 +595,6 @@ def _process_results(
         res_lgr = res.pop('logger', None)
 
         pwd = getpwd()
-        # if '../src' in str(allkwargs):
-        #     import pdb; pdb.set_trace()
         if not reportwd or path_is_under([reportwd.path], pwd) or path_is_under([pwd], reportwd.path):
             res['reportwd'] = pwd
         else:
