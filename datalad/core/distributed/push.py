@@ -123,11 +123,14 @@ class Push(Interface):
             args=("-f", "--force",),
             doc="""force particular operations, overruling automatic decision
             making: use --force with git-push ('gitpush'); do not use --fast
-            with git-annex copy ('datatransfer'); do not attempt to copy
-            annex'ed file content ('no-datatransfer'); combine force modes
-            'gitpush' and 'datatransfer' ('all').""",
+            with git-annex copy ('datatransfer'); use --auto with git-annex
+            copy ('auto-datatransfer'); do not attempt to copy annex'ed file
+            content ('no-datatransfer'); combine force modes 'gitpush' and
+            'datatransfer' ('all').""",
             constraints=EnsureChoice(
-                'all', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
+                'all', 'gitpush',
+                'no-datatransfer', 'auto-datatransfer', 'datatransfer',
+                None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -720,11 +723,10 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    if not to_transfer and force not in ('all', 'datatransfer'):
+    if force == "auto-datatransfer":
         lgr.debug("Invoking copy --auto")
         cmd.append('--auto')
-
-    if force not in ('all', 'datatransfer'):
+    elif force not in ('all', 'datatransfer'):
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 
