@@ -449,7 +449,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
         return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        assert_equal(request.body, '')
+        assert_equal(request.body, b'')
         assert_in('Cookie', request.headers)
         assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
@@ -602,7 +602,7 @@ def test_scenario_2(d):
         return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        assert_equal(request.body, '')
+        assert_equal(request.body, b'')
         assert_in('Cookie', request.headers)
         assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
@@ -672,7 +672,7 @@ def test_HTTPBearerTokenAuthenticator(d):
 
     # Perform assertions. See note above.
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
@@ -714,7 +714,7 @@ def test_HTTPLorisTokenAuthenticator(d):
 
     # Perform assertions. See note above.
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
@@ -757,7 +757,7 @@ def test_lorisadapter(d, keyring):
     downloader.download(url, path=d)
 
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken33")
     # Verify credentials correctly set to test user:pass
