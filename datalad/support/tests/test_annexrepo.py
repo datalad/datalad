@@ -86,6 +86,8 @@ from datalad.tests.utils import (
     serve_path_via_http,
     set_annex_version,
     skip_if,
+    skip_if_on_windows,
+    skip_if_root,
     skip_ssh,
     SkipTest,
     slow,
@@ -2287,7 +2289,8 @@ def test_files_split():
         yield check_files_split, cls
 
 
-@skip_if(cond=(on_windows or os.geteuid() == 0))  # uid and sudo not available on windows
+@skip_if_on_windows
+@skip_if_root
 @with_tree({
     'repo': {
         'file1': 'file1',
@@ -2348,7 +2351,8 @@ def test_ro_operations(path):
     repo2.repo_info()
 
 
-@skip_if(cond=(on_windows or os.geteuid() == 0))  # uid and sudo not available on windows
+@skip_if_on_windows
+@skip_if_root
 @with_tree({
     'file1': 'file1',
 })

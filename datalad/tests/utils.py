@@ -189,6 +189,29 @@ def skip_if_on_windows(func=None):
         check_and_raise()
 
 
+def skip_if_root(func=None):
+    """Skip test if uid == 0.
+
+    Note that on Windows (or anywhere else `os.geteuid` is not available) the
+    test is _not_ skipped.
+    """
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            raise SkipTest("Skipping: test assumptions fail under root")
+
+    if func:
+        @wraps(func)
+        @attr('skip_if_root')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
+
+
 @optional_args
 def skip_if(func, cond=True, msg=None, method='raise'):
     """Skip test for specific condition
