@@ -482,6 +482,7 @@ def test_target_ssh_since():
     yield check_target_ssh_since, False
 
 
+@skip_if_on_windows
 @skip_if_root
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -507,7 +508,6 @@ def check_failon_no_permissions(use_ssh, src_path, target_path):
 
 
 def test_failon_no_permissions():
-    skip_if_on_windows()
     yield skip_ssh(check_failon_no_permissions), True
     yield check_failon_no_permissions, False
 
