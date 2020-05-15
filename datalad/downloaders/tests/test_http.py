@@ -40,7 +40,6 @@ from ...utils import ensure_unicode
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
-    raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
 except (ImportError, AttributeError):
     # Attribute Error happens with newer httpretty and older ssl module
