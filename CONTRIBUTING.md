@@ -487,6 +487,8 @@ Refer datalad/config.py for information on how to add these environment variable
   Whether to log cwd where command to be executed
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
+- *DATALAD_LOG_NAME*
+  To instruct datalad to log name of the logger (corresponds to submodules or outside loggers like asyncio)
 - *DATALAD_LOG_TARGET*
   Where to log: `stderr` (default), `stdout`, or another filename
 - *DATALAD_LOG_TIMESTAMP*:
