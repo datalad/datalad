@@ -30,6 +30,7 @@ from ..credentials import (
 )
 from ..http import (
     HTMLFormAuthenticator,
+    HTTPBaseAuthenticator,
     HTTPDownloader,
     HTTPBearerTokenAuthenticator,
     process_www_authenticate,
@@ -556,6 +557,17 @@ def check_httpretty_authfail404(exp_called, d):
     # first one goes with regular DownloadError -- was 404 with not matching content
     assert_raises(DownloadError, downloader.download, url, path=d)
     assert_equal(was_called, exp_called)
+
+
+def test_auth_bytes_content():
+    # Our regexes are strings, but we can get content in bytes:
+    # I am not sure yet either we shouldn't just skip then testing for regex,
+    # but we definetely should not crash.
+    authenticator = HTTPBaseAuthenticator(failure_re="Failed")
+    authenticator.check_for_auth_failure(b"bytes")
+    # but ATM we do test bytes content, let's ENSURE that!
+    with assert_raises(AccessDeniedError):
+        authenticator.check_for_auth_failure(b"Failed")
 
 
 class FakeCredential2(UserPassword):
