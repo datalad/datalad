@@ -17,24 +17,25 @@ import builtins
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
-from ..base import DownloadError
-from ..base import IncompleteDownloadError
-from ..base import BaseDownloader
-from ..base import NoneAuthenticator
-from ..credentials import UserPassword
-from ..credentials import Token
-from ..credentials import LORIS_Token
-from ..http import HTMLFormAuthenticator
-from ..http import HTTPDownloader
-from ..http import HTTPBearerTokenAuthenticator
-from ..http import process_www_authenticate
+from ..base import (
+    BaseDownloader,
+    DownloadError,
+    IncompleteDownloadError,
+    NoneAuthenticator,
+)
+from ..credentials import (
+    LORIS_Token,
+    Token,
+    UserPassword,
+)
+from ..http import (
+    HTMLFormAuthenticator,
+    HTTPDownloader,
+    HTTPBearerTokenAuthenticator,
+    process_www_authenticate,
+)
 from ...support.exceptions import AccessFailedError
 from ...support.network import get_url_straight_filename
-from ...tests.utils import with_fake_cookies_db
-from ...tests.utils import skip_if_no_network
-from ...tests.utils import with_testsui
-from ...tests.utils import with_memory_keyring
-from ...tests.utils import known_failure_githubci_win
 from ...utils import ensure_unicode
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
@@ -50,23 +51,32 @@ except (ImportError, AttributeError):
     httpretty = NoHTTPPretty()
 
 from unittest.mock import patch
-from ...tests.utils import SkipTest
-from ...tests.utils import assert_in
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_greater
-from ...tests.utils import assert_false
-from ...tests.utils import assert_raises
-from ...tests.utils import ok_file_has_content
-from ...tests.utils import serve_path_via_http, with_tree
-from ...tests.utils import swallow_logs
-from ...tests.utils import swallow_outputs
-from ...tests.utils import with_tempfile
-from ...tests.utils import use_cassette
-from ...tests.utils import skip_if
-from ...tests.utils import without_http_proxy
-from ...support.exceptions import AccessDeniedError
-from ...support.exceptions import AnonymousAccessDeniedError
+from ...tests.utils import (
+    SkipTest,
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    known_failure_githubci_win,
+    ok_file_has_content,
+    serve_path_via_http, with_tree,
+    skip_if,
+    skip_if_no_network,
+    swallow_logs,
+    swallow_outputs,
+    use_cassette,
+    with_fake_cookies_db,
+    with_memory_keyring,
+    with_tempfile,
+    with_testsui,
+    without_http_proxy,
+)
+from ...support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+)
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
 
