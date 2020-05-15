@@ -403,6 +403,18 @@ class WitlessRunner(object):
         if WitlessRunner._event_loop is None:
             WitlessRunner._event_loop = WitlessEventLoop()
             asyncio.set_event_loop(WitlessRunner._event_loop)
+            if lgr.isEnabledFor(2):
+                # make asyncio talk to us too
+                from asyncio.log import logger as asyncio_lgr
+                # asyncio_lgr = logging.getLogger('asyncio')
+                asyncio_lgr_setup = True
+                asyncio_lgr.setLevel(logging.DEBUG)
+                # lgr.handlers are empty since delegated to its parent.
+                asyncio_lgr.handlers = lgr.parent.handlers
+                # enable debugging in the loop
+                WitlessRunner._event_loop.set_debug(True)
+
+
 
     def run(self, cmd, protocol=None, stdin=None, **kwargs):
         """Execute a command and communicate with it.
