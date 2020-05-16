@@ -232,8 +232,7 @@ class Push(Interface):
         ds_spec = _datasets_since_(
             # important to pass unchanged dataset arg
             dataset,
-            # use the diff "since before time"
-            since if since else PRE_INIT_COMMIT_SHA,
+            since,
             paths,
             recursive,
             recursion_limit)
