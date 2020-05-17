@@ -223,15 +223,15 @@ class ProgressHandler(logging.Handler):
             # we may want to actually "print" the completion message
             self.pbars.pop(pid).finish()
         else:
+            # Check for an updated label.
+            label = getattr(record, 'dlm_progress_label', None)
+            if label is not None:
+                self.pbars[pid].set_desc(label)
             # an update
             self.pbars[pid].update(
                 update,
                 increment=getattr(record, 'dlm_progress_increment', False),
                 total=getattr(record, 'dlm_progress_total', None))
-            # Check for an updated label.
-            label = getattr(record, 'dlm_progress_label', None)
-            if label is not None:
-                self.pbars[pid].set_desc(label)
 
 
 class NoProgressLog(logging.Filter):
