@@ -30,6 +30,7 @@ from datalad.interface.utils import (
     eval_results,
 )
 from datalad.interface.results import annexjson2result
+from datalad.log import log_progress
 from datalad.support.annexrepo import (
     AnnexJsonProtocol,
     AnnexRepo,
@@ -243,8 +244,12 @@ class Push(Interface):
         for dspath, dsrecords in ds_spec:
             matched_anything = True
             lgr.debug('Attempt push of Dataset at %s', dspath)
+            pbars = {}
             yield from _push(
-                dspath, dsrecords, to, force, jobs, res_kwargs.copy())
+                dspath, dsrecords, to, force, jobs, res_kwargs.copy(), pbars)
+            # take down progress bars for this dataset
+            for i, ds in pbars.items():
+                log_progress(lgr.info, i, 'Finished push of %s', ds)
         if not matched_anything:
             yield dict(
                 res_kwargs,
@@ -361,7 +366,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         yield (cur_ds, ds_res)
 
 
-def _push(dspath, content, target, force, jobs, res_kwargs,
+def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
           done_fetch=None):
     if not done_fetch:
         done_fetch = set()
@@ -371,6 +376,17 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
 
     res_kwargs.update(type='dataset', path=dspath)
 
+    # content will be unique for every push (even on the some dataset)
+    pbar_id = 'push-{}-{}'.format(target, id(content))
+    # register for final orderly take down
+    pbars[pbar_id] = ds
+    log_progress(
+        lgr.info, pbar_id,
+        'Determine push target',
+        unit=' Steps',
+        label='Push',
+        total=4,
+    )
     if not target:
         try:
             # let Git figure out what needs doing
@@ -418,7 +434,9 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
                 "Unknown target sibling '%s'.", target))
         return
 
-    lgr.debug("Attempt to push to '%s'", target)
+    log_progress(
+        lgr.info, pbar_id, "Push refspecs",
+        label="Push to '{}'".format(target), update=1, total=4)
 
     # define config var name for potential publication dependencies
     depvar = 'remote.{}.datalad-publish-depends'.format(target)
@@ -511,6 +529,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
             force,
             jobs,
             res_kwargs.copy(),
+            pbars,
             done_fetch=None
         )
 
@@ -550,6 +569,10 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         lgr.debug("Data transfer to '%s' disabled by argument", target)
         return
 
+    log_progress(
+        lgr.info, pbar_id, "Transfer data",
+        label="Transfer data to '{}'".format(target), update=2, total=4)
+
     yield from _push_data(
         ds,
         target,
@@ -563,6 +586,10 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         # there is nothing that we need to push or sync with on the git-side
         # of things with this remote
         return
+
+    log_progress(
+        lgr.info, pbar_id, "Update availability information",
+        label="Update availability for '{}'".format(target), update=3, total=4)
 
     # after file transfer the remote might have different commits to
     # the annex branch. They have to be merged locally, otherwise a
