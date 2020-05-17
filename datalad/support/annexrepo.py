@@ -3563,7 +3563,7 @@ class AnnexJsonProtocol(WitlessProtocol):
     # capture both streams and handle messaging completely
     proc_out = True
     proc_err = True
-    total_res_count = None
+    total_nbytes = None
 
     def __init__(self, done_future):
         # to collect parsed JSON command output
@@ -3574,17 +3574,18 @@ class AnnexJsonProtocol(WitlessProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
         self._pbars = set()
-        self._res_count = 0
-        if self.total_res_count:
+        # overall counter of processed bytes (computed from key reports)
+        self._byte_count = 0
+        if self.total_nbytes:
             # init global pbar, do here to be on top of first file
             log_progress(
                 lgr.info,
                 self._global_pbar_id,
                 'Start annex operation',
                 # do not crash if no command is reported
-                unit=' Files',
-                label='total',
-                total=self.total_res_count,
+                unit=' Bytes',
+                label='Total',
+                total=self.total_nbytes,
             )
             self._pbars.add(self._global_pbar_id)
 
@@ -3639,7 +3640,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     pbar_id,
                     'Start annex action: {}'.format(j['action']),
                     # do not crash if no command is reported
-                    label=j['action'].get('command', ''),
+                    label=j['action'].get('command', '').capitalize(),
                     unit=' Bytes',
                     total=float(j['total-size']),
                 )
@@ -3652,15 +3653,19 @@ class AnnexJsonProtocol(WitlessProtocol):
             )
             # do not let progress reports leak into the return value
             return
-        self._res_count += 1
+        # update overall progress, do not crash when there is no key property
+        # in the report (although there should be one)
+        key_bytes = AnnexRepo.get_size_from_key(j.get('key', None))
+        if key_bytes:
+            self._byte_count += key_bytes
         # don't do anything to the results for now in terms of normalization
         # TODO the protocol could be made aware of the runner's CWD and
         # also any dataset the annex command is operating on. This would
         # enable 'file' property conversion to absolute paths
         self.json_out.append(j)
 
-        if self.total_res_count:
-            if self.total_res_count == self._res_count:
+        if self.total_nbytes:
+            if self.total_nbytes <= self._byte_count:
                 # discard global pbar
                 log_progress(
                     lgr.info,
@@ -3674,8 +3679,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     lgr.info,
                     self._global_pbar_id,
                     j.get('file', ''),
-                    update=1,
-                    increment=True,
+                    update=self._byte_count,
                 )
 
     def _prepare_result(self):

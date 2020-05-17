@@ -781,12 +781,12 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
     # XXX must not be a SpooledTemporaryFile -- dunno why, but doesn't work
     # otherwise
     with TemporaryFile() as file_list:
-        nfiles = 0
+        nbytes = 0
         for c in to_transfer:
             file_list.write(
                 bytes(Path(c['path']).relative_to(ds.pathobj)))
             file_list.write(b'\0')
-            nfiles += 1
+            nbytes += c['bytesize']
 
         # rewind stdin buffer
         file_list.seek(0)
@@ -794,7 +794,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
         # tailor the progress protocol with the total number of files
         # to be transferred
         class TailoredPushAnnexJsonProtocol(AnnexJsonProtocol):
-            total_res_count = nfiles
+            total_nbytes = nbytes
 
         # and go
         # TODO try-except and yield what was captured before the crash
