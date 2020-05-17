@@ -313,6 +313,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             paths=None if not paths else [p for p in paths],
             untracked=untracked,
             eval_file_type=eval_file_type,
+            eval_submodule_state='full' if to is None else 'commit',
             _cache=cache)
     except InvalidGitReferenceError as e:
         yield dict(
