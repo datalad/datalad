@@ -690,10 +690,17 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
 
     # it really looks like we will transfer files, get info on what annex
     # has in store
+    ds_repo = ds.repo
+    # paths must be recoded to a dataset REPO root (in case of a symlinked
+    # location
+    annex_info_init = \
+        {ds_repo.pathobj / Path(c['path']).relative_to(ds.pathobj): c
+         for c in content} if ds.pathobj != ds_repo.pathobj else \
+        {Path(c['path']): c for c in content}
     content = ds.repo.get_content_annexinfo(
         # paths are taken from `content`
         paths=None,
-        init={Path(c['path']): c for c in content},
+        init=annex_info_init,
         ref='HEAD',
         # TODO this is an expensive operation that is only needed
         # to perform a warning below that may not be desirable
