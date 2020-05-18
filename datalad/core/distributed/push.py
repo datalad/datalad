@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from tempfile import TemporaryFile
 
-from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.cmd import GitWitlessRunner
 from datalad.interface.base import (
     Interface,
