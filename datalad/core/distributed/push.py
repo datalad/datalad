@@ -286,8 +286,11 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             path=paths,
             # we need to know what is around locally to be able
             # to report something that should have been pushed
-            # but could not, because we don't have a copy
-            annex='availability',
+            # but could not, because we don't have a copy.
+            # however, getting this info here is needlessly
+            # expensive, we will do it at the latest possible stage
+            # in _push_data()
+            annex=None,
             recursive=recursive,
             recursion_limit=recursion_limit,
             # make it as fast as possible
@@ -344,14 +347,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
                 # act on
                 'type',
                 # essential
-                'path',
-                # maybe do a key-based copy-to?
-                'key',
-                # progress reporting?
-                'bytesize',
-                # 'impossible' result when we should have copy-to'ed, but
-                # could not, because content isn't present
-                'has_content')
+                'path')
         })
 
     # if we have something left to report, do it
@@ -691,11 +687,34 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
                 target)
         )
         return
+
+    # it really looks like we will transfer files, get info on what annex
+    # has in store
+    ds_repo = ds.repo
+    # paths must be recoded to a dataset REPO root (in case of a symlinked
+    # location
+    annex_info_init = \
+        {ds_repo.pathobj / Path(c['path']).relative_to(ds.pathobj): c
+         for c in content} if ds.pathobj != ds_repo.pathobj else \
+        {Path(c['path']): c for c in content}
+    content = ds.repo.get_content_annexinfo(
+        # paths are taken from `annex_info_init`
+        paths=None,
+        init=annex_info_init,
+        ref='HEAD',
+        # TODO this is an expensive operation that is only needed
+        # to perform a warning below that may not be desirable
+        # https://github.com/datalad/datalad/issues/4508
+        # and to avoid passing files to annex that it could not
+        # transfer (which, again, annex might figure out better
+        # and faster by itself (grep for 'has_content')
+        eval_availability=True,
+    )
     # figure out which of the reported content (after evaluating
     # `since` and `path` arguments needs transport
     to_transfer = [
         c
-        for c in content
+        for c in content.values()
         # by force
         if ((force in ('all', 'datatransfer') or
              # or by modification report
