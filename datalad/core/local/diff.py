@@ -322,14 +322,14 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         return
 
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
-        # this will ammend `status`
+        # this will ammend `diff_state`
         repo.get_content_annexinfo(
             paths=paths.keys() if paths is not None else paths,
             init=diff_state,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=to)
         # if `fr` is None, we compare against a preinit state, and
-        # nothing needs to be done
+        # a get_content_annexinfo on that state doesn't get us anything new
         if fr and fr != to:
             repo.get_content_annexinfo(
                 paths=paths.keys() if paths is not None else paths,
