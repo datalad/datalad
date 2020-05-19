@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     with_tree,
     on_windows,
     skip_if,
+    skip_if_root,
     assert_in_results,
     assert_not_in_results,
     assert_result_count,
@@ -92,7 +93,7 @@ def test_unlock_raises(path, path2, path3):
 #       Therefore don't know what to test for yet.
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789027#step:8:134
 @known_failure_windows
-@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
+@skip_if_root
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):
 

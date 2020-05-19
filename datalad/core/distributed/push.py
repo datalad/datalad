@@ -729,7 +729,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
          for c in content} if ds.pathobj != ds_repo.pathobj else \
         {Path(c['path']): c for c in content}
     content = ds.repo.get_content_annexinfo(
-        # paths are taken from `content`
+        # paths are taken from `annex_info_init`
         paths=None,
         init=annex_info_init,
         ref='HEAD',
