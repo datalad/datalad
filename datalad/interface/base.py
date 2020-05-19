@@ -473,6 +473,10 @@ def build_doc(cls, **kwargs):
     actual command. It expects that __call__-method to be decorated by
     eval_results.
 
+    Note that values for any `eval_params` keys in `cls._params_` are
+    ignored.  This means one class may extend another's `_params_`
+    without worrying about filtering out `eval_params`.
+
     Parameters
     ----------
     cls: Interface
@@ -510,6 +514,10 @@ def build_doc(cls, **kwargs):
 
     # build standard doc and insert eval_doc
     spec = getattr(cls, '_params_', dict())
+    # ATTN: An important consequence of this update() call is that it
+    # fulfills the docstring's promise of overriding any existing
+    # values for eval_params keys in _params_.
+    #
     # get docs for eval_results parameters:
     spec.update(eval_params)
 
