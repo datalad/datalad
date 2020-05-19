@@ -11,6 +11,7 @@
 from ...support.annexrepo import AnnexRepo
 from ...consts import DATALAD_SPECIAL_REMOTE
 from ...tests.utils import *
+from ...support.external_versions import external_versions
 
 from . import _get_custom_runner
 from ...support.exceptions import CommandError
@@ -30,14 +31,19 @@ def check_basic_scenario(url, d):
     # TODO skip if no boto or no credentials
     get_test_providers(url) # so to skip if unknown creds
 
+    # git-annex got a fix where it stopped replacing - in the middle of the filename
+    filename = '3versions%sallversioned.txt' % (
+        '_' if external_versions['cmd:annex'] < '8.20200501+git53-gcabbc91b1' else '-'
+    )
+
     # Let's try to add some file which we should have access to
     with swallow_outputs() as cmo:
         annex.add_urls([url])
         annex.commit("committing")
-        whereis1 = annex.whereis('3versions_allversioned.txt', output='full')
+        whereis1 = annex.whereis(filename, output='full')
         eq_(len(whereis1), 2)  # here and datalad
-        annex.drop('3versions_allversioned.txt')
-    whereis2 = annex.whereis('3versions_allversioned.txt', output='full')
+        annex.drop(filename)
+    whereis2 = annex.whereis(filename, output='full')
     eq_(len(whereis2), 1)  # datalad
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output
