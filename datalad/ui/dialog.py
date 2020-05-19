@@ -131,7 +131,7 @@ class SilentConsoleLog(ConsoleLog):
             if kwargs_str:
                 msg += " Additional arguments: %s" % kwargs_str
         else:
-            msg += " Additional arguments are not shown due to 'hidden' is set."
+            msg += " Additional arguments are not shown because 'hidden' is set."
         raise RuntimeError(msg)
 
 
