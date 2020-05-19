@@ -444,7 +444,7 @@ def test_force_datatransfer(srcpath, dstpath):
 
     # force data transfer, but data isn't available
     src.repo.drop('test_mod_annex_file')
-    res = src.push(to='target', force='datatransfer', on_failure='ignore')
+    res = src.push(to='target', path='.', force='datatransfer', on_failure='ignore')
     assert_in_results(res, status='impossible',
                       path=str(src.pathobj / 'test_mod_annex_file'),
                       action='copy',

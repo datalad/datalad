@@ -246,7 +246,8 @@ class Push(Interface):
             lgr.debug('Attempt push of Dataset at %s', dspath)
             pbars = {}
             yield from _push(
-                dspath, dsrecords, to, force, jobs, res_kwargs.copy(), pbars)
+                dspath, dsrecords, to, force, jobs, res_kwargs.copy(), pbars,
+                got_path_arg=True if path else False)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
@@ -363,7 +364,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
 
 
 def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
-          done_fetch=None):
+          done_fetch=None, got_path_arg=False):
     if not done_fetch:
         done_fetch = set()
     # nothing recursive in here, we only need a repo to work with
@@ -526,7 +527,8 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
             jobs,
             res_kwargs.copy(),
             pbars,
-            done_fetch=None
+            done_fetch=None,
+            got_path_arg=got_path_arg,
         )
 
     # and lastly the primary push target
@@ -576,6 +578,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
         force,
         jobs,
         res_kwargs.copy(),
+        got_path_arg=got_path_arg,
     )
 
     if not target_is_git_remote:
@@ -690,7 +693,8 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         )
 
 
-def _push_data(ds, target, content, force, jobs, res_kwargs):
+def _push_data(ds, target, content, force, jobs, res_kwargs,
+               got_path_arg=False):
     if ds.config.getbool('remote.{}'.format(target), 'annex-ignore', False):
         lgr.debug(
             "Target '%s' is set to annex-ignore, exclude from data-push.",
@@ -729,13 +733,11 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
         paths=None,
         init=annex_info_init,
         ref='HEAD',
-        # TODO this is an expensive operation that is only needed
-        # to perform a warning below that may not be desirable
-        # https://github.com/datalad/datalad/issues/4508
-        # and to avoid passing files to annex that it could not
-        # transfer (which, again, annex might figure out better
-        # and faster by itself (grep for 'has_content')
-        eval_availability=True,
+        # this is an expensive operation that is only needed
+        # to perform a warning below, and for more accurate
+        # progress reporting (exclude unavailable content).
+        # limit to cases with explicit paths provided
+        eval_availability=True if got_path_arg else False,
     )
     # figure out which of the reported content (after evaluating
     # `since` and `path` arguments needs transport
@@ -750,15 +752,16 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
             and 'key' in c
         )
     ]
-    for c in [c for c in to_transfer if not c.get('has_content', False)]:
-        yield dict(
-            res_kwargs,
-            type=c['type'],
-            path=c['path'],
-            action='copy',
-            status='impossible',
-            message='Slated for transport, but no content present',
-        )
+    if got_path_arg:
+        for c in [c for c in to_transfer if not c.get('has_content', False)]:
+            yield dict(
+                res_kwargs,
+                type=c['type'],
+                path=c['path'],
+                action='copy',
+                status='impossible',
+                message='Slated for transport, but no content present',
+            )
 
     cmd = ['git', 'annex', 'copy', '--batch', '-z', '--to', target,
            '--json', '--json-error-messages', '--json-progress']
@@ -787,9 +790,6 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
     with TemporaryFile() as file_list:
         nfiles = 0
         for c in to_transfer:
-            if not c.get('has_content', False):
-                # warned about above, now just skip
-                continue
             file_list.write(
                 bytes(Path(c['path']).relative_to(ds.pathobj)))
             file_list.write(b'\0')
