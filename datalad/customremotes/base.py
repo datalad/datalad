@@ -252,8 +252,6 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
-        self._annex_supports_info = \
-            external_versions['cmd:annex'] >= '6.20180206'
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -386,8 +384,7 @@ class AnnexCustomRemote(object):
 
     def info(self, msg):
         lgr.info(msg)
-        if self._annex_supports_info:
-            self.send('INFO', msg)
+        self.send('INFO', msg)
 
     def progress(self, bytes):
         bytes = int(bytes)
