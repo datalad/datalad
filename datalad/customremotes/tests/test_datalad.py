@@ -31,18 +31,30 @@ def check_basic_scenario(url, d):
     # TODO skip if no boto or no credentials
     get_test_providers(url) # so to skip if unknown creds
 
-    # git-annex got a fix where it stopped replacing - in the middle of the filename
-    filename = '3versions%sallversioned.txt' % (
-        '_' if external_versions['cmd:annex'] < '8.20200501+git53-gcabbc91b1' else '-'
-    )
-
     # Let's try to add some file which we should have access to
     with swallow_outputs() as cmo:
         annex.add_urls([url])
         annex.commit("committing")
-        whereis1 = annex.whereis(filename, output='full')
-        eq_(len(whereis1), 2)  # here and datalad
-        annex.drop(filename)
+
+    # git-annex got a fix where it stopped replacing - in the middle of the filename
+    # Let's cater to the developers who might have some intermediate version and not
+    # easy to compare -- we will just check that only one file there is an that it
+    # matches what we expect when outside of the development versions range:
+    filenames = glob.glob(op.join(d, '3versions[-_]allversioned.txt'))
+    assert_equal(len(filenames), 1)
+    filename = op.basename(filenames[0])
+    if external_versions['cmd:annex'] < '8.20200501':
+        assert_in('_', filename)
+    # Date after the fix in 8.20200501-53-gcabbc91b1
+    elif external_versions['cmd:annex'] >= '8.20200512':
+        assert_in('-', filename)
+    else:
+        pass  # either of those is ok
+
+    whereis1 = annex.whereis(filename, output='full')
+    eq_(len(whereis1), 2)  # here and datalad
+    annex.drop(filename)
+
     whereis2 = annex.whereis(filename, output='full')
     eq_(len(whereis2), 1)  # datalad
 
