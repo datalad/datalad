@@ -27,6 +27,7 @@ import getpass
 # from unittest.mock import patch
 from collections import deque
 from copy import copy
+from itertools import chain
 
 from ..utils import auto_repr
 from ..utils import on_windows
@@ -117,6 +118,21 @@ class SilentConsoleLog(ConsoleLog):
     def get_progressbar(self, *args, **kwargs):
         from .progressbars import SilentProgressBar
         return SilentProgressBar(*args, **kwargs)
+
+    def question(self, text, title=None, **kwargs):
+        msg = "A non-interactive silent UI was asked for a response to a question: %s." % text
+        if title is not None:
+            msg += ' Title: %s.' % title
+        if not kwargs.get('hidden'):
+            kwargs_str = ', '.join(
+                ('%s=%r' % (k, v)
+                for k, v in kwargs.items()
+                if v is not None))
+            if kwargs_str:
+                msg += " Additional arguments: %s" % kwargs_str
+        else:
+            msg += " Additional arguments are not shown due to 'hidden' is set."
+        raise RuntimeError(msg)
 
 
 @auto_repr
