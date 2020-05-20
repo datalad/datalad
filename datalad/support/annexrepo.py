@@ -2385,7 +2385,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 j['key' if (key or '--all' in options) else 'file']
                 : self._whereis_json_to_dict(j)
                 for j in json_objects
-                if not j.get('key').endswith('.this-is-a-test-key')
+                if not j.get('key', '').endswith('.this-is-a-test-key')
             }
 
     # TODO:
