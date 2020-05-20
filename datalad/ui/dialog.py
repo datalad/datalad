@@ -27,7 +27,6 @@ import getpass
 # from unittest.mock import patch
 from collections import deque
 from copy import copy
-from itertools import chain
 
 from ..utils import auto_repr
 from ..utils import on_windows
