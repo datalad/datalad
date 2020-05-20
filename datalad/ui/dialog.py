@@ -76,7 +76,7 @@ class ConsoleLog(object):
         self.out.write(msg)
         if cr:
             self.out.write(cr)
-        log_progress(lgr.info, None, 'Clear progress bars', maint='refresh')
+        log_progress(lgr.info, None, 'Refresh progress bars', maint='refresh')
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
