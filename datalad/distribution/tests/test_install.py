@@ -885,12 +885,6 @@ def check_datasets_datalad_org(suffix, tdir):
     # Windows we get two records due to a duplicate attempt (as res[1]) to get it
     # again, which is reported as "notneeded".  For the purpose of this test
     # it doesn't make a difference.
-    # git-annex version is not "real" - but that is about when fix was introduced
-    from datalad import cfg
-    if on_windows \
-        and cfg.obtain("datalad.repo.version") < 6 \
-        and external_versions['cmd:annex'] <= '7.20181203':
-        raise SkipTest("Known to fail, needs fixed git-annex")
     assert_result_count(
         ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
         1,
