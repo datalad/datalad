@@ -71,9 +71,12 @@ class ConsoleLog(object):
         self.out = out
 
     def message(self, msg, cr='\n'):
+        from datalad.log import log_progress
+        log_progress(lgr.info, None, 'Clear progress bars', maint='clear')
         self.out.write(msg)
         if cr:
             self.out.write(cr)
+        log_progress(lgr.info, None, 'Clear progress bars', maint='refresh')
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
