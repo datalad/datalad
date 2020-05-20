@@ -67,7 +67,7 @@ def test_ssh_option():
     # `AcceptEnv LC_*` in their sshd_config. If it ends up causing problems, we
     # should just scrap it.
     with patch.dict('os.environ', {"LC_DATALAD_HACK": 'hackbert'}):
-        with swallow_outputs() as cmo:  # need to give smth with .fileno ;)
+        with swallow_outputs() as cmo:
             main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
                   "localhost", "echo $LC_DATALAD_HACK"])
             assert_equal(cmo.out.strip(), "hackbert")
