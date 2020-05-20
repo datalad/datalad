@@ -19,6 +19,7 @@ from datalad.cmdline.main import main
 
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import SkipTest
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 
@@ -63,14 +64,19 @@ def test_fancy_quotes(f):
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_option():
-    # This test is hacky in that it depends on systems commonly configuring
-    # `AcceptEnv LC_*` in their sshd_config. If it ends up causing problems, we
-    # should just scrap it.
+    # This test is hacky in that detecting the sent value depends on systems
+    # commonly configuring `AcceptEnv LC_*` in their sshd_config. If we get
+    # back an empty value, assume that isn't configured, and skip the test.
     with patch.dict('os.environ', {"LC_DATALAD_HACK": 'hackbert'}):
         with swallow_outputs() as cmo:
             main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
                   "localhost", "echo $LC_DATALAD_HACK"])
-            assert_equal(cmo.out.strip(), "hackbert")
+            out = cmo.out.strip()
+            if not out:
+                raise SkipTest(
+                    "SSH target probably does not accept LC_* variables. "
+                    "Skipping")
+            assert_equal(out, "hackbert")
 
 
 @skip_if_on_windows
