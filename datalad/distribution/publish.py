@@ -263,7 +263,7 @@ def _check_and_update_remote_server_info(ds, remote):
 
 def _maybe_fetch(repo, remote):
     if repo.config.get("remote.{}.fetch".format(remote)):
-        repo.fetch(remote=remote)
+        repo.fetch(remote=remote, recurse_submodules="no")
     else:
         # Fetching would lead to "Couldn't find remote ref HEAD" if no
         # branch" error.  See gh-4199 for an example.
