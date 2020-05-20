@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from tempfile import TemporaryFile
 
-from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.cmd import GitWitlessRunner
 from datalad.interface.base import (
     Interface,
@@ -233,8 +232,7 @@ class Push(Interface):
         ds_spec = _datasets_since_(
             # important to pass unchanged dataset arg
             dataset,
-            # use the diff "since before time"
-            since if since else PRE_INIT_COMMIT_SHA,
+            since,
             paths,
             recursive,
             recursion_limit)
