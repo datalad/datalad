@@ -1,0 +1,52 @@
+Update 0.12.6-1-ge8a922901:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    e8a922901f61f3f77cabeb6242b4a532398ccca7..7c28a9d31aff266b1816965dadcdb06a673309cf
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4456 from yarikoptic/bf-get-msg
+   9ea90cee2^-1
++  Merge pull request #4463 from kyleam/custom-summ-dup
+   13045c8ac^-1
++  Merge pull request #4477 from kyleam/argcomplete
+   efdd9a8e0^-1
++  Merge pull request #4481 from christian-monch/bf-whitespace-in-path
+   f5d9eff8e^-1
+-  Merge branch 'enh-tst-min-gitannex' into maint
+   9f9578088^-1
+-  DOC: addurls: Remove a stray ')'
+   5e10bbb50^-1
+-  BF(DOC): strip away RF leftover Parameters in docstring for no_annex.py
+   f03c67ae2^-1
++  Merge pull request #4504 from kyleam/addurls-dotslash-confusion
+   debd4683f^-1
++  BF: Avoid spurious backslashes in manpage double-dash option listings
+   b80d930de^-1
+-  Merge pull request #4512 from kyleam/compress-files-fail-no-7z
+   d44fbea48^-1
+-  Merge pull request #4533 from yarikoptic/enh-downloader
+   ff0369429^-1
++  Merge pull request #4529 from yarikoptic/bf-git-transport-ri
+   3208a38b1^-1
++  Merge pull request #4543 from yarikoptic/enh-httpretty
+   27844eed8^-1
++  Merge pull request #4482 from kyleam/build-doc-clarify
+   bce4caf6b^-1
++  Merge pull request #4552 from yarikoptic/bf-no-key
+   e8dfe5915^-1
++  Merge pull request #4553 from yarikoptic/enh-silent-console-log
+   4ca369ba5^-1
++  ENH: dialog: Prune unused import from 5ba071303
+   4300660f8^-1
++  Merge pull request #4560 from kyleam/publish-fetch-no-recurse
+   df700e67d^-1
+-  Merge pull request #4557 from kyleam/ssh-annex-version
+   961d409d0^-1
+-  Merge pull request #4558 from kyleam/sshrun-o-test
+   7c28a9d31^-1
