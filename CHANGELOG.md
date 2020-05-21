@@ -215,6 +215,58 @@ A handful of new commands, including `copy-file`, `push`, and
   ([#4243][])
 
 
+## 0.12.7 (??? ??, 2020) -- will be better than ever
+￼
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- Requesting tailored output (`--output=tailored`) from a command with
+  a custom result summary renderer produced repeated output. ([#4463][])
+
+- A longstanding regression in argcomplete-based command-line
+  completion has been fixed.  To enable completion from Bash, you can
+  `eval "$(register-python-argcomplete datalad)"` or source DataLad's
+  `tools/cmdline-completion`.  The latter should work for Zsh as well.
+  ([#4477][])
+
+- [publish][] didn't instruct `git-fetch` to not fetch submodules,
+  leading to a failure when the registered submodule was not present
+  locally and the submodule did not have a remote named 'origin'.
+  ([#4560][])
+
+- [addurls][] botched path handling when the file name format started
+  with "./" and the call was made from a subdirectory of the dataset.
+  ([#4504][])
+
+- Double dash options in manpages were unintentionally escaped.
+  ([#4332][])
+
+- The check for HTTP authentication failures crashed in situations
+  where content came in as bytes rather than unicode.  ([#4543][])
+
+- A check in `AnnexRepo.whereis` could lead to a type error.  ([#4552][])
+
+- When installing a dataset to obtain a subdataset, [get][]
+  confusingly displayed a message that described the containing
+  dataset as "underneath" the subdataset.  ([#4456][])
+
+- A couple of Makefile rules didn't properly quote paths.  ([#4481][])
+
+### Enhancements and new features
+
+- The resource identifier helper learned to recognize URLs like
+  <transport>::https://example.com that embed Git transport
+  information.  ([#4529][])
+
+- When running non-interactively, a more informative error is now
+  signaled when the UI backend, which cannot display a question, is
+  asked to do so.  ([#4553][])
+
 ## 0.12.6 (April 23, 2020) -- .
 
 ### Major refactoring and deprecations
@@ -724,7 +776,7 @@ bet we will fix some bugs and make a world even a better place.
   rather than saving only the files it modified.  ([#3680][])
 
 - Some spots in the documentation that were supposed appear as two
-  hyphen's were incorrectly rendered in the HTML output en-dash's.
+  hyphens were incorrectly rendered in the HTML output en-dashs.
   ([#3692][])
 
 - [create][], [install][], and [clone][] treated paths as relative to
@@ -2796,6 +2848,7 @@ publishing
 [#4328]: https://github.com/datalad/datalad/issues/4328
 [#4330]: https://github.com/datalad/datalad/issues/4330
 [#4331]: https://github.com/datalad/datalad/issues/4331
+[#4332]: https://github.com/datalad/datalad/issues/4332
 [#4337]: https://github.com/datalad/datalad/issues/4337
 [#4338]: https://github.com/datalad/datalad/issues/4338
 [#4342]: https://github.com/datalad/datalad/issues/4342
@@ -2818,7 +2871,17 @@ publishing
 [#4438]: https://github.com/datalad/datalad/issues/4438
 [#4439]: https://github.com/datalad/datalad/issues/4439
 [#4441]: https://github.com/datalad/datalad/issues/4441
+[#4456]: https://github.com/datalad/datalad/issues/4456
 [#4459]: https://github.com/datalad/datalad/issues/4459
 [#4460]: https://github.com/datalad/datalad/issues/4460
+[#4463]: https://github.com/datalad/datalad/issues/4463
 [#4464]: https://github.com/datalad/datalad/issues/4464
 [#4471]: https://github.com/datalad/datalad/issues/4471
+[#4477]: https://github.com/datalad/datalad/issues/4477
+[#4481]: https://github.com/datalad/datalad/issues/4481
+[#4504]: https://github.com/datalad/datalad/issues/4504
+[#4529]: https://github.com/datalad/datalad/issues/4529
+[#4543]: https://github.com/datalad/datalad/issues/4543
+[#4552]: https://github.com/datalad/datalad/issues/4552
+[#4553]: https://github.com/datalad/datalad/issues/4553
+[#4560]: https://github.com/datalad/datalad/issues/4560
