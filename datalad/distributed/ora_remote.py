@@ -4,7 +4,9 @@ from annexremote import ProtocolError
 
 from pathlib import (
     Path,
+    PurePosixPath
 )
+import requests
 import shutil
 from shlex import quote as sh_quote
 import subprocess
@@ -372,7 +374,8 @@ class SSHRemoteIO(IOBase):
 
     def get(self, src, dst, progress_cb):
 
-        # Note, that as we are in blocking mode, we can't easily fail on the actual get (that is 'cat').
+        # Note, that as we are in blocking mode, we can't easily fail on the
+        # actual get (that is 'cat').
         # Therefore check beforehand.
         if not self.exists(src):
             raise RIARemoteError("annex object {src} does not exist.".format(src=src))
@@ -509,6 +512,52 @@ class SSHRemoteIO(IOBase):
             self._run(cmd, check=True)
         except RemoteCommandFailedError:
             raise RIARemoteError("Could not write to {}".format(str(file_path)))
+
+
+class HTTPRemoteIO(object):
+    # !!!!
+    # This is not actually an IO class like SSHRemoteIO and LocalIO and needs
+    # respective RF'ing of special remote implementation eventually.
+    # We want ORA over HTTP, but with a server side CGI to talk to in order to
+    # reduce the number of requests. Implementing this as such an IO class would
+    # mean to have separate requests for all server side executions, which is
+    # what we do not want. As a consequence RIARemote class implementation needs
+    # to treat HTTP as a special case until refactoring to a design that fits
+    # both approaches.
+
+    # NOTE: For now read-only. Not sure yet whether an IO class is the right
+    # approach.
+
+    def __init__(self, ria_url, id):
+        assert ria_url.startswith("ria+http")
+        self.base_url = ria_url[4:]
+        if self.base_url[-1] == '/':
+            self.base_url = self.base_url[:-1]
+
+        self.base_url += "/" + id[:3] + '/' + id[3:]
+
+    def checkpresent(self, key_path):
+        # Note, that we need the path with hash dirs, since we don't have access
+        # to annexremote.dirhash from within IO classes
+
+        url = self.base_url + "/annex/objects/" + str(key_path)
+        response = requests.head(url)
+        return response.status_code == 200
+
+    def get(self, key_path, filename, progress_cb):
+        # Note, that we need the path with hash dirs, since we don't have access
+        # to annexremote.dirhash from within IO classes
+
+        url = self.base_url + "/annex/objects/" + str(key_path)
+        response = requests.get(url, stream=True)
+
+        with open(filename, 'wb') as dst_file:
+            bytes_received = 0
+            for chunk in response.iter_content(chunk_size=1024,
+                                               decode_unicode=False):
+                dst_file.write(chunk)
+                bytes_received += len(chunk)
+                progress_cb(bytes_received)
 
 
 def handle_errors(func):
@@ -831,7 +880,9 @@ class RIARemote(SpecialRemote):
             if not self.archive_id:
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
-        self.get_store()
+
+        if not self.ria_store_url.startswith("ria+http"):
+            self.get_store()
 
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
@@ -839,7 +890,7 @@ class RIARemote(SpecialRemote):
 
     def _local_io(self):
         """Are we doing local operations?"""
-        # let's not make this decision dependent on the existance
+        # let's not make this decision dependent on the existence
         # of a directory the matches the name of the configured
         # store tree base dir. Such a match could be pure
         # coincidence. Instead, let's do remote whenever there
@@ -874,12 +925,16 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError("Remote is treated as read-only. "
                                  "Set 'ora-remote.<name>.force-write=true' to "
                                  "overrule this.")
+        if isinstance(self.io, HTTPRemoteIO):
+            raise RIARemoteError("Write access via HTTP not implemented")
 
     @property
     def io(self):
         if not self._io:
             if self._local_io():
                 self._io = LocalIO()
+            elif self.ria_store_url.startswith("ria+http"):
+                self._io = HTTPRemoteIO(self.ria_store_url, self.archive_id)
             elif self.storage_host:
                 self._io = SSHRemoteIO(self.storage_host)
                 from atexit import register
@@ -896,7 +951,9 @@ class RIARemote(SpecialRemote):
         gitdir = self.annex.getgitdir()
         self.uuid = self.annex.getuuid()
         self._verify_config(gitdir)
-        self.get_store()
+
+        if not isinstance(self.io, HTTPRemoteIO):
+            self.get_store()
 
         # report active special remote configuration
         self.info = {
@@ -942,6 +999,13 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def transfer_retrieve(self, key, filename):
+
+        if isinstance(self.io, HTTPRemoteIO):
+            self.io.get(PurePosixPath(self.annex.dirhash(key)) / key / key,
+                        filename,
+                        self.annex.progress)
+            return
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
         # sadly we have no idea what type of source gave checkpresent->true
@@ -959,6 +1023,11 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def checkpresent(self, key):
+
+        if isinstance(self.io, HTTPRemoteIO):
+            return self.io.checkpresent(
+                PurePosixPath(self.annex.dirhash(key)) / key / key)
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
         if self.io.exists(abs_key_path):
@@ -999,6 +1068,13 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def whereis(self, key):
+
+        if isinstance(self.io, HTTPRemoteIO):
+            # display the URL for a request
+            # TODO: method of HTTPRemoteIO
+            return self.ria_store_url[4:] + "/annex/objects" + \
+                   self.annex.dirhash(key) + "/" + key + "/" + key
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         return str(key_path) if self._local_io() \
             else '{}: {}:{}'.format(

@@ -94,11 +94,12 @@ def verify_ria_url(url, cfg):
         raise ValueError(
             "Unexpected fragment in RIA-store URL: %s" % url_ri.fragment)
     protocol = url_ri.scheme[4:]
-    if protocol not in ['ssh', 'file']:
-        raise ValueError("Unsupported protocol: %s. Supported: ssh, file" %
+    if protocol not in ['ssh', 'file', 'http', 'https']:
+        raise ValueError("Unsupported protocol: %s. "
+                         "Supported: ssh, file, http(s)" %
                          protocol)
 
-    return url_ri.hostname if protocol == 'ssh' else None, url_ri.path, url
+    return url_ri.hostname if protocol != 'file' else None, url_ri.path, url
 
 
 def create_store(io, base_path, version):
