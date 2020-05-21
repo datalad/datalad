@@ -737,3 +737,29 @@ def test_publish_no_fetch_refspec_configured(path):
     (ds.repo.pathobj / "foo").write_text("a")
     ds.save()
     ds.publish(to="origin")
+
+
+@skip_ssh
+@with_tempfile(mkdir=True)
+def test_publish_fetch_do_not_recurse_submodules(path):
+    # This sets up a situation where git (2.26.2 at the time of writing) will
+    # fail trying to fetch a non-existent 'origin' remote if
+    # --no-recurse-submodules is not set during the fetch.
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    ds_a.create("sub")
+    ds_a.save(recursive=True)
+    # TODO: This can be switched to a local path on master, dropping the
+    # skip_ssh().
+    ds_a.create_sibling("ssh://datalad-test:{}/b".format(path), name="b",
+                        recursive=True)
+    publish(dataset=ds_a, to="b")
+
+    ds_b = Dataset(path / "b")
+    ds_b.repo.checkout("other", options=["-b"])
+    (ds_b.pathobj / "sub" / "foo").write_text("foo")
+    ds_b.save(recursive=True)
+
+    (ds_a.pathobj / "bar").write_text("bar")
+    ds_a.save()
+    assert_status("ok", publish(dataset=ds_a, to="b"))
