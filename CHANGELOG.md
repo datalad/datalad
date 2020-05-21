@@ -38,9 +38,8 @@ bet we will fix some bugs and make a world even a better place.
   with "./" and the call was made from a subdirectory of the dataset.
   ([#4504][])
 
-- Some spots in the documentation that were supposed to appear as two
-  hyphens were incorrectly rendered in the HTML output as en-dashes.
-  ([#3692][])
+- Double dash options in manpages were unintentionally escaped.
+  ([#4332][])
 
 - The check for HTTP authentication failures crashed in situations
   where content came in as bytes rather than unicode.  ([#4543][])
@@ -2589,6 +2588,7 @@ publishing
 [#4326]: https://github.com/datalad/datalad/issues/4326
 [#4328]: https://github.com/datalad/datalad/issues/4328
 [#4330]: https://github.com/datalad/datalad/issues/4330
+[#4332]: https://github.com/datalad/datalad/issues/4332
 [#4342]: https://github.com/datalad/datalad/issues/4342
 [#4354]: https://github.com/datalad/datalad/issues/4354
 [#4361]: https://github.com/datalad/datalad/issues/4361
