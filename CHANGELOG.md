@@ -20,12 +20,48 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Requesting tailored output (`--output=tailored`) from a command with
+  a custom result summary renderer produced repeated output. ([#4463][])
+
+- A longstanding regression in argcomplete-based command-line
+  completion has been fixed.  To enable completion from Bash, you can
+  `eval "$(register-python-argcomplete datalad)"` or source DataLad's
+  `tools/cmdline-completion`.  The latter should work for Zsh as well.
+  ([#4477][])
+
+- [publish][] didn't instruct `git-fetch` to not fetch submodules,
+  leading to a failure when the registered submodule was not present
+  locally and the submodule did not have a remote named 'origin'.
+  ([#4560][])
+
+- [addurls][] botched path handling when the file name format started
+  with "./" and the call was made from a subdirectory of the dataset.
+  ([#4504][])
+
+- Some spots in the documentation that were supposed to appear as two
+  hyphens were incorrectly rendered in the HTML output as en-dashes.
+  ([#3692][])
+
+- The check for HTTP authentication failures crashed in situations
+  where content came in as bytes rather than unicode.  ([#4543][])
+
+- A check in `AnnexRepo.whereis` could lead to a type error.  ([#4552][])
+
+- When installing a dataset to obtain a subdataset, [get][]
+  confusingly displayed a message that described the containing
+  dataset as "underneath" the subdataset.  ([#4456][])
+
+- A couple of Makefile rules didn't properly quote paths.  ([#4481][])
 
 ### Enhancements and new features
 
-?
+- The resource identifier helper learned to recognize URLs like
+  <transport>::https://example.com that embed Git transport
+  information.  ([#4529][])
 
+- When running non-interactively, a more informative error is now
+  signaled when the UI backend, which cannot display a question, is
+  asked to do so.  ([#4553][])
 
 ## 0.12.6 (April 23, 2020) -- .
 
@@ -2564,3 +2600,13 @@ publishing
 [#4409]: https://github.com/datalad/datalad/issues/4409
 [#4421]: https://github.com/datalad/datalad/issues/4421
 [#4431]: https://github.com/datalad/datalad/issues/4431
+[#4456]: https://github.com/datalad/datalad/issues/4456
+[#4463]: https://github.com/datalad/datalad/issues/4463
+[#4477]: https://github.com/datalad/datalad/issues/4477
+[#4481]: https://github.com/datalad/datalad/issues/4481
+[#4504]: https://github.com/datalad/datalad/issues/4504
+[#4529]: https://github.com/datalad/datalad/issues/4529
+[#4543]: https://github.com/datalad/datalad/issues/4543
+[#4552]: https://github.com/datalad/datalad/issues/4552
+[#4553]: https://github.com/datalad/datalad/issues/4553
+[#4560]: https://github.com/datalad/datalad/issues/4560
