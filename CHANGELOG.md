@@ -572,7 +572,7 @@ bet we will fix some bugs and make a world even a better place.
   rather than saving only the files it modified.  ([#3680][])
 
 - Some spots in the documentation that were supposed appear as two
-  hyphen's were incorrectly rendered in the HTML output en-dash's.
+  hyphens were incorrectly rendered in the HTML output en-dashs.
   ([#3692][])
 
 - [create][], [install][], and [clone][] treated paths as relative to
