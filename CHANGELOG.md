@@ -25,7 +25,7 @@ A handful of new commands, including `copy-file`, `push`, and
   repositories.  #4487
 
 - [push][]
-  - now fails earlier if asked given an unknown target.  #4517
+  - now fails earlier if given an unknown target.  #4517
   - got some optimizations and progress bar improvements.
     #4545 #4546 #4547 #4548
   - now only warns about unavailable content when given explicit
@@ -180,7 +180,7 @@ A handful of new commands, including `copy-file`, `push`, and
     to a clean state.  ([#4106][])
   - provides a stronger warning against using `--to-git`.  ([#4290][])
 
-- [diff][] and [save][] learned about scenarios were they could avoid
+- [diff][] and [save][] learned about scenarios where they could avoid
   unnecessary and expensive work.  ([#4526][]) ([#4544][]) ([#4549][])
 
 - Calling [diff][] without `--recursive` but with a path constraint
