@@ -24,15 +24,16 @@ bet we will fix some bugs and make a world even a better place.
   a custom result summary renderer produced repeated output. ([#4463][])
 
 - A longstanding regression in argcomplete-based command-line
-  completion has been fixed.  To enable completion from Bash, you can
-  `eval "$(register-python-argcomplete datalad)"` or source DataLad's
+  completion for Bash has been fixed.  You can enable completion by
+  configuring a Bash startup file to run `eval
+  "$(register-python-argcomplete datalad)"` or source DataLad's
   `tools/cmdline-completion`.  The latter should work for Zsh as well.
   ([#4477][])
 
-- [publish][] didn't instruct `git-fetch` to not fetch submodules,
-  leading to a failure when the registered submodule was not present
-  locally and the submodule did not have a remote named 'origin'.
-  ([#4560][])
+- [publish][] didn't prevent `git-fetch` from recursing into
+  submodules, leading to a failure when the registered submodule was
+  not present locally and the submodule did not have a remote named
+  'origin'.  ([#4560][])
 
 - [addurls][] botched path handling when the file name format started
   with "./" and the call was made from a subdirectory of the dataset.
@@ -60,13 +61,14 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-- The resource identifier helper learned to recognize URLs like
-  <transport>::https://example.com that embed Git transport
-  information.  ([#4529][])
+- The resource identifier helper learned to recognize URLs with
+  embedded Git transport information, such as
+  gcrypt::https://example.com.  ([#4529][])
 
 - When running non-interactively, a more informative error is now
   signaled when the UI backend, which cannot display a question, is
   asked to do so.  ([#4553][])
+
 
 ## 0.12.6 (April 23, 2020) -- .
 
