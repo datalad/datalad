@@ -215,13 +215,7 @@ A handful of new commands, including `copy-file`, `push`, and
   ([#4243][])
 
 
-## 0.12.7 (??? ??, 2020) -- will be better than ever
-￼
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+## 0.12.7 (May 22, 2020) -- .
 
 ### Fixes
 
@@ -229,15 +223,16 @@ bet we will fix some bugs and make a world even a better place.
   a custom result summary renderer produced repeated output. ([#4463][])
 
 - A longstanding regression in argcomplete-based command-line
-  completion has been fixed.  To enable completion from Bash, you can
-  `eval "$(register-python-argcomplete datalad)"` or source DataLad's
+  completion for Bash has been fixed.  You can enable completion by
+  configuring a Bash startup file to run `eval
+  "$(register-python-argcomplete datalad)"` or source DataLad's
   `tools/cmdline-completion`.  The latter should work for Zsh as well.
   ([#4477][])
 
-- [publish][] didn't instruct `git-fetch` to not fetch submodules,
-  leading to a failure when the registered submodule was not present
-  locally and the submodule did not have a remote named 'origin'.
-  ([#4560][])
+- [publish][] didn't prevent `git-fetch` from recursing into
+  submodules, leading to a failure when the registered submodule was
+  not present locally and the submodule did not have a remote named
+  'origin'.  ([#4560][])
 
 - [addurls][] botched path handling when the file name format started
   with "./" and the call was made from a subdirectory of the dataset.
@@ -257,15 +252,22 @@ bet we will fix some bugs and make a world even a better place.
 
 - A couple of Makefile rules didn't properly quote paths.  ([#4481][])
 
+- With DueCredit support enabled (`DUECREDIT_ENABLE=1`), the query for
+  metadata information could flood the output with warnings if
+  datasets didn't have aggregated metadata.  The warnings are now
+  silenced, with the overall failure of a [metadata][] call logged at
+  the debug level.  ([#4568][])
+
 ### Enhancements and new features
 
-- The resource identifier helper learned to recognize URLs like
-  <transport>::https://example.com that embed Git transport
-  information.  ([#4529][])
+- The resource identifier helper learned to recognize URLs with
+  embedded Git transport information, such as
+  gcrypt::https://example.com.  ([#4529][])
 
 - When running non-interactively, a more informative error is now
   signaled when the UI backend, which cannot display a question, is
   asked to do so.  ([#4553][])
+
 
 ## 0.12.6 (April 23, 2020) -- .
 
@@ -2885,3 +2887,4 @@ publishing
 [#4552]: https://github.com/datalad/datalad/issues/4552
 [#4553]: https://github.com/datalad/datalad/issues/4553
 [#4560]: https://github.com/datalad/datalad/issues/4560
+[#4568]: https://github.com/datalad/datalad/issues/4568
