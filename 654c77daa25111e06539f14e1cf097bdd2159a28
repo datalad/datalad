@@ -1,0 +1,64 @@
+Update 0.13.0rc1-123-g783212416:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    390cfb638b0086a5bc3090cc207fb8c393d055c6..7832124161abf0653b34c992025979ad63cc3a7c
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge branch 'maint'
+   822c9d0ee^-1
++  Merge pull request #4486 from bpoldrack/bf-4484
+   088175205^-1
+-  Merge pull request #4488 from kyleam/ria_utils_delay_ssh_test
+   21fc62a21^-1
++  Merge pull request #4487 from mih/bf-4485
+   1b908b4ca^-1
++  Merge pull request #4503 from mih/bf-4501
+   7b61629d6^-1
+-  Merge pull request #4518 from bpoldrack/fix-4371
+   4c708e987^-1
++  Merge pull request #4515 from mih/bf-4493
+   344c628da^-1
+-  Merge pull request #4516 from mih/bf-4490
+   8ccc34124^-1
+-  Merge branch 'maint'
+   4c2d209f1^-1
+-  Merge pull request #4528 from yarikoptic/rm-doc-examples
+   d6874736d^-1
+-  Merge pull request #4524 from yarikoptic/rf-diffstatus
+   05be18c6b^-1
++  Merge pull request #4517 from mih/bf-4506
+   be1ad7e79^-1
++  Merge branch 'bf-4523'
+   4f0876e18^-1
+-  Merge pull request #4534 from kyleam/create-sibling-sudo
+   f0305f3c9^-1
++  Merge pull request #4545 from mih/enh-push
+   de4549895^-1
++  Merge pull request #4549 from mih/enh-diff-perf
+   2f6d6556d^-1
++  Merge pull request #4546 from mih/enh-pushprogress
+   c025a06b5^-1
++  Merge pull request #4547 from mih/enh-push2
+   057c0d55d^-1
+-  Merge branch 'maint'
+   2047af595^-1
++  Merge pull request #4548 from mih/enh-pushprogress2
+   6f8864b6d^-1
++  Merge pull request #4544 from mih/enh-diff
+   3bc103857^-1
+-  Merge branch 'maint'
+   83fd7e486^-1
++  Merge pull request #4555 from mih/bf-resprog-interaction
+   16787cfa9^-1
+-  Merge branch 'maint'
+   7f24491b2^-1
+-  Merge branch 'maint'
+   53765be03^-1
+-  Merge branch 'maint'
+   783212416^-1
