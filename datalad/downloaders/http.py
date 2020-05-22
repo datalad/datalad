@@ -19,7 +19,11 @@ import requests.auth
 import io
 from time import sleep
 
-from ..utils import assure_list_from_str, assure_dict_from_str
+from ..utils import (
+    assure_list_from_str,
+    assure_dict_from_str,
+    ensure_bytes,
+)
 from ..dochelpers import borrowkwargs
 
 from ..ui import ui
@@ -208,8 +212,11 @@ class HTTPBaseAuthenticator(Authenticator):
 
     def check_for_auth_failure(self, content, err_prefix=""):
         if self.failure_re:
+            content_is_bytes = isinstance(content, bytes)
             # verify that we actually logged in
             for failure_re in self.failure_re:
+                if content_is_bytes:
+                    failure_re = ensure_bytes(failure_re)
                 if re.search(failure_re, content):
                     raise AccessDeniedError(
                         err_prefix + "returned output which matches regular expression %s" % failure_re

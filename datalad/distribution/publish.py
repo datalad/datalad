@@ -267,7 +267,7 @@ def _check_and_update_remote_server_info(ds, remote):
 
 def _maybe_fetch(repo, remote):
     if repo.config.get("remote.{}.fetch".format(remote)):
-        repo.fetch(remote=remote)
+        repo.fetch(remote=remote, recurse_submodules="no")
     else:
         # Fetching would lead to "Couldn't find remote ref HEAD" if no
         # branch" error.  See gh-4199 for an example.
@@ -570,6 +570,11 @@ def _get_remote_diff(repo, current_commit, remote, remote_branch_name):
 @build_doc
 class Publish(Interface):
     """Publish a dataset to a known :term:`sibling`.
+
+    ..note::
+      This command is deprecated. It will be removed from DataLad eventually,
+      but no earlier than with the 0.14 release. Use the `push` and `create-sibling` 
+      (if you used `--missing` flag) commands instead.
 
     This makes the last saved state of a dataset available to a sibling
     or special remote data store of a dataset. Any target sibling must already

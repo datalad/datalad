@@ -62,7 +62,6 @@ from datalad.api import (
     add_archive_content,
     clean,
 )
-from datalad.support.external_versions import external_versions
 from datalad.consts import (
     ARCHIVES_SPECIAL_REMOTE,
     DATALAD_SPECIAL_REMOTES_UUIDS,
@@ -119,10 +118,8 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                             use_current_dir=False,
                             exclude='.*__MACOSX.*')  # some junk penetrates
 
-        if external_versions['cmd:annex'] >= '6.20170208':
-            # should have fixed remotes
-            eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
-                '[%s]' % ARCHIVES_SPECIAL_REMOTE)
+        eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
+            '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
         all_files = sorted(find_files('.'))
         target_files = {

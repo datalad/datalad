@@ -47,4 +47,4 @@ jobs:
       run: |
         mkdir -p __testhome__
         cd __testhome__
-        python -m nose -s -v datalad.core datalad.local datalad.distributed
+        python -m nose -s -v -A "not (turtle)" datalad.core datalad.local datalad.distributed

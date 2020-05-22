@@ -38,7 +38,6 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.param import Parameter
-from datalad.consts import PRE_INIT_COMMIT_SHA
 
 from datalad.core.local.status import (
     Status,
@@ -313,6 +312,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             paths=None if not paths else [p for p in paths],
             untracked=untracked,
             eval_file_type=eval_file_type,
+            eval_submodule_state='full' if to is None else 'commit',
             _cache=cache)
     except InvalidGitReferenceError as e:
         yield dict(
@@ -323,13 +323,15 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         return
 
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
-        # this will ammend `status`
+        # this will ammend `diff_state`
         repo.get_content_annexinfo(
             paths=paths.keys() if paths is not None else paths,
             init=diff_state,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=to)
-        if fr != to:
+        # if `fr` is None, we compare against a preinit state, and
+        # a get_content_annexinfo on that state doesn't get us anything new
+        if fr and fr != to:
             repo.get_content_annexinfo(
                 paths=paths.keys() if paths is not None else paths,
                 init=diff_state,
@@ -372,7 +374,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     subds,
                     # from before time or from the reported state
                     fr if constant_refs
-                    else PRE_INIT_COMMIT_SHA
+                    else None
                     if subds_state == 'added'
                     else props['prev_gitshasum'],
                     # to the last recorded state, or the worktree

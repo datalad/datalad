@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import os
 import os.path as op
+from unittest.mock import patch
+
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
     NoDatasetFound,
@@ -531,3 +533,16 @@ def test_no_worktree_impact_false_deletions(path):
         state='clean',
         path=str(ds.pathobj / 'identical'),
     )
+
+
+@with_tempfile(mkdir=True)
+def test_diff_fr_none_one_get_content_annexinfo_call(path):
+    from datalad.support.annexrepo import AnnexRepo
+    ds = Dataset(path).create()
+    (ds.pathobj / "foo").write_text("foo")
+    ds.save()
+    # get_content_annexinfo() is expensive.  If fr=None, we should
+    # only need to call it once.
+    with patch.object(AnnexRepo, "get_content_annexinfo") as gca:
+        res = ds.diff(fr=None, to="HEAD", annex="all", result_renderer=None)
+        eq_(gca.call_count, 1)

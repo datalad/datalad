@@ -320,7 +320,8 @@ def _guess_ri_cls(ri):
         'url': URL,
         'ssh':  SSHRI,
         'file': PathRI,
-        'datalad': DataLadRI
+        'datalad': DataLadRI,
+        'git-transport': GitTransportRI,
     }
     if isinstance(ri, PurePath):
         lgr.log(5, "Detected file ri")
@@ -339,8 +340,12 @@ def _guess_ri_cls(ri):
     # file:///path should stay file:
     if fields['scheme'] and fields['scheme'] not in {'file'} \
             and not fields['hostname']:
+        # transport::URL-or-path
+        if fields['path'].startswith(':'):  # there was ::
+            lgr.log(5, "Assuming git transport style ri and returning")
+            type_ = 'git-transport'
         # dl+archive:... or just for ssh   hostname:path/p1
-        if '+' not in fields['scheme']:
+        elif '+' not in fields['scheme']:
             type_ = 'ssh'
             lgr.log(5, "Assuming ssh style ri, adjusted: %s" % (fields,))
 
@@ -810,6 +815,24 @@ class DataLadRI(RI, RegexBasedURLMixin):
         if self.remote:
             raise NotImplementedError("not supported ATM to reference additional remotes")
         return "{}{}".format(consts.DATASETS_TOPURL, urlquote(self.path))
+
+
+class GitTransportRI(RI, RegexBasedURLMixin):
+    """RI for some other RI with git transport prefix"""
+
+    # TODO: check how crticial to "inherit" RI._FIELDS asking to provide path
+    _FIELDS = RI._FIELDS + (
+        'transport',
+        'RI',
+    )
+
+    # Due to poor design, `ri` argument already present in various
+    # places intermixed with **kwargs treatment. So we will use RI
+    # here instead of ri.
+    _REGEX = re.compile(r'(?P<transport>[A-Za-z0-9][A-Za-z0-9+.-]*)::(?P<RI>.*)$')
+
+    def as_str(self):
+        return '{self.transport}::{self.RI}'.format(self=self)
 
 
 def _split_colon(s, maxsplit=1):
