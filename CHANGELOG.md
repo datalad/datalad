@@ -15,7 +15,31 @@ We would recommend to consult log of the
 A handful of new commands, including `copy-file`, `push`, and
 `create-sibling-ria`, along with various fixes and enhancements
 
+### rc2 changes
+(section to be pruned before final release)
+
+- [create-sibling-ria][] produced results with an incorrect "dataset"
+  value.  #4486
+
+- [clone][] did not correctly handle RIA datasets that were not annex
+  repositories.  #4487
+
+- [push][]
+  - now fails earlier if asked given an unknown target.  #4517
+  - got some optimizations and progress bar improvements.
+    #4545 #4546 #4547 #4548
+  - now only warns about unavailable content when given explicit
+    paths.  #4547
+
+- The documentation for [publish][] has been updated to mark it as
+  deprecated, pointing to [push][] as its replacement.  #4515
+
+- Fixes for progress bar glitches.  #4503 #4555
+
 ### Major refactoring and deprecations
+
+- With the introduction of [push][], [publish][] is now deprecated.
+  It will be removed in the 0.14.0 release at the earliest.
 
 - The `no_annex` parameter of [create][], which is exposed in the
   Python API but not the command line, is deprecated and will be
@@ -155,6 +179,9 @@ A handful of new commands, including `copy-file`, `push`, and
     making it more obvious that no results being rendered corresponds
     to a clean state.  ([#4106][])
   - provides a stronger warning against using `--to-git`.  ([#4290][])
+
+- [diff][] and [save][] learned about scenarios were they could avoid
+  unnecessary and expensive work.  ([#4526][]) ([#4544][]) ([#4549][])
 
 - Calling [diff][] without `--recursive` but with a path constraint
   within a subdataset ("<subdataset>/<path>") now traverses into the
@@ -2882,8 +2909,11 @@ publishing
 [#4477]: https://github.com/datalad/datalad/issues/4477
 [#4481]: https://github.com/datalad/datalad/issues/4481
 [#4504]: https://github.com/datalad/datalad/issues/4504
+[#4526]: https://github.com/datalad/datalad/issues/4526
 [#4529]: https://github.com/datalad/datalad/issues/4529
 [#4543]: https://github.com/datalad/datalad/issues/4543
+[#4544]: https://github.com/datalad/datalad/issues/4544
+[#4549]: https://github.com/datalad/datalad/issues/4549
 [#4552]: https://github.com/datalad/datalad/issues/4552
 [#4553]: https://github.com/datalad/datalad/issues/4553
 [#4560]: https://github.com/datalad/datalad/issues/4560
