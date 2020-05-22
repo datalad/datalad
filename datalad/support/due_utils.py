@@ -7,6 +7,7 @@ Support functionality for using DueCredit
 # Note Text was added/exposed only since DueCredit 0.6.5
 from .due import due, Doi, Url, Text
 from ..utils import never_fail
+from ..dochelpers import exc_str
 
 import logging
 lgr = logging.getLogger('datalad.duecredit')
@@ -54,9 +55,9 @@ def duecredit_dataset(dataset):
             return_type='item-or-list'  # Expecting a single record
         )
     except Exception as exc:
-        lgr.warning(
-            "Failed to obtain metadata for %s. Will not provide duecredit entry",
-            dataset
+        lgr.debug(
+            "Failed to obtain metadata for %s. Will not provide duecredit entry: %s",
+            dataset, exc_str(exc)
         )
         return
 
