@@ -52,6 +52,12 @@ bet we will fix some bugs and make a world even a better place.
 
 - A couple of Makefile rules didn't properly quote paths.  ([#4481][])
 
+- With DueCredit support enabled (`DUECREDIT_ENABLE=1`), the query for
+  metadata information could flood the output with warnings if
+  datasets didn't have aggregated metadata.  The warnings are now
+  silenced, with the overall failure of a [metadata][] call logged at
+  the debug level.  ([#4568][])
+
 ### Enhancements and new features
 
 - The resource identifier helper learned to recognize URLs like
@@ -2610,3 +2616,4 @@ publishing
 [#4552]: https://github.com/datalad/datalad/issues/4552
 [#4553]: https://github.com/datalad/datalad/issues/4553
 [#4560]: https://github.com/datalad/datalad/issues/4560
+[#4568]: https://github.com/datalad/datalad/issues/4568
