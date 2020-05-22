@@ -10,7 +10,7 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.13.0rc1 (May 05, 2020) -- .
+## 0.13.0rc2 (May 22, 2020) -- .
 
 A handful of new commands, including `copy-file`, `push`, and
 `create-sibling-ria`, along with various fixes and enhancements

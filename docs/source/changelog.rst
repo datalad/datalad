@@ -15,14 +15,48 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the `DataLad git
 repository <http://github.com/datalad/datalad>`__ for more details.
 
-0.13.0rc1 (May 05, 2020) – .
+0.13.0rc2 (May 22, 2020) – .
 ----------------------------
 
 A handful of new commands, including ``copy-file``, ``push``, and
 ``create-sibling-ria``, along with various fixes and enhancements
 
+rc2 changes
+~~~~~~~~~~~
+
+(section to be pruned before final release)
+
+-  `create-sibling-ria <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-ria.html>`__
+   produced results with an incorrect “dataset” value. #4486
+
+-  `clone <http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html>`__
+   did not correctly handle RIA datasets that were not annex
+   repositories. #4487
+
+-  `push <http://datalad.readthedocs.io/en/latest/generated/man/datalad-push.html>`__
+
+   -  now fails earlier if given an unknown target. #4517
+   -  got some optimizations and progress bar improvements. #4545 #4546
+      #4547 #4548
+   -  now only warns about unavailable content when given explicit
+      paths. #4547
+
+-  The documentation for
+   `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
+   has been updated to mark it as deprecated, pointing to
+   `push <http://datalad.readthedocs.io/en/latest/generated/man/datalad-push.html>`__
+   as its replacement. #4515
+
+-  Fixes for progress bar glitches. #4503 #4555
+
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  With the introduction of
+   `push <http://datalad.readthedocs.io/en/latest/generated/man/datalad-push.html>`__,
+   `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
+   is now deprecated. It will be removed in the 0.14.0 release at the
+   earliest.
 
 -  The ``no_annex`` parameter of
    `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__,
@@ -228,6 +262,15 @@ Enhancements and new features
       (`#4106 <https://github.com/datalad/datalad/issues/4106>`__)
    -  provides a stronger warning against using ``--to-git``.
       (`#4290 <https://github.com/datalad/datalad/issues/4290>`__)
+
+-  `diff <http://datalad.readthedocs.io/en/latest/generated/man/datalad-diff.html>`__
+   and
+   `save <http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html>`__
+   learned about scenarios where they could avoid unnecessary and
+   expensive work.
+   (`#4526 <https://github.com/datalad/datalad/issues/4526>`__)
+   (`#4544 <https://github.com/datalad/datalad/issues/4544>`__)
+   (`#4549 <https://github.com/datalad/datalad/issues/4549>`__)
 
 -  Calling
    `diff <http://datalad.readthedocs.io/en/latest/generated/man/datalad-diff.html>`__
