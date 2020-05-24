@@ -11,6 +11,7 @@
 
 import logging
 import re
+import requests
 from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
@@ -612,23 +613,15 @@ def postclonecfg_ria(ds, props):
         scheme = props['giturl'].split(':', 1)[0]
         if scheme == 'http':
 
-            # Note: Following outcommented code was proof how to check via HTTP.
-            #       However, for now we only want to annexenable origin in case
-            #       of HTTP, not the special remote. Hence it's uuid isn't
-            #       actually required. (see gh-4410)
-
-            # import requests
-            # try:
-            #     response = requests.get("{}{}config".format(
-            #         props['giturl'],
-            #         '/' if not props['giturl'].endswith('/') else '')
-            #     )
-            #     config_content = response.text
-            # except requests.RequestException as e:
-            #     lgr.debug("Failed to get config file from source:\n%s",
-            #               exc_str(e))
-
-            lgr.debug("No ORA reconfiguration for HTTP implemented yet")
+            try:
+                response = requests.get("{}{}config".format(
+                    props['giturl'],
+                    '/' if not props['giturl'].endswith('/') else '')
+                )
+                config_content = response.text
+            except requests.RequestException as e:
+                lgr.debug("Failed to get config file from source:\n%s",
+                          exc_str(e))
 
         elif scheme == 'ssh':
             # TODO: switch the following to proper command abstraction:
@@ -653,12 +646,16 @@ def postclonecfg_ria(ds, props):
                 lgr.debug("Failed to get config file from source: %s",
                           exc_str(e))
         else:
-            lgr.debug("Unknown URL-Scheme in %s. Can currently handle SSH or "
+            lgr.debug("Unknown URL-Scheme in %s. Can handle SSH, HTTP or "
                       "FILE scheme URLs.", props['source'])
 
         # 3. And read it
         org_uuid = None
         if config_content:
+            # TODO: We might be able to spare the saving to a file.
+            #       "git config -f -" is not explicitly documented but happens
+            #       to work and would read from stdin. Make sure we know this
+            #       works for required git versions and on all platforms.
             with make_tempfile(content=config_content) as cfg_file:
                 runner = WitlessRunner(env=GitRunner.get_git_environ_adjusted())
                 try:
@@ -689,7 +686,7 @@ def postclonecfg_ria(ds, props):
                 try:
                     repo.enable_remote(srs[org_uuid]['name'],
                                        options=['url={}'.format(new_url)]
-                                      )
+                                       )
                     lgr.info("Reconfigured %s for %s",
                              srs[org_uuid]['name'], new_url)
                     # update ora_remotes for considering publication dependency
