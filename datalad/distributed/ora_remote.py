@@ -21,6 +21,8 @@ from datalad.customremotes.ria_utils import (
 
 lgr = logging.getLogger('datalad.customremotes.ria_remote')
 
+DEFAULT_BUFFER_SIZE = 65536
+
 # TODO
 # - make archive check optional
 
@@ -239,7 +241,7 @@ class SSHRemoteIO(IOBase):
     REMOTE_CMD_FAIL = "ora-remote: end - fail"
     REMOTE_CMD_OK = "ora-remote: end - ok"
 
-    def __init__(self, host, buffer_size):
+    def __init__(self, host, buffer_size=DEFAULT_BUFFER_SIZE):
         """
         Parameters
         ----------
@@ -270,7 +272,8 @@ class SSHRemoteIO(IOBase):
                 break
         # TODO: Same for stderr?
 
-        self.buffer_size = buffer_size if buffer_size else 65536
+        # make sure default is used when None was passed, too.
+        self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
     def close(self):
         # try exiting shell clean first
@@ -530,14 +533,15 @@ class HTTPRemoteIO(object):
     # NOTE: For now read-only. Not sure yet whether an IO class is the right
     # approach.
 
-    def __init__(self, ria_url, dsid, buffer_size):
+    def __init__(self, ria_url, dsid, buffer_size=DEFAULT_BUFFER_SIZE):
         assert ria_url.startswith("ria+http")
         self.base_url = ria_url[4:]
         if self.base_url[-1] == '/':
             self.base_url = self.base_url[:-1]
 
         self.base_url += "/" + dsid[:3] + '/' + dsid[3:]
-        self.buffer_size = buffer_size if buffer_size else 65536
+        # make sure default is used when None was passed, too.
+        self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
     def checkpresent(self, key_path):
         # Note, that we need the path with hash dirs, since we don't have access
