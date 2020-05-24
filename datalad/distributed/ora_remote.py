@@ -737,7 +737,7 @@ class RIARemote(SpecialRemote):
             store_base_path = _get_gitcfg(
                 gitdir, 'annex.ora-remote.{}.base-path'.format(name))
             self.store_base_path = store_base_path.strip() \
-                if store_base_path else store_base_path
+                if store_base_path else None
         # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
         # version mismatch.
         self.force_write = _get_gitcfg(

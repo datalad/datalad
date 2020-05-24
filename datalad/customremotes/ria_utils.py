@@ -99,7 +99,9 @@ def verify_ria_url(url, cfg):
                          "Supported: ssh, file, http(s)" %
                          protocol)
 
-    return url_ri.hostname if protocol != 'file' else None, url_ri.path, url
+    return url_ri.hostname if protocol != 'file' else None, \
+        url_ri.path if url_ri.path else '/', \
+        url
 
 
 def create_store(io, base_path, version):
