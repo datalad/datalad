@@ -239,7 +239,7 @@ class SSHRemoteIO(IOBase):
     REMOTE_CMD_FAIL = "ora-remote: end - fail"
     REMOTE_CMD_OK = "ora-remote: end - ok"
 
-    def __init__(self, host):
+    def __init__(self, host, buffer_size):
         """
         Parameters
         ----------
@@ -269,6 +269,8 @@ class SSHRemoteIO(IOBase):
             if line == b"RIA-REMOTE-LOGIN-END\n":
                 break
         # TODO: Same for stderr?
+
+        self.buffer_size = buffer_size if buffer_size else 65536
 
     def close(self):
         # try exiting shell clean first
@@ -407,7 +409,7 @@ class SSHRemoteIO(IOBase):
         with open(dst, 'wb') as target_file:
             bytes_received = 0
             while bytes_received < size:  # TODO: some additional abortion criteria? check stderr in addition?
-                c = self.shell.stdout.read1(1024)
+                c = self.shell.stdout.read1(self.buffer_size)
                 # no idea yet, whether or not there's sth to gain by a sophisticated determination of how many bytes to
                 # read at once (like size - bytes_received)
                 if c:
@@ -477,7 +479,7 @@ class SSHRemoteIO(IOBase):
         with open(dst, 'wb') as target_file:
             bytes_received = 0
             while bytes_received < size:
-                c = self.shell.stdout.read1(1024)
+                c = self.shell.stdout.read1(self.buffer_size)
                 if c:
                     bytes_received += len(c)
                     target_file.write(c)
@@ -528,13 +530,14 @@ class HTTPRemoteIO(object):
     # NOTE: For now read-only. Not sure yet whether an IO class is the right
     # approach.
 
-    def __init__(self, ria_url, id):
+    def __init__(self, ria_url, dsid, buffer_size):
         assert ria_url.startswith("ria+http")
         self.base_url = ria_url[4:]
         if self.base_url[-1] == '/':
             self.base_url = self.base_url[:-1]
 
-        self.base_url += "/" + id[:3] + '/' + id[3:]
+        self.base_url += "/" + dsid[:3] + '/' + dsid[3:]
+        self.buffer_size = buffer_size if buffer_size else 65536
 
     def checkpresent(self, key_path):
         # Note, that we need the path with hash dirs, since we don't have access
@@ -553,7 +556,7 @@ class HTTPRemoteIO(object):
 
         with open(filename, 'wb') as dst_file:
             bytes_received = 0
-            for chunk in response.iter_content(chunk_size=1024,
+            for chunk in response.iter_content(chunk_size=self.buffer_size,
                                                decode_unicode=False):
                 dst_file.write(chunk)
                 bytes_received += len(chunk)
@@ -742,6 +745,11 @@ class RIARemote(SpecialRemote):
 
         # whether to ignore config flags set at the remote end
         self.ignore_remote_config = _get_gitcfg(gitdir, 'annex.ora-remote.{}.ignore-remote-config'.format(name))
+
+        # buffer size for reading files over HTTP and SSH
+        self.buffer_size = _get_gitcfg(gitdir,
+                                       "annex.ora-remote.{}.buffer-size"
+                                       "".format(name))
 
     def _verify_config(self, gitdir, fail_noid=True):
         # try loading all needed info from (git) config
@@ -934,9 +942,11 @@ class RIARemote(SpecialRemote):
             if self._local_io():
                 self._io = LocalIO()
             elif self.ria_store_url.startswith("ria+http"):
-                self._io = HTTPRemoteIO(self.ria_store_url, self.archive_id)
+                self._io = HTTPRemoteIO(self.ria_store_url,
+                                        self.archive_id,
+                                        self.buffer_size)
             elif self.storage_host:
-                self._io = SSHRemoteIO(self.storage_host)
+                self._io = SSHRemoteIO(self.storage_host, self.buffer_size)
                 from atexit import register
                 register(self._io.close)
             else:
