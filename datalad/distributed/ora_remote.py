@@ -563,6 +563,9 @@ class RIARemote(SpecialRemote):
     @handle_errors
     def __init__(self, annex):
         super(RIARemote, self).__init__(annex)
+        if hasattr(self, 'configs'):
+            # introduced in annexremote 1.4.2 to support LISTCONFIGS
+            self.configs['url'] = "RIA store to use"
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
