@@ -17,6 +17,8 @@ from unittest.mock import (
     call,
     patch,
 )
+
+from datalad.utils import swallow_logs
 from ...tests.utils import (
     assert_in,
     assert_not_in,
@@ -27,6 +29,7 @@ from ...tests.utils import (
     ok_startswith,
 )
 from ..dialog import (
+    ConsoleLog,
     DialogUI,
     IPythonUI,
 )
@@ -188,3 +191,22 @@ def test_silent_question():
     with assert_raises(RuntimeError) as cme:
         ui.question("q", choices=['secret1'])
     assert_in('secret1', str(cme.exception))
+
+
+@patch("datalad.log.is_interactive", lambda: False)
+def test_message_pbar_state_logging_is_demoted():
+    from datalad.log import LoggerHelper
+
+    name = "dl-test"
+    lgr = LoggerHelper(name).get_initialized_logger()
+    ui = ConsoleLog()
+
+    with patch("datalad.ui.dialog.lgr", lgr):
+        with swallow_logs(name=name, new_level=20) as cml:
+            ui.message("testing 0")
+            assert_not_in("Clear progress bars", cml.out)
+            assert_not_in("Refresh progress bars", cml.out)
+        with swallow_logs(name=name, new_level=5) as cml:
+            ui.message("testing 1")
+            assert_in("Clear progress bars", cml.out)
+            assert_in("Refresh progress bars", cml.out)
