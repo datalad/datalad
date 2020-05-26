@@ -1,5 +1,6 @@
 from annexremote import SpecialRemote
 from annexremote import RemoteError
+from annexremote import ProtocolError
 
 from pathlib import (
     Path,
@@ -562,6 +563,9 @@ class RIARemote(SpecialRemote):
     @handle_errors
     def __init__(self, annex):
         super(RIARemote, self).__init__(annex)
+        if hasattr(self, 'configs'):
+            # introduced in annexremote 1.4.2 to support LISTCONFIGS
+            self.configs['url'] = "RIA store to use"
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
@@ -570,9 +574,6 @@ class RIARemote(SpecialRemote):
         self.store_base_path = None
         # by default we can read and write
         self.read_only = False
-        # to be figured out later, since annex.protocol.extensions is not yet
-        # accessible:
-        self.can_notify = None
         self.force_write = None
         self.uuid = None
         self.ignore_remote_config = None
@@ -759,7 +760,7 @@ class RIARemote(SpecialRemote):
 
         file_content = self.io.read_file(path).strip().split('|')
         if not (1 <= len(file_content) <= 2):
-            self._info("invalid version file {}".format(path))
+            self.message("invalid version file {}".format(path))
             return None
 
         remote_version = file_content[0]
@@ -846,23 +847,27 @@ class RIARemote(SpecialRemote):
         #return self.store_base_path.is_dir()
         return not self.storage_host
 
-    def _info(self, msg):
+    def debug(self, msg):
+        # Annex prints just the message, so prepend with
+        # a "DEBUG" on our own.
+        self.annex.debug("ORA-DEBUG: " + msg)
 
-        if self.can_notify:
+    def message(self, msg):
+        try:
             self.annex.info(msg)
-        # TODO: else: if we can't have an actual info message, at least have a
-        #       debug message.
-        #       This probably requires further refurbishment of datalad's
-        #       capability to deal with such aspects of the
-        #       special remote protocol when parsing annex' output.
+        except ProtocolError:
+            # INFO not supported by annex version.
+            # If we can't have an actual info message, at least have a
+            # debug message.
+            self.debug(msg)
 
     def _set_read_only(self, msg):
 
         if not self.force_write:
             self.read_only = True
-            self._info(msg)
+            self.message(msg)
         else:
-            self._info("Was instructed to force write")
+            self.message("Was instructed to force write")
 
     def _ensure_writeable(self):
         if self.read_only:
@@ -887,9 +892,6 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def prepare(self):
-
-        # can we use self.annex.info() for sending user output to annex?
-        self.can_notify = "INFO" in self.annex.protocol.extensions
 
         gitdir = self.annex.getgitdir()
         self.uuid = self.annex.getuuid()
