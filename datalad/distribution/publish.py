@@ -571,11 +571,6 @@ def _get_remote_diff(repo, current_commit, remote, remote_branch_name):
 class Publish(Interface):
     """Publish a dataset to a known :term:`sibling`.
 
-    ..note::
-      This command is deprecated. It will be removed from DataLad eventually,
-      but no earlier than with the 0.14 release. Use the `push` and `create-sibling` 
-      (if you used `--missing` flag) commands instead.
-
     This makes the last saved state of a dataset available to a sibling
     or special remote data store of a dataset. Any target sibling must already
     exist and be known to the dataset.
@@ -600,6 +595,12 @@ class Publish(Interface):
       to publish a dataset. Publication targets are either configured remote
       Git repositories, or git-annex special remotes (if they support data
       upload).
+
+    .. note::
+      The `push` command (new in 0.13.0) provides an alternative interface.
+      Critical differences are that `push` transfers annexed data by default
+      and does not handle sibling creation (i.e. it does not have a `--missing`
+      option).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
