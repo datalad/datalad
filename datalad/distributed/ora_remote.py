@@ -893,8 +893,12 @@ class RIARemote(SpecialRemote):
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
 
-        if not self.ria_store_url.startswith("ria+http"):
+        if not isinstance(self.io, HTTPRemoteIO):
             self.get_store()
+
+        # else:
+        # TODO: consistency with SSH and FILE behavior? In those cases we make
+        #       sure the store exists from within initremote
 
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
