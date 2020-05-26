@@ -587,6 +587,10 @@ class RIARemote(SpecialRemote):
         self.remote_obj_dir = None
         self._io = None  # lazy
 
+        # cache obj_locations:
+        self._last_archive_path = None
+        self._last_keypath = (None, None)
+
     def verify_store(self):
         """Check whether the store exists and reports a layout version we
         know
@@ -1012,21 +1016,30 @@ class RIARemote(SpecialRemote):
         return get_layout_locations(1, base_path, dsid)
 
     def _get_obj_location(self, key):
-        # Note: Changes to this method may require an update of RIARemote._layout_version
-        # Note2: archive_path is always the same ATM. However, it might depend on `key` in the future.
-        #        Therefore build the actual filename for the archive herein as opposed to `get_layout_locations`.
+        # Notes: - Changes to this method may require an update of
+        #          RIARemote._layout_version
+        #        - archive_path is always the same ATM. However, it might depend
+        #          on `key` in the future. Therefore build the actual filename
+        #          for the archive herein as opposed to `get_layout_locations`.
 
-        # If we didn't recognize the remote layout version, we set to read-only and promised to at least try and read
-        # according to our current version. So, treat that case as if remote version was our (client's) version.
-        if self.remote_object_tree_version == '1':
-            key_dir = self.annex.dirhash_lower(key)
-        else:
-            key_dir = self.annex.dirhash(key)
-        # double 'key' is not a mistake, but needed to achieve the exact same
-        # layout as the 'directory'-type special remote
-        key_path = Path(key_dir) / key / key
-        archive_path = self.remote_archive_dir / 'archive.7z'
-        return self.remote_obj_dir, archive_path, key_path
+        if not self._last_archive_path:
+            self._last_archive_path = self.remote_archive_dir / 'archive.7z'
+        if self._last_keypath[0] != key:
+            if self.remote_object_tree_version == '1':
+                key_dir = self.annex.dirhash_lower(key)
+
+            # If we didn't recognize the remote layout version, we set to
+            # read-only and promised to at least try and read according to our
+            # current version. So, treat that case as if remote version was our
+            # (client's) version.
+            else:
+                key_dir = self.annex.dirhash(key)
+            # double 'key' is not a mistake, but needed to achieve the exact
+            # same layout as the annex/objects tree
+            self._last_keypath = (key, Path(key_dir) / key / key)
+
+        return self.remote_obj_dir, self._last_archive_path, \
+            self._last_keypath[1]
 
 
 def main():
