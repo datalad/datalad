@@ -30,6 +30,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
+from .support import submit_helpme
 from ..utils import (
     assure_unicode,
     chpwd,
@@ -557,6 +558,8 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
+                title = "DataLad Cmd Error: %s" % exc.__class__.__name__
+                submit_helpme(title = title, detail = exc_str(exc))
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)
     else:

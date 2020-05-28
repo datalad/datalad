@@ -52,6 +52,7 @@ requires = {
         'PyGithub',          # nice to have
     ],
     'misc': [
+        'helpme[github]',    # support for helpme error submission
         'pyperclip',         # clipboard manipulations
         'python-dateutil',   # add support for more date formats to check_dates
     ],

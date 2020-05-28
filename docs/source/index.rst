@@ -30,6 +30,7 @@ Concepts and technologies
    metadata
    customization
    designpatterns
+   reporting
    glossary
 
 Commands and API
