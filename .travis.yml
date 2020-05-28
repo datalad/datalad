@@ -17,7 +17,7 @@ env:
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
     - NOSE_OPTS=
-    # Disabble helpme interactive interface
+    # Disable helpme interactive interface
     - DATALAD_HELPME_DISABLE=yes
     # Note, that there's "turtle" as well, which is always excluded from
     # running on Travis.
