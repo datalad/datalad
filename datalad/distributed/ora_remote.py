@@ -752,8 +752,10 @@ class RIARemote(SpecialRemote):
 
         # buffer size for reading files over HTTP and SSH
         self.buffer_size = _get_gitcfg(gitdir,
-                                       "annex.ora-remote.{}.buffer-size"
+                                       "remote.{}.ora-buffer-size"
                                        "".format(name))
+        if self.buffer_size:
+            self.buffer_size = int(self.buffer_size)
 
     def _verify_config(self, gitdir, fail_noid=True):
         # try loading all needed info from (git) config
