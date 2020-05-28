@@ -495,8 +495,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 rerun_info=None,
                 extra_inputs=None,
                 rerun_outputs=None,
-                inject=False,
-                saver=None):
+                inject=False):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -525,8 +524,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
-    saver : None
-        This is obsolete and ignored. It will be removed in a later release.
 
     Yields
     ------
@@ -535,10 +532,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not cmd:
         lgr.warning("No command given")
         return
-    if saver:
-        warnings.warn("`saver` argument is ignored "
-                      "and will be removed in a future release",
-                      DeprecationWarning)
 
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
