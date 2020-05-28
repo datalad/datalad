@@ -767,9 +767,11 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    if not to_transfer and force not in ('pushall', 'datatransfer'):
-        lgr.debug("Invoking copy --auto")
-        cmd.append('--auto')
+    if force not in ('pushall', 'datatransfer') and ds_repo.config.get(
+            'datalad.push.copy-auto-if-wanted', False):
+        if ds_repo.get_preferred_content('wanted', target):
+            lgr.debug("Invoking copy --auto")
+            cmd.append('--auto')
 
     if force not in ('pushall', 'datatransfer'):
         # if we force, we do not trust local knowledge and do the checks
