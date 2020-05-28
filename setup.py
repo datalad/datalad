@@ -52,9 +52,9 @@ requires = {
         'PyGithub',          # nice to have
     ],
     'misc': [
-        'helpme[github]',    # support for helpme error submission
-        'pyperclip',         # clipboard manipulations
-        'python-dateutil',   # add support for more date formats to check_dates
+        'helpme[github]>=0.0.41',    # support for helpme error submission
+        'pyperclip',                 # clipboard manipulations
+        'python-dateutil',           # add support for more date formats to check_dates
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests

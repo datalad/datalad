@@ -255,6 +255,7 @@ def get_repo_instance(path=curdir, class_=None):
     else:
         raise RuntimeError("No datalad repository found in %s" % abspath_)
 
+
 from appdirs import AppDirs
 from os.path import join as opj
 

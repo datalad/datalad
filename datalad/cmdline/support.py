@@ -21,14 +21,16 @@ from logging import getLogger
 
 lgr = getLogger("datalad.cmdline")
 
+# Disable helpme additional verbosity
 os.environ["MESSAGELEVEL"] = "QUIET"
 os.putenv("MESSAGELEVEL", "QUIET")
 
-repo = "datalad/datalad-helpme"
+# Set defaults for repository and title for issue
+default_repo = "datalad/datalad-helpme"
 default_title = "Test issue opened manually by helpme"
 
 
-def submit_helpme(title=None, traceback="", detail="", identifier=None):
+def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=None):
     """Submit a request to the datalad-helpme repository at
        https://github.com/datalad/datalad-helpme. If helpme isn't installed,
        we skip this step. The basic submission includes the entire grab from
@@ -39,8 +41,10 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None):
         - detail (str)    : any extra string content to include with the message.
         - traceback (str) : the full traceback
         - identifier (str): the identifier string (will use traceback if not defined)
+        - repo (str)      : GitHub repo (<username>/<repo>) to submit to.
     """
     title = title or default_title
+    repo = repo or default_repo
 
     # If no identifier defined, use traceback
     if identifier is None:
@@ -96,5 +100,6 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None):
             repo=repo, body=body, title=title, identifier=identifier
         )
 
-    except:
+    except ImportError:
+        lgr.debug("helpme is not installed to report issues: pip install helpme[github]")
         pass
