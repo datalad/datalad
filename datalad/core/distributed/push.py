@@ -125,9 +125,9 @@ class Push(Interface):
             making: use --force with git-push ('gitpush'); do not use --fast
             with git-annex copy ('datatransfer'); do not attempt to copy
             annex'ed file content ('no-datatransfer'); combine force modes
-            'gitpush' and 'datatransfer' ('all').""",
+            'gitpush' and 'datatransfer' ('pushall').""",
             constraints=EnsureChoice(
-                'all', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
+                'pushall', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -650,7 +650,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         push_res.extend(repo.push(
             remote=target,
             refspec=refspec,
-            git_options=['--force'] if force in ('all', 'gitpush') else None,
+            git_options=['--force'] if force in ('pushall', 'gitpush') else None,
         ))
     # TODO maybe compress into a single message whenever everything is
     # OK?
@@ -709,7 +709,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
             res_kwargs,
             action='copy',
             status='impossible'
-            if force in ('all', 'datatransfer')
+            if force in ('pushall', 'datatransfer')
             else 'notneeded',
             message=(
                 "Target '%s' does not appear to be an annex remote",
@@ -743,7 +743,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
         c
         for c in content.values()
         # by force
-        if ((force in ('all', 'datatransfer') or
+        if ((force in ('pushall', 'datatransfer') or
              # or by modification report
              c.get('state', None) not in ('clean', 'deleted'))
             # only consider annex'ed files
@@ -767,11 +767,11 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    if not to_transfer and force not in ('all', 'datatransfer'):
+    if not to_transfer and force not in ('pushall', 'datatransfer'):
         lgr.debug("Invoking copy --auto")
         cmd.append('--auto')
 
-    if force not in ('all', 'datatransfer'):
+    if force not in ('pushall', 'datatransfer'):
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 
