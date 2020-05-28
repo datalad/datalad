@@ -35,8 +35,12 @@ def submit_helpme(detail=None, title=None):
     """
     title = title or default_title
 
-    # If the user requests to disable, don't submit
-    if os.environ.get("DATALAD_HELPME_DISABLE") is not None:
+    # If the user requests to disable, or in testing environment don't submit
+    if (
+        os.environ.get("DATALAD_HELPME_DISABLE") is not None
+        or os.environ.get("TESTS_TO_PERFORM") is not None
+        or os.environ.get("DATALAD_TESTS_SSH") is not None
+    ):
         return
 
     # Default sections to include for a reasonably sized message
