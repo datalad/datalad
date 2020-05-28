@@ -20,6 +20,7 @@ import argparse
 from collections import defaultdict
 import sys
 import textwrap
+import traceback
 import os
 
 
@@ -559,7 +560,11 @@ def main(args=None):
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
                 title = "DataLad Cmd Error: %s" % exc.__class__.__name__
-                submit_helpme(title = title, detail = exc_str(exc))
+                submit_helpme(
+                    title = title, 
+                    traceback = traceback.format_exc(),
+                    detail = ' '.join(sys.argv)
+                )
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)
     else:

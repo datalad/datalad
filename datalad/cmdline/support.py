@@ -13,8 +13,9 @@ __docformat__ = "restructuredtext"
 
 from datalad.utils import swallow_outputs
 from datalad.api import wtf
-import sys
+
 import os
+import sys
 
 from logging import getLogger
 
@@ -27,13 +28,23 @@ repo = "datalad/datalad-helpme"
 default_title = "Test issue opened manually by helpme"
 
 
-def submit_helpme(detail=None, title=None):
+def submit_helpme(title=None, traceback="", detail="", identifier=None):
     """Submit a request to the datalad-helpme repository at
        https://github.com/datalad/datalad-helpme. If helpme isn't installed,
        we skip this step. The basic submission includes the entire grab from
        wtf (capturing system and library information) and an optional message.
+
+       Arguments:
+        - title (str)     : the title for the GitHub issue
+        - detail (str)    : any extra string content to include with the message.
+        - traceback (str) : the full traceback
+        - identifier (str): the identifier string (will use traceback if not defined)
     """
     title = title or default_title
+
+    # If no identifier defined, use traceback
+    if identifier is None:
+        identifier = traceback
 
     # If the user requests to disable, or in testing environment don't submit
     if os.environ.get("DATALAD_HELPME_DISABLE") is not None:
@@ -69,17 +80,21 @@ def submit_helpme(detail=None, title=None):
 
 ----------------------------------------------------------------
 ### Metadata
-**Error Message :name_badge:**
+**Command :star:**
+```bash
 %s
-
+```
+**Error Message :name_badge:**
+```python
+%s
+```
 **WTF Output** :open_file_folder:
-%s""" % (
-                detail or "",
-                cmo.out,
-            )
+%s""" % (detail, traceback, cmo.out)
 
         # Submit the issue
-        issue = helper.run_headless(repo=repo, body=body, title=title)
+        issue = helper.run_headless(
+            repo=repo, body=body, title=title, identifier=identifier
+        )
 
     except:
         pass
