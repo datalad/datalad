@@ -51,6 +51,8 @@ jobs:
       run: |
         datalad wtf
     - name: ${{ matrix.extension }} tests
+      env:
+        DATALAD_HELPME_DISABLE: yes
       run: |
         mkdir -p __testhome__
         cd __testhome__

@@ -44,6 +44,7 @@ jobs:
       env:
         # forces all test repos/paths into the VFAT FS
         TMPDIR: /crippledfs
+        DATALAD_HELPME_DISABLE: yes
       run: |
         mkdir -p __testhome__
         cd __testhome__

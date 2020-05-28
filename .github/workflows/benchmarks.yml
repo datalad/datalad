@@ -33,5 +33,6 @@ jobs:
       env:
         # fake environment to be able to reuse script for travis
         TRAVIS_PULL_REQUEST: true
+        DATALAD_HELPME_DISABLE: yes
       run: |
         tools/ci/benchmark-travis-pr.sh
