@@ -21,10 +21,6 @@ from logging import getLogger
 
 lgr = getLogger("datalad.cmdline")
 
-# Disable helpme additional verbosity
-os.environ["MESSAGELEVEL"] = "QUIET"
-os.putenv("MESSAGELEVEL", "QUIET")
-
 # Set defaults for repository and title for issue
 default_repo = "datalad/datalad-helpme"
 default_title = "Test issue opened manually by helpme"
@@ -36,12 +32,18 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=Non
        we skip this step. The basic submission includes the entire grab from
        wtf (capturing system and library information) and an optional message.
 
-       Arguments:
-        - title (str)     : the title for the GitHub issue
-        - detail (str)    : any extra string content to include with the message.
-        - traceback (str) : the full traceback
-        - identifier (str): the identifier string (will use traceback if not defined)
-        - repo (str)      : GitHub repo (<username>/<repo>) to submit to.
+       Parameters
+       ----------
+       title : str
+         the title for the GitHub issue
+       detail : str
+         any extra string content to include with the message.
+       traceback : str
+         the full traceback
+       identifier : str 
+         the identifier string (will use traceback if not defined)
+       repo : str
+         GitHub repo (<username>/<repo>) to submit to.
     """
     title = title or default_title
     repo = repo or default_repo
@@ -67,6 +69,10 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=Non
         "dependencies",
         "dataset",
     ]
+
+    # Disable helpme additional verbosity
+    os.environ["HELPME_MESSAGELEVEL"] = "QUIET"
+    os.putenv("HELPME_MESSAGELEVEL", "QUIET")
 
     try:
         from helpme.main import get_helper
