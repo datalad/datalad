@@ -42,6 +42,7 @@ from datalad.utils import (
     auto_repr,
     better_wraps,
     CMD_MAX_ARG,
+    Path,
     create_tree,
     disable_logger,
     dlabspath,
@@ -59,6 +60,7 @@ from datalad.utils import (
     import_module_from_file,
     import_modules,
     is_explicit_path,
+    join_cmdline,
     knows_annex,
     line_profile,
     make_tempfile,
@@ -68,12 +70,12 @@ from datalad.utils import (
     not_supported_on_windows,
     on_windows,
     partition,
-    Path,
     path_is_subpath,
     path_startswith,
     rotree,
     safe_print,
     setup_exceptionhook,
+    split_cmdline,
     swallow_logs,
     swallow_outputs,
     unique,
@@ -1313,3 +1315,16 @@ def test_is_interactive(fout):
     for o in ('stderr', 'stdin', 'stdout'):
         eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
 
+
+def test_splitjoin_cmdline():
+    # Do full round trip on a number of tricky samples
+    for args in (
+        ['cmd', '-o1', 'simple'],
+        ['c o', r'\m', ''],
+        ['c o', ' '],
+    ):
+        cmdline = join_cmdline(args)
+        assert isinstance(cmdline, str)
+        eq_(split_cmdline(cmdline), args)
+    # assure that there is no needless quoting
+    eq_(join_cmdline(['abc', 'def']), 'abc def')
