@@ -37,6 +37,7 @@ from ..utils import (
     chpwd,
     get_suggestions_msg,
     on_msys_tainted_paths,
+    quote_cmdlinearg,
     setup_exceptionhook,
 )
 from ..dochelpers import exc_str
@@ -563,7 +564,7 @@ def main(args=None):
                 submit_helpme(
                     title = title, 
                     traceback = traceback.format_exc(),
-                    detail = ' '.join(sys.argv)
+                    detail = " ".join(map(quote_cmdlinearg, sys.argv))
                 )
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)
