@@ -562,9 +562,9 @@ def main(args=None):
             except Exception as exc:
                 title = "DataLad Cmd Error: %s" % exc.__class__.__name__
                 submit_helpme(
-                    title = title, 
-                    traceback = traceback.format_exc(),
-                    detail = " ".join(map(quote_cmdlinearg, sys.argv))
+                    title=title,
+                    traceback=traceback.format_exc(),
+                    detail=" ".join(map(quote_cmdlinearg, sys.argv))
                 )
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)
@@ -582,5 +582,6 @@ def main(args=None):
     except Exception as exc:
         lgr.error("Failed to render results due to %s", exc_str(exc))
         sys.exit(1)
+
 
 lgr.log(5, "Done importing cmdline.main")
