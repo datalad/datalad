@@ -31,7 +31,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
-from .support import submit_helpme
+from .support import submit_helpme, generate_datalad_identifier
 from ..utils import (
     assure_unicode,
     chpwd,
@@ -502,6 +502,9 @@ def main(args=None):
     # enable overrides
     datalad.cfg.reload(force=True)
 
+    import IPython
+    IPython.embed()
+
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
         for path in cmdlineargs.change_path:
@@ -560,10 +563,14 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
+                identifier = generate_datalad_identifier(
+                    stack = traceback.extract_stack(), exc=exc,
+                )
                 submit_helpme(
-                    title="[helpme] %s" % str(exc),
-                    traceback=traceback.format_exc(),
-                    detail=" ".join(map(quote_cmdlinearg, sys.argv))
+                    title = str(exc),
+                    tb = traceback.format_exc(),
+                    identifier = identifier,
+                    detail = " ".join(map(quote_cmdlinearg, sys.argv)),
                 )
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)

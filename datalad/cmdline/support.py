@@ -14,8 +14,11 @@ __docformat__ = "restructuredtext"
 from datalad.utils import swallow_outputs
 from datalad.api import wtf
 
+import hashlib
 import os
+import re
 import sys
+import traceback
 
 from logging import getLogger
 
@@ -26,7 +29,61 @@ default_repo = "datalad/datalad-helpme"
 default_title = "Test issue opened manually by helpme"
 
 
-def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=None):
+def generate_identifier_hash(itemlist):
+    """generate a unique identifier (hash) from a list of strings
+
+       Parameters
+       ----------
+       itemlist: list (str)
+         list of strings to add to the hash
+    """
+    if not isinstance(itemlist, list):
+        itemlist = [itemlist]
+
+    hash_object = hashlib.md5()
+    for item in itemlist:
+        hash_object.update(item.encode("utf-8"))
+    return hash_object.hexdigest()
+
+
+def generate_datalad_identifier(stack, exc):
+    """the generation of the identifier for datalad is custom, meaning that
+       we take our own subset of metadata and generate a custom identifier 
+       (and helpme uses it verbatim). This means that we use:
+       - exception class name
+       - md5 of functions list up until datalad
+       - md5 of functions for datalad
+
+       Parameters
+       ----------
+       stack : list of str
+         list of functions to extract from traceback
+       exc: str
+         the exception to derive the name from
+    """
+    # Regular expression to remove install directories
+    install_dir = "(%s)" % "|".join(sys.path)
+
+    # Derive a list with datalad, and a list without
+    datald = []
+    others = []
+    for (filename, line, procname, text) in stack:
+        if re.search(install_dir, filename):
+            filename = re.sub(install_dir, "", filename).strip("/")
+            if "datalad" in filename:
+                datald.append(filename)
+            else:
+                others.append(filename)
+
+    # Generate md5 of each, plus exception name
+    return "%s-others-%s-datald-%s" % (
+        type(exc).__name__,
+        generate_identifier_hash(others),
+        generate_identifier_hash(datald),
+    )
+
+
+def submit_helpme(title=None, tb="", detail="", identifier=None, repo=None):
     """Submit a request to the datalad-helpme repository at
        https://github.com/datalad/datalad-helpme. If helpme isn't installed,
        we skip this step. The basic submission includes the entire grab from
@@ -38,7 +95,7 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=Non
          the title for the GitHub issue
        detail : str
          any extra string content to include with the message.
-       traceback : str
+       tb : str
          the full traceback
        identifier : str 
          the identifier string (will use traceback if not defined)
@@ -48,9 +105,11 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=Non
     title = title or default_title
     repo = repo or default_repo
 
-    # If no identifier defined, use traceback
+    # Not providing a custom identifier means helpme generates it
+    generate_md5 = False
     if identifier is None:
-        identifier = traceback
+        identifier = tb
+        generate_md5 = True
 
     # If the user requests to disable, or in testing environment don't submit
     if os.environ.get("DATALAD_HELPME_DISABLE") is not None:
@@ -99,13 +158,23 @@ def submit_helpme(title=None, traceback="", detail="", identifier=None, repo=Non
 %s
 ```
 **WTF Output** :open_file_folder:
-%s""" % (detail, traceback, cmo.out)
+%s""" % (
+                detail,
+                tb,
+                cmo.out,
+            )
 
         # Submit the issue
         issue = helper.run_headless(
-            repo=repo, body=body, title=title, identifier=identifier
+            repo=repo,
+            body=body,
+            title=title,
+            identifier=identifier,
+            generate_md5=generate_md5,
         )
 
     except ImportError:
-        lgr.debug("helpme is not installed to report issues: pip install helpme[github]")
+        lgr.debug(
+            "helpme is not installed to report issues: pip install helpme[github]"
+        )
         pass
