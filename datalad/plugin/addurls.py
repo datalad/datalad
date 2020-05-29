@@ -684,7 +684,7 @@ class Addurls(Interface):
             to which the URL's content will be downloaded. The name should be a
             relative path and will be taken as relative to the top-level
             dataset, regardless of whether it is specified via [PY: `dataset`
-            PY][CMD: --dataset CMD]) or inferred. The file name may contain
+            PY][CMD: --dataset CMD] or inferred. The file name may contain
             directories. The separator "//" can be used to indicate that the
             left-side directory should be created as a new subdataset. See the
             'Format Specification' section above."""),
@@ -865,10 +865,9 @@ class Addurls(Interface):
             if row["subpath"]:
                 ds_current = Dataset(os.path.join(ds.path,
                                                   row["subpath"]))
-                ds_filename = os.path.relpath(filename_abs, ds_current.path)
             else:
                 ds_current = ds
-                ds_filename = row["filename"]
+            ds_filename = os.path.relpath(filename_abs, ds_current.path)
             row.update({"filename_abs": filename_abs,
                         "ds": ds_current,
                         "ds_filename": ds_filename})

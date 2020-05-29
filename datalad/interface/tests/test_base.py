@@ -12,7 +12,11 @@
 
 import unittest.mock as mock
 from datalad.tests.utils import *
-from datalad.utils import updated
+from datalad.utils import (
+    swallow_outputs,
+    updated,
+)
+
 from ..base import (
     Interface,
     nadict,
@@ -150,3 +154,29 @@ def test_nadict():
     d = nadict({1: 2})
     eq_(d[1], 2)
     eq_(str(d[2]), NA_STRING)
+
+
+@with_tempfile(mkdir=True)
+def test_status_custom_summary_no_repeats(path):
+    from datalad.api import Dataset
+    from datalad.cmd import Runner
+    from datalad.core.local.status import Status
+
+    # This regression test depends on the command having a custom summary
+    # renderer *and* the particular call producing summary output. status()
+    # having this method doesn't guarantee that it is still an appropriate
+    # command for this test, but it's at least a necessary condition.
+    ok_(hasattr(Status, "custom_result_summary_renderer"))
+
+    # Note: This test was added on a branch without a60bf7274a (BF: Don't be
+    # silent in default renderer when everything is clean, 2020-01-30), but
+    # once merged into a branch with that commit, the block below and --annex
+    # could be dropped.
+    ds = Dataset(path).create()
+    (ds.pathobj / "foo").write_text("foo content")
+    ds.save()
+
+    out, _ = Runner(cwd=path).run(
+        ["datalad", "--output-format=tailored", "status", "--annex"])
+    out_lines = out.splitlines()
+    eq_(len(out_lines), len(set(out_lines)))
