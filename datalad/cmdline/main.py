@@ -502,9 +502,6 @@ def main(args=None):
     # enable overrides
     datalad.cfg.reload(force=True)
 
-    import IPython
-    IPython.embed()
-
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
         for path in cmdlineargs.change_path:
