@@ -64,9 +64,9 @@ lgr = logging.getLogger('datalad.core.distributed.push')
 class Push(Interface):
     """Push a dataset to a known :term:`sibling`.
 
-    This makes the last saved state of a dataset available to a sibling
-    or special remote data store of a dataset. Any target sibling must already
-    exist and be known to the dataset.
+    This makes a saved state of a dataset available to a sibling or special
+    remote data store of a dataset. Any target sibling must already exist and
+    be known to the dataset.
 
     Optionally, it is possible to limit a push to change sets relative
     to a particular point in the version history of a dataset (e.g. a release
