@@ -78,6 +78,13 @@ class Push(Interface):
     recorded that is reflected in the current state of the top-level reference
     dataset.
 
+    Which files are copied can be further tailored via the
+    'datalad.push.copy-auto-if-wanted' configuration. If set, push will test
+    whether a git-annex "wanted" configuration is present for the target
+    location, and in this case instruct git-annex to obey this configuration
+    when deciding which files to consider for transfer (i.e. use the --auto
+    flag with git-annex copy).
+
     .. note::
       Power-user info: This command uses :command:`git push`, and :command:`git
       annex copy` to push a dataset. Publication targets are either configured
