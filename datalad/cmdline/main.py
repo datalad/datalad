@@ -560,9 +560,8 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
-                title = "DataLad Cmd Error: %s" % exc.__class__.__name__
                 submit_helpme(
-                    title=title,
+                    title="[helpme] %s" % str(exc),
                     traceback=traceback.format_exc(),
                     detail=" ".join(map(quote_cmdlinearg, sys.argv))
                 )
