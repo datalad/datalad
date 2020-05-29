@@ -68,25 +68,21 @@ class Push(Interface):
     remote data store of a dataset. Any target sibling must already exist and
     be known to the dataset.
 
-    Optionally, it is possible to limit a push to change sets relative
-    to a particular point in the version history of a dataset (e.g. a release
-    tag). By default, the state of the local dataset is evaluated against the
-    last known state of the target sibling. An actual push is only attempted
-    if there was a change compared to the reference state, in order to speed up
-    processing of large collections of datasets. Evaluation with respect to
-    a particular "historic" state is only supported in conjunction with a
-    specified reference dataset. Change sets are also evaluated recursively, i.e.
-    only those subdatasets are pushed where a change was recorded that is
-    reflected in the current state of the top-level reference dataset.
-    See "since" option for more information.
-
-    Only a push of saved changes is supported.
+    By default, all files tracked in the last saved state (of the current
+    branch) will be copied to the target location. Optionally, it is possible
+    to limit a push to changes relative to a particular point in the version
+    history of a dataset (e.g. a release tag) using the
+    [CMD: --since CMD][PY: since PY] option in conjunction with the
+    specification of a reference dataset. Changes can also be evaluated
+    recursively, i.e. only those subdatasets are pushed where a change was
+    recorded that is reflected in the current state of the top-level reference
+    dataset.
 
     .. note::
-      Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
-      to push a dataset. Publication targets are either configured remote
-      Git repositories, or git-annex special remotes (if they support data
-      upload).
+      Power-user info: This command uses :command:`git push`, and :command:`git
+      annex copy` to push a dataset. Publication targets are either configured
+      remote Git repositories, or git-annex special remotes (if they support
+      data upload).
     """
 
     # TODO add examples
