@@ -1,3 +1,9 @@
+datalad (0.12.7-1) unstable; urgency=medium
+
+  * New upstream bugfix release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 29 May 2020 13:26:38 -0400
+
 datalad (0.12.6-2) unstable; urgency=medium
 
   * Remove python3-boto from Build-Depends: we cannot test much of interactions
