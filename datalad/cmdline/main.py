@@ -560,15 +560,18 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
-                identifier = generate_datalad_identifier(
-                    stack = traceback.extract_stack(), exc=exc,
-                )
-                submit_helpme(
-                    title = str(exc),
-                    tb = traceback.format_exc(),
-                    identifier = identifier,
-                    detail = " ".join(map(quote_cmdlinearg, sys.argv)),
-                )
+
+                # If the user requests to disable, or in testing environment don't submit
+                if os.environ.get("DATALAD_HELPME_DISABLE") is None:
+                    identifier = generate_datalad_identifier(
+                        stack = traceback.extract_stack(), exc=exc,
+                    )
+                    submit_helpme(
+                        title = str(exc),
+                        tb = traceback.format_exc(),
+                        identifier = identifier,
+                        detail = " ".join(map(quote_cmdlinearg, sys.argv)),
+                    )
                 lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
                 sys.exit(1)
     else:

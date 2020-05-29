@@ -111,10 +111,6 @@ def submit_helpme(title=None, tb="", detail="", identifier=None, repo=None):
         identifier = tb
         generate_md5 = True
 
-    # If the user requests to disable, or in testing environment don't submit
-    if os.environ.get("DATALAD_HELPME_DISABLE") is not None:
-        return
-
     # Default sections to include for a reasonably sized message
     sections = [
         "datalad",
