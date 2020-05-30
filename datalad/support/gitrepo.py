@@ -1213,9 +1213,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Note
         ----
-        Please try using GitRepo.dot_git instead! That one's not static, but it's cheaper and you should avoid
-        not having an instance of a repo you're working on anyway. Note, that the property in opposition to this method
-        returns an absolute path.
+        This method is likely to get deprecated, please use GitRepo.dot_git instead!
+        That one's not static, but it's cheaper and you should avoid
+        not having an instance of a repo you're working on anyway.
+        Note, that the property in opposition to this method returns an absolute path.
 
 
         Parameters
@@ -1228,24 +1229,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         str
           relative path to the repo's git dir; So, default would be ".git"
         """
-        if hasattr(repo, 'path'):
-            # repo instance like given
-            repo = repo.path
-        dot_git = op.join(repo, ".git")
-        if not op.exists(dot_git):
-            raise RuntimeError("Missing .git in %s." % repo)
-        elif op.islink(dot_git):
-            git_dir = os.readlink(dot_git)
-        elif op.isdir(dot_git):
-            git_dir = ".git"
-        elif op.isfile(dot_git):
-            with open(dot_git) as f:
-                git_dir = f.readline()
-                if git_dir.startswith("gitdir:"):
-                    git_dir = git_dir[7:]
-                git_dir = git_dir.strip()
-
-        return git_dir
+        if isinstance(repo, GitRepo):
+            return str(repo.dot_git)
+        return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, relative=True))
 
     @property
     def config(self):
