@@ -888,22 +888,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # are stored for performance. Path object creation comes with a cost. Most noteably,
         # this is used for validity checking of the repository.
         self.pathobj = ut.Path(self.path)
-        self.dot_git = self.pathobj / '.git'
-        # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
-        # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
-        #       However, it's returning relative path. So, the logic in usage needs to be unified in order to melt both
-        #       pieces.
-        if self.dot_git.is_file():
-            with self.dot_git.open() as f:
-                line = f.readline()
-                if line.startswith("gitdir: "):
-                    self.dot_git = self.pathobj / line[7:].strip()
-                else:
-                    raise InvalidGitRepositoryError("Invalid .git file")
-
-        elif self.dot_git.is_symlink():
-            self.dot_git = self.dot_git.resolve()
-
+        self.dot_git = self._get_dot_git(self.pathobj)
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
@@ -1195,6 +1180,26 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return dot_git_path.exists() and (
             not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
         )
+
+    @staticmethod
+    def _get_dot_git(pathobj):
+        """Given a pathobj to a repository return"""
+        dot_git = pathobj / '.git'
+        # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
+        # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
+        #       However, it's returning relative path. So, the logic in usage needs to be unified in order to melt both
+        #       pieces.
+        if dot_git.is_file():
+            with dot_git.open() as f:
+                line = f.readline()
+                if line.startswith("gitdir: "):
+                    dot_git = pathobj / line[7:].strip()
+                else:
+                    raise InvalidGitRepositoryError("Invalid .git file")
+
+        elif dot_git.is_symlink():
+            dot_git = dot_git.resolve()
+        return dot_git
 
     @staticmethod
     def get_git_dir(repo):
