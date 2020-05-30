@@ -1182,7 +1182,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         )
 
     @staticmethod
-    def _get_dot_git(pathobj, ok_missing=False):
+    def _get_dot_git(pathobj, ok_missing=False, relative=False):
         """Given a pathobj to a repository return"""
         dot_git = pathobj / '.git'
         # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
@@ -1201,6 +1201,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             dot_git = dot_git.resolve()
         elif not (ok_missing or dot_git.exists()):
             raise RuntimeError("Missing .git in %s." % pathobj)
+        if relative:  #  primarily compat kludge for get_git_dir, remove when it is deprecated
+            dot_git = dot_git.relative_to(pathobj)
         return dot_git
 
     @staticmethod
