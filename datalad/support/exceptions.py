@@ -320,8 +320,10 @@ class IncompleteResultsError(RuntimeError):
     # such results have been yielded already at the time this exception is
     # raised, little point in collecting them just for the sake of a possible
     # exception
-    # MIH: AnnexRepo is the last remaining user of this functionality, in a
-    # single context
+    # MIH+YOH: AnnexRepo.copy_to and @eval_results are the last
+    # remaining user of this functionality.
+    # General use (as in AnnexRepo) of it discouraged but use in @eval_results
+    # is warranted
     def __init__(self, results=None, failed=None, msg=None):
         super(IncompleteResultsError, self).__init__(msg)
         self.results = results
