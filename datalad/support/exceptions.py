@@ -11,7 +11,7 @@
 
 import re
 from os import linesep
-
+from pprint import pformat
 
 
 class CommandError(RuntimeError):
@@ -332,7 +332,7 @@ class IncompleteResultsError(RuntimeError):
     def __str__(self):
         super_str = super(IncompleteResultsError, self).__str__()
         return "{} {}" \
-               "".format(super_str, self.failed)
+               "".format(super_str, pformat(self.failed))
 
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""
