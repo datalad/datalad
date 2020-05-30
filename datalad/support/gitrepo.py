@@ -1204,10 +1204,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           Absolute (unless relative=True) path to resolved .git/ directory
         """
         dot_git = pathobj / '.git'
-        # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
-        # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
-        #       However, it's returning relative path. So, the logic in usage needs to be unified in order to melt both
-        #       pieces.
         if dot_git.is_file():
             with dot_git.open() as f:
                 line = f.readline()
@@ -1215,12 +1211,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     dot_git = pathobj / line[7:].strip()
                 else:
                     raise InvalidGitRepositoryError("Invalid .git file")
-
         elif dot_git.is_symlink():
             dot_git = dot_git.resolve()
         elif not (ok_missing or dot_git.exists()):
             raise RuntimeError("Missing .git in %s." % pathobj)
-        if relative:  #  primarily compat kludge for get_git_dir, remove when it is deprecated
+        # Primarily a compat kludge for get_git_dir, remove when it is deprecated
+        if relative:
             dot_git = dot_git.relative_to(pathobj)
         return dot_git
 
