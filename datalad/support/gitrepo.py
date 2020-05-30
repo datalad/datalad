@@ -1182,8 +1182,27 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         )
 
     @staticmethod
-    def _get_dot_git(pathobj, ok_missing=False, relative=False):
-        """Given a pathobj to a repository return"""
+    def _get_dot_git(pathobj, *, ok_missing=False, relative=False):
+        """Given a pathobj to a repository return path to .git/ directory
+
+        Parameters
+        ----------
+        pathjob: Path
+        ok_missing: bool, optional
+          Allow for .git to be missing (useful while sensing before repo is initialized)
+        relative: bool, optional
+          Return path relative to pathobj
+
+        Raises
+        ------
+        RuntimeError
+          When ok_missing is False and .git path does not exist
+
+        Returns
+        -------
+        Path
+          Absolute (unless relative=True) path to resolved .git/ directory
+        """
         dot_git = pathobj / '.git'
         # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
         # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
