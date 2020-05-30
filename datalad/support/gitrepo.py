@@ -888,7 +888,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # are stored for performance. Path object creation comes with a cost. Most noteably,
         # this is used for validity checking of the repository.
         self.pathobj = ut.Path(self.path)
-        self.dot_git = self._get_dot_git(self.pathobj)
+        self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
@@ -1182,7 +1182,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         )
 
     @staticmethod
-    def _get_dot_git(pathobj):
+    def _get_dot_git(pathobj, ok_missing=False):
         """Given a pathobj to a repository return"""
         dot_git = pathobj / '.git'
         # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
@@ -1199,6 +1199,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         elif dot_git.is_symlink():
             dot_git = dot_git.resolve()
+        elif not (ok_missing or dot_git.exists()):
+            raise RuntimeError("Missing .git in %s." % pathobj)
         return dot_git
 
     @staticmethod
