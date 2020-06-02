@@ -1182,15 +1182,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         )
 
     @staticmethod
-    def _get_dot_git(pathobj, *, ok_missing=False, relative=False):
+    def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
         """Given a pathobj to a repository return path to .git/ directory
 
         Parameters
         ----------
-        pathjob: Path
+        pathobj: Path
         ok_missing: bool, optional
           Allow for .git to be missing (useful while sensing before repo is initialized)
-        relative: bool, optional
+        maybe_relative: bool, optional
           Return path relative to pathobj
 
         Raises
@@ -1201,7 +1201,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         Returns
         -------
         Path
-          Absolute (unless relative=True) path to resolved .git/ directory
+          Absolute (unless maybe_relative=True) path to resolved .git/ directory
         """
         dot_git = pathobj / '.git'
         if dot_git.is_file():
@@ -1216,8 +1216,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         elif not (ok_missing or dot_git.exists()):
             raise RuntimeError("Missing .git in %s." % pathobj)
         # Primarily a compat kludge for get_git_dir, remove when it is deprecated
-        if relative:
-            dot_git = dot_git.relative_to(pathobj)
+        if maybe_relative:
+            try:
+                dot_git = dot_git.relative_to(pathobj)
+            except ValueError:
+                # is not a subpath, return as is
+                lgr.debug("Path %r is not subpath of %r", dot_git, pathobj)
         return dot_git
 
     @staticmethod
@@ -1246,7 +1250,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if isinstance(repo, GitRepo):
             return str(repo.dot_git)
-        return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, relative=True))
+        return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, maybe_relative=True))
 
     @property
     def config(self):
