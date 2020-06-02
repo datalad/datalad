@@ -69,15 +69,17 @@ class Push(Interface):
     remote data store of a dataset. Any target sibling must already exist and
     be known to the dataset.
 
+    || REFLOW >>
     By default, all files tracked in the last saved state (of the current
     branch) will be copied to the target location. Optionally, it is possible
     to limit a push to changes relative to a particular point in the version
     history of a dataset (e.g. a release tag) using the
     [CMD: --since CMD][PY: since PY] option in conjunction with the
-    specification of a reference dataset. Changes can also be evaluated
-    recursively, i.e. only those subdatasets are pushed where a change was
+    specification of a reference dataset. In recursive mode subdatasets will also be
+    evaluated, and only those subdatasets are pushed where a change was
     recorded that is reflected in the current state of the top-level reference
     dataset.
+    << REFLOW ||
 
     Which files are copied can be further tailored via the
     'datalad.push.copy-auto-if-wanted' configuration. If set, push will test
