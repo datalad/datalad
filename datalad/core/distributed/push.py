@@ -16,7 +16,6 @@ import logging
 from tempfile import TemporaryFile
 
 from datalad.cmd import GitWitlessRunner
-from datalad.config import anything2bool
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -774,8 +773,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
         cmd.extend(['--jobs', str(jobs)])
 
     if force not in ('pushall', 'datatransfer') and ds_repo.config.obtain(
-            'datalad.push.copy-auto-if-wanted', default=False,
-            valtype=anything2bool):
+            'datalad.push.copy-auto-if-wanted'):
         if ds_repo.get_preferred_content('wanted', target):
             lgr.debug("Invoking copy --auto")
             cmd.append('--auto')
