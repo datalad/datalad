@@ -31,15 +31,9 @@ A handful of new commands, including `copy-file`, `push`, and
   - now only warns about unavailable content when given explicit
     paths.  #4547
 
-- The documentation for [publish][] has been updated to mark it as
-  deprecated, pointing to [push][] as its replacement.  #4515
-
 - Fixes for progress bar glitches.  #4503 #4555
 
 ### Major refactoring and deprecations
-
-- With the introduction of [push][], [publish][] is now deprecated.
-  It will be removed in the 0.14.0 release at the earliest.
 
 - The `no_annex` parameter of [create][], which is exposed in the
   Python API but not the command line, is deprecated and will be
