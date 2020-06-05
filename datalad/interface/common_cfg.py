@@ -194,6 +194,13 @@ definitions = {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
     },
+    'datalad.tests.cache': {
+        'ui': ('question', {
+            'title': 'Cache directory for tests',
+            'text': 'Where should datalad cache test files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'tests')
+    },
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
