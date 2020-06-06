@@ -578,6 +578,11 @@ def test_gh1811(srcpath, clonepath):
 @with_tempfile()
 def test_push_wanted(srcpath, dstpath):
     src = Dataset(srcpath).create()
+
+    if src.repo.is_managed_branch():
+        # on crippled FS post-update hook enabling via create-sibling doesn't
+        # work ATM
+        raise SkipTest("no create-sibling on crippled FS")
     (src.pathobj / 'data.0').write_text('0')
     (src.pathobj / 'secure.1').write_text('1')
     (src.pathobj / 'secure.2').write_text('2')
