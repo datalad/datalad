@@ -572,3 +572,58 @@ def test_gh1811(srcpath, clonepath):
         message='There is no active branch, cannot determine remote '
                 'branch',
     )
+
+
+@with_tempfile()
+@with_tempfile()
+def test_push_wanted(srcpath, dstpath):
+    src = Dataset(srcpath).create()
+    (src.pathobj / 'data.0').write_text('0')
+    (src.pathobj / 'secure.1').write_text('1')
+    (src.pathobj / 'secure.2').write_text('2')
+    src.save()
+
+    # Dropping a file to mimic a case of simply not having it locally (thus not
+    # to be "pushed")
+    src.drop('secure.2', check=False)
+
+    # Annotate sensitive content, actual value "verysecure" does not matter in
+    # this example
+    src.repo.set_metadata(
+        add={'distribution-restrictions': 'verysecure'},
+        files=['secure.1', 'secure.2'])
+
+    src.create_sibling(
+        dstpath,
+        annex_wanted="not metadata=distribution-restrictions=*",
+        name='target',
+    )
+    # check that wanted is obeyed, if instructed by configuration
+    src.config.set('datalad.push.copy-auto-if-wanted', 'true', where='local')
+    res = src.push(to='target')
+    assert_in_results(
+        res, action='copy', path=str(src.pathobj / 'data.0'), status='ok')
+    for p in ('secure.1', 'secure.2'):
+        assert_not_in_results(res, path=str(src.pathobj / p))
+    assert_status('notneeded', src.push(to='target'))
+
+    # check that dataset-config cannot overrule this
+    src.config.set('datalad.push.copy-auto-if-wanted', 'false', where='dataset')
+    res = src.push(to='target')
+    assert_status('notneeded', res)
+
+    # check the target to really make sure
+    dst = Dataset(dstpath)
+    # normal file, yes
+    eq_((dst.pathobj / 'data.0').read_text(), '0')
+    # secure file, no
+    if dst.repo.is_managed_branch():
+        neq_((dst.pathobj / 'secure.1').read_text(), '1')
+    else:
+        assert_raises(FileNotFoundError, (dst.pathobj / 'secure.1').read_text)
+
+    # remove local config, must enable push of secure file
+    src.config.unset('datalad.push.copy-auto-if-wanted', where='local')
+    res = src.push(to='target')
+    assert_in_results(res, path=str(src.pathobj / 'secure.1'))
+    eq_((dst.pathobj / 'secure.1').read_text(), '1')

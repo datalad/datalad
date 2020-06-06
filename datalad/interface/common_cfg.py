@@ -112,6 +112,13 @@ definitions = {
             'text': 'Description for a Personal access token to generate.'}),
         'default': 'DataLad',
     },
+    'datalad.push.copy-auto-if-wanted': {
+        'ui': ('question', {
+            'title': "Use `git-annex copy --auto` with preferred content configured",
+            'text': 'If this flag is set, DataLad looks for preferred content configuration for a push target and instructs git-annex to use auto-mode for copying, if such configuration is detected.'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),

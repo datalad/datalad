@@ -64,29 +64,34 @@ lgr = logging.getLogger('datalad.core.distributed.push')
 class Push(Interface):
     """Push a dataset to a known :term:`sibling`.
 
-    This makes the last saved state of a dataset available to a sibling
-    or special remote data store of a dataset. Any target sibling must already
-    exist and be known to the dataset.
+    This makes a saved state of a dataset available to a sibling or special
+    remote data store of a dataset. Any target sibling must already exist and
+    be known to the dataset.
 
-    Optionally, it is possible to limit a push to change sets relative
-    to a particular point in the version history of a dataset (e.g. a release
-    tag). By default, the state of the local dataset is evaluated against the
-    last known state of the target sibling. An actual push is only attempted
-    if there was a change compared to the reference state, in order to speed up
-    processing of large collections of datasets. Evaluation with respect to
-    a particular "historic" state is only supported in conjunction with a
-    specified reference dataset. Change sets are also evaluated recursively, i.e.
-    only those subdatasets are pushed where a change was recorded that is
-    reflected in the current state of the top-level reference dataset.
-    See "since" option for more information.
+    || REFLOW >>
+    By default, all files tracked in the last saved state (of the current
+    branch) will be copied to the target location. Optionally, it is possible
+    to limit a push to changes relative to a particular point in the version
+    history of a dataset (e.g. a release tag) using the
+    [CMD: --since CMD][PY: since PY] option in conjunction with the
+    specification of a reference dataset. In recursive mode subdatasets will also be
+    evaluated, and only those subdatasets are pushed where a change was
+    recorded that is reflected in the current state of the top-level reference
+    dataset.
+    << REFLOW ||
 
-    Only a push of saved changes is supported.
+    Which files are copied can be further tailored via the
+    'datalad.push.copy-auto-if-wanted' configuration. If set, push will test
+    whether a git-annex "wanted" configuration is present for the target
+    location, and in this case instruct git-annex to obey this configuration
+    when deciding which files to consider for transfer (i.e. use the --auto
+    flag with git-annex copy).
 
     .. note::
-      Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
-      to push a dataset. Publication targets are either configured remote
-      Git repositories, or git-annex special remotes (if they support data
-      upload).
+      Power-user info: This command uses :command:`git push`, and :command:`git
+      annex copy` to push a dataset. Publication targets are either configured
+      remote Git repositories, or git-annex special remotes (if they support
+      data upload).
     """
 
     # TODO add examples
@@ -125,9 +130,9 @@ class Push(Interface):
             making: use --force with git-push ('gitpush'); do not use --fast
             with git-annex copy ('datatransfer'); do not attempt to copy
             annex'ed file content ('no-datatransfer'); combine force modes
-            'gitpush' and 'datatransfer' ('all').""",
+            'gitpush' and 'datatransfer' ('pushall').""",
             constraints=EnsureChoice(
-                'all', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
+                'pushall', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -650,7 +655,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         push_res.extend(repo.push(
             remote=target,
             refspec=refspec,
-            git_options=['--force'] if force in ('all', 'gitpush') else None,
+            git_options=['--force'] if force in ('pushall', 'gitpush') else None,
         ))
     # TODO maybe compress into a single message whenever everything is
     # OK?
@@ -709,7 +714,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
             res_kwargs,
             action='copy',
             status='impossible'
-            if force in ('all', 'datatransfer')
+            if force in ('pushall', 'datatransfer')
             else 'notneeded',
             message=(
                 "Target '%s' does not appear to be an annex remote",
@@ -743,7 +748,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
         c
         for c in content.values()
         # by force
-        if ((force in ('all', 'datatransfer') or
+        if ((force in ('pushall', 'datatransfer') or
              # or by modification report
              c.get('state', None) not in ('clean', 'deleted'))
             # only consider annex'ed files
@@ -767,11 +772,13 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    if not to_transfer and force not in ('all', 'datatransfer'):
-        lgr.debug("Invoking copy --auto")
-        cmd.append('--auto')
+    if force not in ('pushall', 'datatransfer') and ds_repo.config.obtain(
+            'datalad.push.copy-auto-if-wanted'):
+        if ds_repo.get_preferred_content('wanted', target):
+            lgr.debug("Invoking copy --auto")
+            cmd.append('--auto')
 
-    if force not in ('all', 'datatransfer'):
+    if force not in ('pushall', 'datatransfer'):
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 
