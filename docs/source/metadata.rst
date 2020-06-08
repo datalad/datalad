@@ -138,6 +138,17 @@ Having annotated files this way, we could instruct git-annex
 to :ref:`publish <man_datalad-publish>` all but those restricted files to our
 server: `git annex wanted datalad-public "not metadata=distribution-restrictions=*"`.
 
+.. warning::
+  The above setup depends on `git annex copy --auto` deciding to *not*
+  copy the content.  To avoid inadvertently publishing sensitive data,
+  make sure that public targets ("datalad-public" in the example
+  above) do not want the content for another reason, in particular due
+  to `numcopies` or required content configuration.  If ``numcopies``
+  is set to a value greater than 1 (the default) and the requested
+  number of copies cannot be verified, `git annex copy --auto` will
+  transfer the data regardless of the preferred content expression set
+  by the `git annex wanted` call above.
+
 
 Flexible directory layout
 #########################
