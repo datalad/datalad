@@ -134,10 +134,10 @@ class Push(Interface):
         force=Parameter(
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
-            doc="""force particular operations, overruling automatic decision
-            making: use --force with git-push ('gitpush'); do not use --fast
-            with git-annex copy ('checkdatapresent'); combine force modes
-            'gitpush' and 'checkdatapresent' ('all').""",
+            doc="""force particular operations, possibly overruling safety
+            protections or optimizations: use --force with git-push ('gitpush');
+            do not use --fast with git-annex copy ('checkdatapresent');
+            combine all force modes ('all').""",
             constraints=EnsureChoice(
                 'all', 'gitpush', 'checkdatapresent', None)),
         recursive=recursion_flag,
