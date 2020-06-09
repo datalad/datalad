@@ -147,8 +147,13 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_clean_git(target, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    # Note: Don't assume that the tip of the git-annex branch on the
+    # target matches the source repo's. The remote could have an extra
+    # commit if, for example, initialization was triggered due to a
+    # post-receive hook (gh-1319) or auto-initialization (for
+    # git-annex versions newer than 8.20200522).
+    ok_(target.is_ancestor(source.repo.get_hexsha("git-annex"),
+                           "git-annex"))
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `to`:
@@ -304,8 +309,8 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    ok_(target.is_ancestor(source.repo.get_hexsha("git-annex"),
+                           "git-annex"))
     eq_(list(sub1_target.get_branch_commits("master")),
         list(sub1.get_branch_commits("master")))
     eq_(list(sub1_target.get_branch_commits("git-annex")),
