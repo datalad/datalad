@@ -137,9 +137,9 @@ class Push(Interface):
             doc="""force particular operations, overruling automatic decision
             making: use --force with git-push ('gitpush'); do not use --fast
             with git-annex copy ('checkdatapresent'); combine force modes
-            'gitpush' and 'checkdatapresent' ('pushall').""",
+            'gitpush' and 'checkdatapresent' ('all').""",
             constraints=EnsureChoice(
-                'pushall', 'gitpush', 'checkdatapresent', None)),
+                'all', 'gitpush', 'checkdatapresent', None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -378,7 +378,7 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
           done_fetch=None, got_path_arg=False):
     if not done_fetch:
         done_fetch = set()
-    force_git_push = force in ('pushall', 'gitpush')
+    force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
     ds = Dataset(dspath)
@@ -726,7 +726,7 @@ def _push_data(ds, target, content, transfer_data, force, jobs, res_kwargs,
             res_kwargs,
             action='copy',
             status='impossible'
-            if force in ('pushall', 'checkdatapresent')
+            if force in ('all', 'checkdatapresent')
             else 'notneeded',
             message=(
                 "Target '%s' does not appear to be an annex remote",
@@ -760,7 +760,7 @@ def _push_data(ds, target, content, transfer_data, force, jobs, res_kwargs,
         c
         for c in content.values()
         # by force
-        if ((force in ('pushall', 'checkdatapresent') or
+        if ((force in ('all', 'checkdatapresent') or
              # or by modification report
              c.get('state', None) not in ('clean', 'deleted'))
             # only consider annex'ed files
@@ -787,14 +787,14 @@ def _push_data(ds, target, content, transfer_data, force, jobs, res_kwargs,
     # Since we got here - we already have some  transfer_data != "nothing"
     if (transfer_data == 'auto') or \
         (
-            force not in ('pushall', 'checkdatapresent') and
+            force not in ('all', 'checkdatapresent') and
             ds_repo.config.obtain('datalad.push.copy-auto-if-wanted') and
             ds_repo.get_preferred_content('wanted', target)
         ):
         lgr.debug("Invoking copy --auto")
         cmd.append('--auto')
 
-    if force not in ('pushall', 'checkdatapresent'):
+    if force not in ('all', 'checkdatapresent'):
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 
