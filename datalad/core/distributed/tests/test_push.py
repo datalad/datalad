@@ -398,7 +398,7 @@ def test_force_datatransfer(srcpath, dstpath):
     assert_repo_status(src.path, annex=True)
     whereis_prior = src.repo.whereis(files=['test_mod_annex_file'])[0]
 
-    res = src.push(to='target', force='no-datatransfer')
+    res = src.push(to='target', transfer_data='nothing')
     # nothing reported to be copied
     assert_not_in_results(res, action='copy')
     # we got the git-push nevertheless
