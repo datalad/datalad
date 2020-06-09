@@ -378,6 +378,8 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
           done_fetch=None, got_path_arg=False):
     if not done_fetch:
         done_fetch = set()
+    force_git_push = force in ('pushall', 'gitpush')
+
     # nothing recursive in here, we only need a repo to work with
     ds = Dataset(dspath)
     repo = ds.repo
@@ -559,7 +561,7 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
                 repo,
                 target,
                 refspecs2push,
-                force,
+                force_git_push,
                 res_kwargs.copy()):
             if p['status'] not in ('ok', 'notneeded'):
                 push_ok = False
@@ -652,12 +654,12 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
         ['git-annex'
          if ds.config.get('branch.git-annex.merge', None)
          else 'git-annex:git-annex'],
-        force,
+        force_git_push,
         res_kwargs.copy(),
     )
 
 
-def _push_refspecs(repo, target, refspecs, force, res_kwargs):
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
     # TODO inefficient, but push only takes a single refspec at a time
     # at the moment, enhance GitRepo.push() to do all at once
     push_res = []
@@ -665,7 +667,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         push_res.extend(repo.push(
             remote=target,
             refspec=refspec,
-            git_options=['--force'] if force in ('pushall', 'gitpush') else None,
+            git_options=['--force'] if force_git_push else None,
         ))
     # TODO maybe compress into a single message whenever everything is
     # OK?
