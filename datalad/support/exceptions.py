@@ -331,8 +331,14 @@ class IncompleteResultsError(RuntimeError):
 
     def __str__(self):
         super_str = super(IncompleteResultsError, self).__str__()
-        return "{} {}" \
-               "".format(super_str, pformat(self.failed))
+        return "{}{}{}".format(
+            super_str,
+            ". {} result(s)".format(len(self.results)) if self.results else "",
+            ". {} failed:{}{}".format(
+                len(self.failed),
+                linesep,
+                pformat(self.failed)) if self.failed else "")
+
 
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""
