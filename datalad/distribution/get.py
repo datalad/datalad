@@ -198,15 +198,15 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         alternate_suffix=False)
                 )
 
-        for name, tmpl in [(c[12:], ds_repo.config[c])
-                           for c in ds_repo.config.keys()
-                           if c.startswith(
-                               'datalad.get.subdataset-source-candidate-')]:
-            url = tmpl.format(**sm_candidate_props)
-            # we don't want "flexible_source_candidates" here, this is
-            # configuration that can be made arbitrarily precise from the
-            # outside. Additional guesswork can only make it slower
-            clone_urls.append((name, url))
+    for name, tmpl in [(c[12:], ds_repo.config[c])
+                       for c in ds_repo.config.keys()
+                       if c.startswith(
+                           'datalad.get.subdataset-source-candidate-')]:
+        url = tmpl.format(**sm_candidate_props)
+        # we don't want "flexible_source_candidates" here, this is
+        # configuration that can be made arbitrarily precise from the
+        # outside. Additional guesswork can only make it slower
+        clone_urls.append((name, url))
 
     # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
