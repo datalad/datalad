@@ -828,7 +828,10 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
 
 def _get_corresponding_remote_state(repo, to):
     since = None
-    active_branch = repo.get_active_branch()
+    # for managed branches we cannot assume a matching one at the remote end
+    # instead we target the corresponding branch
+    active_branch = repo.get_corresponding_branch() or repo.get_active_branch()
+
     if to:
         # XXX here we assume one to one mapping of names from local branches
         # to the remote
