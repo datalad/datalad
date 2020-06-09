@@ -161,7 +161,10 @@ def check_push(annex, src_path, dst_path):
     src.save(to_git=not annex, message="Modified again.")
     assert_repo_status(src_repo, annex=annex)
 
-    res = src.push(to='target', since="HEAD~2", jobs=2)
+    # we could say since='HEAD~2' to make things fast, or we are lazy
+    # and say since='^' to indicate the state of the tracking remote
+    # which is the same, because we made to commits since the last push.
+    res = src.push(to='target', since="^", jobs=2)
     assert_in_results(
         res,
         action='publish', status='ok', target='target',
