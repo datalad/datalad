@@ -87,26 +87,26 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     ds_subpath = str(ds.pathobj / 'sub')
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), [])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=sshurl)),
-        [('local', sshurl)])
+        [('90local', sshurl)])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=httpurl)),
-        [('local', httpurl)])
+        [('90local', httpurl)])
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
-        [('origin', ds_subpath)])
+        [('50origin', ds_subpath)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
-        [('origin', ds_subpath), ('origin', sshurl)])
+        [('50origin', ds_subpath), ('60origin', sshurl)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
-        [('origin', ds_subpath), ('origin', httpurl)])
+        [('50origin', ds_subpath), ('60origin', httpurl)])
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            ('origin', ds_subpath),
+            ('50origin', ds_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -115,7 +115,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
                    result_renderer='disabled')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            ('origin', ds_subpath),
+            ('50origin', ds_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -123,8 +123,17 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                ('origin', ds_subpath),
-                ('subdataset-source-candidate-bang', 'youredead'),
+                ('50origin', ds_subpath),
+                ('70:subdataset-source-candidate-bang', 'youredead'),
+        ])
+    # we can alter the priority by given the name a two-digit prefix
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__40BANG': 'youredead'}):
+        eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+            [
+                ('40bang:subdataset-source-candidate-40bang', 'youredead'),
+                ('50origin', ds_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -132,8 +141,8 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                ('origin', ds_subpath),
-                ('subdataset-source-candidate-bang', 'pre-{}-post'.format(sub.id)),
+                ('50origin', ds_subpath),
+                ('70:subdataset-source-candidate-bang', 'pre-{}-post'.format(sub.id)),
         ])
     # now again, but have an additional remote besides origin that
     # actually has the relevant commit
