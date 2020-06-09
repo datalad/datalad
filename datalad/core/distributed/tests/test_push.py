@@ -390,7 +390,7 @@ def test_push_subds_no_recursion(src_path, dst_top, dst_sub, dst_subsub):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_force_datatransfer(srcpath, dstpath):
+def test_force_checkdatapresent(srcpath, dstpath):
     src = Dataset(srcpath).create()
     target = mk_push_target(src, 'target', dstpath, annex=True, bare=True)
     (src.pathobj / 'test_mod_annex_file').write_text("Heavy stuff.")
@@ -430,7 +430,7 @@ def test_force_datatransfer(srcpath, dstpath):
                   src.push(to='target', force=None, since='HEAD~1'))
 
     # now force data transfer
-    res = src.push(to='target', force='datatransfer')
+    res = src.push(to='target', force='checkdatapresent')
     # no branch change, done before
     assert_in_results(res, action='publish', status='notneeded',
                       refspec='refs/heads/master:refs/heads/master')
@@ -444,7 +444,7 @@ def test_force_datatransfer(srcpath, dstpath):
 
     # force data transfer, but data isn't available
     src.repo.drop('test_mod_annex_file')
-    res = src.push(to='target', path='.', force='datatransfer', on_failure='ignore')
+    res = src.push(to='target', path='.', force='checkdatapresent', on_failure='ignore')
     assert_in_results(res, status='impossible',
                       path=str(src.pathobj / 'test_mod_annex_file'),
                       action='copy',
