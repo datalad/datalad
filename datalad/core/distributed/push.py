@@ -80,13 +80,6 @@ class Push(Interface):
     dataset.
     << REFLOW ||
 
-    Which files are copied can be further tailored via the
-    'datalad.push.copy-auto-if-wanted' configuration. If set, push will test
-    whether a git-annex "wanted" configuration is present for the target
-    location, and in this case instruct git-annex to obey this configuration
-    when deciding which files to consider for transfer (i.e. use the --auto
-    flag with git-annex copy).
-
     .. note::
       Power-user info: This command uses :command:`git push`, and :command:`git
       annex copy` to push a dataset. Publication targets are either configured
@@ -129,8 +122,12 @@ class Push(Interface):
             transfer of all annexed content, 'nothing' would avoid call to
             `git annex copy` altogether. 'auto' would use 'git annex copy' with
             '--auto' thus transferring only data which would satisfy "wanted"
-            or "numcopies" settings for the remote.""",
-            constraints=EnsureChoice('anything', 'nothing', 'auto')),
+            or "numcopies" settings for the remote (thus "nothing" otherwise).
+            'auto-if-wanted' would enable '--auto' mode only if there is a 
+            "wanted" setting for the remote, and transfer 'anything' otherwise.
+            Note: 'anything' and 'nothing' are "wanted" expressions understood
+            by git-annex.""",
+            constraints=EnsureChoice('anything', 'nothing', 'auto', 'auto-if-wanted')),
         force=Parameter(
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
@@ -188,7 +185,7 @@ class Push(Interface):
             dataset=None,
             to=None,
             since=None,
-            transfer_data='anything',
+            transfer_data='auto-if-wanted',
             force=None,
             recursive=False,
             recursion_limit=None,
@@ -787,8 +784,7 @@ def _push_data(ds, target, content, transfer_data, force, jobs, res_kwargs,
     # Since we got here - we already have some  transfer_data != "nothing"
     if (transfer_data == 'auto') or \
         (
-            force not in ('all', 'checkdatapresent') and
-            ds_repo.config.obtain('datalad.push.copy-auto-if-wanted') and
+            (transfer_data == 'auto-if-wanted') and
             ds_repo.get_preferred_content('wanted', target)
         ):
         lgr.debug("Invoking copy --auto")

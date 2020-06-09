@@ -603,19 +603,13 @@ def test_push_wanted(srcpath, dstpath):
         annex_wanted="not metadata=distribution-restrictions=*",
         name='target',
     )
-    # check that wanted is obeyed, if instructed by configuration
-    src.config.set('datalad.push.copy-auto-if-wanted', 'true', where='local')
+    # check that wanted is obeyed, since set in sibling configuration
     res = src.push(to='target')
     assert_in_results(
         res, action='copy', path=str(src.pathobj / 'data.0'), status='ok')
     for p in ('secure.1', 'secure.2'):
         assert_not_in_results(res, path=str(src.pathobj / p))
     assert_status('notneeded', src.push(to='target'))
-
-    # check that dataset-config cannot overrule this
-    src.config.set('datalad.push.copy-auto-if-wanted', 'false', where='dataset')
-    res = src.push(to='target')
-    assert_status('notneeded', res)
 
     # check the target to really make sure
     dst = Dataset(dstpath)
@@ -627,8 +621,8 @@ def test_push_wanted(srcpath, dstpath):
     else:
         assert_raises(FileNotFoundError, (dst.pathobj / 'secure.1').read_text)
 
-    # remove local config, must enable push of secure file
-    src.config.unset('datalad.push.copy-auto-if-wanted', where='local')
+    # reset wanted config, which must enable push of secure file
+    src.repo.set_preferred_content('wanted', '', remote='target')
     res = src.push(to='target')
     assert_in_results(res, path=str(src.pathobj / 'secure.1'))
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
