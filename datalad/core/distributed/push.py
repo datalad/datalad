@@ -569,9 +569,10 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
             # TODO final global error result for the dataset?!
             return
 
-    # git-annex data move
+    # git-annex data copy
     #
     if not is_annex_repo:
+        lgr.debug("No data transfer: %s is not a git annex repository", repo)
         return
 
     if transfer_data == "nothing":
