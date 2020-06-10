@@ -18,7 +18,7 @@ from distutils.errors import DistutilsOptionError
 from distutils.version import LooseVersion
 from genericpath import exists
 from os import linesep, makedirs
-from os.path import dirname, join as opj, sep as pathsep, splitext
+from os.path import dirname, join as opj, sep as pathsep, splitext, isabs
 from setuptools import findall, find_packages, setup
 
 from . import formatters as fmt
@@ -28,7 +28,12 @@ def _path_rel2file(*p):
     # dirname instead of joining with pardir so it works if
     # datalad_build_support/ is just symlinked into some extension
     # while developing
-    return opj(dirname(dirname(__file__)), *p)
+    if isinstance(p, str) and isabs(p):
+        # do not mess with absolute paths
+        return p
+    else:
+        # relative means relative to the datalad package
+        return opj(dirname(dirname(__file__)), *p)
 
 
 def get_version(name):
@@ -55,17 +60,25 @@ class BuildManPage(Command):
     description = 'Generate man page from an ArgumentParser instance.'
 
     user_options = [
-        ('manpath=', None, 'output path for manpages'),
-        ('rstpath=', None, 'output path for RST files'),
+        ('manpath=', None,
+         'output path for manpages (relative paths are relative to the '
+         'datalad package)'),
+        ('rstpath=', None,
+         'output path for RST files (relative paths are relative to the '
+         'datalad package)'),
         ('parser=', None, 'module path to an ArgumentParser instance'
          '(e.g. mymod:func, where func is a method or function which return'
          'a dict with one or more arparse.ArgumentParser instances.'),
+        ('cmdsuite=', None, 'module path to an extension command suite '
+         '(e.g. mymod:command_suite) to limit the build to the contained '
+         'commands.'),
     ]
 
     def initialize_options(self):
         self.manpath = opj('build', 'man')
         self.rstpath = opj('docs', 'source', 'generated', 'man')
         self.parser = 'datalad.cmdline.main:setup_parser'
+        self.cmdsuite = None
 
     def finalize_options(self):
         if self.manpath is None:
@@ -84,10 +97,18 @@ class BuildManPage(Command):
                 ['datalad'],
                 formatter_class=fmt.ManPageFormatter,
                 return_subparsers=True,
-                help_ignore_extensions=True)
+                # ignore extensions only for the main package to avoid pollution
+                # with all extension commands that happen to be installed
+                help_ignore_extensions=self.distribution.get_name() == 'datalad')
 
         except ImportError as err:
             raise err
+        if self.cmdsuite:
+            mod_name, suite_name = self.cmdsuite.split(':')
+            mod = __import__(mod_name, fromlist=mod_name.split('.'))
+            suite = getattr(mod, suite_name)
+            self.cmdlist = [c[2] if len(c) > 2 else c[1].replace('_', '-')
+                            for c in suite[1]]
 
         self.announce('Writing man page(s) to %s' % self.manpath)
         self._today = datetime.date.today()
@@ -147,6 +168,8 @@ class BuildManPage(Command):
             if not os.path.exists(opath):
                 os.makedirs(opath)
             for cmdname in getattr(self, 'cmdline_names', list(self._parser)):
+                if hasattr(self, 'cmdlist') and cmdname not in self.cmdlist:
+                    continue
                 p = self._parser[cmdname]
                 cmdname = "{0}{1}".format(
                     'datalad ' if cmdname != 'datalad' else '',
