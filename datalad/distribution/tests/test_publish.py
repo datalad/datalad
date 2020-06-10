@@ -112,6 +112,37 @@ def test_smth_about_not_supported(p1, p2):
         publish(to='target1', since='HEAD^')  # must not fail now
 
 
+def assert_git_annex_branch_published(source, target):
+    """Check that tip of git-annex branch in `source` is in `target`.
+
+    Parameters
+    ----------
+    source, target : *Repo instances
+    """
+    # Note: This helper avoids assuming that the tip of the git-annex
+    # branch on the target matches the source repo's. The remote could
+    # have an extra commit if, for example, initialization was
+    # triggered due to a post-receive hook (gh-1319) or
+    # auto-initialization (for git-annex versions newer than
+    # 8.20200522).
+    source_commit = source.get_hexsha("git-annex")
+    if not target.is_ancestor(source_commit, "git-annex"):
+        raise AssertionError(
+            "Tip of source repo's git-annex branch not in target repo's\n"
+            "  source commit, location: {}, {}\n"
+            "  target commit, location: {}, {}"
+            .format(source_commit, source.path,
+                    target.get_hexsha("git-annex"), target.path))
+
+
+@with_tempfile(mkdir=True)
+def test_assert_git_annex_branch_published(path):
+    repo_a = AnnexRepo(opj(path, "a"), create=True)
+    repo_b = AnnexRepo(opj(path, "b"), create=True)
+    with assert_raises(AssertionError):
+        assert_git_annex_branch_published(repo_a, repo_b)
+
+
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:571
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -147,8 +178,7 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_clean_git(target, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    assert_git_annex_branch_published(source.repo, target)
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `to`:
@@ -167,13 +197,7 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_clean_git(dst_path, annex=None)
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    # Since git-annex 6.20170220, post-receive hook gets triggered
-    # which results in entry being added for that repo into uuid.log on remote
-    # end since then finally git-annex senses that it needs to init that remote,
-    # so it might have 1 more commit than local.
-    # see https://github.com/datalad/datalad/issues/1319
-    ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
-        set(target.get_branch_commits("git-annex"))))
+    assert_git_annex_branch_published(source.repo, target)
 
     eq_(filter_fsck_error_msg(source.repo.fsck()),
         filter_fsck_error_msg(source.repo.fsck(remote='target')))
@@ -304,16 +328,13 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    eq_(list(target.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    assert_git_annex_branch_published(source.repo, target)
     eq_(list(sub1_target.get_branch_commits("master")),
         list(sub1.get_branch_commits("master")))
-    eq_(list(sub1_target.get_branch_commits("git-annex")),
-        list(sub1.get_branch_commits("git-annex")))
+    assert_git_annex_branch_published(sub1, sub1_target)
     eq_(list(sub2_target.get_branch_commits("master")),
         list(sub2.get_branch_commits("master")))
-    eq_(list(sub2_target.get_branch_commits("git-annex")),
-        list(sub2.get_branch_commits("git-annex")))
+    assert_git_annex_branch_published(sub2, sub2_target)
 
     # we are tracking origin but origin has different git-annex, since we
     # cloned from it, so it is not aware of our git-annex
@@ -326,8 +347,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_result_count(res_, 1, status='ok', path=sub1.path)
     assert_result_count(res_, 1, status='ok', path=sub2.path)
     # and now should carry the same state for git-annex
-    eq_(list(origin.repo.get_branch_commits("git-annex")),
-        list(source.repo.get_branch_commits("git-annex")))
+    assert_git_annex_branch_published(source.repo, origin.repo)
 
     # test for publishing with  --since.  By default since no changes, nothing pushed
     res_ = publish(dataset=source, recursive=True)
@@ -449,16 +469,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
-    # TODO: last commit in git-annex branch differs. Probably fine,
-    # but figure out, when exactly to expect this for proper testing:
-    # yoh: they differ because local annex records information about now
-    # file being available in that remote, and remote one does it via a call in
-    # the hook I guess.  So they both get the same information but in two
-    # different commits.  I do not observe such behavior of remote having git-annex
-    # automagically updated in older clones
-    # which do not have post-receive hook on remote side
-    eq_(list(target.get_branch_commits("git-annex"))[1:],
-        list(source.repo.get_branch_commits("git-annex"))[1:])
+    assert_git_annex_branch_published(source.repo, target)
 
     # we need compare target/master:
     target.checkout("master")
