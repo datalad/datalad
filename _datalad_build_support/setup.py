@@ -495,12 +495,8 @@ def datalad_setup(name, **kwargs):
             kwargs[k] = v
 
     # More complex, requiring some function call
-
-    # Only recentish versions of find_packages support include
-    # packages = find_packages('.', include=['datalad*'])
-    # so we will filter manually for maximal compatibility
     if kwargs.get('packages') is None:
-        kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
+        kwargs['packages'] = find_packages('.')
     if kwargs.get('long_description') is None:
         kwargs.update(get_long_description_from_README())
     if kwargs.get('version') is None:
