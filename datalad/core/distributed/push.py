@@ -114,8 +114,8 @@ class Push(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
             changes to decide whether pushing is necessary.
-            If an empty string is given, the last state of the current branch
-            at the sibling is taken as a starting point."""),
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point."""),
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -218,18 +218,17 @@ class Push(Interface):
                     else 'No targets configured in dataset.'))
             return
 
-        if since:
-            # will blow with ValueError if unusable
-            ds_repo.get_hexsha(since)
-
-        if not since and since is not None:
-            # special case: --since=''
+        if since == '^':
             # figure out state of remote branch and set `since`
             since = _get_corresponding_remote_state(ds_repo, to)
             if not since:
                 lgr.info(
                     "No tracked remote for active branch, "
                     "detection of last pushed state not in effect.")
+        elif since:
+            # will blow with ValueError if unusable
+            ds_repo.get_hexsha(since)
+
 
         # obtain a generator for information on the datasets to process
         # idea is to turn the `paths` argument into per-dataset
@@ -829,7 +828,10 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
 
 def _get_corresponding_remote_state(repo, to):
     since = None
-    active_branch = repo.get_active_branch()
+    # for managed branches we cannot assume a matching one at the remote end
+    # instead we target the corresponding branch
+    active_branch = repo.get_corresponding_branch() or repo.get_active_branch()
+
     if to:
         # XXX here we assume one to one mapping of names from local branches
         # to the remote
