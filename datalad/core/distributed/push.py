@@ -116,8 +116,8 @@ class Push(Interface):
             data or changes for those paths are considered for a push.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
-        transfer_data=Parameter(
-            args=("--transfer-data",),
+        data=Parameter(
+            args=("--data",),
             doc="""what to do with data (annex'ed) data. 'anything' would cause
             transfer of all annexed content, 'nothing' would avoid call to
             `git annex copy` altogether. 'auto' would use 'git annex copy' with
@@ -185,7 +185,7 @@ class Push(Interface):
             dataset=None,
             to=None,
             since=None,
-            transfer_data='auto-if-wanted',
+            data='auto-if-wanted',
             force=None,
             recursive=False,
             recursion_limit=None,
@@ -254,7 +254,7 @@ class Push(Interface):
             lgr.debug('Attempt push of Dataset at %s', dspath)
             pbars = {}
             yield from _push(
-                dspath, dsrecords, to, transfer_data, force, jobs, res_kwargs.copy(), pbars,
+                dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
                 got_path_arg=True if path else False)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
@@ -371,7 +371,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         yield (cur_ds, ds_res)
 
 
-def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars,
+def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
           done_fetch=None, got_path_arg=False):
     if not done_fetch:
         done_fetch = set()
@@ -533,7 +533,7 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
             content,
             # to this particular dependency
             r,
-            transfer_data,
+            data,
             force,
             jobs,
             res_kwargs.copy(),
@@ -575,7 +575,7 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
         lgr.debug("No data transfer: %s is not a git annex repository", repo)
         return
 
-    if transfer_data == "nothing":
+    if data == "nothing":
         lgr.debug("Data transfer to '%s' disabled by argument", target)
         return
 
@@ -587,7 +587,7 @@ def _push(dspath, content, target, transfer_data, force, jobs, res_kwargs, pbars
         ds,
         target,
         content,
-        transfer_data,
+        data,
         force,
         jobs,
         res_kwargs.copy(),
@@ -706,7 +706,7 @@ def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
         )
 
 
-def _push_data(ds, target, content, transfer_data, force, jobs, res_kwargs,
+def _push_data(ds, target, content, data, force, jobs, res_kwargs,
                got_path_arg=False):
     if ds.config.getbool('remote.{}'.format(target), 'annex-ignore', False):
         lgr.debug(
@@ -782,10 +782,10 @@ def _push_data(ds, target, content, transfer_data, force, jobs, res_kwargs,
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    # Since we got here - we already have some  transfer_data != "nothing"
-    if (transfer_data == 'auto') or \
+    # Since we got here - we already have some  data != "nothing"
+    if (data == 'auto') or \
         (
-            (transfer_data == 'auto-if-wanted') and
+            (data == 'auto-if-wanted') and
             ds_repo.get_preferred_content('wanted', target)
         ):
         lgr.debug("Invoking copy --auto")
