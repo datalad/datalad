@@ -122,7 +122,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
 
       `datalad.get.subdataset-source-candidate-<name>`
 
-    where `name` is an arbitrary identifier. If name starts with two digits
+    where `name` is an arbitrary identifier. If name starts with three digits
     (e.g. '400myserver') these will be interpreted as a priority, and the
     respective candidate will be sorted into the generated candidate list
     according to this priority. If no priority is given, a default of 700

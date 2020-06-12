@@ -584,7 +584,7 @@ def postclonecfg_ria(ds, props):
     ds.config.set(
         # we use the label 'origin' for this candidate in order to not have to
         # generate a complicated name from the actual source specification.
-        # we pick a priority of 20 to sort it before datalad's default candidates
+        # we pick a priority of 200 to sort it before datalad's default candidates
         # for non-RIA URLs, because they prioritize hierarchical layouts that
         # cannot be found in a RIA store
         'datalad.get.subdataset-source-candidate-200origin',
