@@ -220,10 +220,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         alternate_suffix=False)
                 )
     prio_candidate_expr = re.compile('[0-9][0-9][0-9].*')
-    for name, tmpl in [(c[40:], ds_repo.config[c])
+    candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
+    for name, tmpl in [(c[len(candcfg_prefix):],
+                        ds_repo.config[c])
                        for c in ds_repo.config.keys()
-                       if c.startswith(
-                           'datalad.get.subdataset-source-candidate-')]:
+                       if c.startswith(candcfg_prefix)]:
         url = tmpl.format(**sm_candidate_props)
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
