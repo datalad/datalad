@@ -113,9 +113,10 @@ class Push(Interface):
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
             doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
-            changes to decide whether pushing is necessary.
-            If '^' is given, the last state of the current branch at the sibling
-            is taken as a starting point."""),
+            changes to decide whether pushing of data or recursion into subdatasets
+            (in recursive mode) is necessary.
+            If '^' is given, changes are looked up from the commit of the current
+            branch at the sibling."""),
         path=Parameter(
             args=("path",),
             metavar='PATH',
