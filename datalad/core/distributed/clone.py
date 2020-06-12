@@ -587,7 +587,7 @@ def postclonecfg_ria(ds, props):
         # we pick a priority of 20 to sort it before datalad's default candidates
         # for non-RIA URLs, because they prioritize hierarchical layouts that
         # cannot be found in a RIA store
-        'datalad.get.subdataset-source-candidate-20origin',
+        'datalad.get.subdataset-source-candidate-200origin',
         # use the entire original URL, up to the fragment + plus dataset ID
         # placeholder, this should make things work with any store setup we
         # support (paths, ports, ...)
