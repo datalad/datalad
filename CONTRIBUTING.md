@@ -548,6 +548,32 @@ Refer datalad/config.py for information on how to add these environment variable
 
 # Release(s) workflow
 
+## Branches
+
+- `master`: changes toward the next `MAJOR.MINOR.0` release (e.g., `0.13` as of time of writing).
+  It is also used for release candidates (with `rcX` suffix)
+- `maint`: bug fixes and minor enhancements for the latest released `MAJOR.MINOR.PATCH`
+ (e.g., `0.12.7` as of time of writing)
+- `MAJOR.MINOR`: generally not used, unless some bugfix release with a crticial bugfix is needed.
+
+## Workflow
+
+- upon release of `MAJOR.MINOR.0`, `maint` branch need to be fast-forwarded to that release
+- bug fixes to functionality released within the `maint` branch, should (HIGHLY RECOMMENDED) be
+  submitted against `maint ` branch
+- cherry-picking fixes from `master` into `maint` is allowed where needed
+- `master` branch accepts PRs with new functionality
+- `master` branch merges `maint` as frequently as possible/needed 
+
+## Code flow
+
+- new functionality is initially introduced outside of the `datalad.core.` namespace
+- new functionality should mature for at least a single full `MAJOR.MINOR` release until considered
+  for migration to `datalad.core.`
+  - convenience shim imports remain in-place in old locations for at least a single `MAJOR.MINOR` cycle
+  - they should be accompanied with deprecation warnings to trigger downstream code fixups
+  - our internal code should get adjusted immediately upon migration and testing should fail if was not
+
 ## Helpers
 
 [Makefile](./Makefile) provides a number of useful `make` targets:
