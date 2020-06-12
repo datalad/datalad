@@ -232,8 +232,6 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
         has_priority = prio_candidate_expr.match(name) is not None
         clone_urls.append(
             # assign a default priority, if a config doesn't have one
-            # use ':' as delimiter for priority indication, should not
-            # be found in the wild
             dict(
                 priority=int(name[:3]) if has_priority else 700,
                 name=name[3:] if has_priority else name,
