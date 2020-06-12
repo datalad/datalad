@@ -332,7 +332,6 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             # superdataset. if so, inherit the config in the new subdataset
             # clone. if not, keep things clean in order to be able to move with
             # any outside configuration change
-            # .split(':')[1] takes off the priority indicator first
             for c in ('datalad.get.subdataset-source-candidate-{}{}'.format(
                           rec['priority'], rec['name']),
                       'datalad.get.subdataset-source-candidate-{}'.format(
