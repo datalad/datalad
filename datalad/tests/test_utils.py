@@ -1327,4 +1327,8 @@ def test_splitjoin_cmdline():
         assert isinstance(cmdline, str)
         eq_(split_cmdline(cmdline), args)
     # assure that there is no needless quoting
-    eq_(join_cmdline(['abc', 'def']), 'abc def')
+    if on_windows:
+        # in quote_cmdlinearg we always quote on Windows
+        eq_(join_cmdline(['abc', 'def']), '"abc" "def"')
+    else:
+        eq_(join_cmdline(['abc', 'def']), 'abc def')
