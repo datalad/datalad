@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from tempfile import TemporaryFile
 
-from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.cmd import GitWitlessRunner
 from datalad.interface.base import (
     Interface,
@@ -30,6 +29,7 @@ from datalad.interface.utils import (
     eval_results,
 )
 from datalad.interface.results import annexjson2result
+from datalad.log import log_progress
 from datalad.support.annexrepo import (
     AnnexJsonProtocol,
     AnnexRepo,
@@ -64,29 +64,34 @@ lgr = logging.getLogger('datalad.core.distributed.push')
 class Push(Interface):
     """Push a dataset to a known :term:`sibling`.
 
-    This makes the last saved state of a dataset available to a sibling
-    or special remote data store of a dataset. Any target sibling must already
-    exist and be known to the dataset.
+    This makes a saved state of a dataset available to a sibling or special
+    remote data store of a dataset. Any target sibling must already exist and
+    be known to the dataset.
 
-    Optionally, it is possible to limit a push to change sets relative
-    to a particular point in the version history of a dataset (e.g. a release
-    tag). By default, the state of the local dataset is evaluated against the
-    last known state of the target sibling. An actual push is only attempted
-    if there was a change compared to the reference state, in order to speed up
-    processing of large collections of datasets. Evaluation with respect to
-    a particular "historic" state is only supported in conjunction with a
-    specified reference dataset. Change sets are also evaluated recursively, i.e.
-    only those subdatasets are pushed where a change was recorded that is
-    reflected in the current state of the top-level reference dataset.
-    See "since" option for more information.
+    || REFLOW >>
+    By default, all files tracked in the last saved state (of the current
+    branch) will be copied to the target location. Optionally, it is possible
+    to limit a push to changes relative to a particular point in the version
+    history of a dataset (e.g. a release tag) using the
+    [CMD: --since CMD][PY: since PY] option in conjunction with the
+    specification of a reference dataset. In recursive mode subdatasets will also be
+    evaluated, and only those subdatasets are pushed where a change was
+    recorded that is reflected in the current state of the top-level reference
+    dataset.
+    << REFLOW ||
 
-    Only a push of saved changes is supported.
+    Which files are copied can be further tailored via the
+    'datalad.push.copy-auto-if-wanted' configuration. If set, push will test
+    whether a git-annex "wanted" configuration is present for the target
+    location, and in this case instruct git-annex to obey this configuration
+    when deciding which files to consider for transfer (i.e. use the --auto
+    flag with git-annex copy).
 
     .. note::
-      Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
-      to push a dataset. Publication targets are either configured remote
-      Git repositories, or git-annex special remotes (if they support data
-      upload).
+      Power-user info: This command uses :command:`git push`, and :command:`git
+      annex copy` to push a dataset. Publication targets are either configured
+      remote Git repositories, or git-annex special remotes (if they support
+      data upload).
     """
 
     # TODO add examples
@@ -109,8 +114,8 @@ class Push(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
             changes to decide whether pushing is necessary.
-            If an empty string is given, the last state of the current branch
-            at the sibling is taken as a starting point."""),
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point."""),
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -125,9 +130,9 @@ class Push(Interface):
             making: use --force with git-push ('gitpush'); do not use --fast
             with git-annex copy ('datatransfer'); do not attempt to copy
             annex'ed file content ('no-datatransfer'); combine force modes
-            'gitpush' and 'datatransfer' ('all').""",
+            'gitpush' and 'datatransfer' ('pushall').""",
             constraints=EnsureChoice(
-                'all', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
+                'pushall', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -188,18 +193,42 @@ class Push(Interface):
             dataset, check_installed=True, purpose='pushing')
         ds_repo = ds.repo
 
-        if since:
-            # will blow with ValueError if unusable
-            ds_repo.get_hexsha(since)
+        res_kwargs = dict(
+            action='publish',
+            refds=ds.path,
+            logger=lgr,
+        )
 
-        if not since and since is not None:
-            # special case: --since=''
+        get_remote_kwargs = {'exclude_special_remotes': False} \
+            if isinstance(ds_repo, AnnexRepo) else {}
+        if to and to not in ds_repo.get_remotes(**get_remote_kwargs):
+            # get again for proper error:
+            sr = ds_repo.get_remotes(**get_remote_kwargs)
+            # yield an error result instead of raising a ValueError,
+            # to enable the use case of pushing to a target that
+            # a superdataset doesn't know, but some subdatasets to
+            # (in combination with '--on-failure ignore')
+            yield dict(
+                res_kwargs,
+                status='error',
+                message="Unknown push target '{}'. {}".format(
+                    to,
+                    'Known targets: {}.'.format(', '.join(repr(s) for s in sr))
+                    if sr
+                    else 'No targets configured in dataset.'))
+            return
+
+        if since == '^':
             # figure out state of remote branch and set `since`
             since = _get_corresponding_remote_state(ds_repo, to)
             if not since:
                 lgr.info(
                     "No tracked remote for active branch, "
                     "detection of last pushed state not in effect.")
+        elif since:
+            # will blow with ValueError if unusable
+            ds_repo.get_hexsha(since)
+
 
         # obtain a generator for information on the datasets to process
         # idea is to turn the `paths` argument into per-dataset
@@ -207,24 +236,23 @@ class Push(Interface):
         ds_spec = _datasets_since_(
             # important to pass unchanged dataset arg
             dataset,
-            # use the diff "since before time"
-            since if since else PRE_INIT_COMMIT_SHA,
+            since,
             paths,
             recursive,
             recursion_limit)
 
-        res_kwargs = dict(
-            action='publish',
-            refds=ds.path,
-            logger=lgr,
-        )
         # instead of a loop, this could all be done in parallel
         matched_anything = False
         for dspath, dsrecords in ds_spec:
             matched_anything = True
             lgr.debug('Attempt push of Dataset at %s', dspath)
+            pbars = {}
             yield from _push(
-                dspath, dsrecords, to, force, jobs, res_kwargs.copy())
+                dspath, dsrecords, to, force, jobs, res_kwargs.copy(), pbars,
+                got_path_arg=True if path else False)
+            # take down progress bars for this dataset
+            for i, ds in pbars.items():
+                log_progress(lgr.info, i, 'Finished push of %s', ds)
         if not matched_anything:
             yield dict(
                 res_kwargs,
@@ -266,8 +294,11 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             path=paths,
             # we need to know what is around locally to be able
             # to report something that should have been pushed
-            # but could not, because we don't have a copy
-            annex='availability',
+            # but could not, because we don't have a copy.
+            # however, getting this info here is needlessly
+            # expensive, we will do it at the latest possible stage
+            # in _push_data()
+            annex=None,
             recursive=recursive,
             recursion_limit=recursion_limit,
             # make it as fast as possible
@@ -324,14 +355,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
                 # act on
                 'type',
                 # essential
-                'path',
-                # maybe do a key-based copy-to?
-                'key',
-                # progress reporting?
-                'bytesize',
-                # 'impossible' result when we should have copy-to'ed, but
-                # could not, because content isn't present
-                'has_content')
+                'path')
         })
 
     # if we have something left to report, do it
@@ -341,8 +365,8 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         yield (cur_ds, ds_res)
 
 
-def _push(dspath, content, target, force, jobs, res_kwargs,
-          done_fetch=None):
+def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
+          done_fetch=None, got_path_arg=False):
     if not done_fetch:
         done_fetch = set()
     # nothing recursive in here, we only need a repo to work with
@@ -351,6 +375,17 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
 
     res_kwargs.update(type='dataset', path=dspath)
 
+    # content will be unique for every push (even on the some dataset)
+    pbar_id = 'push-{}-{}'.format(target, id(content))
+    # register for final orderly take down
+    pbars[pbar_id] = ds
+    log_progress(
+        lgr.info, pbar_id,
+        'Determine push target',
+        unit=' Steps',
+        label='Push',
+        total=4,
+    )
     if not target:
         try:
             # let Git figure out what needs doing
@@ -398,7 +433,9 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
                 "Unknown target sibling '%s'.", target))
         return
 
-    lgr.debug("Attempt to push to '%s'", target)
+    log_progress(
+        lgr.info, pbar_id, "Push refspecs",
+        label="Push to '{}'".format(target), update=1, total=4)
 
     # define config var name for potential publication dependencies
     depvar = 'remote.{}.datalad-publish-depends'.format(target)
@@ -491,7 +528,9 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
             force,
             jobs,
             res_kwargs.copy(),
-            done_fetch=None
+            pbars,
+            done_fetch=None,
+            got_path_arg=got_path_arg,
         )
 
     # and lastly the primary push target
@@ -530,6 +569,10 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         lgr.debug("Data transfer to '%s' disabled by argument", target)
         return
 
+    log_progress(
+        lgr.info, pbar_id, "Transfer data",
+        label="Transfer data to '{}'".format(target), update=2, total=4)
+
     yield from _push_data(
         ds,
         target,
@@ -537,12 +580,17 @@ def _push(dspath, content, target, force, jobs, res_kwargs,
         force,
         jobs,
         res_kwargs.copy(),
+        got_path_arg=got_path_arg,
     )
 
     if not target_is_git_remote:
         # there is nothing that we need to push or sync with on the git-side
         # of things with this remote
         return
+
+    log_progress(
+        lgr.info, pbar_id, "Update availability information",
+        label="Update availability for '{}'".format(target), update=3, total=4)
 
     # after file transfer the remote might have different commits to
     # the annex branch. They have to be merged locally, otherwise a
@@ -606,7 +654,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         push_res.extend(repo.push(
             remote=target,
             refspec=refspec,
-            git_options=['--force'] if force in ('all', 'gitpush') else None,
+            git_options=['--force'] if force in ('pushall', 'gitpush') else None,
         ))
     # TODO maybe compress into a single message whenever everything is
     # OK?
@@ -647,7 +695,8 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         )
 
 
-def _push_data(ds, target, content, force, jobs, res_kwargs):
+def _push_data(ds, target, content, force, jobs, res_kwargs,
+               got_path_arg=False):
     if ds.config.getbool('remote.{}'.format(target), 'annex-ignore', False):
         lgr.debug(
             "Target '%s' is set to annex-ignore, exclude from data-push.",
@@ -664,35 +713,57 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
             res_kwargs,
             action='copy',
             status='impossible'
-            if force in ('all', 'datatransfer')
+            if force in ('pushall', 'datatransfer')
             else 'notneeded',
             message=(
                 "Target '%s' does not appear to be an annex remote",
                 target)
         )
         return
+
+    # it really looks like we will transfer files, get info on what annex
+    # has in store
+    ds_repo = ds.repo
+    # paths must be recoded to a dataset REPO root (in case of a symlinked
+    # location
+    annex_info_init = \
+        {ds_repo.pathobj / Path(c['path']).relative_to(ds.pathobj): c
+         for c in content} if ds.pathobj != ds_repo.pathobj else \
+        {Path(c['path']): c for c in content}
+    content = ds.repo.get_content_annexinfo(
+        # paths are taken from `annex_info_init`
+        paths=None,
+        init=annex_info_init,
+        ref='HEAD',
+        # this is an expensive operation that is only needed
+        # to perform a warning below, and for more accurate
+        # progress reporting (exclude unavailable content).
+        # limit to cases with explicit paths provided
+        eval_availability=True if got_path_arg else False,
+    )
     # figure out which of the reported content (after evaluating
     # `since` and `path` arguments needs transport
     to_transfer = [
         c
-        for c in content
+        for c in content.values()
         # by force
-        if ((force in ('all', 'datatransfer') or
+        if ((force in ('pushall', 'datatransfer') or
              # or by modification report
              c.get('state', None) not in ('clean', 'deleted'))
             # only consider annex'ed files
             and 'key' in c
         )
     ]
-    for c in [c for c in to_transfer if not c.get('has_content', False)]:
-        yield dict(
-            res_kwargs,
-            type=c['type'],
-            path=c['path'],
-            action='copy',
-            status='impossible',
-            message='Slated for transport, but no content present',
-        )
+    if got_path_arg:
+        for c in [c for c in to_transfer if not c.get('has_content', False)]:
+            yield dict(
+                res_kwargs,
+                type=c['type'],
+                path=c['path'],
+                action='copy',
+                status='impossible',
+                message='Slated for transport, but no content present',
+            )
 
     cmd = ['git', 'annex', 'copy', '--batch', '-z', '--to', target,
            '--json', '--json-error-messages', '--json-progress']
@@ -700,11 +771,13 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    if not to_transfer and force not in ('all', 'datatransfer'):
-        lgr.debug("Invoking copy --auto")
-        cmd.append('--auto')
+    if force not in ('pushall', 'datatransfer') and ds_repo.config.obtain(
+            'datalad.push.copy-auto-if-wanted'):
+        if ds_repo.get_preferred_content('wanted', target):
+            lgr.debug("Invoking copy --auto")
+            cmd.append('--auto')
 
-    if force not in ('all', 'datatransfer'):
+    if force not in ('pushall', 'datatransfer'):
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 
@@ -719,16 +792,21 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
     # XXX must not be a SpooledTemporaryFile -- dunno why, but doesn't work
     # otherwise
     with TemporaryFile() as file_list:
+        nbytes = 0
         for c in to_transfer:
-            if not c.get('has_content', False):
-                # warned about above, now just skip
-                continue
             file_list.write(
                 bytes(Path(c['path']).relative_to(ds.pathobj)))
             file_list.write(b'\0')
+            nbytes += c['bytesize']
 
         # rewind stdin buffer
         file_list.seek(0)
+
+        # tailor the progress protocol with the total number of files
+        # to be transferred
+        class TailoredPushAnnexJsonProtocol(AnnexJsonProtocol):
+            total_nbytes = nbytes
+
         # and go
         # TODO try-except and yield what was captured before the crash
         #res = GitWitlessRunner(
@@ -737,7 +815,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
         ).run(
             cmd,
             # TODO report how many in total, and give global progress too
-            protocol=AnnexJsonProtocol,
+            protocol=TailoredPushAnnexJsonProtocol,
             stdin=file_list)
         for c in ('stdout', 'stderr'):
             if res[c]:
@@ -750,7 +828,10 @@ def _push_data(ds, target, content, force, jobs, res_kwargs):
 
 def _get_corresponding_remote_state(repo, to):
     since = None
-    active_branch = repo.get_active_branch()
+    # for managed branches we cannot assume a matching one at the remote end
+    # instead we target the corresponding branch
+    active_branch = repo.get_corresponding_branch() or repo.get_active_branch()
+
     if to:
         # XXX here we assume one to one mapping of names from local branches
         # to the remote

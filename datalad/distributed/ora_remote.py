@@ -1,21 +1,27 @@
 from annexremote import SpecialRemote
 from annexremote import RemoteError
+from annexremote import ProtocolError
 
 from pathlib import (
     Path,
+    PurePosixPath
 )
+import requests
 import shutil
 from shlex import quote as sh_quote
 import subprocess
 import logging
 from functools import wraps
-from datalad.distributed.ria_utils import (
+from datalad.customremotes.ria_utils import (
     get_layout_locations,
+    UnknownLayoutVersion,
     verify_ria_url,
 )
 
 
 lgr = logging.getLogger('datalad.customremotes.ria_remote')
+
+DEFAULT_BUFFER_SIZE = 65536
 
 # TODO
 # - make archive check optional
@@ -219,7 +225,8 @@ class LocalIO(IOBase):
         return content
 
     def write_file(self, file_path, content, mode='w'):
-
+        if not content.endswith('\n'):
+            content += '\n'
         with open(str(file_path), mode) as f:
             f.write(content)
 
@@ -234,7 +241,7 @@ class SSHRemoteIO(IOBase):
     REMOTE_CMD_FAIL = "ora-remote: end - fail"
     REMOTE_CMD_OK = "ora-remote: end - ok"
 
-    def __init__(self, host):
+    def __init__(self, host, buffer_size=DEFAULT_BUFFER_SIZE):
         """
         Parameters
         ----------
@@ -264,6 +271,9 @@ class SSHRemoteIO(IOBase):
             if line == b"RIA-REMOTE-LOGIN-END\n":
                 break
         # TODO: Same for stderr?
+
+        # make sure default is used when None was passed, too.
+        self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
     def close(self):
         # try exiting shell clean first
@@ -369,7 +379,8 @@ class SSHRemoteIO(IOBase):
 
     def get(self, src, dst, progress_cb):
 
-        # Note, that as we are in blocking mode, we can't easily fail on the actual get (that is 'cat').
+        # Note, that as we are in blocking mode, we can't easily fail on the
+        # actual get (that is 'cat').
         # Therefore check beforehand.
         if not self.exists(src):
             raise RIARemoteError("annex object {src} does not exist.".format(src=src))
@@ -401,7 +412,7 @@ class SSHRemoteIO(IOBase):
         with open(dst, 'wb') as target_file:
             bytes_received = 0
             while bytes_received < size:  # TODO: some additional abortion criteria? check stderr in addition?
-                c = self.shell.stdout.read1(1024)
+                c = self.shell.stdout.read1(self.buffer_size)
                 # no idea yet, whether or not there's sth to gain by a sophisticated determination of how many bytes to
                 # read at once (like size - bytes_received)
                 if c:
@@ -471,7 +482,7 @@ class SSHRemoteIO(IOBase):
         with open(dst, 'wb') as target_file:
             bytes_received = 0
             while bytes_received < size:
-                c = self.shell.stdout.read1(1024)
+                c = self.shell.stdout.read1(self.buffer_size)
                 if c:
                     bytes_received += len(c)
                     target_file.write(c)
@@ -508,12 +519,61 @@ class SSHRemoteIO(IOBase):
             raise RIARemoteError("Could not write to {}".format(str(file_path)))
 
 
+class HTTPRemoteIO(object):
+    # !!!!
+    # This is not actually an IO class like SSHRemoteIO and LocalIO and needs
+    # respective RF'ing of special remote implementation eventually.
+    # We want ORA over HTTP, but with a server side CGI to talk to in order to
+    # reduce the number of requests. Implementing this as such an IO class would
+    # mean to have separate requests for all server side executions, which is
+    # what we do not want. As a consequence RIARemote class implementation needs
+    # to treat HTTP as a special case until refactoring to a design that fits
+    # both approaches.
+
+    # NOTE: For now read-only. Not sure yet whether an IO class is the right
+    # approach.
+
+    def __init__(self, ria_url, dsid, buffer_size=DEFAULT_BUFFER_SIZE):
+        assert ria_url.startswith("ria+http")
+        self.base_url = ria_url[4:]
+        if self.base_url[-1] == '/':
+            self.base_url = self.base_url[:-1]
+
+        self.base_url += "/" + dsid[:3] + '/' + dsid[3:]
+        # make sure default is used when None was passed, too.
+        self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
+
+    def checkpresent(self, key_path):
+        # Note, that we need the path with hash dirs, since we don't have access
+        # to annexremote.dirhash from within IO classes
+
+        url = self.base_url + "/annex/objects/" + str(key_path)
+        response = requests.head(url)
+        return response.status_code == 200
+
+    def get(self, key_path, filename, progress_cb):
+        # Note, that we need the path with hash dirs, since we don't have access
+        # to annexremote.dirhash from within IO classes
+
+        url = self.base_url + "/annex/objects/" + str(key_path)
+        response = requests.get(url, stream=True)
+
+        with open(filename, 'wb') as dst_file:
+            bytes_received = 0
+            for chunk in response.iter_content(chunk_size=self.buffer_size,
+                                               decode_unicode=False):
+                dst_file.write(chunk)
+                bytes_received += len(chunk)
+                progress_cb(bytes_received)
+
+
 def handle_errors(func):
     """Decorator to convert and log errors
 
-    Intended to use with every method of RiaRemote class, facing the outside world.
-    In particular, that is about everything, that may be called via annex' special remote protocol,
-    since a non-RemoteError will simply result in a broken pipe by default handling.
+    Intended to use with every method of RiaRemote class, facing the outside
+    world. In particular, that is about everything, that may be called via
+    annex' special remote protocol, since a non-RemoteError will simply result
+    in a broken pipe by default handling.
     """
 
     # TODO: configurable on remote end (flag within layout_version!)
@@ -527,10 +587,12 @@ def handle_errors(func):
                 from datetime import datetime
                 from traceback import format_exc
                 exc_str = format_exc()
-                entry = "{time}: Error:\n{exc_str}\n".format(time=datetime.now(),
-                                                                exc_str=exc_str)
-                log_target = self.objtree_base_path / 'error_logs' / "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                                                                uuid=self.uuid)
+                entry = "{time}: Error:\n{exc_str}\n" \
+                        "".format(time=datetime.now(),
+                                  exc_str=exc_str)
+                log_target = self.store_base_path / 'error_logs' / \
+                             "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                                        uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
@@ -540,27 +602,34 @@ def handle_errors(func):
     return new_func
 
 
+class NoLayoutVersion(Exception):
+    pass
+
+
 class RIARemote(SpecialRemote):
     """This is the class of RIA remotes.
     """
 
     dataset_tree_version = '1'
     object_tree_version = '2'
+    # TODO: Move known versions. Needed by creation routines as well.
     known_versions_objt = ['1', '2']
     known_versions_dst = ['1']
 
     @handle_errors
     def __init__(self, annex):
         super(RIARemote, self).__init__(annex)
+        if hasattr(self, 'configs'):
+            # introduced in annexremote 1.4.2 to support LISTCONFIGS
+            self.configs['url'] = "RIA store to use"
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
         # must be absolute, and POSIX
         # subclass must set this
-        self.objtree_base_path = None
+        self.store_base_path = None
         # by default we can read and write
         self.read_only = False
-        self.can_notify = None  # to be figured out later, since annex.protocol.extensions is not yet accessible
         self.force_write = None
         self.uuid = None
         self.ignore_remote_config = None
@@ -572,17 +641,111 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir = None
         self.remote_archive_dir = None
         self.remote_obj_dir = None
+        self._io = None  # lazy
+
+        # cache obj_locations:
+        self._last_archive_path = None
+        self._last_keypath = (None, None)
+
+    def verify_store(self):
+        """Check whether the store exists and reports a layout version we
+        know
+
+        The layout of the store is recorded in base_path/ria-layout-version.
+        If the version found on the remote end isn't supported and `force-write`
+        isn't configured, sets the remote to read-only operation.
+        """
+
+        dataset_tree_version_file = \
+            self.store_base_path / 'ria-layout-version'
+
+        # check dataset tree version
+        try:
+            self.remote_dataset_tree_version = \
+                self._get_version_config(dataset_tree_version_file)
+            if self.remote_dataset_tree_version not in self.known_versions_dst:
+                # Note: In later versions, condition might change in order to
+                # deal with older versions.
+                raise UnknownLayoutVersion(
+                    "RIA store layout version unknown: %s" %
+                    self.remote_dataset_tree_version)
+
+        except (RemoteError, FileNotFoundError):
+            # Exception class depends on whether self.io is local or SSH.
+            # assume file doesn't exist
+            # TODO: Is there a possibility RemoteError has a different reason
+            #       and should be handled differently?
+            #       Don't think so ATM. -> Reconsider with new execution layer.
+
+            # Note: Error message needs entire URL not just the missing
+            #       path, since it could be due to invalid URL. Path isn't
+            #       telling if it's not clear what system we are looking at.
+            # Note: Case switch due to still supported configs as an
+            #       alternative to ria+ URLs. To be deprecated.
+            if self.ria_store_url:
+                target = self.ria_store_url
+            elif self.storage_host:
+                target = "ria+ssh://{}{}".format(
+                    self.storage_host,
+                    dataset_tree_version_file.parent)
+            else:
+                target = "ria+" + dataset_tree_version_file.parent.as_uri()
+
+            if not self.io.exists(dataset_tree_version_file.parent):
+                # unify exception to FileNotFoundError
+
+                raise FileNotFoundError(
+                    "Configured RIA store not found at %s " % target
+                )
+            else:
+                # Directory is there, but no version file. We don't know what
+                # that is. Treat the same way as if there was an unknown version
+                # on record.
+                raise NoLayoutVersion(
+                    "Configured RIA store lacks a 'ria-layout-version' file at"
+                    " %s" % target
+                )
+
+    def verify_ds_in_store(self):
+        """Check whether the dataset exists in store and reports a layout
+        version we know
+
+        The layout is recorded in
+        'dataset_somewhere_beneath_base_path/ria-layout-version.'
+        If the version found on the remote end isn't supported and `force-write`
+        isn't configured, sets the remote to read-only operation.
+        """
+
+        object_tree_version_file = self.remote_git_dir / 'ria-layout-version'
+
+        # check (annex) object tree version
+        try:
+            self.remote_object_tree_version =\
+                self._get_version_config(object_tree_version_file)
+            if self.remote_object_tree_version not in self.known_versions_objt:
+                raise UnknownLayoutVersion
+        except (RemoteError, FileNotFoundError):
+            # Exception class depends on whether self.io is local or SSH.
+            # assume file doesn't exist
+            # TODO: Is there a possibility RemoteError has a different reason
+            #       and should be handled differently?
+            #       Don't think so ATM. -> Reconsider with new execution layer.
+            if not self.io.exists(object_tree_version_file.parent):
+                # unify exception
+                raise FileNotFoundError
+            else:
+                raise NoLayoutVersion
 
     def _load_cfg(self, gitdir, name):
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
             self.storage_host = _get_gitcfg(
-                gitdir, 'annex.ria-remote.{}.ssh-host'.format(name))
+                gitdir, 'annex.ora-remote.{}.ssh-host'.format(name))
 
-            objtree_base_path = _get_gitcfg(
-                gitdir, 'annex.ria-remote.{}.base-path'.format(name))
-            self.objtree_base_path = objtree_base_path.strip() \
-                if objtree_base_path else objtree_base_path
+            store_base_path = _get_gitcfg(
+                gitdir, 'annex.ora-remote.{}.base-path'.format(name))
+            self.store_base_path = store_base_path.strip() \
+                if store_base_path else None
         # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
         # version mismatch.
         self.force_write = _get_gitcfg(
@@ -590,6 +753,13 @@ class RIARemote(SpecialRemote):
 
         # whether to ignore config flags set at the remote end
         self.ignore_remote_config = _get_gitcfg(gitdir, 'annex.ora-remote.{}.ignore-remote-config'.format(name))
+
+        # buffer size for reading files over HTTP and SSH
+        self.buffer_size = _get_gitcfg(gitdir,
+                                       "remote.{}.ora-buffer-size"
+                                       "".format(name))
+        if self.buffer_size:
+            self.buffer_size = int(self.buffer_size)
 
     def _verify_config(self, gitdir, fail_noid=True):
         # try loading all needed info from (git) config
@@ -609,7 +779,7 @@ class RIARemote(SpecialRemote):
                 for line in url_cfgs_raw.splitlines():
                     k, v = line.split()
                     url_cfgs[k] = v
-            self.storage_host, self.objtree_base_path, self.ria_store_url = \
+            self.storage_host, self.store_base_path, self.ria_store_url = \
                 verify_ria_url(self.ria_store_url, url_cfgs)
 
         # TODO duplicates call to `git-config` after RIA url rewrite
@@ -617,18 +787,18 @@ class RIARemote(SpecialRemote):
 
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
-            if not self.objtree_base_path:
-                self.objtree_base_path = self.annex.getconfig('base-path')
-            if not self.objtree_base_path:
+            if not self.store_base_path:
+                self.store_base_path = self.annex.getconfig('base-path')
+            if not self.store_base_path:
                 raise RIARemoteError(
                     "No remote base path configured. "
                     "Specify `base-path` setting.")
 
-        self.objtree_base_path = Path(self.objtree_base_path)
-        if not self.objtree_base_path.is_absolute():
+        self.store_base_path = Path(self.store_base_path)
+        if not self.store_base_path.is_absolute():
             raise RIARemoteError(
                 'Non-absolute object tree base path configuration: %s'
-                '' % str(self.objtree_base_path))
+                '' % str(self.store_base_path))
 
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
@@ -657,7 +827,7 @@ class RIARemote(SpecialRemote):
 
         file_content = self.io.read_file(path).strip().split('|')
         if not (1 <= len(file_content) <= 2):
-            self._info("invalid version file {}".format(path))
+            self.message("invalid version file {}".format(path))
             return None
 
         remote_version = file_content[0]
@@ -669,6 +839,55 @@ class RIARemote(SpecialRemote):
 
         return remote_version
 
+    def get_store(self):
+        """checks the remote end for an existing store and dataset
+
+        Furthermore reads and stores version and config flags, layout
+        locations, etc.
+        If this doesn't raise, the remote end should be fine to work with.
+        """
+
+        # cache remote layout directories
+        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
+            self.get_layout_locations(self.store_base_path, self.archive_id)
+
+        read_only_msg = "Treating remote as read-only in order to" \
+                        "prevent damage by putting things into an unknown " \
+                        "version of the target layout. You can overrule this " \
+                        "by setting 'annex.ora-remote.<name>.force-write=true'."
+        try:
+            self.verify_store()
+        except UnknownLayoutVersion:
+            reason = "Remote dataset tree reports version {}. Supported " \
+                     "versions are: {}. Consider upgrading datalad or " \
+                     "fix the 'ria-layout-version' file at the RIA store's " \
+                     "root. ".format(self.remote_dataset_tree_version,
+                                     self.known_versions_dst)
+            self._set_read_only(reason + read_only_msg)
+        except NoLayoutVersion:
+            reason = "Remote doesn't report any dataset tree version." \
+                     "Consider upgrading datalad or add a fitting " \
+                     "'ria-layout-version' file at the RIA store's " \
+                     "root."
+            self._set_read_only(reason + read_only_msg)
+
+        try:
+            self.verify_ds_in_store()
+        except UnknownLayoutVersion:
+            reason = "Remote object tree reports version {}. Supported" \
+                     "versions are {}. Consider upgrading datalad or " \
+                     "fix the 'ria-layout-version' file at the remote " \
+                     "dataset root. " \
+                     "".format(self.remote_object_tree_version,
+                               self.known_versions_objt)
+            self._set_read_only(reason + read_only_msg)
+        except NoLayoutVersion:
+            reason = "Remote doesn't report any object tree version." \
+                     "Consider upgrading datalad or add a fitting " \
+                     "'ria-layout-version' file at the remote " \
+                     "dataset root. "
+            self._set_read_only(reason + read_only_msg)
+
     @handle_errors
     def initremote(self):
         # which repo are we talking about
@@ -679,141 +898,97 @@ class RIARemote(SpecialRemote):
             if not self.archive_id:
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
+
+        if not isinstance(self.io, HTTPRemoteIO):
+            self.get_store()
+
+        # else:
+        # TODO: consistency with SSH and FILE behavior? In those cases we make
+        #       sure the store exists from within initremote
+
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
         self.annex.setconfig('url', self.ria_store_url)
 
     def _local_io(self):
         """Are we doing local operations?"""
-        # let's not make this decision dependent on the existance
+        # let's not make this decision dependent on the existence
         # of a directory the matches the name of the configured
-        # object tree base dir. Such a match could be pure
+        # store tree base dir. Such a match could be pure
         # coincidence. Instead, let's do remote whenever there
         # is a remote host configured
-        #return self.objtree_base_path.is_dir()
+        #return self.store_base_path.is_dir()
         return not self.storage_host
 
-    def _info(self, msg):
+    def debug(self, msg):
+        # Annex prints just the message, so prepend with
+        # a "DEBUG" on our own.
+        self.annex.debug("ORA-DEBUG: " + msg)
 
-        if self.can_notify:
+    def message(self, msg):
+        try:
             self.annex.info(msg)
-        # TODO: else: if we can't have an actual info message, at least have a debug message
-        #       This probably requires further refurbishment of datalad's capability to deal with such aspects of the
-        #       special remote protocol
+        except ProtocolError:
+            # INFO not supported by annex version.
+            # If we can't have an actual info message, at least have a
+            # debug message.
+            self.debug(msg)
 
     def _set_read_only(self, msg):
 
         if not self.force_write:
             self.read_only = True
-            self._info(msg)
+            self.message(msg)
         else:
-            self._info("Was instructed to force write")
+            self.message("Was instructed to force write")
 
-    def _check_layout_version(self):
-        """Check whether we can deal with the layout reported by the remote end
+    def _ensure_writeable(self):
+        if self.read_only:
+            raise RIARemoteError("Remote is treated as read-only. "
+                                 "Set 'ora-remote.<name>.force-write=true' to "
+                                 "overrule this.")
+        if isinstance(self.io, HTTPRemoteIO):
+            raise RIARemoteError("Write access via HTTP not implemented")
 
-        There are two aspects of layout versioning:
-        - the tree to put the datasets in (version recorded in base_path/ria-layout-version)
-        - the tree of the actual annex objects of a particular dataset (version recorded in
-          dataset_somewhere_beneath_base_path/ria-layout-version)
-
-        If the version found on the remote end isn't supported and `force-write` isn't configured,
-        this sets the remote to read-only operation.
-        """
-
-        dataset_tree_version_file = \
-            self.objtree_base_path / 'ria-layout-version'
-        object_tree_version_file = \
-            self.objtree_base_path / self.archive_id[:3] / self.archive_id[3:] / 'ria-layout-version'
-
-        read_only_msg = "Setting remote to read-only usage in order to prevent damage by putting things into an " \
-                        "unknown version of the target layout. You can overrule this by configuring " \
-                        "'annex.ora-remote.<name>.force-write'."
-
-        # 1. check dataset tree version
-        try:
-            self.remote_dataset_tree_version = self._get_version_config(dataset_tree_version_file)
-            if self.remote_dataset_tree_version not in self.known_versions_dst:
-                # Note: In later versions, condition might change in order to deal with older versions
-                self._info("Remote dataset tree reports version {}. Supported versions are: {}. Consider upgrading "
-                           "datalad or fix the structure on the remote end."
-                           "".format(self.remote_dataset_tree_version, self.known_versions_dst))
-                self._set_read_only(read_only_msg)
-
-        except (RemoteError, FileNotFoundError):  # depends on whether self.io is local or ssh
-            # assume file doesn't exist
-            # TODO: Is there a possibility RemoteError has a different reason and should be handled differently?
-            #       Don't think so ATM
-            if not self.io.exists(dataset_tree_version_file.parent):
-                # we are first, just put our stamp on it
-                # ensure we have a store and simultaneously ensure the error log subdir
-                self.io.mkdir(dataset_tree_version_file.parent / 'error_logs')
-
-                self.io.write_file(dataset_tree_version_file, self.dataset_tree_version + '\n')
+    @property
+    def io(self):
+        if not self._io:
+            if self._local_io():
+                self._io = LocalIO()
+            elif self.ria_store_url.startswith("ria+http"):
+                self._io = HTTPRemoteIO(self.ria_store_url,
+                                        self.archive_id,
+                                        self.buffer_size)
+            elif self.storage_host:
+                self._io = SSHRemoteIO(self.storage_host, self.buffer_size)
+                from atexit import register
+                register(self._io.close)
             else:
-                # directory is there, but no version file. We don't know what that is. Treat the same way as if there
-                # was an unknown version on record
-                self._info("Remote doesn't report any dataset tree version. Consider upgrading datalad or "
-                           "fix the structure on the remote end.")
-                self._set_read_only(read_only_msg)
-
-        # 2. check (annex) object tree version
-        try:
-            self.remote_object_tree_version = self._get_version_config(object_tree_version_file)
-            if self.remote_object_tree_version not in self.known_versions_objt:
-                self._info("Remote object tree reports version {}. Supported versions are {}. Consider upgrading "
-                           "datalad.".format(self.remote_object_tree_version, self.known_versions_objt))
-                self._set_read_only(read_only_msg)
-        except (RemoteError, FileNotFoundError):
-            if not self.io.exists(object_tree_version_file.parent):
-                # we are first, just put our stamp on it
-                # ensure we have a ds dir and simultaneously ensure the archives subdir
-                self.io.mkdir(object_tree_version_file.parent / 'archives')
-                self.io.write_file(object_tree_version_file, self.object_tree_version + '\n')
-            else:
-                self._info("Remote doesn't report any object tree version. Consider upgrading datalad or "
-                           "fix the structure on the remote end.")
-                self._set_read_only(read_only_msg)
+                raise RIARemoteError(
+                    "Local object tree base path does not exist, and no SSH"
+                    "host configuration found.")
+        return self._io
 
     @handle_errors
     def prepare(self):
-
-        # can we use self.annex.info() for sending user output to annex?
-        self.can_notify = "INFO" in self.annex.protocol.extensions
 
         gitdir = self.annex.getgitdir()
         self.uuid = self.annex.getuuid()
         self._verify_config(gitdir)
 
-        if self._local_io():
-            self.io = LocalIO()
-        elif self.storage_host:
-            self.io = SSHRemoteIO(self.storage_host)
-            from atexit import register
-            register(self.io.close)
-        else:
-            raise RIARemoteError(
-                "Local object tree base path does not exist, and no SSH host "
-                "configuration found.")
+        if not isinstance(self.io, HTTPRemoteIO):
+            self.get_store()
 
         # report active special remote configuration
         self.info = {
-            'objtree_base_path': str(self.objtree_base_path),
+            'store_base_path': str(self.store_base_path),
             'storage_host': 'local'
             if self._local_io() else self.storage_host,
         }
 
-        self._check_layout_version()
-
-        # cache remote layout directories
-        self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.objtree_base_path, self.archive_id)
-
     @handle_errors
     def transfer_store(self, key, filename):
-        if self.read_only:
-            raise RemoteError("Remote was set to read-only. "
-                              "Configure 'ora-remote.<name>.force-write' to overrule this.")
+        self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
@@ -848,6 +1023,13 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def transfer_retrieve(self, key, filename):
+
+        if isinstance(self.io, HTTPRemoteIO):
+            self.io.get(PurePosixPath(self.annex.dirhash(key)) / key / key,
+                        filename,
+                        self.annex.progress)
+            return
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
         # sadly we have no idea what type of source gave checkpresent->true
@@ -865,6 +1047,11 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def checkpresent(self, key):
+
+        if isinstance(self.io, HTTPRemoteIO):
+            return self.io.checkpresent(
+                PurePosixPath(self.annex.dirhash(key)) / key / key)
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
         if self.io.exists(abs_key_path):
@@ -879,9 +1066,7 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def remove(self, key):
-        if self.read_only:
-            raise RIARemoteError("Remote was set to read-only. "
-                                 "Configure 'ora-remote.<name>.force-write' to overrule this.")
+        self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
@@ -907,6 +1092,13 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def whereis(self, key):
+
+        if isinstance(self.io, HTTPRemoteIO):
+            # display the URL for a request
+            # TODO: method of HTTPRemoteIO
+            return self.ria_store_url[4:] + "/annex/objects" + \
+                   self.annex.dirhash(key) + "/" + key + "/" + key
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         return str(key_path) if self._local_io() \
             else '{}: {}:{}'.format(
@@ -920,21 +1112,30 @@ class RIARemote(SpecialRemote):
         return get_layout_locations(1, base_path, dsid)
 
     def _get_obj_location(self, key):
-        # Note: Changes to this method may require an update of RIARemote._layout_version
-        # Note2: archive_path is always the same ATM. However, it might depend on `key` in the future.
-        #        Therefore build the actual filename for the archive herein as opposed to `get_layout_locations`.
+        # Notes: - Changes to this method may require an update of
+        #          RIARemote._layout_version
+        #        - archive_path is always the same ATM. However, it might depend
+        #          on `key` in the future. Therefore build the actual filename
+        #          for the archive herein as opposed to `get_layout_locations`.
 
-        # If we didn't recognize the remote layout version, we set to read-only and promised to at least try and read
-        # according to our current version. So, treat that case as if remote version was our (client's) version.
-        if self.remote_object_tree_version == '1':
-            key_dir = self.annex.dirhash_lower(key)
-        else:
-            key_dir = self.annex.dirhash(key)
-        # double 'key' is not a mistake, but needed to achieve the exact same
-        # layout as the 'directory'-type special remote
-        key_path = Path(key_dir) / key / key
-        archive_path = self.remote_archive_dir / 'archive.7z'
-        return self.remote_obj_dir, archive_path, key_path
+        if not self._last_archive_path:
+            self._last_archive_path = self.remote_archive_dir / 'archive.7z'
+        if self._last_keypath[0] != key:
+            if self.remote_object_tree_version == '1':
+                key_dir = self.annex.dirhash_lower(key)
+
+            # If we didn't recognize the remote layout version, we set to
+            # read-only and promised to at least try and read according to our
+            # current version. So, treat that case as if remote version was our
+            # (client's) version.
+            else:
+                key_dir = self.annex.dirhash(key)
+            # double 'key' is not a mistake, but needed to achieve the exact
+            # same layout as the annex/objects tree
+            self._last_keypath = (key, Path(key_dir) / key / key)
+
+        return self.remote_obj_dir, self._last_archive_path, \
+            self._last_keypath[1]
 
 
 def main():

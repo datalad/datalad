@@ -16,10 +16,10 @@ clean:
 
 bin:
 	mkdir -p $@
-	PYTHONPATH=bin:$(PYTHONPATH) $(PYTHON) setup.py develop --install-dir $@
+	PYTHONPATH="bin:$(PYTHONPATH)" $(PYTHON) setup.py develop --install-dir $@
 
 test-code: bin
-	PATH=bin:$(PATH) PYTHONPATH=bin:$(PYTHONPATH) $(NOSETESTS) -s -v $(MODULE)
+	PATH="bin:$(PATH)" PYTHONPATH="bin:$(PYTHONPATH)" $(NOSETESTS) -s -v $(MODULE)
 
 test-coverage:
 	rm -rf coverage .coverage

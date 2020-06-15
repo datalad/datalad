@@ -11,6 +11,7 @@
 from ...support.annexrepo import AnnexRepo
 from ...consts import DATALAD_SPECIAL_REMOTE
 from ...tests.utils import *
+from ...support.external_versions import external_versions
 
 from . import _get_custom_runner
 from ...support.exceptions import CommandError
@@ -34,10 +35,27 @@ def check_basic_scenario(url, d):
     with swallow_outputs() as cmo:
         annex.add_urls([url])
         annex.commit("committing")
-        whereis1 = annex.whereis('3versions_allversioned.txt', output='full')
-        eq_(len(whereis1), 2)  # here and datalad
-        annex.drop('3versions_allversioned.txt')
-    whereis2 = annex.whereis('3versions_allversioned.txt', output='full')
+
+    # git-annex got a fix where it stopped replacing - in the middle of the filename
+    # Let's cater to the developers who might have some intermediate version and not
+    # easy to compare -- we will just check that only one file there is an that it
+    # matches what we expect when outside of the development versions range:
+    filenames = glob.glob(op.join(d, '3versions[-_]allversioned.txt'))
+    assert_equal(len(filenames), 1)
+    filename = op.basename(filenames[0])
+    if external_versions['cmd:annex'] < '8.20200501':
+        assert_in('_', filename)
+    # Date after the fix in 8.20200501-53-gcabbc91b1
+    elif external_versions['cmd:annex'] >= '8.20200512':
+        assert_in('-', filename)
+    else:
+        pass  # either of those is ok
+
+    whereis1 = annex.whereis(filename, output='full')
+    eq_(len(whereis1), 2)  # here and datalad
+    annex.drop(filename)
+
+    whereis2 = annex.whereis(filename, output='full')
     eq_(len(whereis2), 1)  # datalad
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output

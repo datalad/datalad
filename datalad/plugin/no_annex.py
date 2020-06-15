@@ -35,11 +35,6 @@ class NoAnnex(Interface):
 
     Note that the plugin works incrementally, hence any existing configuration
     (e.g. from a previous plugin run) is amended, not replaced.
-
-    Parameters
-    ----------
-    ref_dir : str, optional
-    makedirs : bool, optional
     """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod

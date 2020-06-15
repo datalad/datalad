@@ -3549,17 +3549,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def diffstatus(self, fr, to, paths=None, untracked='all',
                    eval_submodule_state='full', eval_file_type=True,
                    _cache=None):
-        """Like diff(), but reports the status of 'clean' content too"""
-        return self._diffstatus(
-            fr, to, paths, untracked, eval_submodule_state, eval_file_type,
-            _cache)
+        """Like diff(), but reports the status of 'clean' content too.
 
-    def _diffstatus(self, fr, to, paths, untracked, eval_state,
-                    eval_file_type, _cache):
-        """Just like diffstatus(), but supports an additional evaluation
-        state 'global'. If given, it will return a single 'modified'
+        It supports an additional submodule evaluation state 'global'.
+        If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
         it can."""
+
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
                 ref, untracked
@@ -3680,7 +3676,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     type=to_state_r['type'],
                 )
             state = props.get('state', None)
-            if eval_state == 'global' and \
+            if eval_submodule_state == 'global' and \
                     state not in ('clean', None):
                 # any modification means globally 'modified'
                 return 'modified'
@@ -3708,10 +3704,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # file
                     gitshasum=from_state_r['gitshasum'],
                 )
-                if eval_state == 'global':
+                if eval_submodule_state == 'global':
                     return 'modified'
 
-        if to is not None or eval_state == 'no':
+        if to is not None or eval_submodule_state == 'no':
             # if we have `to` we are specifically comparing against
             # a recorded state, and this function only attempts
             # to label the state of a subdataset, not investigate
@@ -3719,7 +3715,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # this is done by a high-level command like rev-diff
             # so the comparison within this repo and the present
             # `state` label are all we need, and they are done already
-            if eval_state == 'global':
+            if eval_submodule_state == 'global':
                 return 'clean'
             else:
                 return status
@@ -3744,13 +3740,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             st['state'] = 'modified' \
                 if st['prev_gitshasum'] != subrepo_commit \
                 else 'clean'
-            if eval_state == 'global' and st['state'] == 'modified':
+            if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
-            if eval_state == 'commit':
+            if eval_submodule_state == 'commit':
                 continue
             # the recorded commit did not change, so we need to make
             # a more expensive traversal
-            st['state'] = subrepo._diffstatus(
+            st['state'] = subrepo.diffstatus(
                 # we can use 'HEAD' because we know that the commit
                 # did not change. using 'HEAD' will facilitate
                 # caching the result
@@ -3758,13 +3754,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 to=None,
                 paths=None,
                 untracked=untracked,
-                eval_state='global',
+                eval_submodule_state='global',
                 eval_file_type=False,
                 _cache=_cache) if st['state'] == 'clean' else 'modified'
-            if eval_state == 'global' and st['state'] == 'modified':
+            if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
 
-        if eval_state == 'global':
+        if eval_submodule_state == 'global':
             return 'clean'
         else:
             return status

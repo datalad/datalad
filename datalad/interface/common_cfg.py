@@ -112,6 +112,13 @@ definitions = {
             'text': 'Description for a Personal access token to generate.'}),
         'default': 'DataLad',
     },
+    'datalad.push.copy-auto-if-wanted': {
+        'ui': ('question', {
+            'title': "Use `git-annex copy --auto` with preferred content configured",
+            'text': 'If this flag is set, DataLad looks for preferred content configuration for a push target and instructs git-annex to use auto-mode for copying, if such configuration is detected.'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),
@@ -186,6 +193,13 @@ definitions = {
     'datalad.tests.usecassette': {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
+    },
+    'datalad.tests.cache': {
+        'ui': ('question', {
+            'title': 'Cache directory for tests',
+            'text': 'Where should datalad cache test files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'tests')
     },
     'datalad.log.level': {
         'ui': ('question', {

@@ -150,6 +150,10 @@ class BaseDownloader(object, metaclass=ABCMeta):
             supported_auth_types = []
             used_old_session = False
             try:
+                lgr.debug("Acquiring a currently %s lock to establish download session. "
+                          "If stalls - check which process holds %s",
+                          "existing" if self._lock.exists() else "absent",
+                          self._lock.path)
                 with self._lock:
                     # Locking since it might desire to ask for credentials
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)

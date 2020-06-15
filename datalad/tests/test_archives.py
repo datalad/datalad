@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     ok_generator,
     OBSCURE_FILENAME,
     SkipTest,
+    skip_if,
 )
 
 from datalad.dochelpers import exc_str
@@ -33,6 +34,7 @@ from datalad.support.archives import (
 )
 from datalad.support.archive_utils_patool import unixify_path
 from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.external_versions import external_versions
 from datalad.support import path as op
 
 
@@ -131,6 +133,8 @@ def test_compress_dir():
 _filename = 'fi le.dat'
 
 
+@skip_if("cmd:7z" not in external_versions,
+         msg="Known to fail if p7zip is not installed")
 @with_tree(((_filename, 'content'),))
 @with_tempfile()
 def check_compress_file(ext, annex, path, name):

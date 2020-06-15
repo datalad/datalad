@@ -267,7 +267,7 @@ def _check_and_update_remote_server_info(ds, remote):
 
 def _maybe_fetch(repo, remote):
     if repo.config.get("remote.{}.fetch".format(remote)):
-        repo.fetch(remote=remote)
+        repo.fetch(remote=remote, recurse_submodules="no")
     else:
         # Fetching would lead to "Couldn't find remote ref HEAD" if no
         # branch" error.  See gh-4199 for an example.
@@ -362,8 +362,15 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     if transfer_data != 'none' and isinstance(ds.repo, AnnexRepo):
         # publishing of `remote` might depend on publishing other
         # remote(s) first, so they need to receive the data first:
-        for d in publish_depends:
-            lgr.info("Transferring data to configured publication dependency: '%s'" % d)
+        for d, desc in [
+            (d, "configured publication dependency")
+            for d in publish_depends
+        ] + [
+            # no message the target remote as before
+            (remote, None)
+        ]:
+            if desc:
+                lgr.info("Transferring data to %s: '%s'", desc, d)
             # properly initialized remote annex -> publish data
             for r in _publish_data(
                     ds,
@@ -378,20 +385,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                         r.get('type', None) == 'file':
                     copied_data = True
                 yield r
-        # and for the main target
-        for r in _publish_data(
-                ds,
-                remote,
-                paths,
-                annex_copy_options,
-                force,
-                transfer_data,
-                **kwargs):
-            # note if we published any data, notify to sync annex branch below
-            if r['status'] == 'ok' and r['action'] == 'publish' and \
-                    r.get('type', None) == 'file':
-                copied_data = True
-            yield r
 
     #
     # publish dataset (git push)
@@ -595,6 +588,12 @@ class Publish(Interface):
       to publish a dataset. Publication targets are either configured remote
       Git repositories, or git-annex special remotes (if they support data
       upload).
+
+    .. note::
+      The `push` command (new in 0.13.0) provides an alternative interface.
+      Critical differences are that `push` transfers annexed data by default
+      and does not handle sibling creation (i.e. it does not have a `--missing`
+      option).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True

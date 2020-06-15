@@ -267,10 +267,10 @@ def test_ssh_git_props():
     remote_url = 'ssh://localhost'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
-    eq_(ssh.get_annex_version(),
-        external_versions['cmd:annex'])
-    # cannot compare to locally detected, might differ depending on
-    # how annex was installed
+    # Note: Avoid comparing these versions directly to the versions in
+    # external_versions because the ssh://localhost versions detected might
+    # differ depending on how git-annex is installed.
+    ok_(ssh.get_annex_version())
     ok_(ssh.get_git_version())
     manager.close()  # close possibly still present connections
 

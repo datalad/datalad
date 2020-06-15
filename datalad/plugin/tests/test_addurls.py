@@ -478,14 +478,12 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_unbound_dataset(self, path):
-        ds = Dataset(path).create(force=True)
-
-        def check(subpath, dataset_arg, url_file):
-            subdir = op.join(path, subpath)
+        def check(ds, dataset_arg, url_file, fname_format):
+            subdir = op.join(ds.path, "subdir")
             os.mkdir(subdir)
             with chpwd(subdir):
                 shutil.copy(self.json_file, "in.json")
-                addurls(dataset_arg, url_file, "{url}", "{name}")
+                addurls(dataset_arg, url_file, "{url}", fname_format)
                 # Files specified in the CSV file are always relative to the
                 # dataset.
                 for fname in ["a", "b", "c"]:
@@ -493,10 +491,16 @@ class TestAddurls(object):
 
         # The input file is relative to the current working directory, as
         # with other commands.
-        check("subdir0", None, "in.json")
+        ds0 = Dataset(op.join(path, "ds0")).create()
+        check(ds0, None, "in.json", "{name}")
         # Likewise the input file is relative to the current working directory
         # if a string dataset argument is given.
-        check("subdir1", ds.path, "in.json")
+        ds1 = Dataset(op.join(path, "ds1")).create()
+        check(ds1, ds1.path, "in.json", "{name}")
+        # A leading "./" doesn't confuse addurls() into downloading the file
+        # into the subdirectory.
+        ds2 = Dataset(op.join(path, "ds2")).create()
+        check(ds2, None, "in.json", "./{name}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):

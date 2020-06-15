@@ -17,29 +17,30 @@ import builtins
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
-from ..base import DownloadError
-from ..base import IncompleteDownloadError
-from ..base import BaseDownloader
-from ..base import NoneAuthenticator
-from ..credentials import UserPassword
-from ..credentials import Token
-from ..credentials import LORIS_Token
-from ..http import HTMLFormAuthenticator
-from ..http import HTTPDownloader
-from ..http import HTTPBearerTokenAuthenticator
-from ..http import process_www_authenticate
+from ..base import (
+    BaseDownloader,
+    DownloadError,
+    IncompleteDownloadError,
+    NoneAuthenticator,
+)
+from ..credentials import (
+    LORIS_Token,
+    Token,
+    UserPassword,
+)
+from ..http import (
+    HTMLFormAuthenticator,
+    HTTPBaseAuthenticator,
+    HTTPDownloader,
+    HTTPBearerTokenAuthenticator,
+    process_www_authenticate,
+)
 from ...support.exceptions import AccessFailedError
 from ...support.network import get_url_straight_filename
-from ...tests.utils import with_fake_cookies_db
-from ...tests.utils import skip_if_no_network
-from ...tests.utils import with_testsui
-from ...tests.utils import with_memory_keyring
-from ...tests.utils import known_failure_githubci_win
 from ...utils import ensure_unicode
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
-    raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
 except (ImportError, AttributeError):
     # Attribute Error happens with newer httpretty and older ssl module
@@ -50,23 +51,32 @@ except (ImportError, AttributeError):
     httpretty = NoHTTPPretty()
 
 from unittest.mock import patch
-from ...tests.utils import SkipTest
-from ...tests.utils import assert_in
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_greater
-from ...tests.utils import assert_false
-from ...tests.utils import assert_raises
-from ...tests.utils import ok_file_has_content
-from ...tests.utils import serve_path_via_http, with_tree
-from ...tests.utils import swallow_logs
-from ...tests.utils import swallow_outputs
-from ...tests.utils import with_tempfile
-from ...tests.utils import use_cassette
-from ...tests.utils import skip_if
-from ...tests.utils import without_http_proxy
-from ...support.exceptions import AccessDeniedError
-from ...support.exceptions import AnonymousAccessDeniedError
+from ...tests.utils import (
+    SkipTest,
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    known_failure_githubci_win,
+    ok_file_has_content,
+    serve_path_via_http, with_tree,
+    skip_if,
+    skip_if_no_network,
+    swallow_logs,
+    swallow_outputs,
+    use_cassette,
+    with_fake_cookies_db,
+    with_memory_keyring,
+    with_tempfile,
+    with_testsui,
+    without_http_proxy,
+)
+from ...support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+)
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
 
@@ -439,7 +449,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
         return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        assert_equal(request.body, '')
+        assert_equal(request.body, b'')
         assert_in('Cookie', request.headers)
         assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
@@ -549,6 +559,17 @@ def check_httpretty_authfail404(exp_called, d):
     assert_equal(was_called, exp_called)
 
 
+def test_auth_bytes_content():
+    # Our regexes are strings, but we can get content in bytes:
+    # I am not sure yet either we shouldn't just skip then testing for regex,
+    # but we definetely should not crash.
+    authenticator = HTTPBaseAuthenticator(failure_re="Failed")
+    authenticator.check_for_auth_failure(b"bytes")
+    # but ATM we do test bytes content, let's ENSURE that!
+    with assert_raises(AccessDeniedError):
+        authenticator.check_for_auth_failure(b"Failed")
+
+
 class FakeCredential2(UserPassword):
     """Credential to test scenarios."""
     _fixed_credentials = {'user': 'testlogin', 'password': 'testpassword'}
@@ -592,7 +613,7 @@ def test_scenario_2(d):
         return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        assert_equal(request.body, '')
+        assert_equal(request.body, b'')
         assert_in('Cookie', request.headers)
         assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
@@ -662,7 +683,7 @@ def test_HTTPBearerTokenAuthenticator(d):
 
     # Perform assertions. See note above.
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
@@ -704,7 +725,7 @@ def test_HTTPLorisTokenAuthenticator(d):
 
     # Perform assertions. See note above.
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
@@ -747,7 +768,7 @@ def test_lorisadapter(d, keyring):
     downloader.download(url, path=d)
 
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken33")
     # Verify credentials correctly set to test user:pass
