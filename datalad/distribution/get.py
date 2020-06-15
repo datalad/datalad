@@ -100,22 +100,22 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
 def _get_flexible_source_candidates_for_submodule(ds, sm):
     """Assemble candidate locations from where to clone a submodule
 
-    The following locations candidates are considered. For each candidate
-    a priority is given in parenthesis, lower values indicate higher priority:
+    The following locations candidates are considered. For each candidate a
+    cost is given in parenthesis, lower values indicate higher cost:
 
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
-      There can be more than one candidate (priority 500).
+      There can be more than one candidate (cost 500).
 
-    - A URL or absolute path recorded in `.gitmodules` (priority 600).
+    - A URL or absolute path recorded in `.gitmodules` (cost 600).
 
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
       desired submodule commit, with this relative path appended to it.
-      There can be more than one candidate (priority 500).
+      There can be more than one candidate (cost 500).
 
     - In case `.gitmodules` contains a relative path as a URL, the absolute
-      path of the superdataset, appended with this relative path (priority 900).
+      path of the superdataset, appended with this relative path (cost 900).
 
     Additional candidate URLs can be generated based on templates specified as
     configuration variables with the pattern
@@ -123,9 +123,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       `datalad.get.subdataset-source-candidate-<name>`
 
     where `name` is an arbitrary identifier. If name starts with three digits
-    (e.g. '400myserver') these will be interpreted as a priority, and the
+    (e.g. '400myserver') these will be interpreted as a cost, and the
     respective candidate will be sorted into the generated candidate list
-    according to this priority. If no priority is given, a default of 700
+    according to this cost. If no cost is given, a default of 700
     is used.
 
     A template string assigned to such a variable can utilize the Python format
@@ -139,7 +139,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     submodule commit is available as `remote-<name>` properties, where `name`
     is the configured remote name.
 
-    Lastly, all candidates are sorted according to their priority (lower values
+    Lastly, all candidates are sorted according to their cost (lower values
     first, and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
 
@@ -153,7 +153,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     Returns
     -------
     list of dict
-      Where each dict has keys 'priority' (int), 'name' (str), 'url' (str).
+      Where each dict has keys 'cost' (int), 'name' (str), 'url' (str).
       Names are not unique and either derived from the name of the respective
       remote, template configuration variable, or 'local'.
     """
@@ -201,7 +201,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                dict(priority=500, name=remote, url=url)
+                dict(cost=500, name=remote, url=url)
                 for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
                     sm_path_url, remote_url, alternate_suffix=False)
@@ -213,13 +213,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             #  --recursive)
             if sm_url:
                 clone_urls.extend(
-                    dict(priority=600, name=remote, url=url)
+                    dict(cost=600, name=remote, url=url)
                     for url in _get_flexible_source_candidates(
                         sm_url,
                         remote_url,
                         alternate_suffix=False)
                 )
-    prio_candidate_expr = re.compile('[0-9][0-9][0-9].*')
+    cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
     for name, tmpl in [(c[len(candcfg_prefix):],
                         ds_repo.config[c])
@@ -229,12 +229,12 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
         # outside. Additional guesswork can only make it slower
-        has_priority = prio_candidate_expr.match(name) is not None
+        has_cost = cost_candidate_expr.match(name) is not None
         clone_urls.append(
-            # assign a default priority, if a config doesn't have one
+            # assign a default cost, if a config doesn't have one
             dict(
-                priority=int(name[:3]) if has_priority else 700,
-                name=name[3:] if has_priority else name,
+                cost=int(name[:3]) if has_cost else 700,
+                name=name[3:] if has_cost else name,
                 url=url,
                 from_config=True,
             ))
@@ -242,7 +242,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
         clone_urls.extend(
-            dict(priority=900, name='local', url=url)
+            dict(cost=900, name='local', url=url)
             for url in _get_flexible_source_candidates(
                 sm_url,
                 ds.path,
@@ -254,7 +254,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # sort all candidates by their label, thereby allowing a
     # candidate provided by configuration to purposefully
     # sort before or after automatically generated configuration
-    clone_urls = sorted(clone_urls, key=lambda x: x['priority'])
+    clone_urls = sorted(clone_urls, key=lambda x: x['cost'])
     # take out any duplicate source candidates
     # unique() takes out the duplicated at the tail end
     clone_urls = unique(clone_urls, lambda x: x['url'])
@@ -331,7 +331,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             # clone. if not, keep things clean in order to be able to move with
             # any outside configuration change
             for c in ('datalad.get.subdataset-source-candidate-{}{}'.format(
-                          rec['priority'], rec['name']),
+                          rec['cost'], rec['name']),
                       'datalad.get.subdataset-source-candidate-{}'.format(
                           rec['name'])):
                 if c in super_cfg.keys():

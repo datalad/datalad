@@ -87,28 +87,28 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     ds_subpath = str(ds.pathobj / 'sub')
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), [])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=sshurl)),
-        [dict(priority=900, name='local', url=sshurl)])
+        [dict(cost=900, name='local', url=sshurl)])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=httpurl)),
-        [dict(priority=900, name='local', url=httpurl)])
+        [dict(cost=900, name='local', url=httpurl)])
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
-        [dict(priority=500, name='origin', url=ds_subpath)])
+        [dict(cost=500, name='origin', url=ds_subpath)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
-        [dict(priority=500, name='origin', url=ds_subpath),
-         dict(priority=600, name='origin', url=sshurl)])
+        [dict(cost=500, name='origin', url=ds_subpath),
+         dict(cost=600, name='origin', url=sshurl)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
-        [dict(priority=500, name='origin', url=ds_subpath),
-         dict(priority=600, name='origin', url=httpurl)])
+        [dict(cost=500, name='origin', url=ds_subpath),
+         dict(cost=600, name='origin', url=httpurl)])
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            dict(priority=500, name='origin', url=ds_subpath),
+            dict(cost=500, name='origin', url=ds_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -117,7 +117,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
                    result_renderer='disabled')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            dict(priority=500, name='origin', url=ds_subpath),
+            dict(cost=500, name='origin', url=ds_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -125,17 +125,17 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(priority=500, name='origin', url=ds_subpath),
-                dict(priority=700, name='bang', url='youredead', from_config=True),
+                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=700, name='bang', url='youredead', from_config=True),
         ])
-    # we can alter the priority by given the name a two-digit prefix
+    # we can alter the cost by given the name a two-digit prefix
     with patch.dict(
             'os.environ',
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__400BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(priority=400, name='bang', url='youredead', from_config=True),
-                dict(priority=500, name='origin', url=ds_subpath),
+                dict(cost=400, name='bang', url='youredead', from_config=True),
+                dict(cost=500, name='origin', url=ds_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -143,8 +143,8 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(priority=500, name='origin', url=ds_subpath),
-                dict(priority=700, name='bang', url='pre-{}-post'.format(sub.id),
+                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
                      from_config=True),
         ])
     # now again, but have an additional remote besides origin that
