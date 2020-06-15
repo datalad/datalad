@@ -118,16 +118,16 @@ class Push(Interface):
             constraints=EnsureStr() | EnsureNone()),
         data=Parameter(
             args=("--data",),
-            doc="""what to do with data (annex'ed) data. 'anything' would cause
+            doc="""what to do with (annex'ed) data. 'anything' would cause
             transfer of all annexed content, 'nothing' would avoid call to
             `git annex copy` altogether. 'auto' would use 'git annex copy' with
             '--auto' thus transferring only data which would satisfy "wanted"
             or "numcopies" settings for the remote (thus "nothing" otherwise).
             'auto-if-wanted' would enable '--auto' mode only if there is a 
             "wanted" setting for the remote, and transfer 'anything' otherwise.
-            Note: 'anything' and 'nothing' are "wanted" expressions understood
-            by git-annex.""",
-            constraints=EnsureChoice('anything', 'nothing', 'auto', 'auto-if-wanted')),
+            """,
+            constraints=EnsureChoice(
+                'anything', 'nothing', 'auto', 'auto-if-wanted')),
         force=Parameter(
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
