@@ -583,8 +583,11 @@ def postclonecfg_ria(ds, props):
     # get probe this RIA store when obtaining subdatasets
     ds.config.set(
         # we use the label 'origin' for this candidate in order to not have to
-        # generate a complicated name from the actual source specification
-        'datalad.get.subdataset-source-candidate-origin',
+        # generate a complicated name from the actual source specification.
+        # we pick a cost of 200 to sort it before datalad's default candidates
+        # for non-RIA URLs, because they prioritize hierarchical layouts that
+        # cannot be found in a RIA store
+        'datalad.get.subdataset-source-candidate-200origin',
         # use the entire original URL, up to the fragment + plus dataset ID
         # placeholder, this should make things work with any store setup we
         # support (paths, ports, ...)

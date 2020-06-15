@@ -702,7 +702,7 @@ def test_ria_http(lcl, storepath, url):
             eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
         ok_(cloneds.config.get('remote.origin.url').startswith(url))
         eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
-        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
+        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-200origin'),
             'ria+%s#{id}' % url)
 
     # now advance the source dataset
@@ -755,7 +755,7 @@ def test_ria_http(lcl, storepath, url):
     # ... the clone candidates go with the label-based URL such that
     # future get() requests acknowlege a (system-wide) configuration
     # update
-    eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-origin'),
+    eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-200origin'),
         'ria+ssh://somelabel#{id}')
 
     if not has_symlink_capability():
@@ -966,7 +966,7 @@ def test_inherit_src_candidates(lcl, storepath, url):
     eq_(len(datasets), 2)
     for ds in datasets:
         eq_(ConfigManager(dataset=ds, source='dataset-local').get(
-            'datalad.get.subdataset-source-candidate-origin'),
+            'datalad.get.subdataset-source-candidate-200origin'),
             'ria+%s#{id}' % url)
 
 
