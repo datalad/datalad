@@ -1972,15 +1972,15 @@ def test_AnnexRepo_get_corresponding_branch(path):
 
     ar = AnnexRepo(path)
 
-    # we should be on master.
+    # we should be on the default branch.
     eq_(DEFAULT_BRANCH,
         ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
     if ar.supports_unlocked_pointers:
         ar.adjust()
-        # as above, we still want to get 'master', while being on
-        # 'adjusted/master(unlocked)'
+        # as above, we still want to get the default branch, while being on
+        # 'adjusted/<default branch>(unlocked)'
         eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
             ar.get_active_branch())
         eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())

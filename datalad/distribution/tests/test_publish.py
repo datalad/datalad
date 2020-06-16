@@ -187,7 +187,7 @@ def test_publish_simple(origin, src_path, dst_path):
         list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(source.repo, target)
 
-    # 'target/master' should be tracking branch at this point, so
+    # 'target/<default branch>' should be tracking branch at this point, so
     # try publishing without `to`:
     # MIH: Nope, we don't automatically add this anymore
 
@@ -479,7 +479,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
         list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(source.repo, target)
 
-    # we need compare target/master:
+    # we need compare target/<default branch>:
     target.checkout(DEFAULT_BRANCH)
     ok_(target.file_has_content('test-annex.dat'))
 

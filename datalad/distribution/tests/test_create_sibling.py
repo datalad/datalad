@@ -806,7 +806,7 @@ def test_non_master_branch(src_path, target_path):
     target_path = Path(target_path)
 
     ds_a = Dataset(src_path).create()
-    # Rename rather than checking out another branch so that master
+    # Rename rather than checking out another branch so that the default branch
     # doesn't exist in any state.
     ds_a.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
     (ds_a.pathobj / "afile").write_text("content")

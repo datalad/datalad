@@ -1063,7 +1063,7 @@ def test_clone_unborn_head(path):
     # The setup below is involved, mostly because it's accounting for adjusted
     # branches. The scenario itself isn't so complicated, though:
     #
-    #   * a checked out master branch with no commits
+    #   * a checked out default branch with no commits
     #   * a (potentially adjusted) "abc" branch with commits.
     #   * a (potentially adjusted) "chooseme" branch whose tip commit has a
     #     more recent commit than any in "abc".

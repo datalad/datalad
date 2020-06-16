@@ -85,7 +85,7 @@ def test_invalid_call(path):
 
 
 def last_commit_msg(repo):
-    # ATTN: Use master explicitly so that this check works when we're on an
+    # ATTN: Pass branch explicitly so that this check works when we're on an
     # adjusted branch too (e.g., when this test is executed under Windows).
     return repo.format_commit("%B", DEFAULT_BRANCH)
 

@@ -96,7 +96,7 @@ def test_update_simple(origin, src_path, dst_path):
     # modification is not known to active branch:
     assert_not_in("update.txt",
                   dest.repo.get_files(dest.repo.get_active_branch()))
-    # modification is known to branch origin/master
+    # modification is known to branch origin/<default branch>
     assert_in("update.txt", dest.repo.get_files("origin/" + DEFAULT_BRANCH))
 
     # merge:

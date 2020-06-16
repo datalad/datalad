@@ -155,8 +155,9 @@ def test_save_message_file(path):
                        "msg": "add foo"})
     ds.repo.add("foo")
     ds.save(message_file=op.join(ds.path, "msg"))
-    # ATTN: Use master explicitly so that this check works when we're on an
-    # adjusted branch too (e.g., when this test is executed under Windows).
+    # ATTN: Consider corresponding branch so that this check works when we're
+    # on an adjusted branch too (e.g., when this test is executed under
+    # Windows).
     eq_(ds.repo.format_commit("%s", DEFAULT_BRANCH),
         "add foo")
 

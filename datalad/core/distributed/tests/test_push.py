@@ -229,7 +229,7 @@ def check_push(annex, src_path, dst_path):
             list(src_repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # we do not have more branches than we had in the beginning
-    # in particular no 'synced/master'
+    # in particular no 'synced/<default branch>'
     eq_(orig_branches, src_repo.get_branches())
 
 
@@ -300,7 +300,7 @@ def test_push_recursive(
             eq_(list(s.repo.get_branch_commits_("git-annex")),
                 list(d.get_branch_commits_("git-annex")))
 
-    # rerun should not result in further pushes of master
+    # rerun should not result in further pushes of the default branch
     res = top.push(to="target", recursive=True)
     assert_not_in_results(
         res, status='ok', refspec=DEFAULT_REFSPEC)
