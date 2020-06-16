@@ -25,6 +25,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     assert_status,
+    DEFAULT_BRANCH,
     eq_,
     neq_,
     ok_,
@@ -45,6 +46,8 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.core.distributed.clone import Clone
 from datalad.core.distributed.push import Push
 from datalad.support.network import get_local_file_url
+
+DEFAULT_REFSPEC = "refs/heads/{0}:refs/heads/{0}".format(DEFAULT_BRANCH)
 
 
 @with_tempfile(mkdir=True)
@@ -119,7 +122,7 @@ def check_push(annex, src_path, dst_path):
     src_repo = src.repo
     # push should not add branches to the local dataset
     orig_branches = src_repo.get_branches()
-    assert_not_in('synced/master', orig_branches)
+    assert_not_in('synced/' + DEFAULT_BRANCH, orig_branches)
 
     res = src.push(on_failure='ignore')
     assert_result_count(res, 1)
@@ -138,16 +141,18 @@ def check_push(annex, src_path, dst_path):
     assert_in_results(
         res,
         action='publish', status='ok', target='target',
-        refspec='refs/heads/master:refs/heads/master',
+        refspec=DEFAULT_REFSPEC,
         operations=['new-branch'])
 
     assert_repo_status(src_repo, annex=annex)
-    eq_(list(target.get_branch_commits_("master")),
-        list(src_repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(src_repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # configure a default merge/upstream target
-    src.config.set('branch.master.remote', 'target', where='local')
-    src.config.set('branch.master.merge', 'master', where='local')
+    src.config.set('branch.{}.remote'.format(DEFAULT_BRANCH),
+                   'target', where='local')
+    src.config.set('branch.{}.merge'.format(DEFAULT_BRANCH),
+                   DEFAULT_BRANCH, where='local')
 
     # don't fail when doing it again, no explicit target specification
     # needed anymore
@@ -157,8 +162,8 @@ def check_push(annex, src_path, dst_path):
     assert_status('notneeded', res)
 
     assert_repo_status(src_repo, annex=annex)
-    eq_(list(target.get_branch_commits_("master")),
-        list(src_repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(src_repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # some modification:
     (src.pathobj / 'test_mod_file').write_text("Some additional stuff.")
@@ -174,7 +179,7 @@ def check_push(annex, src_path, dst_path):
     assert_in_results(
         res,
         action='publish', status='ok', target='target',
-        refspec='refs/heads/master:refs/heads/master',
+        refspec=DEFAULT_REFSPEC,
         # we get to see what happened
         operations=['fast-forward'])
     if annex:
@@ -194,8 +199,8 @@ def check_push(annex, src_path, dst_path):
             src_repo.pathobj / 'test_mod_annex_file',
             'Heavy stuff.')
 
-    eq_(list(target.get_branch_commits_("master")),
-        list(src_repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(src_repo.get_branch_commits_(DEFAULT_BRANCH)))
     if not (annex and src_repo.is_managed_branch()):
         # the following doesn't make sense in managed branches, because
         # a commit that could be amended is no longer the last commit
@@ -211,17 +216,17 @@ def check_push(annex, src_path, dst_path):
         assert_in_results(
             res,
             action='publish', status='error', target='target',
-            refspec='refs/heads/master:refs/heads/master',
+            refspec=DEFAULT_REFSPEC,
             operations=['rejected', 'error'])
         # push with force=True works:
         res = src.push(to='target', since='HEAD~2', force='gitpush')
         assert_in_results(
             res,
             action='publish', status='ok', target='target',
-            refspec='refs/heads/master:refs/heads/master',
+            refspec=DEFAULT_REFSPEC,
             operations=['forced-update'])
-        eq_(list(target.get_branch_commits_("master")),
-            list(src_repo.get_branch_commits_("master")))
+        eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+            list(src_repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # we do not have more branches than we had in the beginning
     # in particular no 'synced/master'
@@ -260,7 +265,7 @@ def test_push_recursive(
     res = top.push(to="target", recursive=True, on_failure='ignore')
     assert_in_results(
         res, path=top.path, type='dataset',
-        refspec='refs/heads/master:refs/heads/master',
+        refspec=DEFAULT_REFSPEC,
         operations=['new-branch'], action='publish', status='ok',
         target='target')
     for d in (sub, subsub, subnoannex):
@@ -284,13 +289,13 @@ def test_push_recursive(
     for d in (sub, subsub, subnoannex):
         assert_in_results(
             res, status='ok', type='dataset', path=d.path,
-            refspec='refs/heads/master:refs/heads/master')
+            refspec=DEFAULT_REFSPEC)
     # all correspondig branches match across all datasets
     for s, d in zip((top, sub, subnoannex, subsub),
                     (target_top, target_sub, target_subnoannex,
                      target_subsub)):
-        eq_(list(s.repo.get_branch_commits_("master")),
-            list(d.get_branch_commits_("master")))
+        eq_(list(s.repo.get_branch_commits_(DEFAULT_BRANCH)),
+            list(d.get_branch_commits_(DEFAULT_BRANCH)))
         if s != subnoannex:
             eq_(list(s.repo.get_branch_commits_("git-annex")),
                 list(d.get_branch_commits_("git-annex")))
@@ -298,9 +303,9 @@ def test_push_recursive(
     # rerun should not result in further pushes of master
     res = top.push(to="target", recursive=True)
     assert_not_in_results(
-        res, status='ok', refspec="refs/heads/master:refs/heads/master")
+        res, status='ok', refspec=DEFAULT_REFSPEC)
     assert_in_results(
-        res, status='notneeded', refspec="refs/heads/master:refs/heads/master")
+        res, status='notneeded', refspec=DEFAULT_REFSPEC)
 
     if top.repo.is_managed_branch():
         raise SkipTest(
@@ -321,7 +326,7 @@ def test_push_recursive(
     for d in (top, sub, subsub):
         assert_in_results(
             res, status='ok', type='dataset', path=d.path,
-            refspec='refs/heads/master:refs/heads/master')
+            refspec=DEFAULT_REFSPEC)
     # file content copied too
     assert_in_results(
         res,
@@ -348,7 +353,7 @@ def test_push_recursive(
     for d in (top, subnoannex):
         assert_in_results(
             res, status='ok', type='dataset', path=d.path,
-            refspec='refs/heads/master:refs/heads/master')
+            refspec=DEFAULT_REFSPEC)
     # an unconditional push should now pick up the remaining changes
     res = top.push(to="target", recursive=True)
     assert_in_results(
@@ -358,11 +363,11 @@ def test_push_recursive(
         path=str(sub.pathobj / 'test_mod_annex_file'))
     assert_in_results(
         res, status='ok', type='dataset', path=sub.path,
-        refspec='refs/heads/master:refs/heads/master')
+        refspec=DEFAULT_REFSPEC)
     for d in (top, subnoannex, subsub):
         assert_in_results(
             res, status='notneeded', type='dataset', path=d.path,
-            refspec='refs/heads/master:refs/heads/master')
+            refspec=DEFAULT_REFSPEC)
 
 
 @with_tempfile(mkdir=True)
@@ -411,7 +416,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
     # nothing reported to be copied
     assert_not_in_results(res, action='copy')
     # we got the git-push nevertheless
-    eq_(src.repo.get_hexsha('master'), target.get_hexsha('master'))
+    eq_(src.repo.get_hexsha(DEFAULT_BRANCH), target.get_hexsha(DEFAULT_BRANCH))
     # nothing moved
     eq_(whereis_prior, src.repo.whereis(files=['test_mod_annex_file'])[0])
 
@@ -421,7 +426,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
     res = src.push(to='target', force=None)
     # no branch change, done before
     assert_in_results(res, action='publish', status='notneeded',
-                      refspec='refs/heads/master:refs/heads/master')
+                      refspec=DEFAULT_REFSPEC)
     # but availability update
     assert_in_results(res, action='publish', status='ok',
                       refspec='refs/heads/git-annex:refs/heads/git-annex')
@@ -442,7 +447,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
     res = src.push(to='target', force='checkdatapresent')
     # no branch change, done before
     assert_in_results(res, action='publish', status='notneeded',
-                      refspec='refs/heads/master:refs/heads/master')
+                      refspec=DEFAULT_REFSPEC)
     # no availability update
     assert_in_results(res, action='publish', status='notneeded',
                       refspec='refs/heads/git-annex:refs/heads/git-annex')
@@ -478,7 +483,7 @@ def test_ria_push(srcpath, dstpath):
     res = src.push(to='datastore')
     assert_in_results(
         res, action='publish', target='datastore', status='ok',
-        refspec='refs/heads/master:refs/heads/master')
+        refspec=DEFAULT_REFSPEC)
     assert_in_results(
         res, action='publish', target='datastore', status='ok',
         refspec='refs/heads/git-annex:refs/heads/git-annex')
@@ -497,19 +502,22 @@ def test_gh1426(origin_path, target_path):
     origin.push(to='target')
     assert_repo_status(origin.path)
     assert_repo_status(target.path)
-    eq_(origin.repo.get_hexsha('master'), target.get_hexsha('master'))
+    eq_(origin.repo.get_hexsha(DEFAULT_BRANCH),
+        target.get_hexsha(DEFAULT_BRANCH))
 
     # gist of #1426 is that a newly added subdataset does not cause the
     # superdataset to get published
     origin.create('sub')
     assert_repo_status(origin.path)
-    neq_(origin.repo.get_hexsha('master'), target.get_hexsha('master'))
+    neq_(origin.repo.get_hexsha(DEFAULT_BRANCH),
+         target.get_hexsha(DEFAULT_BRANCH))
     # now push
     res = origin.push(to='target')
     assert_result_count(
         res, 1, status='ok', type='dataset', path=origin.path,
         action='publish', target='target', operations=['fast-forward'])
-    eq_(origin.repo.get_hexsha('master'), target.get_hexsha('master'))
+    eq_(origin.repo.get_hexsha(DEFAULT_BRANCH),
+        target.get_hexsha(DEFAULT_BRANCH))
 
 
 @skip_if_on_windows  # create_sibling incompatible with win servers

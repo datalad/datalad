@@ -37,6 +37,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     get_mtimes_and_digests,
     ok_,
@@ -238,7 +239,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
                 dataset=source,
                 name="local_target",
                 sshurl="ssh://localhost" + target_path,
-                publish_by_default='master',
+                publish_by_default=DEFAULT_BRANCH,
                 existing='replace',
                 ui=True,
             )
@@ -257,7 +258,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             # valid uuid
             eq_(lclcfg.get('remote.local_target.annex-uuid').count('-'), 4)
             # should be added too, even if URL matches prior state
-            eq_(lclcfg.get('remote.local_target.push'), 'master')
+            eq_(lclcfg.get('remote.local_target.push'), DEFAULT_BRANCH)
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
@@ -807,7 +808,7 @@ def test_non_master_branch(src_path, target_path):
     ds_a = Dataset(src_path).create()
     # Rename rather than checking out another branch so that master
     # doesn't exist in any state.
-    ds_a.repo.call_git(["branch", "-m", "master", "other"])
+    ds_a.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
     (ds_a.pathobj / "afile").write_text("content")
     sa = ds_a.create("sub-a")
     sa.repo.checkout("other-sub", ["-b"])
@@ -832,4 +833,4 @@ def test_non_master_branch(src_path, target_path):
     eq_(get_branch(Dataset(target_path / "b" / "sub-a").repo),
         "other-sub")
     eq_(get_branch(Dataset(target_path / "b" / "sub-b").repo),
-        "master")
+        DEFAULT_BRANCH)

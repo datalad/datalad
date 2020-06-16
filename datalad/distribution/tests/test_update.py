@@ -46,6 +46,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     assert_in_results,
+    DEFAULT_BRANCH,
     SkipTest,
     slow,
     known_failure_windows,
@@ -96,7 +97,7 @@ def test_update_simple(origin, src_path, dst_path):
     assert_not_in("update.txt",
                   dest.repo.get_files(dest.repo.get_active_branch()))
     # modification is known to branch origin/master
-    assert_in("update.txt", dest.repo.get_files("origin/master"))
+    assert_in("update.txt", dest.repo.get_files("origin/" + DEFAULT_BRANCH))
 
     # merge:
     assert_status('ok', dest.update(merge=True))
@@ -236,8 +237,8 @@ def test_update_fetch_all(src, remote_1, remote_2):
     assert_not_in("second.txt",
                   ds.repo.get_files(ds.repo.get_active_branch()))
     # but we know the changes in remote branches:
-    assert_in("first.txt", ds.repo.get_files("sibling_1/master"))
-    assert_in("second.txt", ds.repo.get_files("sibling_2/master"))
+    assert_in("first.txt", ds.repo.get_files("sibling_1/" + DEFAULT_BRANCH))
+    assert_in("second.txt", ds.repo.get_files("sibling_2/" + DEFAULT_BRANCH))
 
     # no merge strategy for multiple remotes yet:
     # more clever now, there is a tracking branch that provides a remote
@@ -280,7 +281,7 @@ def test_newthings_coming_down(originpath, destpath):
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     assert(knows_annex(ds.path))
     # no branches appeared
-    eq_(ds.repo.get_branches(), ['master'])
+    eq_(ds.repo.get_branches(), [DEFAULT_BRANCH])
     # now merge, and get an annex
     assert_result_count(ds.update(merge=True),
                         1, action='update', status='ok', type='dataset')
@@ -310,7 +311,8 @@ def test_newthings_coming_down(originpath, destpath):
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(before_branches, ds.repo.get_branches())
     # annex branch got pruned
-    eq_(['origin/HEAD', 'origin/master'], ds.repo.get_remote_branches())
+    eq_(['origin/HEAD', 'origin/' + DEFAULT_BRANCH],
+        ds.repo.get_remote_branches())
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
@@ -474,7 +476,7 @@ def test_merge_no_merge_target(path):
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     assert_repo_status(ds_src.path)
-    ds_clone.repo.checkout("master", options=["-bnew"])
+    ds_clone.repo.checkout(DEFAULT_BRANCH, options=["-bnew"])
     res = ds_clone.update(merge=True, on_failure="ignore")
     assert_in_results(res, status="impossible", action="update")
 
@@ -640,7 +642,7 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
 
     (ds_src_subds.pathobj / "bar").write_text("bar content")
     ds_src.save(recursive=True)
-    ds_clone_subds.repo.checkout("master", options=["-bnew"])
+    ds_clone_subds.repo.checkout(DEFAULT_BRANCH, options=["-bnew"])
     ds_clone.update(merge=True, follow="parentds", recursive=True)
     if not on_adjusted:
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
@@ -677,7 +679,7 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     # top repo for the submodule (even if using 'git annex sync' rather than
     # 'git merge').
 
-    ds_src_subds.repo.call_git(["checkout", "master^0"])
+    ds_src_subds.repo.call_git(["checkout", DEFAULT_BRANCH + "^0"])
     (ds_src_subds.pathobj / "foo").write_text("foo content")
     ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
@@ -722,7 +724,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
                        recursive=True, result_xfm="datasets")
     ds_clone_s1 = Dataset(ds_clone.pathobj / "s0" / "s1")
 
-    ds_src_s1.repo.checkout("master^0")
+    ds_src_s1.repo.checkout(DEFAULT_BRANCH + "^0")
     (ds_src_s1.pathobj / "foo").write_text("foo content")
     ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
@@ -756,7 +758,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # the explicit revision fetch fails.
     (ds_src_s1.pathobj / "bar").write_text("bar content")
     ds_src.save(recursive=True)
-    ds_src_s1.repo.checkout('master')
+    ds_src_s1.repo.checkout(DEFAULT_BRANCH)
     # This is the default, but just in case:
     ds_src_s1.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
                               where="local")
@@ -799,8 +801,8 @@ def test_merge_follow_parentds_subdataset_detached():
 @with_tempfile(mkdir=True)
 def test_update_unborn_master(path):
     ds_a = Dataset(op.join(path, "ds-a")).create()
-    ds_a.repo.call_git(["branch", "-m", "master", "other"])
-    ds_a.repo.checkout("master", options=["--orphan"])
+    ds_a.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
+    ds_a.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
     ds_b = install(source=ds_a.path, path=op.join(path, "ds-b"))
 
     ds_a.repo.checkout("other")
@@ -811,7 +813,8 @@ def test_update_unborn_master(path):
     # is another ref available.  Reverse these efforts so that we can
     # test that update() fails reasonably here because we should still
     # be able to update from remotes that datalad didn't clone.
-    ds_b.repo.update_ref("HEAD", "refs/heads/master", symbolic=True)
+    ds_b.repo.update_ref("HEAD", "refs/heads/" + DEFAULT_BRANCH,
+                         symbolic=True)
     assert_false(ds_b.repo.commit_exists("HEAD"))
     assert_status("impossible",
                   ds_b.update(merge=True, on_failure="ignore"))

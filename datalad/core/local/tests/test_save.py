@@ -27,6 +27,7 @@ from datalad.tests.utils import (
     assert_status,
     chpwd,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     known_failure_appveyor,
     known_failure_windows,
@@ -156,7 +157,7 @@ def test_save_message_file(path):
     ds.save(message_file=op.join(ds.path, "msg"))
     # ATTN: Use master explicitly so that this check works when we're on an
     # adjusted branch too (e.g., when this test is executed under Windows).
-    eq_(ds.repo.format_commit("%s", "master"),
+    eq_(ds.repo.format_commit("%s", DEFAULT_BRANCH),
         "add foo")
 
 

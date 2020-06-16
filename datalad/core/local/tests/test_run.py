@@ -54,6 +54,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     known_failure_appveyor,
     known_failure_githubci_win,
@@ -86,7 +87,7 @@ def test_invalid_call(path):
 def last_commit_msg(repo):
     # ATTN: Use master explicitly so that this check works when we're on an
     # adjusted branch too (e.g., when this test is executed under Windows).
-    return repo.format_commit("%B", "master")
+    return repo.format_commit("%B", DEFAULT_BRANCH)
 
 
 @with_tempfile(mkdir=True)

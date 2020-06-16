@@ -43,6 +43,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     known_failure_windows,
     neq_,
@@ -172,8 +173,8 @@ def test_publish_simple(origin, src_path, dst_path):
 
     assert_repo_status(source.repo, annex=None)
     assert_repo_status(target, annex=None)
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
@@ -182,8 +183,8 @@ def test_publish_simple(origin, src_path, dst_path):
 
     assert_repo_status(source.repo, annex=None)
     assert_repo_status(target, annex=None)
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(source.repo, target)
 
     # 'target/master' should be tracking branch at this point, so
@@ -201,8 +202,8 @@ def test_publish_simple(origin, src_path, dst_path):
     eq_(res, [source])
 
     assert_repo_status(dst_path, annex=None)
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(source.repo, target)
 
     eq_(filter_fsck_error_msg(source.repo.fsck()),
@@ -231,8 +232,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
 
     assert_repo_status(source.repo, annex=None)
     assert_repo_status(target, annex=None)
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
@@ -241,8 +242,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
 
     assert_repo_status(source.repo, annex=None)
     assert_repo_status(target, annex=None)
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
@@ -255,8 +256,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     eq_(res, [source])
 
     assert_repo_status(dst_path, annex=None)
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
 
     # amend and change commit msg in order to test for force push:
     source.repo.commit("amended", options=['--amend'])
@@ -332,14 +333,14 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     eq_({r['path'] for r in res},
         {src_path, sub1.path, sub2.path})
 
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(source.repo, target)
-    eq_(list(sub1_target.get_branch_commits_("master")),
-        list(sub1.get_branch_commits_("master")))
+    eq_(list(sub1_target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(sub1.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(sub1, sub1_target)
-    eq_(list(sub2_target.get_branch_commits_("master")),
-        list(sub2.get_branch_commits_("master")))
+    eq_(list(sub2_target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(sub2.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(sub2, sub2_target)
 
     # we are tracking origin but origin has different git-annex, since we
@@ -422,7 +423,8 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # merge point"
     source.save(message="Changes in subm2")
     # and test if it could deduce the remote/branch to push to
-    source.config.set('branch.master.remote', 'target', where='local')
+    source.config.set('branch.{}.remote'.format(DEFAULT_BRANCH),
+                      'target', where='local')
     with chpwd(source.path):
         res_ = publish(since='', recursive=True)
     # TODO: somehow test that there were no even attempt to diff within "subm 1"
@@ -473,12 +475,12 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     eq_(set(res), set([opj(source.path, 'test-annex.dat'), source.path]))
     # XXX master was not checked out in dst!
 
-    eq_(list(target.get_branch_commits_("master")),
-        list(source.repo.get_branch_commits_("master")))
+    eq_(list(target.get_branch_commits_(DEFAULT_BRANCH)),
+        list(source.repo.get_branch_commits_(DEFAULT_BRANCH)))
     assert_git_annex_branch_published(source.repo, target)
 
     # we need compare target/master:
-    target.checkout("master")
+    target.checkout(DEFAULT_BRANCH)
     ok_(target.file_has_content('test-annex.dat'))
 
     # make sure that whatever we published is actually consumable
