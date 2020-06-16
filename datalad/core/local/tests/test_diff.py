@@ -515,7 +515,7 @@ def test_no_worktree_impact_false_deletions(path):
     ds = Dataset(path).create()
     # create a branch that has no new content
     ds.repo.call_git(['checkout', '-b', 'test'])
-    # place to successive commits with file additions into the master branch
+    # place two successive commits with file additions into the master branch
     ds.repo.call_git(['checkout', DEFAULT_BRANCH])
     (ds.pathobj / 'identical').write_text('should be')
     ds.save()
