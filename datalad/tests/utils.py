@@ -100,6 +100,12 @@ _TEMP_PATHS_CLONES = set()
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
 
+if external_versions["cmd:git"] >= "2.28":
+    # The specific value here doesn't matter, but it should not be the default
+    # from any Git version to test that we work with custom values.
+    DEFAULT_BRANCH = "dl-test-branch"  # Set by setup_package().
+else:
+    DEFAULT_BRANCH = "master"
 
 # additional shortcuts
 neq_ = assert_not_equal
