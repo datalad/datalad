@@ -57,6 +57,7 @@ from datalad.tests.utils import (
     assert_result_values_equal,
     ok_startswith,
     assert_repo_status,
+    set_date,
     serve_path_via_http,
     swallow_logs,
     use_cassette,
@@ -793,14 +794,17 @@ def test_clone_unborn_head(path):
                     "refs/heads/{}".format(
                         "adjusted/abc(unlocked)" if managed else "abc"),
                     symbolic=True)
+    abc_ts = int(repo.format_commit("%ct"))
     repo.call_git(["checkout", "-b", "chooseme", "abc~1"])
     if managed:
         repo.adjust()
     (ds_origin.pathobj / "bar").write_text("bar content")
-    ds_origin.save(message="bar")
-    # Try to make the git-annex branch the most recently updated ref so that we
-    # test that it is skipped.
-    ds_origin.drop("bar", check=False)
+    with set_date(abc_ts + 1):
+        ds_origin.save(message="bar")
+    # Make the git-annex branch the most recently updated ref so that we test
+    # that it is skipped.
+    with set_date(abc_ts + 2):
+        ds_origin.drop("bar", check=False)
     ds_origin.repo.checkout("master", options=["--orphan"])
 
     ds = clone(ds_origin.path, op.join(path, "b"))
