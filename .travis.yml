@@ -246,7 +246,8 @@ install:
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
-  - npm install grunt-contrib-qunit@>=3.0.1
+  # FIXME: Pinned because v4.0.0 caused failure (gh-4635).
+  - npm install grunt-contrib-qunit@3.1.0
 
 script:
   # Test installation system-wide
