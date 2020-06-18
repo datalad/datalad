@@ -1740,6 +1740,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if pointers or batch or not allow_quick:
             # We're only concerned about modified files in V6+ mode. In V5
             # `find` returns an empty string for unlocked files.
+            #
+            # ATTN: test_AnnexRepo_file_has_content has a failure before Git
+            # v2.13 (tested back to v2.9) because this diff call unexpectedly
+            # reports a type change as modified.
             modified = [
                 f for f in self.call_git_items_(
                     ['diff', '--name-only', '-z'], sep='\0')
