@@ -550,10 +550,9 @@ Refer datalad/config.py for information on how to add these environment variable
 
 ## Branches
 
-- `master`: changes toward the next `MAJOR.MINOR.0` release (e.g., `0.13` as of time of writing).
-  It is also used for release candidates (with `rcX` suffix)
-- `maint`: bug fixes and minor enhancements for the latest released `MAJOR.MINOR.PATCH`
- (e.g., `0.12.7` as of time of writing)
+- `master`: changes toward the next `MAJOR.MINOR.0` release.
+  Release candidates (tagged with an rcX suffix) are cut from this branch
+- `maint`: bug fixes for the latest released `MAJOR.MINOR.PATCH`
 - `MAJOR.MINOR`: generally not used, unless some bugfix release with a crticial bugfix is needed.
 
 ## Workflow
