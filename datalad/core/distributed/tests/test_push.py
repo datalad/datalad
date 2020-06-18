@@ -626,3 +626,59 @@ def test_push_wanted(srcpath, dstpath):
     res = src.push(to='target')
     assert_in_results(res, path=str(src.pathobj / 'secure.1'))
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
+
+
+@with_tempfile(mkdir=True)
+def test_auto_data_transfer(path):
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    (ds_a.pathobj / "foo.dat").write_text("foo")
+    ds_a.save()
+
+    # Should be the default, but just in case.
+    ds_a.repo.config.set("annex.numcopies", "1", where="local")
+    ds_a.create_sibling(str(path / "b"), name="b")
+
+    # With numcopies=1, no data is copied with data="auto".
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_not_in_results(res, action="copy")
+
+    # Even when a file is explicitly given.
+    res = ds_a.push(to="b", path="foo.dat", data="auto", since=None)
+    assert_not_in_results(res, action="copy")
+
+    # numcopies=2 changes that.
+    ds_a.repo.config.set("annex.numcopies", "2", where="local")
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_in_results(
+        res, action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "foo.dat"))
+
+    # --since= limits the files considered by --auto.
+    (ds_a.pathobj / "bar.dat").write_text("bar")
+    ds_a.save()
+    (ds_a.pathobj / "baz.dat").write_text("baz")
+    ds_a.save()
+    res = ds_a.push(to="b", data="auto", since="HEAD~1")
+    assert_not_in_results(
+        res,
+        action="copy", path=str(ds_a.pathobj / "bar.dat"))
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "baz.dat"))
+
+    # --auto also considers preferred content.
+    ds_a.repo.config.unset("annex.numcopies", where="local")
+    ds_a.repo.set_preferred_content("wanted", "nothing", remote="b")
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_not_in_results(
+        res,
+        action="copy", path=str(ds_a.pathobj / "bar.dat"))
+
+    ds_a.repo.set_preferred_content("wanted", "anything", remote="b")
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "bar.dat"))
