@@ -1,3 +1,9 @@
+datalad (0.13.0~rc2+git66-g1d11ca9d0-1) UNRELEASED; urgency=medium
+
+  * Draft for 0.13.0
+
+ -- Michael Hanke <mih@debian.org>  Fri, 19 Jun 2020 13:46:07 +0200
+
 datalad (0.12.4-2) unstable; urgency=medium
 
   * Add python3-distro to Depends of python3-datalad (needed for python>=3.8).
