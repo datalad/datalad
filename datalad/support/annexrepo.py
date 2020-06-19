@@ -735,12 +735,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd = ['git']
             if git_options:
                 cmd.extend(git_options)
-
-            cmd.append("rev-parse")
-            if external_versions['cmd:git'] >= '2.13.0':
-                cmd.append("--absolute-git-dir")
-            else:
-                cmd.append("--git-dir")
+            cmd.extend(["rev-parse", "--absolute-git-dir"])
 
             try:
                 toppath, err = GitRunner().run(
@@ -755,10 +750,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 toppath = AnnexRepo.get_toppath(dirname(path),
                                                 follow_up=follow_up,
                                                 git_options=git_options)
-
-            if external_versions['cmd:git'] < '2.13.0':
-                # we got a path relative to `path` instead of an absolute one
-                toppath = opj(path, toppath)
 
             # we got the git-dir. Assuming the root dir we are looking for is
             # one level up:

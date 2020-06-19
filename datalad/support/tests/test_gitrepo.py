@@ -46,7 +46,6 @@ from datalad.tests.utils import (
     local_testrepo_flavors,
     neq_,
     ok_,
-    skip_if,
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
@@ -146,7 +145,6 @@ def test_GitRepo_init_options(path):
     ok_(gr.config.getbool(section="core", option="bare"))
 
 
-@skip_if(external_versions['cmd:git'] < '2.14.0')
 @with_tree(
     tree={
         'subds': {

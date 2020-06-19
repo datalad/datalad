@@ -26,7 +26,6 @@ from datalad.tests.utils import (
     assert_true,
     chpwd,
     ok_file_has_content,
-    skip_if,
     with_tempfile,
     with_testsui,
     with_tree,
@@ -44,7 +43,6 @@ from datalad.config import (
 )
 from datalad.cmd import CommandError
 
-from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 
 
@@ -203,11 +201,6 @@ def test_something(path, new_home):
         # but after we unset the only value -- that section is no longer listed
         assert (not globalcfg.has_section('datalad.unittest'))
         assert_not_in('datalad.unittest.youcan', globalcfg)
-        if external_versions['cmd:git'] < '2.18':
-            # older versions leave empty section behind in the file
-            ok_file_has_content(global_gitconfig, '[datalad "unittest"]', strip=True)
-            # remove_section to clean it up entirely
-            globalcfg.remove_section('datalad.unittest', where='global')
         ok_file_has_content(global_gitconfig, "")
 
     cfg = ConfigManager(
@@ -467,7 +460,6 @@ def test_no_leaks(path1, path2):
         assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
 
 
-@skip_if(external_versions["cmd:git"] < "2.13.2")
 @with_tempfile()
 def test_no_local_write_if_no_dataset(path):
     Dataset(path).create()

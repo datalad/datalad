@@ -980,13 +980,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
             os.makedirs(path)
-        elif sanity_checks and external_versions['cmd:git'] < '2.14.0':
-            warnings.warn(
-                "Your git version (%s) is too old, we will not safe-guard "
-                "against creating a new repository under already known to git "
-                "subdirectory" % external_versions['cmd:git'],
-                OutdatedExternalDependencyWarning
-            )
         elif sanity_checks:
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
@@ -2610,8 +2603,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             options = []
         if msg:
             options = options + ["-m", msg]
-        if allow_unrelated and external_versions['cmd:git'] >= '2.9':
-            options += ['--allow-unrelated-histories']
+        options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
             check_fake_dates=True,
