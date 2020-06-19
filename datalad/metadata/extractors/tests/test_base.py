@@ -11,20 +11,20 @@
 from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
-from datalad.utils import on_osx
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_githubci_win
-
-from nose import SkipTest
-from nose.tools import assert_equal
+from datalad.tests.utils import (
+    assert_equal,
+    assert_repo_status,
+    known_failure_githubci_win,
+    SkipTest,
+    with_tree,
+)
 
 
 @with_tree(tree={'file.dat': ''})
-def check_api(no_annex, path):
-    ds = Dataset(path).create(force=True, no_annex=no_annex)
+def check_api(annex, path):
+    ds = Dataset(path).create(force=True, annex=annex)
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     processed_extractors, skipped_extractors = [], []
     for extractor_ep in iter_entry_points('datalad.metadata.extractors'):
@@ -55,7 +55,7 @@ def check_api(no_annex, path):
         if extractor_ep.name == 'datalad_core':
             assert 'file.dat' in cm
         elif extractor_ep.name == 'annex':
-            if not no_annex:
+            if annex:
                 # verify correct key, which is the same for all files of 0 size
                 assert_equal(
                     cm['file.dat']['key'],
@@ -76,9 +76,9 @@ def check_api(no_annex, path):
 @known_failure_githubci_win
 def test_api_git():
     # should tollerate both pure git and annex repos
-    yield check_api, True
+    yield check_api, False
 
 
 @known_failure_githubci_win
 def test_api_annex():
-    yield check_api, False
+    yield check_api, True

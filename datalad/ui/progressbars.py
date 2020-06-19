@@ -26,19 +26,21 @@ from .. import lgr
 class ProgressBarBase(object):
     """Base class for any progress bar"""
 
-    def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B', initial=0):
+    def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B'):
         self.label = label
         self.fill_text = fill_text
         self.total = total
         self.unit = unit
         self.out = out
-        self._current = initial
+        self._current = 0
 
     def refresh(self):
         """Force update"""
         pass
 
-    def update(self, size, increment=False):
+    def update(self, size, increment=False, total=None):
+        if total:
+            self.total = total
         if not size:
             return
         if increment:
@@ -224,7 +226,9 @@ try:
             frontend: (None, 'ipython'), optional
               tqdm module to use.  Could be tqdm_notebook if under IPython
             """
-            super(tqdmProgressBar, self).__init__(label=label, total=total, unit=unit)
+            super(tqdmProgressBar, self).__init__(label=label,
+                                                  total=total,
+                                                  unit=unit)
 
             if frontend not in self._frontends:
                 raise ValueError(
@@ -248,31 +252,49 @@ try:
                 self._default_pbar_params,
                 dict(desc=label, unit=unit,
                      unit_scale=True, total=total, file=out,
-                     leave=leave
+                     leave=leave,
                      ))
             self._pbar = None
 
-        def _create(self):
+        def _create(self, initial=0):
             if self._pbar is None:
-                self._pbar = self._tqdm(**self._pbar_params)
+                self._pbar = self._tqdm(initial=initial, **self._pbar_params)
 
-        def update(self, size, increment=False):
+        def update(self, size, increment=False, total=None):
             self._create()
+            if total is not None:
+                # only a reset can change the total of an existing pbar
+                self._pbar.reset(total)
+                # we need to (re-)advance the pbar back to the old state
+                self._pbar.update(self.current)
+                # an update() does not (reliably) trigger a refresh, hence
+                # without the next, the pbar may still show zero progress
+                if not size:
+                    # whenever a total is changed, we need a refresh. If there is
+                    # no progress update, we do it here, else we'll do it after
+                    # the progress update
+                    self._pbar.refresh()
+                # if we set a new total and also advance the progress bar:
             if not size:
                 return
             inc = size - self.current
             try:
                 self._pbar.update(size if increment else inc)
+                if total:
+                    # refresh to new total and progress
+                    self._pbar.refresh()
             except ValueError:
                 # Do not crash entire process because of some glitch with
                 # progressbar update
                 # TODO: issue a warning?
                 pass
-            super(tqdmProgressBar, self).update(size, increment=increment)
+            super(tqdmProgressBar, self).update(size,
+                                                increment=increment,
+                                                total=total)
 
-        def start(self):
-            super(tqdmProgressBar, self).start()
-            self._create()
+        def start(self, initial=0):
+            super(tqdmProgressBar, self).start(initial=initial)
+            self._create(initial=initial)
 
         def refresh(self):
             super(tqdmProgressBar, self).refresh()

@@ -11,30 +11,58 @@
 
 import re
 from os import linesep
-
-
+from pprint import pformat
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
 
-    def __init__(self, cmd="", msg="", code=None, stdout="", stderr=""):
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
+                 **kwargs):
         RuntimeError.__init__(self, msg)
         self.cmd = cmd
         self.msg = msg
         self.code = code
         self.stdout = stdout
         self.stderr = stderr
+        self.cwd = cwd
+        self.kwargs = kwargs
+
+    def to_str(self, include_output=True):
+        from datalad.utils import (
+            ensure_unicode,
+            ensure_list,
+            quote_cmdlinearg,
+        )
+        to_str = "{}: ".format(self.__class__.__name__)
+        if self.cmd:
+            to_str += "'{}'".format(
+                # go for a compact, normal looking, properly quoted
+                # command rendering
+                ' '.join(quote_cmdlinearg(c) for c in ensure_list(self.cmd))
+            )
+        if self.code:
+            to_str += " failed with exitcode {}".format(self.code)
+        if self.cwd:
+            # only if not under standard PWD
+            to_str += " under {}".format(self.cwd)
+        if self.msg:
+            # typically a command error has no specific idea
+            to_str += " [{}]".format(ensure_unicode(self.msg))
+        if not include_output:
+            return to_str
+
+        if self.stdout:
+            to_str += " [out: '{}']".format(ensure_unicode(self.stdout).strip())
+        if self.stderr:
+            to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
+        if self.kwargs:
+            to_str += " [info keys: {}]".format(
+                ', '.join(self.kwargs.keys()))
+        return to_str
 
     def __str__(self):
-        from datalad.utils import assure_unicode
-        to_str = "%s: " % self.__class__.__name__
-        if self.cmd:
-            to_str += "command '%s'" % (self.cmd,)
-        if self.code:
-            to_str += " failed with exitcode %d" % self.code
-        to_str += "\n%s" % assure_unicode(self.msg)
-        return to_str
+        return self.to_str()
 
 
 class MissingExternalDependency(RuntimeError):
@@ -163,7 +191,8 @@ class GitIgnoreError(CommandError):
     """
 
     pattern = \
-        re.compile(r'ignored by one of your .gitignore files:\s*(.*)^Use -f.*$',
+        re.compile(r'ignored by one of your .gitignore files:\s*(.*)'
+                   r'^(?:hint: )?Use -f.*$',
                    flags=re.MULTILINE | re.DOTALL)
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="",
@@ -193,6 +222,14 @@ class PathKnownToRepositoryError(Exception):
     """Thrown if file/path is under Git control, and attempted operation
     must not be ran"""
     pass
+
+
+class GitError(Exception):
+    """ Base class for all package exceptions """
+
+
+class NoSuchPathError(GitError, OSError):
+    """ Thrown if a path could not be access by the system. """
 
 
 class MissingBranchError(Exception):
@@ -289,6 +326,10 @@ class InvalidInstanceRequestError(RuntimeError):
         self.msg = msg
 
 
+class InvalidGitRepositoryError(GitError):
+    """ Thrown if the given repository appears to have an invalid format.  """
+
+
 class InvalidAnnexRepositoryError(RuntimeError):
     """Thrown if AnnexRepo was instantiated on a non-annex and
     without init=True"""
@@ -319,8 +360,10 @@ class IncompleteResultsError(RuntimeError):
     # such results have been yielded already at the time this exception is
     # raised, little point in collecting them just for the sake of a possible
     # exception
-    # MIH: AnnexRepo is the last remaining user of this functionality, in a
-    # single context
+    # MIH+YOH: AnnexRepo.copy_to and @eval_results are the last
+    # remaining user of this functionality.
+    # General use (as in AnnexRepo) of it discouraged but use in @eval_results
+    # is warranted
     def __init__(self, results=None, failed=None, msg=None):
         super(IncompleteResultsError, self).__init__(msg)
         self.results = results
@@ -328,8 +371,14 @@ class IncompleteResultsError(RuntimeError):
 
     def __str__(self):
         super_str = super(IncompleteResultsError, self).__str__()
-        return "{} {}" \
-               "".format(super_str, self.failed)
+        return "{}{}{}".format(
+            super_str,
+            ". {} result(s)".format(len(self.results)) if self.results else "",
+            ". {} failed:{}{}".format(
+                len(self.failed),
+                linesep,
+                pformat(self.failed)) if self.failed else "")
+
 
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""

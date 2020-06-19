@@ -13,13 +13,31 @@ import unittest.mock as mock
 
 import github as gh
 
-from ..exceptions import AccessDeniedError
-from ...tests.utils import assert_raises, assert_equal, eq_, assert_in
-
-from ...utils import swallow_logs
+from datalad.support.exceptions import AccessDeniedError
+from datalad.tests.utils import (
+    assert_equal,
+    assert_greater,
+    assert_in,
+    assert_raises,
+    eq_,
+    patch_config,
+    skip_if,
+    skip_if_no_network,
+)
+from ...consts import (
+    CONFIG_HUB_TOKEN_FIELD,
+)
+from datalad.utils import swallow_logs
 
 from .. import github_
-from ..github_ import get_repo_url
+from ..github_ import (
+    _gen_github_entity,
+    _get_github_cred,
+    get_repo_url,
+)
+
+
+skip_if_no_github_cred = skip_if(cond=not _get_github_cred().is_known)
 
 
 def test_get_repo_url():
@@ -110,3 +128,19 @@ def test__make_github_repos():
         with assert_raises(AccessDeniedError) as cme:
             github_._make_github_repos(*args)
         assert_in("Tried 3 times", str(cme.exception))
+
+
+@skip_if_no_network
+@skip_if_no_github_cred
+def test__gen_github_entity_organization():
+    # to test effectiveness of the fix, we need to provide some
+    # token which would not work
+    with patch_config({CONFIG_HUB_TOKEN_FIELD: "ed51111111111111111111111111111111111111"}):
+        org_cred = next(_gen_github_entity(None, None, 'datalad-collection-1'))
+    assert len(org_cred) == 2, "we return organization and credential"
+    org, _ = org_cred
+    assert org
+    repos = list(org.get_repos())
+    repos_names = [r.name for r in repos]
+    assert_greater(len(repos), 3)  # we have a number of those
+    assert_in('datasets.datalad.org', repos_names)

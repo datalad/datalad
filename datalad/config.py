@@ -93,7 +93,13 @@ def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
         if line.startswith('command line:'):
             # nothing we could handle
             continue
-        k, v = cfg_kv_regex.match(line).groups()
+        kv_match = cfg_kv_regex.match(line)
+        if kv_match:
+            k, v = kv_match.groups()
+        else:
+            # could be just a key without = value, which git treats as True
+            # if asked for a bool
+            k, v = line, None
         present_v = dct.get(k, None)
         if present_v is None:
             dct[k] = v
@@ -542,6 +548,8 @@ class ConfigManager(object):
         TypeError is raised for other values.
         """
         val = self.get_value(section, option, default=default)
+        if val is None:  # no value at all, git treats it as True
+            return True
         return anything2bool(val)
 
     def getfloat(self, section, option):
@@ -611,7 +619,7 @@ class ConfigManager(object):
         if where == 'dataset':
             if not self._dataset_cfgfname:
                 raise ValueError(
-                    'ConfigManager cannot store to configuration to dataset, '
+                    'ConfigManager cannot store configuration to dataset, '
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise

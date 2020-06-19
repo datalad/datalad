@@ -24,7 +24,6 @@ Dataset operations
    :toctree: generated
 
    api.Dataset
-   api.add
    api.create
    api.create_sibling
    api.create_sibling_github
@@ -74,10 +73,12 @@ Plumbing commands
    api.annotate_paths
    api.clean
    api.clone
+   api.copy_file
    api.create_test_dataset
    api.diff
    api.download_url
    api.ls
+   api.push
    api.sshrun
    api.siblings
    api.subdatasets

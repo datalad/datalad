@@ -39,10 +39,12 @@ from datalad.support.constraints import EnsureInt
 
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import (
-    assure_list, assure_iter, unicode_srctypes, as_unicode,
+    as_unicode,
+    assure_list,
     assure_unicode,
     get_suggestions_msg,
-    unique,
+    shortened_repr,
+    unicode_srctypes,
 )
 from datalad.support.exceptions import NoDatasetFound
 from datalad.ui import ui
@@ -252,7 +254,15 @@ class _Search(object):
     def __call__(self, query, max_nresults=None):
         raise NotImplementedError
 
-    def show_keys(self, *args):
+    @classmethod
+    def _key_matches(cls, k, regexes):
+        """Return which regex the key matches
+        """
+        for regex in regexes:
+            if re.search(regex, k):
+                return regex
+
+    def show_keys(self, *args, **kwargs):
         raise NotImplementedError(args)
 
     def get_query(self, query):
@@ -280,13 +290,23 @@ class _WhooshSearch(_Search):
         self.index_dir = opj(str(self.ds.repo.dot_git), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
-    def show_keys(self, mode):
+    def show_keys(self, mode, regexes=None):
+        """
+
+        Parameters
+        ----------
+        mode: {"name"}
+        regexes: list of regex
+          Which keys to bother working on
+        """
         if mode != 'name':
             raise NotImplementedError(
                 "ATM %s can show only names, so please use show_keys with 'name'"
                 % self.__class__.__name__
             )
         for k in self.idx_obj.schema.names():
+            if regexes and not self._key_matches(k, regexes):
+                continue
             print(u'{}'.format(k))
 
     def get_query(self, query):
@@ -753,44 +773,57 @@ class _EGrepCSSearch(_Search):
                     )
                     break
 
-    def show_keys(self, mode=None):
-        maxl = 100  # maximal line length for unique values in mode=short
+    def show_keys(self, mode=None, regexes=None):
+        """
+
+        Parameters
+        ----------
+        mode: {"name", "short", "full"}
+        regexes: list of regex
+          Which keys to bother working on
+        """
+        maxl = 100  # approx maximal line length for unique values in mode=short
         # use a dict already, later we need to map to a definition
         # meanwhile map to the values
 
         keys = self._get_keys(mode)
 
         for k in sorted(keys):
+            if regexes and not self._key_matches(k, regexes):
+                continue
             if mode == 'name':
                 print(k)
                 continue
 
             # do a bit more
             stat = keys[k]
-            uvals = stat.uvals
-            if mode == 'short':
-                # show only up to X uvals
-                if len(stat.uvals) > 10:
-                    uvals = {v for i, v in enumerate(uvals) if i < 10}
-            # all unicode still scares yoh -- he will just use repr
-            # def conv(s):
-            #     try:
-            #         return '{}'.format(s)
-            #     except UnicodeEncodeError:
-            #         return assure_unicode(s).encode('utf-8')
+            all_uvals = uvals = sorted(stat.uvals)
+
             stat.uvals_str = assure_unicode(
-                "{} unique values: {}".format(
-                    len(stat.uvals), ', '.join(map(repr, uvals))))
+                "{} unique values: ".format(len(all_uvals))
+            )
+
             if mode == 'short':
-                if len(stat.uvals) > 10:
-                    stat.uvals_str += ', ...'
-                if len(stat.uvals_str) > maxl:
-                    stat.uvals_str = stat.uvals_str[:maxl-4] + ' ....'
+                # show only up until we fill maxl
+                uvals_str = ''
+                uvals = []
+                for v in all_uvals:
+                    appendix = ('; ' if uvals else '') + v
+                    if len(uvals_str) + len(appendix) > maxl - len(stat.uvals_str):
+                        break
+                    uvals.append(v)
+                    uvals_str += appendix
             elif mode == 'full':
                 pass
             else:
                 raise ValueError(
                     "Unknown value for stats. Know full and short")
+
+            stat.uvals_str += '; '.join(uvals)
+
+            if len(all_uvals) > len(uvals):
+                stat.uvals_str += \
+                    '; +%s' % single_or_plural("value", "values", len(all_uvals) - len(uvals), True)
 
             print(
                 u'{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
@@ -834,19 +867,19 @@ class _EGrepCSSearch(_Search):
                 keys[k].ndatasets += 1
                 if mode == 'name':
                     continue
-                try:
-                    kvals_set = assure_iter(kvals, set)
-                except TypeError:
-                    # TODO: may be do show hashable ones???
-                    nunhashable = sum(
-                        isinstance(x, collections.Hashable) for x in kvals
-                    )
-                    kvals_set = {
-                        'unhashable %d out of %d entries'
-                        % (nunhashable, len(kvals))
-                    }
-                keys[k].uvals |= kvals_set
+                keys[k].uvals |= self.get_repr_uvalues(kvals)
         return keys
+
+    def get_repr_uvalues(self, kvals):
+        kvals_set = set()
+        if not kvals:
+            return kvals_set
+        kvals_iter = (
+            kvals
+            if hasattr(kvals, '__iter__') and not isinstance(kvals, (str, bytes))
+            else [kvals]
+        )
+        return set(shortened_repr(x, 50) for x in kvals_iter)
 
     def get_query(self, query):
         query = assure_list(query)
@@ -871,8 +904,8 @@ class _EGrepCSSearch(_Search):
             self._queried_keys.append(None)
         # expand matches, compile expressions
         query = [
-            {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
-            if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
+            {k: self._compile_query(v) for k, v in q.groupdict().items()}
+            if hasattr(q, 'groupdict') else self._compile_query(q)
             for q in query_rec_matches
         ]
 
@@ -887,6 +920,19 @@ class _EGrepCSSearch(_Search):
     def _xfm_query(self, q):
         # implement potential transformations of regex before they get compiled
         return q
+
+    def _compile_query(self, q):
+        """xfm and compile the query, with informative exception if query is incorrect
+        """
+        q_xfmed = self._xfm_query(q)
+        try:
+            return re.compile(q_xfmed)
+        except re.error as exc:
+            omsg = " (original: '%s')" % q if q != q_xfmed else ''
+            raise ValueError(
+                "regular expression '%s'%s is incorrect: %s"
+                % (q_xfmed, omsg, exc)
+            )
 
     def get_nohits_msg(self):
         """Given the query and performed search, provide recommendation
@@ -1097,9 +1143,10 @@ class Search(Interface):
     Examples:
 
       List names of search index fields (auto-discovered from the set of
-      indexed datasets)::
+      indexed datasets) which either have a field starting with "age" or
+      "gender"::
 
-        % datalad search --mode autofield --show-keys name
+        % datalad search --mode autofield --show-keys name '\.age' '\.gender'
 
       Fuzzy search for datasets with an author that is specified in a particular
       metadata field::
@@ -1177,6 +1224,8 @@ class Search(Interface):
             only the name is printed one per line. If 'short' or 'full',
             statistics (in how many datasets, and how many unique values) are
             printed. 'short' truncates the listing of unique values.
+            QUERY, if provided, is regular expressions any of which keys should
+            contain.
             No other action is performed (except for reindexing), even if other
             arguments are given. Each key is accompanied by a term definition in
             parenthesis (TODO). In most cases a definition is given in the form
@@ -1236,7 +1285,7 @@ class Search(Interface):
         searcher = searcher(ds, force_reindex=force_reindex)
 
         if show_keys:
-            searcher.show_keys(show_keys)
+            searcher.show_keys(show_keys, regexes=query)
             return
 
         if not query:

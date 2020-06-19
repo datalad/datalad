@@ -10,15 +10,24 @@
 """
 
 import re
-from nose.tools import assert_is, assert_equal, assert_raises, assert_true
 
-from ..support.param import Parameter
-from ..support import constraints as cnstr
-from ..interface.base import Interface, get_api_name, get_cmdline_command_name
+from datalad.support.param import Parameter
+from datalad.support import constraints as cnstr
+from datalad.interface.base import (
+    get_api_name,
+    get_cmdline_command_name,
+    Interface,
+)
 
-from ..utils import swallow_outputs
-from .utils import assert_re_in
-from .utils import assert_in
+from datalad.tests.utils import (
+    assert_equal,
+    assert_in,
+    assert_is,
+    assert_raises,
+    assert_re_in,
+    assert_true,
+    swallow_outputs,
+)
 
 
 class Demo(Interface):

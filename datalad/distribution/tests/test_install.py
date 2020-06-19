@@ -12,63 +12,70 @@
 import logging
 import os
 
-from os.path import join as opj
-from os.path import isdir
-from os.path import exists
-from os.path import realpath
-from os.path import basename
-from os.path import dirname
-
+from os.path import (
+    join as opj,
+    isdir,
+    exists,
+    basename,
+    dirname,
+)
 from unittest.mock import patch
-
-from datalad.utils import getpwd
-
-from datalad.api import create
-from datalad.api import install
-from datalad.api import get
-from datalad.utils import chpwd
-from datalad.utils import on_windows
+from datalad.api import (
+    create,
+    install,
+    get,
+)
+from datalad.utils import (
+    chpwd,
+    on_windows,
+    getpwd,
+    _path_,
+    rmtree,
+    Path,
+)
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    IncompleteResultsError,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_is_instance
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import use_cassette
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import put_file_under_git
-from datalad.tests.utils import integration
-from datalad.tests.utils import slow
-from datalad.tests.utils import usecase
-from datalad.tests.utils import get_datasets_topdir
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.utils import _path_
-from datalad.utils import rmtree
-
+from datalad.tests.utils import (
+    skip_ssh,
+    create_tree,
+    with_tempfile,
+    assert_in,
+    with_tree,
+    with_testrepos,
+    eq_,
+    ok_,
+    assert_false,
+    ok_file_has_content,
+    assert_not_in,
+    assert_raises,
+    assert_is_instance,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    assert_in_results,
+    ok_startswith,
+    serve_path_via_http,
+    swallow_logs,
+    use_cassette,
+    skip_if_no_network,
+    skip_if_on_windows,
+    put_file_under_git,
+    integration,
+    slow,
+    usecase,
+    get_datasets_topdir,
+    SkipTest,
+    known_failure_windows,
+    known_failure_githubci_win,
+)
 from ..dataset import Dataset
 
 ###############
@@ -94,9 +101,9 @@ def _test_guess_dot_git(annex, path, url, tdir):
     with swallow_logs() as cml:
         installed = install(tdir, source=url)
         assert_not_in("Failed to get annex.uuid", cml.out)
-    eq_(realpath(installed.path), realpath(tdir))
+    eq_(installed.pathobj.resolve(), Path(tdir).resolve())
     ok_(exists(tdir))
-    ok_clean_git(tdir, annex=annex)
+    assert_repo_status(tdir, annex=annex)
 
 
 def test_guess_dot_git():
@@ -210,14 +217,14 @@ def test_install_simple_local(src, path):
         ok_(GitRepo.is_valid_repo(ds.path))
         eq_(set(ds.repo.get_indexed_files()),
             {'test.dat', 'INFO.txt'})
-        ok_clean_git(path, annex=False)
+        assert_repo_status(path, annex=False)
     else:
         # must be an annex
         ok_(isinstance(ds.repo, AnnexRepo))
         ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
         eq_(set(ds.repo.get_indexed_files()),
             {'test.dat', 'INFO.txt', 'test-annex.dat'})
-        ok_clean_git(path, annex=True)
+        assert_repo_status(path, annex=True)
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
@@ -242,7 +249,7 @@ def test_install_dataset_from_just_source(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -256,7 +263,7 @@ def test_install_dataset_from_instance(src, dst):
     ok_startswith(clone.path, dst)
     ok_(clone.is_installed())
     ok_(GitRepo.is_valid_repo(clone.path))
-    ok_clean_git(clone.path, annex=None)
+    assert_repo_status(clone.path, annex=None)
     assert_in('INFO.txt', clone.repo.get_indexed_files())
 
 
@@ -273,7 +280,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -294,7 +301,7 @@ def test_install_dataladri(src, topurl, path):
             swallow_logs():
         ds = install(path, source='///ds')
     eq_(ds.path, path)
-    ok_clean_git(path, annex=False)
+    assert_repo_status(path, annex=False)
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
@@ -392,35 +399,35 @@ def test_install_recursive_with_data(src, path):
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     subds = ds.install("sub", source=source, save=False)
     ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
     # sub is clean:
-    ok_clean_git(subds.path, annex=None)
+    assert_repo_status(subds.path, annex=None)
     # top is too:
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
     ds.save(message='addsub')
     # now it is:
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
     # Create a dummy change
     create_tree(ds.path, {'dummy.txt': 'buga'})
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
     subds_ = ds.install("sub2", source=source)
     eq_(subds_.path, opj(ds.path, "sub2"))  # for paranoid yoh ;)
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
 
     # and we should achieve the same behavior if we create a dataset
     # and then decide to add it
     create(_path_(top_path, 'sub3'))
-    ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
+    assert_repo_status(ds.path, untracked=['dummy.txt', 'sub3/'])
     ds.save('sub3')
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
 @known_failure_windows  #FIXME
@@ -433,7 +440,7 @@ def test_failed_install_multiple(top_path):
 
     create(_path_(top_path, 'ds1'))
     create(_path_(top_path, 'ds3'))
-    ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
+    assert_repo_status(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
 
     # specify install with multiple paths and one non-existing
     with assert_raises(IncompleteResultsError) as cme:
@@ -441,9 +448,9 @@ def test_failed_install_multiple(top_path):
                    on_failure='continue')
 
     # install doesn't add existing submodules -- add does that
-    ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
+    assert_repo_status(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
     ds.save(['ds1', 'ds3'])
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
     # those which succeeded should be saved now
     eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
     # and those which didn't -- listed
@@ -603,14 +610,14 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@skip_if_on_windows  # Due to "another process error" and buggy ok_clean_git
+@skip_if_on_windows  # Due to "another process error"
 def test_install_recursive_repeat(src, path):
     top_src = Dataset(src).create(force=True)
     sub1_src = top_src.create('sub 1', force=True)
     sub2_src = top_src.create('sub 2', force=True)
     subsub_src = sub1_src.create('subsub', force=True)
     top_src.save(recursive=True)
-    ok_clean_git(top_src.path)
+    assert_repo_status(top_src.path)
 
     # install top level:
     top_ds = install(path, source=src)
@@ -802,8 +809,6 @@ def test_install_consistent_state(src, dest, dest2, dest3):
     # TODO: makes a nice use-case for an update operation
 
 
-from datalad.tests.utils import skip_ssh
-
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -849,7 +854,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1_ = 'clone1'
         clone2_ = 'clone2'
 
-        origin = create(origin_, no_annex=True)
+        origin = create(origin_, annex=False)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
         clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
@@ -880,12 +885,6 @@ def check_datasets_datalad_org(suffix, tdir):
     # Windows we get two records due to a duplicate attempt (as res[1]) to get it
     # again, which is reported as "notneeded".  For the purpose of this test
     # it doesn't make a difference.
-    # git-annex version is not "real" - but that is about when fix was introduced
-    from datalad import cfg
-    if on_windows \
-        and cfg.obtain("datalad.repo.version") < 6 \
-        and external_versions['cmd:annex'] <= '7.20181203':
-        raise SkipTest("Known to fail, needs fixed git-annex")
     assert_result_count(
         ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
         1,

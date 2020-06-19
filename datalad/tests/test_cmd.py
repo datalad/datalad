@@ -14,38 +14,37 @@ import os.path as op
 import sys
 import logging
 
-from .utils import (
-    ok_,
-    ok_exists,
-    eq_,
-    assert_is,
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
     assert_equal,
     assert_false,
-    assert_true,
     assert_greater,
-    assert_raises,
     assert_in,
-    SkipTest,
-    skip_if_on_windows,
-    with_tempfile,
-    with_tree,
-    assert_cwd_unchanged,
-    swallow_outputs,
-    swallow_logs,
-    ok_file_has_content,
-    on_windows,
+    assert_is,
+    assert_raises,
+    eq_,
+    known_failure_githubci_win,
     lgr,
     OBSCURE_FILENAME,
-    known_failure_githubci_win,
+    ok_,
+    ok_exists,
+    ok_file_has_content,
+    on_windows,
+    skip_if_on_windows,
+    SkipTest,
+    swallow_logs,
+    swallow_outputs,
+    with_tempfile,
+    with_tree,
 )
 
 from ..cmd import (
     Runner,
     GitRunner,
 )
-from ..support.exceptions import CommandError
-from ..support.protocol import DryRunProtocol
-from ..utils import split_cmdline
+from datalad.support.exceptions import CommandError
+from datalad.support.protocol import DryRunProtocol
+from datalad.utils import split_cmdline
 
 
 @known_failure_githubci_win
@@ -58,7 +57,7 @@ def test_runner_dry(tempfile):
 
     # test dry command call
     cmd = 'echo Testing äöü東 dry run > %s' % tempfile
-    with swallow_logs(new_level=9) as cml:
+    with swallow_logs(new_level=5) as cml:
         ret = runner.run(cmd)
         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
     assert_equal(("DRY", "DRY"), ret,
@@ -159,9 +158,9 @@ def test_runner_log_stderr():
     runner = Runner(log_outputs=True)
     cmd = 'echo stderr-Message should be logged >&2'
     with swallow_outputs() as cmo:
-        with swallow_logs(new_level=9) as cml:
+        with swallow_logs(new_level=5) as cml:
             ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
-            cml.assert_logged("Running: %s" % cmd, level='Level 9', regex=False)
+            cml.assert_logged("Running: %s" % cmd, level='Level 5', regex=False)
             if not on_windows:
                 # we can just count on sanity
                 cml.assert_logged("stderr| stderr-"
@@ -172,7 +171,7 @@ def test_runner_log_stderr():
 
     cmd = 'echo stderr-Message should not be logged >&2'
     with swallow_outputs() as cmo:
-        with swallow_logs(new_level=9) as cml:
+        with swallow_logs(new_level=5) as cml:
             ret = runner.run(cmd, log_stderr=False)
             eq_(cmo.err.rstrip(), "stderr-Message should not be logged")
             assert_raises(AssertionError, cml.assert_logged,
@@ -192,9 +191,9 @@ def test_runner_log_stdout():
         # on Windows it can't find echo if ran outside the shell
         if on_windows and isinstance(cmd, list):
             kw['shell'] = True
-        with swallow_logs(9) as cm:
+        with swallow_logs(5) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
-            cm.assert_logged("Running: %s" % cmd, level='Level 9', regex=False)
+            cm.assert_logged("Running: %s" % cmd, level='Level 5', regex=False)
             if not on_windows:
                 # we can just count on sanity
                 cm.assert_logged("stdout| stdout-"

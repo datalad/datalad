@@ -15,18 +15,25 @@ from os.path import join as opj
 from os.path import isabs
 import tarfile
 
-from datalad.api import Dataset
-from datalad.api import export_archive
-from datalad.utils import chpwd
-from datalad.utils import md5sum
-
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import assert_true, assert_not_equal, assert_raises, \
-    assert_false, assert_equal
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-
+from datalad.api import (
+    Dataset,
+    export_archive,
+)
+from datalad.utils import (
+    chpwd,
+    md5sum,
+)
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_not_equal,
+    assert_raises,
+    assert_result_count,
+    assert_status,
+    assert_true,
+    ok_startswith,
+    with_tree,
+)
 
 _dataset_template = {
     'ds': {
@@ -95,7 +102,7 @@ def test_archive(path):
 
 @with_tree(_dataset_template)
 def test_zip_archive(path):
-    ds = Dataset(opj(path, 'ds')).create(force=True, no_annex=True)
+    ds = Dataset(opj(path, 'ds')).create(force=True, annex=False)
     ds.save()
     with chpwd(path):
         ds.export_archive(filename='my', archivetype='zip')

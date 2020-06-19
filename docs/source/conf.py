@@ -24,7 +24,13 @@ def setup(sphinx):
     sys.path.insert(0, os.path.abspath('utils'))  # travis
     sys.path.insert(0, os.path.abspath(opj(pardir, 'utils')))  # RTD
     from pygments_ansi_color import AnsiColorLexer
-    sphinx.add_lexer("ansi-color", AnsiColorLexer())
+    # As of Sphinx v2.1, passing an instance is deprecated.
+    # TODO: Remove when minimum sphinx version is at least 2.1.
+    import sphinx as sphinx_mod
+    sphinx_ver = int(sphinx_mod.__version__.split('.')[0])
+    if sphinx_ver < 3:  # Check against 3 rather than 2.1 for simplicity.
+        AnsiColorLexer = AnsiColorLexer()
+    sphinx.add_lexer("ansi-color", AnsiColorLexer)
 
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -183,7 +189,7 @@ html_logo = '_static/datalad_logo.png'
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-#html_favicon = None
+html_favicon = '_static/favicon.ico'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -336,4 +342,12 @@ texinfo_documents = [
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {
+    'handbook': (
+        # use handbook matching "major" release
+        'http://handbook.datalad.org/en/{version}/'.format(
+            #version='.'.join(datalad.__version__.split('.', maxsplit=2)[:2]),
+            version='latest',
+        ),
+        None),
+}

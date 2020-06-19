@@ -21,18 +21,30 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
+from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.tests.utils import chpwd, slow, swallow_logs
-from datalad.tests.utils import assert_false, assert_true, assert_raises
-from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import eq_, ok_exists
-from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_false,
+    assert_in,
+    assert_in_results,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_true,
+    chpwd,
+    create_tree,
+    eq_,
+    HTTPPath,
+    known_failure_githubci_win,
+    ok_exists,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
+)
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 
@@ -316,7 +328,7 @@ def test_extract_wrong_input_type():
 
 @with_tempfile(mkdir=True)
 def test_addurls_nonannex_repo(path):
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).create(force=True, annex=False)
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
@@ -466,14 +478,12 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_unbound_dataset(self, path):
-        ds = Dataset(path).create(force=True)
-
-        def check(subpath, dataset_arg, url_file):
-            subdir = op.join(path, subpath)
+        def check(ds, dataset_arg, url_file, fname_format):
+            subdir = op.join(ds.path, "subdir")
             os.mkdir(subdir)
             with chpwd(subdir):
                 shutil.copy(self.json_file, "in.json")
-                addurls(dataset_arg, url_file, "{url}", "{name}")
+                addurls(dataset_arg, url_file, "{url}", fname_format)
                 # Files specified in the CSV file are always relative to the
                 # dataset.
                 for fname in ["a", "b", "c"]:
@@ -481,10 +491,16 @@ class TestAddurls(object):
 
         # The input file is relative to the current working directory, as
         # with other commands.
-        check("subdir0", None, "in.json")
+        ds0 = Dataset(op.join(path, "ds0")).create()
+        check(ds0, None, "in.json", "{name}")
         # Likewise the input file is relative to the current working directory
         # if a string dataset argument is given.
-        check("subdir1", ds.path, "in.json")
+        ds1 = Dataset(op.join(path, "ds1")).create()
+        check(ds1, ds1.path, "in.json", "{name}")
+        # A leading "./" doesn't confuse addurls() into downloading the file
+        # into the subdirectory.
+        ds2 = Dataset(op.join(path, "ds2")).create()
+        check(ds2, None, "in.json", "./{name}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
@@ -616,7 +632,7 @@ class TestAddurls(object):
 
         whereis = ds.repo.whereis(names, output="full")
         for fname, info in whereis.items():
-            eq_(info[ds.repo.WEB_UUID]['urls'],
+            eq_(info[WEB_SPECIAL_REMOTE_UUID]['urls'],
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
 
     @with_tempfile(mkdir=True)

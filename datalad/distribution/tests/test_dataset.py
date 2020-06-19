@@ -11,33 +11,54 @@
 
 import os
 import os.path as op
-from os.path import join as opj, abspath, relpath
-
-
-from ..dataset import Dataset, EnsureDataset, require_dataset
-from ..dataset import resolve_path
+from os.path import (
+    abspath,
+    join as opj,
+    lexists,
+    relpath,
+)
+from ..dataset import (
+    Dataset,
+    EnsureDataset,
+    require_dataset,
+    resolve_path,
+)
 from datalad import cfg
-from datalad.api import create
-from datalad.api import get
+from datalad.api import (
+    create,
+    get,
+)
 import datalad.utils as ut
-from datalad.utils import chpwd, rmtree
-from datalad.utils import _path_
-from datalad.utils import on_windows
-from datalad.utils import Path
+from datalad.utils import (
+    _path_,
+    chpwd,
+    on_windows,
+    Path,
+    rmtree,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, \
-    assert_is_instance, assert_is_none, assert_is_not, assert_is_not_none
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import with_tempfile, with_testrepos
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import assert_is
-from datalad.tests.utils import assert_not_equal
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import OBSCURE_FILENAME
-
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_is,
+    assert_is_instance,
+    assert_is_none,
+    assert_is_not,
+    assert_is_not_none,
+    assert_not_equal,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_true,
+    eq_,
+    known_failure_windows,
+    OBSCURE_FILENAME,
+    ok_,
+    SkipTest,
+    with_tempfile,
+    with_testrepos,
+)
 from datalad.support.exceptions import InsufficientArgumentsError
 
 
@@ -294,7 +315,7 @@ def test_dataset_id(path):
     # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
     # dict isn't a nice approach. May be create needs a fix/RF?
     Dataset._unique_instances.clear()
-    ds.create(no_annex=True, force=True)
+    ds.create(annex=False, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
     #
@@ -356,10 +377,6 @@ def test_Dataset_flyweight(path1, path2):
 
 @with_tempfile
 def test_property_reevaluation(repo1):
-
-    from os.path import lexists
-    from datalad.tests.utils import ok_clean_git
-
     ds = Dataset(repo1)
     assert_is_none(ds.repo)
     assert_is_not_none(ds.config)
@@ -368,7 +385,7 @@ def test_property_reevaluation(repo1):
     assert_is_none(ds.id)
 
     ds.create()
-    ok_clean_git(repo1)
+    assert_repo_status(repo1)
     # after creation, we have `repo`, and `config` was reevaluated to point
     # to the repo's config:
     assert_is_not_none(ds.repo)
@@ -392,7 +409,7 @@ def test_property_reevaluation(repo1):
     assert_is_none(ds.id)
 
     ds.create()
-    ok_clean_git(repo1)
+    assert_repo_status(repo1)
     # after recreation everything is sane again:
     assert_is_not_none(ds.repo)
     assert_is_not_none(ds.config)
@@ -465,7 +482,7 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
 @with_tempfile(mkdir=True)
 def test_resolve_path(path):
-    if op.realpath(path) != path:
+    if str(Path(path).resolve()) != path:
         raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
     opath = op.join(path, "origin")

@@ -27,6 +27,7 @@ import platform
 import gc
 import glob
 import gzip
+import stat
 import string
 import warnings
 import wrapt
@@ -41,11 +42,10 @@ from itertools import tee
 import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix
-from os.path import curdir, basename, exists, realpath, islink, join as opj
+from os.path import curdir, basename, exists, islink, join as opj
 from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
-from os.path import stat
 from os.path import dirname
 from os.path import split as psplit
 import posixpath
@@ -191,7 +191,11 @@ def shortened_repr(value, l=30):
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
             if not value_repr.startswith('<') and len(value_repr) > l:
-                value_repr = "<<%s...>>" % (value_repr[:l - 8])
+                value_repr = "<<%s++%d chars++%s>>" % (
+                    value_repr[:l - 16],
+                    len(value_repr) - (l - 16 + 4),
+                    value_repr[-4:]
+                )
             elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
                 raise ValueError("I hate those useless long reprs")
         else:
@@ -369,6 +373,30 @@ from pathlib import (
     PurePosixPath,
 )
 
+if sys.version_info.major == 3 and sys.version_info.minor < 6:
+    # Path.resolve() doesn't have strict=False until 3.6
+    # monkey patch it -- all code imports this class from this
+    # module
+    Path._datalad_moved_resolve = Path.resolve
+
+    def _resolve_without_strict(self, strict=False):
+        if strict or self.exists():
+            # this is pre 3.6 behavior
+            return self._datalad_moved_resolve()
+
+        # if strict==False, find the closest component
+        # that actually exists and resolve that one
+        for p in self.parents:
+            if not p.exists():
+                continue
+            resolved = p._datalad_moved_resolve()
+            # append the rest that did not exist
+            return resolved / self.relative_to(p)
+        # pathlib return the unresolved if nothing resolved
+        return self
+
+    Path.resolve = _resolve_without_strict
+
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -446,6 +474,8 @@ def rmdir(path, *args, **kwargs):
 def get_open_files(path, log_open=False):
     """Get open files under a path
 
+    Note: This function is very slow on Windows.
+
     Parameters
     ----------
     path : str
@@ -464,7 +494,9 @@ def get_open_files(path, log_open=False):
     files = {}
     # since the ones returned by psutil would not be aware of symlinks in the
     # path we should also get realpath for path
-    path = realpath(path)
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing paths on windows
+    path = str(Path(path).resolve().absolute())
     for proc in psutil.process_iter():
         try:
             open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
@@ -593,14 +625,15 @@ else:
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
         Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
-        rfilepath = realpath(filepath)
-        if islink(filepath) and exists(rfilepath):
+        filepath = Path(filepath)
+        rfilepath = filepath.resolve()
+        if filepath.is_symlink() and rfilepath.exists():
             # trust noone - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
                     rfilepath, mtime)
-            os.utime(rfilepath, (time.time(), mtime))
+            os.utime(str(rfilepath), (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
@@ -1058,6 +1091,73 @@ def line_profile(func):
     return newfunc
 
 
+@optional_args
+def collect_method_callstats(func):
+    """Figure out methods which call the method repeatedly on the same instance
+
+    Use case(s):
+      - .repo is expensive since does all kinds of checks.
+      - .config is expensive transitively since it calls .repo each time
+
+
+    TODO:
+    - fancy one could look through the stack for the same id(self) to see if
+      that location is already in memo.  That would hint to the cases where object
+      is not passed into underlying functions, causing them to redo the same work
+      over and over again
+    - ATM might flood with all "1 lines" calls which are not that informative.
+      The underlying possibly suboptimal use might be coming from their callers.
+      It might or not relate to the previous TODO
+    """
+    from collections import defaultdict
+    import traceback
+    from time import time
+    memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
+    # gross timing
+    times = []
+    toppath = op.dirname(__file__) + op.sep
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            self = args[0]
+            stack = traceback.extract_stack()
+            caller = stack[-2]
+            stack_sig = \
+                "{relpath}:{s.name}".format(
+                    s=caller, relpath=op.relpath(caller.filename, toppath))
+            sig = (id(self), stack_sig)
+            # we will count based on id(self) + wherefrom
+            memo[sig][caller.lineno] += 1
+            t0 = time()
+            return func(*args, **kwargs)
+        finally:
+            times.append(time() - t0)
+            pass
+
+    def print_stats():
+        print("The cost of property {}:".format(func.__name__))
+        if not memo:
+            print("None since no calls")
+            return
+        # total count
+        counts = {k: sum(v.values()) for k,v in memo.items()}
+        total = sum(counts.values())
+        ids = {self_id for (self_id, _) in memo}
+        print(" Total: {} calls from {} objects with {} contexts taking {:.2f} sec"
+              .format(total, len(ids), len(memo), sum(times)))
+        # now we need to sort by value
+        for (self_id, caller), count in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+            print("  {} {}: {} from {} lines"
+                  .format(self_id, caller, count, len(memo[(self_id, caller)])))
+
+    # Upon total exit we print the stats
+    import atexit
+    atexit.register(print_stats)
+
+    return newfunc
+
+
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
 def never_fail(f):
     """Assure that function never fails -- all exceptions are caught
@@ -1401,7 +1501,7 @@ _pwd_mode = None
 def _switch_to_getcwd(msg, *args):
     global _pwd_mode
     _pwd_mode = 'cwd'
-    lgr.warning(
+    lgr.debug(
         msg + ". From now on will be returning os.getcwd(). Directory"
                " symlinks in the paths will be resolved",
         *args
@@ -1463,7 +1563,9 @@ def getpwd():
                 raise
         try:
             pwd = os.environ['PWD']
-            pwd_real = op.realpath(pwd)
+            # do absolute() in addition to always get an absolute path
+            # even with non-existing paths on windows
+            pwd_real = str(Path(pwd).resolve().absolute())
             # This logic would fail to catch the case where chdir did happen
             # to the directory where current PWD is pointing to, e.g.
             # $> ls -ld $PWD
@@ -1675,11 +1777,15 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-    filename = realpath(filename)
+    filename = Path(filename).resolve()
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
-            f.write(content)
+        (filename.write_bytes
+         if isinstance(content, bytes)
+         else filename.write_text)(content)
+
+    # TODO globbing below can also be done with pathlib
+    filename = str(filename)
 
     if __debug__:
         # TODO mkdir
@@ -1806,7 +1912,16 @@ def get_dataset_root(path):
     the root dataset containing its parent directory will be reported.
     If none can be found, at a symlink at `path` is pointing to a
     dataset, `path` itself will be reported as the root.
+
+    Parameters
+    ----------
+    path : Path-like
+
+    Returns
+    -------
+    str or None
     """
+    path = str(path)
     suffix = '.git'
     altered = None
     if op.islink(path) or not op.isdir(path):
@@ -1870,7 +1985,7 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
             if on_windows else OSError
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
-        ntrials = 50 if on_windows else 3
+        ntrials = 100 if on_windows else 10
 
     assert increment_type in {None, 'exponential'}
 
@@ -2392,3 +2507,36 @@ assure_dir = ensure_dir
 
 
 lgr.log(5, "Done importing datalad.utils")
+
+
+def check_symlink_capability(path, target):
+    """helper similar to datalad.tests.utils.has_symlink_capability
+
+    However, for use in a datalad command context, we shouldn't
+    assume to be able to write to tmpfile and also not import a whole lot from
+    datalad's test machinery. Finally, we want to know, whether we can create a
+    symlink at a specific location, not just somewhere. Therefore use
+    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    location can therefore be determined by high lever code.
+
+    Parameters
+    ----------
+    path: Path
+    target: Path
+
+    Returns
+    -------
+    bool
+    """
+
+    try:
+        target.touch()
+        path.symlink_to(target)
+        return True
+    except Exception:
+        return False
+    finally:
+        if path.exists():
+            path.unlink()
+        if target.exists():
+            target.unlink()

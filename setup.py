@@ -30,13 +30,13 @@ requires = {
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
-        'GitPython>=2.1.12',
         'iso8601',
         'humanize',
         'fasteners',
         'patool>=1.7',
         'tqdm',
         'wrapt',
+        'annexremote',
     ],
     'downloaders': [
         'boto',
@@ -57,7 +57,7 @@ requires = {
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
-        'httpretty>=0.8.14',
+        'httpretty>=0.9.4',  # Introduced py 3.6 support
         'nose>=1.3.4',
         'vcrpy',
     ],
@@ -130,6 +130,7 @@ setup_kwargs = setup_entry_points(
         'datalad': 'datalad.cmdline.main',
         'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
+        'git-annex-remote-ora': 'datalad.distributed.ora_remote',
     })
 
 # normal entrypoints for the rest

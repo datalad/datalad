@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from functools import partial
 import logging
 import os
 import sys
@@ -200,6 +201,16 @@ class ProgressHandler(logging.Handler):
 
     def emit(self, record):
         from datalad.ui import ui
+        maint = getattr(record, 'dlm_progress_maint', None)
+        if maint == 'clear':
+            # remove the progress bar
+            for pb in self.pbars.values():
+                pb.clear()
+            return
+        elif maint == 'refresh':
+            for pb in self.pbars.values():
+                pb.refresh()
+            return
         pid = getattr(record, 'dlm_progress')
         update = getattr(record, 'dlm_progress_update', None)
         # would be an actual message, not used ATM here,
@@ -212,7 +223,9 @@ class ProgressHandler(logging.Handler):
             pbar = ui.get_progressbar(
                 label=getattr(record, 'dlm_progress_label', ''),
                 unit=getattr(record, 'dlm_progress_unit', ''),
-                total=getattr(record, 'dlm_progress_total', None))
+                total=getattr(record, 'dlm_progress_total', None,),
+            )
+            pbar.start(initial=getattr(record, 'dlm_progress_initial', 0))
             self.pbars[pid] = pbar
         elif update is None:
             # not an update -> done
@@ -220,14 +233,15 @@ class ProgressHandler(logging.Handler):
             # we may want to actually "print" the completion message
             self.pbars.pop(pid).finish()
         else:
-            # an update
-            self.pbars[pid].update(
-                update,
-                increment=getattr(record, 'dlm_progress_increment', False))
             # Check for an updated label.
             label = getattr(record, 'dlm_progress_label', None)
             if label is not None:
                 self.pbars[pid].set_desc(label)
+            # an update
+            self.pbars[pid].update(
+                update,
+                increment=getattr(record, 'dlm_progress_increment', False),
+                total=getattr(record, 'dlm_progress_total', None))
 
 
 class NoProgressLog(logging.Filter):
@@ -238,6 +252,11 @@ class NoProgressLog(logging.Filter):
 class OnlyProgressLog(logging.Filter):
     def filter(self, record):
         return hasattr(record, 'dlm_progress')
+
+
+def filter_noninteractive_progress(logger, record):
+    level = getattr(record, "dlm_progress_noninteractive_level", None)
+    return level is None or level >= logger.level
 
 
 def log_progress(lgrcall, pid, *args, **kwargs):
@@ -268,10 +287,23 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       To which quantity to advance the progress.
     increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
+    initial : int
+      If set, start value for progress bar
+    noninteractive_level : int, optional
+      When a level is specified here and progress is being logged
+      non-interactively (i.e. without progress bars), do not log the message if
+      logging is not enabled for the specified level. This is useful when you
+      want all calls to be "logged" via the progress bar, but non-interactively
+      showing a message at the `lgrcall` level for each step would be too much
+      noise. Note that the level here only determines if the record will be
+      dropped; it will still be logged at the level of `lgrcall`.
+    maint : {'clear', 'refresh'}
     """
     d = dict(
         {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
-         if v},
+         # initial progress might be zero, but not sending it further
+         # would signal to destroy the progress bar, hence test for 'not None'
+         if v is not None},
         dlm_progress=pid)
     lgrcall(*args, extra=d)
 
@@ -462,6 +494,9 @@ class LoggerHelper(object):
             # no stream logs of progress messages when interactive
             loghandler.addFilter(NoProgressLog())
             self.lgr.addHandler(phandler)
+        else:
+            loghandler.addFilter(partial(filter_noninteractive_progress,
+                                         self.lgr))
 
         self.set_level()  # set default logging level
         return self.lgr

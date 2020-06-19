@@ -8,22 +8,26 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test EXIF extractor"""
 
-from datalad.tests.utils import SkipTest
+from datalad.tests.utils import (
+    assert_in,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    eq_,
+    SkipTest,
+    with_tempfile,
+)
 try:
     import exifread
 except ImportError:
     raise SkipTest
 
 from shutil import copy
-from os.path import dirname
-from os.path import join as opj
+from os.path import (
+    dirname,
+    join as opj,
+)
 from datalad.api import Dataset
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_in
 
 
 target = {
@@ -82,7 +86,7 @@ def test_exif(path):
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'exif.jpg'),
         path)
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     res = ds.aggregate_metadata()
     assert_status('ok', res)
     res = ds.metadata('exif.jpg')

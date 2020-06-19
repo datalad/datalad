@@ -17,7 +17,7 @@ import errno
 import os
 import sys
 
-from ..support.path import exists, join as opj, realpath, dirname, lexists
+from ..support.path import exists, join as opj, dirname, lexists
 
 from urllib.parse import urlparse
 
@@ -27,13 +27,14 @@ lgr.log(5, "Importing datalad.customremotes.main")
 
 from ..ui import ui
 from ..support.protocol import ProtocolInterface
-from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
-from ..utils import assure_unicode
-from ..utils import getargspec
-
+from datalad.utils import (
+    assure_unicode,
+    getargspec,
+    Path,
+)
 
 URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
@@ -98,6 +99,10 @@ send () {
     def __init__(self, repopath, custom_remote_name=None):
         super(AnnexExchangeProtocol, self).__init__()
         self.repopath = repopath
+        # resolve once, repeated resolution is slow and depending on
+        # file system operations
+        # unclear why logging needs it at all
+        self.realrepopath = Path(repopath).resolve()
         self.custom_remote_name = custom_remote_name
         self._file = None
         self._initiated = False
@@ -128,7 +133,7 @@ send () {
 
         lgr.debug("Initiating protocoling."
                   "cd %s; vim %s"
-                  % (realpath(self.repopath),
+                  % (self.realrepopath,
                      _file[len(self.repopath) + 1:]))
         with open(_file, 'a') as f:
             f.write(self.HEADER)
@@ -140,7 +145,7 @@ send () {
             f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
         lgr.debug("New section in the protocol: "
                   "cd %s; PATH=%s:$PATH %s"
-                  % (realpath(self.repopath),
+                  % (self.realrepopath,
                      dirname(self._file),
                      cmd))
 
@@ -252,8 +257,6 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
-        self._annex_supports_info = \
-            external_versions['cmd:annex'] >= '6.20180206'
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -386,8 +389,7 @@ class AnnexCustomRemote(object):
 
     def info(self, msg):
         lgr.info(msg)
-        if self._annex_supports_info:
-            self.send('INFO', msg)
+        self.send('INFO', msg)
 
     def progress(self, bytes):
         bytes = int(bytes)
@@ -669,7 +671,6 @@ def generate_uuids():
 
 def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]):
     """Initialize datalad special remote"""
-    from datalad.support.external_versions import external_versions
     from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
     lgr.info("Initiating special remote %s" % remote)
     remote_opts = [
@@ -678,12 +679,11 @@ def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]
         'autoenable=%s' % str(bool(autoenable)).lower(),
         'externaltype=%s' % remote
     ]
-    if external_versions['cmd:annex'] >= '6.20170208':
-        # use unique uuid for our remotes
-        # This should help with merges of disconnected repos etc
-        # ATM only datalad/datalad-archives is expected,
-        # so on purpose getitem
-        remote_opts.append('uuid=%s' % DATALAD_SPECIAL_REMOTES_UUIDS[remote])
+    # use unique uuid for our remotes
+    # This should help with merges of disconnected repos etc
+    # ATM only datalad/datalad-archives is expected,
+    # so on purpose getitem
+    remote_opts.append('uuid=%s' % DATALAD_SPECIAL_REMOTES_UUIDS[remote])
     return repo.init_remote(remote, remote_opts + opts)
 
 

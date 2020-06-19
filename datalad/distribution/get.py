@@ -11,6 +11,7 @@
 """
 
 import logging
+import re
 
 import os.path as op
 
@@ -97,28 +98,50 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
 
 
 def _get_flexible_source_candidates_for_submodule(ds, sm):
-    """Assemble candidates from where to install a submodule
+    """Assemble candidate locations from where to clone a submodule
 
-    Even if a URL for submodule is provided explicitly -- first tries urls under
-    parent's module tracking branch remote.
+    The following locations candidates are considered. For each candidate a
+    cost is given in parenthesis, lower values indicate higher cost:
+
+    - URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with the submodule path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+
+    - In case `.gitmodules` contains a relative path instead of a URL,
+      the URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with this relative path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - In case `.gitmodules` contains a relative path as a URL, the absolute
+      path of the superdataset, appended with this relative path (cost 900).
 
     Additional candidate URLs can be generated based on templates specified as
     configuration variables with the pattern
 
       `datalad.get.subdataset-source-candidate-<name>`
 
-    where `name` is an arbitrary identifier.
+    where `name` is an arbitrary identifier. If name starts with three digits
+    (e.g. '400myserver') these will be interpreted as a cost, and the
+    respective candidate will be sorted into the generated candidate list
+    according to this cost. If no cost is given, a default of 700
+    is used.
 
     A template string assigned to such a variable can utilize the Python format
     mini language and may reference a number of properties that are inferred
     from the parent dataset's knowledge about the target subdataset. Properties
-    include any submodule property specified in the respective .gitmodules
+    include any submodule property specified in the respective `.gitmodules`
     record. For convenience, an existing `datalad-id` record is made available
     under the shortened name `id`.
 
     Additionally, the URL of any configured remote that contains the respective
     submodule commit is available as `remote-<name>` properties, where `name`
     is the configured remote name.
+
+    Lastly, all candidates are sorted according to their cost (lower values
+    first, and duplicate URLs are stripped, while preserving the first item in the
+    candidate list.
 
     Parameters
     ----------
@@ -129,11 +152,10 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
 
     Returns
     -------
-    list of tuples
-      Where each tuples consists of a name and a URL. Names are not unique
-      and either derived from the name of the respective remote, template
-      configuration variable, or 'origin' for the candidate URL that was
-      obtained from the .gitmodule record.
+    list of dict
+      Where each dict has keys 'cost' (int), 'name' (str), 'url' (str).
+      Names are not unique and either derived from the name of the respective
+      remote, template configuration variable, or 'local'.
     """
     # short cuts
     ds_repo = ds.repo
@@ -179,7 +201,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                (remote, url)
+                dict(cost=500, name=remote, url=url)
                 for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
                     sm_path_url, remote_url, alternate_suffix=False)
@@ -191,34 +213,53 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             #  --recursive)
             if sm_url:
                 clone_urls.extend(
-                    (remote, url)
+                    dict(cost=600, name=remote, url=url)
                     for url in _get_flexible_source_candidates(
                         sm_url,
                         remote_url,
                         alternate_suffix=False)
                 )
-
-        for name, tmpl in [(c[12:], ds_repo.config[c])
-                           for c in ds_repo.config.keys()
-                           if c.startswith(
-                               'datalad.get.subdataset-source-candidate-')]:
-            url = tmpl.format(**sm_candidate_props)
-            # we don't want "flexible_source_candidates" here, this is
-            # configuration that can be made arbitrarily precise from the
-            # outside. Additional guesswork can only make it slower
-            clone_urls.append((name, url))
+    cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
+    candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
+    for name, tmpl in [(c[len(candcfg_prefix):],
+                        ds_repo.config[c])
+                       for c in ds_repo.config.keys()
+                       if c.startswith(candcfg_prefix)]:
+        url = tmpl.format(**sm_candidate_props)
+        # we don't want "flexible_source_candidates" here, this is
+        # configuration that can be made arbitrarily precise from the
+        # outside. Additional guesswork can only make it slower
+        has_cost = cost_candidate_expr.match(name) is not None
+        clone_urls.append(
+            # assign a default cost, if a config doesn't have one
+            dict(
+                cost=int(name[:3]) if has_cost else 700,
+                name=name[3:] if has_cost else name,
+                url=url,
+                from_config=True,
+            ))
 
     # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
         clone_urls.extend(
-            ('local', url)
+            dict(cost=900, name='local', url=url)
             for url in _get_flexible_source_candidates(
                 sm_url,
                 ds.path,
                 alternate_suffix=False)
+            # avoid inclusion of submodule location itself
+            if url != sm['path']
         )
 
-    return unique(clone_urls, lambda x: x[1])
+    # sort all candidates by their label, thereby allowing a
+    # candidate provided by configuration to purposefully
+    # sort before or after automatically generated configuration
+    clone_urls = sorted(clone_urls, key=lambda x: x['cost'])
+    # take out any duplicate source candidates
+    # unique() takes out the duplicated at the tail end
+    clone_urls = unique(clone_urls, lambda x: x['url'])
+
+    return clone_urls
 
 
 def _install_subds_from_flexible_source(ds, sm, **kwargs):
@@ -239,7 +280,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
 
     # prevent inevitable exception from `clone`
     dest_path = op.join(ds.path, sm_path)
-    clone_urls_ = [src for name, src in clone_urls if src != dest_path]
+    clone_urls_ = [src['url'] for src in clone_urls if src['url'] != dest_path]
 
     if not clone_urls:
         # yield error
@@ -278,23 +319,26 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         return
 
     # check whether clone URL generators were involved
-    cand_cfg = set(n for n, s in clone_urls
-                   if n.startswith('subdataset-source-candidate-'))
+    cand_cfg = [rec for rec in clone_urls if rec.get('from_config', False)]
     if cand_cfg:
         # get a handle on the configuration that is specified in the
         # dataset itself (local and dataset)
         super_cfg = ConfigManager(dataset=ds, source='dataset-local')
         need_reload = False
-        for c in cand_cfg:
+        for rec in cand_cfg:
             # check whether any of this configuration originated from the
             # superdataset. if so, inherit the config in the new subdataset
             # clone. if not, keep things clean in order to be able to move with
             # any outside configuration change
-            c = 'datalad.get.{}'.format(c)
-            if c in super_cfg.keys():
-                subds.config.set(c, super_cfg.get(c), where='local',
-                                 reload=False)
-                need_reload = True
+            for c in ('datalad.get.subdataset-source-candidate-{}{}'.format(
+                          rec['cost'], rec['name']),
+                      'datalad.get.subdataset-source-candidate-{}'.format(
+                          rec['name'])):
+                if c in super_cfg.keys():
+                    subds.config.set(c, super_cfg.get(c), where='local',
+                                     reload=False)
+                    need_reload = True
+                    break
         if need_reload:
             subds.config.reload(force=True)
 
@@ -494,7 +538,7 @@ def _install_targetpath(
     lgr.info(
         "Installing %s%s recursively",
         ds,
-        (" underneath %s" % target_path
+        (" to get %s" % target_path
          if ds.path != target_path
          else ""))
     for res in _recursive_install_subds_underneath(
@@ -529,7 +573,9 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
         for r in results_from_paths(
                 content, status='notneeded',
                 message="no dataset annex, content already present",
-                action='get', logger=lgr,
+                action='get',
+                type='file',
+                logger=lgr,
                 refds=refds_path):
             yield r
         return
@@ -595,7 +641,10 @@ class Get(Interface):
              code_cmd="datalad get <path/to/dir/>"),
         dict(text="Get all contents of the current dataset and its subdatasets",
              code_py="get(dataset='.', recursive=True)",
-             code_cmd="datalad get . --recursive"),
+             code_cmd="datalad get . -r"),
+        dict(text="Get (clone) a registered subdataset, but don't retrieve data",
+             code_py="get('path/to/subds', get_data=False)",
+             code_cmd="datalad get -n <path/to/subds>"),
     ]
 
     _params_ = dict(
@@ -777,32 +826,3 @@ class Get(Interface):
                     # we had reports on datasets and subdatasets already
                     # before the annex stage
                     yield res
-
-    @staticmethod
-    def custom_result_summary_renderer(res):
-        from datalad.ui import ui
-        from os import linesep
-        if not len(res):
-            ui.message("Got nothing new")
-            return
-
-        nfiles = count_results(res, type='file')
-        nsuccess_file = count_results(res, type='file', status='ok')
-        nfailure = nfiles - nsuccess_file
-        msg = "Tried to get %d %s that had no content yet." % (
-            nfiles, single_or_plural("file", "files", nfiles))
-        if nsuccess_file:
-            msg += " Successfully obtained %d. " % nsuccess_file
-        if nfailure:
-            msg += " %d (failed)." % (nfailure,)
-        ui.message(msg)
-
-        # if just a few or less than initially explicitly requested
-        if len(res) < 10:
-            msg = linesep.join([
-                "{path}{type} ... {suc}".format(
-                    suc=item.get('status'),
-                    path=item.get('path'),
-                    type=' [{}]'.format(item['type']) if 'type' in item else '')
-                for item in res])
-            ui.message(msg)

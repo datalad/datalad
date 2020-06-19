@@ -43,14 +43,6 @@ except ImportError as e:
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
 
-# If there is a bundled git, make sure GitPython uses it too:
-from datalad.cmd import GitRunner
-GitRunner._check_git_path()
-if GitRunner._GIT_PATH:
-    import os
-    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
-        os.path.join(GitRunner._GIT_PATH, 'git')
-
 from .config import ConfigManager
 cfg = ConfigManager()
 
@@ -129,6 +121,19 @@ def setup_package():
 	email = test@example.com
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
+
+    # If there is a bundled git, make sure GitPython uses it too
+    # (some parts of the test utilities still rely on GitPython)
+    from datalad.cmd import GitRunner
+    GitRunner._check_git_path()
+    if GitRunner._GIT_PATH:
+        import os
+        os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
+            os.path.join(GitRunner._GIT_PATH, 'git')
+
+    # Re-load ConfigManager, since otherwise it won't consider global config
+    # from new $HOME (see gh-4153
+    cfg.reload(force=True)
 
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
@@ -222,6 +227,12 @@ def teardown_package():
 
     if _test_states['HOME'] is not None:
         os.environ['HOME'] = _test_states['HOME']
+
+    # Re-establish correct global config after changing $HOME.
+    # Might be superfluous, since after teardown datalad.cfg shouldn't be
+    # needed. However, maintaining a consistent state seems a good thing
+    # either way.
+    cfg.reload(force=True)
 
     if _test_states['DATASETS_TOPURL_ENV']:
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']

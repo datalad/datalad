@@ -9,7 +9,7 @@
 
 import sys
 from io import StringIO
-from nose.tools import assert_raises, assert_equal
+from datalad.tests.utils import assert_raises, assert_equal
 
 from unittest.mock import patch
 
@@ -19,10 +19,12 @@ from datalad.cmdline.main import main
 
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import SkipTest
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 
 
+@skip_if_on_windows
 @skip_ssh
 def test_exit_code():
     # will relay actual exit code on CommandError
@@ -38,6 +40,7 @@ def test_exit_code():
     assert_equal(cme.exception.code, 42)
 
 
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(content="123magic")
 def test_no_stdin_swallow(fname):
@@ -52,6 +55,7 @@ def test_no_stdin_swallow(fname):
     assert_equal(out, '')
 
 
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(suffix="1 space", content="magic")
 def test_fancy_quotes(f):
@@ -63,14 +67,19 @@ def test_fancy_quotes(f):
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_option():
-    # This test is hacky in that it depends on systems commonly configuring
-    # `AcceptEnv LC_*` in their sshd_config. If it ends up causing problems, we
-    # should just scrap it.
+    # This test is hacky in that detecting the sent value depends on systems
+    # commonly configuring `AcceptEnv LC_*` in their sshd_config. If we get
+    # back an empty value, assume that isn't configured, and skip the test.
     with patch.dict('os.environ', {"LC_DATALAD_HACK": 'hackbert'}):
-        with swallow_outputs() as cmo:  # need to give smth with .fileno ;)
+        with swallow_outputs() as cmo:
             main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
                   "localhost", "echo $LC_DATALAD_HACK"])
-            assert_equal(cmo.out.strip(), "hackbert")
+            out = cmo.out.strip()
+            if not out:
+                raise SkipTest(
+                    "SSH target probably does not accept LC_* variables. "
+                    "Skipping")
+            assert_equal(out, "hackbert")
 
 
 @skip_if_on_windows

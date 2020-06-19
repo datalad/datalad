@@ -233,7 +233,7 @@ class BuildConfigInfo(Command):
             categories[v.get('destination', 'misc')][term] = v
 
         for cat in categories:
-            with open(opj(opath, '{}.rst'.format(cat)), 'w') as rst:
+            with open(opj(opath, '{}.rst.in'.format(cat)), 'w') as rst:
                 rst.write('.. glossary::\n')
                 for term, v in sorted(categories[cat].items(), key=lambda x: x[0]):
                     rst.write(_indent(term, '\n  '))

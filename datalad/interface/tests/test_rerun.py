@@ -13,8 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-
-import os
 import os.path as op
 from os import (
     remove,
@@ -26,6 +24,7 @@ from unittest.mock import patch
 from datalad.utils import (
     chpwd,
     on_windows,
+    Path,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -67,7 +66,6 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
-    known_failure,
     known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
@@ -476,7 +474,7 @@ def test_rerun_subdir(path):
     # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
     # in the TMPDIR="/var/tmp/sym link" test case. Temporarily call realpath.
     def ok_file_under_git_kludge(path, basename):
-        ok_file_under_git(op.join(op.realpath(path), basename), annexed=True)
+        ok_file_under_git(op.join(str(Path(path).resolve()), basename), annexed=True)
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
@@ -512,7 +510,7 @@ def test_new_or_modified(path):
         return [op.relpath(ap["path"], path)
                 for ap in new_or_modified(diff_revision(*args, **kwargs))]
 
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).create(force=True, annex=False)
 
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
@@ -762,7 +760,7 @@ def test_run_inputs_outputs(src, path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(no_annex=True)
+    ds = Dataset(path).create(annex=False)
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))

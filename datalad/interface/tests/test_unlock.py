@@ -17,28 +17,33 @@ from os.path import join as opj
 
 
 from datalad.distribution.dataset import Dataset
-from datalad.api import create
-from datalad.api import unlock
+from datalad.api import (
+    create,
+    unlock,
+)
 from datalad.utils import Path
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import NoDatasetFound
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
+)
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import eq_
-from datalad.tests.utils import getpwd
-from datalad.tests.utils import chpwd
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import on_windows, skip_if
 from datalad.tests.utils import (
+    with_tempfile,
+    assert_false,
+    assert_raises,
+    assert_repo_status,
+    eq_,
+    getpwd,
+    chpwd,
+    assert_cwd_unchanged,
+    with_testrepos,
+    with_tree,
+    on_windows,
+    skip_if,
+    skip_if_root,
     assert_in_results,
     assert_not_in_results,
     assert_result_count,
-    assert_status,
     known_failure_githubci_win,
     known_failure_windows,
 )
@@ -61,7 +66,7 @@ def test_unlock_raises(path, path2, path3):
     assert_raises(NoDatasetFound,
                   unlock, dataset=None, path=path2)
 
-    create(path=path, no_annex=True)
+    create(path=path, annex=False)
     ds = Dataset(path)
     # no complaints
     ds.unlock()
@@ -88,7 +93,7 @@ def test_unlock_raises(path, path2, path3):
 #       Therefore don't know what to test for yet.
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789027#step:8:134
 @known_failure_windows
-@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
+@skip_if_root
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):
 

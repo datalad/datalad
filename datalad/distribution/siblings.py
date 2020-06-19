@@ -74,6 +74,8 @@ from .dataset import (
     EnsureDataset,
     datasetmethod,
 )
+import datalad.support.ansi_colors as ac
+
 
 lgr = logging.getLogger('datalad.distribution.siblings')
 
@@ -301,6 +303,14 @@ class Siblings(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+        # should we attempt to remove an unknown sibling, complain like Git does
+        if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
+            ui.message(
+                '{warn}: No sibling "{name}" in dataset {path}'.format(
+                    warn=ac.color_word('Warning', ac.LOG_LEVEL_COLORS['WARNING']),
+                    **res)
+            )
+            return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
             # logging complained about this already
             return
@@ -539,8 +549,9 @@ def _configure_remote(
                 # which starts to fail with AccessFailedError) if URL is bogus,
                 # so enableremote fails. E.g. as "tested" in test_siblings
                 lgr.info(
-                    "Failed to enable annex remote %s, could be a pure git "
-                    "or not accessible", name)
+                    "Could not enable annex remote %s. This is expected if %s "
+                    "is a pure Git remote, or happens if it is not accessible.",
+                    name, name)
                 lgr.debug("Exception was: %s" % exc_str(exc))
 
             if as_common_datasrc:
@@ -671,13 +682,15 @@ def _query_remotes(
                     if groupwanted:
                         info['annex-groupwanted'] = groupwanted
                 except CommandError as exc:
-                    if 'cannot determine uuid' in str(exc):
+                    if 'cannot determine uuid' in exc.stderr:
                         # not an annex (or no connection), would be marked as
                         #  annex-ignore
-                        msg = "Failed to determine if %s carries annex." % remote
+                        msg = "Could not detect whether %s carries an annex. " \
+                              "If %s is a pure Git remote, this is expected. " %\
+                              (remote, remote)
                         ds.repo.config.reload()
                         if ds.repo.is_remote_annex_ignored(remote):
-                            msg += " Remote was marked by annex as annex-ignore.  " \
+                            msg += "Remote was marked by annex as annex-ignore. " \
                                    "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
                         lgr.warning(msg)
                         info['annex-ignore'] = True

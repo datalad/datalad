@@ -112,6 +112,13 @@ definitions = {
             'text': 'Description for a Personal access token to generate.'}),
         'default': 'DataLad',
     },
+    'datalad.push.copy-auto-if-wanted': {
+        'ui': ('question', {
+            'title': "Use `git-annex copy --auto` with preferred content configured",
+            'text': 'If this flag is set, DataLad looks for preferred content configuration for a push target and instructs git-annex to use auto-mode for copying, if such configuration is detected.'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),
@@ -187,6 +194,13 @@ definitions = {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
     },
+    'datalad.tests.cache': {
+        'ui': ('question', {
+            'title': 'Cache directory for tests',
+            'text': 'Where should datalad cache test files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'tests')
+    },
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
@@ -248,6 +262,17 @@ definitions = {
         'destination': 'global',
         'default': None,
     },
+    'datalad.annex.retry': {
+        'ui': ('question',
+               {'title': 'Value for annex.retry to use for git-annex calls',
+                'text': 'On transfer failure, annex.retry (sans "datalad.") '
+                        'controls the number of times that git-annex retries. '
+                        'DataLad will call git-annex with annex.retry set '
+                        'to the value here unless the annex.retry '
+                        'is explicitly configured'}),
+        'type': EnsureInt(),
+        'default': 3,
+    },
     'datalad.repo.backend': {
         'ui': ('question', {
                'title': 'git-annex backend',
@@ -306,6 +331,13 @@ definitions = {
                'title': 'Limit configuration annexing aggregated metadata in new dataset',
                'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
         'default': 'anything',
+    },
+    'datalad.runtime.max-annex-jobs': {
+        'ui': ('question', {
+               'title': 'Maximum number of git-annex jobs to request when "jobs" option set to "auto" (default)',
+               'text': 'Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores).'}),
+        'type': EnsureInt(),
+        'default': 1,
     },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {

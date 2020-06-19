@@ -320,7 +320,8 @@ def _guess_ri_cls(ri):
         'url': URL,
         'ssh':  SSHRI,
         'file': PathRI,
-        'datalad': DataLadRI
+        'datalad': DataLadRI,
+        'git-transport': GitTransportRI,
     }
     if isinstance(ri, PurePath):
         lgr.log(5, "Detected file ri")
@@ -339,8 +340,12 @@ def _guess_ri_cls(ri):
     # file:///path should stay file:
     if fields['scheme'] and fields['scheme'] not in {'file'} \
             and not fields['hostname']:
+        # transport::URL-or-path
+        if fields['path'].startswith(':'):  # there was ::
+            lgr.log(5, "Assuming git transport style ri and returning")
+            type_ = 'git-transport'
         # dl+archive:... or just for ssh   hostname:path/p1
-        if '+' not in fields['scheme']:
+        elif '+' not in fields['scheme']:
             type_ = 'ssh'
             lgr.log(5, "Assuming ssh style ri, adjusted: %s" % (fields,))
 
@@ -428,7 +433,8 @@ class RI(object):
         ----------
         ri: str, optional
           String version of a resource specific for this class.  If you would like
-          a type of the resource be deduced, use RI(ri)
+          a type of the resource be deduced, use RI(ri). Note that this value
+          will be passed to str(), so you do not have to cast it yourself.
         **fields: dict, optional
           The values for the fields defined in _FIELDS class variable.
         """
@@ -439,11 +445,12 @@ class RI(object):
 
         self._fields = self._get_blank_fields()
         if ri is not None:
+            ri = str(ri)
             fields = self._str_to_fields(ri)
         self._set_from_fields(**fields)
 
         # If was initialized from a string representation
-        if self._str is not None:
+        if lgr.isEnabledFor(logging.DEBUG) and self._str is not None:
             # well -- some ris might not unparse identically back
             # strictly speaking, but let's assume they do
             ri_ = self.as_str()
@@ -810,6 +817,24 @@ class DataLadRI(RI, RegexBasedURLMixin):
         return "{}{}".format(consts.DATASETS_TOPURL, urlquote(self.path))
 
 
+class GitTransportRI(RI, RegexBasedURLMixin):
+    """RI for some other RI with git transport prefix"""
+
+    # TODO: check how crticial to "inherit" RI._FIELDS asking to provide path
+    _FIELDS = RI._FIELDS + (
+        'transport',
+        'RI',
+    )
+
+    # Due to poor design, `ri` argument already present in various
+    # places intermixed with **kwargs treatment. So we will use RI
+    # here instead of ri.
+    _REGEX = re.compile(r'(?P<transport>[A-Za-z0-9][A-Za-z0-9+.-]*)::(?P<RI>.*)$')
+
+    def as_str(self):
+        return '{self.transport}::{self.RI}'.format(self=self)
+
+
 def _split_colon(s, maxsplit=1):
     """Split on unescaped colon"""
     return re.compile(r'(?<!\\):').split(s, maxsplit=maxsplit)
@@ -916,9 +941,14 @@ def get_local_file_url(fname, compatibility='git-annex'):
         Git-annex command input (e.g. `addurl`). On any other platform this
         setting has no effect.
     """
-    path = Path(fname).absolute()
+    # we resolve the path to circumwent potential short paths on unfortunate
+    # platforms that would ruin the URL format.
+    #path = Path(fname).resolve().absolute()
+    path = Path(fname).resolve()
     if on_windows:
-        path = path.as_posix()
+        # in addition we need to absolute(), as on windows resolve() doesn't
+        # imply that
+        path = path.absolute().as_posix()
         furl = 'file://{}{}'.format(
             '/' if compatibility == 'git' else '',
             urlquote(

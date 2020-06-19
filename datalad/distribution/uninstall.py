@@ -124,11 +124,6 @@ class Uninstall(Interface):
     subdirectories within a dataset is done automatically. An optional
     recursion limit is applied relative to each given input path.
 
-    Examples:
-
-      Uninstall a subdataset (undo installation)::
-
-        ~/some/dataset$ datalad uninstall somesubdataset1
     """
     _action = 'uninstall'
 
@@ -144,6 +139,18 @@ class Uninstall(Interface):
         check=check_argument,
         if_dirty=if_dirty_opt,
     )
+
+    _examples_ = [
+        dict(text="Uninstall a subdataset (undo installation)",
+             code_py="uninstall(path='path/to/subds')",
+             code_cmd="datalad uninstall <path/to/subds>"),
+        dict(text="Uninstall a subdataset and all potential subdatasets",
+             code_py="uninstall(path='path/to/subds', recursive=True)",
+             code_cmd="datalad uninstall -r <path/to/subds>"),
+        dict(text="Skip checks that ensure a minimal number of (remote) sources",
+             code_py="uninstall(path='path/to/subds', check=False)",
+             code_cmd="datalad uninstall <path/to/subds> --nocheck"),
+    ]
 
     @staticmethod
     @datasetmethod(name=_action)

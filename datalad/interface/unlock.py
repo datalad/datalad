@@ -63,6 +63,16 @@ class Unlock(Interface):
         recursion_limit=recursion_limit,
     )
 
+    _examples_ = [
+        dict(text="Unlock a single file",
+             code_py="unlock(path='path/to/file')",
+             code_cmd="datalad unlock <path/to/file>"),
+        dict(text="Unlock all contents in the dataset",
+             code_py="unlock('.')",
+             code_cmd="datalad unlock ."),
+    ]
+
+
     @staticmethod
     @datasetmethod(name='unlock')
     @eval_results

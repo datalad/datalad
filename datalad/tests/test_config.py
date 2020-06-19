@@ -17,20 +17,23 @@ from os.path import join as opj
 
 from unittest.mock import patch
 from datalad.tests.utils import (
-    assert_raises,
-    assert_false,
-    assert_true,
     assert_equal,
-    assert_not_equal,
+    assert_false,
     assert_in,
+    assert_not_equal,
     assert_not_in,
+    assert_raises,
+    assert_true,
+    chpwd,
     ok_file_has_content,
-    with_tree,
     with_tempfile,
     with_testsui,
-    chpwd,
+    with_tree,
 )
-from datalad.utils import swallow_logs
+from datalad.utils import (
+    swallow_logs,
+    Path
+)
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
@@ -41,6 +44,8 @@ from datalad.config import (
 from datalad.cmd import CommandError
 
 from datalad.support.external_versions import external_versions
+from datalad.support.gitrepo import GitRepo
+
 
 # XXX tabs are intentional (part of the format)!
 # XXX put back! confuses pep8
@@ -48,6 +53,8 @@ _config_file_content = """\
 [something]
 user = name=Jane Doe
 user = email=jd@example.com
+novalue
+empty =
 myint = 3
 
 [onemore "complicated の beast with.dot"]
@@ -67,7 +74,7 @@ def test_something(path, new_home):
     assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
-    assert_equal(len(cfg), 3)
+    assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
     assert_equal(len(cfg['something.user']), 2)
@@ -80,17 +87,21 @@ def test_something(path, new_home):
     assert_true(cfg.has_option('something', 'user'))
     assert_false(cfg.has_option('something', 'us?er'))
     assert_false(cfg.has_option('some?thing', 'user'))
-    assert_equal(sorted(cfg.options('something')), ['myint', 'user'])
+    assert_equal(sorted(cfg.options('something')), ['empty', 'myint', 'novalue', 'user'])
     assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
 
     assert_equal(
         sorted(cfg.items()),
         [(u'onemore.complicated の beast with.dot.findme', '5.0'),
+         ('something.empty', ''),
          ('something.myint', '3'),
+         ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
     assert_equal(
         sorted(cfg.items('something')),
-        [('something.myint', '3'),
+        [('something.empty', ''),
+         ('something.myint', '3'),
+         ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
 
     # always get all values
@@ -101,6 +112,12 @@ def test_something(path, new_home):
     assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
     assert_equal(cfg.getbool('something', 'myint'), True)
+    # git demands a key without value at all to be used as a flag, thus True
+    assert_equal(cfg.getbool('something', 'novalue'), True)
+    assert_equal(cfg.get('something.novalue'), None)
+    # empty value is False
+    assert_equal(cfg.getbool('something', 'empty'), False)
+    assert_equal(cfg.get('something.empty'), '')
     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
     assert_raises(TypeError, cfg.getbool, 'something', 'user')
 
@@ -491,3 +508,30 @@ def test_dataset_systemglobal_mode(path):
         assert_in('user.name', cfg)
         assert_not_in('datalad.dataset.id', cfg)
         assert_not_in('annex.version', cfg)
+
+
+def test_global_config():
+
+    # from within tests, global config should be read from faked $HOME (see
+    # setup_package)
+    from datalad import cfg
+    glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
+    assert any(glb_cfg_file.samefile(Path(p)) for p in cfg._cfgfiles)
+    assert_equal(cfg.get("user.name"), "DataLad Tester")
+    assert_equal(cfg.get("user.email"), "test@example.com")
+
+
+@with_tempfile()
+def test_bare(path):
+    # can we handle a bare repo?
+    gr = GitRepo(path, create=True, bare=True)
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', gr.config)
+    # not set something that wasn't there
+    obscure_key = 'sec.reallyobscurename!@@.key'
+    assert_not_in(obscure_key, gr.config)
+    # to the local config, which is easily accessible
+    gr.config.set(obscure_key, 'myvalue', where='local')
+    assert_equal(gr.config.get(obscure_key), 'myvalue')
+    # now make sure the config is where we think it is
+    assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
