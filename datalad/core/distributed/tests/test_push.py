@@ -682,3 +682,70 @@ def test_auto_data_transfer(path):
         res,
         action="copy", target="b", status="ok",
         path=str(ds_a.pathobj / "bar.dat"))
+
+
+@with_tempfile(mkdir=True)
+def test_auto_if_wanted_data_transfer_path_restriction(path):
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    ds_a_sub0 = ds_a.create("sub0")
+    ds_a_sub1 = ds_a.create("sub1")
+
+    for ds in [ds_a, ds_a_sub0, ds_a_sub1]:
+        (ds.pathobj / "sec.dat").write_text("sec")
+        (ds.pathobj / "reg.dat").write_text("reg")
+    ds_a.save(recursive=True)
+
+    ds_a.create_sibling(str(path / "b"), name="b",
+                        annex_wanted="not metadata=distribution-restrictions=*",
+                        recursive=True)
+    for ds in [ds_a, ds_a_sub0, ds_a_sub1]:
+        ds.repo.set_metadata(add={"distribution-restrictions": "doesntmatter"},
+                             files=["sec.dat"])
+
+    # wanted-triggered --auto can be restricted to subdataset...
+    res = ds_a.push(to="b", path="sub0", data="auto-if-wanted",
+                    recursive=True)
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "reg.dat"))
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub0.pathobj / "reg.dat"))
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub0.pathobj / "sec.dat"))
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub1.pathobj / "reg.dat"))
+
+    # ... and to a wanted file.
+    res = ds_a.push(to="b", path="reg.dat", data="auto-if-wanted",
+                    recursive=True)
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "reg.dat"))
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub1.pathobj / "reg.dat"))
+
+    # But asking to transfer a file does not do it if the remote has a
+    # wanted setting and doesn't want it.
+    res = ds_a.push(to="b", path="sec.dat", data="auto-if-wanted",
+                    recursive=True)
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "sec.dat"))
+
+    res = ds_a.push(to="b", path="sec.dat", data="anything", recursive=True)
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "sec.dat"))
