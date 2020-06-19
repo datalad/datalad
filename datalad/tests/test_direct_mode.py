@@ -10,34 +10,19 @@
 
 """
 
-
-
-import logging
-
-# Please do ignore possible unused marking.
-# This is used via Dataset class:
-import datalad.api
-from datalad import cfg
-
-from nose.tools import ok_
 from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.utils import swallow_logs
-from datalad.distribution.dataset import Dataset
 
-from ..support.exceptions import DirectModeNoLongerSupportedError
-from ..support import path as op
+from datalad.support.exceptions import DirectModeNoLongerSupportedError
+from datalad.support import path as op
 
-from .utils import with_tempfile
-from .utils import skip_if_no_network
-from .utils import with_testrepos
-from .utils import on_windows
-from .utils import SkipTest
-from .utils import assert_raises
-from .utils import assert_in
-from .utils import eq_
-
+from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
+    SkipTest,
+    with_tempfile,
+)
 
 # if on_windows:
 #     raise SkipTest("Can't test direct mode switch, "
@@ -74,6 +59,9 @@ def test_direct_cfg(path1, path2):
         raise SkipTest(
             "Rest of test requires direct mode support in git-annex")
 
+    # TODO: Remove the rest of this test once GIT_ANNEX_MIN_VERSION is
+    # at least 7.20190912 (which dropped direct mode support).
+
     if ar.config.obtain("datalad.repo.version") >= 6:
         raise SkipTest("Created repo not v5, cannot test detection of direct mode repos")
     # and if repo existed before and was in direct mode, we fail too
@@ -99,7 +87,7 @@ def test_direct_cfg(path1, path2):
     del ar2; del ar2sub1; AnnexRepo._unique_instances.clear()  # fight flyweight
 
     ar2 = AnnexRepo(path2)
-    ar2.get_submodules()
+    list(ar2.get_submodules_())
 
     # And what if we are trying to add pre-cloned repo in direct mode?
     ar2sub2 = AnnexRepo.clone(path1, op.join(path2, 'sub2'))

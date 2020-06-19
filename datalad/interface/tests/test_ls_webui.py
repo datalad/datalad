@@ -12,21 +12,33 @@ import json as js
 import logging
 from genericpath import exists
 from datalad.tests.utils import (
-    assert_equal, assert_raises, assert_in, assert_false,
-    assert_not_in, ok_startswith,
+    assert_equal,
+    assert_raises,
+    assert_in,
+    assert_false,
+    assert_not_in,
+    ok_startswith,
     serve_path_via_http,
-    known_failure_githubci_win,
+    known_failure_windows,
+    with_tree,
 )
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-from datalad.interface.ls_webui import machinesize, ignored, fs_traverse, \
-    _ls_json, UNKNOWN_SIZE
+from datalad.interface.ls_webui import (
+    machinesize,
+    ignored,
+    fs_traverse,
+    _ls_json,
+    UNKNOWN_SIZE,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import with_tree
-from datalad.utils import swallow_logs, swallow_outputs, _path_
-
+from datalad.utils import (
+    swallow_logs,
+    swallow_outputs,
+    _path_,
+)
 from datalad.cmd import Runner
 
 
@@ -136,7 +148,7 @@ def test_fs_traverse(topdir):
 
 # underlying code cannot deal with adjusted branches
 # https://github.com/datalad/datalad/pull/3817
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
                   'subdir': {'file1.txt': '123',

@@ -12,11 +12,17 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.interface.base import dedent_docstring
-from datalad.interface.base import alter_interface_docs_for_api
-from datalad.interface.base import alter_interface_docs_for_cmdline
-from datalad.tests.utils import assert_true, assert_false, assert_in, \
-    assert_not_in, eq_
+from datalad.interface.base import (
+    dedent_docstring,
+    alter_interface_docs_for_api,
+    alter_interface_docs_for_cmdline,
+)
+from datalad.tests.utils import (
+    assert_false,
+    assert_in,
+    assert_not_in,
+    eq_,
+)
 
 
 demo_doc = """\

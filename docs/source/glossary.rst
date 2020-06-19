@@ -44,5 +44,13 @@ them to the corresponding Git_/git-annex_ concepts.
     operations significantly and impair handling of such repositories in
     general).
 
+  DataLad extension
+    A Python package, developed outside of the core DataLad codebase, which
+    (when installed) typically either provides additional top level `datalad`
+    commands and/or additional metadata extractors.  Visit
+    `Handbook, Ch.2. DataLad’s extensions <http://handbook.datalad.org/en/latest/basics/101-144-intro_extensions.html>`_
+    for a representative list of extensions and instructions on how to install
+    them.
+
 .. _Git: https://git-scm.com
 .. _Git-annex: http://git-annex.branchable.com

@@ -1,6 +1,6 @@
 name: Win2019
 
-on: [pull_request]
+on: [push, pull_request]
 
 jobs:
   test:
@@ -20,6 +20,10 @@ jobs:
             datalad.metadata datalad.tests datalad.ui datalad.cmdline
         ]
     steps:
+    - name: Configure windows system
+      run: |
+        # https://support.microsoft.com/en-us/help/121007/how-to-disable-8-3-file-name-creation-on-ntfs-partitions
+        fsutil.exe behavior set disable8dot3 1
     - name: Set up environment
       run: |
         git config --global user.email "test@github.land"
@@ -31,7 +35,10 @@ jobs:
         python-version: 3.7
     - name: Set up git-annex
       run: |
-        python -c "import urllib.request as r; r.urlretrieve('https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe', 'C:\\git-annex-installer.exe')"
+        # latest version
+        #python -c "import urllib.request as r; r.urlretrieve('https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe', 'C:\\git-annex-installer.exe')"
+        # specific version mih uses to debug on real win10 box
+        python -c "import urllib.request as r; r.urlretrieve('http://store.datalad.org/git-annex/windows/git-annex_8.20200309.exe', 'C:\\git-annex-installer.exe')"
         7z x -o"C:\\Program Files\Git" C:\\git-annex-installer.exe
     - name: Install dependencies
       run: |

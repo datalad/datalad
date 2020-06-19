@@ -13,8 +13,8 @@ import unittest.mock as mock
 
 import github as gh
 
-from ..exceptions import AccessDeniedError
-from ...tests.utils import (
+from datalad.support.exceptions import AccessDeniedError
+from datalad.tests.utils import (
     assert_equal,
     assert_greater,
     assert_in,
@@ -27,7 +27,7 @@ from ...tests.utils import (
 from ...consts import (
     CONFIG_HUB_TOKEN_FIELD,
 )
-from ...utils import swallow_logs
+from datalad.utils import swallow_logs
 
 from .. import github_
 from ..github_ import (

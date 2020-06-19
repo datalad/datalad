@@ -42,8 +42,10 @@ from datalad.utils import (
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
-from datalad.dochelpers import exc_str
-
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -392,7 +394,7 @@ def eval_results(func):
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
-            do_custom_result_summary = result_renderer == 'tailored' \
+            do_custom_result_summary = result_renderer in ('tailored', 'default') \
                 and hasattr(wrapped_class, 'custom_result_summary_renderer')
 
             # process main results
@@ -479,7 +481,7 @@ def eval_results(func):
                     # any processing
                     results = list(results)
                 # render summaries
-                if not result_xfm and result_renderer == 'tailored':
+                if not result_xfm and result_renderer in ('tailored', 'default'):
                     # cannot render transformed results
                     if hasattr(wrapped_class, 'custom_result_summary_renderer'):
                         wrapped_class.custom_result_summary_renderer(results)
@@ -512,6 +514,18 @@ def default_result_renderer(res):
                 if res.get('message', None) else ''))
 
 
+def _display_suppressed_message(nsimilar, ndisplayed, final=False):
+    # +1 because there was the original result + nsimilar displayed.
+    n_suppressed = nsimilar - ndisplayed + 1
+    if n_suppressed > 0:
+        ui.message('  [{} similar {} been suppressed]'
+                   .format(n_suppressed,
+                           single_or_plural("message has",
+                                            "messages have",
+                                            n_suppressed, False)),
+                   cr="\n" if final else "\r")
+
+
 def _process_results(
         results,
         cmd_class,
@@ -524,6 +538,17 @@ def _process_results(
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
+
+    # used to track repeated messages in the default renderer
+    last_result = None
+    # which result dict keys to inspect for changes to discover repetions
+    # of similar messages
+    repetition_keys = set(('action', 'status', 'type', 'refds'))
+    # counter for detected repetitions
+    result_repetitions = 0
+    # how many repetitions to show, before suppression kicks in
+    render_n_repetitions = 10 if sys.stdout.isatty() else float("inf")
+
     for res in results:
         if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
@@ -567,7 +592,25 @@ def _process_results(
         if result_renderer is None or result_renderer == 'disabled':
             pass
         elif result_renderer == 'default':
-            default_result_renderer(res)
+            trimmed_result = {k: v for k, v in res.items() if k in repetition_keys}
+            if res.get('status', None) != 'notneeded' \
+                    and trimmed_result == last_result:
+                # this is a similar report, suppress if too many, but count it
+                result_repetitions += 1
+                if result_repetitions < render_n_repetitions:
+                    default_result_renderer(res)
+                else:
+                    _display_suppressed_message(
+                        result_repetitions, render_n_repetitions)
+            else:
+                # this one is new, first report on any prev. suppressed results
+                # by number, and then render this fresh one
+                _display_suppressed_message(
+                    result_repetitions, render_n_repetitions,
+                    final=True)
+                default_result_renderer(res)
+                result_repetitions = 0
+            last_result = trimmed_result
         elif result_renderer in ('json', 'json_pp'):
             ui.message(json.dumps(
                 {k: v for k, v in res.items()
@@ -575,7 +618,7 @@ def _process_results(
                 sort_keys=True,
                 indent=2 if result_renderer.endswith('_pp') else None,
                 default=lambda x: str(x)))
-        elif result_renderer == 'tailored':
+        elif result_renderer in ('tailored', 'default'):
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
@@ -598,6 +641,9 @@ def _process_results(
                 # raise will happen after the loop
                 break
         yield res
+    # make sure to report on any issues that we had suppressed
+    _display_suppressed_message(
+        result_repetitions, render_n_repetitions, final=True)
 
 
 def keep_result(res, rfilter, **kwargs):

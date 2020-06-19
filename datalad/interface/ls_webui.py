@@ -17,7 +17,7 @@ import json as js
 import time
 from genericpath import isdir, exists, getmtime
 from os import makedirs, remove, listdir
-from os.path import split, abspath, basename, join as opj, realpath, relpath, \
+from os.path import join as opj, relpath, \
     isabs, dirname
 
 from datalad.consts import OLDMETADATA_DIR, OLDMETADATA_FILENAME
@@ -25,6 +25,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.interface.ls import FsModel, lgr, GitModel
 from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import safe_print, with_pathsep
+from datalad.utils import Path
 
 # A string to use to depict unknown size of the annexed dataset, e.g.
 # whenever all the keys are "relaxed" urls
@@ -48,8 +49,8 @@ def machinesize(humansize):
 
 def leaf_name(path):
     """takes a relative or absolute path and returns name of node at that location"""
-    head, tail = split(abspath(path))
-    return tail or basename(head)
+    path = Path(path)
+    return path.name or path.parent.name
 
 
 def ignored(path, only_hidden=False):
@@ -88,7 +89,7 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     # Note: usage of ds_path as if it was the Repo's path. Therefore use
     # realpath, since we switched to have symlinks resolved in repos but not in
     # datasets
-    ds_path = realpath(ds_path) if ds_path else fs_metadata['repo']
+    ds_path = str(Path(ds_path).resolve()) if ds_path else fs_metadata['repo']
     path = path or fs_metadata['path']
     metadata_path = metadata_path or '.git/datalad/metadata'
     # directory metadata directory tree location
@@ -130,7 +131,7 @@ def fs_extract(nodepath, repo, basepath='/'):
         else leaf_name(node.repo.path)
     rec = {
         "name": name,
-        "path": relpath(node._path, basepath),
+        "path": relpath(str(node._path), basepath),
         "type": node.type_,
         "size": pretty_size,
         "date": pretty_date,
@@ -219,8 +220,8 @@ def fs_traverse(path, repo, parent=None,
     subdatasets = subdatasets or []
     fs = fs_extract(path, repo, basepath=basepath or path)
     dataset = Dataset(repo.path)
-    submodules = {sm.path: sm
-                  for sm in repo.get_submodules()}
+    submodules = {str(sm["path"].relative_to(repo.pathobj)): sm
+                  for sm in repo.get_submodules_()}
     # TODO:  some submodules might not even have a local empty directory
     # (git doesn't care about those), so us relying on listdir here and
     # for _traverse_handle_subds might not work out.
@@ -253,7 +254,7 @@ def fs_traverse(path, repo, parent=None,
             if is_subdataset:
                 # repo.path is real, so we are doomed (for now at least)
                 # to resolve nodepath as well to get relpath for it
-                node_relpath = relpath(realpath(nodepath), repo.path)
+                node_relpath = relpath(str(Path(nodepath).resolve()), repo.path)
                 subds = _traverse_handle_subds(
                     node_relpath,
                     dataset,
@@ -262,7 +263,7 @@ def fs_traverse(path, repo, parent=None,
                     json=json
                 )
                 # Enhance it with external url if available
-                submod_url = submodules[node_relpath].url
+                submod_url = submodules[node_relpath]["gitmodule_url"]
                 if submod_url and is_datalad_compat_ri(submod_url):
                     subds['url'] = submod_url
                 children.append(subds)

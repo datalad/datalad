@@ -14,6 +14,7 @@ import logging
 import os
 import os.path as op
 from functools import partial
+from itertools import chain
 from collections import OrderedDict
 
 
@@ -26,8 +27,10 @@ from datalad.utils import (
 )
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
-from datalad.support.exceptions import CommandError
-from datalad.support.gitrepo import InvalidGitRepositoryError
+from datalad.support.exceptions import (
+    CommandError,
+    InvalidGitRepositoryError,
+)
 from datalad.version import __version__, __full_version__
 
 lgr = logging.getLogger('datalad.plugin.wtf')
@@ -217,12 +220,8 @@ def _describe_metadata_extractors():
 
 
 def _describe_dependencies():
-    # query all it got
-    [external_versions[k]
-     for k in tuple(external_versions.CUSTOM) + external_versions.INTERESTING]
-
     return {
-        k: str(external_versions[k]) for k in external_versions.keys()
+        k: str(external_versions[k]) for k in external_versions.keys(query=True)
     }
 
 
@@ -345,6 +344,16 @@ class WTF(Interface):
             # failure is already logged
             pass
         if ds and not ds.is_installed():
+            # warn that the dataset is bogus
+            yield dict(
+                action='wtf',
+                path=ds.path,
+                status='impossible',
+                message=(
+                'No dataset found at %s. Reporting on the dataset is '
+                'not attempted.', ds.path),
+                logger=lgr
+            )
             # we don't deal with absent datasets
             ds = None
         if sensitive:

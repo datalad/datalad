@@ -17,7 +17,7 @@ import errno
 import os
 import sys
 
-from ..support.path import exists, join as opj, realpath, dirname, lexists
+from ..support.path import exists, join as opj, dirname, lexists
 
 from urllib.parse import urlparse
 
@@ -30,9 +30,11 @@ from ..support.protocol import ProtocolInterface
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
-from ..utils import assure_unicode
-from ..utils import getargspec
-
+from datalad.utils import (
+    assure_unicode,
+    getargspec,
+    Path,
+)
 
 URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
@@ -97,6 +99,10 @@ send () {
     def __init__(self, repopath, custom_remote_name=None):
         super(AnnexExchangeProtocol, self).__init__()
         self.repopath = repopath
+        # resolve once, repeated resolution is slow and depending on
+        # file system operations
+        # unclear why logging needs it at all
+        self.realrepopath = Path(repopath).resolve()
         self.custom_remote_name = custom_remote_name
         self._file = None
         self._initiated = False
@@ -127,7 +133,7 @@ send () {
 
         lgr.debug("Initiating protocoling."
                   "cd %s; vim %s"
-                  % (realpath(self.repopath),
+                  % (self.realrepopath,
                      _file[len(self.repopath) + 1:]))
         with open(_file, 'a') as f:
             f.write(self.HEADER)
@@ -139,7 +145,7 @@ send () {
             f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
         lgr.debug("New section in the protocol: "
                   "cd %s; PATH=%s:$PATH %s"
-                  % (realpath(self.repopath),
+                  % (self.realrepopath,
                      dirname(self._file),
                      cmd))
 

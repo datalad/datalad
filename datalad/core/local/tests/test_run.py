@@ -34,8 +34,8 @@ from datalad.utils import (
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
-    NoDatasetFound,
     CommandError,
+    NoDatasetFound,
 )
 from datalad.api import (
     run,
@@ -45,30 +45,30 @@ from datalad.core.local.run import (
     run_command,
 )
 from datalad.tests.utils import (
-    assert_raises,
     assert_false,
-    assert_repo_status,
-    with_tempfile,
-    with_tree,
-    ok_,
-    ok_exists,
-    ok_file_has_content,
-    create_tree,
-    eq_,
-    neq_,
-    assert_status,
-    assert_result_count,
     assert_in,
     assert_in_results,
     assert_not_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    create_tree,
+    eq_,
+    known_failure_appveyor,
+    known_failure_githubci_win,
+    known_failure_windows,
+    neq_,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_exists,
+    ok_file_has_content,
+    slow,
     swallow_logs,
     swallow_outputs,
-    known_failure_githubci_win,
-    known_failure_appveyor,
-    known_failure_windows,
-    slow,
+    with_tempfile,
     with_testrepos,
-    OBSCURE_FILENAME,
+    with_tree,
 )
 
 
@@ -154,7 +154,11 @@ def test_py2_unicode_command(path):
     assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ0.dat"))
 
-    if not on_windows:  # FIXME
+    # somewhat desperate attempt to detect our own Github CI tests on a
+    # crippled filesystem (VFAT) that is so crippled that it doesn't handle
+    # what is needed here. It just goes mad with encoded bytestrings:
+    # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
+    if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
         ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
         assert_repo_status(ds.path)
         ok_exists(op.join(path, u"bβ1.dat"))
@@ -254,7 +258,7 @@ def test_run_from_subds_gh3551(path):
     assert_repo_status(ds.path)
     subds = Dataset(op.join(ds.path, subds_path))
     ok_exists(op.join(subds.path, "f"))
-    if not on_windows:  # FIXME
+    if not ds.repo.is_managed_branch():  # FIXME
         # This check fails on Windows:
         # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
         ok_(subds.repo.file_has_content("f"))

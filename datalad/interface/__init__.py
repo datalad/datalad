@@ -25,8 +25,8 @@ _group_dataset = (
         ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
-        ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
+        ('datalad.core.distributed.push', 'Push', 'push'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
         ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
         ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
@@ -42,8 +42,12 @@ _group_dataset = (
         ('datalad.distributed.create_sibling_gitlab',
          'CreateSiblingGitlab',
          'create-sibling-gitlab'),
+        ('datalad.distributed.create_sibling_ria',
+         'CreateSiblingRia',
+         'create-sibling-ria'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.core.local.save', 'Save', 'save'),
+        ('datalad.local.copy_file', 'CopyFile', 'copy-file'),
     ])
 
 _group_metadata = (
@@ -72,6 +76,8 @@ _group_misc = (
         ('datalad.core.local.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
         ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
+        ('datalad.distributed.export_archive_ora', 'ExportArchiveORA',
+         'export-archive-ora')
     ])
 
 _group_plumbing = (
@@ -94,4 +100,9 @@ _known_extension_commands = {
     'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
     'datalad-neuroimaging': ('bids2scidata',)
+}
+
+
+_deprecated_commands = {
+    'add': "save",
 }

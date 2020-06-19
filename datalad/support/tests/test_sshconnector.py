@@ -15,7 +15,7 @@ import os.path as op
 from os.path import exists, isdir, getmtime, join as opj
 from unittest.mock import patch
 
-from nose import SkipTest
+from datalad.tests.utils import SkipTest
 
 
 from datalad.support.external_versions import external_versions

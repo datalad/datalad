@@ -22,6 +22,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import textwrap
 import warnings
 from fnmatch import fnmatch
 import time
@@ -29,18 +30,42 @@ from difflib import unified_diff
 from contextlib import contextmanager
 from unittest.mock import patch
 
-from http.server import SimpleHTTPRequestHandler
-from http.server import HTTPServer
+from http.server import (
+    HTTPServer,
+    SimpleHTTPRequestHandler,
+)
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
-from os.path import relpath
+from os.path import (
+    curdir,
+    exists,
+    join as opj,
+    relpath,
+    split as pathsplit,
+)
 
 from nose.plugins.attrib import attr
-from nose.tools import \
-    assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
-    assert_in, assert_not_in, assert_in as in_, assert_is, \
-    raises, ok_, eq_, make_decorator
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_greater_equal,
+    assert_in as in_,
+    assert_in,
+    assert_is,
+    assert_is_none,
+    assert_is_not,
+    assert_is_not_none,
+    assert_not_equal,
+    assert_not_in,
+    assert_not_is_instance,
+    assert_raises,
+    assert_true,
+    eq_,
+    make_decorator,
+    ok_,
+    raises,
+)
 
 from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
@@ -164,6 +189,29 @@ def skip_if_on_windows(func=None):
         check_and_raise()
 
 
+def skip_if_root(func=None):
+    """Skip test if uid == 0.
+
+    Note that on Windows (or anywhere else `os.geteuid` is not available) the
+    test is _not_ skipped.
+    """
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            raise SkipTest("Skipping: test assumptions fail under root")
+
+    if func:
+        @wraps(func)
+        @attr('skip_if_root')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
+
+
 @optional_args
 def skip_if(func, cond=True, msg=None, method='raise'):
     """Skip test for specific condition
@@ -243,7 +291,6 @@ def skip_v6_or_later(func, method='raise'):
 # Addition "checkers"
 #
 
-import git
 import os
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
@@ -251,89 +298,22 @@ from datalad.distribution.dataset import Dataset
 from ..utils import chpwd, getpwd
 
 
-def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
-                 untracked=[], ignore_submodules=False):
-    """Verify that under given path there is a clean git repository
+def ok_clean_git(path, annex=None, index_modified=[], untracked=[]):
+    """Obsolete test helper. Use assert_repo_status() instead.
 
-    it exists, .git exists, nothing is uncommitted/dirty/staged
-
-    Note
-    ----
-    Parameters head_modified and index_modified currently work
-    in pure git or indirect mode annex only. If they are given, no
-    test of modification of known repo content is performed.
-
-    Parameters
-    ----------
-    path: str or Repo
-      in case of a str: path to the repository's base dir;
-      Note, that passing a Repo instance prevents detecting annex. This might be
-      useful in case of a non-initialized annex, a GitRepo is pointing to.
-    annex: bool or None
-      explicitly set to True or False to indicate, that an annex is (not)
-      expected; set to None to autodetect, whether there is an annex.
-      Default: None.
-    ignore_submodules: bool
-      if True, submodules are not inspected
+    Still maps a few common cases to the new helper, to ease transition
+    in extensions.
     """
-    # TODO: See 'Note' in docstring
-
-    if isinstance(path, AnnexRepo):
-        if annex is None:
-            annex = True
-        # if `annex` was set to False, but we find an annex => fail
-        assert_is(annex, True)
-        r = path
-    elif isinstance(path, GitRepo):
-        if annex is None:
-            annex = False
-        # explicitly given GitRepo instance doesn't make sense with 'annex' True
-        assert_is(annex, False)
-        r = path
-    else:
-        # 'path' is an actual path
-        try:
-            r = AnnexRepo(path, init=False, create=False)
-            if annex is None:
-                annex = True
-            # if `annex` was set to False, but we find an annex => fail
-            assert_is(annex, True)
-        except Exception:
-            # Instantiation failed => no annex
-            try:
-                r = GitRepo(path, init=False, create=False)
-            except Exception:
-                raise AssertionError("Couldn't find an annex or a git "
-                                     "repository at {}.".format(path))
-            if annex is None:
-                annex = False
-            # explicitly given GitRepo instance doesn't make sense with
-            # 'annex' True
-            assert_is(annex, False)
-
-    eq_(sorted(r.untracked_files), sorted(untracked))
-
-    repo = r.repo
-
-    if repo.index.entries.keys():
-        ok_(repo.head.is_valid())
-
-        if not head_modified and not index_modified:
-            # get string representations of diffs with index to ease
-            # troubleshooting
-            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-            index_diffs = [str(d) for d in repo.index.diff(None)]
-            eq_(head_diffs, [])
-            eq_(index_diffs, [])
-        else:
-            # TODO: These names are confusing/non-descriptive.  REDO
-            if head_modified:
-                # we did ask for interrogating changes
-                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                eq_(sorted(head_modified_), sorted(head_modified))
-            if index_modified:
-                index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                eq_(sorted(index_modified_), sorted(index_modified))
+    kwargs = {}
+    if index_modified:
+        kwargs['modified'] = index_modified
+    if untracked:
+        kwargs['untracked'] = untracked
+    assert_repo_status(
+        path,
+        annex=annex,
+        **kwargs,
+    )
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -400,7 +380,9 @@ def _prep_file_under_git(path, filename):
     # path to the file within the repository
     # repo.path is a "realpath" so to get relpath working correctly
     # we need to realpath our path as well
-    path = op.realpath(path)  # intentional realpath to match GitRepo behavior
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing paths on windows
+    path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
     file_repo_dir = op.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
@@ -419,16 +401,16 @@ def ok_symlink(path):
 
 def ok_good_symlink(path):
     ok_symlink(path)
-    rpath = realpath(path)
-    ok_(exists(rpath),
+    rpath = Path(path).resolve()
+    ok_(rpath.exists(),
         msg="Path {} seems to be missing.  Symlink {} is broken".format(
                 rpath, path))
 
 
 def ok_broken_symlink(path):
     ok_symlink(path)
-    rpath = realpath(path)
-    assert_false(exists(rpath),
+    rpath = Path(path).resolve()
+    assert_false(rpath.exists(),
             msg="Path {} seems to be present.  Symlink {} is not broken".format(
                     rpath, path))
 
@@ -916,24 +898,6 @@ def _get_resolved_flavors(flavors):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
 
-def _get_repo_url(path):
-    """Return ultimate URL for this repo"""
-
-    if path.startswith('http') or path.startswith('git'):
-        # We were given a URL, so let's just return it
-        return path
-
-    if not exists(opj(path, '.git')):
-        # do the dummiest check so we know it is not git.Repo's fault
-        raise AssertionError("Path %s does not point to a git repository "
-                             "-- missing .git" % path)
-    repo = git.Repo(path)
-    if len(repo.remotes) == 1:
-        remote = repo.remotes[0]
-    else:
-        remote = repo.remotes.origin
-    return remote.config_reader.get('url')
-
 
 def clone_url(url):
     # delay import of our code until needed for certain
@@ -1316,6 +1280,12 @@ def assert_message(message, results):
         assert_equal(m, message)
 
 
+def _format_res(x):
+    return textwrap.indent(
+        dumps(x, indent=1, default=str, sort_keys=True),
+        prefix="  ")
+
+
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
@@ -1327,12 +1297,12 @@ def assert_result_count(results, n, **kwargs):
             count += 1
     if not n == count:
         raise AssertionError(
-            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+            'Got {} instead of {} expected results matching\n{}\nInspected {} record(s):\n{}'.format(
                 count,
                 n,
-                kwargs,
+                _format_res(kwargs),
                 len(results),
-                dumps(results, indent=1, default=lambda x: str(x))))
+                _format_res(results)))
 
 
 def assert_in_results(results, **kwargs):
@@ -1342,7 +1312,10 @@ def assert_in_results(results, **kwargs):
     for r in assure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
+    if not found:
+        raise AssertionError(
+            "Desired result\n{}\nnot found among\n{}"
+            .format(_format_res(kwargs), _format_res(results)))
 
 
 def assert_not_in_results(results, **kwargs):
@@ -1558,8 +1531,6 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
 
     Anything file/directory that is not explicitly indicated must have
     state 'clean', i.e. no modifications and recorded in Git.
-
-    This is an alternative to the traditional `ok_clean_git` helper.
 
     Parameters
     ----------
@@ -1849,15 +1820,10 @@ def get_deeply_nested_structure(path):
 
 
 def has_symlink_capability():
-    try:
-        wdir = ut.Path(tempfile.mkdtemp())
-        (wdir / 'target').touch()
-        (wdir / 'link').symlink_to(wdir / 'target')
-        return True
-    except Exception:
-        return False
-    finally:
-        shutil.rmtree(str(wdir))
+
+    path = ut.Path(tempfile.mktemp())
+    target = ut.Path(tempfile.mktemp())
+    return utils.check_symlink_capability(path, target)
 
 
 def skip_wo_symlink_capability(func):
@@ -1944,6 +1910,12 @@ def slow(f):
     """Mark test as a slow, although not necessarily integration or usecase test
     """
     return attr('slow')(f)
+
+
+def turtle(f):
+    """Mark test as very slow, meaning to not run it on Travis due to its
+    time limit"""
+    return attr('turtle')(f)
 
 
 def usecase(f):

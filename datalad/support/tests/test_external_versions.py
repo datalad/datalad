@@ -11,27 +11,35 @@ import logging
 
 from os import linesep
 
-from ... import __version__
-from ...dochelpers import exc_str
-from ...version import __version__
+from datalad import __version__
+from datalad.dochelpers import exc_str
+from datalad.version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
-from ..exceptions import CommandError
-from ..exceptions import OutdatedExternalDependency, MissingExternalDependency
-from ...support.annexrepo import AnnexRepo
-from ...tests.utils import (
-    with_tempfile,
+from datalad.support.exceptions import (
+    CommandError,
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.tests.utils import (
     create_tree,
     set_annex_version,
     swallow_logs,
+    patch,
+    with_tempfile,
 )
 
-from unittest.mock import patch
-from nose.tools import (
-    assert_true, assert_false,
-    assert_equal, assert_greater_equal, assert_greater,
-    assert_raises, assert_in
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_greater_equal,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_true,
 )
-from nose import SkipTest
+from datalad.tests.utils import SkipTest
 
 
 # just to ease testing
@@ -255,3 +263,24 @@ def test_check():
 
     with assert_raises(OutdatedExternalDependency):
         ev.check('datalad', min_version="10000000")  # we will never get there!
+
+
+def test_add():
+    ev = ExternalVersions()
+    ev.add('custom1', lambda: "0.1.0")
+    assert_in("custom1=0.1.0", ev.dumps(query=True))
+    assert_not_in("numpy", ev.INTERESTING)  # we do not have it by default yet
+    assert_not_in("numpy=", ev.dumps(query=True))
+    ev.add('numpy')
+    try:
+        import numpy
+    except ImportError:
+        # no numpy, we do not have some bogus entry
+        assert_not_in("numpy=", ev.dumps(query=True))
+    else:
+        assert_in("numpy=%s" % numpy.__version__, ev.dumps(query=True))
+    assert_in("custom1=0.1.0", ev.dumps(query=True))  # we still have that one
+
+    # override with a new function will work
+    ev.add('custom1', lambda: "0.2.0")
+    assert_in("custom1=0.2.0", ev.dumps(query=True))

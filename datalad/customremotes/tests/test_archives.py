@@ -30,38 +30,38 @@ from .test_base import (
 )
 from ...tests.utils import (
     abspath,
-    chpwd,
-    get_most_obscure_supported_name,
-    with_tempfile,
-    with_tree,
-    eq_,
-    ok_,
+    assert_equal,
     assert_false,
-    assert_true,
     assert_is_instance,
     assert_not_in,
-    assert_equal,
+    assert_true,
+    chpwd,
+    eq_,
+    get_most_obscure_supported_name,
     in_,
-    ok_file_has_content,
-    swallow_outputs,
-    swallow_logs,
-    serve_path_via_http,
     known_failure_githubci_win,
+    ok_,
+    ok_file_has_content,
+    serve_path_via_http,
+    swallow_logs,
+    swallow_outputs,
+    with_tempfile,
+    with_tree,
 )
 from ...cmd import Runner, GitRunner
 from ...utils import (
     _path_,
-    unlink,
     on_linux,
     on_osx,
+    unlink,
 )
 from . import _get_custom_runner
 
 
 from ...tests.test_archives import (
-    fn_in_archive_obscure,
     fn_archive_obscure,
     fn_archive_obscure_ext,
+    fn_in_archive_obscure,
 )
 
 #import line_profiler

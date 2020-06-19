@@ -16,24 +16,28 @@ import os.path as op
 import sys
 
 from datalad.cmd import Runner
-from datalad.utils import chpwd
-from datalad.utils import quote_cmdlinearg
-from datalad.utils import swallow_outputs
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import assert_true
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
-from datalad.tests.utils import skip_if
-from datalad.tests.utils import OBSCURE_FILENAME
-from datalad.tests.utils import on_windows
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import skip_if_on_windows
+from datalad.utils import (
+    chpwd,
+    quote_cmdlinearg,
+    swallow_outputs,
+)
+from datalad.tests.utils import (
+    eq_,
+    ok_file_has_content,
+    with_tree,
+    with_tempfile,
+    assert_raises,
+    assert_repo_status,
+    assert_true,
+    assert_false,
+    assert_in_results,
+    assert_not_in_results,
+    skip_if,
+    OBSCURE_FILENAME,
+    on_windows,
+    known_failure_windows,
+    skip_if_on_windows,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
@@ -75,15 +79,12 @@ def test_dirty(path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-""",
-             'testdir': {}
-
-             }})
+save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+"""}})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
     with chpwd(path):
@@ -255,11 +256,11 @@ def test_configs(path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], sys.argv[2]), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
+save(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
 """}})
 def test_spaces(path):
     """

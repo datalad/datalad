@@ -21,11 +21,11 @@ Dataset operations
 .. toctree::
    :maxdepth: 1
 
-   generated/man/datalad-add
    generated/man/datalad-create
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github
    generated/man/datalad-create-sibling-gitlab
+   generated/man/datalad-create-sibling-ria
    generated/man/datalad-drop
    generated/man/datalad-get
    generated/man/datalad-install
@@ -68,6 +68,7 @@ Miscellaneous commands
    generated/man/datalad-download-url
    generated/man/datalad-ls
    generated/man/datalad-test
+   generated/man/datalad-export-archive-ora
 
 
 Plugin commands
@@ -92,8 +93,10 @@ Plumbing commands
 
    generated/man/datalad-annotate-paths
    generated/man/datalad-clone
+   generated/man/datalad-copy-file
    generated/man/datalad-create-test-dataset
    generated/man/datalad-diff
+   generated/man/datalad-push
    generated/man/datalad-sshrun
    generated/man/datalad-siblings
    generated/man/datalad-status

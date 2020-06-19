@@ -6,9 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface to Git via GitPython
-
-For further information on GitPython see http://gitpython.readthedocs.org/
+"""Internal low-level interface to Git repositories
 
 """
 
@@ -17,9 +15,9 @@ import time
 import os
 import os.path as op
 import warnings
+from locale import getpreferredencoding
 
 
-from itertools import chain
 import logging
 from collections import (
     OrderedDict,
@@ -33,7 +31,6 @@ from os.path import (
     isabs,
     commonprefix,
     relpath,
-    realpath,
     dirname,
     basename,
     curdir,
@@ -45,42 +42,37 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-import git as gitpy
-from git import RemoteProgress
-from gitdb.exc import BadName
-from git.exc import (
-    GitCommandError,
-    NoSuchPathError,
-    InvalidGitRepositoryError
-)
+from datalad.log import log_progress
 from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import (
+    GitWitlessRunner,
+    WitlessProtocol,
     GitRunner,
-    BatchedCommand
+    BatchedCommand,
+    run_gitcommand_on_file_list_chunks,
+    StdOutErrCapture,
 )
 from datalad.config import (
     ConfigManager,
     _parse_gitconfig_dump
 )
 
-from datalad.consts import (
-    GIT_SSH_COMMAND,
-)
 from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
     Path,
     PurePosixPath,
-    assure_list,
+    ensure_list,
     optional_args,
     on_windows,
     getpwd,
     posix_relpath,
-    assure_dir,
+    ensure_dir,
     generate_file_chunks,
-    assure_unicode,
+    ensure_unicode,
+    quote_cmdlinearg,
     split_cmdline,
 )
 
@@ -92,7 +84,8 @@ from .exceptions import (
     FileNotInRepositoryError,
     GitIgnoreError,
     InvalidGitReferenceError,
-    MissingBranchError,
+    InvalidGitRepositoryError,
+    NoSuchPathError,
     OutdatedExternalDependencyWarning,
     PathKnownToRepositoryError,
 )
@@ -104,10 +97,9 @@ from .network import (
 from .path import get_parent_paths
 from .repo import (
     PathBasedFlyweight,
-    RepoInterface
+    RepoInterface,
+    path_based_str_repr,
 )
-
-#from git.objects.blob import Blob
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -115,25 +107,17 @@ _pardirsep = pardir + sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
-_lgr_level = lgr.getEffectiveLevel()
-if _lgr_level <= 2:
-    from ..log import LoggerHelper
-    # Let's also enable gitpy etc debugging
-    gitpy_lgr = LoggerHelper(logtarget="git").get_initialized_logger()
-    gitpy_lgr.setLevel(_lgr_level)
-    gitpy_lgr.propagate = True
-
-# Override default GitPython's DB backend to talk directly to git so it doesn't
-# interfere with possible operations performed by gc/repack
-default_git_odbt = gitpy.GitCmdObjectDB
-
-# TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
-# Didn't work as expected on a first try. Probably there is a neatier way to
-# log Exceptions from git commands.
 
 
-def to_options(**kwargs):
+def to_options(split_single_char_options=True, **kwargs):
     """Transform keyword arguments into a list of cmdline options
+
+    Imported from GitPython.
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
 
     Parameters
     ----------
@@ -145,9 +129,34 @@ def to_options(**kwargs):
     -------
     list
     """
-    # TODO: borrow_docs!
+    def dashify(string):
+        return string.replace('_', '-')
 
-    return gitpy.Git().transform_kwargs(**kwargs)
+    def transform_kwarg(name, value, split_single_char_options):
+        if len(name) == 1:
+            if value is True:
+                return ["-%s" % name]
+            elif value not in (False, None):
+                if split_single_char_options:
+                    return ["-%s" % name, "%s" % value]
+                else:
+                    return ["-%s%s" % (name, value)]
+        else:
+            if value is True:
+                return ["--%s" % dashify(name)]
+            elif value is not False and value is not None:
+                return ["--%s=%s" % (dashify(name), value)]
+        return []
+
+    args = []
+    kwargs = OrderedDict(sorted(kwargs.items(), key=lambda x: x[0]))
+    for k, v in kwargs.items():
+        if isinstance(v, (list, tuple)):
+            for value in v:
+                args += transform_kwarg(k, value, split_single_char_options)
+        else:
+            args += transform_kwarg(k, v, split_single_char_options)
+    return args
 
 
 def _normalize_path(base_dir, path):
@@ -173,18 +182,22 @@ def _normalize_path(base_dir, path):
     """
     if not path:
         return path
+    pathobj = Path(path)
 
-    base_dir = realpath(base_dir)  # realpath OK
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing base_dirs on windows
+    base_dir = str(Path(base_dir).resolve().absolute())  # realpath OK
+
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
     # correct base.
 
-    if isabs(path):
+    if pathobj.is_absolute():
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
+        path = str(pathobj.parent.resolve() / pathobj.name)  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -194,7 +207,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-        path = normpath(opj(realpath(getpwd()), path))  # realpath OK
+        path = str(Path(getpwd()).resolve() / pathobj)  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -202,7 +215,7 @@ def _normalize_path(base_dir, path):
 
     if commonprefix([path, base_dir]) != base_dir:
         raise FileNotInRepositoryError(msg="Path outside repository: %s"
-                                           % path, filename=path)
+                                           % base_dir, filename=path)
 
     return relpath(path, start=base_dir)
 
@@ -339,27 +352,6 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
     return newfunc
 
 
-def _remove_empty_items(list_):
-    """Remove empty entries from list
-
-    This is needed, since some functions of GitPython may convert
-    an empty entry to '.', when used with a list of paths.
-
-    Parameter:
-    ----------
-    list_: list of str
-
-    Returns
-    -------
-    list of str
-    """
-    if not isinstance(list_, list):
-        lgr.warning(
-            "_remove_empty_items() called with non-list type: %s" % type(list_))
-        return list_
-    return [file_ for file_ in list_ if file_]
-
-
 if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
     # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
     # into untracked submodules when multiple pathspecs are given, returning
@@ -380,149 +372,421 @@ else:
         return repos
 
 
-def Repo(*args, **kwargs):
-    """Factory method around gitpy.Repo to consistently initiate with different
-    backend
+class GitProgress(WitlessProtocol):
+    """Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
     """
-    # TODO: This probably doesn't work as intended (or at least not as
-    #       consistently as intended). gitpy.Repo could be instantiated by
-    #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
-    #       would be needed as a parameter to these methods instead of the
-    #       constructor.
-    if 'odbt' not in kwargs:
-        kwargs['odbt'] = default_git_odbt
-    return gitpy.Repo(*args, **kwargs)
+    # inform super-class to capture stderr
+    proc_err = True
 
+    _num_op_codes = 10
+    BEGIN, END, COUNTING, COMPRESSING, WRITING, RECEIVING, RESOLVING, FINDING_SOURCES, CHECKING_OUT, ENUMERATING = \
+        [1 << x for x in range(_num_op_codes)]
+    STAGE_MASK = BEGIN | END
+    OP_MASK = ~STAGE_MASK
 
-def guard_BadName(func):
-    """A helper to guard against BadName exception
+    DONE_TOKEN = 'done.'
+    TOKEN_SEPARATOR = ', '
 
-    Workaround for
-    https://github.com/gitpython-developers/GitPython/issues/768
-    also see https://github.com/datalad/datalad/issues/2550
-    Let's try to precommit (to flush anything flushable) and do
-    it again
-    """
-
-    @wraps(func)
-    def wrapped(repo, *args, **kwargs):
-        try:
-            return func(repo, *args, **kwargs)
-        except BadName:
-            repo.precommit()
-            return func(repo, *args, **kwargs)
-
-    return wrapped
-
-
-class GitPythonProgressBar(RemoteProgress):
-    """A handler for Git commands interfaced by GitPython which report progress
-    """
-
-    # GitPython operates with op_codes which are a mask for actions.
     _known_ops = {
-        RemoteProgress.COUNTING: "counting objects",
-        RemoteProgress.COMPRESSING: "compressing objects",
-        RemoteProgress.WRITING: "writing objects",
-        RemoteProgress.RECEIVING: "receiving objects",
-        RemoteProgress.RESOLVING: "resolving stuff",
-        RemoteProgress.FINDING_SOURCES: "finding sources",
-        RemoteProgress.CHECKING_OUT: "checking things out"
+        COUNTING: ("Counting", "Objects"),
+        ENUMERATING: ("Enumerating", "Objects"),
+        COMPRESSING: ("Compressing", "Objects"),
+        WRITING: ("Writing", "Objects"),
+        RECEIVING: ("Receiving", "Objects"),
+        RESOLVING: ("Resolving", "Deltas"),
+        FINDING_SOURCES: ("Finding", "Sources"),
+        CHECKING_OUT: ("Check out", "Things"),
     }
 
-    # To overcome the bug when GitPython (<=2.1.11), with tentative fix
-    # in https://github.com/gitpython-developers/GitPython/pull/798
-    # we will collect error_lines from the last progress bar used by GitPython
-    # To do that reliably this class should be used as a ContextManager,
-    # or .close() should be called explicitly before analysis of this
-    # attribute is done.
-    # TODO: remove the workaround whenever new GitPython version provides
-    # it natively and we boost versioned dependency on it
-    _last_error_lines = None
+    __slots__ = ('_seen_ops', '_pbars', '_encoding')
 
-    def __init__(self, action):
-        super(GitPythonProgressBar, self).__init__()
-        self._action = action
-        from datalad.ui import ui
-        self._ui = ui
-        self._pbar = None
-        self._op_code = None
-        GitPythonProgressBar._last_error_lines = None
+    re_op_absolute = re.compile(r"(remote: )?([\w\s]+):\s+()(\d+)()(.*)")
+    re_op_relative = re.compile(r"(remote: )?([\w\s]+):\s+(\d+)% \((\d+)/(\d+)\)(.*)")
 
-    def __del__(self):
-        self.close()
+    def __init__(self, *args):
+        super().__init__(*args)
+        self._unprocessed = None
 
-    def close(self):
-        GitPythonProgressBar._last_error_lines = self.error_lines
-        self._close_pbar()
+    def connection_made(self, transport):
+        super().connection_made(transport)
+        self._seen_ops = []
+        self._pbars = set()
 
-    def __enter__(self):
-        return self
+    def process_exited(self):
+        # take down any progress bars that were not closed orderly
+        for pbar_id in self._pbars:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished',
+            )
+        super().process_exited()
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-
-    def _close_pbar(self):
-        if self._pbar:
-            self._pbar.finish()
-        self._pbar = None
-
-    def _get_human_msg(self, op_code):
-        """Return human readable action message
-        """
-        op_id = op_code & self.OP_MASK
-        op = self._known_ops.get(op_id, "doing other evil")
-        return "%s (%s)" % (self._action, op)
-
-    def update(self, op_code, cur_count, max_count=None, message=''):
-        # ATM we ignore message which typically includes bandwidth info etc
-        try:
-            if not max_count:
-                # spotted used by GitPython tests, so may be at times it is not
-                # known and assumed to be a 100%...? TODO
-                max_count = 100.0
-            if op_code:
-                # Apparently those are composite and we care only about the ones
-                # we know, so to avoid switching the progress bar for no good
-                # reason - first & with the mask
-                op_code = op_code & self.OP_MASK
-            if self._op_code is None or self._op_code != op_code:
-                # new type of operation
-                self._close_pbar()
-
-                self._pbar = self._ui.get_progressbar(
-                    self._get_human_msg(op_code),
-                    total=max_count,
-                    unit=' objects'
-                )
-                self._op_code = op_code
-            if not self._pbar:
-                lgr.error("Ended up without progress bar... how?")
-                return
-            self._pbar.update(cur_count, increment=False)
-        except Exception as exc:
-            lgr.debug("GitPythonProgressBar errored with %s", exc_str(exc))
+    def pipe_data_received(self, fd, byts):
+        # progress reports only come from stderr
+        if fd != 2:
+            # let the base class decide what to do with it
+            super().pipe_data_received(fd, byts)
             return
-        #import time; time.sleep(0.001)  # to see that things are actually "moving"
-        # without it we would get only a blink on initial 0 value, istead of
-        # a blink at some higher value.  Anyways git provides those
-        # without flooding so should be safe to force here.
-        self._pbar.refresh()
+        for line in byts.splitlines(keepends=True):
+            # put any unprocessed content back in front
+            line = self._unprocessed + line if self._unprocessed else line
+            self._unprocessed = None
+            if not self._parse_progress_line(line):
+                # anything that doesn't look like a progress report
+                # is retained and returned
+                # in case of partial progress lines, this can lead to
+                # leakage of progress info into the output, but
+                # it is better to enable better (maybe more expensive)
+                # subsequent filtering than hidding lines with
+                # unknown, potentially important info
+                lgr.debug('Non-progress stderr: %s', line)
+                if line.endswith((b'\r', b'\n')):
+                    # complete non-progress line, pass on
+                    super().pipe_data_received(fd, line)
+                else:
+                    # an incomplete line, maybe the next batch completes
+                    # it to become a recognizable progress report
+                    self._unprocessed = line
+
+    def _parse_progress_line(self, line):
+        """Process a single line
+
+        Parameters
+        ----------
+        line : bytes
+
+        Returns
+        -------
+        bool
+          Flag whether the line was recognized as a Git progress report.
+        """
+        # handle
+        # Counting objects: 4, done.
+        # Compressing objects:  50% (1/2)
+        # Compressing objects: 100% (2/2)
+        # Compressing objects: 100% (2/2), done.
+        line = line.decode(self.encoding) if isinstance(line, bytes) else line
+        if line.startswith(('warning:', 'error:', 'fatal:')):
+            return False
+
+        # find escape characters and cut them away - regex will not work with
+        # them as they are non-ascii. As git might expect a tty, it will send them
+        last_valid_index = None
+        for i, c in enumerate(reversed(line)):
+            if ord(c) < 32:
+                # its a slice index
+                last_valid_index = -i - 1
+            # END character was non-ascii
+        # END for each character in line
+        if last_valid_index is not None:
+            line = line[:last_valid_index]
+        # END cut away invalid part
+        line = line.rstrip()
+
+        cur_count, max_count = None, None
+        match = self.re_op_relative.match(line)
+        if match is None:
+            match = self.re_op_absolute.match(line)
+
+        if not match:
+            return False
+        # END could not get match
+
+        op_code = 0
+        _remote, op_name, _percent, cur_count, max_count, message = match.groups()
+
+        # get operation id
+        if op_name == "Counting objects":
+            op_code |= self.COUNTING
+        elif op_name == "Compressing objects":
+            op_code |= self.COMPRESSING
+        elif op_name == "Writing objects":
+            op_code |= self.WRITING
+        elif op_name == 'Receiving objects':
+            op_code |= self.RECEIVING
+        elif op_name == 'Resolving deltas':
+            op_code |= self.RESOLVING
+        elif op_name == 'Finding sources':
+            op_code |= self.FINDING_SOURCES
+        elif op_name == 'Checking out files':
+            op_code |= self.CHECKING_OUT
+        elif op_name == 'Enumerating objects':
+            op_code |= self.ENUMERATING
+        else:
+            # Note: On windows it can happen that partial lines are sent
+            # Hence we get something like "CompreReceiving objects", which is
+            # a blend of "Compressing objects" and "Receiving objects".
+            # This can't really be prevented.
+            lgr.debug(
+                'Output line matched a progress report of an unknown type: %s',
+                line)
+            # TODO investigate if there is any chance that we might swallow
+            # important info -- until them do not flag this line
+            # as progress
+            return False
+        # END handle op code
+
+        pbar_id = 'gitprogress-{}-{}'.format(id(self), op_code)
+
+        op_props = self._known_ops[op_code]
+
+        # figure out stage
+        if op_code not in self._seen_ops:
+            self._seen_ops.append(op_code)
+            op_code |= self.BEGIN
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Start {} {}'.format(
+                    op_props[0].lower(),
+                    op_props[1].lower(),
+                ),
+                label=op_props[0],
+                unit=' {}'.format(op_props[1]),
+                total=float(max_count) if max_count else None,
+            )
+            self._pbars.add(pbar_id)
+        # END begin opcode
+
+        if message is None:
+            message = ''
+        # END message handling
+
+        done_progress = False
+        message = message.strip()
+        if message.endswith(self.DONE_TOKEN):
+            op_code |= self.END
+            message = message[:-len(self.DONE_TOKEN)]
+            done_progress = True
+        # END end message handling
+        message = message.strip(self.TOKEN_SEPARATOR)
+
+        if cur_count and max_count:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                line,
+                update=float(cur_count),
+                noninteractive_level=logging.DEBUG,
+            )
+
+        if done_progress:
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished {} {}'.format(
+                    op_props[0].lower(),
+                    op_props[1].lower(),
+                ),
+                noninteractive_level=logging.DEBUG,
+            )
+            self._pbars.discard(pbar_id)
+        return True
+
+
+class StdOutCaptureWithGitProgress(GitProgress):
+    proc_out = True
+
+
+class FetchInfo(dict):
+    """
+    dict that carries results of a fetch operation of a single head
+
+    Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+
+    NEW_TAG, NEW_HEAD, HEAD_UPTODATE, TAG_UPDATE, REJECTED, FORCED_UPDATE, \
+        FAST_FORWARD, ERROR = [1 << x for x in range(8)]
+
+    _re_fetch_result = re.compile(r'^\s*(.) (\[?[\w\s\.$@]+\]?)\s+(.+) [-> ]+ ([^\s]+)(    \(.*\)?$)?')
+
+    _flag_map = {
+        '!': ERROR,
+        '+': FORCED_UPDATE,
+        '*': 0,
+        '=': HEAD_UPTODATE,
+        ' ': FAST_FORWARD,
+        '-': TAG_UPDATE,
+    }
+    _operation_map = {
+        NEW_TAG: 'new-tag',
+        NEW_HEAD: 'new-branch',
+        HEAD_UPTODATE: 'uptodate',
+        TAG_UPDATE: 'tag-update',
+        REJECTED: 'rejected',
+        FORCED_UPDATE: 'forced-update',
+        FAST_FORWARD: 'fast-forward',
+        ERROR: 'error',
+    }
+
+    @classmethod
+    def _from_line(cls, line):
+        """Parse information from the given line as returned by git-fetch -v
+        and return a new FetchInfo object representing this information.
+        """
+        match = cls._re_fetch_result.match(line)
+        if match is None:
+            raise ValueError("Failed to parse line: %r" % line)
+
+        # parse lines
+        control_character, operation, local_remote_ref, remote_local_ref, note = \
+            match.groups()
+
+        # parse flags from control_character
+        flags = 0
+        try:
+            flags |= cls._flag_map[control_character]
+        except KeyError:
+            raise ValueError(
+                "Control character %r unknown as parsed from line %r"
+                % (control_character, line))
+        # END control char exception handling
+
+        # parse operation string for more info - makes no sense for symbolic refs,
+        # but we parse it anyway
+        old_commit = None
+        if 'rejected' in operation:
+            flags |= cls.REJECTED
+        if 'new tag' in operation:
+            flags |= cls.NEW_TAG
+        if 'tag update' in operation:
+            flags |= cls.TAG_UPDATE
+        if 'new branch' in operation:
+            flags |= cls.NEW_HEAD
+        if '...' in operation or '..' in operation:
+            split_token = '...'
+            if control_character == ' ':
+                split_token = split_token[:-1]
+            old_commit = operation.split(split_token)[0]
+        # END handle refspec
+
+        return cls(
+            ref=remote_local_ref.strip(),
+            local_ref=local_remote_ref.strip(),
+            # convert flag int into a list of operation labels
+            operations=[
+                cls._operation_map[o]
+                for o in cls._operation_map.keys()
+                if flags & o
+            ],
+            note=note,
+            old_commit=old_commit,
+        )
+
+
+class PushInfo(dict):
+    """dict that carries results of a push operation of a single head
+
+    Reduced variant of GitPython's RemoteProgress class
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+    NEW_TAG, NEW_HEAD, NO_MATCH, REJECTED, REMOTE_REJECTED, REMOTE_FAILURE, DELETED, \
+        FORCED_UPDATE, FAST_FORWARD, UP_TO_DATE, ERROR = [1 << x for x in range(11)]
+
+    _flag_map = {'X': NO_MATCH,
+                 '-': DELETED,
+                 '*': 0,
+                 '+': FORCED_UPDATE,
+                 ' ': FAST_FORWARD,
+                 '=': UP_TO_DATE,
+                 '!': ERROR}
+
+    _operation_map = {
+        NEW_TAG: 'new-tag',
+        NEW_HEAD: 'new-branch',
+        NO_MATCH: 'no-match',
+        REJECTED: 'rejected',
+        REMOTE_REJECTED: 'remote-rejected',
+        REMOTE_FAILURE: 'remote-failure',
+        DELETED: 'deleted',
+        FORCED_UPDATE: 'forced-update',
+        FAST_FORWARD: 'fast-forward',
+        UP_TO_DATE: 'uptodate',
+        ERROR: 'error',
+    }
+
+    @classmethod
+    def _from_line(cls, line):
+        """Create a new PushInfo instance as parsed from line which is expected to be like
+            refs/heads/master:refs/heads/master 05d2687..1d0568e as bytes"""
+        control_character, from_to, summary = line.split('\t', 3)
+        flags = 0
+
+        # control character handling
+        try:
+            flags |= cls._flag_map[control_character]
+        except KeyError:
+            raise ValueError("Control character %r unknown as parsed from line %r" % (control_character, line))
+        # END handle control character
+
+        # from_to handling
+        from_ref_string, to_ref_string = from_to.split(':')
+
+        # commit handling, could be message or commit info
+        old_commit = None
+        if summary.startswith('['):
+            if "[rejected]" in summary:
+                flags |= cls.REJECTED
+            elif "[remote rejected]" in summary:
+                flags |= cls.REMOTE_REJECTED
+            elif "[remote failure]" in summary:
+                flags |= cls.REMOTE_FAILURE
+            elif "[no match]" in summary:
+                flags |= cls.ERROR
+            elif "[new tag]" in summary:
+                flags |= cls.NEW_TAG
+            elif "[new branch]" in summary:
+                flags |= cls.NEW_HEAD
+            # uptodate encoded in control character
+        else:
+            # fast-forward or forced update - was encoded in control character,
+            # but we parse the old and new commit
+            split_token = "..."
+            if control_character == " ":
+                split_token = ".."
+            old_sha, _new_sha = summary.split(' ')[0].split(split_token)
+            # have to use constructor here as the sha usually is abbreviated
+            old_commit = old_sha
+        # END message handling
+
+        return cls(
+            from_ref=from_ref_string.strip(),
+            to_ref=to_ref_string.strip(),
+            # convert flag int into a list of operation labels
+            operations=[
+                cls._operation_map[o]
+                for o in cls._operation_map.keys()
+                if flags & o
+            ],
+            note=summary.strip(),
+            old_commit=old_commit,
+        )
 
 
 # Compatibility kludge.  See GitRepo.get_submodules().
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
+@path_based_str_repr
 class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
-
-    # We use our sshrun helper
-    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND,
-                   'GIT_SSH_VARIANT': 'ssh'}
-
     # We must check git config to have name and email set, but
     # should do it once
     _config_checked = False
@@ -587,7 +851,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
         repo: git.Repo, optional
-          GitPython's Repo instance to (re)use if provided
+          This argument is ignored.
         create_sanity_checks: bool, optional
           Whether to perform sanity checks during initialization (when
           `create=True` and target path is not a valid repo already), such as
@@ -680,9 +944,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # Could be used to e.g. disable automatic garbage and autopacking
         # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         self._GIT_COMMON_OPTIONS = []
-        # actually no need with default GitPython db backend not in memory
-        # default_git_odbt but still allows for faster testing etc.
-        # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
         if git_opts is None:
             git_opts = {}
@@ -690,18 +951,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             git_opts.update(kwargs)
 
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        self._repo = repo
         self._cfg = None
 
-        if do_create:  # we figured it out ealier
-            self._repo = self._create_empty_repo(path,
-                                                 create_sanity_checks, **git_opts)
-
-        # inject git options into GitPython's git call wrapper:
-        # Note: `None` currently can happen, when Runner's protocol prevents
-        # calls above from being actually executed (DryRunProtocol)
-        if self._repo is not None:
-            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
+        if do_create:  # we figured it out earlier
+            self._create_empty_repo(path, create_sanity_checks, **git_opts)
 
         # with DryRunProtocol path might still not exist
         if exists(self.path):
@@ -765,41 +1018,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
-        # we want to return None and have lazy eval take care of
-        # the rest
-        return
-
-    @property
-    def repo(self):
-        # with DryRunProtocol path not exist
-        if exists(self.path):
-            inode = os.stat(self.path).st_ino
-        else:
-            inode = None
-        if self.inode != inode:
-
-            # TODO: - what if we never had any inode? possible?
-            #       - also: call to self._repo and only afterwards checking whether it's None seems strange
-
-            # reset background processes invoked by GitPython:
-            self._repo.git.clear_cache()
-            self.inode = inode
-
-        if self._repo is None:
-            # Note, that this may raise GitCommandError, NoSuchPathError,
-            # InvalidGitRepositoryError:
-            self._repo = self.cmd_call_wrapper(
-                Repo,
-                self.path)
-            lgr.log(8, "Using existing Git repository at %s", self.path)
-
-        # inject git options into GitPython's git call wrapper:
-        # Note: `None` currently can happen, when Runner's protocol prevents
-        # call of Repo(path) above from being actually executed (DryRunProtocol)
-        if self._repo is not None:
-            self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
-
-        return self._repo
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
@@ -818,6 +1036,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
+        kwargs:
+          Passed to the Repo class constructor.
         """
 
         if 'repo' in kwargs:
@@ -828,13 +1048,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # fail early on non-empty target:
         from os import listdir
         if exists(path) and listdir(path):
-            # simulate actual GitCommandError:
-            lgr.warning("destination path '%s' already exists and is not an "
-                        "empty directory." % path)
-            raise GitCommandError(
-                ['git', 'clone', '-v', url, path],
-                128,
-                "fatal: destination path '%s' already exists and is not an "
+            raise ValueError(
+                "destination path '%s' already exists and is not an "
                 "empty directory." % path)
         else:
             # protect against cloning into existing and obviously dangling
@@ -862,42 +1077,36 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
-            # TODO: with git <= 2.3 keep old mechanism:
-            #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            env = GitRepo.GIT_SSH_ENV
         else:
             if isinstance(url_ri, PathRI):
+                # expand user, because execution not going through a shell
+                # doesn't work well otherwise
                 new_url = os.path.expanduser(url)
                 if url != new_url:
-                    # TODO: remove whenever GitPython is fixed:
-                    # https://github.com/gitpython-developers/GitPython/issues/731
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
-            env = None
 
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                with GitPythonProgressBar("Cloning") as git_progress:
-                    repo = gitpy.Repo.clone_from(
-                        url, path,
-                        env=env,
-                        # we accept a plain dict with options, and not a gitpy
-                        # tailored list of "multi options" to make a future
-                        # non-GitPy based implementation easier. Do conversion
-                        # here
-                        multi_options=to_options(**clone_options) if clone_options else None,
-                        odbt=default_git_odbt,
-                        progress=git_progress
-                    )
-                # Note/TODO: signature for clone from:
-                # (url, to_path, progress=None, env=None, **kwargs)
 
+                res = GitWitlessRunner().run(
+                        ['git', 'clone', '--progress', url, path] \
+                        + (to_options(**clone_options)
+                           if clone_options else []),
+                        protocol=GitProgress,
+                )
+                # fish out non-critical warnings by git-clone
+                # (empty repo clone, etc.), all other content is logged
+                # by the progress helper to 'debug'
+                for errline in res['stderr'].splitlines():
+                    if errline.startswith('warning:'):
+                        lgr.warning(errline[8:].strip())
                 lgr.debug("Git clone completed")
                 break
-            except GitCommandError as e:
+            except CommandError as e:
                 # log here but let caller decide what to do
                 e_str = exc_str(e)
                 # see https://github.com/datalad/datalad/issues/785
@@ -917,18 +1126,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
                 raise
 
-            except ValueError as e:
-                if gitpy.__version__ == '1.0.2' \
-                        and "I/O operation on closed file" in str(e):
-                    # bug https://github.com/gitpython-developers/GitPython
-                    # /issues/383
-                    raise GitCommandError(
-                        "clone has failed, telling ya",
-                        999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
-                raise  # reraise original
-
-        gr = cls(path, *args, repo=repo, **kwargs)
+        # get ourselves a repository instance
+        gr = cls(path, *args, **kwargs)
         if fix_annex:
             # cheap check whether we deal with an AnnexRepo - we can't check the class of `gr` itself, since we then
             # would need to import our own subclass
@@ -946,25 +1145,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
         # stalls etc
         self._cfg = None
-        # Make sure to flush pending changes, especially close batch processes
-        # (internal `git cat-file --batch` by GitPython)
-        try:
-            if getattr(self, '_repo', None) is not None and exists(self.path):
-                # gc might be late, so the (temporary)
-                # repo doesn't exist on FS anymore
-                self._repo.git.clear_cache()
-                # We used to write out the index to flush GitPython's
-                # state... but such unconditional write is really a workaround
-                # and does not play nice with read-only operations - permission
-                # denied etc. So disabled 
-                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                #    self.repo.index.write()
-        except (InvalidGitRepositoryError, AttributeError):
-            # might have being removed and no longer valid or attributes unbound
-            pass
-
-    def __repr__(self):
-        return "<GitRepo path=%s (%s)>" % (self.path, type(self))
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
@@ -1119,7 +1299,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             path_ = path
             path_prev = ""
             while path_ and path_ != path_prev:  # on top /.. = /
-                if realpath(path_) == toppath:
+                if str(Path(path_).resolve()) == toppath:
                     toppath = path_
                     break
                 path_prev = path_
@@ -1173,7 +1353,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # there is no other way then to collect all files into a list
         # at this point, because we need to pass them at once to a single
         # `git add` call
-        files = [_normalize_path(self.path, f) for f in assure_list(files) if f]
+        files = [_normalize_path(self.path, f) for f in ensure_list(files) if f]
 
         if not (files or git_options or update):
             # wondering why just a warning? in cmdline this is also not an error
@@ -1184,10 +1364,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._git_custom_command(
                 files,
-                # Set annex.largefiles to prevent storing files in annex when
-                # GitRepo() is instantiated with a v6+ annex repo.
+                # Set annex.largefiles to prevent storing files in
+                # annex with a v6+ annex repo.
                 ['git', '-c', 'annex.largefiles=nothing', 'add'] +
-                assure_list(git_options) +
+                ensure_list(git_options) +
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
@@ -1229,7 +1409,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         modes when ran through proxy
         """
         return [{u'file': f, u'success': True}
-                for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
+                for f in re.findall("'(.*)'[\n$]", ensure_unicode(stdout))]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, recursive=False, **kwargs):
@@ -1251,9 +1431,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         [str]
           list of successfully removed files.
         """
-
-        files = _remove_empty_items(files)
-
         if recursive:
             kwargs['r'] = True
         stdout, stderr = self._git_custom_command(
@@ -1262,23 +1439,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # output per removed file is expected to be "rm 'PATH'":
         return [line.strip()[4:-1] for line in stdout.splitlines()]
 
-        #return self.repo.git.rm(files, cached=False, **kwargs)
-
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-        # All GitPython commands should take care about flushing index
-        # whenever they modify it, so we would not care to do anything
-        # if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
-        #     # flush possibly cached in GitPython changes to index:
-        #     # if self.repo.git:
-        #     #     sys.stderr.write("CLEARING\n")
-        #     #     self.repo.git.clear_cache()
-        #     self.repo.index.write()
-
-        # Close batched by GitPython git processes etc
-        # Ref: https://github.com/gitpython-developers/GitPython/issues/718
-        self.repo.__del__()
+        # we used to clean up GitPython here
         pass
 
     @staticmethod
@@ -1330,7 +1494,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if not fields:
             raise ValueError('no `fields` provided, refuse to proceed')
-        fields = assure_list(fields)
+        fields = ensure_list(fields)
         cmd = [
             "git",
             "for-each-ref",
@@ -1343,10 +1507,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if contains:
             cmd.append('--contains={}'.format(contains))
         if sort:
-            for k in assure_list(sort):
+            for k in ensure_list(sort):
                 cmd.append('--sort={}'.format(k))
         if pattern:
-            cmd += assure_list(pattern)
+            cmd += ensure_list(pattern)
         if count:
             cmd.append('--count={:d}'.format(count))
 
@@ -1443,71 +1607,73 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         self.precommit()
 
-        if _datalad_msg:
-            msg = self._get_prefixed_commit_msg(msg)
-
-        options = options or []
-
-        if not msg:
-            if options:
-                if "--allow-empty-message" not in options:
-                        options.append("--allow-empty-message")
-            else:
-                options = ["--allow-empty-message"]
+        # assemble commandline
+        cmd = ['git', 'commit']
+        options = ensure_list(options)
 
         if date:
             options += ["--date", date]
-        # Note: We used to use a direct call to git only if there were options,
-        # since we can't pass all possible options to gitpython's implementation
-        # of commit.
-        # But there's an additional issue. GitPython implements commit in a way,
-        # that it might create a new commit, when a direct call wouldn't. This
-        # was discovered with a modified (but unstaged) submodule, leading to a
-        # commit, that apparently did nothing - git status still showed the very
-        # same thing afterwards. But a commit was created nevertheless:
-        # diff --git a/sub b/sub
-        # --- a/sub
-        # +++ b/sub
-        # @@ -1 +1 @@
-        # -Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f
-        # +Subproject commit d3935338a3b3735792de1078bbfb5e9913ef998f-dirty
-        #
-        # Therefore, for now always use direct call.
-        # TODO: Figure out, what exactly is going on with gitpython here
 
-        cmd = ['git', 'commit'] + (["-m", msg if msg else ""])
-        if options:
-            cmd.extend(options)
+        if not msg:
+            msg = 'Recorded changes'
+            _datalad_msg = True
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
+
+        options += ["-m", msg]
+        cmd.extend(options)
+
+        # set up env for commit
+        env = GitRunner.get_git_environ_adjusted()
+        if self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+        if index_file:
+            env['GIT_INDEX_FILE'] = index_file
+
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
+        file_chunks = generate_file_chunks(files, cmd) if files else [[]]
+
+        runner = GitWitlessRunner(cwd=self.path, env=env)
+
         try:
-            self._git_custom_command(files, cmd,
-                                     expect_stderr=True, expect_fail=True,
-                                     check_fake_dates=True,
-                                     index_file=index_file)
+            for i, chunk in enumerate(file_chunks):
+                cur_cmd = cmd + (
+                    # if this is an explicit dry-run, there is no point in
+                    # amending, because no commit was ever made
+                    # otherwise, amend the first commit, and prevent
+                    # leaving multiple commits behind
+                    ['--amend', '--no-edit']
+                    if i > 0 and '--dry-run' not in cmd
+                    else []
+                ) + ['--'] + chunk
+                runner.run(
+                    cur_cmd,
+                    protocol=StdOutErrCapture,
+                    stdin=None,
+                )
         except CommandError as e:
-            if 'nothing to commit' in e.stdout:
-                if careless:
-                    lgr.debug(u"nothing to commit in {}. "
-                              "Ignored.".format(self))
-                else:
-                    raise
+            # real errors first
+            if "did not match any file(s) known to git" in e.stderr:
+                raise FileNotInRepositoryError(
+                    cmd=e.cmd,
+                    msg="File(s) unknown to git",
+                    code=e.code,
+                    filename=linesep.join([
+                        l for l in e.stderr.splitlines()
+                        if l.startswith("error: pathspec")
+                    ])
+                )
+            # behavior choices now
+            elif not careless:
+                # not willing to compromise at all
+                raise
+            elif 'nothing to commit' in e.stdout:
+                lgr.debug("nothing to commit in %s. Ignored.", self)
             elif 'no changes added to commit' in e.stdout or \
                     'nothing added to commit' in e.stdout:
-                if careless:
-                    lgr.debug(u"no changes added to commit in {}. "
-                              "Ignored.".format(self))
-                else:
-                    raise
-            elif "did not match any file(s) known to git" in e.stderr:
-                # TODO: Improve FileNotInXXXXError classes to better deal with
-                # multiple files; Also consider PathOutsideRepositoryError
-                raise FileNotInRepositoryError(cmd=e.cmd,
-                                               msg="File(s) unknown to git",
-                                               code=e.code,
-                                               filename=linesep.join(
-                                            [l for l in e.stderr.splitlines()
-                                             if l.startswith("pathspec")]))
+                lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
 
@@ -1678,16 +1844,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             commitishes = commitishes + [self.get_active_branch()]
 
         try:
-            bases = self.repo.merge_base(*commitishes)
-        except GitCommandError as exc:
-            if "fatal: Not a valid object name" in str(exc):
+            base = self.call_git_oneline(['merge-base'] + commitishes)
+        except CommandError as exc:
+            if exc.code == 1 and not (exc.stdout or exc.stderr):
+                # No merge base was found (unrelated commits).
+                return None
+            if "fatal: Not a valid object name" in exc.stderr:
                 return None
             raise
 
-        if not bases:
-            return None
-        assert(len(bases) == 1)  # we do not do 'all' yet
-        return bases[0].hexsha
+        return base
 
     def is_ancestor(self, reva, revb):
         """Is `reva` an ancestor of `revb`?
@@ -1748,6 +1914,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 raise e
         return out.strip()[11:]  # strip refs/heads/
 
+    def get_corresponding_branch(self, branch=None):
+        """Always returns None, a plain GitRepo has no managed branches"""
+        return None
+
     def get_branches(self):
         """Get all branches of the repo.
 
@@ -1793,11 +1963,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         remotes : list of str
           List of names of the remotes
         """
-
-        # Note: read directly from config and spare instantiation of gitpy.Repo
-        # since we need this in AnnexRepo constructor. Furthermore gitpy does it
-        # pretty much the same way and the use of a Repo instance seems to have
-        # no reason other than a nice object oriented look.
         from datalad.utils import unique
 
         self.config.reload()
@@ -1844,9 +2009,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             updates_tree=False):
         """Allows for calling arbitrary commands.
 
-        Helper for developing purposes, i.e. to quickly implement git commands
-        for proof of concept without the need to figure out, how this is done
-        via GitPython.
+        The method should be avoided and the call_git*() should be used instead.
 
         Parameters
         ----------
@@ -1881,7 +2044,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
         #  handling????
         try:
-            out, err = self._run_command_files_split(
+            out, err = run_gitcommand_on_file_list_chunks(
                 self.cmd_call_wrapper.run,
                 cmd,
                 files,
@@ -1906,35 +2069,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.debug("Reloading config due to supposed working tree update")
             self.config.reload()
 
-        return out, err
-
-    # TODO: could be static or class method even
-    def _run_command_files_split(
-            self,
-            func,
-            cmd,
-            files,
-            *args, **kwargs
-        ):
-        """
-        Run `func(cmd + files, ...)` possibly multiple times if `files` is too long
-        """
-        assert isinstance(cmd, list)
-        if not files:
-            file_chunks = [[]]
-        else:
-            file_chunks = generate_file_chunks(files, cmd)
-
-        out, err = "", ""
-        for file_chunk in file_chunks:
-            out_, err_ = func(
-                cmd + (['--'] if file_chunk else []) + file_chunk,
-                *args, **kwargs)
-            # out_, err_ could be None, and probably no need to append empty strings
-            if out_:
-                out += out_
-            if err_:
-                err += err_
         return out, err
 
     # Convenience wrappers for one-off git calls that don't require further
@@ -2106,10 +2240,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             expect_stderr=True
         )
 
-    # TODO: centralize all the c&p code in fetch, pull, push
-    # TODO: document **kwargs passed to gitpython
-    @guard_BadName
-    def fetch(self, remote=None, refspec=None, all_=False, **kwargs):
+    def fetch(self, remote=None, refspec=None, all_=False, git_options=None,
+              **kwargs):
         """Fetches changes from a remote (or all remotes).
 
         Parameters
@@ -2122,211 +2254,269 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         all_ : bool, optional
           fetch all remotes (and all of their branches).
           Fails if `remote` was given.
+        git_options : list, optional
+          Additional command line options for git-fetch.
         kwargs :
-          passed to gitpython. TODO: Figure it out, make consistent use of it
-          and document it.
-
-        Returns
-        -------
-        list
-            FetchInfo objects of the items fetched from remote
+          Deprecated. GitPython-style keyword argument for git-fetch.
+          Will be appended to any git_options.
         """
-        # TODO: options=> **kwargs):
-        # Note: Apparently there is no explicit (fetch --all) in gitpython,
-        #       but fetch is always bound to a certain remote instead.
-        #       Therefore implement it on our own:
+        git_options = ensure_list(git_options)
+        if kwargs:
+            git_options.extend(to_options(**kwargs))
+        return list(
+            self.fetch_(
+                remote=remote,
+                refspec=refspec,
+                all_=all_,
+                git_options=git_options,
+            )
+        )
+
+    def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
+        """Like `fetch`, but returns a generator"""
+        yield from self._fetch_push_helper(
+            base_cmd=['git', 'fetch', '--verbose', '--progress'],
+            action='fetch',
+            urlvars=('remote.{}.url', 'remote.{}.url'),
+            protocol=GitProgress,
+            info_cls=FetchInfo,
+            info_from='stderr',
+            add_remote=False,
+            remote=remote,
+            refspec=refspec,
+            all_=all_,
+            git_options=git_options)
+
+    # XXX Consider removing this method. It is only used in `update()`,
+    # where it could be easily replaced with fetch+merge
+    def pull(self, remote=None, refspec=None, git_options=None, **kwargs):
+        """Pulls changes from a remote.
+
+        Parameters
+        ----------
+        remote : str, optional
+          name of the remote to pull from. If no remote is given,
+          the remote tracking branch is used.
+        refspec : str, optional
+          refspec to fetch.
+        git_options : list, optional
+          Additional command line options for git-pull.
+        kwargs :
+          Deprecated. GitPython-style keyword argument for git-pull.
+          Will be appended to any git_options.
+        """
+        git_options = ensure_list(git_options)
+        if kwargs:
+            git_options.extend(to_options(**kwargs))
+
+        cmd = ['git', 'pull', '--progress'] + git_options
+
         if remote is None:
-            if refspec is not None:
+            if refspec:
                 # conflicts with using tracking branch or fetch all remotes
                 # For now: Just fail.
                 # TODO: May be check whether it fits to tracking branch
-                raise ValueError("refspec specified without a remote. (%s)" %
-                                 refspec)
+                raise ValueError(
+                    "refspec specified without a remote. ({})".format(refspec))
+            # No explicit remote to fetch.
+            # => get tracking branch:
+            tb_remote, refspec = self.get_tracking_branch()
+            if tb_remote is not None:
+                remote = tb_remote
+            else:
+                # No remote, no tracking branch
+                # => fail
+                raise ValueError("Neither a remote is specified to pull "
+                                 "from nor a tracking branch is set up.")
+
+        cmd.append(remote)
+        if refspec:
+            cmd += ensure_list(refspec)
+
+        # best effort to enable SSH connection caching
+        url = self.config.get('remote.{}.url'.format(remote), None)
+        if url and is_ssh(url):
+            ssh_manager.get_connection(url).open()
+        GitWitlessRunner(cwd=self.path).run(
+            cmd,
+            protocol=StdOutCaptureWithGitProgress,
+        )
+
+    def push(self, remote=None, refspec=None, all_remotes=False,
+             all_=False, git_options=None, **kwargs):
+        """Push changes to a remote (or all remotes).
+
+        Parameters
+        ----------
+        remote : str, optional
+          name of the remote to push to. If no remote is given and
+          `all_` is not set, the tracking branch is pushed.
+        refspec : str, optional
+          refspec to push.
+        all_ : bool, optional
+          push to all remotes. Fails if `remote` was given.
+        git_options : list, optional
+          Additional command line options for git-push.
+        kwargs :
+          Deprecated. GitPython-style keyword argument for git-push.
+          Will be appended to any git_options.
+        """
+        git_options = ensure_list(git_options)
+        if kwargs:
+            git_options.extend(to_options(**kwargs))
+        if all_remotes:
+            # be nice to the elderly
+            all_ = True
+        return list(
+            self.push_(
+                remote=remote,
+                refspec=refspec,
+                all_=all_,
+                git_options=git_options,
+            )
+        )
+
+    def push_(self, remote=None, refspec=None, all_=False, git_options=None):
+        """Like `push`, but returns a generator"""
+        yield from self._fetch_push_helper(
+            base_cmd=['git', 'push', '--progress', '--porcelain'],
+            action='push',
+            urlvars=('remote.{}.pushurl', 'remote.{}.url'),
+            protocol=StdOutCaptureWithGitProgress,
+            info_cls=PushInfo,
+            info_from='stdout',
+            add_remote=True,
+            remote=remote,
+            refspec=refspec,
+            all_=all_,
+            git_options=git_options)
+
+    def _fetch_push_helper(
+            self,
+            base_cmd,     # arg list
+            action,       # label fetch|push
+            urlvars,      # variables to query for URLs
+            protocol,     # processor for output
+            info_cls,     # Push|FetchInfo
+            info_from,    # stdout, stderr
+            add_remote,   # whether to add a 'remote' field to the info dict
+            remote=None, refspec=None, all_=False, git_options=None):
+
+        git_options = ensure_list(git_options)
+
+        cmd = base_cmd + git_options
+
+        if remote is None:
+            if refspec:
+                # conflicts with using tracking branch or push all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError(
+                    "refspec specified without a remote. ({})".format(refspec))
             if all_:
-                remotes_to_fetch = [
-                    self.repo.remote(r)
-                    for r in self.get_remotes(with_urls_only=True)
-                ]
+                remotes_to_process = self.get_remotes(with_urls_only=True)
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
                 tb_remote, refspec = self.get_tracking_branch()
                 if tb_remote is not None:
-                    remotes_to_fetch = [self.repo.remote(tb_remote)]
+                    remotes_to_process = [tb_remote]
                 else:
                     # No remote, no tracking branch
                     # => fail
-                    raise ValueError("Neither a remote is specified to fetch "
-                                     "from nor a tracking branch is set up.")
+                    raise ValueError(
+                        "Neither a remote is specified to {} "
+                        "from nor a tracking branch is set up.".format(action))
         else:
-            remotes_to_fetch = [self.repo.remote(remote)]
+            if all_:
+                raise ValueError(
+                    "Option 'all_' conflicts with specified remote "
+                    "'{}'.".format(remote))
+            remotes_to_process = [remote]
 
-        fi_list = []
-        for rm in remotes_to_fetch:
-            fetch_url = \
-                self.config.get('remote.%s.fetchurl' % rm.name,
-                                self.config.get('remote.%s.url' % rm.name,
-                                                None))
-            if fetch_url is None:
-                lgr.debug("Remote %s has no URL", rm)
-                return []
+        if refspec:
+            # prep for appending to cmd
+            refspec = ensure_list(refspec)
 
-            fi_list += self._call_gitpy_with_progress(
-                "Fetching %s" % rm.name,
-                rm.fetch,
-                rm.repo,
-                refspec,
-                fetch_url,
-                **kwargs
+        # no need for progress report, when there is just one remote
+        log_remote_progress = len(remotes_to_process) > 1
+        if log_remote_progress:
+            pbar_id = '{}remotes-{}'.format(action, id(self))
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Start %sing remotes for %s', action, self,
+                total=len(remotes_to_process),
+                label=action.capitalize(),
+                unit=' Remotes',
             )
+        try:
+            for remote in remotes_to_process:
+                r_cmd = cmd + [remote]
+                if refspec:
+                    r_cmd += refspec
 
-        # TODO: fetch returns a list of FetchInfo instances. Make use of it.
-        return fi_list
+                if log_remote_progress:
+                    log_progress(
+                        lgr.info,
+                        pbar_id,
+                        '{}ing remote %s'.format(action.capitalize()),
+                        remote,
+                        update=1,
+                        increment=True,
+                    )
+                # best effort to enable SSH connection caching
+                url = self.config.get(
+                    # make two attempts to get a URL
+                    urlvars[0].format(remote),
+                    self.config.get(
+                        urlvars[1].format(remote),
+                        None)
+                )
+                if url and is_ssh(url):
+                    ssh_manager.get_connection(url).open()
+                try:
+                    out = GitWitlessRunner(cwd=self.path).run(
+                        r_cmd,
+                        protocol=protocol,
+                    )
+                    output = out[info_from] or ''
+                except CommandError as e:
+                    # intercept some errors that we express as an error report
+                    # in the info dicts
+                    if re.match(
+                            '.*^error: failed to (push|fetch) some refs',
+                            e.stderr,
+                            re.DOTALL | re.MULTILINE):
+                        output = getattr(e, info_from)
+                        hints = ' '.join([l[6:] for l in e.stderr.splitlines()
+                                          if l.startswith('hint: ')])
+                        if output is None:
+                            output = ''
+                    else:
+                        raise
 
-    def _call_gitpy_with_progress(self, msg, callable, git_repo,
-                                  refspec, url, **kwargs):
-        """A helper to reduce code duplication
-
-        Wraps call to a GitPython method with all needed decoration for
-        workarounds of having aged git, or not providing full stderr
-        when monitoring progress of the operation
-        """
-        with GitPythonProgressBar(msg) as git_progress:
-            git_kwargs = dict(
-                refspec=refspec,
-                progress=git_progress,
-                **kwargs
-            )
-            if is_ssh(url):
-                ssh_manager.get_connection(url).open()
-                # TODO: with git <= 2.3 keep old mechanism:
-                #       with rm.repo.git.custom_environment(
-                # GIT_SSH="wrapper_script"):
-                with git_repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                    ret = callable(**git_kwargs)
-                    # TODO: +kwargs
-            else:
-                ret = callable(**git_kwargs)
-                # TODO: +kwargs
-        return ret
-
-    def pull(self, remote=None, refspec=None, **kwargs):
-        """See fetch
-        """
-
-        if remote is None:
-            if refspec is not None:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError("refspec specified without a remote. (%s)" %
-                                 refspec)
-            # No explicit remote to pull from.
-            # => get tracking branch:
-            tb_remote, refspec = self.get_tracking_branch()
-            if tb_remote is not None:
-                remote = self.repo.remote(tb_remote)
-            else:
-                # No remote, no tracking branch
-                # => fail
-                raise ValueError("No remote specified to pull from nor a "
-                                 "tracking branch is set up.")
-
-        else:
-            remote = self.repo.remote(remote)
-
-        fetch_url = \
-            remote.config_reader.get(
-                'fetchurl' if remote.config_reader.has_option('fetchurl')
-                else 'url')
-
-        return self._call_gitpy_with_progress(
-                "Pulling",
-                remote.pull,
-                remote.repo,
-                refspec,
-                fetch_url,
-                **kwargs
-            )
-
-    def push(self, remote=None, refspec=None, all_remotes=False,
-             **kwargs):
-        """Push to remote repository
-
-        Parameters
-        ----------
-        remote: str
-          name of the remote to push to
-        refspec: str
-          specify what to push
-        all_remotes: bool
-          if set to True push to all remotes. Conflicts with `remote` not being
-          None.
-        kwargs: dict
-          options to pass to `git push`
-
-        Returns
-        -------
-        list
-            PushInfo objects of the items pushed to remote
-        """
-
-        if remote is None:
-            if refspec is not None:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError("refspec specified without a remote. (%s)" %
-                                 refspec)
-            if all_remotes:
-                remotes_to_push = self.repo.remotes
-            else:
-                # Nothing explicitly specified. Just call `git push` and let git
-                # decide what to do would be an option. But:
-                # - without knowing the remote and its URL we cannot provide
-                #   shared SSH connection
-                # - we lose ability to use GitPython's progress info and return
-                #   values
-                #   (the latter would be solvable:
-                #    Provide a Repo.push() method for GitPython, copying
-                #    Remote.push() for similar return value and progress
-                #    (also: fetch, pull)
-
-                # Do what git would do:
-                # 1. branch.*.remote for current branch or 'origin' as default
-                #    if config is missing
-                # 2. remote.*.push or push.default
-
-                # TODO: check out "same procedure" for fetch/pull
-
-                tb_remote, refspec = self.get_tracking_branch()
-                if tb_remote is None:
-                    tb_remote = 'origin'
-                remotes_to_push = [self.repo.remote(tb_remote)]
-                # use no refspec; let git find remote.*.push or push.default on
-                # its own
-
-        else:
-            if all_remotes:
-                lgr.warning("Option 'all_remotes' conflicts with specified "
-                            "remote '%s'. Option ignored.")
-            remotes_to_push = [self.repo.remote(remote)]
-
-        pi_list = []
-        for rm in remotes_to_push:
-            push_url = \
-                rm.config_reader.get('pushurl'
-                                     if rm.config_reader.has_option('pushurl')
-                                     else 'url')
-            pi_list += self._call_gitpy_with_progress(
-                "Pushing %s" % rm.name,
-                rm.push,
-                rm.repo,
-                refspec,
-                push_url,
-                **kwargs
-            )
-        return pi_list
+                for line in output.splitlines():
+                    try:
+                        # push info doesn't identify a remote, add it here
+                        pi = info_cls._from_line(line)
+                        if add_remote:
+                            pi['remote'] = remote
+                        # There were errors, but Git provided hints
+                        if 'error' in pi['operations']:
+                            pi['hints'] = hints or None
+                        yield pi
+                    except Exception:
+                        # it is not progress and no push info
+                        # don't hide it completely
+                        lgr.debug('git-%s reported: %s', action, line)
+        finally:
+            if log_remote_progress:
+                log_progress(
+                    lgr.info,
+                    pbar_id,
+                    'Finished %sing remotes for %s', action, self,
+                )
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
@@ -2362,11 +2552,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
         self.config.set(var, url, where='local', reload=True)
 
-    def get_branch_commits(self, branch=None, limit=None, stop=None, value=None):
-        """Return GitPython's commits for the branch
-
-        Pretty much similar to what 'git log <branch>' does.
-        It is a generator which returns top commits first
+    def get_branch_commits_(self, branch=None, limit=None, stop=None):
+        """Return commit hexshas for a branch
 
         Parameters
         ----------
@@ -2379,44 +2566,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         stop: str, optional
           hexsha of the commit at which stop reporting (matched one is not
           reported either)
-        value: None | 'hexsha', optional
-          What to yield.  If None - entire commit object is yielded, if 'hexsha'
-          only its hexsha
-        """
 
+        Yields
+        ------
+        str
+        """
+        cmd = ['rev-list']
+        if limit == 'left-only':
+            cmd.append('--left-only')
         if not branch:
             branch = self.get_active_branch()
-
-        try:
-            _branch = self.repo.branches[branch]
-        except IndexError:
-            raise MissingBranchError(self, branch,
-                                     [b.name for b in self.repo.branches])
-
-        fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
-
-        if not limit:
-            def gen():
-                # traverse doesn't yield original commit
-                co = _branch.commit
-                yield co
-                for co_ in co.traverse():
-                    yield co_
-        elif limit == 'left-only':
-            # we need a custom implementation since couldn't figure out how to
-            # do with .traversal
-            def gen():
-                co = _branch.commit
-                while co:
-                    yield co
-                    co = co.parents[0] if co.parents else None
-        else:
-            raise ValueError(limit)
-
-        for c in gen():
-            if stop and c.hexsha == stop:
+        cmd.append(branch)
+        for r in self.call_git_items_(cmd):
+            if stop and stop == r:
                 return
-            yield fvalue(c)
+            yield r
 
     def checkout(self, name, options=None):
         """
@@ -2643,14 +2807,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if name is None:
             name = Path(path).as_posix()
-        # XXX the following should do it, but GitPython will refuse to add a submodule
-        # unless you specify a URL that is configured as one of its remotes, or you
-        # specify no URL, but the repo has at least one remote.
-        # this is stupid, as for us it is valid to not have any remote, because we can
-        # still obtain the submodule from a future publication location, based on the
-        # parent
-        # gitpy.Submodule.add(self.repo, name, path, url=url, branch=branch)
-        # going git native instead
         cmd = ['submodule', 'add', '--name', name]
         if branch is not None:
             cmd += ['-b', branch]
@@ -2917,13 +3073,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except:
             return None
 
-    def get_tracking_branch(self, branch=None):
+    def get_tracking_branch(self, branch=None, remote_only=False):
         """Get the tracking branch for `branch` if there is any.
 
         Parameters
         ----------
         branch: str
             local branch to look up. If none is given, active branch is used.
+        remote_only : bool
+            Don't return a value if the upstream remote is set to "." (meaning
+            this repository).
 
         Returns
         -------
@@ -2936,6 +3095,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 return None, None
 
         track_remote = self.config.get('branch.{0}.remote'.format(branch), None)
+        if remote_only and track_remote == ".":
+            return None, None
         track_branch = self.config.get('branch.{0}.merge'.format(branch), None)
         return track_remote, track_branch
 
@@ -2951,56 +3112,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                     for item in count_str.split('\n')
                                     if len(item.split(': ')) == 2]}
         return count
-
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
-                          files=None):
-        """Return files that have changed between the index and working tree.
-
-        Parameters
-        ----------
-        staged: bool, optional
-          Consider changes between HEAD and the index instead of changes
-          between the index and the working tree.
-        diff_filter: str, optional
-          Any value accepted by the `--diff-filter` option of `git diff`.
-          Common ones include "A", "D", "M" for add, deleted, and modified
-          files, respectively.
-        index_file: str, optional
-          Alternative index file for git to use
-        """
-        opts = ['--name-only', '-z']
-        kwargs = {}
-        if staged:
-            opts.append('--staged')
-        if diff_filter:
-            opts.append('--diff-filter=%s' % diff_filter)
-        if index_file:
-            kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        if files is not None:
-            opts.append('--')
-            # might be too many, need to chunk up
-            optss = (
-                opts + file_chunk
-                for file_chunk in generate_file_chunks(files, ['git', 'diff'] + opts)
-            )
-        else:
-            optss = [opts]
-        return [
-            normpath(f)  # Call normpath to convert separators on Windows.
-            for f in chain(
-                *(self.repo.git.diff(*opts, **kwargs).split('\0')
-                for opts in optss)
-            )
-            if f
-        ]
-
-    def get_missing_files(self):
-        """Return a list of paths with missing files (and no staged deletion)"""
-        return self.get_changed_files(diff_filter='D')
-
-    def get_deleted_files(self):
-        """Return a list of paths with deleted files (staged deletion)"""
-        return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
         """Query gitattributes which apply to top level directory
@@ -3038,7 +3149,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           name and value items. Attribute values are either True or False,
           for set and unset attributes, or are the literal attribute value.
         """
-        path = assure_list(path)
+        path = ensure_list(path)
         cmd = ["git", "check-attr", "-z", "--all"]
         if index_only:
             cmd.append('--cached')
@@ -3217,7 +3328,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # we need to get their within repo elements since ls-tree
                 # for paths within submodules returns nothing!
                 # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
-                submodules = [s.path for s in self.get_submodules()]
+                submodules = [str(s["path"].relative_to(self.pathobj))
+                              for s in self.get_submodules_()]
                 path_strs = get_parent_paths(path_strs, submodules)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
@@ -3238,7 +3350,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # we don't want it to scream on stdout
                 expect_fail=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in str(exc):
+            if "fatal: Not a valid object name" in exc.stderr:
                 raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
@@ -3268,7 +3380,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # readlink will fail if the symlink reported by ls-files is
                     # not in the working tree (it could be removed or
                     # unlocked). Fall back to a slower method.
-                    return op.realpath(path)
+                    return str(Path(path).resolve())
 
             _get_link_target = try_readlink
 
@@ -3437,17 +3549,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def diffstatus(self, fr, to, paths=None, untracked='all',
                    eval_submodule_state='full', eval_file_type=True,
                    _cache=None):
-        """Like diff(), but reports the status of 'clean' content too"""
-        return self._diffstatus(
-            fr, to, paths, untracked, eval_submodule_state, eval_file_type,
-            _cache)
+        """Like diff(), but reports the status of 'clean' content too.
 
-    def _diffstatus(self, fr, to, paths, untracked, eval_state,
-                    eval_file_type, _cache):
-        """Just like diffstatus(), but supports an additional evaluation
-        state 'global'. If given, it will return a single 'modified'
+        It supports an additional submodule evaluation state 'global'.
+        If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
         it can."""
+
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
                 ref, untracked
@@ -3568,7 +3676,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     type=to_state_r['type'],
                 )
             state = props.get('state', None)
-            if eval_state == 'global' and \
+            if eval_submodule_state == 'global' and \
                     state not in ('clean', None):
                 # any modification means globally 'modified'
                 return 'modified'
@@ -3596,10 +3704,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # file
                     gitshasum=from_state_r['gitshasum'],
                 )
-                if eval_state == 'global':
+                if eval_submodule_state == 'global':
                     return 'modified'
 
-        if to is not None or eval_state == 'no':
+        if to is not None or eval_submodule_state == 'no':
             # if we have `to` we are specifically comparing against
             # a recorded state, and this function only attempts
             # to label the state of a subdataset, not investigate
@@ -3607,7 +3715,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # this is done by a high-level command like rev-diff
             # so the comparison within this repo and the present
             # `state` label are all we need, and they are done already
-            if eval_state == 'global':
+            if eval_submodule_state == 'global':
                 return 'clean'
             else:
                 return status
@@ -3632,13 +3740,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             st['state'] = 'modified' \
                 if st['prev_gitshasum'] != subrepo_commit \
                 else 'clean'
-            if eval_state == 'global' and st['state'] == 'modified':
+            if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
-            if eval_state == 'commit':
+            if eval_submodule_state == 'commit':
                 continue
             # the recorded commit did not change, so we need to make
             # a more expensive traversal
-            st['state'] = subrepo._diffstatus(
+            st['state'] = subrepo.diffstatus(
                 # we can use 'HEAD' because we know that the commit
                 # did not change. using 'HEAD' will facilitate
                 # caching the result
@@ -3646,13 +3754,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 to=None,
                 paths=None,
                 untracked=untracked,
-                eval_state='global',
+                eval_submodule_state='global',
                 eval_file_type=False,
                 _cache=_cache) if st['state'] == 'clean' else 'modified'
-            if eval_state == 'global' and st['state'] == 'modified':
+            if eval_submodule_state == 'global' and st['state'] == 'modified':
                 return 'modified'
 
-        if eval_state == 'global':
+        if eval_submodule_state == 'global':
             return 'clean'
         else:
             return status
@@ -3701,10 +3809,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def _save_post(self, message, status, partial_commit):
         # helper to commit changes reported in status
-        _datalad_msg = False
-        if not message:
-            message = 'Recorded changes'
-            _datalad_msg = True
 
         # TODO remove pathobj stringification when commit() can
         # handle it
@@ -3719,7 +3823,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 self,
                 files=to_commit,
                 msg=message,
-                _datalad_msg=_datalad_msg,
                 options=None,
                 # do not raise on empty commit
                 # it could be that the `add` in this save-cycle has already
@@ -3931,7 +4034,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._git_custom_command(
                 list(files.keys()),
-                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
+                # Set annex.largefiles to prevent storing files in
+                # annex with a v6+ annex repo.
+                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
+                ensure_list(git_opts) + ['--verbose']
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
@@ -3988,7 +4094,7 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     src_dotgit = str(repo.dot_git)
     # move .git
     from os import rename, listdir, rmdir
-    assure_dir(subds_dotgit)
+    ensure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
         rename(opj(src_dotgit, dot_git_entry),
                opj(subds_dotgit, dot_git_entry))

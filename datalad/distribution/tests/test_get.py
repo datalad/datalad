@@ -9,44 +9,49 @@
 
 """
 
-
-
 from os import curdir
-import os.path as op
-from os.path import join as opj, basename
-from glob import glob
+from os.path import (
+    join as opj,
+    basename,
+)
 from unittest.mock import patch
 
-from datalad.api import create
-from datalad.api import get
-from datalad.api import install
+from datalad.api import (
+    create,
+    get,
+    install,
+)
 from datalad.interface.results import only_matching_paths
 from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import RemoteNotAvailableError
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_message
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import slow
-from datalad.tests.utils import known_failure_windows
-from datalad.utils import with_pathsep
-from datalad.utils import chpwd
-from datalad.utils import assure_list
-from datalad.utils import rmtree
-
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    RemoteNotAvailableError,
+)
+from datalad.tests.utils import (
+    ok_,
+    eq_,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+    create_tree,
+    assert_raises,
+    assert_in,
+    assert_status,
+    assert_in_results,
+    assert_not_in_results,
+    assert_repo_status,
+    assert_result_count,
+    assert_message,
+    serve_path_via_http,
+    slow,
+    known_failure_windows,
+)
+from datalad.utils import (
+    with_pathsep,
+    chpwd,
+    rmtree,
+)
 from ..dataset import Dataset
 
 
@@ -82,25 +87,28 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     ds_subpath = str(ds.pathobj / 'sub')
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), [])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=sshurl)),
-        [('local', sshurl)])
+        [dict(cost=900, name='local', url=sshurl)])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=httpurl)),
-        [('local', httpurl)])
+        [dict(cost=900, name='local', url=httpurl)])
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
-    eq_(f(clone, dict(path=ds_subpath, parentds=t)), [('origin', ds_subpath)])
-    eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=sshurl)),
-        [('origin', ds_subpath), ('origin', sshurl)])
-    eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=httpurl)),
-        [('origin', ds_subpath), ('origin', httpurl)])
+    clone_subpath = str(clone.pathobj / 'sub')
+    eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
+        [dict(cost=500, name='origin', url=ds_subpath)])
+    eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
+        [dict(cost=500, name='origin', url=ds_subpath),
+         dict(cost=600, name='origin', url=sshurl)])
+    eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
+        [dict(cost=500, name='origin', url=ds_subpath),
+         dict(cost=600, name='origin', url=httpurl)])
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            ('origin', ds_subpath),
-            ('local', clone_subpath),
+            dict(cost=500, name='origin', url=ds_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -109,8 +117,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
                    result_renderer='disabled')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            ('origin', ds_subpath),
-            ('local', clone_subpath),
+            dict(cost=500, name='origin', url=ds_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -118,9 +125,17 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                ('origin', ds_subpath),
-                ('subdataset-source-candidate-bang', 'youredead'),
-                ('local', clone_subpath),
+                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=700, name='bang', url='youredead', from_config=True),
+        ])
+    # we can alter the cost by given the name a two-digit prefix
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__400BANG': 'youredead'}):
+        eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+            [
+                dict(cost=400, name='bang', url='youredead', from_config=True),
+                dict(cost=500, name='origin', url=ds_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -128,9 +143,9 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                ('origin', ds_subpath),
-                ('subdataset-source-candidate-bang', 'pre-{}-post'.format(sub.id)),
-                ('local', clone_subpath),
+                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
+                     from_config=True),
         ])
     # now again, but have an additional remote besides origin that
     # actually has the relevant commit
@@ -145,7 +160,8 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     # registered under two different names
     assert_in(
         ds_subpath,
-        [i[1] for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
+        [i['url']
+         for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
     )
 
     # TODO: check that http:// urls for the dataset itself get resolved
@@ -164,7 +180,7 @@ def test_get_invalid_call(path, file_outside):
 
     # have a plain git:
     ds = Dataset(path)
-    ds.create(no_annex=True)
+    ds.create(annex=False)
     with open(opj(path, "some.txt"), "w") as f:
         f.write("whatever")
     ds.save("some.txt", to_git=True, message="Initial commit.")
@@ -331,7 +347,7 @@ def test_get_recurse_subdatasets(src, path):
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
-    ok_clean_git(subds1.path)
+    assert_repo_status(subds1.path)
     # explicitly given path in subdataset => implicit recursion:
     # MIH: Nope, we fulfill the dataset handle, but that doesn't
     #      imply fulfilling all file handles
@@ -441,7 +457,7 @@ def test_get_install_missing_subdataset(src, path):
 @with_tempfile(mkdir=True)
 def test_get_mixed_hierarchy(src, path):
 
-    origin = Dataset(src).create(no_annex=True)
+    origin = Dataset(src).create(annex=False)
     origin_sub = origin.create('subds')
     with open(opj(origin.path, 'file_in_git.txt'), "w") as f:
         f.write('no idea')

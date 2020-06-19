@@ -1,3 +1,9 @@
+datalad (0.13.0~rc2+git66-g1d11ca9d0-1) UNRELEASED; urgency=medium
+
+  * Draft for 0.13.0
+
+ -- Michael Hanke <mih@debian.org>  Fri, 19 Jun 2020 13:46:07 +0200
+
 datalad (0.12.7-1) unstable; urgency=medium
 
   * New upstream bugfix release

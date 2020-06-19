@@ -10,12 +10,11 @@
 
 """
 
-from nose.tools import assert_is_instance
+from datalad.tests.utils import assert_is_instance
 
 import logging
 
 import os
-from os import linesep
 import os.path as op
 
 import sys
@@ -24,56 +23,57 @@ import sys
 from datalad import get_encoding_info
 from datalad.cmd import Runner
 
-from datalad.utils import unlink
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import neq_
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import local_testrepo_flavors
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import skip_if
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import integration
-from datalad.utils import rmtree
-from datalad.tests.utils_testrepos import BasicAnnexTestRepo
-from datalad.utils import getpwd, chpwd
-from datalad.utils import on_windows
-
-from datalad.dochelpers import exc_str
-
+from datalad.utils import (
+    chpwd,
+    getpwd,
+    on_windows,
+    rmtree,
+    Path,
+)
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_false,
+    assert_in,
+    assert_in_results,
+    assert_not_in,
+    assert_raises,
+    assert_repo_status,
+    create_tree,
+    eq_,
+    get_most_obscure_supported_name,
+    integration,
+    known_failure_windows,
+    local_testrepo_flavors,
+    neq_,
+    ok_,
+    skip_if,
+    skip_if_no_network,
+    skip_if_on_windows,
+    skip_ssh,
+    SkipTest,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+)
 from datalad.support.sshconnector import get_connection_hash
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
-from datalad.support.gitrepo import NoSuchPathError
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import to_options
-from datalad.support.gitrepo import _normalize_path
-from datalad.support.gitrepo import normalize_paths
-from datalad.support.gitrepo import gitpy
-from datalad.support.gitrepo import guard_BadName
-from datalad.support.exceptions import DeprecatedError
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import PathKnownToRepositoryError
+from datalad.support.gitrepo import (
+    _normalize_path,
+    GitRepo,
+    normalize_paths,
+    to_options,
+)
+from datalad.support.exceptions import (
+    CommandError,
+    DeprecatedError,
+    FileNotInRepositoryError,
+    InvalidGitRepositoryError,
+    PathKnownToRepositoryError,
+    NoSuchPathError,
+)
 from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
-from .utils import check_repo_deals_with_inode_change
 
 
 @with_tempfile(mkdir=True)
@@ -92,17 +92,15 @@ def test_GitRepo_instance_from_clone(src, dst):
 
     gr = GitRepo.clone(src, dst)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
-    assert_is_instance(gr.repo, gitpy.Repo,
-                       "Failed to instantiate GitPython Repo object.")
     ok_(op.exists(op.join(dst, '.git')))
 
-    # do it again should raise GitCommandError since git will notice there's
+    # do it again should raise ValueError since git will notice there's
     # already a git-repo at that path and therefore can't clone to `dst`
     # Note: Since GitRepo is now a WeakSingletonRepo, this is prevented from
     # happening atm. Disabling for now:
 #    raise SkipTest("Disabled for RF: WeakSingletonRepo")
     with swallow_logs() as logs:
-        assert_raises(GitCommandError, GitRepo.clone, src, dst)
+        assert_raises(ValueError, GitRepo.clone, src, dst)
 
 
 @assert_cwd_unchanged
@@ -132,22 +130,20 @@ def test_GitRepo_instance_from_not_existing(path, path2):
     gr = GitRepo(path2, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path2, '.git')))
-    ok_clean_git(path2, annex=False)
+    assert_repo_status(path2, annex=False)
 
     # 4. create=True, path exists, but no git repo:
     gr = GitRepo(path, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path, '.git')))
-    ok_clean_git(path, annex=False)
+    assert_repo_status(path, annex=False)
 
 
 @with_tempfile
 def test_GitRepo_init_options(path):
     # passing an option, not explicitly defined in GitRepo class:
     gr = GitRepo(path, create=True, bare=True)
-
-    cfg = gr.repo.config_reader()
-    ok_(cfg.get_value(section="core", option="bare"))
+    ok_(gr.config.getbool(section="core", option="bare"))
 
 
 @skip_if(external_versions['cmd:git'] < '2.14.0')
@@ -217,7 +213,7 @@ def test_GitRepo_add(src, path):
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
-    ok_clean_git(path)
+    assert_repo_status(path)
 
 
 @assert_cwd_unchanged
@@ -253,7 +249,7 @@ def test_GitRepo_commit(path):
 
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
-    ok_clean_git(gr)
+    assert_repo_status(gr)
     eq_("Testing GitRepo.commit().",
         gr.format_commit("%B").strip())
 
@@ -267,7 +263,7 @@ def test_GitRepo_commit(path):
 
     # commit with empty message:
     gr.commit()
-    ok_clean_git(gr)
+    assert_repo_status(gr)
 
     # nothing to commit doesn't raise by default:
     gr.commit()
@@ -507,9 +503,9 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     fetched = clone.fetch(remote='origin')
     # test FetchInfo list returned by fetch
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
-        [commit.name for commit in fetched])
+        [commit['ref'] for commit in fetched])
 
-    ok_clean_git(clone.path, annex=False)
+    assert_repo_status(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(op.exists(op.join(clone_path, filename)))  # not checked out
@@ -519,14 +515,11 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     origin.config.unset('remote.not-available.url', where='local')
 
     # fetch without provided URL
-    fetched = origin.fetch('not-available')
-    # nothing was done, nothing returned:
-    eq_([], fetched)
+    assert_raises(CommandError, origin.fetch, 'not-available')
 
 
 def _path2localsshurl(path):
     """Helper to build valid localhost SSH urls on Windows too"""
-    from pathlib import Path
     path = op.abspath(path)
     p = Path(path)
     if p.drive:
@@ -555,8 +548,8 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     eq_([], repo.get_remote_branches())
 
     fetched = repo.fetch(remote="ssh-remote")
-    assert_in('ssh-remote/master', [commit.name for commit in fetched])
-    ok_clean_git(repo)
+    assert_in('ssh-remote/master', [commit['ref'] for commit in fetched])
+    assert_repo_status(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -595,7 +588,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 
     # pull changes:
     repo.pull(remote="ssh-remote", refspec=remote_repo.get_active_branch())
-    ok_clean_git(repo.path, annex=False)
+    assert_repo_status(repo.path, annex=False)
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -633,9 +626,10 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
 
     # push changes:
-    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
-    # test PushInfo object for
-    assert_in("ssh-remote/ssh-test", [commit.remote_ref.name for commit in pushed])
+    pushed = list(repo.push(remote="ssh-remote", refspec="ssh-test"))
+    # test PushInfo
+    assert_in("refs/heads/ssh-test", [p['from_ref'] for p in pushed])
+    assert_in("refs/heads/ssh-test", [p['to_ref'] for p in pushed])
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, list(map(str, ssh_manager._connections)))
@@ -649,13 +643,23 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     # amend to make it require "--force":
     repo.commit("amended", options=['--amend'])
     # push without --force should yield an error:
-    pushed = repo.push(remote="ssh-remote", refspec="ssh-test")
-    assert_in("[rejected] (non-fast-forward)", pushed[0].summary)
+    res = repo.push(remote="ssh-remote", refspec="ssh-test")
+    assert_in_results(
+        res,
+        from_ref='refs/heads/ssh-test',
+        to_ref='refs/heads/ssh-test',
+        operations=['rejected', 'error'],
+        note='[rejected] (non-fast-forward)',
+        remote='ssh-remote',
+    )
     # now push using force:
     repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
     # correct commit message in remote:
     assert_in("amended",
-              list(remote_repo.get_branch_commits('ssh-test'))[-1].summary)
+              remote_repo.format_commit(
+                  '%s',
+                  list(remote_repo.get_branch_commits_('ssh-test'))[-1]
+              ))
 
 
 @with_tempfile
@@ -775,12 +779,12 @@ def test_GitRepo_get_files(url, path):
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_GitRepo_get_toppath(repo, tempdir, repo2):
-    reporeal = op.realpath(repo)
+    reporeal = str(Path(repo).resolve())
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)
     eq_(GitRepo.get_toppath(repo), repo)
     # Generate some nested directory
     GitRepo(repo2, create=True)
-    repo2real = op.realpath(repo2)
+    repo2real = str(Path(repo2).resolve())
     nested = op.join(repo2, "d1", "d2")
     os.makedirs(nested)
     eq_(GitRepo.get_toppath(nested, follow_up=False), repo2real)
@@ -885,7 +889,7 @@ def test_GitRepo_get_merge_base(src):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_git_get_branch_commits(src):
+def test_GitRepo_git_get_branch_commits_(src):
 
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
@@ -893,20 +897,10 @@ def test_GitRepo_git_get_branch_commits(src):
     repo.add('*')
     repo.commit('committing')
 
-    commits_default = list(repo.get_branch_commits())
-    commits = list(repo.get_branch_commits('master'))
+    commits_default = list(repo.get_branch_commits_())
+    commits = list(repo.get_branch_commits_('master'))
     eq_(commits, commits_default)
-
     eq_(len(commits), 1)
-    commits_stop0 = list(repo.get_branch_commits(stop=commits[0].hexsha))
-    eq_(commits_stop0, [])
-    commits_hexsha = list(repo.get_branch_commits(value='hexsha'))
-    commits_hexsha_left = list(repo.get_branch_commits(value='hexsha', limit='left-only'))
-    eq_([commits[0].hexsha], commits_hexsha)
-    # our unittest is rudimentary ;-)
-    eq_(commits_hexsha_left, commits_hexsha)
-    repo.precommit()  # to stop all the batched processes for swallow_outputs
-    raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 
 @with_testrepos(flavors=['local'])
@@ -930,13 +924,20 @@ def test_get_tracking_branch(o_path, c_path):
     eq_(('origin', 'refs/heads/' + master_branch),
         clone.get_tracking_branch(master_branch))
 
+    clone.checkout(master_branch, options=["--track", "-btopic"])
+    eq_(('.', 'refs/heads/' + master_branch),
+        clone.get_tracking_branch())
+    eq_((None, None),
+        clone.get_tracking_branch(remote_only=True))
+
 
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_submodule_deinit(path):
     from datalad.support.annexrepo import AnnexRepo
 
     top_repo = AnnexRepo(path, create=False)
-    eq_({'subm 1', '2'}, {s.name for s in top_repo.get_submodules()})
+    eq_({'subm 1', '2'},
+        {s["gitmodule_name"] for s in top_repo.get_submodules_()})
     # note: here init=True is ok, since we are using it just for testing
     with swallow_logs(new_level=logging.WARN) as cml:
         top_repo.update_submodule('subm 1', init=True)
@@ -947,8 +948,8 @@ def test_submodule_deinit(path):
     # TODO: old assertion above if non-bare? (can't use "direct mode" in test_gitrepo)
     # Alternatively: New testrepo (plain git submodules) and have a dedicated
     # test for annexes in addition
-    ok_(all([GitRepo.is_valid_repo(op.join(top_repo.path, s.path))
-             for s in top_repo.get_submodules()]))
+    ok_(all(GitRepo.is_valid_repo(s["path"])
+            for s in top_repo.get_submodules_()))
 
     # modify submodule:
     with open(op.join(top_repo.path, 'subm 1', 'file_ut.dat'), "w") as f:
@@ -959,7 +960,7 @@ def test_submodule_deinit(path):
     # using force should work:
     top_repo.deinit_submodule('subm 1', force=True)
 
-    ok_(not top_repo.repo.submodule('subm 1').module_exists())
+    ok_(not GitRepo.is_valid_repo(str(top_repo.pathobj / 'subm 1')))
 
 
 @with_testrepos(".*basic_git.*", flavors=['local'])
@@ -970,9 +971,10 @@ def test_GitRepo_add_submodule(source, path):
 
     top_repo.add_submodule('sub', name='sub', url=source)
     top_repo.commit('submodule added')
-    eq_([s.name for s in top_repo.get_submodules()], ['sub'])
-    ok_clean_git(path)
-    ok_clean_git(op.join(path, 'sub'))
+    eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
+        ['sub'])
+    assert_repo_status(path)
+    assert_repo_status(op.join(path, 'sub'))
 
 
 def test_GitRepo_update_submodule():
@@ -1046,7 +1048,7 @@ def test_get_submodules_parent_on_unborn_branch(path):
     subrepo = GitRepo(op.join(path, "sub"), create=True)
     subrepo.commit(msg="s", options=["--allow-empty"])
     repo.add_submodule(path="sub")
-    eq_([s.name for s in repo.get_submodules()],
+    eq_([s["gitmodule_name"] for s in repo.get_submodules_()],
         ["sub"])
 
 
@@ -1079,6 +1081,32 @@ def test_to_options():
         ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
 
 
+def test_to_options_from_gitpython():
+    """Imported from GitPython and modified.
+
+    Original copyright:
+        Copyright (C) 2008, 2009 Michael Trier and contributors
+    Original license:
+        BSD 3-Clause "New" or "Revised" License
+    """
+    eq_(["-s"], to_options(**{'s': True}))
+    eq_(["-s", "5"], to_options(**{'s': 5}))
+    eq_([], to_options(**{'s': None}))
+
+    eq_(["--max-count"], to_options(**{'max_count': True}))
+    eq_(["--max-count=5"], to_options(**{'max_count': 5}))
+    eq_(["--max-count=0"], to_options(**{'max_count': 0}))
+    eq_([], to_options(**{'max_count': None}))
+
+    # Multiple args are supported by using lists/tuples
+    eq_(["-L", "1-3", "-L", "12-18"], to_options(**{'L': ('1-3', '12-18')}))
+    eq_(["-C", "-C"], to_options(**{'C': [True, True, None, False]}))
+
+    # order is undefined
+    res = to_options(**{'s': True, 't': True})
+    eq_({'-s', '-t'}, set(res))
+
+
 @with_tempfile
 def test_GitRepo_count_objects(repo_path):
 
@@ -1089,50 +1117,6 @@ def test_GitRepo_count_objects(repo_path):
     empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
                    'size': 0, 'size-garbage': 0, 'size-pack': 0}
     eq_(empty_count, repo.count_objects)
-
-
-@with_tempfile
-def test_get_missing(path):
-    repo = GitRepo(path, create=True)
-    os.makedirs(op.join(path, 'deep'))
-    with open(op.join(path, 'test1'), 'w') as f:
-        f.write('some')
-    with open(op.join(path, 'deep', 'test2'), 'w') as f:
-        f.write('some more')
-    # no files tracked yet, so nothing changed
-    eq_(repo.get_changed_files(), [])
-    repo.add('.')
-    # still no differences between worktree and staged
-    eq_(repo.get_changed_files(), [])
-    eq_(set(repo.get_changed_files(staged=True)),
-        {'test1', op.join('deep', 'test2')})
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD')),
-        {'test1', op.join('deep', 'test2')})
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['test1'])),
-        {'test1'})
-    # providing 'files' pointing to subdirectory lists files within
-    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['deep'])),
-        {op.join('deep', 'test2')})
-    # empty list should cause no files being reported in either scenario
-    eq_(repo.get_changed_files(staged=True, files=[]), [])
-    eq_(repo.get_changed_files(staged=False, files=[]), [])
-    eq_(repo.get_changed_files(staged=True, diff_filter='D'), [])
-    repo.commit()
-    eq_(repo.get_changed_files(), [])
-    eq_(repo.get_changed_files(staged=True), [])
-    ok_clean_git(path, annex=False)
-    unlink(op.join(path, 'test1'))
-    eq_(repo.get_missing_files(), ['test1'])
-    rmtree(op.join(path, 'deep'))
-    eq_(sorted(repo.get_missing_files()), [op.join('deep', 'test2'), 'test1'])
-    # nothing is actually known to be deleted
-    eq_(repo.get_deleted_files(), [])
-    # do proper removal
-    repo.remove(op.join(path, 'test1'))
-    # no longer missing
-    eq_(repo.get_missing_files(), [op.join('deep', 'test2')])
-    # but deleted
-    eq_(repo.get_deleted_files(), ['test1'])
 
 
 # this is simply broken on win, but less important
@@ -1147,7 +1131,7 @@ def test_optimized_cloning(path):
         f.write('some')
     repo.add('test')
     repo.commit('init')
-    ok_clean_git(originpath, annex=False)
+    assert_repo_status(originpath, annex=False)
     from glob import glob
 
     def _get_inodes(repo):
@@ -1175,29 +1159,6 @@ def test_optimized_cloning(path):
         # return the original object in second run
 
 
-@with_tempfile
-@with_tempfile
-def test_GitRepo_gitpy_injection(path, path2):
-
-    gr = GitRepo(path, create=True)
-    gr._GIT_COMMON_OPTIONS.extend(['test-option'])
-
-    with assert_raises(GitCommandError) as cme:
-        gr.repo.git.unknown_git_command()
-    assert_in('test-option', exc_str(cme.exception))
-
-    # once set, these option should be persistent across git calls:
-    with assert_raises(GitCommandError) as cme:
-        gr.repo.git.another_unknown_git_command()
-    assert_in('test-option', exc_str(cme.exception))
-
-    # but other repos should not be affected:
-    gr2 = GitRepo(path2, create=True)
-    with assert_raises(GitCommandError) as cme:
-        gr2.repo.git.unknown_git_command()
-    assert_not_in('test-option', exc_str(cme.exception))
-
-
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_GitRepo_flyweight(path1, path2):
@@ -1218,13 +1179,6 @@ def test_GitRepo_flyweight(path1, path2):
 
     # and realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)
-
-
-@with_tempfile(mkdir=True)
-@with_tempfile()
-def test_GitRepo_flyweight_monitoring_inode(path, store):
-    # testing for issue #1512
-    check_repo_deals_with_inode_change(GitRepo, path, store)
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
@@ -1464,26 +1418,6 @@ def test_fake_dates(path):
     eq_(seconds_initial + 3, gr.get_commit_date())
 
 
-def test_guard_BadName():
-    from gitdb.exc import BadName
-
-    calls = []
-
-    class Vulnerable(object):
-        def precommit(self):
-            calls.append('precommit')
-
-        @guard_BadName
-        def __call__(self, x, y=2):
-            if not calls:
-                calls.append(1)
-                raise BadName
-            return x+y
-    v = Vulnerable()
-    eq_(v(1, y=3), 4)
-    eq_(calls, [1, 'precommit'])
-
-
 @with_tree(tree={"foo": "foo content"})
 def test_custom_runner_protocol(path):
     # Check that a runner with a non-default protocol gets wired up correctly.
@@ -1504,9 +1438,10 @@ def test_custom_runner_protocol(path):
     gr.add("foo")
     check(prev_len, prot, "add")
 
-    prev_len = len(prot)
-    gr.commit("commit foo")
-    check(prev_len, prot, "commit")
+    # commit no longer uses a Runner with protocol capabilities
+    #prev_len = len(prot)
+    #gr.commit("commit foo")
+    #check(prev_len, prot, "commit")
 
     ok_(all(p['duration'] >= 0 for p in prot))
 

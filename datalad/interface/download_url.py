@@ -46,10 +46,6 @@ class DownloadURL(Interface):
     It allows for a uniform download interface to various supported URL
     schemes, re-using or asking for authentication details maintained by
     datalad.
-
-    Examples:
-
-      $ datalad download-url http://example.com/file.dat s3://bucket/file2.dat
     """
 
     _params_ = dict(
@@ -90,6 +86,16 @@ class DownloadURL(Interface):
         save=nosave_opt,
         message=save_message_opt
     )
+
+    _examples_ = [
+        dict(text="Download files from an http and S3 URL",
+             code_py="download_url(urls=['http://example.com/file.dat', 's3://bucket/file2.dat'])",
+             code_cmd="datalad download-url http://example.com/file.dat s3://bucket/file2.dat"),
+        dict(text="Download a file to a path and provide a commit message",
+             code_py="download_url(urls='s3://bucket/file2.dat', message='added a file', path='myfile.dat')",
+             code_cmd="""datalad download-url -m 'added a file' -O myfile.dat \\
+                         s3://bucket/file2.dat"""),
+    ]
 
     @staticmethod
     @datasetmethod(name="download_url")

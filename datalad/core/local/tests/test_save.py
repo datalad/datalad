@@ -12,31 +12,33 @@ import os
 import os.path as op
 
 from datalad.utils import (
-    on_windows,
     assure_list,
     Path,
+    on_windows,
     rmtree,
 )
 from datalad.tests.utils import (
-    assert_status,
-    assert_result_count,
     assert_in,
     assert_in_results,
     assert_not_in,
     assert_raises,
-    create_tree,
-    with_tempfile,
-    with_tree,
-    with_testrepos,
-    eq_,
-    ok_,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
     chpwd,
+    create_tree,
+    eq_,
     known_failure_appveyor,
     known_failure_windows,
-    swallow_outputs,
     OBSCURE_FILENAME,
+    ok_,
+    SkipTest,
+    skip_wo_symlink_capability,
+    swallow_outputs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
-from datalad.distribution.tests.test_add import tree_arg
 
 import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
@@ -44,16 +46,20 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
 from datalad.support.external_versions import external_versions
 from datalad.api import (
-    save,
     create,
     install,
+    save,
 )
 
-from datalad.tests.utils import (
-    assert_repo_status,
-    SkipTest,
-    skip_wo_symlink_capability,
-)
+
+tree_arg = dict(tree={'test.txt': 'some',
+                      'test_annex.txt': 'some annex',
+                      'test1.dat': 'test file 1',
+                      'test2.dat': 'test file 2',
+                      OBSCURE_FILENAME: 'blobert',
+                      'dir': {'testindir': 'someother',
+                              OBSCURE_FILENAME: 'none'},
+                      'dir2': {'testindir3': 'someother3'}})
 
 
 # https://ci.appveyor.com/project/mih/datalad/builds/29840270/job/oya0cs55nwtoga4p
@@ -156,8 +162,8 @@ def test_save_message_file(path):
 
 def test_renamed_file():
     @with_tempfile()
-    def check_renamed_file(recursive, no_annex, path):
-        ds = Dataset(path).create(no_annex=no_annex)
+    def check_renamed_file(recursive, annex, path):
+        ds = Dataset(path).create(annex=annex)
         create_tree(path, {'old': ''})
         ds.repo.add('old')
         ds.repo.call_git(["mv"], files=["old", "new"])
@@ -165,8 +171,8 @@ def test_renamed_file():
         assert_repo_status(path)
 
     for recursive in False,:  #, True TODO when implemented
-        for no_annex in True, False:
-            yield check_renamed_file, recursive, no_annex
+        for annex in True, False:
+            yield check_renamed_file, recursive, annex
 
 
 @with_tempfile(mkdir=True)
@@ -200,6 +206,35 @@ def test_subdataset_save(path):
             "new2": "wanted2"}})
     sub.save('new2')
     assert_repo_status(parent.path, untracked=['untracked'], modified=['sub'])
+
+
+@with_tempfile(mkdir=True)
+def test_subsuperdataset_save(path):
+    # Verify that when invoked without recursion save does not
+    # cause querying of subdatasets of the subdataset
+    # see https://github.com/datalad/datalad/issues/4523
+    parent = Dataset(path).create()
+    # Create 3 levels of subdatasets so later to check operation
+    # with or without --dataset being specified
+    sub1 = parent.create('sub1')
+    sub2 = parent.create(sub1.pathobj / 'sub2')
+    sub3 = parent.create(sub2.pathobj / 'sub3')
+    assert_repo_status(path)
+    # now we will lobotomize that sub2 so git would fail if any query is performed.
+    rmtree(str(sub3.pathobj / '.git' / 'objects'))
+    # the call should proceed fine since neither should care about sub3
+    # default is no recursion
+    parent.save('sub1')
+    sub1.save('sub2')
+    assert_raises(CommandError, parent.save, 'sub1', recursive=True)
+    # and should fail if we request saving while in the parent directory
+    # but while not providing a dataset, since operation would run within
+    # pointed subdataset
+    with chpwd(sub1.path):
+        assert_raises(CommandError, save, 'sub2')
+    # but should not fail in the top level superdataset
+    with chpwd(parent.path):
+        save('sub1')
 
 
 @skip_wo_symlink_capability
@@ -296,7 +331,7 @@ def test_gh2043p1(path):
         ds.path,
         # on windows we are in an unlocked branch by default, hence
         # we would see no change
-        modified=[] if on_windows else ['1'],
+        modified=[] if ds.repo.is_managed_branch() else ['1'],
         untracked=['2', '3'])
     # save(.) should recommit unlocked file, and not touch anything else
     # this tests the second issue in #2043

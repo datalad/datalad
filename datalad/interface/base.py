@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.interface.base')
 
+import os
 import sys
 import re
 import textwrap
@@ -239,6 +240,19 @@ def alter_interface_docs_for_api(docs):
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
+    if 'DATALAD_SPHINX_RUN' not in os.environ:
+        # remove :role:`...` RST markup for cmdline docs
+        docs = re.sub(
+            r':\S+:`[^`]*`[\\]*',
+            lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
+            docs,
+            flags=re.MULTILINE | re.DOTALL)
+        # make the handbook doc references more accessible
+        # the URL is a redirect configured at readthedocs
+        docs = re.sub(
+            r'(handbook:[0-9]-[0-9]*)',
+            '\\1 (http://handbook.datalad.org/symbols)',
+            docs)
     docs = re.sub(
         r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
@@ -282,6 +296,12 @@ def alter_interface_docs_for_cmdline(docs):
         lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
         docs,
         flags=re.MULTILINE | re.DOTALL)
+    # make the handbook doc references more accessible
+    # the URL is a redirect configured at readthedocs
+    docs = re.sub(
+        r'(handbook:[0-9]-[0-9]*)',
+        '\\1 (http://handbook.datalad.org/symbols)',
+        docs)
     # remove None constraint. In general, `None` on the cmdline means don't
     # give option at all, but specifying `None` explicitly is practically
     # impossible
@@ -399,17 +419,29 @@ def build_example(example, api='python'):
         indicator='%'
     else:
         raise ValueError("unknown API selection: {}".format(api))
-    description = dedent_docstring(example.get('text'))
+    if code_field not in example:
+        # only show an example if it exist for the API
+        return ''
+    description = textwrap.fill(example.get('text'))
     # this indent the code snippet to get it properly rendered as code
     # we are not using textwrap.fill(), because it would not acknowledge
     # any meaningful structure/formatting of code snippets. Instead, we
     # maintain line content as is.
     code = dedent_docstring(example.get(code_field))
-    code = textwrap.indent(code, '     ').lstrip()
+    needs_indicator = not code.startswith(indicator)
+    code = textwrap.indent(code, ' ' * (5 if needs_indicator else 3)).lstrip()
 
-    ex = """{}::\n\n   {} {}\n\n""".format(description,
-                                           indicator,
-                                           code)
+    ex = """{}::\n\n   {}{}\n\n""".format(
+        description,
+        # disable automatic prefixing, if the example already has one
+        # this enables providing more complex examples without having
+        # to infer its inner structure
+        '{} '.format(indicator)
+        if needs_indicator
+        # maintain spacing to avoid undesired relative indentation
+        else '',
+        code)
+
     return ex
 
 
@@ -472,7 +504,9 @@ def build_doc(cls, **kwargs):
         cls_doc = cls_doc.format(**cls._docs_)
     # get examples
     ex = getattr(cls, '_examples_', [])
-    cls_doc = update_docstring_with_examples(cls_doc, ex)
+    if ex:
+        cls_doc = update_docstring_with_examples(cls_doc, ex)
+
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
@@ -627,7 +661,11 @@ class Interface(object):
             param = cls._params_[arg]
             defaults_idx = ndefaults - len(args) + i
             cmd_args = param.cmd_args
-            if cmd_args is None:
+            if cmd_args == tuple():
+                # explicitly provided an empty sequence of argument names
+                # this shall not appear in the parser
+                continue
+            elif cmd_args is None:
                 cmd_args = []
             if not len(cmd_args):
                 if defaults_idx >= 0:
@@ -701,7 +739,11 @@ class Interface(object):
                            'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
-        kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
+        kwargs = {k: getattr(args, k)
+                  for k in argnames
+                  # some arguments might be Python-only and do not appear in the
+                  # parser Namespace
+                  if hasattr(args, k) and is_api_arg(k)}
         # we are coming from the entry point, this is the toplevel command,
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and

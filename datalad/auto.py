@@ -23,7 +23,7 @@ from os.path import dirname, lexists, realpath, sep as pathsep
 from os.path import exists
 from os.path import isabs
 from os.path import join as opj
-from git.exc import InvalidGitRepositoryError
+from datalad.support.exceptions import InvalidGitRepositoryError
 
 from .utils import getpwd
 from .dochelpers import exc_str

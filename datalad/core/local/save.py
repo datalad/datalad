@@ -74,26 +74,26 @@ class Save(Interface):
     _examples_ = [
         dict(text="""Save any content underneath the current directory, without
              altering any potential subdataset""",
-             code_py="ds.save()",
+             code_py="save(path='.')",
              code_cmd="datalad save ."),
         dict(text="""Save specific content in the dataset""",
-             code_py="ds.save(path='myfile.txt')",
+             code_py="save(path='myfile.txt')",
              code_cmd="datalad save myfile.txt"),
         dict(text="""Attach a commit message to save""",
-             code_py="ds.save(path='myfile.txt', message='add a file')",
+             code_py="save(path='myfile.txt', message='add file')",
              code_cmd="datalad save -m 'add file' myfile.txt"),
         dict(text="""Save any content underneath the current directory, and
              recurse into any potential subdatasets""",
-             code_py="ds.save(recursive=True)",
-             code_cmd="datalad save . --recursive"),
-        dict(text="""Save any modification of known dataset content in the
-             current directory, but leave untracked files (e.g. temporary files)
-             untouched""",
-             code_py="""ds.save(updated=True, path='.')""",
-             code_cmd="""datalad save -u -d ."""),
+             code_py="save(path='.', recursive=True)",
+             code_cmd="datalad save . -r"),
+        dict(text="Save any modification of known dataset content in the "
+                  "current directory, but leave untracked files (e.g. temporary files) "
+                  "untouched",
+             code_py="""save(path='.', updated=True)""",
+             code_cmd="""datalad save -u ."""),
         dict(text="Tag the most recent saved state of a dataset",
-             code_py="ds.save(version_tag='bestyet')",
-             code_cmd="datalad save -d . --version-tag 'bestyet'"),
+             code_py="save(version_tag='bestyet')",
+             code_cmd="datalad save --version-tag 'bestyet'"),
     ]
 
     _params_ = dict(
@@ -130,14 +130,15 @@ class Save(Interface):
             args=("--to-git",),
             action='store_true',
             doc="""flag whether to add data directly to Git, instead of
-            tracking data identity only.  Usually this is not desired,
-            as it inflates dataset sizes and impacts flexibility of data
-            transport. If not specified - it will be up to git-annex to
-            decide, possibly on .gitattributes options. Use this flag
-            with a simultaneous selection of paths to save. In general,
-            it is better to pre-configure a dataset to track particular paths,
+            tracking data identity only.  Use with caution, there is no
+            guarantee that a file put directly into Git like this will
+            not be annexed in a subsequent save operation.
+            If not specified, it will be up to git-annex to decide how
+            a file is tracked, based on a dataset's configuration
+            to track particular paths,
             file types, or file sizes with either Git or git-annex.
-            See https://git-annex.branchable.com/tips/largefiles/"""),
+            (see https://git-annex.branchable.com/tips/largefiles).
+            """),
     )
 
     @staticmethod
@@ -205,6 +206,8 @@ class Save(Interface):
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',
+                # for save without recursion only commit matters
+                eval_subdataset_state='full' if recursive else 'commit',
                 result_renderer='disabled'):
             if s['status'] == 'error':
                 # Downstream code can't do anything with these. Let the caller

@@ -9,30 +9,34 @@
 """Test logging facilities """
 
 import logging
-import re
 import os.path
 from os.path import exists
 
 from logging import makeLogRecord
-from nose.tools import assert_raises, assert_is_instance, assert_true
-from git.exc import GitCommandError
 
 from unittest.mock import patch
 
-from datalad.log import LoggerHelper
-from datalad.log import TraceBack
-from datalad.log import ColorFormatter
+from datalad.log import (
+    ColorFormatter,
+    LoggerHelper,
+    log_progress,
+    TraceBack,
+)
 from datalad import cfg
 from datalad.support.constraints import EnsureBool
 from datalad.support import ansi_colors as colors
 
-from datalad.tests.utils import with_tempfile, ok_, assert_equal
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import ok_endswith
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_equal,
+    assert_in,
+    assert_not_in,
+    assert_re_in,
+    known_failure_githubci_win,
+    ok_,
+    ok_endswith,
+    swallow_logs,
+    with_tempfile,
+)
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -113,6 +117,7 @@ def check_filters(name):
         assert_in('log2', cml.out)
         assert 'log3' not in cml.out
 
+
 def test_filters():
     def _mock_names(self, v, d=None):
         return 'datalad1.goodone,datalad1.anotherone' if v == 'names' else d
@@ -157,3 +162,21 @@ def test_color_formatter():
 
 
 # TODO: somehow test is stdout/stderr get their stuff
+
+
+@patch("datalad.log.is_interactive", lambda: False)
+def test_log_progress_noninteractive_filter():
+    name = "dl-test"
+    lgr = LoggerHelper(name).get_initialized_logger()
+    pbar_id = "lp_test"
+    with swallow_logs(new_level=logging.INFO, name=name) as cml:
+        log_progress(lgr.info, pbar_id, "Start", label="testing", total=3)
+        log_progress(lgr.info, pbar_id, "THERE0", update=1)
+        log_progress(lgr.info, pbar_id, "NOT", update=1,
+                     noninteractive_level=logging.DEBUG)
+        log_progress(lgr.info, pbar_id, "THERE1", update=1,
+                     noninteractive_level=logging.INFO)
+        log_progress(lgr.info, pbar_id, "Done")
+        for present in ["Start", "THERE0", "THERE1", "Done"]:
+            assert_in(present, cml.out)
+        assert_not_in("NOT", cml.out)

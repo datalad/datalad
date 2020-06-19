@@ -16,18 +16,19 @@ from os.path import join as opj
 from datalad.api import metadata
 from datalad.distribution.dataset import Dataset
 
-
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_not_in,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    eq_,
+    known_failure_githubci_win,
+    skip_if_on_windows,
+    skip_ssh,
+    with_tempfile,
+    with_tree,
+)
 
 
 def _assert_metadata_empty(meta):
@@ -66,14 +67,14 @@ def test_basic_aggregate(path):
     #base.metadata(sub.path, init=dict(homepage='this'), apply2global=True)
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.save(recursive=True)
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     # we will first aggregate the middle dataset on its own, this will
     # serve as a smoke test for the reuse of metadata objects later on
     sub.aggregate_metadata()
     base.save()
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     direct_meta = base.metadata(recursive=True, return_type='list')
     # loose the deepest dataset
     sub.uninstall('subsub', check=False)
@@ -88,7 +89,7 @@ def test_basic_aggregate(path):
     # no we can throw away the subdataset tree, and loose no metadata
     base.uninstall('sub', recursive=True, check=False)
     assert(not sub.is_installed())
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     # same result for aggregate query than for (saved) direct query
     agg_meta = base.metadata(recursive=True, return_type='list')
     for d, a in zip(direct_meta, agg_meta):
@@ -159,9 +160,9 @@ def test_reaggregate_with_unavailable_objects(path):
     sub = base.create('sub', force=True)
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.save(recursive=True)
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     objpath = opj('.datalad', 'metadata', 'objects')
     objs = list(sorted(base.repo.find(objpath)))
     # we have 3x2 metadata sets (dataset/files) under annex
@@ -170,7 +171,7 @@ def test_reaggregate_with_unavailable_objects(path):
     # drop all object content
     base.drop(objs, check=False)
     eq_(all(base.repo.file_has_content(objs)), False)
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     # now re-aggregate, the state hasn't changed, so the file names will
     # be the same
     base.aggregate_metadata(recursive=True, update_mode='all', force_extraction=True)
@@ -194,17 +195,17 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
     sub = base.create('sub', force=True)
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.save(recursive=True)
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
 
     # now make that a subdataset of a new one, so aggregation needs to get the
     # metadata objects first:
     super = Dataset(target).create()
     super.install("base", source=base.path)
-    ok_clean_git(super.path)
+    assert_repo_status(super.path)
     clone = Dataset(opj(super.path, "base"))
-    ok_clean_git(clone.path)
+    assert_repo_status(clone.path)
     objpath = opj('.datalad', 'metadata', 'objects')
     objs = [o for o in sorted(clone.repo.get_annexed_files(with_content_only=False)) if o.startswith(objpath)]
     eq_(len(objs), 6)
@@ -228,9 +229,9 @@ def test_publish_aggregated(path):
             '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
     base.create('sub', force=True)
     base.save(recursive=True)
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
 
     # create sibling and publish to it
     spath = opj(path, 'remote')
@@ -277,7 +278,7 @@ def test_aggregate_removal(path):
     subsub = sub.create(opj('subsub'), force=True)
     base.save(recursive=True)
     base.aggregate_metadata(recursive=True, update_mode='all')
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     res = base.metadata(get_aggregates=True)
     assert_result_count(res, 3)
     assert_result_count(res, 1, path=subsub.path)
@@ -289,7 +290,7 @@ def test_aggregate_removal(path):
     # now aggregation has to detect that subsub is not simply missing, but gone
     # for good
     base.aggregate_metadata(recursive=True, update_mode='all')
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     # internally consistent state
     eq_(_get_contained_objs(base), _get_referenced_objs(base))
     # info on subsub was removed at all levels
@@ -314,7 +315,7 @@ def test_update_strategy(path):
     sub = base.create('sub', force=True)
     subsub = sub.create(opj('subsub'), force=True)
     base.save(recursive=True)
-    ok_clean_git(base.path)
+    assert_repo_status(base.path)
     # we start clean
     for ds in base, sub, subsub:
         eq_(len(_get_contained_objs(ds)), 0)
@@ -403,7 +404,7 @@ def test_partial_aggregation(path):
     with open(opj(sub1.path, 'here'), 'w') as f:
         f.write('fresh')
     ds.save(recursive=True)
-    ok_clean_git(path)
+    assert_repo_status(path)
     # TODO for later
     # test --since with non-incremental
     #ds.aggregate_metadata(recursive=True, since='HEAD~1', incremental=False)

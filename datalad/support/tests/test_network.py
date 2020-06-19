@@ -456,13 +456,13 @@ def test_get_local_file_url():
     for path, url in (
                 # relpaths are special-cased below
                 ('test.txt', 'test.txt'),
+            ) + (
+                ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
+            ) if on_windows else (
                 # static copy of "most_obscore_name"
                 (' "\';a&b&cΔЙקم๗あ `| ',
                  # and translation by google chrome
                  "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
-            ) + (
-                ('C:\\Windows\\Notepad.exe', 'file://C/Windows/Notepad.exe'),
-            ) if on_windows else (
                 ('/a', 'file:///a'),
                 ('/a/b/c', 'file:///a/b/c'),
                 ('/a~', 'file:///a~'),

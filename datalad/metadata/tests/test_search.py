@@ -14,35 +14,40 @@ from shutil import copy
 from unittest.mock import patch
 import os
 from os import makedirs
-from os.path import join as opj
-from os.path import dirname
+from os.path import (
+    dirname,
+    join as opj,
+)
 from datalad.api import Dataset
-from nose.tools import assert_equal, assert_raises
 from datalad.utils import (
     chpwd,
     swallow_logs,
     swallow_outputs,
 )
 from datalad.tests.utils import (
+    assert_equal,
     assert_in,
     assert_re_in,
+    assert_is_generator,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    eq_,
+    known_failure_githubci_win,
+    ok_file_under_git,
+    patch_config,
+    SkipTest,
+    with_tempfile,
+    with_testsui,
 )
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_is_generator
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_testsui
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import patch_config
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import eq_
-from datalad.tests.utils import known_failure_githubci_win
 from datalad.support.exceptions import NoDatasetFound
 
 from datalad.api import search
 
-from ..search import _listdict2dictlist
-from ..search import _meta2autofield_dict
+from ..search import (
+    _listdict2dictlist,
+    _meta2autofield_dict,
+)
 
 
 @with_testsui(interactive=False)
@@ -179,7 +184,7 @@ def test_within_ds_file_search(path):
     ds.repo.set_metadata(
         opj('stim', 'stim1.mp3'), init={'importance': 'very'})
     ds.aggregate_metadata()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # basic sanity check on the metadata structure of the dataset
     dsmeta = ds.metadata('.', reporton='datasets')[0]['metadata']
     for src in ('audio',):
