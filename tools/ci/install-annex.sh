@@ -3,7 +3,7 @@
 # An ultimate helper to use to setup a CI with some git-annex installation
 # Arguments:
 #  First argument would be which "schema" would it be.
-#  Some schemas might like additional arguments
+#  Some schemas might like additional arguments (ATM annotated in comments for cases)
 #
 # This script
 # - needs to be "source"d since some schemas would need to modify env vars
@@ -23,7 +23,7 @@ _TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/ga-XXXXXXX")
 echo "I: top directory $_TMPDIR"
 
 case "$scenario" in
-  neurodebian)
+  neurodebian)  # TODO: use nd_freeze_install for an arbitrary version specified
     # we assume neurodebian is generally configured
     sudo apt-get install git-annex-standalone
     ;;
@@ -43,7 +43,7 @@ case "$scenario" in
         exit 0
     fi
     ;;
-  deb-url)
+  deb-url)  # expects: URL
     (
     shift
     url="$1"  # expects URL
@@ -60,9 +60,10 @@ case "$scenario" in
     export PATH="$_ANNEXDIR:$PATH"
     unset _ANNEXDIR
     ;;
-  conda-forge|conda-forge-last)
+  conda-forge|conda-forge-last)  # optional: version
     _miniconda_script=Miniconda3-latest-Linux-x86_64.sh
-
+    shift
+    _conda_annex_version=${1:+=}${1:-}  # will include = prefix is specified
     case "$scenario" in
       conda-forge-last)
         if hash git-annex; then
@@ -84,7 +85,7 @@ case "$scenario" in
       "${ANACONDA_URL:-https://repo.anaconda.com/miniconda/}${_miniconda_script}"
     HOME="$_TMPDIR" bash "$_TMPDIR/${_miniconda_script}" -b -p "$_TMPDIR/miniconda"
     unset _miniconda_script
-    "$_TMPDIR/miniconda/bin/conda" install -c conda-forge -y git-annex
+    "$_TMPDIR/miniconda/bin/conda" install -c conda-forge -y git-annex${_conda_annex_version}
     ;;
   *)
     echo "Unknown git-annex installation scheme $scenario"
