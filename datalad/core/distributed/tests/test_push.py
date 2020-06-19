@@ -632,6 +632,10 @@ def test_push_wanted(srcpath, dstpath):
 def test_auto_data_transfer(path):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
+    if ds_a.repo.is_managed_branch():
+        # on crippled FS post-update hook enabling via create-sibling doesn't
+        # work ATM
+        raise SkipTest("no create-sibling on crippled FS")
     (ds_a.pathobj / "foo.dat").write_text("foo")
     ds_a.save()
 
@@ -688,6 +692,10 @@ def test_auto_data_transfer(path):
 def test_auto_if_wanted_data_transfer_path_restriction(path):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
+    if ds_a.repo.is_managed_branch():
+        # on crippled FS post-update hook enabling via create-sibling doesn't
+        # work ATM
+        raise SkipTest("no create-sibling on crippled FS")
     ds_a_sub0 = ds_a.create("sub0")
     ds_a_sub1 = ds_a.create("sub1")
 
