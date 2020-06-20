@@ -218,7 +218,10 @@ before_install:
   # Install grunt-cli
   - eatmydata npm install grunt-cli
   # Install git-annex
+  - OLD_PATH="$PATH"
   - eval source tools/ci/install-annex.sh ${_DL_ANNEX_INSTALL_SCENARIO}
+  # if PATH was changed, we need to make it available in the login sessions
+  - if [ "$PATH" != "$OLD_PATH" ]; then echo export PATH=$PATH >> ~/.bashrc; fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
       sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
