@@ -27,6 +27,7 @@ from datalad.utils import (
     chpwd,
     Path,
 )
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import (
     GitRepo,
 )
@@ -744,6 +745,9 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
             path=ds_clone_s1.path,
             action="update")
         return
+    if external_versions["cmd:git"] < "2.13.2":
+        raise SkipTest("Test depends on fix from Git 2.13.2. Detected git is {}"
+                       .format(external_versions["cmd:git"]))
     assert_repo_status(ds_clone.path)
 
     # We brought in the revision and got to the same state of the remote.
