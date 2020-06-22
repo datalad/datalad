@@ -795,6 +795,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     _unique_instances = WeakValueDictionary()
 
+    GIT_MIN_VERSION = "2.19.1"
+    git_version = None
+
     def _flyweight_invalid(self):
         return not self.is_valid_git()
 
@@ -819,6 +822,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # the flyweight key is already determining unique instances
         # add the class name to distinguish from strings of a path
         return hash((self.__class__.__name__, self.__weakref__.key))
+
+    @classmethod
+    def _check_git_version(cls):
+        external_versions.check("cmd:git", min_version=cls.GIT_MIN_VERSION)
+        cls.git_version = external_versions['cmd:git']
 
     # This is the least common denominator to claim that a user
     # used DataLad.
@@ -876,6 +884,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           C='/my/path'   => -C /my/path
 
         """
+        if self.git_version is None:
+            self._check_git_version()
 
         # BEGIN Repo validity test
         # We want to fail early for tests, that would be performed a lot. In particular this is about
