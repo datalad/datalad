@@ -26,6 +26,7 @@ from datalad.tests.utils import (
     assert_true,
     chpwd,
     ok_file_has_content,
+    skip_if,
     with_tempfile,
     with_testsui,
     with_tree,
@@ -466,6 +467,7 @@ def test_no_leaks(path1, path2):
         assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
 
 
+@skip_if(external_versions["cmd:git"] < "2.13.2")
 @with_tempfile()
 def test_no_local_write_if_no_dataset(path):
     Dataset(path).create()
