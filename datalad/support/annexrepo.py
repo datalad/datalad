@@ -47,12 +47,12 @@ from datalad.utils import (
     assure_list,
     auto_repr,
     ensure_list,
+    join_cmdline,
     linux_distribution_name,
     on_windows,
     partition,
     Path,
     PurePosixPath,
-    quote_cmdlinearg,
     split_cmdline,
     unlink,
 )
@@ -2848,7 +2848,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         stdout, stderr
         """
         cmd = split_cmdline(
-            cmd_str + " " + " ".join(quote_cmdlinearg(f) for f in files)) \
+            cmd_str + " " + join_cmdline(files)) \
             if isinstance(cmd_str, str) \
             else cmd_str + files
 

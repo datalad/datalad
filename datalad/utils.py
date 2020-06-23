@@ -2441,6 +2441,12 @@ def quote_cmdlinearg(arg):
     ) if on_windows else shlex_quote(arg)
 
 
+def join_cmdline(args):
+    """Join command line args into a string using quote_cmdlinearg
+    """
+    return ' '.join(map(quote_cmdlinearg, args))
+
+
 def split_cmdline(s):
     """Perform platform-appropriate command line splitting.
 

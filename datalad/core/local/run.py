@@ -49,20 +49,23 @@ from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
-from datalad.utils import assure_bytes
-from datalad.utils import assure_unicode
-from datalad.utils import chpwd
-from datalad.utils import get_dataset_root
-from datalad.utils import getpwd
-from datalad.utils import SequenceFormatter
-from datalad.utils import quote_cmdlinearg
+from datalad.utils import (
+    assure_bytes,
+    assure_unicode,
+    chpwd,
+    get_dataset_root,
+    getpwd,
+    join_cmdline,
+    quote_cmdlinearg,
+    SequenceFormatter,
+)
 
 lgr = logging.getLogger('datalad.core.local.run')
 
 
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
-    cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
+    cmd_shorty = (join_cmdline(cmd) if isinstance(cmd, list) else cmd)
     cmd_shorty = u'{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
@@ -413,7 +416,7 @@ def normalize_command(command):
                 # Strip disambiguation marker. Note: "running from Python API"
                 # FIXME from below applies to this too.
                 command = command[1:]
-            command = " ".join(quote_cmdlinearg(c) for c in command)
+            command = join_cmdline(command)
     else:
         command = assure_unicode(command)
     return command
