@@ -112,7 +112,7 @@ A handful of new commands, including `copy-file`, `push`, and
 
 - The new command [push][] provides an alternative interface to
   [publish][] for pushing a dataset hierarchy to a sibling.
-  ([#4206][])
+  ([#4206][]) ([#4581][]) ([#4617][]) ([#4620][])
 
 - The new command [copy-file][] copies files and associated
   availability information from one dataset to another.  ([#4430][])
@@ -184,10 +184,10 @@ A handful of new commands, including `copy-file`, `push`, and
 
 - The DataLad Singularity container now comes with p7zip-full.
 
-- DataLad shows a log message when the current working is resolved to
-  a different location due to a symlink.  This is now logged at the
-  DEBUG rather than WARNING level, as it typically does not indicate a
-  problem.  ([#4426][])
+- DataLad emits a log message when the current working directory is
+  resolved to a different location due to a symlink.  This is now
+  logged at the DEBUG rather than WARNING level, as it typically does
+  not indicate a problem.  ([#4426][])
 
 - DataLad now lets the caller know that `git annex init` is scanning
   for unlocked files, as this operation can be slow in some
@@ -2903,4 +2903,7 @@ publishing
 [#4553]: https://github.com/datalad/datalad/issues/4553
 [#4560]: https://github.com/datalad/datalad/issues/4560
 [#4568]: https://github.com/datalad/datalad/issues/4568
+[#4581]: https://github.com/datalad/datalad/issues/4581
+[#4617]: https://github.com/datalad/datalad/issues/4617
 [#4619]: https://github.com/datalad/datalad/issues/4619
+[#4620]: https://github.com/datalad/datalad/issues/4620
