@@ -15,52 +15,6 @@ We would recommend to consult log of the
 A handful of new commands, including `copy-file`, `push`, and
 `create-sibling-ria`, along with various fixes and enhancements
 
-### Changes since last rc
-(section to be pruned before final release)
-
-- git-annex-remote-ora has been updated for compatibility with
-  annexremote v1.4.2.  #4573
-
-- A progress bar fix from rc2 led to unintended messages when not
-  attached to a tty.  #4575
-
-- `publish` is no longer marked as deprecated.  #4578
-
-- `push`  #4620
-  - `--force` no longer takes "no-datatransfer" as a value. There is
-    instead a `--data` option that takes the values "anything",
-    "nothing", "auto", "auto-if-wanted".  "auto-if-wanted" (the
-    default) results in `--auto` being added to `git annex copy` calls
-    if the sibling was configured to prefer content via `git annex
-    wanted`.
-  - The "pushall" and "datatransfer" values of `--force` have been
-    renamed to "all" and "checkdatapresent", respectively.
-
-- The `--since=` option of `push` now takes '^', not an empty string,
-  to mean "the last known state of the matching branch on the
-  sibling".  #4617
-
-- `datalad.get.subdataset-source-candidate-NAME` can now include a
-  cost value by appending three digits to `NAME`.  #4619
-
-### rc2 changes
-(section to be pruned before final release)
-
-- [create-sibling-ria][] produced results with an incorrect "dataset"
-  value.  #4486
-
-- [clone][] did not correctly handle RIA datasets that were not annex
-  repositories.  #4487
-
-- [push][]
-  - now fails earlier if given an unknown target.  #4517
-  - got some optimizations and progress bar improvements.
-    #4545 #4546 #4547 #4548
-  - now only warns about unavailable content when given explicit
-    paths.  #4547
-
-- Fixes for progress bar glitches.  #4503 #4555
-
 ### Major refactoring and deprecations
 
 - The `no_annex` parameter of [create][], which is exposed in the
