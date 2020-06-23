@@ -15,48 +15,14 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the `DataLad git
 repository <http://github.com/datalad/datalad>`__ for more details.
 
-0.13.0rc2 (May 22, 2020) – .
-----------------------------
+0.13.0 (June 23, 2020) – .
+--------------------------
 
 A handful of new commands, including ``copy-file``, ``push``, and
 ``create-sibling-ria``, along with various fixes and enhancements
 
-rc2 changes
-~~~~~~~~~~~
-
-(section to be pruned before final release)
-
--  `create-sibling-ria <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-ria.html>`__
-   produced results with an incorrect “dataset” value. #4486
-
--  `clone <http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html>`__
-   did not correctly handle RIA datasets that were not annex
-   repositories. #4487
-
--  `push <http://datalad.readthedocs.io/en/latest/generated/man/datalad-push.html>`__
-
-   -  now fails earlier if given an unknown target. #4517
-   -  got some optimizations and progress bar improvements. #4545 #4546
-      #4547 #4548
-   -  now only warns about unavailable content when given explicit
-      paths. #4547
-
--  The documentation for
-   `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
-   has been updated to mark it as deprecated, pointing to
-   `push <http://datalad.readthedocs.io/en/latest/generated/man/datalad-push.html>`__
-   as its replacement. #4515
-
--  Fixes for progress bar glitches. #4503 #4555
-
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
--  With the introduction of
-   `push <http://datalad.readthedocs.io/en/latest/generated/man/datalad-push.html>`__,
-   `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
-   is now deprecated. It will be removed in the 0.14.0 release at the
-   earliest.
 
 -  The ``no_annex`` parameter of
    `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__,
@@ -156,6 +122,11 @@ Fixes
    renderer has been removed entirely.
    (`#4471 <https://github.com/datalad/datalad/issues/4471>`__)
 
+-  The documentation for the Python interface of a command listed an
+   incorrect default when the command overrode the value of command
+   parameters such as ``result_renderer``.
+   (`#4480 <https://github.com/datalad/datalad/issues/4480>`__)
+
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -190,6 +161,9 @@ Enhancements and new features
    `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
    for pushing a dataset hierarchy to a sibling.
    (`#4206 <https://github.com/datalad/datalad/issues/4206>`__)
+   (`#4581 <https://github.com/datalad/datalad/issues/4581>`__)
+   (`#4617 <https://github.com/datalad/datalad/issues/4617>`__)
+   (`#4620 <https://github.com/datalad/datalad/issues/4620>`__)
 
 -  The new command
    `copy-file <http://datalad.readthedocs.io/en/latest/generated/man/datalad-copy-file.html>`__
@@ -221,9 +195,14 @@ Enhancements and new features
       (`#4324 <https://github.com/datalad/datalad/issues/4324>`__)
 
 -  `clone <http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html>`__
-   learned to handle dataset aliases in RIA stores when given a URL of
-   the form ``ria+<protocol>://<storelocation>#~<aliasname>``.
-   (`#4459 <https://github.com/datalad/datalad/issues/4459>`__)
+
+   -  learned to handle dataset aliases in RIA stores when given a URL
+      of the form ``ria+<protocol>://<storelocation>#~<aliasname>``.
+      (`#4459 <https://github.com/datalad/datalad/issues/4459>`__)
+   -  now checks ``datalad.get.subdataset-source-candidate-NAME`` to see
+      if ``NAME`` starts with three digits, which is taken as a “cost”.
+      Sources with lower costs will be tried first.
+      (`#4619 <https://github.com/datalad/datalad/issues/4619>`__)
 
 -  `update <http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html>`__
    (`#4167 <https://github.com/datalad/datalad/issues/4167>`__)
@@ -296,10 +275,11 @@ Enhancements and new features
 
 -  The DataLad Singularity container now comes with p7zip-full.
 
--  DataLad shows a log message when the current working is resolved to a
-   different location due to a symlink. This is now logged at the DEBUG
-   rather than WARNING level, as it typically does not indicate a
-   problem. (`#4426 <https://github.com/datalad/datalad/issues/4426>`__)
+-  DataLad emits a log message when the current working directory is
+   resolved to a different location due to a symlink. This is now logged
+   at the DEBUG rather than WARNING level, as it typically does not
+   indicate a problem.
+   (`#4426 <https://github.com/datalad/datalad/issues/4426>`__)
 
 -  DataLad now lets the caller know that ``git annex init`` is scanning
    for unlocked files, as this operation can be slow in some
