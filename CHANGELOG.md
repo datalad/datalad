@@ -15,6 +15,34 @@ We would recommend to consult log of the
 A handful of new commands, including `copy-file`, `push`, and
 `create-sibling-ria`, along with various fixes and enhancements
 
+### Changes since last rc
+(section to be pruned before final release)
+
+- git-annex-remote-ora has been updated for compatibility with
+  annexremote v1.4.2.  #4573
+
+- A progress bar fix from rc2 led to unintended messages when not
+  attached to a tty.  #4575
+
+- `publish` is no longer marked as deprecated.  #4578
+
+- `push`  #4620
+  - `--force` no longer takes "no-datatransfer" as a value. There is
+    instead a `--data` option that takes the values "anything",
+    "nothing", "auto", "auto-if-wanted".  "auto-if-wanted" (the
+    default) results in `--auto` being added to `git annex copy` calls
+    if the sibling was configured to prefer content via `git annex
+    wanted`.
+  - The "pushall" and "datatransfer" values of `--force` have been
+    renamed to "all" and "checkdatapresent", respectively.
+
+- The `--since=` option of `push` now takes '^', not an empty string,
+  to mean "the last known state of the matching branch on the
+  sibling".  #4617
+
+- `datalad.get.subdataset-source-candidate-NAME` can now include a
+  cost value by appending three digits to `NAME`.  #4619
+
 ### rc2 changes
 (section to be pruned before final release)
 
@@ -106,6 +134,10 @@ A handful of new commands, including `copy-file`, `push`, and
   information in some cases.  The custom renderer has been removed
   entirely.  ([#4471][])
 
+- The documentation for the Python interface of a command listed an
+  incorrect default when the command overrode the value of command
+  parameters such as `result_renderer`.  ([#4480][])
+
 ### Enhancements and new features
 
 - The default result renderer learned to elide a chain of results
@@ -144,9 +176,13 @@ A handful of new commands, including `copy-file`, `push`, and
   - "shared-{group|all|...}" that can be used to set up datasets for
     collaborative write access.  ([#4324][])
 
-- [clone][] learned to handle dataset aliases in RIA stores when given
-  a URL of the form `ria+<protocol>://<storelocation>#~<aliasname>`.
-  ([#4459][])
+- [clone][]
+  - learned to handle dataset aliases in RIA stores when given a URL
+    of the form `ria+<protocol>://<storelocation>#~<aliasname>`.
+    ([#4459][])
+  - now checks `datalad.get.subdataset-source-candidate-NAME` to see
+    if `NAME` starts with three digits, which is taken as a "cost".
+    Sources with lower costs will be tried first.  ([#4619][])
 
 - [update][]  ([#4167][])
   - learned to disallow non-fast-forward updates when `ff-only` is
@@ -2901,6 +2937,7 @@ publishing
 [#4464]: https://github.com/datalad/datalad/issues/4464
 [#4471]: https://github.com/datalad/datalad/issues/4471
 [#4477]: https://github.com/datalad/datalad/issues/4477
+[#4480]: https://github.com/datalad/datalad/issues/4480
 [#4481]: https://github.com/datalad/datalad/issues/4481
 [#4504]: https://github.com/datalad/datalad/issues/4504
 [#4526]: https://github.com/datalad/datalad/issues/4526
@@ -2912,3 +2949,4 @@ publishing
 [#4553]: https://github.com/datalad/datalad/issues/4553
 [#4560]: https://github.com/datalad/datalad/issues/4560
 [#4568]: https://github.com/datalad/datalad/issues/4568
+[#4619]: https://github.com/datalad/datalad/issues/4619
