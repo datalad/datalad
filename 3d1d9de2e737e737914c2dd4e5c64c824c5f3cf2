@@ -1,0 +1,52 @@
+Update 0.13.0rc2-9-g7e1158fc3:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    a3a154bcbc980c152657886870b32a87f42afe0f..dac6cfb8549904b6402b65fd3758de600d00c073
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4573 from bpoldrack/fix-ora
+   0182cbc81^-1
++  Merge pull request #4575 from kyleam/pbar-demote-state-msg
+   a477ba2ef^-1
+-  Merge pull request #4574 from bpoldrack/perf-gh-4563
+   e7e42a415^-1
+-  Merge pull request #4561 from bpoldrack/enh-ora-http
+   9b80737af^-1
++  Merge pull request #4578 from yarikoptic/enh-publish-noyetdeprecate
+   381c201df^-1
+-  Merge pull request #4581 from mih/enh-push
+   d36c571e0^-1
+-  Merge pull request #4610 from bpoldrack/fix-push-test
+   b2cea75eb^-1
+-  trigger a rebuild of fullmaster singularity image
+   f0adaedb5^-1
+-  Merge pull request #4608 from bpoldrack/enh-cached-test-ds
+   afa682550^-1
+-  Merge branch 'maint'
+   afdc5e138^-1
++  Merge pull request #4617 from mih/bf-4582
+   3360cc18c^-1
+-  Merge branch 'maint'
+   7ade0fda8^-1
++  Merge pull request #4619 from mih/bf-4613
+   896aa2067^-1
+-  Merge pull request #4596 from yarikoptic/rm-deprecated-master
+   8b91f3767^-1
+-  Merge branch 'maint'
+   1d11ca9d0^-1
++  Merge branch 'iss2762': DOC: Fixed documentation builder to allow for overriding opts...
+   47614e0b7^-1
+-  Merge branch 'maint'
+   6b9e07fb0^-1
+-  Merge pull request #4645 from kyleam/annexremote-interesting
+   b17f3db65^-1
+-  Merge pull request #4649 from kyleam/tqdm-reset-kludge
+   c0b7ec85b^-1
++  Merge pull request #4620 from yarikoptic/enh-push-transfer-modes
+   aac23bccc^-1
