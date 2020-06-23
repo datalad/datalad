@@ -206,6 +206,9 @@ def test_save_hierarchy(path):
 class TestUtils(Interface):
     """TestUtil's fake command"""
 
+    result_renderer = 'tailored' # overrides None default
+    return_type = 'item-or-list' # overrides 'list'
+
     _params_ = dict(
         number=Parameter(
             args=("-n", "--number",),
@@ -254,6 +257,10 @@ def test_eval_results_plus_build_doc():
     assert_in("TestUtil's fake command", doc1)
     assert_in("Parameters", doc1)
     assert_in("It's a number", doc1)
+
+    # docstring shows correct override values of defaults in eval_params
+    assert_in("Default: 'tailored'", doc1)
+    assert_in("Default: 'item-or-list'", doc1)
 
     # docstring also contains eval_result's parameters:
     assert_in("result_filter", doc1)

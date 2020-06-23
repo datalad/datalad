@@ -514,10 +514,19 @@ def build_doc(cls, **kwargs):
 
     # build standard doc and insert eval_doc
     spec = getattr(cls, '_params_', dict())
+
+
+    # update class attributes that may override defaults 
+    if hasattr(cls, '_no_eval_results'):
+        add_args = None
+    else:
+        add_args = {k: getattr(cls, k, v) for k, v in eval_defaults.items()}
+
     # ATTN: An important consequence of this update() call is that it
     # fulfills the docstring's promise of overriding any existing
     # values for eval_params keys in _params_.
     #
+
     # get docs for eval_results parameters:
     spec.update(eval_params)
 
@@ -525,7 +534,7 @@ def build_doc(cls, **kwargs):
         cls.__call__, spec,
         prefix=alter_interface_docs_for_api(cls_doc),
         suffix=alter_interface_docs_for_api(call_doc),
-        add_args=eval_defaults if not hasattr(cls, '_no_eval_results') else None
+        add_args=add_args
     )
 
     # return original

@@ -143,6 +143,7 @@ class ExternalVersions(object):
         'cmd:7z': _get_system_7z_version,
     }
     _INTERESTING = (
+        'annexremote',
         'appdirs',
         'boto',
         'exifread',
