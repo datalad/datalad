@@ -422,6 +422,13 @@ def _test_gitannex(host, store, dspath):
     init_opts = common_init_opts + ['url={}'.format(store_url)]
     ds.repo.init_remote('store', options=init_opts)
 
+    from datalad.support.external_versions import external_versions
+    if '8.20200330' < external_versions['cmd:annex'] < '8.20200624':
+        # https://git-annex.branchable.com/bugs/testremote_breeds_way_too_many_instances_of_the_externals_remote/?updated
+        raise SkipTest(
+            "git-annex might lead to overwhelming number of external "
+            "special remote instances")
+
     # run git-annex-testremote
     # note, that we don't want to capture output. If something goes wrong we
     # want to see it in test build's output log.
