@@ -888,22 +888,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # are stored for performance. Path object creation comes with a cost. Most noteably,
         # this is used for validity checking of the repository.
         self.pathobj = ut.Path(self.path)
-        self.dot_git = self.pathobj / '.git'
-        # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
-        # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
-        #       However, it's returning relative path. So, the logic in usage needs to be unified in order to melt both
-        #       pieces.
-        if self.dot_git.is_file():
-            with self.dot_git.open() as f:
-                line = f.readline()
-                if line.startswith("gitdir: "):
-                    self.dot_git = self.pathobj / line[7:].strip()
-                else:
-                    raise InvalidGitRepositoryError("Invalid .git file")
-
-        elif self.dot_git.is_symlink():
-            self.dot_git = self.dot_git.resolve()
-
+        self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
@@ -1197,6 +1182,49 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         )
 
     @staticmethod
+    def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
+        """Given a pathobj to a repository return path to .git/ directory
+
+        Parameters
+        ----------
+        pathobj: Path
+        ok_missing: bool, optional
+          Allow for .git to be missing (useful while sensing before repo is initialized)
+        maybe_relative: bool, optional
+          Return path relative to pathobj
+
+        Raises
+        ------
+        RuntimeError
+          When ok_missing is False and .git path does not exist
+
+        Returns
+        -------
+        Path
+          Absolute (unless maybe_relative=True) path to resolved .git/ directory
+        """
+        dot_git = pathobj / '.git'
+        if dot_git.is_file():
+            with dot_git.open() as f:
+                line = f.readline()
+                if line.startswith("gitdir: "):
+                    dot_git = pathobj / line[7:].strip()
+                else:
+                    raise InvalidGitRepositoryError("Invalid .git file")
+        elif dot_git.is_symlink():
+            dot_git = dot_git.resolve()
+        elif not (ok_missing or dot_git.exists()):
+            raise RuntimeError("Missing .git in %s." % pathobj)
+        # Primarily a compat kludge for get_git_dir, remove when it is deprecated
+        if maybe_relative:
+            try:
+                dot_git = dot_git.relative_to(pathobj)
+            except ValueError:
+                # is not a subpath, return as is
+                lgr.debug("Path %r is not subpath of %r", dot_git, pathobj)
+        return dot_git
+
+    @staticmethod
     def get_git_dir(repo):
         """figure out a repo's gitdir
 
@@ -1204,9 +1232,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Note
         ----
-        Please try using GitRepo.dot_git instead! That one's not static, but it's cheaper and you should avoid
-        not having an instance of a repo you're working on anyway. Note, that the property in opposition to this method
-        returns an absolute path.
+        This method is likely to get deprecated, please use GitRepo.dot_git instead!
+        That one's not static, but it's cheaper and you should avoid
+        not having an instance of a repo you're working on anyway.
+        Note, that the property in opposition to this method returns an absolute path.
 
 
         Parameters
@@ -1219,24 +1248,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         str
           relative path to the repo's git dir; So, default would be ".git"
         """
-        if hasattr(repo, 'path'):
-            # repo instance like given
-            repo = repo.path
-        dot_git = op.join(repo, ".git")
-        if not op.exists(dot_git):
-            raise RuntimeError("Missing .git in %s." % repo)
-        elif op.islink(dot_git):
-            git_dir = os.readlink(dot_git)
-        elif op.isdir(dot_git):
-            git_dir = ".git"
-        elif op.isfile(dot_git):
-            with open(dot_git) as f:
-                git_dir = f.readline()
-                if git_dir.startswith("gitdir:"):
-                    git_dir = git_dir[7:]
-                git_dir = git_dir.strip()
-
-        return git_dir
+        if isinstance(repo, GitRepo):
+            return str(repo.dot_git)
+        return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, maybe_relative=True))
 
     @property
     def config(self):
