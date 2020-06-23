@@ -124,7 +124,11 @@ class OutdatedExternalDependency(MissingExternalDependency):
 
     def __str__(self):
         to_str = super(OutdatedExternalDependency, self).__str__()
-        to_str += ". You have version %s" % self.ver_present \
+        # MissingExternalDependency ends with a period unless msg is
+        # given, in which case it's up to the msg and no callers in
+        # our code base currently give a msg ending with a period.
+        to_str += "." if self.msg else ""
+        to_str += " You have version %s" % self.ver_present \
             if self.ver_present else \
             " Some unknown version of dependency found."
         return to_str

@@ -44,7 +44,6 @@ import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
-from datalad.support.external_versions import external_versions
 from datalad.api import (
     create,
     install,
@@ -711,7 +710,7 @@ def test_surprise_subds(path):
     # this test irrelevant because it is about the unborn branch edge case.
     adjusted = somerepo.is_managed_branch()
     # This edge case goes away with Git v2.22.0.
-    fixed_git = external_versions['cmd:git'] >= '2.22.0'
+    fixed_git = somerepo.git_version >= '2.22.0'
 
     # save non-recursive
     res = ds.save(recursive=False, on_failure='ignore')
