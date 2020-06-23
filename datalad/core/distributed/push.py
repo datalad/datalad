@@ -80,13 +80,6 @@ class Push(Interface):
     dataset.
     << REFLOW ||
 
-    Which files are copied can be further tailored via the
-    'datalad.push.copy-auto-if-wanted' configuration. If set, push will test
-    whether a git-annex "wanted" configuration is present for the target
-    location, and in this case instruct git-annex to obey this configuration
-    when deciding which files to consider for transfer (i.e. use the --auto
-    flag with git-annex copy).
-
     .. note::
       Power-user info: This command uses :command:`git push`, and :command:`git
       annex copy` to push a dataset. Publication targets are either configured
@@ -123,16 +116,27 @@ class Push(Interface):
             data or changes for those paths are considered for a push.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
+        data=Parameter(
+            args=("--data",),
+            doc="""what to do with (annex'ed) data. 'anything' would cause
+            transfer of all annexed content, 'nothing' would avoid call to
+            `git annex copy` altogether. 'auto' would use 'git annex copy' with
+            '--auto' thus transferring only data which would satisfy "wanted"
+            or "numcopies" settings for the remote (thus "nothing" otherwise).
+            'auto-if-wanted' would enable '--auto' mode only if there is a 
+            "wanted" setting for the remote, and transfer 'anything' otherwise.
+            """,
+            constraints=EnsureChoice(
+                'anything', 'nothing', 'auto', 'auto-if-wanted')),
         force=Parameter(
             # multi-mode option https://github.com/datalad/datalad/issues/3414
             args=("-f", "--force",),
-            doc="""force particular operations, overruling automatic decision
-            making: use --force with git-push ('gitpush'); do not use --fast
-            with git-annex copy ('datatransfer'); do not attempt to copy
-            annex'ed file content ('no-datatransfer'); combine force modes
-            'gitpush' and 'datatransfer' ('pushall').""",
+            doc="""force particular operations, possibly overruling safety
+            protections or optimizations: use --force with git-push ('gitpush');
+            do not use --fast with git-annex copy ('checkdatapresent');
+            combine all force modes ('all').""",
             constraints=EnsureChoice(
-                'pushall', 'gitpush', 'no-datatransfer', 'datatransfer', None)),
+                'all', 'gitpush', 'checkdatapresent', None)),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         jobs=jobs_opt,
@@ -181,6 +185,7 @@ class Push(Interface):
             dataset=None,
             to=None,
             since=None,
+            data='auto-if-wanted',
             force=None,
             recursive=False,
             recursion_limit=None,
@@ -248,7 +253,7 @@ class Push(Interface):
             lgr.debug('Attempt push of Dataset at %s', dspath)
             pbars = {}
             yield from _push(
-                dspath, dsrecords, to, force, jobs, res_kwargs.copy(), pbars,
+                dspath, dsrecords, to, data, force, jobs, res_kwargs.copy(), pbars,
                 got_path_arg=True if path else False)
             # take down progress bars for this dataset
             for i, ds in pbars.items():
@@ -365,10 +370,12 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
         yield (cur_ds, ds_res)
 
 
-def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
+def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
           done_fetch=None, got_path_arg=False):
     if not done_fetch:
         done_fetch = set()
+    force_git_push = force in ('all', 'gitpush')
+
     # nothing recursive in here, we only need a repo to work with
     ds = Dataset(dspath)
     repo = ds.repo
@@ -525,6 +532,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
             content,
             # to this particular dependency
             r,
+            data,
             force,
             jobs,
             res_kwargs.copy(),
@@ -549,7 +557,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
                 repo,
                 target,
                 refspecs2push,
-                force,
+                force_git_push,
                 res_kwargs.copy()):
             if p['status'] not in ('ok', 'notneeded'):
                 push_ok = False
@@ -560,12 +568,13 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
             # TODO final global error result for the dataset?!
             return
 
-    # git-annex data move
+    # git-annex data copy
     #
     if not is_annex_repo:
+        lgr.debug("No data transfer: %s is not a git annex repository", repo)
         return
 
-    if force == 'no-datatransfer':
+    if data == "nothing":
         lgr.debug("Data transfer to '%s' disabled by argument", target)
         return
 
@@ -577,6 +586,7 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
         ds,
         target,
         content,
+        data,
         force,
         jobs,
         res_kwargs.copy(),
@@ -641,12 +651,12 @@ def _push(dspath, content, target, force, jobs, res_kwargs, pbars,
         ['git-annex'
          if ds.config.get('branch.git-annex.merge', None)
          else 'git-annex:git-annex'],
-        force,
+        force_git_push,
         res_kwargs.copy(),
     )
 
 
-def _push_refspecs(repo, target, refspecs, force, res_kwargs):
+def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
     # TODO inefficient, but push only takes a single refspec at a time
     # at the moment, enhance GitRepo.push() to do all at once
     push_res = []
@@ -654,7 +664,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         push_res.extend(repo.push(
             remote=target,
             refspec=refspec,
-            git_options=['--force'] if force in ('pushall', 'gitpush') else None,
+            git_options=['--force'] if force_git_push else None,
         ))
     # TODO maybe compress into a single message whenever everything is
     # OK?
@@ -695,7 +705,7 @@ def _push_refspecs(repo, target, refspecs, force, res_kwargs):
         )
 
 
-def _push_data(ds, target, content, force, jobs, res_kwargs,
+def _push_data(ds, target, content, data, force, jobs, res_kwargs,
                got_path_arg=False):
     if ds.config.getbool('remote.{}'.format(target), 'annex-ignore', False):
         lgr.debug(
@@ -713,7 +723,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
             res_kwargs,
             action='copy',
             status='impossible'
-            if force in ('pushall', 'datatransfer')
+            if force in ('all', 'checkdatapresent')
             else 'notneeded',
             message=(
                 "Target '%s' does not appear to be an annex remote",
@@ -747,7 +757,7 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
         c
         for c in content.values()
         # by force
-        if ((force in ('pushall', 'datatransfer') or
+        if ((force in ('all', 'checkdatapresent') or
              # or by modification report
              c.get('state', None) not in ('clean', 'deleted'))
             # only consider annex'ed files
@@ -771,13 +781,16 @@ def _push_data(ds, target, content, force, jobs, res_kwargs,
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
 
-    if force not in ('pushall', 'datatransfer') and ds_repo.config.obtain(
-            'datalad.push.copy-auto-if-wanted'):
-        if ds_repo.get_preferred_content('wanted', target):
-            lgr.debug("Invoking copy --auto")
-            cmd.append('--auto')
+    # Since we got here - we already have some  data != "nothing"
+    if (data == 'auto') or \
+        (
+            (data == 'auto-if-wanted') and
+            ds_repo.get_preferred_content('wanted', target)
+        ):
+        lgr.debug("Invoking copy --auto")
+        cmd.append('--auto')
 
-    if force not in ('pushall', 'datatransfer'):
+    if force not in ('all', 'checkdatapresent'):
         # if we force, we do not trust local knowledge and do the checks
         cmd.append('--fast')
 

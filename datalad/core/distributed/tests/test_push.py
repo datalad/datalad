@@ -393,7 +393,7 @@ def test_push_subds_no_recursion(src_path, dst_top, dst_sub, dst_subsub):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_force_datatransfer(srcpath, dstpath):
+def test_force_checkdatapresent(srcpath, dstpath):
     src = Dataset(srcpath).create()
     target = mk_push_target(src, 'target', dstpath, annex=True, bare=True)
     (src.pathobj / 'test_mod_annex_file').write_text("Heavy stuff.")
@@ -401,7 +401,7 @@ def test_force_datatransfer(srcpath, dstpath):
     assert_repo_status(src.path, annex=True)
     whereis_prior = src.repo.whereis(files=['test_mod_annex_file'])[0]
 
-    res = src.push(to='target', force='no-datatransfer')
+    res = src.push(to='target', data='nothing')
     # nothing reported to be copied
     assert_not_in_results(res, action='copy')
     # we got the git-push nevertheless
@@ -433,7 +433,7 @@ def test_force_datatransfer(srcpath, dstpath):
                   src.push(to='target', force=None, since='HEAD~1'))
 
     # now force data transfer
-    res = src.push(to='target', force='datatransfer')
+    res = src.push(to='target', force='checkdatapresent')
     # no branch change, done before
     assert_in_results(res, action='publish', status='notneeded',
                       refspec='refs/heads/master:refs/heads/master')
@@ -447,7 +447,7 @@ def test_force_datatransfer(srcpath, dstpath):
 
     # force data transfer, but data isn't available
     src.repo.drop('test_mod_annex_file')
-    res = src.push(to='target', path='.', force='datatransfer', on_failure='ignore')
+    res = src.push(to='target', path='.', force='checkdatapresent', on_failure='ignore')
     assert_in_results(res, status='impossible',
                       path=str(src.pathobj / 'test_mod_annex_file'),
                       action='copy',
@@ -606,19 +606,13 @@ def test_push_wanted(srcpath, dstpath):
         annex_wanted="not metadata=distribution-restrictions=*",
         name='target',
     )
-    # check that wanted is obeyed, if instructed by configuration
-    src.config.set('datalad.push.copy-auto-if-wanted', 'true', where='local')
+    # check that wanted is obeyed, since set in sibling configuration
     res = src.push(to='target')
     assert_in_results(
         res, action='copy', path=str(src.pathobj / 'data.0'), status='ok')
     for p in ('secure.1', 'secure.2'):
         assert_not_in_results(res, path=str(src.pathobj / p))
     assert_status('notneeded', src.push(to='target'))
-
-    # check that dataset-config cannot overrule this
-    src.config.set('datalad.push.copy-auto-if-wanted', 'false', where='dataset')
-    res = src.push(to='target')
-    assert_status('notneeded', res)
 
     # check the target to really make sure
     dst = Dataset(dstpath)
@@ -630,8 +624,139 @@ def test_push_wanted(srcpath, dstpath):
     else:
         assert_raises(FileNotFoundError, (dst.pathobj / 'secure.1').read_text)
 
-    # remove local config, must enable push of secure file
-    src.config.unset('datalad.push.copy-auto-if-wanted', where='local')
+    # reset wanted config, which must enable push of secure file
+    src.repo.set_preferred_content('wanted', '', remote='target')
     res = src.push(to='target')
     assert_in_results(res, path=str(src.pathobj / 'secure.1'))
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
+
+
+@with_tempfile(mkdir=True)
+def test_auto_data_transfer(path):
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    if ds_a.repo.is_managed_branch():
+        # on crippled FS post-update hook enabling via create-sibling doesn't
+        # work ATM
+        raise SkipTest("no create-sibling on crippled FS")
+    (ds_a.pathobj / "foo.dat").write_text("foo")
+    ds_a.save()
+
+    # Should be the default, but just in case.
+    ds_a.repo.config.set("annex.numcopies", "1", where="local")
+    ds_a.create_sibling(str(path / "b"), name="b")
+
+    # With numcopies=1, no data is copied with data="auto".
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_not_in_results(res, action="copy")
+
+    # Even when a file is explicitly given.
+    res = ds_a.push(to="b", path="foo.dat", data="auto", since=None)
+    assert_not_in_results(res, action="copy")
+
+    # numcopies=2 changes that.
+    ds_a.repo.config.set("annex.numcopies", "2", where="local")
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_in_results(
+        res, action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "foo.dat"))
+
+    # --since= limits the files considered by --auto.
+    (ds_a.pathobj / "bar.dat").write_text("bar")
+    ds_a.save()
+    (ds_a.pathobj / "baz.dat").write_text("baz")
+    ds_a.save()
+    res = ds_a.push(to="b", data="auto", since="HEAD~1")
+    assert_not_in_results(
+        res,
+        action="copy", path=str(ds_a.pathobj / "bar.dat"))
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "baz.dat"))
+
+    # --auto also considers preferred content.
+    ds_a.repo.config.unset("annex.numcopies", where="local")
+    ds_a.repo.set_preferred_content("wanted", "nothing", remote="b")
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_not_in_results(
+        res,
+        action="copy", path=str(ds_a.pathobj / "bar.dat"))
+
+    ds_a.repo.set_preferred_content("wanted", "anything", remote="b")
+    res = ds_a.push(to="b", data="auto", since=None)
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "bar.dat"))
+
+
+@with_tempfile(mkdir=True)
+def test_auto_if_wanted_data_transfer_path_restriction(path):
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    if ds_a.repo.is_managed_branch():
+        # on crippled FS post-update hook enabling via create-sibling doesn't
+        # work ATM
+        raise SkipTest("no create-sibling on crippled FS")
+    ds_a_sub0 = ds_a.create("sub0")
+    ds_a_sub1 = ds_a.create("sub1")
+
+    for ds in [ds_a, ds_a_sub0, ds_a_sub1]:
+        (ds.pathobj / "sec.dat").write_text("sec")
+        (ds.pathobj / "reg.dat").write_text("reg")
+    ds_a.save(recursive=True)
+
+    ds_a.create_sibling(str(path / "b"), name="b",
+                        annex_wanted="not metadata=distribution-restrictions=*",
+                        recursive=True)
+    for ds in [ds_a, ds_a_sub0, ds_a_sub1]:
+        ds.repo.set_metadata(add={"distribution-restrictions": "doesntmatter"},
+                             files=["sec.dat"])
+
+    # wanted-triggered --auto can be restricted to subdataset...
+    res = ds_a.push(to="b", path="sub0", data="auto-if-wanted",
+                    recursive=True)
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "reg.dat"))
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub0.pathobj / "reg.dat"))
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub0.pathobj / "sec.dat"))
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub1.pathobj / "reg.dat"))
+
+    # ... and to a wanted file.
+    res = ds_a.push(to="b", path="reg.dat", data="auto-if-wanted",
+                    recursive=True)
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "reg.dat"))
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a_sub1.pathobj / "reg.dat"))
+
+    # But asking to transfer a file does not do it if the remote has a
+    # wanted setting and doesn't want it.
+    res = ds_a.push(to="b", path="sec.dat", data="auto-if-wanted",
+                    recursive=True)
+    assert_not_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "sec.dat"))
+
+    res = ds_a.push(to="b", path="sec.dat", data="anything", recursive=True)
+    assert_in_results(
+        res,
+        action="copy", target="b", status="ok",
+        path=str(ds_a.pathobj / "sec.dat"))
