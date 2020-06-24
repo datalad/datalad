@@ -10,28 +10,10 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.13.0rc2 (May 22, 2020) -- .
+## 0.13.0 (June 23, 2020) -- .
 
 A handful of new commands, including `copy-file`, `push`, and
 `create-sibling-ria`, along with various fixes and enhancements
-
-### rc2 changes
-(section to be pruned before final release)
-
-- [create-sibling-ria][] produced results with an incorrect "dataset"
-  value.  #4486
-
-- [clone][] did not correctly handle RIA datasets that were not annex
-  repositories.  #4487
-
-- [push][]
-  - now fails earlier if given an unknown target.  #4517
-  - got some optimizations and progress bar improvements.
-    #4545 #4546 #4547 #4548
-  - now only warns about unavailable content when given explicit
-    paths.  #4547
-
-- Fixes for progress bar glitches.  #4503 #4555
 
 ### Major refactoring and deprecations
 
@@ -106,6 +88,10 @@ A handful of new commands, including `copy-file`, `push`, and
   information in some cases.  The custom renderer has been removed
   entirely.  ([#4471][])
 
+- The documentation for the Python interface of a command listed an
+  incorrect default when the command overrode the value of command
+  parameters such as `result_renderer`.  ([#4480][])
+
 ### Enhancements and new features
 
 - The default result renderer learned to elide a chain of results
@@ -126,7 +112,7 @@ A handful of new commands, including `copy-file`, `push`, and
 
 - The new command [push][] provides an alternative interface to
   [publish][] for pushing a dataset hierarchy to a sibling.
-  ([#4206][])
+  ([#4206][]) ([#4581][]) ([#4617][]) ([#4620][])
 
 - The new command [copy-file][] copies files and associated
   availability information from one dataset to another.  ([#4430][])
@@ -144,9 +130,13 @@ A handful of new commands, including `copy-file`, `push`, and
   - "shared-{group|all|...}" that can be used to set up datasets for
     collaborative write access.  ([#4324][])
 
-- [clone][] learned to handle dataset aliases in RIA stores when given
-  a URL of the form `ria+<protocol>://<storelocation>#~<aliasname>`.
-  ([#4459][])
+- [clone][]
+  - learned to handle dataset aliases in RIA stores when given a URL
+    of the form `ria+<protocol>://<storelocation>#~<aliasname>`.
+    ([#4459][])
+  - now checks `datalad.get.subdataset-source-candidate-NAME` to see
+    if `NAME` starts with three digits, which is taken as a "cost".
+    Sources with lower costs will be tried first.  ([#4619][])
 
 - [update][]  ([#4167][])
   - learned to disallow non-fast-forward updates when `ff-only` is
@@ -194,10 +184,10 @@ A handful of new commands, including `copy-file`, `push`, and
 
 - The DataLad Singularity container now comes with p7zip-full.
 
-- DataLad shows a log message when the current working is resolved to
-  a different location due to a symlink.  This is now logged at the
-  DEBUG rather than WARNING level, as it typically does not indicate a
-  problem.  ([#4426][])
+- DataLad emits a log message when the current working directory is
+  resolved to a different location due to a symlink.  This is now
+  logged at the DEBUG rather than WARNING level, as it typically does
+  not indicate a problem.  ([#4426][])
 
 - DataLad now lets the caller know that `git annex init` is scanning
   for unlocked files, as this operation can be slow in some
@@ -2901,6 +2891,7 @@ publishing
 [#4464]: https://github.com/datalad/datalad/issues/4464
 [#4471]: https://github.com/datalad/datalad/issues/4471
 [#4477]: https://github.com/datalad/datalad/issues/4477
+[#4480]: https://github.com/datalad/datalad/issues/4480
 [#4481]: https://github.com/datalad/datalad/issues/4481
 [#4504]: https://github.com/datalad/datalad/issues/4504
 [#4526]: https://github.com/datalad/datalad/issues/4526
@@ -2912,3 +2903,7 @@ publishing
 [#4553]: https://github.com/datalad/datalad/issues/4553
 [#4560]: https://github.com/datalad/datalad/issues/4560
 [#4568]: https://github.com/datalad/datalad/issues/4568
+[#4581]: https://github.com/datalad/datalad/issues/4581
+[#4617]: https://github.com/datalad/datalad/issues/4617
+[#4619]: https://github.com/datalad/datalad/issues/4619
+[#4620]: https://github.com/datalad/datalad/issues/4620
