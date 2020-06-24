@@ -22,9 +22,10 @@ from datalad.tests.utils import (
     assert_status,
     assert_true,
     has_symlink_capability,
-    known_failure_windows,
-    skip_ssh,
     SkipTest,
+    known_failure_windows,
+    skip_if_no_network,
+    skip_ssh,
     slow,
     swallow_logs,
     turtle,
@@ -504,4 +505,4 @@ def _test_binary_data(host, store, dspath):
 def test_binary_data():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_binary_data)), 'datalad-test'
-    yield _test_binary_data, None
+    yield skip_if_no_network(_test_binary_data), None
