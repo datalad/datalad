@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     with_testrepos,
     with_tree,
     create_tree,
+    assert_false,
     assert_raises,
     assert_in,
     assert_status,
@@ -226,6 +227,35 @@ def test_get_single_file(path):
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
     eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
+
+
+@with_tempfile(mkdir=True)
+def check_get_subdataset_inherit_reckless(override, path):
+    src = Dataset(opj(path, "a")).create()
+    src_subds = src.create("sub")
+    src_subds.create("subsub")
+    src.save(recursive=True)
+
+    clone = install(opj(path, "b"), source=src, reckless="auto",
+                    result_xfm="datasets", return_type="item-or-list")
+    clone_sub = Dataset(clone.pathobj / "sub")
+    assert_false(clone_sub.is_installed())
+    clone_subsub = Dataset(clone.pathobj / "sub" / "subsub")
+
+    clone.get(opj("sub", "subsub"), reckless=False if override else None)
+    ok_(clone_sub.is_installed())
+    ok_(clone_subsub.is_installed())
+
+    for sub in [clone_sub, clone_subsub]:
+        eq_(sub.config.get("datalad.clone.reckless", None),
+            None if override else "auto")
+        eq_(sub.config.get("annex.hardlink", None),
+            None if override else "true")
+
+
+def test_get_subdataset_inherit_reckless():
+    yield check_get_subdataset_inherit_reckless, False
+    yield check_get_subdataset_inherit_reckless, True
 
 
 @with_tree(tree={'file1.txt': 'whatever 1',

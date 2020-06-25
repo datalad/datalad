@@ -298,6 +298,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
     for res in clone_dataset(
             clone_urls_,
             Dataset(dest_path),
+            cfg=ds.config,
             **kwargs):
         # make sure to fix a detached HEAD before yielding the install success
         # result. The resetting of the branch would undo any change done
