@@ -765,7 +765,7 @@ def test_assure_unicode():
         assure_unicode(mixedin, confidence=0.9)
     # For other, non string values, actually just returns original value
     # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
-    assert assure_unicode(1) is 1
+    assert assure_unicode(1) == 1
 
 
 def test_pathlib_unicode():
