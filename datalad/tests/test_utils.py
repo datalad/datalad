@@ -1212,7 +1212,7 @@ def test_get_open_files(p):
     eq_(get_open_files(p)[str(subd.resolve())].pid, proc.pid)
     eq_(get_open_files(subd)[str(subd.resolve())].pid, proc.pid)
     proc.terminate()
-    assert not get_open_files(str(subd))
+    assert_equal(get_open_files(str(subd)), {})
 
 
 def test_map_items():
