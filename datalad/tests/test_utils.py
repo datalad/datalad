@@ -767,7 +767,7 @@ def test_assure_unicode():
         assure_unicode(mixedin, confidence=0.9)
     # For other, non string values, actually just returns original value
     # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
-    assert assure_unicode(1) is 1
+    assert assure_unicode(1) == 1
 
 
 def test_pathlib_unicode():
@@ -1214,7 +1214,7 @@ def test_get_open_files(p):
     eq_(get_open_files(p)[str(subd.resolve())].pid, proc.pid)
     eq_(get_open_files(subd)[str(subd.resolve())].pid, proc.pid)
     proc.terminate()
-    assert not get_open_files(str(subd))
+    assert_equal(get_open_files(str(subd)), {})
 
 
 def test_map_items():
