@@ -220,8 +220,12 @@ before_install:
   # Install git-annex
   - OLD_PATH="$PATH"
   - eval source tools/ci/install-annex.sh ${_DL_ANNEX_INSTALL_SCENARIO}
-  # if PATH was changed, we need to make it available in the login sessions
-  - if [ "$PATH" != "$OLD_PATH" ]; then echo export PATH=$PATH >> ~/.bashrc; fi
+  # If PATH was changed, we need to make it available to SSH commands.
+  # Note: Prepending is necessary.  SSH commands load .bashrc, but
+  # Ubuntu's comes with a snippet to exit early in that case.
+  - if [ "$PATH" != "$OLD_PATH" ]; then
+      echo "export PATH=$PATH" >.tmp && cat ~/.bashrc >>.tmp && mv .tmp ~/.bashrc;
+    fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
       sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
