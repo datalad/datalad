@@ -21,6 +21,7 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
+from datalad.cmd import Runner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
@@ -671,3 +672,42 @@ class TestAddurls(object):
                     action="addurls",
                     status="notneeded")
                 cml.assert_logged("No rows", regex=False)
+
+    @with_tempfile(mkdir=True)
+    def check_addurls_stdin_input(self, input_text, input_type, path):
+        ds = Dataset(path).create(force=True)
+        with patch("sys.stdin", new=StringIO(input_text)):
+            ds.addurls("-", "{url}", "{name}", input_type=input_type)
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(ds.path, fname))
+
+    def test_addurls_stdin_input(self):
+        def make_test(text, input_type, description):
+            def fn():
+                self.check_addurls_stdin_input(json_text, "ext")
+            fn.description = description
+            return fn
+
+        with open(self.json_file) as jfh:
+            json_text = jfh.read()
+
+        yield make_test(json_text, "ext", "json,default input type")
+        yield make_test(json_text, "json", "json,json input type")
+
+        csv_text = "\n".join(
+            ["name,url"] +
+            ["{name},{url}".format(**rec) for rec in json.loads(json_text)])
+        yield make_test(csv_text, "csv", "csv,csv input type")
+
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_stdin_input_command_line(self, path):
+        # The previous test checks all the cases, but it overrides sys.stdin.
+        # Do a simple check that's closer to a command line call.
+        Dataset(path).create(force=True)
+        runner = Runner(cwd=path)
+        with open(self.json_file) as jfh:
+            runner.run(["datalad", "addurls", '-', '{url}', '{name}'],
+                       stdin=jfh)
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(path, fname))
