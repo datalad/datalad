@@ -216,6 +216,7 @@ class Push(Interface):
             yield dict(
                 res_kwargs,
                 status='error',
+                path=ds.path,
                 message="Unknown push target '{}'. {}".format(
                     to,
                     'Known targets: {}.'.format(', '.join(repr(s) for s in sr))
