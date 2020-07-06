@@ -443,7 +443,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 res_kwargs,
                 status='error',
                 message=(
-                    "Unknown target sibling '%s'.", target))
+                    "Unknown target sibling '%s'.", _target))
             return
         target = _target
 
