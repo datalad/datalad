@@ -503,7 +503,7 @@ def default_result_renderer(res):
         ui.message('{action}({status}):{path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
-                path=relpath(path, res['refds']) if res.get('refds') else path,
+                path=relpath(path, res['refds']) if path and res.get('refds') else path,
                 type=' ({})'.format(
                         ac.color_word(res['type'], ac.MAGENTA)
                 ) if 'type' in res else '',
