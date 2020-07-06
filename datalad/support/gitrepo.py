@@ -2482,6 +2482,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     )
                     output = out[info_from] or ''
                 except CommandError as e:
+                    output = None
                     # intercept some errors that we express as an error report
                     # in the info dicts
                     if re.match(
@@ -2493,7 +2494,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                           if l.startswith('hint: ')])
                         if output is None:
                             output = ''
-                    else:
+                    if not output:
                         raise
 
                 for line in output.splitlines():
