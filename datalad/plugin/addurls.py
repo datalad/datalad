@@ -644,6 +644,12 @@ class Addurls(Interface):
 
       $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
+    If the information is represented as JSON lines instead of comma separated
+    values or a JSON array, you can use a utility like jq to transform the JSON
+    lines into an array that addurls accepts::
+
+      $ ... | jq --slurp . | datalad addurls - '{link}' '{who}.{ext}'
+
     .. note::
 
        For users familiar with 'git annex addurl': A large part of this
