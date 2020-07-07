@@ -190,6 +190,10 @@ class Push(Interface):
             recursive=False,
             recursion_limit=None,
             jobs=None):
+        # push uses '^' to annotate the previous pushed committish, and None for default
+        # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
+        if since == '':
+            raise ValueError("'since' should point to commitish or use '^'.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in assure_list(path)]
