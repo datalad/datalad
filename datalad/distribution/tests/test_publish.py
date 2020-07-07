@@ -424,7 +424,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # and test if it could deduce the remote/branch to push to
     source.config.set('branch.master.remote', 'target', where='local')
     with chpwd(source.path):
-        res_ = publish(since='', recursive=True)
+        res_ = publish(since='^', recursive=True)
     # TODO: somehow test that there were no even attempt to diff within "subm 1"
     # since if `--since=''` worked correctly, nothing has changed there and it
     # should have not been even touched
@@ -432,7 +432,16 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_result_count(res_, 1, status='ok', path=source.path, type='dataset')
 
     # Don't fail when a string is passed as `dataset` and since="".
-    assert_status("notneeded", publish(since='', dataset=source.path))
+    assert_status("notneeded", publish(since='^', dataset=source.path))
+
+    # TODO: introduced after 0.13, remove with 0.15
+    import warnings
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        publish(since='', dataset=source.path)
+        assert len(w) == 1
+        assert issubclass(w[-1].category, DeprecationWarning)
+        assert "deprecated" in str(w[-1].message)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
