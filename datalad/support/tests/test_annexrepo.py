@@ -21,7 +21,6 @@ from os import mkdir
 from os.path import (
     join as opj,
     basename,
-    realpath,
     relpath,
     curdir,
     pardir,
@@ -1128,10 +1127,10 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     rm2 = AnnexRepo(remote_2_path, create=False)
 
     # check whether we are the first to use these sockets:
-    socket_1 = opj(str(ssh_manager.socket_dir),
-                   get_connection_hash('datalad-test', bundled=True))
-    socket_2 = opj(str(ssh_manager.socket_dir),
-                   get_connection_hash('localhost', bundled=True))
+    hash_1 = get_connection_hash('datalad-test', bundled=True)
+    socket_1 = opj(str(ssh_manager.socket_dir), hash_1)
+    hash_2 = get_connection_hash('localhost', bundled=True)
+    socket_2 = opj(str(ssh_manager.socket_dir), hash_2)
     datalad_test_was_open = exists(socket_1)
     localhost_was_open = exists(socket_2)
 
@@ -1143,7 +1142,12 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     gr.add_remote("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
 
     # Now, make it an annex:
+    # Clear instances so that __init__() is invoked and
+    # _set_shared_connection() is called.
+    AnnexRepo._unique_instances.clear()
     ar = AnnexRepo(repo_path, create=False)
+    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
+    ok_(all(hash_2 not in opt for opt in ar._annex_common_options))
 
     # connection to 'datalad-test' should be known to ssh manager:
     assert_in(socket_1, list(map(str, ssh_manager._connections)))
@@ -1153,13 +1157,6 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
-    # TODO: figure it out
-    if external_versions['cmd:annex'] >= '8.20200226':
-        # This is not necessarily the version where it started to hang
-        # See https://github.com/datalad/datalad/pull/4265 for more info
-        raise SkipTest("Version of git-annex might cause us to stall.")
-
-    from datalad import lgr
     # remote interaction causes socket to be created:
     try:
         # Note: For some reason, it hangs if log_stdout/err True
@@ -1190,6 +1187,8 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # now, this connection to localhost was requested:
     assert_in(socket_2, list(map(str, ssh_manager._connections)))
+    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
+    ok_(any(hash_2 in opt for opt in ar._annex_common_options))
     # but socket was not touched:
     if localhost_was_open:
         # FIXME: occasionally(?) fails in V6:
@@ -1217,9 +1216,8 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_annex_remove(path1, path2):
-    repo = AnnexRepo(path1, create=False)
+def test_annex_remove(path):
+    repo = AnnexRepo(path, create=False)
 
     file_list = repo.get_annexed_files()
     assert len(file_list) >= 1
@@ -1235,10 +1233,7 @@ def test_annex_remove(path1, path2):
     repo.add("rm-test.dat")
 
     # remove without '--force' should fail, due to staged changes:
-    if repo.is_direct_mode():
-        assert_raises(CommandError, repo.remove, "rm-test.dat")
-    else:
-        assert_raises(ValueError, repo.remove, "rm-test.dat")
+    assert_raises(CommandError, repo.remove, "rm-test.dat")
     assert_in("rm-test.dat", repo.get_annexed_files())
 
     # now force:
@@ -1439,33 +1434,6 @@ def test_annex_get_annexed_files(path):
 
     eq_(set(repo.get_annexed_files(with_content_only=True)),
         set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
-
-
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_annex_remove(path):
-    repo = AnnexRepo(path, create=False)
-
-    file_list = repo.get_annexed_files()
-    assert len(file_list) >= 1
-    # remove a single file
-    out = repo.remove(file_list[0])
-    assert_not_in(file_list[0], repo.get_annexed_files())
-    eq_(out[0], file_list[0])
-
-    with open(opj(repo.path, "rm-test.dat"), "w") as f:
-        f.write("whatever")
-
-    # add it
-    repo.add("rm-test.dat")
-
-    # remove without '--force' should fail, due to staged changes:
-    assert_raises(CommandError, repo.remove, "rm-test.dat")
-    assert_in("rm-test.dat", repo.get_annexed_files())
-
-    # now force:
-    out = repo.remove("rm-test.dat", force=True)
-    assert_not_in("rm-test.dat", repo.get_annexed_files())
-    eq_(out[0], "rm-test.dat")
 
 
 @with_parametric_batch
@@ -2231,7 +2199,6 @@ def test_commit_annex_commit_changed():
 
 @with_tempfile(mkdir=True)
 def check_files_split_exc(cls, topdir):
-    from glob import glob
     r = cls(topdir)
     # absent files -- should not crash with "too long" but some other more
     # meaningful exception
