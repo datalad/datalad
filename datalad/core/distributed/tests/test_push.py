@@ -75,6 +75,12 @@ def test_invalid_call(origin, tdir):
         ValueError,
         ds.push, to='target', since='09320957509720437523')
 
+    # If a publish() user accidentally passes since='', which push() spells as
+    # since='^', the call is aborted.
+    assert_raises(
+        ValueError,
+        ds.push, to='target', since='')
+
 
 def mk_push_target(ds, name, path, annex=True, bare=True):
     # life could be simple, but nothing is simple on windows
