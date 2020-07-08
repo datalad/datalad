@@ -257,3 +257,15 @@ def test_annexinfo_init(path):
     assert_in(foo, cinfo_init_none)
     assert_in(bar, cinfo_init_none)
     assert_not_in("gitshasum", cinfo_init_none[foo])
+
+
+@with_tempfile
+def test_info_path_inside_submodule(path):
+    ds = Dataset(path).create()
+    subds = ds.create("submod")
+    foo = (subds.pathobj / "foo")
+    foo.write_text("foo")
+    ds.save(recursive=True)
+    cinfo = ds.repo.get_content_info(
+        ref="HEAD", paths=[foo.relative_to(ds.pathobj)])
+    assert_in("gitshasum", cinfo[subds.pathobj])
