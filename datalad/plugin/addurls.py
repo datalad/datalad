@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import string
+import sys
 
 from urllib.parse import urlparse
 
@@ -643,6 +644,12 @@ class Addurls(Interface):
 
       $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
+    If the information is represented as JSON lines instead of comma separated
+    values or a JSON array, you can use a utility like jq to transform the JSON
+    lines into an array that addurls accepts::
+
+      $ ... | jq --slurp . | datalad addurls - '{link}' '{who}.{ext}'
+
     .. note::
 
        For users familiar with 'git annex addurl': A large part of this
@@ -671,7 +678,9 @@ class Addurls(Interface):
             doc="""A file that contains URLs or information that can be used to
             construct URLs.  Depending on the value of --input-type, this
             should be a CSV file (with a header as the first row) or a JSON
-            file (structured as a list of objects with string values)."""),
+            file (structured as a list of objects with string values). If '-',
+            read from standard input, taking the content as JSON when
+            --input-type is at its default value of 'ext'."""),
         urlformat=Parameter(
             args=("urlformat",),
             metavar="URL-FORMAT",
@@ -787,13 +796,18 @@ class Addurls(Interface):
                                   message="not an annex repo")
             return
 
-        url_file = str(resolve_path(url_file, dataset))
+        if url_file != "-":
+            url_file = str(resolve_path(url_file, dataset))
 
         if input_type == "ext":
-            extension = os.path.splitext(url_file)[1]
-            input_type = "json" if extension == ".json" else "csv"
+            if url_file == "-":
+                input_type = "json"
+            else:
+                extension = os.path.splitext(url_file)[1]
+                input_type = "json" if extension == ".json" else "csv"
 
-        with open(url_file) as fd:
+        fd = sys.stdin if url_file == "-" else open(url_file)
+        try:
             try:
                 rows, subpaths = extract(fd, input_type,
                                          url_format, filename_format,
@@ -806,6 +820,9 @@ class Addurls(Interface):
                                       status="error",
                                       message=exc_str(exc))
                 return
+        finally:
+            if fd is not sys.stdin:
+                fd.close()
 
         if not rows:
             yield get_status_dict(action="addurls",
