@@ -216,6 +216,7 @@ class Push(Interface):
             yield dict(
                 res_kwargs,
                 status='error',
+                path=ds.path,
                 message="Unknown push target '{}'. {}".format(
                     to,
                     'Known targets: {}.'.format(', '.join(repr(s) for s in sr))
@@ -393,9 +394,14 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         label='Push',
         total=4,
     )
-    if not target:
+    # pristine input arg
+    _target = target
+    # verified or auto-detected
+    target = None
+    if not _target:
         try:
             # let Git figure out what needs doing
+            # we will reuse the result further down again, so nothing is wasted
             wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
             # we did not get an explicit push target, get it from Git
             target = set(p.get('remote', None) for p in wannabe_gitpush)
@@ -432,13 +438,15 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             # can only be a single one at this point
             target = target.pop()
 
-    if target not in repo.get_remotes():
-        yield dict(
-            res_kwargs,
-            status='error',
-            message=(
-                "Unknown target sibling '%s'.", target))
-        return
+    if not target:
+        if _target not in repo.get_remotes():
+            yield dict(
+                res_kwargs,
+                status='error',
+                message=(
+                    "Unknown target sibling '%s'.", _target))
+            return
+        target = _target
 
     log_progress(
         lgr.info, pbar_id, "Push refspecs",
@@ -461,9 +469,12 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     # do this on the main target only, and apply the result to all
     # dependencies
     try:
-        wannabe_gitpush = repo.push(
-            remote=target,
-            git_options=['--dry-run'])
+        if _target:
+            # only do it when an explicit target was given, otherwise
+            # we can reuse the result from the auto-probing above
+            wannabe_gitpush = repo.push(
+                remote=target,
+                git_options=['--dry-run'])
     except Exception as e:
         lgr.debug(
             'Dry-run push to check push configuration failed, '
