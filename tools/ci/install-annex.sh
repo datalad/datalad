@@ -67,7 +67,10 @@ case "$scenario" in
     shift
     _conda_annex_version=${1:+=}${1:-}  # will include = prefix is specified
     _conda_bin="$_TMPDIR/miniconda/bin"
-    _annex_bin="${_conda_bin}"
+    # we will symlink git-annex only under a didicated directory, so it could be
+    # used with default Python etc. If names changed here, possibly adjust hardcoded
+    # duplicates below where we establish relative symlinks
+    _annex_bin="$_TMPDIR/annex-bin"
     case "$scenario" in
       conda-forge-last)
         if hash git-annex; then
@@ -85,10 +88,19 @@ case "$scenario" in
         exit 1;;
     esac
 
-    wget -O "$_TMPDIR/${_miniconda_script}" \
+    echo "I: downloading and running miniconda installer"
+    wget -q  -O "$_TMPDIR/${_miniconda_script}" \
       "${ANACONDA_URL:-https://repo.anaconda.com/miniconda/}${_miniconda_script}"
     HOME="$_TMPDIR" bash "$_TMPDIR/${_miniconda_script}" -b -p "$_TMPDIR/miniconda"
-    "${_conda_bin}/conda" install -c conda-forge -y "git-annex${_conda_annex_version}"
+    "${_conda_bin}/conda" install -q -c conda-forge -y "git-annex${_conda_annex_version}"
+
+    if [[ "$_annex_bin" != "$_conda_bin" ]]; then
+      mkdir -p "$_annex_bin"
+      (
+        cd "$_annex_bin" || exit 1
+        ln -s ../miniconda/bin/git-annex* .
+      )
+    fi
     unset _miniconda_script
     unset _conda_bin
     unset _conda_annex_version
