@@ -241,7 +241,9 @@ before_install:
   # Note: Prepending is necessary.  SSH commands load .bashrc, but
   # Ubuntu's comes with a snippet to exit early in that case.
   - if [ "$PATH" != "$OLD_PATH" ]; then
-      echo "export PATH=$PATH" >.tmp && cat ~/.bashrc >>.tmp && mv .tmp ~/.bashrc;
+      sed -i -e "1iexport PATH=\"$PATH\"" ~/.bashrc;
+      echo "head of the adjusted ~/.bashrc:";
+      head ~/.bashrc;
     fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
