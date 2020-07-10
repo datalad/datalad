@@ -38,22 +38,22 @@ function call_curl {
 
 JOBS_URL="https://api.github.com/repos/${TARGET_REPO}/actions/workflows/${TARGET_WORKFLOW}/runs?status=success&branch=${TARGET_BRANCH}"
 
-echo "Getting artifacts_url from ${JOBS_URL} into ${JOBS_DOWNLOAD}"
+echo "Getting artifacts_url from ${JOBS_URL} into '${JOBS_DOWNLOAD}'"
 call_curl "${JOBS_URL}" >| "${JOBS_DOWNLOAD}"
 ARTIFACTS_URL=$(jq --raw-output '.workflow_runs[0].artifacts_url | if . == null then "" else . end' < "${JOBS_DOWNLOAD}")
-definedOrExit "${ARTIFACTS_URL}" "Unable to get artifacts_url" ${JOBS_DOWNLOAD}
+definedOrExit "${ARTIFACTS_URL}" "Unable to get artifacts_url" "${JOBS_DOWNLOAD}"
 
 echo "Getting archive download url from ${ARTIFACTS_URL}"
-call_curl "${ARTIFACTS_URL}" >| ${JOBS_DOWNLOAD}
-ARCHIVE_DOWNLOAD_URL=$(jq --raw-output '.artifacts[0].archive_download_url | if . == null then "" else . end' < ${JOBS_DOWNLOAD})
-definedOrExit "${ARCHIVE_DOWNLOAD_URL}" "Unable to get archive_download_url" ${JOBS_DOWNLOAD}
+call_curl "${ARTIFACTS_URL}" >| "${JOBS_DOWNLOAD}"
+ARCHIVE_DOWNLOAD_URL=$(jq --raw-output '.artifacts[0].archive_download_url | if . == null then "" else . end' < "${JOBS_DOWNLOAD}")
+definedOrExit "${ARCHIVE_DOWNLOAD_URL}" "Unable to get archive_download_url" "${JOBS_DOWNLOAD}"
 
-call_curl -i "${ARCHIVE_DOWNLOAD_URL}" >| ${JOBS_DOWNLOAD}
+call_curl -i "${ARCHIVE_DOWNLOAD_URL}" >| "${JOBS_DOWNLOAD}"
 echo "Getting download url from ${ARCHIVE_DOWNLOAD_URL}"
-DOWNLOAD_URL=$(grep -oP 'Location: \K.+' < ${JOBS_DOWNLOAD})
-definedOrExit "${DOWNLOAD_URL}" "Unable to get Location header with download url" ${JOBS_DOWNLOAD}
+DOWNLOAD_URL=$(grep -oP 'Location: \K.+' < "${JOBS_DOWNLOAD}")
+definedOrExit "${DOWNLOAD_URL}" "Unable to get Location header with download url" "${JOBS_DOWNLOAD}"
 DOWNLOAD_URL=${DOWNLOAD_URL%$'\r'}
-rm -f ${JOBS_DOWNLOAD}
+rm -f "${JOBS_DOWNLOAD}"
 
 echo "Downloading artifact package from ${DOWNLOAD_URL}"
 mkdir -p "${TARGET_PATH}"
