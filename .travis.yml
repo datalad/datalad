@@ -225,8 +225,14 @@ before_install:
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - sudo eatmydata tools/ci/prep-travis-forssh-sudo.sh
   - tools/ci/prep-travis-forssh.sh
+  # Install nvm https://github.com/nvm-sh/nvm/blob/master/README.md
+  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
+  # Use install & use node v10 as grunt-contrib-qunit uses generic try catch <https://github.com/datalad/datalad/issues/4635#issue-640604347>
+  - nvm install 10 && nvm use 10
+  # Echo node and npm version for debug
+  - which node && node -v && which npm && npm -v
   # Install grunt-cli
-  - eatmydata npm install grunt-cli
+  - eatmydata npm install -g grunt-cli
   # Install optionally upstream current development so we are sure that they break nothing important for us
   - if [ ! -z "${_DL_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
@@ -260,8 +266,7 @@ install:
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
-  # FIXME: Pinned because v4.0.0 caused failure (gh-4635).
-  - npm install grunt-contrib-qunit@3.1.0
+  - npm install grunt-contrib-qunit@^4.0.0
 
 script:
   # Test installation system-wide
