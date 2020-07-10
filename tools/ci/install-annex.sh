@@ -12,12 +12,13 @@
 
 function _show_schemes() {
   _schemes_doc=(
-    "neurodebian"
-    "neurodebian-devel"
-    "deb-url URL"
-    "snapshot"
     "conda-forge [version]"
     "conda-forge-last [version]"
+    "datalad-extensions-build"
+    "deb-url URL"
+    "neurodebian"
+    "neurodebian-devel"
+    "snapshot"
   )
   echo "Known schemes:"
   for s in "${_schemes_doc[@]}"; do
@@ -38,6 +39,8 @@ if [[ "$scenario" == "--help" ]]; then
     _show_schemes
     exit 0
 fi
+
+_this_dir=$(dirname "$0")
 
 # Most common location of installation - /usr/bin
 _annex_bin=/usr/bin
@@ -126,6 +129,10 @@ case "$scenario" in
     unset _conda_bin
     unset _conda_annex_version
     ;;
+  datalad-extensions-build)
+    TARGET_PATH="$_TMPDIR" "$_this_dir/download-latest-artifact"
+    sudo dpkg -i "$_TMPDIR"/*.deb
+    ;;
   *)
     echo "Unknown git-annex installation scheme '$scenario'" >&2
     _show_schemes >&2
@@ -139,3 +146,4 @@ echo "I: git-annex is available under '${_annex_bin}'"
 
 unset _annex_bin
 unset _show_schemes
+unset _this_dir
