@@ -7,7 +7,7 @@ set -eu
 : "${TARGET_BRANCH:=master}"
 : "${TARGET_WORKFLOW:=build-git-annex-debianstandalone.yaml}"
 : "${TARGET_PATH:=download}"  # Directory which will be created if doesn't exist
-: "${GITHUB_TOKEN}" # needs to be defined
+: "${GITHUB_TOKEN:=}" # will be taken from git config hub.oauthtoken or needs to be defined
 
 : "${CURL:=curl --silent}"
 
@@ -20,6 +20,15 @@ function definedOrExit {
     exit 1
   fi
 }
+
+if [ -z "$GITHUB_TOKEN" ]; then
+  if git config hub.oauthtoken >/dev/null; then
+    GITHUB_TOKEN=$(git config hub.oauthtoken)
+  else
+    echo "E: no GITHUB_TOKEN was specified and no hub.oauthtoken is in git config" >&2
+    exit 1
+  fi
+fi
 
 echo "Using curl as \"${CURL}\""
 
