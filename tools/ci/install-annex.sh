@@ -10,6 +10,22 @@
 # - might use "sudo" for some operations
 # - might exit with 0 if e.g. specific installation "is not needed" (e.g. devel annex == default annex)
 
+function _show_schemes() {
+  _schemes_doc=(
+    "neurodebian"
+    "neurodebian-devel"
+    "deb-url URL"
+    "snapshot"
+    "conda-forge [version]"
+    "conda-forge-last [version]"
+  )
+  echo "Known schemes:"
+  for s in "${_schemes_doc[@]}"; do
+    echo "  $s"
+  done
+
+}
+
 function setup_neurodebian_devel() {
   # configure
   sed -e 's,/debian ,/debian-devel ,g' /etc/apt/sources.list.d/neurodebian.sources.list | sudo tee /etc/apt/sources.list.d/neurodebian-devel.sources.list
@@ -17,6 +33,11 @@ function setup_neurodebian_devel() {
 }
 
 scenario="${1:-conda-forge}"
+
+if [[ "$scenario" == "--help" ]]; then
+    _show_schemes
+    exit 0
+fi
 
 # Most common location of installation - /usr/bin
 _annex_bin=/usr/bin
@@ -106,7 +127,9 @@ case "$scenario" in
     unset _conda_annex_version
     ;;
   *)
-    echo "Unknown git-annex installation scheme $scenario"
+    echo "Unknown git-annex installation scheme '$scenario'" >&2
+    _show_schemes >&2
+    exit 1
 esac
 
 # Rudimentary test of installation and inform user about location
@@ -115,3 +138,4 @@ test -x "${_annex_bin}/git-annex-shell"
 echo "I: git-annex is available under '${_annex_bin}'"
 
 unset _annex_bin
+unset _show_schemes
