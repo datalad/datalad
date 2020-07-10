@@ -18,6 +18,9 @@ function setup_neurodebian_devel() {
 
 scenario="${1:-conda-forge}"
 
+# Most common location of installation - /usr/bin
+_annex_bin=/usr/bin
+
 # we do not want to `cd` anywhere but all temp stuff should get unique temp prefix
 _TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/ga-XXXXXXX")
 echo "I: top directory $_TMPDIR"
@@ -52,18 +55,19 @@ case "$scenario" in
     )
     ;;
   snapshot)
-    _ANNEXDIR="$_TMPDIR/git-annex.linux"
-    echo "I: downloading and extracting under $_ANNEXDIR"
+    _annex_bin="$_TMPDIR/git-annex.linux"
+    echo "I: downloading and extracting under $_annex_bin"
     tar -C "$_TMPDIR" -xzf <(
       wget -q -O- https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz
     )
-    export PATH="$_ANNEXDIR:$PATH"
-    unset _ANNEXDIR
+    export PATH="${_annex_bin}:$PATH"
     ;;
   conda-forge|conda-forge-last)  # optional: version
     _miniconda_script=Miniconda3-latest-Linux-x86_64.sh
     shift
     _conda_annex_version=${1:+=}${1:-}  # will include = prefix is specified
+    _conda_bin="$_TMPDIR/miniconda/bin"
+    _annex_bin="${_conda_bin}"
     case "$scenario" in
       conda-forge-last)
         if hash git-annex; then
@@ -73,9 +77,9 @@ case "$scenario" in
         # We are interested only to get git-annex into our environment
         # So to not interfer with "system wide" Python etc, we will add miniconda at the
         # end of the path
-        export PATH="$PATH:$_TMPDIR/miniconda/bin";;
+        export PATH="$PATH:${_annex_bin}";;
       conda-forge)
-        export PATH="$_TMPDIR/miniconda/bin:$PATH";;
+        export PATH="${_annex_bin}:$PATH";;
       *)
         echo "E: internal error - $scenario is unknown"
         exit 1;;
@@ -84,9 +88,18 @@ case "$scenario" in
     wget -O "$_TMPDIR/${_miniconda_script}" \
       "${ANACONDA_URL:-https://repo.anaconda.com/miniconda/}${_miniconda_script}"
     HOME="$_TMPDIR" bash "$_TMPDIR/${_miniconda_script}" -b -p "$_TMPDIR/miniconda"
+    "${_conda_bin}/conda" install -c conda-forge -y "git-annex${_conda_annex_version}"
     unset _miniconda_script
-    "$_TMPDIR/miniconda/bin/conda" install -c conda-forge -y git-annex${_conda_annex_version}
+    unset _conda_bin
+    unset _conda_annex_version
     ;;
   *)
     echo "Unknown git-annex installation scheme $scenario"
 esac
+
+# Rudimentary test of installation and inform user about location
+test -x "${_annex_bin}/git-annex"
+test -x "${_annex_bin}/git-annex-shell"
+echo "I: git-annex is available under '${_annex_bin}'"
+
+unset _annex_bin
