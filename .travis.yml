@@ -76,7 +76,7 @@ matrix:
   - python: 3.5
     # Run slow etc tests under a single tricky scenario
     env:
-    - TMPDIR="/var/tmp/sym link"
+    - _DL_TMPDIR="/var/tmp/sym link"
     - NOSE_SELECTION_OP=""
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
@@ -86,8 +86,8 @@ matrix:
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
     env:
-    # eventually: - TMPDIR="/var/tmp/sym ссылка"
-    - TMPDIR="/var/tmp/sym link"
+    # eventually: - _DL_TMPDIR="/var/tmp/sym ссылка"
+    - _DL_TMPDIR="/var/tmp/sym link"
     # and obscure the names more a bit
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     # By default no logs will be output. This one is to test with log output at INFO level
@@ -120,7 +120,7 @@ matrix:
     # do not run SSH-based tests due to stall(s)
     # https://github.com/datalad/datalad/pull/4172
     - DATALAD_TESTS_SSH=0
-    - TMPDIR="/tmp/nfsmount"
+    - _DL_TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad.tests datalad.support"
   #
   # The ones to run only on weekends against master.
@@ -165,7 +165,7 @@ matrix:
   - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
-    - TMPDIR="/tmp/nfsmount"
+    - _DL_TMPDIR="/tmp/nfsmount"
     - _DL_CRON=1
 #  - python: 3.5
 #    # test whether known v6 failures still fail
@@ -180,7 +180,7 @@ matrix:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
     env:
-    - TMPDIR="/tmp/nfsmount"
+    - _DL_TMPDIR="/tmp/nfsmount"
     - _DL_CRON=1
 #  # test whether known v6 failures still fail
 #  - env:
@@ -230,10 +230,10 @@ before_install:
   - travis_retry sudo eatmydata apt-get install shunit2
   # for metadata support
   - travis_retry sudo eatmydata apt-get install exempi
-  # Configure TMPDIR before trying install git-annex -- script might use it
-  - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
-  - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
-  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR" "${TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  # Configure _DL_TMPDIR before trying install git-annex -- script might use it
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # Install git-annex
   - OLD_PATH="$PATH"
   - eval source tools/ci/install-annex.sh ${_DL_ANNEX_INSTALL_SCENARIO}
@@ -256,7 +256,7 @@ install:
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # git-annex workaround. TODO: remove - should not be needed
-  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
@@ -264,6 +264,8 @@ install:
   - npm install grunt-contrib-qunit@^4.0.0
 
 script:
+  # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
+  - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
   - sudo pip install .
   - mkdir -p __testhome__
