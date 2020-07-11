@@ -40,7 +40,6 @@ from os.path import (
 
 import posixpath
 from functools import wraps
-from weakref import WeakValueDictionary
 
 from datalad.log import log_progress
 from datalad.support.due import due, Doi
@@ -55,7 +54,6 @@ from datalad.cmd import (
     StdOutErrCapture,
 )
 from datalad.config import (
-    ConfigManager,
     _parse_gitconfig_dump
 )
 
@@ -95,11 +93,7 @@ from .network import (
     is_ssh
 )
 from .path import get_parent_paths
-from datalad.core.dataset import (
-    PathBasedFlyweight,
-    RepoInterface,
-    path_based_str_repr,
-)
+from datalad.core.dataset.gitrepo import GitRepo as CoreGitRepo
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -782,47 +776,10 @@ class PushInfo(dict):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
-@path_based_str_repr
-class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
+class GitRepo(CoreGitRepo):
     """Representation of a git repository
 
     """
-    # We must check git config to have name and email set, but
-    # should do it once
-    _config_checked = False
-
-    # Begin Flyweight:
-
-    _unique_instances = WeakValueDictionary()
-
-    GIT_MIN_VERSION = "2.19.1"
-    git_version = None
-
-    def _flyweight_invalid(self):
-        return not self.is_valid_git()
-
-    @classmethod
-    def _flyweight_reject(cls, id_, *args, **kwargs):
-        # TODO:
-        # This is a temporary approach. See PR # ...
-        # create = kwargs.pop('create', None)
-        # kwargs.pop('path', None)
-        # if create and kwargs:
-        #     # we have `create` plus options other than `path`
-        #     return "Call to {0}() with args {1} and kwargs {2} conflicts " \
-        #            "with existing instance {3}." \
-        #            "This is likely to be caused by inconsistent logic in " \
-        #            "your code." \
-        #            "".format(cls, args, kwargs, cls._unique_instances[id_])
-        pass
-
-    # End Flyweight
-
-    def __hash__(self):
-        # the flyweight key is already determining unique instances
-        # add the class name to distinguish from strings of a path
-        return hash((self.__class__.__name__, self.__weakref__.key))
-
     @classmethod
     def _check_git_version(cls):
         external_versions.check("cmd:git", min_version=cls.GIT_MIN_VERSION)
@@ -884,6 +841,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           C='/my/path'   => -C /my/path
 
         """
+        # provide base class with essentials before anything else can happen
+        super().__init__(path)
+
         if self.git_version is None:
             self._check_git_version()
 
@@ -892,12 +852,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
         # __init__ to then test the same things again. If we fail early we can save the additional test from outer
         # scope.
-        self.path = path
-
-        # Note, that the following three path objects are used often and therefore
+        # Note, that the following objects are used often and therefore
         # are stored for performance. Path object creation comes with a cost. Most noteably,
         # this is used for validity checking of the repository.
-        self.pathobj = ut.Path(self.path)
         self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
@@ -936,17 +893,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
-        # Could be used to e.g. disable automatic garbage and autopacking
-        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-        self._GIT_COMMON_OPTIONS = []
-
         if git_opts is None:
             git_opts = {}
         if kwargs:
             git_opts.update(kwargs)
 
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
-        self._cfg = None
 
         if do_create:  # we figured it out earlier
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
@@ -1129,36 +1081,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
         return gr
 
-    def __del__(self):
-        # unbind possibly bound ConfigManager, to prevent all kinds of weird
-        # stalls etc
-        self._cfg = None
-
-    def __eq__(self, obj):
-        """Decides whether or not two instances of this class are equal.
-
-        This is done by comparing the base repository path.
-        """
-        return self.path == obj.path
-
-    def is_valid_git(self):
-        """Returns whether the underlying repository appears to be still valid
-
-        Note, that this almost identical to the classmethod is_valid_repo(). However,
-        if we are testing an existing instance, we can save Path object creations. Since this testing
-        is done a lot, this is relevant. Creation of the Path objects in is_valid_repo() takes nearly half the time of
-        the entire function.
-
-        Also note, that this method is bound to an instance but still class-dependent, meaning that a subclass
-        cannot simply overwrite it. This is particularly important for the call from within __init__(),
-        which in turn is called by the subclasses' __init__. Using an overwrite would lead to the wrong thing being
-        called.
-        """
-
-        return self.dot_git.exists() and (
-                not self.dot_git.is_dir() or self._valid_git_test_path.exists()
-        )
-
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
@@ -1183,49 +1105,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return dot_git_path.exists() and (
             not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
         )
-
-    @staticmethod
-    def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
-        """Given a pathobj to a repository return path to .git/ directory
-
-        Parameters
-        ----------
-        pathobj: Path
-        ok_missing: bool, optional
-          Allow for .git to be missing (useful while sensing before repo is initialized)
-        maybe_relative: bool, optional
-          Return path relative to pathobj
-
-        Raises
-        ------
-        RuntimeError
-          When ok_missing is False and .git path does not exist
-
-        Returns
-        -------
-        Path
-          Absolute (unless maybe_relative=True) path to resolved .git/ directory
-        """
-        dot_git = pathobj / '.git'
-        if dot_git.is_file():
-            with dot_git.open() as f:
-                line = f.readline()
-                if line.startswith("gitdir: "):
-                    dot_git = pathobj / line[7:].strip()
-                else:
-                    raise InvalidGitRepositoryError("Invalid .git file")
-        elif dot_git.is_symlink():
-            dot_git = dot_git.resolve()
-        elif not (ok_missing or dot_git.exists()):
-            raise RuntimeError("Missing .git in %s." % pathobj)
-        # Primarily a compat kludge for get_git_dir, remove when it is deprecated
-        if maybe_relative:
-            try:
-                dot_git = dot_git.relative_to(pathobj)
-            except ValueError:
-                # is not a subpath, return as is
-                lgr.debug("Path %r is not subpath of %r", dot_git, pathobj)
-        return dot_git
 
     @staticmethod
     def get_git_dir(repo):
@@ -1254,23 +1133,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if isinstance(repo, GitRepo):
             return str(repo.dot_git)
         return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, maybe_relative=True))
-
-    @property
-    def config(self):
-        """Get an instance of the parser for the persistent repository
-        configuration.
-
-        Note: This allows to also read/write .datalad/config,
-        not just .git/config
-
-        Returns
-        -------
-        ConfigManager
-        """
-        if self._cfg is None:
-            # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, source='any')
-        return self._cfg
 
     def is_with_annex(self):
         """Report if GitRepo (assumed) has (remotes with) a git-annex branch
