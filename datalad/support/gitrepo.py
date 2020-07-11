@@ -15,7 +15,6 @@ import time
 import os
 import os.path as op
 import warnings
-from locale import getpreferredencoding
 
 
 import logging
@@ -27,12 +26,10 @@ from os import linesep
 from os.path import (
     join as opj,
     exists,
-    normpath,
     isabs,
     commonprefix,
     relpath,
     dirname,
-    basename,
     curdir,
     pardir,
     sep
@@ -70,7 +67,6 @@ from datalad.utils import (
     ensure_dir,
     generate_file_chunks,
     ensure_unicode,
-    quote_cmdlinearg,
     split_cmdline,
 )
 
@@ -84,7 +80,6 @@ from .exceptions import (
     InvalidGitReferenceError,
     InvalidGitRepositoryError,
     NoSuchPathError,
-    OutdatedExternalDependencyWarning,
     PathKnownToRepositoryError,
 )
 from .network import (
