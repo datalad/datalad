@@ -69,8 +69,8 @@ from datalad.cmd import (
     WitlessProtocol,
 )
 
+from datalad.core.dataset import RepoInterface
 # imports from same module:
-from .repo import RepoInterface
 from .gitrepo import (
     GitRepo,
     _normalize_path,
