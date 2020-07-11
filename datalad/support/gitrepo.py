@@ -1561,10 +1561,10 @@ class GitRepo(CoreGitRepo):
         elif isinstance(revrange, str):
             revrange = [revrange]
 
-        cmd = ["git", "log", "--format={}".format(fmt)]
+        cmd = ["log", "--format={}".format(fmt)]
         cmd.extend((options or []) + revrange + ["--"])
         try:
-            stdout, _ = self._git_custom_command(None, cmd, expect_fail=True)
+            stdout = self.call_git(cmd, expect_fail=True)
         except CommandError as e:
             if "does not have any commits" in e.stderr:
                 return []
@@ -1672,9 +1672,7 @@ class GitRepo(CoreGitRepo):
           and the branch name otherwise.
         """
         try:
-            out, _ = self._git_custom_command(
-                "", ["git", "symbolic-ref", "HEAD"],
-                expect_fail=True)
+            out = self.call_git(["symbolic-ref", "HEAD"], expect_fail=True)
         except CommandError as e:
             if 'HEAD is not a symbolic ref' in e.stderr:
                 lgr.debug("detached HEAD in {0}".format(self))
@@ -1843,12 +1841,12 @@ class GitRepo(CoreGitRepo):
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
         """
-        cmd = ['git', 'remote', 'add']
+        cmd = ['remote', 'add']
         if options:
             cmd += options
         cmd += [name, url]
 
-        result = self._git_custom_command('', cmd)
+        result = self._call_git(cmd)
         self.config.reload()
         return result
 
@@ -1859,8 +1857,7 @@ class GitRepo(CoreGitRepo):
         # TODO: testing and error handling!
         from .exceptions import RemoteNotAvailableError
         try:
-            out, err = self._git_custom_command(
-                '', ['git', 'remote', 'remove', name])
+            out, err = self._call_git(['remote', 'remove', name])
         except CommandError as e:
             if 'fatal: No such remote' in e.stderr:
                 raise RemoteNotAvailableError(name,
@@ -1880,8 +1877,8 @@ class GitRepo(CoreGitRepo):
         """
         options = ["-v"] if verbose else []
         name = [name] if name else []
-        self._git_custom_command(
-            '', ['git', 'remote'] + name + ['update'] + options,
+        self._call_git(
+            ['remote'] + name + ['update'] + options,
             expect_stderr=True
         )
 
@@ -2232,12 +2229,13 @@ class GitRepo(CoreGitRepo):
         """
         """
         # TODO: May be check for the need of -b options herein?
-        cmd = ['git', 'checkout']
+        cmd = ['checkout']
         if options:
             cmd += options
         cmd += [str(name)]
 
-        self._git_custom_command('', cmd, expect_stderr=True, updates_tree=True)
+        self.call_git(cmd, expect_stderr=True)
+        self.config.reload()
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
@@ -2254,9 +2252,7 @@ class GitRepo(CoreGitRepo):
         )
 
     def remove_branch(self, branch):
-        self._git_custom_command(
-            '', ['git', 'branch', '-D', branch]
-        )
+        self.call_git(['branch', '-D', branch])
 
     def cherry_pick(self, commit):
         """Cherry pick `commit` to the current branch.
@@ -2266,8 +2262,7 @@ class GitRepo(CoreGitRepo):
         commit : str
             A single commit.
         """
-        self._git_custom_command("", ["git", "cherry-pick", commit],
-                                 check_fake_dates=True)
+        self.call_git(["cherry-pick", commit])
 
     @property
     def dirty(self):
@@ -2278,9 +2273,8 @@ class GitRepo(CoreGitRepo):
         its submodules. For finer-grained control and more detailed reporting,
         use status() instead.
         """
-        stdout, _ = self._git_custom_command(
-            [],
-            ["git", "status", "--porcelain",
+        stdout = self.call_git(
+            ["status", "--porcelain",
              # Ensure the result isn't influenced by status.showUntrackedFiles.
              "--untracked-files=normal",
              # Ensure the result isn't influenced by diff.ignoreSubmodules.
@@ -2306,13 +2300,13 @@ class GitRepo(CoreGitRepo):
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
-        cmd_options = ['git']
+        cmd_options = []
         if not allow_background:
             cmd_options += ['-c', 'gc.autodetach=0']
         cmd_options += ['gc', '--aggressive']
         if auto:
             cmd_options += ['--auto']
-        self._git_custom_command('', cmd_options)
+        self.call_git(cmd_options)
 
     def _parse_gitmodules(self):
         # TODO read .gitconfig from Git blob?
@@ -2320,9 +2314,8 @@ class GitRepo(CoreGitRepo):
         if not gitmodules.exists():
             return {}
         # pull out file content
-        out, err = self._git_custom_command(
-            '',
-            ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
+        out = self.call_git(
+            ['config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
         db, _ = _parse_gitconfig_dump(out, {}, None, True, cwd=self.path)
         mods = {}
@@ -2502,9 +2495,8 @@ class GitRepo(CoreGitRepo):
             see `__init__`
         """
 
-        self._git_custom_command(path,
-                                 ['git', 'submodule', 'deinit'] +
-                                 to_options(**kwargs))
+        self.call_git(['submodule', 'deinit'] + to_options(**kwargs),
+                      files=[path])
         # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
@@ -2555,7 +2547,7 @@ class GitRepo(CoreGitRepo):
             subbranch = None
             subbranch_hexsha = None
 
-        cmd = ['git', 'submodule', 'update', '--%s' % mode]
+        cmd = ['submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
             subgitpath = opj(self.path, path, '.git')
@@ -2569,7 +2561,7 @@ class GitRepo(CoreGitRepo):
             #  yoh: I thought I saw one recently but thought it was some kind of
             #  an artifact from running submodule update --init manually at
             #  some point, but looking at this code now I worry that it was not
-        self._git_custom_command(path, cmd)
+        self.call_git(cmd, files=[path])
 
         if not init:
             return
@@ -2624,9 +2616,8 @@ class GitRepo(CoreGitRepo):
           To instruct if ref is symbolic, e.g. should be used in case of
           ref=HEAD
         """
-        self._git_custom_command(
-            '',
-            ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
+        self.call_git(
+            ['symbolic-ref' if symbolic else 'update-ref', ref, value]
         )
 
     def tag(self, tag, message=None, commit=None, options=None):
@@ -2705,14 +2696,11 @@ class GitRepo(CoreGitRepo):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
-        cmd = ['git', 'describe'] + to_options(**kwargs)
+        cmd = ['describe'] + to_options(**kwargs)
         if commitish is not None:
             cmd.append(commitish)
         try:
-            describe, outerr = self._git_custom_command(
-                [],
-                cmd,
-                expect_fail=True)
+            describe = self.call_git(cmd, expect_fail=True)
             return describe.strip()
         # TODO: WTF "catch everything"?
         except:
@@ -2750,8 +2738,8 @@ class GitRepo(CoreGitRepo):
         """return dictionary with count, size(in KiB) information of git objects
         """
 
-        count_cmd = ['git', 'count-objects', '-v']
-        count_str, err = self._git_custom_command('', count_cmd)
+        count_cmd = ['count-objects', '-v']
+        count_str = self.call_git(count_cmd)
         count = {key: int(value)
                  for key, value in [item.split(': ')
                                     for item in count_str.split('\n')
