@@ -893,7 +893,9 @@ class GitRepo(CoreGitRepo):
         if kwargs:
             git_opts.update(kwargs)
 
-        self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
+        if runner:
+            # override the default GitRunner established by the base class
+            self._cmd_call_wrapper = runner
 
         if do_create:  # we figured it out earlier
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
@@ -1129,14 +1131,6 @@ class GitRepo(CoreGitRepo):
             return str(repo.dot_git)
         return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, maybe_relative=True))
 
-    def is_with_annex(self):
-        """Report if GitRepo (assumed) has (remotes with) a git-annex branch
-        """
-        return any(
-            b['refname:strip=2'] == 'git-annex' or b['refname:strip=2'].endswith('/git-annex')
-            for b in self.for_each_ref_(fields='refname:strip=2', pattern=['refs/heads', 'refs/remotes'])
-        )
-
     @classmethod
     def get_toppath(cls, path, follow_up=True, git_options=None):
         """Return top-level of a repository given the path.
@@ -1324,79 +1318,6 @@ class GitRepo(CoreGitRepo):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
-    def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
-                      pattern=None, points_at=None, sort=None, count=None,
-                      contains=None):
-        """Wrapper for `git for-each-ref`
-
-        Please see manual page git-for-each-ref(1) for a complete overview
-        of its functionality. Only a subset of it is supported by this
-        wrapper.
-
-        Parameters
-        ----------
-        fields : iterable or str
-          Used to compose a NULL-delimited specification for for-each-ref's
-          --format option. The default field list reflects the standard
-          behavior of for-each-ref when the --format option is not given.
-        pattern : list or str, optional
-          If provided, report only refs that match at least one of the given
-          patterns.
-        points_at : str, optional
-          Only list refs which points at the given object.
-        sort : list or str, optional
-          Field name(s) to sort-by. If multiple fields are given, the last one
-          becomes the primary key. Prefix any field name with '-' to sort in
-          descending order.
-        count : int, optional
-          Stop iteration after the given number of matches.
-        contains : str, optional
-          Only list refs which contain the specified commit.
-
-        Yields
-        ------
-        dict with items matching the given `fields`
-
-        Raises
-        ------
-        ValueError
-          if no `fields` are given
-
-        RuntimeError
-          if `git for-each-ref` returns a record where the number of
-          properties does not match the number of `fields`
-        """
-        if not fields:
-            raise ValueError('no `fields` provided, refuse to proceed')
-        fields = ensure_list(fields)
-        cmd = [
-            "git",
-            "for-each-ref",
-            "--format={}".format(
-                '%00'.join(
-                    '%({})'.format(f) for f in fields)),
-        ]
-        if points_at:
-            cmd.append('--points-at={}'.format(points_at))
-        if contains:
-            cmd.append('--contains={}'.format(contains))
-        if sort:
-            for k in ensure_list(sort):
-                cmd.append('--sort={}'.format(k))
-        if pattern:
-            cmd += ensure_list(pattern)
-        if count:
-            cmd.append('--count={:d}'.format(count))
-
-        out, _ = self._git_custom_command(None, cmd)
-        for line in out.splitlines():
-            props = line.split('\0')
-            if len(fields) != len(props):
-                raise RuntimeError(
-                    'expected fields {} from git-for-each-ref, but got: {}'.format(
-                        fields, props))
-            yield dict(zip(fields, props))
-
     def configure_fake_dates(self):
         """Configure repository to use fake dates.
         """
@@ -1411,49 +1332,6 @@ class GitRepo(CoreGitRepo):
             self._fake_dates_enabled = \
                 self.config.getbool('datalad', 'fake-dates', default=False)
         return self._fake_dates_enabled
-
-    def add_fake_dates(self, env):
-        """Add fake dates to `env`.
-
-        Parameters
-        ----------
-        env : dict or None
-            Environment variables.
-
-        Returns
-        -------
-        A dict (copied from env), with date-related environment
-        variables for git and git-annex set.
-        """
-        env = (env if env is not None else os.environ).copy()
-        # Note: Use _git_custom_command here rather than repo.git.for_each_ref
-        # so that we use annex-proxy in direct mode.
-        last_date = list(self.for_each_ref_(
-            fields='committerdate:raw',
-            count=1,
-            pattern='refs/heads',
-            sort="-committerdate",
-        ))
-
-        if last_date:
-            # Drop the "contextual" timezone, leaving the unix timestamp.  We
-            # avoid :unix above because it wasn't introduced until Git v2.9.4.
-            last_date = last_date[0]['committerdate:raw'].split()[0]
-            seconds = int(last_date)
-        else:
-            seconds = self.config.obtain("datalad.fake-dates-start")
-        seconds_new = seconds + 1
-        date = "@{} +0000".format(seconds_new)
-
-        lgr.debug("Setting date to %s",
-                  time.strftime("%a %d %b %Y %H:%M:%S +0000",
-                                time.gmtime(seconds_new)))
-
-        env["GIT_AUTHOR_DATE"] = date
-        env["GIT_COMMITTER_DATE"] = date
-        env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
-
-        return env
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None, index_file=None):
@@ -1919,7 +1797,7 @@ class GitRepo(CoreGitRepo):
         #  handling????
         try:
             out, err = run_gitcommand_on_file_list_chunks(
-                self.cmd_call_wrapper.run,
+                self._cmd_call_wrapper.run,
                 cmd,
                 files,
                 log_stderr=log_stderr,

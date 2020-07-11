@@ -70,6 +70,7 @@ from datalad.cmd import (
 )
 
 from datalad.core.dataset import RepoInterface
+from datalad.core.dataset.annexrepo import AnnexRepo as CoreAnnexRepo
 # imports from same module:
 from .gitrepo import (
     GitRepo,
@@ -108,7 +109,7 @@ lgr = logging.getLogger('datalad.annex')
 N_AUTO_JOBS = 1
 
 
-class AnnexRepo(GitRepo, RepoInterface):
+class AnnexRepo(CoreAnnexRepo, GitRepo):
     """Representation of an git-annex repository.
 
     Paths given to any of the class methods will be interpreted as relative
@@ -118,26 +119,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     accepted either way.
     """
 
-    # Begin Flyweight:
-    _unique_instances = WeakValueDictionary()
-
-    def _flyweight_invalid(self):
-        return not self.is_valid_annex(allow_noninitialized=True)
-
-    # End Flyweight:
-
-    # Web remote UUID, kept here for backward compatibility
-    WEB_UUID = WEB_SPECIAL_REMOTE_UUID
-
-    # To be assigned and checked to be good enough upon first call to AnnexRepo
-    # 6.20160923 -- --json-progress for get
-    # 6.20161210 -- annex add  to add also changes (not only new files) to git
-    # 6.20170220 -- annex status provides --ignore-submodules
-    # 6.20180416 -- annex handles unicode filenames more uniformly
-    # 6.20180913 -- annex fixes all known to us issues for v6
-    # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
-    # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
-    GIT_ANNEX_MIN_VERSION = '7.20190503'
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None
@@ -147,6 +128,9 @@ class AnnexRepo(GitRepo, RepoInterface):
     # git annex 6.20180626 those will by default be not allowed for security
     # reasons
     _ALLOW_LOCAL_URLS = False
+
+    # Web remote UUID, kept here for backward compatibility
+    WEB_UUID = WEB_SPECIAL_REMOTE_UUID
 
     def __init__(self, path, url=None, runner=None,
                  backend=None, always_commit=True,
@@ -775,19 +759,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return (self.dot_git / 'annex').exists()
 
-    @borrowdoc(GitRepo, 'is_valid_git')
-    def is_valid_annex(self, allow_noninitialized=False, check_git=True):
-
-        initialized_annex = (self.is_valid_git() if check_git else True) and (self.dot_git / 'annex').exists()
-
-        if allow_noninitialized:
-            try:
-                return initialized_annex or ((self.is_valid_git() if check_git else True) and self.is_with_annex())
-            except (NoSuchPathError, InvalidGitRepositoryError):
-                return False
-        else:
-            return initialized_annex
-
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository
@@ -1077,7 +1048,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             run_func = GitWitlessRunner(cwd=self.path, env=env).run
             kwargs['protocol'] = _protocol
         elif runner is None:
-            run_func = self.cmd_call_wrapper.run
+            run_func = self._cmd_call_wrapper.run
             kwargs['env'] = env
         else:
             raise ValueError("Unknown runner %r" % runner)
@@ -2850,7 +2821,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
-        return self.cmd_call_wrapper.run(
+        return self._cmd_call_wrapper.run(
             cmd,
             log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
             expect_stderr=expect_stderr,
