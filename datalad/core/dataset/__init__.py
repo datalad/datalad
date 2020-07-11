@@ -14,9 +14,13 @@ import logging
 
 from datalad.support.exceptions import InvalidInstanceRequestError
 from datalad.support.network import RI
-from datalad import utils as ut
+from datalad.utils import (
+    Path,
+    PurePath,
+    quote_cmdlinearg,
+)
 
-lgr = logging.getLogger('datalad.repo')
+lgr = logging.getLogger('datalad.core.dataset')
 
 
 class Flyweight(type):
@@ -188,7 +192,7 @@ class PathBasedFlyweight(Flyweight):
         # physical repository at a time
         # do absolute() in addition to always get an absolute path
         # even with non-existing paths on windows
-        return str(ut.Path(path).resolve().absolute())
+        return str(Path(path).resolve().absolute())
 
     def _flyweight_id_from_args(cls, *args, **kwargs):
 
@@ -213,7 +217,7 @@ class PathBasedFlyweight(Flyweight):
         path_ = cls._flyweight_preproc_path(path)
 
         # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
+        if isinstance(path, PurePath):
             path = str(path)
 
         # Sanity check for argument `path`:
@@ -270,7 +274,7 @@ def path_based_str_repr(cls):
         s = self._str
         if s is None:
             s = self._str = \
-                '%s(%s)' % (self.__class__.__name__, ut.quote_cmdlinearg(self.path))
+                '%s(%s)' % (self.__class__.__name__, quote_cmdlinearg(self.path))
         return s
 
     def __repr__(self):
