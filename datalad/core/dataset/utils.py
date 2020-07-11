@@ -17,7 +17,7 @@ from datalad.support.exceptions import (
 )
 
 import logging
-lgr = logging.getLogger('datalad.core.local.repo')
+lgr = logging.getLogger('datalad.core.dataset.utils')
 
 __all__ = ["repo_from_path"]
 

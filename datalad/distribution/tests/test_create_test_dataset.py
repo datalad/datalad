@@ -12,7 +12,7 @@
 from glob import glob
 from os.path import join as opj
 
-from datalad.core.local.repo import repo_from_path
+from datalad.core.dataset.utils import repo_from_path
 from datalad.tests.utils import (
     with_tempfile,
     assert_raises,

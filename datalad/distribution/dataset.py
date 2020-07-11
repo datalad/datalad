@@ -22,7 +22,7 @@ import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
-from datalad.core.local.repo import repo_from_path
+from datalad.core.dataset.utils import repo_from_path
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 # DueCredit
