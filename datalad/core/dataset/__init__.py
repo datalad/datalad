@@ -12,10 +12,9 @@
 
 import logging
 
-from .exceptions import InvalidInstanceRequestError
-from . import path as op
-from .network import RI
-from .. import utils as ut
+from datalad.support.exceptions import InvalidInstanceRequestError
+from datalad.support.network import RI
+from datalad import utils as ut
 
 lgr = logging.getLogger('datalad.repo')
 
