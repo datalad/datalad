@@ -11,6 +11,9 @@
 """
 
 import logging
+from os import environ
+import re
+import time
 from weakref import WeakValueDictionary
 
 from datalad.config import (
@@ -22,10 +25,17 @@ from datalad.core.dataset import (
     path_based_str_repr,
 )
 from datalad.utils import (
+    ensure_list,
     Path,
 )
 from datalad.support.exceptions import (
+    CommandError,
+    GitIgnoreError,
     InvalidGitRepositoryError,
+)
+from datalad.cmd import (
+    GitRunner,
+    run_gitcommand_on_file_list_chunks,
 )
 
 lgr = logging.getLogger('datalad.core.dataset.gitrepo')
@@ -89,6 +99,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # Could be used to e.g. disable automatic garbage and autopacking
         # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         self._GIT_COMMON_OPTIONS = []
+
+        self._cmd_call_wrapper = GitRunner(cwd=path)
 
     def __hash__(self):
         # the flyweight key is already determining unique instances
@@ -185,3 +197,204 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return self.dot_git.exists() and (
             not self.dot_git.is_dir() or self._valid_git_test_path.exists()
         )
+
+    def is_with_annex(self):
+        """Report if GitRepo (assumed) has (remotes with) a git-annex branch
+        """
+        return any(
+            b['refname:strip=2'] == 'git-annex'
+            or b['refname:strip=2'].endswith('/git-annex')
+            for b in self.for_each_ref_(
+                fields='refname:strip=2',
+                pattern=['refs/heads', 'refs/remotes'])
+        )
+
+    def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
+                      pattern=None, points_at=None, sort=None, count=None,
+                      contains=None):
+        """Wrapper for `git for-each-ref`
+
+        Please see manual page git-for-each-ref(1) for a complete overview
+        of its functionality. Only a subset of it is supported by this
+        wrapper.
+
+        Parameters
+        ----------
+        fields : iterable or str
+          Used to compose a NULL-delimited specification for for-each-ref's
+          --format option. The default field list reflects the standard
+          behavior of for-each-ref when the --format option is not given.
+        pattern : list or str, optional
+          If provided, report only refs that match at least one of the given
+          patterns.
+        points_at : str, optional
+          Only list refs which points at the given object.
+        sort : list or str, optional
+          Field name(s) to sort-by. If multiple fields are given, the last one
+          becomes the primary key. Prefix any field name with '-' to sort in
+          descending order.
+        count : int, optional
+          Stop iteration after the given number of matches.
+        contains : str, optional
+          Only list refs which contain the specified commit.
+
+        Yields
+        ------
+        dict with items matching the given `fields`
+
+        Raises
+        ------
+        ValueError
+          if no `fields` are given
+
+        RuntimeError
+          if `git for-each-ref` returns a record where the number of
+          properties does not match the number of `fields`
+        """
+        if not fields:
+            raise ValueError('no `fields` provided, refuse to proceed')
+        fields = ensure_list(fields)
+        cmd = [
+            "for-each-ref",
+            "--format={}".format(
+                '%00'.join(
+                    '%({})'.format(f) for f in fields)),
+        ]
+        if points_at:
+            cmd.append('--points-at={}'.format(points_at))
+        if contains:
+            cmd.append('--contains={}'.format(contains))
+        if sort:
+            for k in ensure_list(sort):
+                cmd.append('--sort={}'.format(k))
+        if pattern:
+            cmd += ensure_list(pattern)
+        if count:
+            cmd.append('--count={:d}'.format(count))
+
+        out, _ = self._call_git(cmd)
+        for line in out.splitlines():
+            props = line.split('\0')
+            if len(fields) != len(props):
+                raise RuntimeError(
+                    'expected fields {} from git-for-each-ref, but got: {}'.format(
+                        fields, props))
+            yield dict(zip(fields, props))
+
+    def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
+                  honor_fake_dates=True, cwd=None, env=None, index_file=None):
+        """Allows for calling arbitrary commands.
+
+        Internal helper to the call_git*() methods.
+
+        Parameters
+        ----------
+        args : list of str
+          Arguments to pass to `git`.
+        files : list of str, optional
+          File arguments to pass to `git`. The advantage of passing these here
+          rather than as part of `args` is that the call will be split into
+          multiple calls to avoid exceeding the maximum command line length.
+        expect_stderr : bool, optional
+          Standard error is expected and should not be elevated above the DEBUG
+          level.
+        expect_fail : bool, optional
+          A non-zero exit is expected and should not be elevated above the
+          DEBUG level.
+        honor_fake_dates : bool, optional
+          Whether to actually fake dates for Git operations, if enable for a
+          repo.
+
+
+        Returns
+        -------
+        stdout, stderr
+
+        Raises
+        ------
+        CommandError if the call exits with a non-zero status.
+        """
+        cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
+
+        if honor_fake_dates and self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+
+        if index_file:
+            env = (env if env is not None else environ).copy()
+            env['GIT_INDEX_FILE'] = index_file
+
+        # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
+        #  handling????
+        try:
+            out, err = run_gitcommand_on_file_list_chunks(
+                self._cmd_call_wrapper.run,
+                cmd,
+                files,
+                log_stderr=True,
+                log_stdout=True,
+                log_online=False,
+                expect_stderr=expect_stderr,
+                cwd=cwd,
+                env=env,
+                shell=None,
+                expect_fail=expect_fail)
+        except CommandError as e:
+            ignored = re.search(GitIgnoreError.pattern, e.stderr)
+            if ignored:
+                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
+                                     code=e.code, stdout=e.stdout,
+                                     stderr=e.stderr,
+                                     paths=ignored.groups()[0].splitlines())
+            raise
+
+        return out, err
+
+    def add_fake_dates(self, env):
+        """Add fake dates to `env`.
+
+        Parameters
+        ----------
+        env : dict or None
+            Environment variables.
+
+        Returns
+        -------
+        A dict (copied from env), with date-related environment
+        variables for git and git-annex set.
+        """
+        env = (env if env is not None else environ).copy()
+        if 'DATALAD_FAKE_DATE' in env:
+            # there is already a fake date setup
+            return env
+        # prevent infinite recursion, should this function be called again
+        # inside the next call.
+        environ['DATALAD_FAKE_DATE'] = '1'
+        last_date = list(self.for_each_ref_(
+            fields='committerdate:raw',
+            count=1,
+            pattern='refs/heads',
+            sort="-committerdate",
+        ))
+        del environ['DATALAD_FAKE_DATE']
+
+        if last_date:
+            # Drop the "contextual" timezone, leaving the unix timestamp.  We
+            # avoid :unix above because it wasn't introduced until Git v2.9.4.
+            last_date = last_date[0]['committerdate:raw'].split()[0]
+            seconds = int(last_date)
+        else:
+            seconds = self.config.obtain("datalad.fake-dates-start")
+        seconds_new = seconds + 1
+        date = "@{} +0000".format(seconds_new)
+
+        lgr.debug("Setting date to %s",
+                  time.strftime("%a %d %b %Y %H:%M:%S +0000",
+                                time.gmtime(seconds_new)))
+
+        env["GIT_AUTHOR_DATE"] = date
+        env["GIT_COMMITTER_DATE"] = date
+        env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
+        # leave a marker to prevent duplicate processing
+        env["DATALAD_FAKE_DATE"] = date
+
+        return env

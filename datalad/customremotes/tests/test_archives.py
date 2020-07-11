@@ -152,7 +152,7 @@ def test_basic_scenario(d, d2):
         ok_file_has_content(protocol_file, "GETAVAILABILITY", re_=True, match=False)
         ok_file_has_content(protocol_file, "#!/bin/bash", re_=True, match=False)
     else:
-        assert_false(isinstance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol))
+        assert_false(isinstance(annex._cmd_call_wrapper.protocol, AnnexExchangeProtocol))
 
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py
