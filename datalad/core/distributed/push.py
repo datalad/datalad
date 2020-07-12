@@ -668,15 +668,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
 
 def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
-    # TODO inefficient, but push only takes a single refspec at a time
-    # at the moment, enhance GitRepo.push() to do all at once
-    push_res = []
-    for refspec in refspecs:
-        push_res.extend(repo.push(
-            remote=target,
-            refspec=refspec,
-            git_options=['--force'] if force_git_push else None,
-        ))
+    push_res = repo.push(
+        remote=target,
+        refspec=refspecs,
+        git_options=['--force'] if force_git_push else None,
+    )
     # TODO maybe compress into a single message whenever everything is
     # OK?
     for pr in push_res:
