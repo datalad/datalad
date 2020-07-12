@@ -555,54 +555,28 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     # and lastly the primary push target
     target_is_git_remote = repo.config.get(
         'remote.{}.url'.format(target), None) is not None
-    # only attempt, if Git knows about a URL, otherwise this is
-    # a pure special remote that doesn't deal with the git repo
-    if target_is_git_remote:
-        # push the main branches of interest first, but not yet (necessarily)
-        # the git-annex branch. We ant to push first in order to hit any
-        # conflicts or unknown history before we move data. Otherwise out
-        # decision making done above (--since ...) might have been
-        # inappropriate.
-        push_ok = True
-        for p in _push_refspecs(
-                repo,
-                target,
-                refspecs2push,
-                force_git_push,
-                res_kwargs.copy()):
-            if p['status'] not in ('ok', 'notneeded'):
-                push_ok = False
-            yield p
-        if not push_ok:
-            # error-type results have been yielded, the local status quo is
-            # outdated/invalid, stop to let user decide how to proceed.
-            # TODO final global error result for the dataset?!
-            return
 
     # git-annex data copy
     #
-    if not is_annex_repo:
+    if is_annex_repo:
+        if data != "nothing":
+            log_progress(
+                lgr.info, pbar_id, "Transfer data",
+                label="Transfer data to '{}'".format(target), update=2, total=4)
+            yield from _push_data(
+                ds,
+                target,
+                content,
+                data,
+                force,
+                jobs,
+                res_kwargs.copy(),
+                got_path_arg=got_path_arg,
+            )
+        else:
+            lgr.debug("Data transfer to '%s' disabled by argument", target)
+    else:
         lgr.debug("No data transfer: %s is not a git annex repository", repo)
-        return
-
-    if data == "nothing":
-        lgr.debug("Data transfer to '%s' disabled by argument", target)
-        return
-
-    log_progress(
-        lgr.info, pbar_id, "Transfer data",
-        label="Transfer data to '{}'".format(target), update=2, total=4)
-
-    yield from _push_data(
-        ds,
-        target,
-        content,
-        data,
-        force,
-        jobs,
-        res_kwargs.copy(),
-        got_path_arg=got_path_arg,
-    )
 
     if not target_is_git_remote:
         # there is nothing that we need to push or sync with on the git-side
@@ -612,6 +586,9 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     log_progress(
         lgr.info, pbar_id, "Update availability information",
         label="Update availability for '{}'".format(target), update=3, total=4)
+
+    # TODO fetch is only needed if anything was actually transferred. Collect this
+    # info and make the following conditional on it
 
     # after file transfer the remote might have different commits to
     # the annex branch. They have to be merged locally, otherwise a
@@ -654,14 +631,18 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         if "fatal: couldn't find remote ref git-annex" not in e.stderr.lower():
             raise
         lgr.debug('Remote does not have a git-annex branch: %s', e)
-    # and push the annex branch to announce local availability info
-    # too
+
+    if is_annex_repo:
+        refspecs2push += [
+            'git-annex'
+            if ds.config.get('branch.git-annex.merge', None)
+            else 'git-annex:git-annex']
+    # and push all relevant branches, plus the git-annex branch to announce
+    # local availability info too
     yield from _push_refspecs(
         repo,
         target,
-        ['git-annex'
-         if ds.config.get('branch.git-annex.merge', None)
-         else 'git-annex:git-annex'],
+        refspecs2push,
         force_git_push,
         res_kwargs.copy(),
     )
