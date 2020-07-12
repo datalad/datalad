@@ -2249,8 +2249,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         remote : str, optional
           name of the remote to fetch from. If no remote is given and
           `all_` is not set, the tracking branch is fetched.
-        refspec : str, optional
-          refspec to fetch.
+        refspec : str or list, optional
+          refspec(s) to fetch.
         all_ : bool, optional
           fetch all remotes (and all of their branches).
           Fails if `remote` was given.
@@ -2351,8 +2351,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         remote : str, optional
           name of the remote to push to. If no remote is given and
           `all_` is not set, the tracking branch is pushed.
-        refspec : str, optional
-          refspec to push.
+        refspec : str or list, optional
+          refspec(s) to push.
         all_ : bool, optional
           push to all remotes. Fails if `remote` was given.
         git_options : list, optional
