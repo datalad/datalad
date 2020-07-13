@@ -693,25 +693,6 @@ class AnnexRepo(CoreAnnexRepo, GitRepo):
             # might be an annex in direct mode
             if git_options is None:
                 git_options = []
-            # TODO: Apparently doesn't work with git 2.11.0
-            # Note: Since we are in a classmethod, GitRepo.get_toppath uses
-            # Runner directly instead of _git_custom_command, which is why the
-            # common mechanics for direct mode are not applied.
-            # This is why there is no solution for git 2.11 yet
-
-            # Note 2: Actually, the above issue is irrelevant. The git
-            # executable has no repository it is bound to, since it's the
-            # purpose of the call to find this repository. Therefore
-            # core.bare=False has no effect at all.
-
-            # Disabled. See notes.
-            # git_options.extend(['-c', 'core.bare=False'])
-            # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-            #                               git_options=git_options)
-
-            # basically a copy of code in GitRepo.get_toppath
-            # except it uses 'git rev-parse --git-dir' as a workaround for
-            # direct mode:
 
             from os.path import dirname
             from os import pardir
@@ -904,10 +885,27 @@ class AnnexRepo(CoreAnnexRepo, GitRepo):
           working with a sameas remote, the presence of either "sameas-name" or
           "sameas-uuid" is a reliable indicator.
         """
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
         try:
-            stdout, stderr = self._git_custom_command(
-                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
-                expect_fail=True)
+            for line in self.call_git_items_(
+                    ['cat-file', 'blob', 'git-annex:remote.log']):
+                # be precise and split by spaces
+                fields = line.split(' ')
+                # special remote UUID
+                sr_id = fields[0]
+                # the rest are config args for enableremote
+                sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+                if "name" not in sr_info:
+                    name = sr_info.get("sameas-name")
+                    if name is None:
+                        lgr.warning(
+                            "Encountered git-annex remote without a name or "
+                            "sameas-name value: %s",
+                            sr_info)
+                    else:
+                        sr_info["name"] = name
+                srs[sr_id] = sr_info
         except CommandError as e:
             if 'Not a valid object name git-annex:remote.log' in e.stderr:
                 # no special remotes configures
@@ -915,25 +913,6 @@ class AnnexRepo(CoreAnnexRepo, GitRepo):
             else:
                 # some unforseen error
                 raise e
-        argspec = re.compile(r'^([^=]*)=(.*)$')
-        srs = {}
-        for line in stdout.splitlines():
-            # be precise and split by spaces
-            fields = line.split(' ')
-            # special remote UUID
-            sr_id = fields[0]
-            # the rest are config args for enableremote
-            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
-            if "name" not in sr_info:
-                name = sr_info.get("sameas-name")
-                if name is None:
-                    lgr.warning(
-                        "Encountered git-annex remote without a name or "
-                        "sameas-name value: %s",
-                        sr_info)
-                else:
-                    sr_info["name"] = name
-            srs[sr_id] = sr_info
         return srs
 
     def _run_annex_command(self, annex_cmd,

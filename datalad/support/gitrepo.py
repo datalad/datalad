@@ -913,8 +913,8 @@ class GitRepo(CoreGitRepo):
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
             try:
-                stdout, _ = self._git_custom_command(
-                    None, ['git', 'ls-files'], cwd=path, expect_fail=True
+                stdout = self.call_git(
+                    ['-C', path, 'ls-files'], expect_fail=True
                 )
                 if stdout:
                     raise PathKnownToRepositoryError(
@@ -926,30 +926,22 @@ class GitRepo(CoreGitRepo):
                 # assume that all is good -- we are not under any repo
                 pass
 
-        cmd = ['git', 'init']
+        cmd = ['-C', path, 'init']
         cmd.extend(kwargs.pop('_from_cmdline_', []))
         cmd.extend(to_options(**kwargs))
         lgr.debug(
             "Initialize empty Git repository at '%s'%s",
             path,
-            ' %s' % cmd[2:] if cmd[2:] else '')
+            ' %s' % cmd[3:] if cmd[3:] else '')
 
         try:
-            stdout, stderr = self._git_custom_command(
-                None,
+            stdout = self.call_git(
                 cmd,
-                cwd=path,
-                log_stderr=True,
-                log_stdout=True,
-                log_online=False,
-                expect_stderr=False,
-                shell=False,
                 # we don't want it to scream on stdout
                 expect_fail=True)
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
-
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
@@ -1225,13 +1217,13 @@ class GitRepo(CoreGitRepo):
 
         try:
             # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                files,
+            add_out = self._call_git(
                 # Set annex.largefiles to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
+                ['-c', 'annex.largefiles=nothing', 'add'] +
                 ensure_list(git_options) +
-                to_options(update=update) + ['--verbose']
+                to_options(update=update) + ['--verbose'],
+                files=files,
             )
             # get all the entries
             for o in self._process_git_get_output(*add_out):
@@ -1296,11 +1288,13 @@ class GitRepo(CoreGitRepo):
         """
         if recursive:
             kwargs['r'] = True
-        stdout, stderr = self._git_custom_command(
-            files, ['git', 'rm'] + to_options(**kwargs))
 
         # output per removed file is expected to be "rm 'PATH'":
-        return [line.strip()[4:-1] for line in stdout.splitlines()]
+        return [
+            line.strip()[4:-1]
+            for line in self.call_git_items_(
+                ['rm'] + to_options(**kwargs), files=files)
+        ]
 
     def precommit(self):
         """Perform pre-commit maintenance tasks
@@ -1446,14 +1440,14 @@ class GitRepo(CoreGitRepo):
         -------
         str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        cmd = ['show', '-z', '--no-patch', '--format=' + fmt]
         if commitish is not None:
             cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
-            stdout, stderr = self._git_custom_command(
-                '', cmd, expect_stderr=True, expect_fail=True)
+            stdout = self.call_git(
+                cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
                 raise ValueError("Unknown commit identifier: %s" % commitish)
@@ -1734,78 +1728,6 @@ class GitRepo(CoreGitRepo):
             for p in self.get_content_info(
                 paths=None, ref=branch, untracked='no', eval_file_type=False)
             ]
-
-    @normalize_paths(match_return_type=False)
-    def _git_custom_command(self, files, cmd_str,
-                            log_stdout=True, log_stderr=True, log_online=False,
-                            expect_stderr=True, cwd=None, env=None,
-                            shell=None, expect_fail=False,
-                            check_fake_dates=False,
-                            index_file=None,
-                            updates_tree=False):
-        """Allows for calling arbitrary commands.
-
-        The method should be avoided and the call_git*() should be used instead.
-
-        Parameters
-        ----------
-        files: list of files
-        cmd_str: str or list
-          arbitrary command str. `files` is appended to that string.
-        updates_tree: bool
-          whether or not command updates the working tree. If True, triggers
-          necessary reevaluations like self.config.reload()
-
-        Returns
-        -------
-        stdout, stderr
-        """
-
-        # ensure cmd_str becomes a well-formed list:
-        if isinstance(cmd_str, str):
-            cmd = split_cmdline(cmd_str)
-        else:
-            cmd = cmd_str[:]  # we will modify in-place
-
-        assert(cmd[0] == 'git')
-        cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-
-        if check_fake_dates and self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
-
-        if index_file:
-            env = (env if env is not None else os.environ).copy()
-            env['GIT_INDEX_FILE'] = index_file
-
-        # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
-        #  handling????
-        try:
-            out, err = run_gitcommand_on_file_list_chunks(
-                self._cmd_call_wrapper.run,
-                cmd,
-                files,
-                log_stderr=log_stderr,
-                log_stdout=log_stdout,
-                log_online=log_online,
-                expect_stderr=expect_stderr,
-                cwd=cwd,
-                env=env,
-                shell=shell,
-                expect_fail=expect_fail)
-        except CommandError as e:
-            ignored = re.search(GitIgnoreError.pattern, e.stderr)
-            if ignored:
-                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
-                                     code=e.code, stdout=e.stdout,
-                                     stderr=e.stderr,
-                                     paths=ignored.groups()[0].splitlines())
-            raise
-
-        if updates_tree:
-            lgr.debug("Reloading config due to supposed working tree update")
-            self.config.reload()
-
-        return out, err
 
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
@@ -2214,9 +2136,8 @@ class GitRepo(CoreGitRepo):
         if msg:
             options = options + ["-m", msg]
         options += ['--allow-unrelated-histories']
-        self._git_custom_command(
-            '', ['git', 'merge'] + options + [name],
-            check_fake_dates=True,
+        self.call_git(
+            ['merge'] + options + [name],
             **kwargs
         )
 
@@ -2752,15 +2673,14 @@ class GitRepo(CoreGitRepo):
           for set and unset attributes, or are the literal attribute value.
         """
         path = ensure_list(path)
-        cmd = ["git", "check-attr", "-z", "--all"]
+        cmd = ["check-attr", "-z", "--all"]
         if index_only:
             cmd.append('--cached')
-        stdout, stderr = self._git_custom_command(path, cmd)
         # make sure we have one entry for each query path to
         # simplify work with the result
-        attributes = {_normalize_path(self.path, p): {} for p in path}
+        attributes = {p: {} for p in path}
         attr = []
-        for item in stdout.split('\0'):
+        for item in self.call_git_items_(cmd, files=path, sep='\0'):
             attr.append(item)
             if len(attr) < 3:
                 continue
@@ -2771,7 +2691,13 @@ class GitRepo(CoreGitRepo):
                 True if value == 'set' else False if value == 'unset' else value
             # done, reset item
             attr = []
-        return attributes
+        # normalize to relative path keys, to maintain the promise made in the docs
+        # TODO switch to absolute paths like in the rest of the newer code
+        return {
+            str(Path(k).relative_to(self.pathobj)) if isabs(k) else k:
+            v
+            for k, v in attributes.items()
+        }
 
     def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
         """Set gitattributes
@@ -2911,7 +2837,7 @@ class GitRepo(CoreGitRepo):
             # --exclude-standard will make sure to honor and standard way
             # git can be instructed to ignore content, and will prevent
             # crap from contaminating untracked file reports
-            cmd = ['git', 'ls-files',
+            cmd = ['ls-files',
                    '--stage', '-z', '-d', '-m', '--exclude-standard']
             # untracked report mode, using labels from `git diff` option style
             if untracked == 'all':
@@ -2934,22 +2860,15 @@ class GitRepo(CoreGitRepo):
                               for s in self.get_submodules_()]
                 path_strs = get_parent_paths(path_strs, submodules)
         else:
-            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
+            cmd = ['ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(
                 r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
         lgr.debug('Query repo: %s', cmd)
         try:
-            stdout, stderr = self._git_custom_command(
-                path_strs,
+            stdout = self.call_git(
                 cmd,
-                log_stderr=True,
-                log_stdout=True,
-                # not sure why exactly, but log_online has to be false!
-                log_online=False,
-                expect_stderr=False,
-                shell=False,
-                # we don't want it to scream on stdout
+                files=path_strs,
                 expect_fail=True)
         except CommandError as exc:
             if "fatal: Not a valid object name" in exc.stderr:
@@ -3196,10 +3115,11 @@ class GitRepo(CoreGitRepo):
             else:
                 modified = set(
                     self.pathobj.joinpath(ut.PurePosixPath(p))
-                    for p in self._git_custom_command(
+                    for p in self.call_git_items_(
                         # low-level code cannot handle pathobjs
-                        [str(p) for p in paths] if paths else None,
-                        ['git', 'ls-files', '-z', '-m'])[0].split('\0')
+                        ['ls-files', '-z', '-m'],
+                        files=[str(p) for p in paths] if paths else None,
+                        sep='\0')
                     if p)
                 _cache[key] = modified
         else:
@@ -3395,19 +3315,12 @@ class GitRepo(CoreGitRepo):
         in the worktree.
         """
         try:
-            stdout, stderr = self._git_custom_command(
-                None,
+            return list(self.call_git_items_(
                 ['git', 'diff', '--name-only', '--staged'],
-                cwd=self.path,
-                log_stderr=True,
-                log_stdout=True,
-                log_online=False,
-                expect_stderr=False,
-                expect_fail=True)
+                expect_stderr=True))
         except CommandError as e:
             lgr.debug(exc_str(e))
-            stdout = ''
-        return [f for f in stdout.split('\n') if f]
+            return []
 
     def _save_post(self, message, status, partial_commit):
         # helper to commit changes reported in status
@@ -3634,12 +3547,12 @@ class GitRepo(CoreGitRepo):
         from datalad.interface.results import get_status_dict
         try:
             # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                list(files.keys()),
+            add_out = self._call_git(
                 # Set annex.largefiles to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
-                ensure_list(git_opts) + ['--verbose']
+                ['-c', 'annex.largefiles=nothing', 'add'] + ensure_list(
+                    git_opts) + ['--verbose'],
+                files=list(files.keys()),
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
