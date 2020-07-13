@@ -47,7 +47,7 @@ from datalad.utils import (
     assure_list,
     auto_repr,
     ensure_list,
-    linux_distribution_name,
+    get_linux_distribution,
     on_windows,
     partition,
     Path,
@@ -552,11 +552,16 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']
         # in case it is missing
-        if linux_distribution_name in {'debian', 'ubuntu'}:
-            msg = "Install  git-annex-standalone  from NeuroDebian " \
-                  "(http://neuro.debian.net)"
-        else:
-            msg = "Visit http://git-annex.branchable.com/install/"
+        msg = "Visit http://git-annex.branchable.com/install/"
+        # we might be able to do better
+        try:
+            linux_distribution_name = get_linux_distribution()[0]
+            if linux_distribution_name in {'debian', 'ubuntu'}:
+                msg = "Install  git-annex-standalone  from NeuroDebian " \
+                      "(http://neuro.debian.net)"
+        except:  # pragma: no cover
+            pass
+
         exc_kwargs = dict(
             name="git-annex",
             msg=msg,
