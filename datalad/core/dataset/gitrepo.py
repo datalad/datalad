@@ -102,6 +102,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         self._cmd_call_wrapper = GitRunner(cwd=path)
 
+        # Set by fake_dates_enabled to cache config value across this instance.
+        self._fake_dates_enabled = None
+
     def __hash__(self):
         # the flyweight key is already determining unique instances
         # add the class name to distinguish from strings of a path
@@ -517,3 +520,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         env["DATALAD_FAKE_DATE"] = date
 
         return env
+
+    @property
+    def fake_dates_enabled(self):
+        """Is the repository configured to use fake dates?
+        """
+        if self._fake_dates_enabled is None:
+            self._fake_dates_enabled = \
+                self.config.getbool('datalad', 'fake-dates', default=False)
+        return self._fake_dates_enabled
