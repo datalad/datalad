@@ -908,8 +908,6 @@ class GitRepo(CoreGitRepo):
 
         if fake_dates:
             self.configure_fake_dates()
-        # Set by fake_dates_enabled to cache config value across this instance.
-        self._fake_dates_enabled = None
 
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
@@ -955,6 +953,7 @@ class GitRepo(CoreGitRepo):
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
+
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
@@ -1323,15 +1322,6 @@ class GitRepo(CoreGitRepo):
         """
         lgr.debug("Enabling fake dates")
         self.config.set("datalad.fake-dates", "true")
-
-    @property
-    def fake_dates_enabled(self):
-        """Is the repository configured to use fake dates?
-        """
-        if self._fake_dates_enabled is None:
-            self._fake_dates_enabled = \
-                self.config.getbool('datalad', 'fake-dates', default=False)
-        return self._fake_dates_enabled
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None, index_file=None):
