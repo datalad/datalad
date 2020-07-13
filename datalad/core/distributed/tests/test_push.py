@@ -201,7 +201,6 @@ def check_push(annex, src_path, dst_path):
         # push should be rejected (non-fast-forward):
         res = src.push(to='target', since='HEAD~2', on_failure='ignore')
         # fails before even touching the annex branch
-        assert_result_count(res, 1)
         assert_in_results(
             res,
             action='publish', status='error', target='target',
