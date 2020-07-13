@@ -890,9 +890,8 @@ class GitRepo(CoreGitRepo):
         if kwargs:
             git_opts.update(kwargs)
 
-        if runner:
-            # override the default GitRunner established by the base class
-            self._cmd_call_wrapper = runner
+        # TODO: remove any usage of this, and rely on call_git()
+        self._cmd_call_wrapper = runner if runner else GitRunner(cwd=path)
 
         if do_create:  # we figured it out earlier
             self._create_empty_repo(path, create_sanity_checks, **git_opts)

@@ -1547,7 +1547,7 @@ def test_gitrepo_call_git_methods(path):
             with assert_raises(CommandError):
                 gr.call_git(["mv"], files=["notthere", "dest"],
                             expect_fail=expect_fail)
-            check("notthere", cml.out)
+            check("fatal: bad source", cml.out)
 
     eq_(list(gr.call_git_items_(["ls-files"])),
         ["bar", "foo.txt"])
@@ -1565,7 +1565,7 @@ def test_gitrepo_call_git_methods(path):
     ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
     with swallow_logs(new_level=logging.DEBUG) as cml:
         assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
-        assert_not_in("blob", cml.out)
+        assert_not_in("fatal: ambiguous argument", cml.out)
 
 
 @skip_if_no_network

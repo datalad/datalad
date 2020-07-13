@@ -34,8 +34,9 @@ from datalad.support.exceptions import (
     InvalidGitRepositoryError,
 )
 from datalad.cmd import (
-    GitRunner,
+    GitWitlessRunner,
     run_gitcommand_on_file_list_chunks,
+    StdOutErrCapture,
 )
 
 lgr = logging.getLogger('datalad.core.dataset.gitrepo')
@@ -99,7 +100,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
         self._GIT_COMMON_OPTIONS = []
 
-        self._cmd_call_wrapper = GitRunner(cwd=path)
+        self._git_runner = GitWitlessRunner(cwd=path)
 
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
@@ -312,24 +313,24 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
+        runner = self._git_runner
+        stderr_log_level = {True: 5, False: 11}[expect_stderr]
+
         cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
 
+        env = None
         if self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
+            env = self.add_fake_dates(runner.env)
 
+        out = err = None
         try:
             out, err = run_gitcommand_on_file_list_chunks(
-                self._cmd_call_wrapper.run,
+                self._git_runner.run,
                 cmd,
                 files,
-                log_stderr=True,
-                log_stdout=True,
-                log_online=False,
-                expect_stderr=expect_stderr,
-                cwd=cwd,
+                protocol=StdOutErrCapture,
                 env=env,
-                shell=None,
-                expect_fail=expect_fail)
+            )
         except CommandError as e:
             ignored = re.search(GitIgnoreError.pattern, e.stderr)
             if ignored:
@@ -337,8 +338,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                      code=e.code, stdout=e.stdout,
                                      stderr=e.stderr,
                                      paths=ignored.groups()[0].splitlines())
+            lgr.log(5 if expect_fail else 11, e)
             raise
 
+        if err:
+            for line in err.splitlines():
+                lgr.log(stderr_log_level,
+                        "stderr| " + line.rstrip('\n'))
         return out, err
 
     # Convenience wrappers for one-off git calls that don't require further
