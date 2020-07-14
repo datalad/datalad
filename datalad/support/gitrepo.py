@@ -11,7 +11,6 @@
 """
 
 import re
-import time
 import os
 import os.path as op
 import warnings
