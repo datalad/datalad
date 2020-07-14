@@ -3,7 +3,7 @@
 # An ultimate helper to use to setup a CI with some git-annex installation
 # Arguments:
 #  First argument would be which "schema" would it be.
-#  Some schemas might like additional arguments (ATM annotated in comments for cases)
+#  Some schemas might like additional arguments.
 #
 # This script
 # - needs to be "source"d since some schemas would need to modify env vars
@@ -33,12 +33,40 @@ function setup_neurodebian_devel() {
   sudo apt-get update
 }
 
-scenario="${1:-conda-forge}"
-
-if [[ "$scenario" == "--help" ]]; then
-    _show_schemes
-    exit 0
-fi
+_conda_annex_version=
+scenario="conda-forge"
+url=
+while [ $# != 0 ]; do
+    case "$1" in
+        --help)
+            _show_schemes
+            exit 0
+            ;;
+        *)
+            scenario="$1"
+            shift
+            case "$scenario" in
+                neurodebian|neurodebian-devel|snapshot|datalad-extensions-build)
+                    ;;
+                conda-forge|conda-forge-last)
+                    if [ -n "$1" ]; then
+                        _conda_annex_version="=$1"
+                        shift
+                    fi
+                    ;;
+                deb-url)
+                    url="${1?deb-url scheme requires URL}"
+                    shift
+                    ;;
+                *)
+                    echo "Unknown git-annex installation scheme '$scenario'" >&2
+                    _show_schemes >&2
+                    exit 1
+                    ;;
+            esac
+            ;;
+    esac
+done
 
 _this_dir=$(dirname "$0")
 
@@ -70,10 +98,8 @@ case "$scenario" in
         exit 0
     fi
     ;;
-  deb-url)  # expects: URL
+  deb-url)
     (
-    shift
-    url="$1"  # expects URL
     wget -O "$_TMPDIR/git-annex.deb" "$url"
     sudo dpkg -i "$_TMPDIR/git-annex.deb"
     )
@@ -86,10 +112,8 @@ case "$scenario" in
     )
     export PATH="${_annex_bin}:$PATH"
     ;;
-  conda-forge|conda-forge-last)  # optional: version
+  conda-forge|conda-forge-last)
     _miniconda_script=Miniconda3-latest-Linux-x86_64.sh
-    shift
-    _conda_annex_version=${1:+=}${1:-}  # will include = prefix is specified
     _conda_bin="$_TMPDIR/miniconda/bin"
     # we will symlink git-annex only under a didicated directory, so it could be
     # used with default Python etc. If names changed here, possibly adjust hardcoded
@@ -134,8 +158,7 @@ case "$scenario" in
     sudo dpkg -i "$_TMPDIR"/*.deb
     ;;
   *)
-    echo "Unknown git-annex installation scheme '$scenario'" >&2
-    _show_schemes >&2
+    echo "E: internal error: '$scenario' should be handled above" >&2
     exit 1
 esac
 
