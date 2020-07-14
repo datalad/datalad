@@ -20,11 +20,22 @@ function _show_schemes() {
     "neurodebian-devel"
     "snapshot"
   )
-  echo "Known schemes:"
   for s in "${_schemes_doc[@]}"; do
-    echo "  $s"
+    echo "    $s"
   done
 
+}
+
+function _usage() {
+    cat >&2 <<EOF
+usage: source $0 [SCHEME [ARGS...]]
+
+*Options*
+  SCHEME
+    Type of git-annex installation (default "conda-forge").
+
+$(_show_schemes)
+EOF
 }
 
 function setup_neurodebian_devel() {
@@ -39,7 +50,7 @@ url=
 while [ $# != 0 ]; do
     case "$1" in
         --help)
-            _show_schemes
+            _usage
             exit 0
             ;;
         *)
@@ -60,6 +71,7 @@ while [ $# != 0 ]; do
                     ;;
                 *)
                     echo "Unknown git-annex installation scheme '$scenario'" >&2
+                    echo "Known schemes:" >&2
                     _show_schemes >&2
                     exit 1
                     ;;
