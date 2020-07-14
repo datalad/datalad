@@ -250,8 +250,9 @@ class ConfigManager(object):
             run_kwargs['cwd'] = dataset.path
         self._runner = GitWitlessRunner(**run_kwargs)
         try:
+            # reuse the runner we already have for the version check
             self._gitconfig_has_showorgin = \
-                LooseVersion(get_git_version()) >= '2.8.0'
+                LooseVersion(get_git_version(self._runner)) >= '2.8.0'
         except Exception:
             # no git something else broken, assume git is present anyway
             # to not delay this, but assume it is old
