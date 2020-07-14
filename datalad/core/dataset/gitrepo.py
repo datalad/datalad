@@ -506,9 +506,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         env["GIT_AUTHOR_DATE"] = date
         env["GIT_COMMITTER_DATE"] = date
         env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
-        # leave a marker to prevent duplicate processing
-        env["DATALAD_FAKE_DATE"] = date
-
         return env
 
     @property
