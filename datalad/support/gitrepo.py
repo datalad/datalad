@@ -942,6 +942,9 @@ class GitRepo(CoreGitRepo):
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
+        # init will have created the 'local' config file -- make sure it is
+        # picked up
+        self.config.reload(force=True)
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
