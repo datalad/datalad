@@ -519,7 +519,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def fake_dates_enabled(self):
         """Is the repository configured to use fake dates?
         """
-        if self._fake_dates_enabled is None:
+        # if not yet evaluated, but there is a repo to query config from
+        # otherwise keep undecided
+        if self._fake_dates_enabled is None and self.is_valid_git():
             self._fake_dates_enabled = \
                 self.config.getbool('datalad', 'fake-dates', default=False)
         return self._fake_dates_enabled

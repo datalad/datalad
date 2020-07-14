@@ -1391,6 +1391,7 @@ def test_get_commit_date(path):
                  "bar": "bar content"})
 def test_fake_dates(path):
     gr = GitRepo(path, create=True, fake_dates=True)
+    ok_(gr.fake_dates_enabled)
 
     gr.add("foo")
     gr.commit("commit foo")
