@@ -28,12 +28,14 @@ function _show_schemes() {
 
 function _usage() {
     cat >&2 <<EOF
-usage: source $0 [--adjust-bashrc] [SCHEME [ARGS...]]
+usage: source $0 [--help] [--adjust-bashrc] [SCHEME [ARGS...]]
 
 *Options*
   --adjust-bashrc
     If the scheme tweaks PATH, prepend a snippet to ~/.bashrc that exports that
     path.  Note: This should be positiioned before SCHEME.
+  --help
+    Display this help and exit.
 
   SCHEME
     Type of git-annex installation (default "conda-forge").
@@ -57,6 +59,10 @@ while [ $# != 0 ]; do
         --adjust-bashrc)
             adjust_bashrc=1
             shift
+            ;;
+        --help)
+            _usage
+            exit 0
             ;;
         -*)
             _usage
