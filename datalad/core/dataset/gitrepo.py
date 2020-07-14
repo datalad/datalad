@@ -285,7 +285,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             yield dict(zip(fields, props))
 
     def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
-                  cwd=None, env=None, index_file=None):
+                  cwd=None, env=None):
         """Allows for calling arbitrary commands.
 
         Internal helper to the call_git*() methods.
@@ -318,12 +318,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
-        if index_file:
-            env = (env if env is not None else environ).copy()
-            env['GIT_INDEX_FILE'] = index_file
-
-        # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
-        #  handling????
         try:
             out, err = run_gitcommand_on_file_list_chunks(
                 self._cmd_call_wrapper.run,
