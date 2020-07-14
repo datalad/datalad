@@ -86,7 +86,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           path to the git repository; In case it's not an absolute path,
           it's relative to PWD
         """
-        self.path = path
         self.pathobj = Path(path)
         self._cfg = None
 
@@ -120,7 +119,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         This is done by comparing the base repository path.
         """
-        return self.path == obj.path
+        return self.pathobj == obj.pathobj
 
     @property
     def config(self):

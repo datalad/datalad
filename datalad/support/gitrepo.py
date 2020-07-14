@@ -846,11 +846,9 @@ class GitRepo(CoreGitRepo):
         # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
         # __init__ to then test the same things again. If we fail early we can save the additional test from outer
         # scope.
-        # Note, that the following objects are used often and therefore
-        # are stored for performance. Path object creation comes with a cost. Most noteably,
+        self.path = path
+
         # this is used for validity checking of the repository.
-        self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
-        self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
         do_create = False
