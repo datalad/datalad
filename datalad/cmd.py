@@ -379,20 +379,30 @@ class WitlessRunner(object):
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise.
         env : dict, optional
-          Environment to be passed to subprocess.Popen(). If `cwd`
+          Environment to be used for command execution. If `cwd`
           was given, 'PWD' in the environment is set to its value.
           This must be a complete environment definition, no values
           from the current environment will be inherited.
         """
-        self.env = env.copy() if env else None
+        self.env = env
         # stringify to support Path instances on PY35
         self.cwd = str(cwd) if cwd is not None else None
-        if self.cwd and env is not None:
+
+    def _get_adjusted_env(self, env=None, cwd=None, copy=True):
+        """Return an adjusted copy of an execution environment
+
+        Or return an unaltered copy of the environment, if no adjustments
+        need to be made.
+        """
+        if copy:
+            env = env.copy() if env else None
+        if cwd and env is not None:
             # if CWD was provided, we must not make it conflict with
             # a potential PWD setting
-            self.env['PWD'] = self.cwd
+            env['PWD'] = cwd
+        return env
 
-    def run(self, cmd, protocol=None, stdin=None, **kwargs):
+    def run(self, cmd, protocol=None, stdin=None, cwd=None, env=None, **kwargs):
         """Execute a command and communicate with it.
 
         Parameters
@@ -408,6 +418,16 @@ class WitlessRunner(object):
         stdin : byte stream, optional
           File descriptor like, used as stdin for the process. Passed
           verbatim to subprocess.Popen().
+        cwd : path-like, optional
+          If given, commands are executed with this path as PWD,
+          the PWD of the parent process is used otherwise. Overrides
+          any `cwd` given to the constructor.
+        env : dict, optional
+          Environment to be used for command execution. If `cwd`
+          was given, 'PWD' in the environment is set to its value.
+          This must be a complete environment definition, no values
+          from the current environment will be inherited. Overrides
+          any `env` given to the constructor.
         kwargs :
           Passed to the Protocol class constructor.
 
@@ -431,6 +451,13 @@ class WitlessRunner(object):
         if protocol is None:
             # by default let all subprocess stream pass through
             protocol = NoCapture
+
+        cwd = cwd or self.cwd
+        env = self._get_adjusted_env(
+            env or self.env,
+            cwd=cwd,
+        )
+
         # start a new event loop, which we will close again further down
         # if this is not done events like this will occur
         #   BlockingIOError: [Errno 11] Resource temporarily unavailable
@@ -452,8 +479,8 @@ class WitlessRunner(object):
                 protocol,
                 stdin,
                 protocol_kwargs=kwargs,
-                cwd=self.cwd,
-                env=self.env,
+                cwd=cwd,
+                env=env,
             )
         )
         # terminate the event loop, cannot be undone, hence we start a fresh
@@ -1125,11 +1152,18 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
 
     @borrowdoc(WitlessRunner)
     def __init__(self, *args, **kwargs):
-        kwargs['env'] = GitRunnerBase.get_git_environ_adjusted(
-            env=kwargs.get('env', None)
-        )
         super().__init__(*args, **kwargs)
         self._check_git_path()
+
+    def _get_adjusted_env(self, env=None, cwd=None, copy=True):
+        env = GitRunnerBase.get_git_environ_adjusted(env=env)
+        return super()._get_adjusted_env(
+            env=env,
+            cwd=cwd,
+            # git env above is already a copy, so we have no choice,
+            # but we can prevent duplication
+            copy=False,
+        )
 
 
 def readline_rstripped(stdout):
