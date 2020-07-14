@@ -285,7 +285,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             yield dict(zip(fields, props))
 
     def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
-                  honor_fake_dates=True, cwd=None, env=None, index_file=None):
+                  cwd=None, env=None, index_file=None):
         """Allows for calling arbitrary commands.
 
         Internal helper to the call_git*() methods.
@@ -304,10 +304,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool, optional
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
-        honor_fake_dates : bool, optional
-          Whether to actually fake dates for Git operations, if enable for a
-          repo.
-
 
         Returns
         -------
@@ -319,7 +315,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
 
-        if honor_fake_dates and self.fake_dates_enabled:
+        if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
         if index_file:
