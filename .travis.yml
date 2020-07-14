@@ -235,16 +235,7 @@ before_install:
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # Install git-annex
-  - OLD_PATH="$PATH"
-  - eval source tools/ci/install-annex.sh ${_DL_ANNEX_INSTALL_SCENARIO}
-  # If PATH was changed, we need to make it available to SSH commands.
-  # Note: Prepending is necessary.  SSH commands load .bashrc, but
-  # Ubuntu's comes with a snippet to exit early in that case.
-  - if [ "$PATH" != "$OLD_PATH" ]; then
-      sed -i -e "1iexport PATH=\"$PATH\"" ~/.bashrc;
-      echo "head of the adjusted ~/.bashrc:";
-      head ~/.bashrc;
-    fi
+  - eval source tools/ci/install-annex.sh --adjust-bashrc ${_DL_ANNEX_INSTALL_SCENARIO}
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
       sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;

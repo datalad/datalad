@@ -28,9 +28,13 @@ function _show_schemes() {
 
 function _usage() {
     cat >&2 <<EOF
-usage: source $0 [SCHEME [ARGS...]]
+usage: source $0 [--adjust-bashrc] [SCHEME [ARGS...]]
 
 *Options*
+  --adjust-bashrc
+    If the scheme tweaks PATH, prepend a snippet to ~/.bashrc that exports that
+    path.  Note: This should be positiioned before SCHEME.
+
   SCHEME
     Type of git-annex installation (default "conda-forge").
 
@@ -46,9 +50,14 @@ function setup_neurodebian_devel() {
 
 _conda_annex_version=
 scenario="conda-forge"
+adjust_bashrc=
 url=
 while [ $# != 0 ]; do
     case "$1" in
+        --adjust-bashrc)
+            adjust_bashrc=1
+            shift
+            ;;
         -*)
             _usage
             exit 1
@@ -89,6 +98,8 @@ _this_dir=$(dirname "$0")
 
 # Most common location of installation - /usr/bin
 _annex_bin=/usr/bin
+
+_PATH_OLD="$PATH"
 
 # we do not want to `cd` anywhere but all temp stuff should get unique temp prefix
 _TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/ga-XXXXXXX")
@@ -178,6 +189,18 @@ case "$scenario" in
     echo "E: internal error: '$scenario' should be handled above" >&2
     exit 1
 esac
+
+if [ -n "$adjust_bashrc" ]; then
+    # If PATH was changed, we need to make it available to SSH commands.
+    # Note: Prepending is necessary. SSH commands load .bashrc, but many
+    # distributions (including Debian and Ubuntu) come with a snippet to exit
+    # early in that case.
+    if [ "$PATH" != "$_PATH_OLD" ]; then
+        sed -i -e "1iexport PATH=\"$PATH\"" ~/.bashrc
+        echo "I: Adjusted first line of ~/.bashrc:"
+        head -n1 ~/.bashrc
+    fi
+fi
 
 # Rudimentary test of installation and inform user about location
 test -x "${_annex_bin}/git-annex"
