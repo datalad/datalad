@@ -10,6 +10,7 @@
 """
 
 from functools import lru_cache
+from pathlib import Path
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
@@ -24,13 +25,6 @@ from distutils.version import LooseVersion
 
 import re
 import os
-from os.path import (
-    join as opj,
-    exists,
-    getmtime,
-    abspath,
-    isabs,
-)
 from time import time
 
 import logging
@@ -73,6 +67,8 @@ def _where_reload(obj):
 
 
 def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
+    if cwd:
+        cwd = Path(cwd)
     if replace:
         # if we want to replace existing values in the store
         # collect into a new dict and `update` the store at the
@@ -89,9 +85,9 @@ def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
             continue
         if line.startswith('file:'):
             # origin line
-            fname = line[5:]
-            if not isabs(fname):
-                fname = opj(cwd, fname) if cwd else abspath(fname)
+            fname = Path(line[5:])
+            if not fname.is_absolute():
+                fname = (cwd / fname) if cwd else (Path.cwd() / fname)
             fileset.add(fname)
             continue
         if line.startswith('command line:'):
@@ -236,18 +232,17 @@ class ConfigManager(object):
             # working directory from leaking configuration into the output.
             self._config_cmd = ['git', '--git-dir=', 'config']
         else:
-            self._dataset_path = dataset.path
+            self._dataset_path = dataset.pathobj
             if source != 'local':
-                self._dataset_cfgfname = opj(self._dataset_path,
-                                             DATASET_CONFIG_FILE)
+                self._dataset_cfgfname = self._dataset_path / DATASET_CONFIG_FILE
             if source != 'dataset':
-                self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
+                self._repo_cfgfname = self._dataset_path / '.git' / 'config'
         self._src_mode = source
         run_kwargs = dict()
         if dataset is not None:
             # make sure we run the git config calls in the dataset
             # to pick up the right config files
-            run_kwargs['cwd'] = dataset.path
+            run_kwargs['cwd'] = dataset.pathobj
         self._runner = GitWitlessRunner(**run_kwargs)
         try:
             # reuse the runner we already have for the version check
@@ -272,7 +267,11 @@ class ConfigManager(object):
             # we aren't forcing and we have read files before
             # check if any file we read from has changed
             current_time = time()
-            curmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
+            curmtimes = {
+                c: c.stat().st_mtime
+                for c in self._cfgfiles
+                if c.exists()
+            }
             if all(curmtimes[c] == self._cfgmtimes.get(c) and
                    # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
                    # if mtime age is less than worst resolution assume modified
@@ -297,9 +296,9 @@ class ConfigManager(object):
             run_args.append('--show-origin')
 
         if self._dataset_cfgfname:
-            if exists(self._dataset_cfgfname):
+            if self._dataset_cfgfname.exists():
                 stdout, stderr = self._run(
-                    run_args + ['--file', self._dataset_cfgfname],
+                    run_args + ['--file', str(self._dataset_cfgfname)],
                     protocol=StdOutErrCapture
                 )
                 # overwrite existing value, do not amend to get multi-line
@@ -324,7 +323,11 @@ class ConfigManager(object):
         if self._dataset_cfgfname:
             self._cfgfiles.add(self._dataset_cfgfname)
             self._cfgfiles.add(self._repo_cfgfname)
-        self._cfgmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
+        self._cfgmtimes = {
+            c: c.stat().st_mtime
+            for c in self._cfgfiles
+            if c.exists()
+        }
 
         # superimpose overrides
         self._store.update(self.overrides)
@@ -625,12 +628,12 @@ class ConfigManager(object):
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset_path, DATALAD_DOTDIR)
-            if not exists(dscfg_dirname):
-                os.makedirs(dscfg_dirname)
-            if not exists(self._dataset_cfgfname):
-                open(self._dataset_cfgfname, 'w').close()
-            args.extend(['--file', self._dataset_cfgfname])
+            dscfg_dirname = self._dataset_path / DATALAD_DOTDIR
+            if not dscfg_dirname.exists():
+                dscfg_dirname.mkdir(parents=True)
+            if not self._dataset_cfgfname.exists():
+                self._dataset_cfgfname.touch()
+            args.extend(['--file', str(self._dataset_cfgfname)])
         elif where == 'global':
             args.append('--global')
         elif where == 'local':

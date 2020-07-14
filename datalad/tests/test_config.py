@@ -453,11 +453,11 @@ def test_no_leaks(path1, path2):
         assert_not_in('i.was.here', ds2.config.keys())
 
         # and that we do not track the wrong files
-        assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_not_in(ds1.pathobj / '.git' / 'config', ds2.config._cfgfiles)
+        assert_not_in(ds1.pathobj / '.datalad' / 'config', ds2.config._cfgfiles)
         # these are the right ones
-        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_in(ds2.pathobj / '.git' / 'config', ds2.config._cfgfiles)
+        assert_in(ds2.pathobj / '.datalad' / 'config', ds2.config._cfgfiles)
 
 
 @with_tempfile()
