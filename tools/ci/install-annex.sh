@@ -49,9 +49,9 @@ scenario="conda-forge"
 url=
 while [ $# != 0 ]; do
     case "$1" in
-        --help)
+        -*)
             _usage
-            exit 0
+            exit 1
             ;;
         *)
             scenario="$1"
@@ -76,6 +76,11 @@ while [ $# != 0 ]; do
                     exit 1
                     ;;
             esac
+            if [ -n "$1" ]; then
+                # There are unexpected arguments left over.
+                _usage
+                exit 1
+            fi
             ;;
     esac
 done
