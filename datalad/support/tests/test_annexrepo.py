@@ -1121,6 +1121,14 @@ def test_annex_backends(path):
 @with_testrepos('basic_annex', flavors=['local'])
 @with_testrepos('basic_annex', flavors=['local'])
 def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
+    # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
+    # 7.20191230-142-g75059c9f3. This is likely due to an interaction with an
+    # older openssh version. See
+    # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
+    if external_versions['cmd:system-ssh'] < '7.4' and \
+       external_versions['cmd:annex'] > '7.20191230':
+        raise SkipTest("Test known to hang")
+
     from datalad import ssh_manager
     # create remotes:
     rm1 = AnnexRepo(remote_1_path, create=False)
