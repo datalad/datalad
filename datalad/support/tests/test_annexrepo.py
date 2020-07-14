@@ -48,7 +48,7 @@ from datalad.support.sshconnector import get_connection_hash
 
 from datalad.utils import (
     chpwd,
-    linux_distribution_name,
+    get_linux_distribution,
     on_windows,
     rmtree,
     unlink,
@@ -1546,6 +1546,7 @@ def test_annex_version_handling_bad_git_annex(path):
         eq_(AnnexRepo.git_annex_version, None)
         with assert_raises(MissingExternalDependency) as cme:
             AnnexRepo(path)
+        linux_distribution_name = get_linux_distribution()[0]
         if linux_distribution_name == 'debian':
             assert_in("http://neuro.debian.net", str(cme.exception))
         eq_(AnnexRepo.git_annex_version, None)
