@@ -480,14 +480,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             return env
         # prevent infinite recursion, should this function be called again
         # inside the next call.
-        environ['DATALAD_FAKE_DATE'] = '1'
-        last_date = list(self.for_each_ref_(
-            fields='committerdate:raw',
-            count=1,
-            pattern='refs/heads',
-            sort="-committerdate",
-        ))
-        del environ['DATALAD_FAKE_DATE']
+        try:
+            environ['DATALAD_FAKE_DATE'] = '1'
+            last_date = list(self.for_each_ref_(
+                fields='committerdate:raw',
+                count=1,
+                pattern='refs/heads',
+                sort="-committerdate",
+            ))
+        finally:
+            environ.pop('DATALAD_FAKE_DATE', None)
 
         if last_date:
             # Drop the "contextual" timezone, leaving the unix timestamp.  We
