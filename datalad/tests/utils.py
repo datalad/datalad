@@ -71,6 +71,7 @@ from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
 from nose import SkipTest
 
+from datalad import cfg as dl_cfg
 import datalad.utils as ut
 # TODO this must go
 from ..utils import *
@@ -541,6 +542,10 @@ def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
+        if 'dir' not in tkwargs.keys():
+            # if not specified otherwise, respect datalad.tests.temp.dir config
+            # as this is a test helper
+            tkwargs['dir'] = dl_cfg.get("datalad.tests.temp.dir")
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
         d = tempfile.mkdtemp(**tkwargs_)
         create_tree(d, tree, archives_leading_dir=archives_leading_dir)
@@ -717,6 +722,10 @@ def with_tempfile(t, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
+        if 'dir' not in tkwargs.keys():
+            # if not specified otherwise, respect datalad.tests.temp.dir config
+            # as this is a test helper
+            tkwargs['dir'] = dl_cfg.get("datalad.tests.temp.dir")
         with make_tempfile(wrapped=t, **tkwargs) as filename:
             return t(*(arg + (filename,)), **kw)
 
@@ -910,7 +919,8 @@ def clone_url(url):
     # delay import of our code until needed for certain
     from ..cmd import Runner
     runner = Runner()
-    tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
+    tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
+        {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
     if GitRepo(tdir).is_with_annex():
         AnnexRepo(tdir, init=True)

@@ -88,10 +88,18 @@ def _with_tempfile_decorated_dummy(path):
 def test_with_tempfile_dir_via_env_variable():
     target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
     assert_false(os.path.exists(target), "directory %s already exists." % target)
-    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
-        filename = _with_tempfile_decorated_dummy()
-        ok_startswith(filename, target)
 
+    # if patch the env and expect it to be respected by existing
+    # ConfigManager instance, we need to reload
+    from datalad import cfg
+    try:
+        with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
+            cfg.reload()
+            filename = _with_tempfile_decorated_dummy()
+            ok_startswith(filename, target)
+    finally:
+        # "clean up" ConfigManager
+        cfg.reload()
 
 @with_tempfile
 @with_tempfile
