@@ -1068,7 +1068,10 @@ def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
-    directory = os.environ.get('DATALAD_TESTS_TEMP_DIR')
+    directory = os.environ.get(
+        'DATALAD_TESTS_TEMP_DIR',
+        os.environ.get('TMPDIR')
+    )
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
