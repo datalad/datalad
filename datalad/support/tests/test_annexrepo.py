@@ -70,6 +70,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_true,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     find_files,
     get_most_obscure_supported_name,
@@ -1971,16 +1972,18 @@ def test_AnnexRepo_get_corresponding_branch(path):
 
     ar = AnnexRepo(path)
 
-    # we should be on master.
-    eq_('master', ar.get_corresponding_branch() or ar.get_active_branch())
+    # we should be on the default branch.
+    eq_(DEFAULT_BRANCH,
+        ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
     if ar.supports_unlocked_pointers:
         ar.adjust()
-        # as above, we still want to get 'master', while being on
-        # 'adjusted/master(unlocked)'
-        eq_('adjusted/master(unlocked)', ar.get_active_branch())
-        eq_('master', ar.get_corresponding_branch())
+        # as above, we still want to get the default branch, while being on
+        # 'adjusted/<default branch>(unlocked)'
+        eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
+            ar.get_active_branch())
+        eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -1989,7 +1992,7 @@ def test_AnnexRepo_get_tracking_branch(path):
     ar = AnnexRepo(path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
-    eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
+    eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:433

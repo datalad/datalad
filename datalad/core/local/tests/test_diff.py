@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     assert_status,
     chpwd,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     get_deeply_nested_structure,
     has_symlink_capability,
@@ -73,8 +74,8 @@ def test_repo_diff(path, norepo):
     assert_raises(ValueError, ds.repo.diff, fr='WTF', to='MIKE')
 
     if ds.repo.is_managed_branch():
-        fr_base = "master"
-        to = "master"
+        fr_base = DEFAULT_BRANCH
+        to = DEFAULT_BRANCH
     else:
         fr_base = "HEAD"
         to = None
@@ -179,8 +180,8 @@ def test_diff(path, norepo):
     assert_repo_status(ds.path)
 
     if ds.repo.is_managed_branch():
-        fr_base = "master"
-        to = "master"
+        fr_base = DEFAULT_BRANCH
+        to = DEFAULT_BRANCH
     else:
         fr_base = "HEAD"
         to = None
@@ -255,11 +256,12 @@ def test_diff_recursive(path):
     ds = Dataset(path).create()
     sub = ds.create('sub')
     # look at the last change, and confirm a dataset was added
-    res = ds.diff(fr='master~1', to='master', result_renderer=None)
+    res = ds.diff(fr=DEFAULT_BRANCH + '~1', to=DEFAULT_BRANCH,
+                  result_renderer=None)
     assert_result_count(
         res, 1, action='diff', state='added', path=sub.path, type='dataset')
     # now recursive
-    res = ds.diff(recursive=True, fr='master~1', to='master',
+    res = ds.diff(recursive=True, fr=DEFAULT_BRANCH + '~1', to=DEFAULT_BRANCH,
                   result_renderer=None)
     # we also get the entire diff of the subdataset from scratch
     assert_status('ok', res)
@@ -291,7 +293,7 @@ def test_diff_recursive(path):
     ds.save()
     assert_repo_status(ds.path)
 
-    head_ref = 'master' if ds.repo.is_managed_branch() else 'HEAD'
+    head_ref = DEFAULT_BRANCH if ds.repo.is_managed_branch() else 'HEAD'
 
     # look at the last change, only one file was added
     res = ds.diff(fr=head_ref + '~1', to=head_ref, result_renderer=None)
@@ -513,8 +515,8 @@ def test_no_worktree_impact_false_deletions(path):
     ds = Dataset(path).create()
     # create a branch that has no new content
     ds.repo.call_git(['checkout', '-b', 'test'])
-    # place to successive commits with file additions into the master branch
-    ds.repo.call_git(['checkout', 'master'])
+    # place two successive commits with file additions into the default branch
+    ds.repo.call_git(['checkout', DEFAULT_BRANCH])
     (ds.pathobj / 'identical').write_text('should be')
     ds.save()
     (ds.pathobj / 'new').write_text('yes')
@@ -522,7 +524,8 @@ def test_no_worktree_impact_false_deletions(path):
     # now perform a diff for the last commit, there is one file that remained
     # identifical
     ds.repo.call_git(['checkout', 'test'])
-    res = ds.diff(fr='master~1', to='master', result_renderer=None)
+    res = ds.diff(fr=DEFAULT_BRANCH + '~1', to=DEFAULT_BRANCH,
+                  result_renderer=None)
     # under no circumstances can there be any reports on deleted files
     # because we never deleted anything
     assert_result_count(res, 0, state='deleted')

@@ -42,6 +42,7 @@ from datalad.tests.utils import (
     assert_result_values_equal,
     assert_status,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     get_datasets_topdir,
     integration,
@@ -1062,7 +1063,7 @@ def test_clone_unborn_head(path):
     # The setup below is involved, mostly because it's accounting for adjusted
     # branches. The scenario itself isn't so complicated, though:
     #
-    #   * a checked out master branch with no commits
+    #   * a checked out default branch with no commits
     #   * a (potentially adjusted) "abc" branch with commits.
     #   * a (potentially adjusted) "chooseme" branch whose tip commit has a
     #     more recent commit than any in "abc".
@@ -1070,8 +1071,8 @@ def test_clone_unborn_head(path):
     ds_origin.save(message="foo")
     for res in repo.for_each_ref_(fields="refname"):
         ref = res["refname"]
-        if "master" in ref:
-            repo.update_ref(ref.replace("master", "abc"), ref)
+        if DEFAULT_BRANCH in ref:
+            repo.update_ref(ref.replace(DEFAULT_BRANCH, "abc"), ref)
             repo.call_git(["update-ref", "-d", ref])
     repo.update_ref("HEAD",
                     "refs/heads/{}".format(
@@ -1088,7 +1089,7 @@ def test_clone_unborn_head(path):
     # that it is skipped.
     with set_date(abc_ts + 2):
         ds_origin.drop("bar", check=False)
-    ds_origin.repo.checkout("master", options=["--orphan"])
+    ds_origin.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
     ds = clone(ds_origin.path, op.join(path, "b"))
     # We landed on the branch with the most recent commit, ignoring the
@@ -1106,7 +1107,8 @@ def test_clone_unborn_head(path):
 @with_tempfile(mkdir=True)
 def test_clone_unborn_head_no_other_ref(path):
     ds_origin = Dataset(op.join(path, "a")).create(annex=False)
-    ds_origin.repo.call_git(["update-ref", "-d", "refs/heads/master"])
+    ds_origin.repo.call_git(["update-ref", "-d",
+                             "refs/heads/" + DEFAULT_BRANCH])
     with swallow_logs(new_level=logging.WARNING) as cml:
         clone(source=ds_origin.path, path=op.join(path, "b"))
         assert_in("could not find a branch with commits", cml.out)
@@ -1117,9 +1119,9 @@ def test_clone_unborn_head_sub(path):
     ds_origin = Dataset(op.join(path, "a")).create()
     ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
     managed = ds_origin_sub.repo.is_managed_branch()
-    ds_origin_sub.repo.call_git(["branch", "-m", "master", "other"])
+    ds_origin_sub.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
     ds_origin.save()
-    ds_origin_sub.repo.checkout("master", options=["--orphan"])
+    ds_origin_sub.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
     ds_cloned = clone(source=ds_origin.path, path=op.join(path, "b"))
     ds_cloned_sub = ds_cloned.get(

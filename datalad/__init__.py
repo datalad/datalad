@@ -101,6 +101,12 @@ def setup_package():
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
     os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
 
+    from datalad.tests.utils import DEFAULT_BRANCH
+    _test_states["GIT_CONFIG_PARAMETERS"] = os.environ.get(
+        "GIT_CONFIG_PARAMETERS")
+    os.environ["GIT_CONFIG_PARAMETERS"] = "'init.defaultBranch={}'".format(
+        DEFAULT_BRANCH)
+
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
@@ -227,6 +233,12 @@ def teardown_package():
 
     if _test_states['HOME'] is not None:
         os.environ['HOME'] = _test_states['HOME']
+
+    git_config_params = _test_states["GIT_CONFIG_PARAMETERS"]
+    if git_config_params is None:
+        os.environ.pop("GIT_CONFIG_PARAMETERS")
+    else:
+        os.environ["GIT_CONFIG_PARAMETERS"] = git_config_params
 
     # Re-establish correct global config after changing $HOME.
     # Might be superfluous, since after teardown datalad.cfg shouldn't be
