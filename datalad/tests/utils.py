@@ -262,8 +262,7 @@ def skip_ssh(func):
     @wraps(func)
     @attr('skip_ssh')
     def newfunc(*args, **kwargs):
-        from datalad import cfg
-        test_ssh = cfg.get("datalad.tests.ssh", '')
+        test_ssh = dl_cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
@@ -279,10 +278,9 @@ def skip_v6_or_later(func, method='raise'):
     installed git-annex.
     """
 
-    from datalad import cfg
     from datalad.support.annexrepo import AnnexRepo
 
-    version = cfg.obtain("datalad.repo.version")
+    version = dl_cfg.obtain("datalad.repo.version")
     info = AnnexRepo.check_repository_versions()
 
     @skip_if(version >= 6 or 5 not in info["supported"],
@@ -747,8 +745,7 @@ def probe_known_failure(func):
     @wraps(func)
     @attr('probe_known_failure')
     def newfunc(*args, **kwargs):
-        from datalad import cfg
-        if cfg.obtain("datalad.tests.knownfailures.probe"):
+        if dl_cfg.obtain("datalad.tests.knownfailures.probe"):
             assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
             # Note: Since assert_raises lacks a `msg` argument, a comment
             # in the same line is helpful to determine what's going on whenever
@@ -766,9 +763,8 @@ def skip_known_failure(func, method='raise'):
     Setting config datalad.tests.knownfailures.skip to a bool enables/disables
     skipping.
     """
-    from datalad import cfg
 
-    @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
+    @skip_if(cond=dl_cfg.obtain("datalad.tests.knownfailures.skip"),
              msg="Skip test known to fail",
              method=method)
     @wraps(func)
@@ -804,10 +800,9 @@ def known_failure_v6_or_later(func):
     installed git-annex.
     """
 
-    from datalad import cfg
     from datalad.support.annexrepo import AnnexRepo
 
-    version = cfg.obtain("datalad.repo.version")
+    version = dl_cfg.obtain("datalad.repo.version")
     info = AnnexRepo.check_repository_versions()
 
     if (version and version >= 6) or 5 not in info["supported"]:
@@ -1875,8 +1870,7 @@ def skip_wo_symlink_capability(func):
 def patch_config(vars):
     """Patch our config with custom settings. Returns mock.patch cm
     """
-    from datalad import cfg
-    return patch.dict(cfg._store, vars)
+    return patch.dict(dl_cfg._store, vars)
 
 
 @contextmanager
