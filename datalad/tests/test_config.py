@@ -334,22 +334,24 @@ def test_obtain(path):
 def test_from_env():
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.cfg', cfg)
-    os.environ['DATALAD_CRAZY_CFG'] = 'impossibletoguess'
-    cfg.reload()
-    assert_in('datalad.crazy.cfg', cfg)
-    assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
-    # not in dataset-only mode
-    cfg = ConfigManager(Dataset('nowhere'), source='dataset')
-    assert_not_in('datalad.crazy.cfg', cfg)
+    with patch.dict('os.environ',
+                    {'DATALAD_CRAZY_CFG': 'impossibletoguess'}):
+        cfg.reload()
+        assert_in('datalad.crazy.cfg', cfg)
+        assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
+        # not in dataset-only mode
+        cfg = ConfigManager(Dataset('nowhere'), source='dataset')
+        assert_not_in('datalad.crazy.cfg', cfg)
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
     cfg.set('datalad.crazy.override', 'fromoverride', where='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
-    os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
-    cfg.reload()
-    assert_equal(cfg['datalad.crazy.override'], 'fromenv')
+    with patch.dict('os.environ',
+                    {'DATALAD_CRAZY_OVERRIDE': 'fromenv'}):
+        cfg.reload()
+        assert_equal(cfg['datalad.crazy.override'], 'fromenv')
 
 
 def test_overrides():
