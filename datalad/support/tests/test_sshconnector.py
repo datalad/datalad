@@ -74,7 +74,7 @@ def test_ssh_get_connection():
 
 @skip_if_on_windows
 @skip_ssh
-@with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
+@with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
 def test_ssh_open_close(tfile1):
 
@@ -84,7 +84,6 @@ def test_ssh_open_close(tfile1):
                get_connection_hash('localhost', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
-    print("%s existed: %s" % (path, existed_before))
 
     c1 = manager.get_connection('ssh://localhost')
     c1.open()
@@ -99,11 +98,15 @@ def test_ssh_open_close(tfile1):
                  if entry != '.' and entry != '..']
     local_ls = os.listdir(local_home)
     eq_(set(remote_ls), set(local_ls))
+    ok_(exists(path))
 
     # now test for arguments containing spaces and other pleasant symbols
     out, err = c1('ls -l {}'.format(sh_quote(tfile1)))
     assert_in(tfile1, out)
-    eq_(err, '')
+    # on a crippled FS it will actually say something like
+    # Control socket connect(...6258b3a7): Connection refused\r\n'
+    # but still work.
+    #eq_(err, '')
 
     c1.close()
     # control master doesn't exist anymore:
@@ -215,10 +218,12 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
             eq_(content, fp.read())
 
     # and now a quick smoke test for get
-    togetfile = Path(targetdir) / '2|g>e"t.t&x;t'
+    # but simplify the most obscure filename slightly to not trip `scp` itself
+    togetfile = Path(targetdir) / (
+        get_most_obscure_supported_name().replace('`', '') + '2')
     togetfile.write_text(str('something'))
     ssh.get(opj(remote_url, str(togetfile)), sourcedir)
-    ok_((Path(sourcedir) / '2|g>e"t.t&x;t').exists())
+    ok_((Path(sourcedir) / togetfile.name).exists())
 
     ssh.close()
 
