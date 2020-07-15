@@ -280,7 +280,7 @@ class SSHConnection(object):
 
         if exit_code != 0:
             raise ConnectionOpenFailedError(
-                str(cmd),
+                cmd,
                 'Failed to open SSH connection (could not start ControlMaster process)',
                 exit_code,
                 stdout,

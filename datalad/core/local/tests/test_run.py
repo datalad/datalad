@@ -54,6 +54,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     known_failure_appveyor,
     known_failure_githubci_win,
@@ -83,6 +84,12 @@ def test_invalid_call(path):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
+def last_commit_msg(repo):
+    # ATTN: Pass branch explicitly so that this check works when we're on an
+    # adjusted branch too (e.g., when this test is executed under Windows).
+    return repo.format_commit("%B", DEFAULT_BRANCH)
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
@@ -105,9 +112,7 @@ def test_basics(path, nodspath):
         assert_result_count(res, 1, action='add',
                             path=op.join(ds.path, 'empty'), type='file')
         assert_result_count(res, 1, action='save', path=ds.path)
-        # ATTN: Use master explicitly so that this check works when we're on an
-        # adjusted branch too (e.g., when this test is executed under Windows).
-        commit_msg = ds.repo.format_commit("%B", "master")
+        commit_msg = last_commit_msg(ds.repo)
         ok_(commit_msg.startswith('[DATALAD RUNCMD] TEST'))
         # crude test that we have a record for the PWD
         assert_in('"pwd": "."', commit_msg)
@@ -191,23 +196,18 @@ def test_sidecar(path):
     ds.config.set("datalad.run.record-sidecar", "false", where="local")
     ds.run("cd .> dummy1", message="sidecar config")
 
-    def last_commit_msg():
-        # ATTN: Use master explicitly so that this check works when we're on an
-        # adjusted branch too (e.g., when this test is executed under Windows).
-        return ds.repo.format_commit("%B", "master")
-
-    assert_in('"cmd":', last_commit_msg())
+    assert_in('"cmd":', last_commit_msg(ds.repo))
 
     ds.config.set("datalad.run.record-sidecar", "true", where="local")
     ds.run("cd .> dummy2", message="sidecar config")
-    assert_not_in('"cmd":', last_commit_msg())
+    assert_not_in('"cmd":', last_commit_msg(ds.repo))
 
     # Don't break when config.get() returns multiple values. Here it's two
     # values in .gitconfig, but a more realistic scenario is a value in
     # $repo/.git/config that overrides a setting in ~/.config/git/config.
     ds.config.add("datalad.run.record-sidecar", "false", where="local")
     ds.run("cd .> dummy3", message="sidecar config")
-    assert_in('"cmd":', last_commit_msg())
+    assert_in('"cmd":', last_commit_msg(ds.repo))
 
 
 @with_tree(tree={"to_remove": "abc"})
@@ -354,9 +354,7 @@ def test_inject(path):
                      dataset=ds,
                      inject=True,
                      extra_info={"custom_key": "custom_field"}))
-    # ATTN: Use master explicitly so that this check works when we're on an
-    # adjusted branch too (e.g., when this test is executed under Windows).
-    msg = ds.repo.format_commit("%B", "master")
+    msg = last_commit_msg(ds.repo)
     assert_in("custom_key", msg)
     assert_in("nonsense command", msg)
 
