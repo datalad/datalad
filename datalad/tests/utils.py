@@ -1840,10 +1840,12 @@ def get_deeply_nested_structure(path):
     return ds
 
 
-def has_symlink_capability():
+@with_tempfile
+@with_tempfile
+def has_symlink_capability(p1, p2):
 
-    path = ut.Path(tempfile.mktemp())
-    target = ut.Path(tempfile.mktemp())
+    path = ut.Path(p1)
+    target = ut.Path(p2)
     return utils.check_symlink_capability(path, target)
 
 
