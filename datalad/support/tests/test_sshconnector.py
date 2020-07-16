@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     assert_is_instance,
     skip_if_on_windows,
 )
+from datalad import cfg as dl_cfg
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
 
@@ -261,10 +262,9 @@ def test_ssh_custom_identity_file():
         raise SkipTest("Travis-specific '{}' identity file does not exist"
                        .format(ifile))
 
-    from datalad import cfg
     try:
         with patch.dict("os.environ", {"DATALAD_SSH_IDENTITYFILE": ifile}):
-            cfg.reload(force=True)
+            dl_cfg.reload(force=True)
             with swallow_logs(new_level=logging.DEBUG) as cml:
                 manager = SSHManager()
                 ssh = manager.get_connection('ssh://localhost')
@@ -279,7 +279,7 @@ def test_ssh_custom_identity_file():
                 assert_in(ifile, cml.out)
     finally:
         # Prevent overridden DATALAD_SSH_IDENTITYFILE from lingering.
-        cfg.reload(force=True)
+        dl_cfg.reload(force=True)
 
 
 @skip_if_on_windows

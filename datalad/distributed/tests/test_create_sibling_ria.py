@@ -9,7 +9,7 @@
 
 import os.path as op
 
-from datalad import cfg
+from datalad import cfg as dl_cfg
 from datalad.api import (
     clone,
     Dataset
@@ -40,18 +40,18 @@ def with_store_insteadof(func):
         host = args[0]
         base_path = args[1]
         try:
-            cfg.set('url.ria+{prot}://{host}{path}.insteadOf'
-                    ''.format(prot='ssh' if host else 'file',
-                              host=host if host else '',
-                              path=base_path),
-                    'ria+ssh://test-store:', where='global', reload=True)
+            dl_cfg.set('url.ria+{prot}://{host}{path}.insteadOf'
+                       ''.format(prot='ssh' if host else 'file',
+                                 host=host if host else '',
+                                 path=base_path),
+                       'ria+ssh://test-store:', where='global', reload=True)
             return func(*args, **kwargs)
         finally:
-            cfg.unset('url.ria+{prot}://{host}{path}.insteadOf'
-                      ''.format(prot='ssh' if host else 'file',
-                                host=host if host else '',
-                                path=base_path),
-                      where='global', reload=True)
+            dl_cfg.unset('url.ria+{prot}://{host}{path}.insteadOf'
+                         ''.format(prot='ssh' if host else 'file',
+                                   host=host if host else '',
+                                   path=base_path),
+                         where='global', reload=True)
     return newfunc
 
 

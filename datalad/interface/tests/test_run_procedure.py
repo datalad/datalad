@@ -44,7 +44,7 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
 from datalad.api import run_procedure
-from datalad import cfg
+from datalad import cfg as dl_cfg
 
 
 @with_tempfile(mkdir=True)
@@ -74,7 +74,7 @@ def test_dirty(path):
     assert_repo_status(ds.path)
 
 
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -174,7 +174,7 @@ def test_procedure_discovery(path, super_path):
             state='absent')
 
 
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys

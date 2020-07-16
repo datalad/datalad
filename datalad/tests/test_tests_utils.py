@@ -94,17 +94,16 @@ def test_with_tempfile_dir_via_env_variable():
 
     # if patch the env and expect it to be respected by existing
     # ConfigManager instance, we need to reload
-    from datalad import cfg
     try:
         with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
-            cfg.reload()
+            dl_cfg.reload()
             filename = _with_tempfile_decorated_dummy()
             ok_startswith(filename, target)
     finally:
         # "clean up" ConfigManager
         # Note that force is needed since there was no change to the config
         # files, that reload can discover.
-        cfg.reload(force=True)
+        dl_cfg.reload(force=True)
 
 @with_tempfile
 @with_tempfile
