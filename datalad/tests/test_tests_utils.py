@@ -76,6 +76,7 @@ from datalad.tests.utils import (
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support import path as op
+from datalad import cfg as dl_cfg
 #
 # Test with_tempfile, especially nested invocations
 #
@@ -163,7 +164,7 @@ def test_with_testrepos():
 
     eq_(len(repos),
         2 if on_windows  # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
-          else (15 if os.environ.get('DATALAD_TESTS_NONETWORK') else 16))  # local, local-url, clone, network
+          else (15 if dl_cfg.get('datalad.tests.nonetwork') else 16))  # local, local-url, clone, network
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
@@ -176,18 +177,22 @@ def test_with_testrepos():
 def test_get_resolved_values():
     from datalad.tests.utils import _get_resolved_flavors
     flavors = ['networkish', 'local']
-    eq_(([] if os.environ.get('DATALAD_TESTS_NONETWORK') else ['networkish'])
+    eq_(([] if dl_cfg.get('datalad.tests.nonetwork') else ['networkish'])
         + ['local'],
         _get_resolved_flavors(flavors))
 
-    with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
-        eq_(_get_resolved_flavors(flavors), ['local'])
+    try:  # guard ConfigManager from carrying patched env in case of failure
+        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+            dl_cfg.reload(force=True)
+            eq_(_get_resolved_flavors(flavors), ['local'])
 
-        # and one more to see the exception being raised if nothing to teston
-        @with_testrepos(flavors=['network'])
-        def magical():
-            raise AssertionError("Must not be ran")
-        assert_raises(SkipTest, magical)
+            # and one more to see the exception being raised if nothing to teston
+            @with_testrepos(flavors=['network'])
+            def magical():
+                raise AssertionError("Must not be ran")
+            assert_raises(SkipTest, magical)
+    finally:
+        dl_cfg.reload(force=True)
 
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function
@@ -203,7 +208,7 @@ def test_with_tempfile_mkdir():
             f.write("TEST LOAD")
 
     check_mkdir()
-    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
+    if not dl_cfg.get('datalad.tests.temp.keep'):
         ok_(not os.path.exists(dnames[0]))  # got removed
 
 
@@ -238,7 +243,7 @@ def test_get_most_obscure_supported_name():
 
 def test_keeptemp_via_env_variable():
 
-    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):  # pragma: no cover
+    if dl_cfg.get('datalad.tests.temp.keep'):  # pragma: no cover
         raise SkipTest("We have env variable set to preserve tempfiles")
 
     files = []

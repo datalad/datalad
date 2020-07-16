@@ -46,6 +46,7 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import get_tempfile_kwargs, rmtemp
+from datalad import cfg as dl_cfg
 
 
 def test_formatter():
@@ -444,7 +445,7 @@ class TestAddurls(object):
 
         # Ignore this check if we're faking dates because that disables
         # batch mode.
-        if not os.environ.get('DATALAD_FAKE__DATES'):
+        if not dl_cfg.get('datalad.fake-dates'):
             # We should have two new commits on the git-annex: one for the
             # added urls and one for the added metadata.
             eq_(n_annex_commits + 2, get_annex_commit_counts())

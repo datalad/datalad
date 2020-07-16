@@ -905,7 +905,7 @@ def _get_resolved_flavors(flavors):
     if not isinstance(flavors_, list):
         flavors_ = [flavors_]
 
-    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+    if dl_cfg.get('datalad.tests.nonetwork'):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
 
