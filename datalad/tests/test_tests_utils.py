@@ -26,8 +26,9 @@ from urllib.request import urlopen
 
 from unittest.mock import patch
 from datalad.utils import (
-    getpwd,
     chpwd,
+    getpwd,
+    Path,
 )
 from datalad.tests.utils import (
     assert_cwd_unchanged,
@@ -67,6 +68,7 @@ from datalad.tests.utils import (
     skip_if_on_windows,
     skip_ssh,
     SkipTest,
+    skip_wo_symlink_capability,
     swallow_logs,
     with_tempfile,
     with_testrepos, with_tree,
@@ -266,6 +268,7 @@ def test_keeptemp_via_env_variable():
     rmtemp(files[-1])
 
 
+@skip_wo_symlink_capability
 @with_tempfile
 def test_ok_symlink_helpers(tmpfile):
 
@@ -274,10 +277,7 @@ def test_ok_symlink_helpers(tmpfile):
     assert_raises(AssertionError, ok_broken_symlink, tmpfile)
 
     tmpfile_symlink = tmpfile + '_symlink'
-    try:
-        os.symlink(tmpfile, tmpfile_symlink)
-    except Exception:
-        raise SkipTest("Cannot create a symlink")
+    Path(tmpfile_symlink).symlink_to(Path(tmpfile))
 
     # broken symlink
     ok_symlink(tmpfile_symlink)
@@ -666,6 +666,7 @@ def test_ignore_nose_capturing_stdout():
         ignore_nose_capturing_stdout(raise_exc)()
 
 
+@skip_wo_symlink_capability
 @with_tree(tree={'ingit': '', 'staged': 'staged', 'notingit': ''})
 def test_ok_file_under_git_symlinks(path):
     # Test that works correctly under symlinked path
@@ -674,10 +675,7 @@ def test_ok_file_under_git_symlinks(path):
     orepo.commit('msg')
     orepo.add('staged')
     lpath = path + "-symlink"  # will also be removed AFAIK by our tempfile handling
-    try:
-        os.symlink(path, lpath)
-    except Exception:
-        raise SkipTest("Cannot create a symlink")
+    Path(lpath).symlink_to(Path(path))
     ok_symlink(lpath)
     ok_file_under_git(op.join(path, 'ingit'))
     ok_file_under_git(op.join(lpath, 'ingit'))
