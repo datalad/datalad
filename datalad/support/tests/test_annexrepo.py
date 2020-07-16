@@ -935,8 +935,6 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:348
-@known_failure_windows
 @with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
 def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
@@ -950,6 +948,11 @@ def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
         annex.get(fname)
     key_location = annex.get_contentlocation(key, batch=batch)
     assert(key_location)
+
+    if annex.is_managed_branch():
+        # the rest of the test assumes annexed files being symlinks
+        return
+
     # they both should point to the same location eventually
     eq_((annex.pathobj / fname).resolve(),
         (annex.pathobj / key_location).resolve())
