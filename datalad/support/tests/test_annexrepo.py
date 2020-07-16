@@ -786,8 +786,6 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:295
-@known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
 
@@ -805,8 +803,8 @@ def test_AnnexRepo_add_to_annex(path):
 
     out_json = repo.add(filename)
     # file is known to annex:
-    assert_true(os.path.islink(filename_abs),
-                "Annexed file is not a link.")
+    ok_(repo.is_under_annex(filename_abs),
+        "Annexed file is not a link.")
     assert_in('key', out_json)
     key = repo.get_file_key(filename)
     assert_false(key == '')
