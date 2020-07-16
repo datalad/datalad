@@ -39,7 +39,11 @@ from datalad.utils import (
     assure_list,
     on_windows,
 )
-from datalad.cmd import Runner
+from datalad.cmd import (
+    NoCapture,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
@@ -183,24 +187,18 @@ class SSHConnection(object):
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
-        kwargs = dict(
-            log_stdout=log_output, log_stderr=log_output,
-            log_online=not log_output
-        )
-
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
-        return self.runner.run(
+        out = self.runner.run(
             ssh_cmd,
-            expect_fail=True,
-            expect_stderr=True,
-            stdin=stdin,
-            **kwargs)
+            protocol=StdOutErrCapture if log_output else NoCapture,
+            stdin=stdin)
+        return out['stdout'], out['stderr']
 
     @property
     def runner(self):
         if self._runner is None:
-            self._runner = Runner()
+            self._runner = WitlessRunner()
         return self._runner
 
     def is_open(self):
@@ -219,7 +217,11 @@ class SSHConnection(object):
             # "Master is running" and that is normal, not worthy warning about
             # etc -- we are doing the check here for successful operation
             with tempfile.TemporaryFile() as tempf:
-                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
+                self.runner.run(
+                    cmd,
+                    # do not leak output
+                    protocol=StdOutErrCapture,
+                    stdin=tempf)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -299,7 +301,7 @@ class SSHConnection(object):
         cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
-            self.runner.run(cmd, expect_stderr=True, expect_fail=True)
+            self.runner.run(cmd, protocol=StdOutErrCapture)
         except CommandError as e:
             lgr.debug("Failed to run close command")
             if self.ctrl_path.exists():
@@ -355,7 +357,8 @@ class SSHConnection(object):
             self.sshri.hostname,
             _quote_filename_for_scp(destination),
         )]
-        return self.runner.run(scp_cmd)
+        out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
@@ -391,7 +394,8 @@ class SSHConnection(object):
                     for s in assure_list(source)]
         # add destination path
         scp_cmd += [destination]
-        return self.runner.run(scp_cmd)
+        out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get_annex_installdir(self):
         key = 'installdir:annex'
