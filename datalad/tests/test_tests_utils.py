@@ -99,7 +99,9 @@ def test_with_tempfile_dir_via_env_variable():
             ok_startswith(filename, target)
     finally:
         # "clean up" ConfigManager
-        cfg.reload()
+        # Note that force is needed since there was no change to the config
+        # files, that reload can discover.
+        cfg.reload(force=True)
 
 @with_tempfile
 @with_tempfile
