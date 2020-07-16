@@ -753,9 +753,8 @@ def test_AnnexRepo_on_uninited_annex(origin, path):
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
     # and still can get our things
     assert_false(annex.file_has_content('test-annex.dat'))
-    with swallow_outputs():
-        annex.get('test-annex.dat')
-        ok_(annex.file_has_content('test-annex.dat'))
+    annex.get('test-annex.dat')
+    ok_(annex.file_has_content('test-annex.dat'))
 
 
 @assert_cwd_unchanged
