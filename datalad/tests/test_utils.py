@@ -392,7 +392,10 @@ def test_getpwd_change_mode(tdir):
 def test_getpwd_symlink(tdir):
     sdir = opj(tdir, 's1')
     pwd_orig = getpwd()
-    os.symlink('.', sdir)
+    try:
+        os.symlink('.', sdir)
+    except Exception:
+        raise SkipTest("Cannot create a symlink")
     s1dir = opj(sdir, 's1')
     s2dir = opj(sdir, 's2')
     try:

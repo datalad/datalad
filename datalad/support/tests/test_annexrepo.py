@@ -786,8 +786,6 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:295
-@known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
 
@@ -805,8 +803,8 @@ def test_AnnexRepo_add_to_annex(path):
 
     out_json = repo.add(filename)
     # file is known to annex:
-    assert_true(os.path.islink(filename_abs),
-                "Annexed file is not a link.")
+    ok_(repo.is_under_annex(filename_abs),
+        "Annexed file is not a link.")
     assert_in('key', out_json)
     key = repo.get_file_key(filename)
     assert_false(key == '')
@@ -935,8 +933,6 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:348
-@known_failure_windows
 @with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
 def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
@@ -950,6 +946,11 @@ def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
         annex.get(fname)
     key_location = annex.get_contentlocation(key, batch=batch)
     assert(key_location)
+
+    if annex.is_managed_branch():
+        # the rest of the test assumes annexed files being symlinks
+        return
+
     # they both should point to the same location eventually
     eq_((annex.pathobj / fname).resolve(),
         (annex.pathobj / key_location).resolve())
@@ -1995,17 +1996,13 @@ def test_AnnexRepo_get_tracking_branch(path):
     eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:433
-@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 
     ar = AnnexRepo(path)
 
-    # ATM only v6+ adjusted branches should return True.
-    # Adjusted branch requires a call of git-annex-adjust and shouldn't
-    # be the state of a fresh clone
-    ok_(not ar.is_managed_branch())
+    if ar.is_managed_branch():
+        raise SkipTest("Test needs repository with non-managed branch")
 
     if ar.supports_unlocked_pointers:
         ar.adjust()
