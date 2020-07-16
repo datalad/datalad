@@ -1995,17 +1995,13 @@ def test_AnnexRepo_get_tracking_branch(path):
     eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:433
-@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 
     ar = AnnexRepo(path)
 
-    # ATM only v6+ adjusted branches should return True.
-    # Adjusted branch requires a call of git-annex-adjust and shouldn't
-    # be the state of a fresh clone
-    ok_(not ar.is_managed_branch())
+    if ar.is_managed_branch():
+        raise SkipTest("Test needs repository with non-managed branch")
 
     if ar.supports_unlocked_pointers:
         ar.adjust()
