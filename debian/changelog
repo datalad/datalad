@@ -1,3 +1,10 @@
+datalad (0.13.1-1) UNRELEASED; urgency=medium
+
+  * New upstream major release
+    - dopped all debian/patches/00*
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 17 Jul 2020 16:49:11 -0400
+
 datalad (0.13.0-1) UNRELEASED; urgency=medium
 
   [ Michael Hanke ]
