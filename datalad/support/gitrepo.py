@@ -2249,8 +2249,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         remote : str, optional
           name of the remote to fetch from. If no remote is given and
           `all_` is not set, the tracking branch is fetched.
-        refspec : str, optional
-          refspec to fetch.
+        refspec : str or list, optional
+          refspec(s) to fetch.
         all_ : bool, optional
           fetch all remotes (and all of their branches).
           Fails if `remote` was given.
@@ -2351,8 +2351,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         remote : str, optional
           name of the remote to push to. If no remote is given and
           `all_` is not set, the tracking branch is pushed.
-        refspec : str, optional
-          refspec to push.
+        refspec : str or list, optional
+          refspec(s) to push.
         all_ : bool, optional
           push to all remotes. Fails if `remote` was given.
         git_options : list, optional
@@ -2482,6 +2482,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     )
                     output = out[info_from] or ''
                 except CommandError as e:
+                    output = None
                     # intercept some errors that we express as an error report
                     # in the info dicts
                     if re.match(
@@ -2493,7 +2494,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                           if l.startswith('hint: ')])
                         if output is None:
                             output = ''
-                    else:
+                    if not output:
                         raise
 
                 for line in output.splitlines():

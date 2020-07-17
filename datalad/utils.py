@@ -34,7 +34,10 @@ import wrapt
 
 from copy import copy as shallow_copy
 from contextlib import contextmanager
-from functools import wraps
+from functools import (
+    lru_cache,
+    wraps,
+)
 from time import sleep
 import inspect
 from itertools import tee
@@ -77,6 +80,8 @@ on_msys_tainted_paths = on_windows \
                         and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 
 
+# Takes ~200msec, so should not be called at import time
+@lru_cache()  # output should not change through life time of datalad process
 def get_linux_distribution():
     """Compatibility wrapper for {platform,distro}.linux_distribution().
     """
@@ -91,16 +96,12 @@ def get_linux_distribution():
     return result
 
 
-try:
-    linux_distribution_name, linux_distribution_release \
-        = get_linux_distribution()[:2]
-    on_debian_wheezy = on_linux \
-                       and linux_distribution_name == 'debian' \
-                       and linux_distribution_release.startswith('7.')
-except:  # pragma: no cover
-    # MIH: IndexError?
-    on_debian_wheezy = False
-    linux_distribution_name = linux_distribution_release = None
+# TODO: deprecated, remove in 0.15
+# Wheezy EOLed 2 years ago, no new datalad builds from neurodebian
+on_debian_wheezy = False
+# Those weren't used for any critical decision making, thus we just set them to None
+# Use get_linux_distribution() directly where needed
+linux_distribution_name = linux_distribution_release = None
 
 # Maximal length of cmdline string
 # Query the system and use hardcoded "knowledge" if None

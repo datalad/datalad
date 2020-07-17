@@ -58,6 +58,7 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     neq_,
     assert_status,
@@ -195,7 +196,7 @@ def test_rerun_onto(path):
 
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     with swallow_outputs():
         ds.rerun(revision="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
@@ -207,33 +208,33 @@ def test_rerun_onto(path):
 
     # Unlike the static change, if we run the ever-growing change on
     # top of itself, we end up with a new commit.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     ds.rerun(onto="HEAD")
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.get_hexsha(),
-         ds.repo.get_hexsha("master"))
+         ds.repo.get_hexsha(DEFAULT_BRANCH))
 
     # An empty `onto` means use the parent of the first revision.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     with swallow_outputs():
         ds.rerun(since="static^", onto="")
     ok_(ds.repo.get_active_branch() is None)
-    for revrange in ["..master", "master.."]:
+    for revrange in [".." + DEFAULT_BRANCH, DEFAULT_BRANCH + ".."]:
         eq_(len(ds.repo.get_revisions(revrange)), 3)
 
     # An empty `onto` means use the parent of the first revision that
     # has a run command.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     with swallow_outputs():
         ds.rerun(since="", onto="", branch="from-base")
     eq_(ds.repo.get_active_branch(), "from-base")
     ok_(all(r["state"] == "clean"
-            for r in ds.diff(fr="master", to="from-base")))
+            for r in ds.diff(fr=DEFAULT_BRANCH, to="from-base")))
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
 
     # We abort when an explicitly specified `onto` doesn't exist.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     assert_result_count(
         ds.rerun(since="", onto="doesnotexist", branch="from-base",
                  on_failure="ignore"),
@@ -367,22 +368,22 @@ def test_rerun_branch(path):
     # commit.  Otherwise, all the metadata (e.g., author date) aside from the
     # parent commit that is used to generate the commit ID may be set when
     # running the tests, which would result in two commits rather than three.
-    for revrange in ["rerun..master", "master..rerun"]:
+    for revrange in ["rerun.." + DEFAULT_BRANCH, DEFAULT_BRANCH + "..rerun"]:
         eq_(len(ds.repo.get_revisions(revrange)), 3)
-    eq_(ds.repo.get_merge_base(["master", "rerun"]),
+    eq_(ds.repo.get_merge_base([DEFAULT_BRANCH, "rerun"]),
         ds.repo.get_hexsha("prerun"))
 
     # Start rerun branch at tip of current branch.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     ds.rerun(since="prerun", branch="rerun2")
     eq_(ds.repo.get_active_branch(), "rerun2")
     eq_('xxxx\n', open(outfile).read())
 
-    eq_(len(ds.repo.get_revisions("master..rerun2")), 2)
-    eq_(len(ds.repo.get_revisions("rerun2..master")), 0)
+    eq_(len(ds.repo.get_revisions(DEFAULT_BRANCH + "..rerun2")), 2)
+    eq_(len(ds.repo.get_revisions("rerun2.." + DEFAULT_BRANCH)), 0)
 
     # Using an existing branch name fails.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     assert_raises(IncompleteResultsError,
                   ds.rerun, since="prerun", branch="rerun2")
 
@@ -411,7 +412,7 @@ def test_rerun_invalid_merge_run_commit(path):
     ds.run("echo invalid >>invalid")
     run_msg = ds.repo.format_commit("%B")
     run_hexsha = ds.repo.get_hexsha()
-    ds.repo.call_git(["reset", "--hard", "master~"])
+    ds.repo.call_git(["reset", "--hard", DEFAULT_BRANCH + "~"])
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
         nrfh.write("non-run")
     ds.save()
@@ -425,7 +426,7 @@ def test_rerun_invalid_merge_run_commit(path):
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.rerun(since="")
         assert_in("has run information but is a merge commit", cml.out)
-    eq_(len(ds.repo.get_revisions(hexsha_orig + "..master")), 1)
+    eq_(len(ds.repo.get_revisions(hexsha_orig + ".." + DEFAULT_BRANCH)), 1)
 
 
 @known_failure_windows
@@ -780,7 +781,7 @@ def test_rerun_explicit(path):
     # Explicit rerun is allowed in a dirty tree.
     ok_(ds.repo.dirty)
     ds.rerun(explicit=True)
-    eq_(orig_head, ds.repo.get_hexsha("master~1"))
+    eq_(orig_head, ds.repo.get_hexsha(DEFAULT_BRANCH + "~1"))
     with open(op.join(ds.path, "foo")) as ifh:
         eq_(orig_content * 2, ifh.read())
 
@@ -788,7 +789,7 @@ def test_rerun_explicit(path):
     ds.rerun(since="", explicit=True)
     eq_(orig_head,
         # Added two rerun commits.
-        ds.repo.get_hexsha("master~3"))
+        ds.repo.get_hexsha(DEFAULT_BRANCH + "~3"))
 
     # With just untracked changes, we can rerun with --onto.
     ds.rerun(since="", onto="", explicit=True)
@@ -797,7 +798,7 @@ def test_rerun_explicit(path):
         ds.repo.get_hexsha("HEAD~4"))
 
     # But checking out a new HEAD can fail when there are modifications.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     ok_(ds.repo.dirty)
     ds.repo.add(["to_modify"], git=True)
     ds.save()

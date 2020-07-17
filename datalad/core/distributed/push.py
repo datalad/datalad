@@ -190,6 +190,10 @@ class Push(Interface):
             recursive=False,
             recursion_limit=None,
             jobs=None):
+        # push uses '^' to annotate the previous pushed committish, and None for default
+        # behavior. '' was/is (to be deprecated) used in `publish`. Alert user about the mistake
+        if since == '':
+            raise ValueError("'since' should point to commitish or use '^'.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
         paths = [resolve_path(p, dataset) for p in assure_list(path)]
@@ -216,6 +220,7 @@ class Push(Interface):
             yield dict(
                 res_kwargs,
                 status='error',
+                path=ds.path,
                 message="Unknown push target '{}'. {}".format(
                     to,
                     'Known targets: {}.'.format(', '.join(repr(s) for s in sr))
@@ -393,9 +398,14 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         label='Push',
         total=4,
     )
-    if not target:
+    # pristine input arg
+    _target = target
+    # verified or auto-detected
+    target = None
+    if not _target:
         try:
             # let Git figure out what needs doing
+            # we will reuse the result further down again, so nothing is wasted
             wannabe_gitpush = repo.push(remote=None, git_options=['--dry-run'])
             # we did not get an explicit push target, get it from Git
             target = set(p.get('remote', None) for p in wannabe_gitpush)
@@ -432,13 +442,15 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             # can only be a single one at this point
             target = target.pop()
 
-    if target not in repo.get_remotes():
-        yield dict(
-            res_kwargs,
-            status='error',
-            message=(
-                "Unknown target sibling '%s'.", target))
-        return
+    if not target:
+        if _target not in repo.get_remotes():
+            yield dict(
+                res_kwargs,
+                status='error',
+                message=(
+                    "Unknown target sibling '%s'.", _target))
+            return
+        target = _target
 
     log_progress(
         lgr.info, pbar_id, "Push refspecs",
@@ -461,9 +473,12 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     # do this on the main target only, and apply the result to all
     # dependencies
     try:
-        wannabe_gitpush = repo.push(
-            remote=target,
-            git_options=['--dry-run'])
+        if _target:
+            # only do it when an explicit target was given, otherwise
+            # we can reuse the result from the auto-probing above
+            wannabe_gitpush = repo.push(
+                remote=target,
+                git_options=['--dry-run'])
     except Exception as e:
         lgr.debug(
             'Dry-run push to check push configuration failed, '
@@ -657,15 +672,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
 
 def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
-    # TODO inefficient, but push only takes a single refspec at a time
-    # at the moment, enhance GitRepo.push() to do all at once
-    push_res = []
-    for refspec in refspecs:
-        push_res.extend(repo.push(
-            remote=target,
-            refspec=refspec,
-            git_options=['--force'] if force_git_push else None,
-        ))
+    push_res = repo.push(
+        remote=target,
+        refspec=refspecs,
+        git_options=['--force'] if force_git_push else None,
+    )
     # TODO maybe compress into a single message whenever everything is
     # OK?
     for pr in push_res:

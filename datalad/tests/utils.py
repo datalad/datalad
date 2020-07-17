@@ -82,6 +82,7 @@ from datalad.utils import (
 from ..cmd import Runner
 from .. import utils
 from ..support.exceptions import CommandNotAvailableError
+from ..support.external_versions import external_versions
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
 from ..support.network import RI
@@ -99,6 +100,12 @@ _TEMP_PATHS_CLONES = set()
 # Additional indicators
 on_travis = bool(os.environ.get('TRAVIS', False))
 
+if external_versions["cmd:git"] >= "2.28":
+    # The specific value here doesn't matter, but it should not be the default
+    # from any Git version to test that we work with custom values.
+    DEFAULT_BRANCH = "dl-test-branch"  # Set by setup_package().
+else:
+    DEFAULT_BRANCH = "master"
 
 # additional shortcuts
 neq_ = assert_not_equal
@@ -1072,6 +1079,15 @@ def with_sameas_remote(func, autoenabled=False):
     @with_tempfile(mkdir=True)
     @with_tempfile(mkdir=True)
     def newfunc(*args, **kwargs):
+        # With git-annex's 8.20200522-77-g1f2e2d15e, transferring from an rsync
+        # special remote hangs on Xenial. This is likely due to an interaction
+        # with an older rsync or openssh version. Use openssh as a rough
+        # indicator. See
+        # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
+        if external_versions['cmd:system-ssh'] < '7.4' and \
+           external_versions['cmd:annex'] > '8.20200522':
+            raise SkipTest("Test known to hang")
+
         sr_path, repo_path = args[-2:]
         fn_args = args[:-2]
         repo = AnnexRepo(repo_path)

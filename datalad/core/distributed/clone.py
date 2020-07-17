@@ -214,11 +214,6 @@ class Clone(Interface):
         if reckless is True:
             # so that we can forget about how things used to be
             reckless = 'auto'
-        if reckless is None and ds:
-            # if reckless is not explicitly given, but we operate on a
-            # superdataset, query whether it has been instructed to operate
-            # in a reckless mode, and inherit it for the coming clone
-            reckless = ds.config.get('datalad.clone.reckless', None)
 
         if isinstance(source, Dataset):
             source = source.path
@@ -331,15 +326,15 @@ def clone_dataset(
       Dataset instance for the clone destination
     reckless : {None, 'auto', 'ephemeral', 'shared-...'}, optional
       Mode switch to put cloned dataset into unsafe/throw-away configurations, i.e.
-      sacrifice data safety for performance or resource footprint.
+      sacrifice data safety for performance or resource footprint. When None
+      and `cfg` is specified, use the value of `datalad.clone.reckless`.
     description : str, optional
       Location description for the annex of the dataset clone (if there is any).
     result_props : dict, optional
       Default properties for any yielded result, passed on to get_status_dict().
     cfg : ConfigManager, optional
-      Configuration will be queried from this instance (i.e. from a particular
-      dataset). If None is given, the global DataLad configuration will be
-      queried.
+      Configuration for parent dataset. This will be queried instead
+      of the global DataLad configuration.
 
     Yields
     ------
@@ -354,6 +349,12 @@ def clone_dataset(
             logger=lgr,
             ds=destds,
         )
+
+    if reckless is None and cfg:
+        # if reckless is not explicitly given, but we operate on a
+        # superdataset, query whether it has been instructed to operate
+        # in a reckless mode, and inherit it for the coming clone
+        reckless = cfg.get('datalad.clone.reckless', None)
 
     dest_path = destds.pathobj
 

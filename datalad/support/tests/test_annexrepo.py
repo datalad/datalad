@@ -21,7 +21,6 @@ from os import mkdir
 from os.path import (
     join as opj,
     basename,
-    realpath,
     relpath,
     curdir,
     pardir,
@@ -49,7 +48,7 @@ from datalad.support.sshconnector import get_connection_hash
 
 from datalad.utils import (
     chpwd,
-    linux_distribution_name,
+    get_linux_distribution,
     on_windows,
     rmtree,
     unlink,
@@ -71,6 +70,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_true,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     find_files,
     get_most_obscure_supported_name,
@@ -786,8 +786,6 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:295
-@known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
 
@@ -805,8 +803,8 @@ def test_AnnexRepo_add_to_annex(path):
 
     out_json = repo.add(filename)
     # file is known to annex:
-    assert_true(os.path.islink(filename_abs),
-                "Annexed file is not a link.")
+    ok_(repo.is_under_annex(filename_abs),
+        "Annexed file is not a link.")
     assert_in('key', out_json)
     key = repo.get_file_key(filename)
     assert_false(key == '')
@@ -935,8 +933,6 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:348
-@known_failure_windows
 @with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
 def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
@@ -950,6 +946,11 @@ def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
         annex.get(fname)
     key_location = annex.get_contentlocation(key, batch=batch)
     assert(key_location)
+
+    if annex.is_managed_branch():
+        # the rest of the test assumes annexed files being symlinks
+        return
+
     # they both should point to the same location eventually
     eq_((annex.pathobj / fname).resolve(),
         (annex.pathobj / key_location).resolve())
@@ -1122,16 +1123,24 @@ def test_annex_backends(path):
 @with_testrepos('basic_annex', flavors=['local'])
 @with_testrepos('basic_annex', flavors=['local'])
 def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
+    # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
+    # 7.20191230-142-g75059c9f3. This is likely due to an interaction with an
+    # older openssh version. See
+    # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
+    if external_versions['cmd:system-ssh'] < '7.4' and \
+       external_versions['cmd:annex'] > '7.20191230':
+        raise SkipTest("Test known to hang")
+
     from datalad import ssh_manager
     # create remotes:
     rm1 = AnnexRepo(remote_1_path, create=False)
     rm2 = AnnexRepo(remote_2_path, create=False)
 
     # check whether we are the first to use these sockets:
-    socket_1 = opj(str(ssh_manager.socket_dir),
-                   get_connection_hash('datalad-test', bundled=True))
-    socket_2 = opj(str(ssh_manager.socket_dir),
-                   get_connection_hash('localhost', bundled=True))
+    hash_1 = get_connection_hash('datalad-test', bundled=True)
+    socket_1 = opj(str(ssh_manager.socket_dir), hash_1)
+    hash_2 = get_connection_hash('localhost', bundled=True)
+    socket_2 = opj(str(ssh_manager.socket_dir), hash_2)
     datalad_test_was_open = exists(socket_1)
     localhost_was_open = exists(socket_2)
 
@@ -1143,7 +1152,12 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     gr.add_remote("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
 
     # Now, make it an annex:
+    # Clear instances so that __init__() is invoked and
+    # _set_shared_connection() is called.
+    AnnexRepo._unique_instances.clear()
     ar = AnnexRepo(repo_path, create=False)
+    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
+    ok_(all(hash_2 not in opt for opt in ar._annex_common_options))
 
     # connection to 'datalad-test' should be known to ssh manager:
     assert_in(socket_1, list(map(str, ssh_manager._connections)))
@@ -1153,13 +1167,6 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     else:
         ok_(not exists(socket_1))
 
-    # TODO: figure it out
-    if external_versions['cmd:annex'] >= '8.20200226':
-        # This is not necessarily the version where it started to hang
-        # See https://github.com/datalad/datalad/pull/4265 for more info
-        raise SkipTest("Version of git-annex might cause us to stall.")
-
-    from datalad import lgr
     # remote interaction causes socket to be created:
     try:
         # Note: For some reason, it hangs if log_stdout/err True
@@ -1190,6 +1197,8 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # now, this connection to localhost was requested:
     assert_in(socket_2, list(map(str, ssh_manager._connections)))
+    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
+    ok_(any(hash_2 in opt for opt in ar._annex_common_options))
     # but socket was not touched:
     if localhost_was_open:
         # FIXME: occasionally(?) fails in V6:
@@ -1217,9 +1226,8 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_annex_remove(path1, path2):
-    repo = AnnexRepo(path1, create=False)
+def test_annex_remove(path):
+    repo = AnnexRepo(path, create=False)
 
     file_list = repo.get_annexed_files()
     assert len(file_list) >= 1
@@ -1235,10 +1243,7 @@ def test_annex_remove(path1, path2):
     repo.add("rm-test.dat")
 
     # remove without '--force' should fail, due to staged changes:
-    if repo.is_direct_mode():
-        assert_raises(CommandError, repo.remove, "rm-test.dat")
-    else:
-        assert_raises(ValueError, repo.remove, "rm-test.dat")
+    assert_raises(CommandError, repo.remove, "rm-test.dat")
     assert_in("rm-test.dat", repo.get_annexed_files())
 
     # now force:
@@ -1441,33 +1446,6 @@ def test_annex_get_annexed_files(path):
         set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_annex_remove(path):
-    repo = AnnexRepo(path, create=False)
-
-    file_list = repo.get_annexed_files()
-    assert len(file_list) >= 1
-    # remove a single file
-    out = repo.remove(file_list[0])
-    assert_not_in(file_list[0], repo.get_annexed_files())
-    eq_(out[0], file_list[0])
-
-    with open(opj(repo.path, "rm-test.dat"), "w") as f:
-        f.write("whatever")
-
-    # add it
-    repo.add("rm-test.dat")
-
-    # remove without '--force' should fail, due to staged changes:
-    assert_raises(CommandError, repo.remove, "rm-test.dat")
-    assert_in("rm-test.dat", repo.get_annexed_files())
-
-    # now force:
-    out = repo.remove("rm-test.dat", force=True)
-    assert_not_in("rm-test.dat", repo.get_annexed_files())
-    eq_(out[0], "rm-test.dat")
-
-
 @with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
 def test_is_available(batch, p):
@@ -1578,6 +1556,7 @@ def test_annex_version_handling_bad_git_annex(path):
         eq_(AnnexRepo.git_annex_version, None)
         with assert_raises(MissingExternalDependency) as cme:
             AnnexRepo(path)
+        linux_distribution_name = get_linux_distribution()[0]
         if linux_distribution_name == 'debian':
             assert_in("http://neuro.debian.net", str(cme.exception))
         eq_(AnnexRepo.git_annex_version, None)
@@ -1889,13 +1868,15 @@ def test_wanted(path):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
+    obscure_name = get_most_obscure_supported_name()
+
     ar = AnnexRepo(path, create=True)
     create_tree(
         path,
         {
             'up.dat': 'content',
-            'd o w n' if on_windows else 'd o"w n': {
-                'd o w n.dat': 'lowcontent'
+            obscure_name: {
+                obscure_name + '.dat': 'lowcontent'
             }
         })
     ar.add('.', git=False)
@@ -1935,7 +1916,7 @@ def test_AnnexRepo_metadata(path):
         dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
     ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
-    playfile = opj("d o w n" if on_windows else 'd o"w n', 'd o w n.dat')
+    playfile = opj(obscure_name, obscure_name + '.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
@@ -1994,16 +1975,18 @@ def test_AnnexRepo_get_corresponding_branch(path):
 
     ar = AnnexRepo(path)
 
-    # we should be on master.
-    eq_('master', ar.get_corresponding_branch() or ar.get_active_branch())
+    # we should be on the default branch.
+    eq_(DEFAULT_BRANCH,
+        ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
     if ar.supports_unlocked_pointers:
         ar.adjust()
-        # as above, we still want to get 'master', while being on
-        # 'adjusted/master(unlocked)'
-        eq_('adjusted/master(unlocked)', ar.get_active_branch())
-        eq_('master', ar.get_corresponding_branch())
+        # as above, we still want to get the default branch, while being on
+        # 'adjusted/<default branch>(unlocked)'
+        eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
+            ar.get_active_branch())
+        eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -2012,20 +1995,16 @@ def test_AnnexRepo_get_tracking_branch(path):
     ar = AnnexRepo(path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
-    eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
+    eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:433
-@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 
     ar = AnnexRepo(path)
 
-    # ATM only v6+ adjusted branches should return True.
-    # Adjusted branch requires a call of git-annex-adjust and shouldn't
-    # be the state of a fresh clone
-    ok_(not ar.is_managed_branch())
+    if ar.is_managed_branch():
+        raise SkipTest("Test needs repository with non-managed branch")
 
     if ar.supports_unlocked_pointers:
         ar.adjust()
@@ -2231,7 +2210,6 @@ def test_commit_annex_commit_changed():
 
 @with_tempfile(mkdir=True)
 def check_files_split_exc(cls, topdir):
-    from glob import glob
     r = cls(topdir)
     # absent files -- should not crash with "too long" but some other more
     # meaningful exception
