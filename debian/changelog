@@ -1,10 +1,16 @@
 datalad (0.13.0-1) UNRELEASED; urgency=medium
 
+  [ Michael Hanke ]
   * New upstream major release.
   * debian/control
     - add python3-annexremote as dependency.
 
- -- Michael Hanke <mih@debian.org>  Wed, 24 Jun 2020 13:48:43 +0200
+  [ Yaroslav Halchenko ]
+  * debian/patches
+    + 0001-BF-TST-skip-one-case-of-test_ria_basics.test_binary_.patch
+    + 0001-BF-annotate-tests-in-test_utils_cached_dataset-with-.patch
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 16 Jul 2020 23:41:09 -0400
 
 datalad (0.12.7-1) unstable; urgency=medium
 
