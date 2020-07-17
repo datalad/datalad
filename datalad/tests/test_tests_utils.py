@@ -92,18 +92,9 @@ def test_with_tempfile_dir_via_env_variable():
     target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
     assert_false(os.path.exists(target), "directory %s already exists." % target)
 
-    # if patch the env and expect it to be respected by existing
-    # ConfigManager instance, we need to reload
-    try:
-        with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
-            dl_cfg.reload()
-            filename = _with_tempfile_decorated_dummy()
-            ok_startswith(filename, target)
-    finally:
-        # "clean up" ConfigManager
-        # Note that force is needed since there was no change to the config
-        # files, that reload can discover.
-        dl_cfg.reload(force=True)
+    with patch_config({'datalad.tests.temp.dir': target}):
+        filename = _with_tempfile_decorated_dummy()
+        ok_startswith(filename, target)
 
 @with_tempfile
 @with_tempfile
@@ -182,18 +173,14 @@ def test_get_resolved_values():
         + ['local'],
         _get_resolved_flavors(flavors))
 
-    try:  # guard ConfigManager from carrying patched env in case of failure
-        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
-            dl_cfg.reload(force=True)
-            eq_(_get_resolved_flavors(flavors), ['local'])
+    with patch_config({'datalad.tests.nonetwork': '1'}):
+        eq_(_get_resolved_flavors(flavors), ['local'])
 
-            # and one more to see the exception being raised if nothing to teston
-            @with_testrepos(flavors=['network'])
-            def magical():
-                raise AssertionError("Must not be ran")
-            assert_raises(SkipTest, magical)
-    finally:
-        dl_cfg.reload(force=True)
+        # and one more to see the exception being raised if nothing to teston
+        @with_testrepos(flavors=['network'])
+        def magical():
+            raise AssertionError("Must not be ran")
+        assert_raises(SkipTest, magical)
 
 def test_with_tempfile_mkdir():
     dnames = []  # just to store the name within the decorated function

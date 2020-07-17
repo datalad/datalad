@@ -22,17 +22,18 @@ from datalad.support.external_versions import external_versions
 from datalad.utils import Path
 
 from datalad.tests.utils import (
+    assert_false,
+    assert_in,
+    assert_is_instance,
     assert_raises,
     eq_,
-    skip_ssh,
-    with_tempfile,
     get_most_obscure_supported_name,
-    swallow_logs,
-    assert_in,
-    assert_false,
     ok_,
-    assert_is_instance,
+    patch_config,
     skip_if_on_windows,
+    skip_ssh,
+    swallow_logs,
+    with_tempfile,
 )
 from datalad import cfg as dl_cfg
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
@@ -262,24 +263,19 @@ def test_ssh_custom_identity_file():
         raise SkipTest("Travis-specific '{}' identity file does not exist"
                        .format(ifile))
 
-    try:
-        with patch.dict("os.environ", {"DATALAD_SSH_IDENTITYFILE": ifile}):
-            dl_cfg.reload(force=True)
-            with swallow_logs(new_level=logging.DEBUG) as cml:
-                manager = SSHManager()
-                ssh = manager.get_connection('ssh://localhost')
-                cmd_out, _ = ssh("echo blah")
-                expected_socket = op.join(
-                    str(manager.socket_dir),
-                    get_connection_hash("localhost", identity_file=ifile,
-                                        bundled=True))
-                ok_(exists(expected_socket))
-                manager.close()
-                assert_in("-i", cml.out)
-                assert_in(ifile, cml.out)
-    finally:
-        # Prevent overridden DATALAD_SSH_IDENTITYFILE from lingering.
-        dl_cfg.reload(force=True)
+    with patch_config({"datalad.ssh.identityfile": ifile}):
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            manager = SSHManager()
+            ssh = manager.get_connection('ssh://localhost')
+            cmd_out, _ = ssh("echo blah")
+            expected_socket = op.join(
+                str(manager.socket_dir),
+                get_connection_hash("localhost", identity_file=ifile,
+                                    bundled=True))
+            ok_(exists(expected_socket))
+            manager.close()
+            assert_in("-i", cml.out)
+            assert_in(ifile, cml.out)
 
 
 @skip_if_on_windows
