@@ -509,12 +509,12 @@ def test_skip_if_no_network():
         def somefunc(a1):
             return a1
         ok_(hasattr(somefunc, "network"))
-        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        with patch_config({'datalad.tests.nonetwork': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
         # and now if used as a function, not a decorator
-        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        with patch_config({'datalad.tests.nonetwork': '1'}):
             assert_raises(SkipTest, skip_if_no_network)
         with patch.dict('os.environ', {}):
             eq_(skip_if_no_network(), None)
