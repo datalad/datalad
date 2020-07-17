@@ -1,0 +1,57 @@
+Update 0.13.1-52-g81b383eb0:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    dd647fab35c6db714d50cc2bc0b00de65aa61d36..81b383eb06ab8e250202d79427e77c9e1c9d16a4
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge branch 'maint'
+   0f3f6279b^-1
++  Merge pull request #4597 from yarikoptic/rf-dotgit
+   fef8b094d^-1
+-  Merge pull request #4587 from yarikoptic/rf-quote_cmdlineargs
+   38af32be0^-1
++  Merge pull request #4583 from yarikoptic/rm-deprecated
+   a655d9f99^-1
++  Merge pull request #4650 from kyleam/min-git-version
+   e73029804^-1
+-  Merge branch 'maint'
+   67620e51d^-1
+-  Merge branch 'maint' into master
+   9b33b39a3^-1
+-  Merge branch 'maint' into master
+   8445de4dd^-1
+-  Merge branch 'maint' into master
+   9744e8ae6^-1
++  Merge pull request #4669 from kyleam/addurls-stdin
+   d8ce04960^-1
+-  Merge branch 'maint' into master
+   92efc94b9^-1
+-  Merge remote-tracking branch 'origin/maint'
+   e61a8c26f^-1
+-  Merge remote-tracking branch 'origin/maint'
+   51620008f^-1
++  Merge pull request #4693 from mih/opt-push
+   dd09e4dfd^-1
++  Merge pull request #4695 from jwodder/use-console-scripts
+   eda6c9e8e^-1
+-  Merge branch 'maint' into master
+   89abbcc10^-1
+-  Merge pull request #4707 from bpoldrack/fix-cfg-test
+   8b629f95d^-1
+-  Merge pull request #4708 from mih/tst-tmpdir
+   823033aa2^-1
+   Will be reverted by changes in bpoldrack/tst-tmpdir (gh-4733)
+-  Merge branch 'maint' into master
+   be0e810d2^-1
+-  Merge pull request #4731 from mih/tst-obscure
+   2740f6305^-1
+-  Merge branch 'maint' into master
+   493add92f^-1
+-  Merge branch 'maint' into master
+   81b383eb0^-1
