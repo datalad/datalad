@@ -65,11 +65,13 @@ matrix:
     - NOSE_SELECTION_OP=not
     - _DL_CRON=1
   - python: 3.5
+    dist: bionic # ancient Xenial comes with an SSH 7.2 that has stalling issues
     # Split runs for v6 since a single one is too long now
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=not
   - python: 3.5
+    dist: bionic # ancient Xenial comes with an SSH 7.2 that has stalling issues
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=""
@@ -77,6 +79,7 @@ matrix:
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
   - python: 3.5
+    dist: bionic # ancient Xenial comes with an SSH 7.2 that has stalling issues
     # Run slow etc tests under a single tricky scenario
     env:
     - _DL_TMPDIR="/var/tmp/sym link"
@@ -85,6 +88,7 @@ matrix:
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
   - python: 3.5
+    dist: bionic # ancient Xenial comes with an SSH 7.2 that has stalling issues
     # A run loaded with various customizations to smoke test those functionalities
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
@@ -98,6 +102,7 @@ matrix:
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
     - DATALAD_LOG_VMEM=1
   - python: 3.5
+    dist: bionic # ancient Xenial comes with an SSH 7.2 that has stalling issues
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
