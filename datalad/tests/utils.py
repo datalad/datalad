@@ -162,7 +162,7 @@ def skip_if_no_network(func=None):
     check_not_generatorfunction(func)
 
     def check_and_raise():
-        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        if dl_cfg.get('datalad.tests.nonetwork'):
             raise SkipTest("Skipping since no network settings")
 
     if func:
@@ -1035,13 +1035,13 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
         # we should always have at least one repo to test on, unless explicitly only
         # network was requested by we are running without networked tests
-        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+        if not (dl_cfg.get('datalad.tests.nonetwork') and flavors == ['network']):
             assert(testrepos_uris)
         else:
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
-        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
+        fake_dates = dl_cfg.get("datalad.fake-dates")
         ntested = 0
         for uri in testrepos_uris:
             if count and ntested >= count:
