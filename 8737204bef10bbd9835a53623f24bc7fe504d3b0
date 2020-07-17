@@ -1,0 +1,66 @@
+Update 0.13.0-1-g16962b5f7:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    16962b5f7c2f36860bc642f671f430735964ccc6..2877ea10534f1822553c91bd16176210eb28dd02
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4652 from yarikoptic/bf-testremote
+   bee63ce98^-1
+-  Merge pull request #4654 from yarikoptic/bf-skip-no-network
+   be643aaf0^-1
++  Merge pull request #4657 from kyleam/get-inherit-reckless
+   1a2efe68e^-1
+-  Merge pull request #4664 from yarikoptic/enh-open-files
+   d1345797b^-1
++  Merge pull request #4666 from mih/enh-nonpathresults
+   d98eb91c4^-1
+-  Merge pull request #4663 from kyleam/travis-py38
+   214bdc42a^-1
++  Merge pull request #4673 from mih/bf-resultrendering
+   b8e95bca9^-1
++  Merge pull request #4674 from mih/bf-pushcrash
+   33f25c76b^-1
+-  Merge pull request #4680 from kyleam/ssh-hang-tweaks
+   fef3c7023^-1
++  Merge pull request #4675 from mih/opt-pushdryrun
+   b0c2bfce3^-1
++  Merge pull request #4687 from xgui3783/bugfix_gruntDepOnMaint
+   97d54c014^-1
+-  Merge pull request #4694 from mih/tst-nowincov
+   a26cb6e38^-1
++  Merge pull request #4692 from mih/maint
+   1cb823d94^-1
++  Merge pull request #4682 from yarikoptic/enhrf-since
+   547acd948^-1
++  Merge pull request #4703 from mih/bf-4702
+   20367124b^-1
++  Merge pull request #4696 from yarikoptic/opt-no-distro
+   ea0790b56^-1
+-  Merge pull request #4688 from kyleam/skip-test-annex-ssh-if-old
+   2a81cb921^-1
+-  MNT: CONTRIBUTORS: Update
+   abaaed2e6^-1
+-  Merge branch 'rf-travis-conda' into maint
+   07b684cad^-1
++  Merge pull request #4729 from mih/bf-sshexc
+   3ae696c87^-1
+-  Merge pull request #4632 from kyleam/git-configurable-default-branch
+   9a4fcc66f^-1
+-  Merge pull request #4732 from mih/tst-symlink
+   849801bb1^-1
+-  Merge pull request #4734 from kyleam/annex-autobuilds
+   05262a90d^-1
+-  Merge pull request #4737 from mih/bf-4713
+   b0815a5cb^-1
+-  Merge pull request #4738 from mih/bf-4711
+   1c529a59d^-1
+-  Merge pull request #4739 from mih/bf-4712
+   5b36603ae^-1
+-  Merge pull request #4743 from mih/bf-4710
+   2877ea105^-1
