@@ -1868,13 +1868,15 @@ def test_wanted(path):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
+    obscure_name = get_most_obscure_supported_name()
+
     ar = AnnexRepo(path, create=True)
     create_tree(
         path,
         {
             'up.dat': 'content',
-            'd o w n' if on_windows else 'd o"w n': {
-                'd o w n.dat': 'lowcontent'
+            obscure_name: {
+                obscure_name + '.dat': 'lowcontent'
             }
         })
     ar.add('.', git=False)
@@ -1914,7 +1916,7 @@ def test_AnnexRepo_metadata(path):
         dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
     ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
-    playfile = opj("d o w n" if on_windows else 'd o"w n', 'd o w n.dat')
+    playfile = opj(obscure_name, obscure_name + '.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
