@@ -577,7 +577,7 @@ class SSHManager(object):
         allow_fail: bool, optional
           If True, swallow exceptions which might be thrown during
           connection.close, and just log them at DEBUG level
-        ctrl_path: str or list of str, optional
+        ctrl_path: str, Path, or list of str or Path, optional
           If specified, only the path(s) provided would be considered
         """
         if self._connections:
