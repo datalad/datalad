@@ -26,7 +26,7 @@ env:
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
-    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 7.20190819"
+    - _DL_ANNEX_INSTALL_SCENARIO="neurodebian-devel"
   matrix:
 ##1    - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
