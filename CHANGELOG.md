@@ -15,7 +15,23 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- Git versions below v2.19.1 are no longer supported.  ([#4650][])
+
+- The `get_git_dir` static method of `GitRepo` is deprecated and will
+  be removed in a later release.  Use the `dot_git` attribute of an
+  instance instead.  ([#4597][])
+
+- The `datalad.inteface.run` module, which was deprecated in 0.12.0
+  and kept as a compatibility shim for `datalad.core.local.run`, has
+  been removed.  ([#4583][])
+
+- The `saver` argument of `datalad.core.local.run.run_command`, marked
+  as obsolete in 0.12.0, has been removed.  ([#4583][])
+
+- The `linux_distribution_name`, `linux_distribution_release`, and
+  `on_debian_wheezy` attributes in `datalad.utils` are no longer set
+  at import time and will be removed in a later release.  Use
+  `datalad.utils.get_linux_distribution` instead.  ([#4696][])
 
 ### Fixes
 
@@ -23,7 +39,58 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-?
+- [addurls][] learned how to read data from standard input.  ([#4669][])
+
+- [push][] now pushes the git-annex branch at the same time as the
+  other refspecs to avoid an unnecessary `git push` call.  ([#4693][])
+
+- Command-line scripts are now defined via the `entry_points` argument
+  of `setuptools.setup` instead of the `scripts` argument.  ([#4695][])
+
+
+## 0.13.1 (July 17, 2020) -- .
+
+### Fixes
+
+- Cloning a subdataset should inherit the parent's
+  `datalad.clone.reckless` value, but that did not happen when cloning
+  via `datalad get` rather than `datalad install` or `datalad clone`.
+  ([#4657][])
+
+- The default result renderer crashed when the result did not have a
+  `path` key.  ([#4666][]) ([#4673][])
+
+- `datalad push` didn't show information about `git push` errors when
+  the output was not in the format that it expected.  ([#4674][])
+
+- `datalad push` silently accepted an empty string for `--since` even
+  though it is an invalid value.  ([#4682][])
+
+- Our JavaScript testing setup on Travis grew stale and has now been
+  updated.  (Thanks to Xiao Gui.)  ([#4687][])
+
+- The new class for running Git commands (added in v0.13.0) ignored
+  any changes to the process environment that occurred after
+  instantiation.  ([#4703][])
+
+### Enhancements and new features
+
+- `datalad push` now avoids unnecessary `git push` dry runs and pushes
+  all refspecs with a single `git push` call rather than invoking `git
+  push` for each one.  ([#4692][]) ([#4675][])
+
+- The readability of SSH error messages has been improved.  ([#4729][])
+
+- `datalad.support.annexrepo` avoids calling
+  `datalad.utils.get_linux_distribution` at import time and caches the
+  result once it is called because, as of Python 3.8, the function
+  uses `distro` underneath, adding noticeable overhead.  ([#4696][])
+
+  Third-party code should be updated to use `get_linux_distribution`
+  directly in the unlikely event that the code relied on the
+  import-time call to `get_linux_distribution` setting the
+  `linux_distribution_name`, `linux_distribution_release`, or
+  `on_debian_wheezy` attributes in `datalad.utils.
 
 
 ## 0.13.0 (June 23, 2020) -- .
@@ -2920,6 +2987,23 @@ publishing
 [#4560]: https://github.com/datalad/datalad/issues/4560
 [#4568]: https://github.com/datalad/datalad/issues/4568
 [#4581]: https://github.com/datalad/datalad/issues/4581
+[#4583]: https://github.com/datalad/datalad/issues/4583
+[#4597]: https://github.com/datalad/datalad/issues/4597
 [#4617]: https://github.com/datalad/datalad/issues/4617
 [#4619]: https://github.com/datalad/datalad/issues/4619
 [#4620]: https://github.com/datalad/datalad/issues/4620
+[#4650]: https://github.com/datalad/datalad/issues/4650
+[#4657]: https://github.com/datalad/datalad/issues/4657
+[#4666]: https://github.com/datalad/datalad/issues/4666
+[#4669]: https://github.com/datalad/datalad/issues/4669
+[#4673]: https://github.com/datalad/datalad/issues/4673
+[#4674]: https://github.com/datalad/datalad/issues/4674
+[#4675]: https://github.com/datalad/datalad/issues/4675
+[#4682]: https://github.com/datalad/datalad/issues/4682
+[#4687]: https://github.com/datalad/datalad/issues/4687
+[#4692]: https://github.com/datalad/datalad/issues/4692
+[#4693]: https://github.com/datalad/datalad/issues/4693
+[#4695]: https://github.com/datalad/datalad/issues/4695
+[#4696]: https://github.com/datalad/datalad/issues/4696
+[#4703]: https://github.com/datalad/datalad/issues/4703
+[#4729]: https://github.com/datalad/datalad/issues/4729

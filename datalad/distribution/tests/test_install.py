@@ -61,6 +61,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     assert_in_results,
+    DEFAULT_BRANCH,
     ok_startswith,
     serve_path_via_http,
     swallow_logs,
@@ -769,8 +770,8 @@ def test_install_consistent_state(src, dest, dest2, dest3):
                                         result_xfm='paths')))
         assert len(datasets) == 2  # in this test
         for ds in datasets:
-            # all of them should be in master branch
-            eq_(ds.repo.get_active_branch(), "master")
+            # all of them should be in the default branch
+            eq_(ds.repo.get_active_branch(), DEFAULT_BRANCH)
             # all of them should be clean, so sub should be installed in a "version"
             # as pointed by the super
             ok_(not ds.repo.dirty)

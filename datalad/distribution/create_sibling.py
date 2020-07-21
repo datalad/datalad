@@ -366,13 +366,12 @@ def _create_dataset_sibling(
     branch = ds_repo.get_active_branch()
     if branch is not None:
         branch = ds_repo.get_corresponding_branch(branch) or branch
-        if branch != "master":
-            # Setting the HEAD for the created sibling to the original
-            # repo's current branch should be unsurprising, and it
-            # helps with consumers that don't properly handle the
-            # default master with no commits. See gh-4349.
-            shell("git -C {} symbolic-ref HEAD refs/heads/{}"
-                  .format(sh_quote(remoteds_path), branch))
+        # Setting the HEAD for the created sibling to the original repo's
+        # current branch should be unsurprising, and it helps with consumers
+        # that don't properly handle the default branch with no commits. See
+        # gh-4349.
+        shell("git -C {} symbolic-ref HEAD refs/heads/{}"
+              .format(sh_quote(remoteds_path), branch))
 
     if install_postupdate_hook:
         # enable metadata refresh on dataset updates to publication server
@@ -948,6 +947,14 @@ if [ ! -e "$dsdir/.git" ]; then
 fi
 
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
+
+# Avoid file name collisions.
+suffix=0
+logfile_orig="$logfile"
+while [ -f "$logfile" ]; do
+  suffix=$(( $suffix + 1 ))
+  logfile="$logfile_orig.$suffix"
+done
 
 ( which datalad > /dev/null \
   && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \

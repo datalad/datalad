@@ -216,14 +216,9 @@ def test_with_tempfile_specified_prefix(d1):
     ok_('test_with_tempfile_specified_prefix' not in d1)
 
 
-@known_failure_githubci_win
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
-    if platform.system() in ('Linux', 'Darwin'):
-        eq_(n, OBSCURE_PREFIX + OBSCURE_FILENAMES[1])
-    else:
-        # ATM no one else is as good
-        ok_(n in OBSCURE_PREFIX + OBSCURE_FILENAMES[2:])
+    assert_in(n, [OBSCURE_PREFIX + OF for OF in OBSCURE_FILENAMES[1:]])
 
 
 def test_keeptemp_via_env_variable():
@@ -254,15 +249,15 @@ def test_keeptemp_via_env_variable():
 @with_tempfile
 def test_ok_symlink_helpers(tmpfile):
 
-    if on_windows:  # pragma: no cover
-        raise SkipTest("no sylmlinks on windows")
-
     assert_raises(AssertionError, ok_symlink, tmpfile)
     assert_raises(AssertionError, ok_good_symlink, tmpfile)
     assert_raises(AssertionError, ok_broken_symlink, tmpfile)
 
     tmpfile_symlink = tmpfile + '_symlink'
-    os.symlink(tmpfile, tmpfile_symlink)  
+    try:
+        os.symlink(tmpfile, tmpfile_symlink)
+    except Exception:
+        raise SkipTest("Cannot create a symlink")
 
     # broken symlink
     ok_symlink(tmpfile_symlink)
@@ -651,7 +646,6 @@ def test_ignore_nose_capturing_stdout():
         ignore_nose_capturing_stdout(raise_exc)()
 
 
-@skip_if_on_windows  # no symlinks. may be skip if not hasattr(os, "symlink")
 @with_tree(tree={'ingit': '', 'staged': 'staged', 'notingit': ''})
 def test_ok_file_under_git_symlinks(path):
     # Test that works correctly under symlinked path
@@ -660,7 +654,10 @@ def test_ok_file_under_git_symlinks(path):
     orepo.commit('msg')
     orepo.add('staged')
     lpath = path + "-symlink"  # will also be removed AFAIK by our tempfile handling
-    os.symlink(path, lpath)
+    try:
+        os.symlink(path, lpath)
+    except Exception:
+        raise SkipTest("Cannot create a symlink")
     ok_symlink(lpath)
     ok_file_under_git(op.join(path, 'ingit'))
     ok_file_under_git(op.join(lpath, 'ingit'))

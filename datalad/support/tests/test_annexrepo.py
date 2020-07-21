@@ -70,6 +70,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_true,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     find_files,
     get_most_obscure_supported_name,
@@ -785,8 +786,6 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:295
-@known_failure_windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
 
@@ -804,8 +803,8 @@ def test_AnnexRepo_add_to_annex(path):
 
     out_json = repo.add(filename)
     # file is known to annex:
-    assert_true(os.path.islink(filename_abs),
-                "Annexed file is not a link.")
+    ok_(repo.is_under_annex(filename_abs),
+        "Annexed file is not a link.")
     assert_in('key', out_json)
     key = repo.get_file_key(filename)
     assert_false(key == '')
@@ -934,8 +933,6 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:348
-@known_failure_windows
 @with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
 def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
@@ -949,6 +946,11 @@ def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
         annex.get(fname)
     key_location = annex.get_contentlocation(key, batch=batch)
     assert(key_location)
+
+    if annex.is_managed_branch():
+        # the rest of the test assumes annexed files being symlinks
+        return
+
     # they both should point to the same location eventually
     eq_((annex.pathobj / fname).resolve(),
         (annex.pathobj / key_location).resolve())
@@ -1866,13 +1868,15 @@ def test_wanted(path):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
+    obscure_name = get_most_obscure_supported_name()
+
     ar = AnnexRepo(path, create=True)
     create_tree(
         path,
         {
             'up.dat': 'content',
-            'd o w n' if on_windows else 'd o"w n': {
-                'd o w n.dat': 'lowcontent'
+            obscure_name: {
+                obscure_name + '.dat': 'lowcontent'
             }
         })
     ar.add('.', git=False)
@@ -1912,7 +1916,7 @@ def test_AnnexRepo_metadata(path):
         dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
     ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
-    playfile = opj("d o w n" if on_windows else 'd o"w n', 'd o w n.dat')
+    playfile = opj(obscure_name, obscure_name + '.dat')
     target = {
         'up.dat': {
             'tag': ['one and= ']},
@@ -1971,16 +1975,18 @@ def test_AnnexRepo_get_corresponding_branch(path):
 
     ar = AnnexRepo(path)
 
-    # we should be on master.
-    eq_('master', ar.get_corresponding_branch() or ar.get_active_branch())
+    # we should be on the default branch.
+    eq_(DEFAULT_BRANCH,
+        ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
     if ar.supports_unlocked_pointers:
         ar.adjust()
-        # as above, we still want to get 'master', while being on
-        # 'adjusted/master(unlocked)'
-        eq_('adjusted/master(unlocked)', ar.get_active_branch())
-        eq_('master', ar.get_corresponding_branch())
+        # as above, we still want to get the default branch, while being on
+        # 'adjusted/<default branch>(unlocked)'
+        eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
+            ar.get_active_branch())
+        eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -1989,20 +1995,16 @@ def test_AnnexRepo_get_tracking_branch(path):
     ar = AnnexRepo(path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
-    eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
+    eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:433
-@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 
     ar = AnnexRepo(path)
 
-    # ATM only v6+ adjusted branches should return True.
-    # Adjusted branch requires a call of git-annex-adjust and shouldn't
-    # be the state of a fresh clone
-    ok_(not ar.is_managed_branch())
+    if ar.is_managed_branch():
+        raise SkipTest("Test needs repository with non-managed branch")
 
     if ar.supports_unlocked_pointers:
         ar.adjust()

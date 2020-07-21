@@ -39,6 +39,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_repo_status,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     get_most_obscure_supported_name,
     integration,
@@ -546,7 +547,8 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     eq_([], repo.get_remote_branches())
 
     fetched = repo.fetch(remote="ssh-remote")
-    assert_in('ssh-remote/master', [commit['ref'] for commit in fetched])
+    assert_in('ssh-remote/' + DEFAULT_BRANCH,
+              [commit['ref'] for commit in fetched])
     assert_repo_status(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
@@ -555,7 +557,8 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     ok_(op.exists(socket_path))
 
     # we actually fetched it:
-    assert_in('ssh-remote/master', repo.get_remote_branches())
+    assert_in('ssh-remote/' + DEFAULT_BRANCH,
+              repo.get_remote_branches())
 
 
 # broken,possibly due to a GitPy issue with windows sshurls
@@ -673,7 +676,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
     clone.add(filename)
     clone.commit("new file added.")
     # TODO: need checkout first:
-    clone.push('origin', '+master:new-branch')
+    clone.push('origin', '+{}:new-branch'.format(DEFAULT_BRANCH))
     origin.checkout('new-branch')
     ok_(op.exists(op.join(orig_path, filename)))
 
@@ -742,7 +745,7 @@ def test_GitRepo_get_files(url, path):
 
     # get the files via GitRepo:
     local_files = set(gr.get_files())
-    remote_files = set(gr.get_files(branch="origin/master"))
+    remote_files = set(gr.get_files(branch="origin/" + DEFAULT_BRANCH))
 
     eq_(local_files, set(gr.get_indexed_files()))
     eq_(local_files, remote_files)
@@ -760,12 +763,12 @@ def test_GitRepo_get_files(url, path):
     local_files = set(gr.get_files())
     eq_(local_files, os_files.union({filename}))
     # retrieve remote branch again, which should not have changed:
-    remote_files = set(gr.get_files(branch="origin/master"))
+    remote_files = set(gr.get_files(branch="origin/" + DEFAULT_BRANCH))
     eq_(remote_files, os_files)
     eq_(set([filename]), local_files.difference(remote_files))
 
     # switch back and query non-active branch:
-    gr.checkout('master')
+    gr.checkout(DEFAULT_BRANCH)
     local_files = set(gr.get_files())
     branch_files = set(gr.get_files(branch="new_branch"))
     eq_(set([filename]), branch_files.difference(local_files))
@@ -896,7 +899,7 @@ def test_GitRepo_git_get_branch_commits_(src):
     repo.commit('committing')
 
     commits_default = list(repo.get_branch_commits_())
-    commits = list(repo.get_branch_commits_('master'))
+    commits = list(repo.get_branch_commits_(DEFAULT_BRANCH))
     eq_(commits, commits_default)
     eq_(len(commits), 1)
 
@@ -995,7 +998,7 @@ def check_update_submodule_init_adjust_branch(is_ancestor, path):
         src_sub.commit(msg="c2", options=["--allow-empty"])
     else:
         # ... where the registered commit is NOT an ancestor of the new one.
-        src_sub.call_git(["reset", "--hard", "master~1"])  # c0
+        src_sub.call_git(["reset", "--hard", DEFAULT_BRANCH + "~1"])  # c0
     hexsha_sub = src_sub.get_hexsha()
 
     clone = GitRepo.clone(url=src.path,
@@ -1005,7 +1008,7 @@ def check_update_submodule_init_adjust_branch(is_ancestor, path):
                               path=op.join(clone.path, "sub"),
                               create=True)
     ok_(clone.dirty)
-    eq_(clone_sub.get_active_branch(), "master")
+    eq_(clone_sub.get_active_branch(), DEFAULT_BRANCH)
     eq_(hexsha_sub, clone_sub.get_hexsha())
 
     clone.update_submodule("sub", init=True)
@@ -1013,7 +1016,7 @@ def check_update_submodule_init_adjust_branch(is_ancestor, path):
     assert_false(clone.dirty)
     eq_(hexsha_registered, clone_sub.get_hexsha())
     if is_ancestor:
-        eq_(clone_sub.get_active_branch(), "master")
+        eq_(clone_sub.get_active_branch(), DEFAULT_BRANCH)
     else:
         assert_false(clone_sub.get_active_branch())
 
@@ -1380,11 +1383,11 @@ def test_get_commit_date(path):
     neq_(date, None)
     eq_(date, DATE_EPOCH)
 
-    eq_(date, gr.get_commit_date('master'))
+    eq_(date, gr.get_commit_date(DEFAULT_BRANCH))
     # and even if we get into a detached head
     gr.checkout(gr.get_hexsha())
     eq_(gr.get_active_branch(), None)
-    eq_(date, gr.get_commit_date('master'))
+    eq_(date, gr.get_commit_date(DEFAULT_BRANCH))
 
 
 @with_tree(tree={"foo": "foo content",
@@ -1493,7 +1496,7 @@ def test_GitRepo_get_revisions(path):
 
     # But will raise if on a bad ref name, including an unborn branch.
     with assert_raises(CommandError):
-        gr.get_revisions("master")
+        gr.get_revisions(DEFAULT_BRANCH)
 
     # By default, we query HEAD.
     commit("1")
@@ -1503,24 +1506,24 @@ def test_GitRepo_get_revisions(path):
     commit("2")
 
     # We can also query branch by name.
-    eq_(len(gr.get_revisions("master")), 1)
+    eq_(len(gr.get_revisions(DEFAULT_BRANCH)), 1)
     eq_(len(gr.get_revisions("other")), 2)
 
     # "name" is sugar for ["name"].
-    eq_(gr.get_revisions("master"),
-        gr.get_revisions(["master"]))
+    eq_(gr.get_revisions(DEFAULT_BRANCH),
+        gr.get_revisions([DEFAULT_BRANCH]))
 
-    gr.checkout("master")
+    gr.checkout(DEFAULT_BRANCH)
     commit("3")
-    eq_(len(gr.get_revisions("master")), 2)
+    eq_(len(gr.get_revisions(DEFAULT_BRANCH)), 2)
     # We can pass multiple revisions...
-    eq_(len(gr.get_revisions(["master", "other"])), 3)
+    eq_(len(gr.get_revisions([DEFAULT_BRANCH, "other"])), 3)
     # ... or options like --all and --branches
-    eq_(gr.get_revisions(["master", "other"]),
+    eq_(gr.get_revisions([DEFAULT_BRANCH, "other"]),
         gr.get_revisions(options=["--all"]))
 
     # Ranges are supported.
-    eq_(gr.get_revisions("master.."), [])
+    eq_(gr.get_revisions(DEFAULT_BRANCH + ".."), [])
 
 
 @with_tree({"foo": "foo"})

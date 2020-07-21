@@ -12,6 +12,7 @@
 
 function _show_schemes() {
   _schemes_doc=(
+    "autobuild"
     "conda-forge [version]"
     "conda-forge-last [version]"
     "datalad-extensions-build"
@@ -72,7 +73,7 @@ while [ $# != 0 ]; do
             scenario="$1"
             shift
             case "$scenario" in
-                neurodebian|neurodebian-devel|snapshot|datalad-extensions-build)
+                neurodebian|neurodebian-devel|autobuild|snapshot|datalad-extensions-build)
                     ;;
                 conda-forge|conda-forge-last)
                     if [ -n "$1" ]; then
@@ -138,11 +139,23 @@ case "$scenario" in
     sudo dpkg -i "$_TMPDIR/git-annex.deb"
     )
     ;;
-  snapshot)
+  autobuild|snapshot)
     _annex_bin="$_TMPDIR/git-annex.linux"
     echo "I: downloading and extracting under $_annex_bin"
+    case "$scenario" in
+        autobuild)
+            _subpath=autobuild/amd64
+            ;;
+        snapshot)
+            _subpath=linux/current
+            ;;
+        *)
+            echo "E: internal error: scenario '$scenario' should not reach here" >&2
+            exit 1
+            ;;
+    esac
     tar -C "$_TMPDIR" -xzf <(
-      wget -q -O- https://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz
+      wget -q -O- https://downloads.kitenet.net/git-annex/$_subpath/git-annex-standalone-amd64.tar.gz
     )
     export PATH="${_annex_bin}:$PATH"
     ;;
