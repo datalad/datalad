@@ -581,7 +581,7 @@ class SSHManager(object):
           If specified, only the path(s) provided would be considered
         """
         if self._connections:
-            ctrl_paths = assure_list(ctrl_path)
+            ctrl_paths = [Path(p) for p in assure_list(ctrl_path)]
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
