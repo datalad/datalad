@@ -581,7 +581,6 @@ class SSHManager(object):
           If specified, only the path(s) provided would be considered
         """
         if self._connections:
-            from datalad.utils import assure_list
             ctrl_paths = assure_list(ctrl_path)
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
