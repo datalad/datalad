@@ -517,7 +517,6 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
         from datalad import ssh_manager
         ssh = ssh_manager.get_connection('datalad-test')
         remote_home, err = ssh('pwd')
-        assert not err
         remote_home = remote_home.rstrip('\n')
         dst_relpath = os.path.relpath(dst_path, remote_home)
         url = 'datalad-test:%s' % dst_relpath
