@@ -110,11 +110,12 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
     repo = ds.repo
     repo_path = repo.pathobj
     lgr.debug('query %s.diffstatus() for paths: %s', repo, paths)
+    # recode paths with repo reference for low-level API
+    paths = [repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None
     status = repo.diffstatus(
         fr='HEAD' if repo.get_hexsha() else None,
         to=None,
-        # recode paths with repo reference for low-level API
-        paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
+        paths=paths,
         untracked=untracked,
         eval_submodule_state=eval_submodule_state,
         eval_file_type=eval_filetype,
@@ -123,7 +124,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
         lgr.debug('query %s.get_content_annexinfo() for paths: %s', repo, paths)
         # this will amend `status`
         repo.get_content_annexinfo(
-            paths=paths if paths else None,
+            paths=paths,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=None)
