@@ -85,14 +85,19 @@ class Dataset(object, metaclass=PathBasedFlyweight):
     def _flyweight_preproc_path(cls, path):
         """Custom handling for few special abbreviations for datasets"""
         path_ = path
-        if path == '^':
-            # get the topmost dataset from current location. Note that 'zsh'
-            # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(get_dataset_root(curdir)).get_superdataset(
-                topmost=True).path
-        elif path == '^.':
-            # get the dataset containing current directory
-            path_ = get_dataset_root(curdir)
+        if path in ('^', '^.'):
+            dsroot = get_dataset_root(curdir)
+            if dsroot is None:
+                raise NoDatasetFound('No dataset contains path: {}'.format(
+                    str(Path.cwd())))
+            if path == '^':
+                # get the topmost dataset from current location. Note that 'zsh'
+                # might have its ideas on what to do with ^, so better use as -d^
+                path_ = Dataset(dsroot).get_superdataset(
+                    topmost=True).path
+            elif path == '^.':
+                # the dataset containing current directory
+                path_ = dsroot
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?
