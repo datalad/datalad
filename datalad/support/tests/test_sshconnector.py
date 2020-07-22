@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     skip_ssh,
     swallow_logs,
     with_tempfile,
+    with_tree,
 )
 from datalad import cfg as dl_cfg
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
@@ -77,9 +78,10 @@ def test_ssh_get_connection():
 
 @skip_if_on_windows
 @skip_ssh
+@with_tree(tree={'f0': 'f0', 'f1': 'f1'})
 @with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
-def test_ssh_open_close(tfile1):
+def test_ssh_open_close(tmp_path, tfile1):
 
     manager = SSHManager()
 
@@ -94,13 +96,15 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path))
 
     # use connection to execute remote command:
-    local_home = os.path.expanduser('~')
     # we list explicitly local HOME since we override it in module_setup
-    out, err = c1('ls -a %r' % local_home)
+    #
+    # Note: Use realpath() below because we know that the resolved temporary
+    # test directory exists on the target (many tests rely on that), but it
+    # doesn't necessarily have the unresolved variant.
+    out, err = c1('ls -a {}'.format(sh_quote(op.realpath(tmp_path))))
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
-    local_ls = os.listdir(local_home)
-    eq_(set(remote_ls), set(local_ls))
+    eq_(set(remote_ls), {"f0", "f1"})
     ok_(exists(path))
 
     # now test for arguments containing spaces and other pleasant symbols
