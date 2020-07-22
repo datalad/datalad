@@ -1085,7 +1085,7 @@ def with_sameas_remote(func, autoenabled=False):
         # indicator. See
         # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
         if external_versions['cmd:system-ssh'] < '7.4' and \
-           external_versions['cmd:annex'] > '8.20200522':
+           '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
             raise SkipTest("Test known to hang")
 
         sr_path, repo_path = args[-2:]
