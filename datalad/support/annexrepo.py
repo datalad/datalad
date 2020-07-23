@@ -1728,31 +1728,28 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return objects
 
-    def _check_files(self, fn, quick_fn, files, allow_quick, batch):
+    def _check_files(self, fn, files, batch):
         # Helper that isolates the common logic in `file_has_content` and
         # `is_under_annex`. `fn` is the annex command used to do the check, and
         # `quick_fn` is the non-annex variant.
         pointers = self.supports_unlocked_pointers
-        if pointers or batch or not allow_quick:
-            # We're only concerned about modified files in V6+ mode. In V5
-            # `find` returns an empty string for unlocked files.
-            #
-            # ATTN: test_AnnexRepo_file_has_content has a failure before Git
-            # v2.13 (tested back to v2.9) because this diff call unexpectedly
-            # reports a type change as modified.
-            modified = [
-                f for f in self.call_git_items_(
-                    ['diff', '--name-only', '-z'], sep='\0')
-                if f] if pointers else []
-            annex_res = fn(files, normalize_paths=False, batch=batch)
-            return [bool(annex_res.get(f) and
-                         not (pointers and normpath(f) in modified))
-                    for f in files]
-        else:  # ad-hoc check which should be faster than call into annex
-            return [quick_fn(f) for f in files]
+        # We're only concerned about modified files in V6+ mode. In V5
+        # `find` returns an empty string for unlocked files.
+        #
+        # ATTN: test_AnnexRepo_file_has_content has a failure before Git
+        # v2.13 (tested back to v2.9) because this diff call unexpectedly
+        # reports a type change as modified.
+        modified = [
+            f for f in self.call_git_items_(
+                ['diff', '--name-only', '-z'], sep='\0')
+            if f] if pointers else []
+        annex_res = fn(files, normalize_paths=False, batch=batch)
+        return [bool(annex_res.get(f) and
+                     not (pointers and normpath(f) in modified))
+                for f in files]
 
     @normalize_paths
-    def file_has_content(self, files, allow_quick=True, batch=False):
+    def file_has_content(self, files, allow_quick=False, batch=False):
         """Check whether files have their content present under annex.
 
         Parameters
@@ -1760,8 +1757,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         files: list of str
             file(s) to check for being actually present.
         allow_quick: bool, optional
-            allow quick check, based on having a symlink into .git/annex/objects.
-            Works only in non-direct mode (TODO: thin mode)
+            This is no longer supported.
 
         Returns
         -------
@@ -1769,28 +1765,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             For each input file states whether file has content locally
         """
         # TODO: Also provide option to look for key instead of path
-
-        def quick_check(filename):
-            filepath = self.pathobj / filename
-            # MIH wonders why it cannot just return exists(filepath)...
-            # this test must not use op.path.exists(), because automagic
-            # IO patches it to return True for any symlink pointing into
-            # the annex
-            return filepath.exists() and (
-                filepath.is_symlink()
-                # TODO: checks for being not outside of this repository
-                # Note: ben removed '.git/' from '.git/annex/objects',
-                # since it is not true for submodules, whose '.git' is a
-                # symlink and being resolved to some
-                # '.git/modules/.../annex/objects'
-                and opj('annex', 'objects') in os.readlink(str(filepath))  # realpath OK
-            )
-
-        return self._check_files(self.find, quick_check,
-                                 files, allow_quick, batch)
+        return self._check_files(self.find, files, batch)
 
     @normalize_paths
-    def is_under_annex(self, files, allow_quick=True, batch=False):
+    def is_under_annex(self, files, allow_quick=False, batch=False):
         """Check whether files are under annex control
 
         Parameters
@@ -1798,8 +1776,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         files: list of str
             file(s) to check for being under annex
         allow_quick: bool, optional
-            allow quick check, based on having a symlink into .git/annex/objects.
-            Works only in non-direct mode (TODO: thin mode)
+            This is no longer supported.
 
         Returns
         -------
@@ -1821,20 +1798,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self.info([f for f in files if not isdir(f)],
                              fast=True, **kwargs)
 
-        def quick_check(filename):
-            filepath = opj(self.path, filename)
-            # todo checks for being not outside of this repository
-            # Note: ben removed '.git/' from '.git/annex/objects',
-            # since it is not true for submodules, whose '.git' is a
-            # symlink and being resolved to some
-            # '.git/modules/.../annex/objects'
-            return (
-                islink(filepath)
-                and opj('annex', 'objects') in os.readlink(filepath)  # realpath OK
-            )
-
-        return self._check_files(check, quick_check,
-                                 files, allow_quick, batch)
+        return self._check_files(check, files, batch)
 
     def init_remote(self, name, options):
         """Creates a new special remote

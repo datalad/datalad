@@ -753,9 +753,8 @@ def test_AnnexRepo_on_uninited_annex(origin, path):
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
     # and still can get our things
     assert_false(annex.file_has_content('test-annex.dat'))
-    with swallow_outputs():
-        annex.get('test-annex.dat')
-        ok_(annex.file_has_content('test-annex.dat'))
+    annex.get('test-annex.dat')
+    ok_(annex.file_has_content('test-annex.dat'))
 
 
 @assert_cwd_unchanged
@@ -1128,7 +1127,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     # older openssh version. See
     # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
     if external_versions['cmd:system-ssh'] < '7.4' and \
-       external_versions['cmd:annex'] > '7.20191230':
+       '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
         raise SkipTest("Test known to hang")
 
     from datalad import ssh_manager
