@@ -136,7 +136,8 @@ class Create(Interface):
             metavar='PATH',
             doc="""path where the dataset shall be created, directories
             will be created as necessary. If no location is provided, a dataset
-            will be created in the current working directory. Either way the
+            will be created in the location specified by --dataset (if given) or
+            the current working directory. Either way the
             command will error if the target directory is not empty.
             Use `force` to create a dataset in a non-empty directory.""",
             # put dataset 2nd to avoid useless conversion
@@ -156,7 +157,10 @@ class Create(Interface):
             args=("-d", "--dataset"),
             metavar='DATASET',
             doc="""specify the dataset to perform the create operation on. If
-            a dataset is given, a new subdataset will be created in it.""",
+            a dataset is given along with PATH, a new subdataset will be created
+            in it at the PATH provided to the create command. If a dataset is
+            given but PATH is unspecified, a new dataset will be created at the
+            location specified by this option.""",
             constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
