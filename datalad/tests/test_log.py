@@ -22,7 +22,7 @@ from datalad.log import (
     log_progress,
     TraceBack,
 )
-from datalad import cfg
+from datalad import cfg as dl_cfg
 from datalad.support.constraints import EnsureBool
 from datalad.support import ansi_colors as colors
 
@@ -62,9 +62,9 @@ def test_logging_to_a_file(dst):
     # so matching just with regexp
     # (...)? is added to swallow possible traceback logs
     regex = "\[ERROR\]"
-    if EnsureBool()(cfg.get('datalad.log.timestamp', False)):
+    if EnsureBool()(dl_cfg.get('datalad.log.timestamp', False)):
         regex = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} " + regex
-    if EnsureBool()(cfg.get('datalad.log.vmem', False)):
+    if EnsureBool()(dl_cfg.get('datalad.log.vmem', False)):
         regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
     regex += "(\s+\S+\s*)? " + msg
     assert_re_in(regex, line, match=True)

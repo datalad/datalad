@@ -115,9 +115,11 @@ from .utils import (
     skip_if_on_windows,
     skip_known_failure,
     SkipTest,
+    skip_wo_symlink_capability,
     with_tempfile,
     with_tree,
 )
+from datalad import cfg as dl_cfg
 
 
 def test_get_func_kwargs_doc():
@@ -384,16 +386,14 @@ def test_getpwd_change_mode(tdir):
     eq_(utils._pwd_mode, 'cwd')
 
 
+@skip_wo_symlink_capability
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @assert_cwd_unchanged
 def test_getpwd_symlink(tdir):
     sdir = opj(tdir, 's1')
     pwd_orig = getpwd()
-    try:
-        os.symlink('.', sdir)
-    except Exception:
-        raise SkipTest("Cannot create a symlink")
+    Path(sdir).symlink_to(Path('.'))
     s1dir = opj(sdir, 's1')
     s2dir = opj(sdir, 's2')
     try:
@@ -923,8 +923,7 @@ def test_probe_known_failure():
     def failing():
         raise AssertionError("Failed")
 
-    from datalad import cfg
-    switch = cfg.obtain("datalad.tests.knownfailures.probe")
+    switch = dl_cfg.obtain("datalad.tests.knownfailures.probe")
 
     if switch:
         # if probing is enabled the failing is considered to be expected and
@@ -966,8 +965,7 @@ def test_skip_known_failure():
     def failing():
         raise AssertionError("Failed")
 
-    from datalad import cfg
-    switch = cfg.obtain("datalad.tests.knownfailures.skip")
+    switch = dl_cfg.obtain("datalad.tests.knownfailures.skip")
 
     if switch:
         # if skipping is enabled, we shouldn't see the exception:
@@ -984,10 +982,8 @@ def test_known_failure():
     def failing():
         raise AssertionError("Failed")
 
-    from datalad import cfg
-
-    skip = cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+    skip = dl_cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = dl_cfg.obtain("datalad.tests.knownfailures.probe")
 
     if skip:
         # skipping takes precedence over probing
@@ -1006,11 +1002,9 @@ def test_known_failure_v6():
     def failing():
         raise AssertionError("Failed")
 
-    from datalad import cfg
-
-    v6 = cfg.obtain("datalad.repo.version") == 6
-    skip = cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+    v6 = dl_cfg.obtain("datalad.repo.version") == 6
+    skip = dl_cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = dl_cfg.obtain("datalad.tests.knownfailures.probe")
 
     if v6:
         if skip:

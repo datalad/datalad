@@ -63,6 +63,7 @@ from ...tests.test_archives import (
     fn_archive_obscure_ext,
     fn_in_archive_obscure,
 )
+from datalad import cfg as dl_cfg
 
 #import line_profiler
 #prof = line_profiler.LineProfiler()
@@ -143,7 +144,7 @@ def test_basic_scenario(d, d2):
     assert_true(cloned_annex.file_has_content(fn_archive))
 
     # Check if protocol was collected
-    if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE'):
+    if dl_cfg.get('datalad.tests.protocolremote'):
         assert_is_instance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol)
         protocol_file = _path_(annex.path,
                                '.git/bin/git-annex-remote-datalad-archive')

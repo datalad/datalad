@@ -114,6 +114,7 @@ from datalad.support.exceptions import (
 )
 
 from datalad.support.gitrepo import GitRepo
+from datalad import cfg as dl_cfg
 
 # imports from same module:
 from datalad.support.annexrepo import (
@@ -983,7 +984,7 @@ def test_AnnexRepo_get_contentlocation():
 @with_tempfile
 def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
-    if os.environ.get('DATALAD_FAKE__DATES'):
+    if dl_cfg.get('datalad.fake-dates'):
         raise SkipTest(
             "Faked dates are enabled; skipping batched addurl tests")
 

@@ -51,7 +51,7 @@ from datalad.tests.utils import (
     slow,
     known_failure_windows,
 )
-
+from datalad import cfg as dl_cfg
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
 @known_failure_windows
@@ -223,7 +223,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
     rmt2.commit(msg="Add file to git.")
 
     # Let's init some special remote which we couldn't really update/fetch
-    if not os.environ.get('DATALAD_TESTS_DATALADREMOTE'):
+    if not dl_cfg.get('datalad.tests.dataladremote'):
         ds.repo.init_remote(
             'datalad',
             ['encryption=none', 'type=external', 'externaltype=datalad'])
