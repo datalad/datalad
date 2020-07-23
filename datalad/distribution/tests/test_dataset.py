@@ -23,7 +23,7 @@ from ..dataset import (
     require_dataset,
     resolve_path,
 )
-from datalad import cfg
+from datalad import cfg as dl_cfg
 from datalad.api import (
     create,
     get,
@@ -223,7 +223,7 @@ def test_subdatasets(path):
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path,
-            cfg.obtain('datalad.locations.default-dataset'))
+            dl_cfg.obtain('datalad.locations.default-dataset'))
 
     with chpwd(ds.path):
         dstop = Dataset('^')
