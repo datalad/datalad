@@ -440,6 +440,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
+@slow  # 10sec on Yarik's laptop
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
@@ -692,6 +693,7 @@ def test_publish_target_url(src, desttop, desturl):
     ok_file_has_content(_path_(desttop, 'subdir/1'), '123')
 
 
+@slow  # 11sec on Yarik's laptop
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
@@ -755,6 +757,7 @@ def test_publish_no_fetch_refspec_configured(path):
     ds.publish(to="origin")
 
 
+@slow  # 14sec on Yarik's laptop
 @skip_ssh
 @with_tempfile(mkdir=True)
 def test_publish_fetch_do_not_recurse_submodules(path):

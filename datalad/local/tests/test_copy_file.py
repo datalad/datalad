@@ -250,6 +250,7 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
     ])
 
 
+@slow  # 11sec on Yarik's laptop
 @with_tree(tree={
     'lvl1': {
         'file1': '123',

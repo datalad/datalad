@@ -801,6 +801,7 @@ def test_local_path_target_dir(path):
     ok_((path / "e" / "d-subds").exists())
 
 
+@slow  # 12sec on Yarik's laptop
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
