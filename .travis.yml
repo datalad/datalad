@@ -95,6 +95,7 @@ script:
   # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
   - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
+  - pip install nose-timer
   - sudo pip install .
   - mkdir -p __testhome__
   - cd __testhome__
@@ -104,6 +105,7 @@ script:
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
+      --with-timer
       --with-cov --cover-package datalad
       --logging-level=INFO
       $TESTS_TO_PERFORM
