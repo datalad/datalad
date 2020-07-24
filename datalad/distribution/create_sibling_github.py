@@ -131,6 +131,7 @@ class CreateSiblingGithub(Interface):
         private=Parameter(
             args=("--private",),
             action="store_true",
+            default=False,
             doc="""If this flag is set, the repository created on github
             will be marked as private and only visible to those granted 
             access or by membership of a team/organization/etc.
@@ -158,7 +159,7 @@ class CreateSiblingGithub(Interface):
             github_organization=None,
             access_protocol='https',
             publish_depends=None,
-            private=None,
+            private=False,
             dryrun=False):
         # this is an absolute leaf package, import locally to avoid
         # unnecessary dependencies
