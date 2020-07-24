@@ -13,13 +13,14 @@ import logging
 from genericpath import exists
 from datalad.tests.utils import (
     assert_equal,
-    assert_raises,
-    assert_in,
     assert_false,
+    assert_in,
     assert_not_in,
+    assert_raises,
+    known_failure_windows,
     ok_startswith,
     serve_path_via_http,
-    known_failure_windows,
+    slow,
     with_tree,
 )
 from os.path import join as opj
@@ -148,6 +149,7 @@ def test_fs_traverse(topdir):
 
 # underlying code cannot deal with adjusted branches
 # https://github.com/datalad/datalad/pull/3817
+@slow  # 9sec on Yarik's laptop
 @known_failure_windows
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},

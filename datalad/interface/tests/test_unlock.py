@@ -41,6 +41,7 @@ from datalad.tests.utils import (
     on_windows,
     skip_if,
     skip_if_root,
+    slow,
     assert_in_results,
     assert_not_in_results,
     assert_result_count,
@@ -92,6 +93,7 @@ def test_unlock_raises(path, path2, path3):
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789027#step:8:134
+@slow  # 12sec on Yarik's laptop
 @known_failure_windows
 @skip_if_root
 @with_testrepos('.*annex.*', flavors=['clone'])
