@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     eq_,
     skip_if_on_windows,
     skip_ssh,
+    slow,
     with_tempfile,
     with_tree,
 )
@@ -164,6 +165,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
                    for r in res['{}ed repositories'.format(trust)]])
 
 
+@slow  # 11 + 42 sec on travis
 def test_create_simple():
 
     yield _test_create_store, None

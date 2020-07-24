@@ -282,6 +282,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         assert_equal(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
 
 
+@slow  # 12sec + ? on travis
 def test_remote_layout():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_remote_layout)), 'datalad-test'
@@ -373,6 +374,7 @@ def _test_version_check(host, dspath, store):
     ds.repo.copy_to('new_file', 'store')
 
 
+@slow  # 17sec + ? on travis
 def test_version_check():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_version_check)), 'datalad-test'
@@ -445,6 +447,7 @@ def test_gitannex_ssh():
     _test_gitannex('datalad-test')
 
 
+@slow  # 41sec on travis
 def test_gitannex_local():
     _test_gitannex(None)
 

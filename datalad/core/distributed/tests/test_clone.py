@@ -904,6 +904,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
+@slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
     if not has_symlink_capability():

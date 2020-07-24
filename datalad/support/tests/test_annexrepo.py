@@ -2225,6 +2225,7 @@ def check_files_split_exc(cls, topdir):
         assert_not_in('too many', str(ecm.exception))
 
 
+@slow  # 15 + 17sec on travis
 def test_files_split_exc():
     for cls in GitRepo, AnnexRepo:
         yield check_files_split_exc, cls

@@ -52,6 +52,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     skip_if_on_windows,
     skip_ssh,
+    slow,
     swallow_logs,
     with_tempfile,
     with_testrepos,
@@ -269,6 +270,7 @@ def test_publish_plain_git(origin, src_path, dst_path):
     eq_(res, [source])
 
 
+@slow  # 12sec on travis
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:380
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -529,6 +531,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
         filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
+@slow  # 10sec on travis
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
