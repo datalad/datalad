@@ -206,6 +206,7 @@ before_install:
   - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
       NOSE_OPTS=( --with-doctest --with-timer --timer-ok 5 --timer-warning 30 --timer-fail error --timer-filter warning,
     error )
+      export DATALAD_TESTS_SETUP_TESTREPOS=1  # to not bias timing with the first @with_testrepos
     fi
   # Just in case we need to check if nfs is there etc
   - sudo lsmod
