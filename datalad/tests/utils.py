@@ -1923,25 +1923,33 @@ from nose.plugins.attrib import attr
 def integration(f):
     """Mark test as an "integration" test which generally is not needed to be run
     
-    Generally tend to be slower
+    Generally tend to be slower.
+    Should be used in combination with @slow and @turtle if that is the case.
     """
     return attr('integration')(f)
 
 
 def slow(f):
     """Mark test as a slow, although not necessarily integration or usecase test
+
+    Rule of thumb cut-off to mark as slow is 10 sec
     """
     return attr('slow')(f)
 
 
 def turtle(f):
     """Mark test as very slow, meaning to not run it on Travis due to its
-    time limit"""
+    time limit
+
+    Rule of thumb cut-off to mark as turtle is 2 minutes
+    """
     return attr('turtle')(f)
 
 
 def usecase(f):
     """Mark test as a usecase user ran into and which (typically) caused bug report
     to be filed/troubleshooted
+
+    Should be used in combination with @slow and @turtle if slow.
     """
     return attr('usecase')(f)
