@@ -122,8 +122,6 @@ matrix:
     - DATALAD_TESTS_SSH=0
     - _DL_TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad.tests datalad.support"
-    # since we limit set of tests anyways and only really base ones, run all including @slow
-    - NOSE_SELECTION=
     #
   # The ones to run only on weekends against master.
   # They will not contribute to coverage etc, but might lead to failed status
