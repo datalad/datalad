@@ -234,7 +234,10 @@ def test_publish_aggregated(path):
     assert_repo_status(base.path)
 
     # create sibling and publish to it
-    spath = opj(path, 'remote')
+    # Note: Use realpath() below because we know that the resolved temporary
+    # test directory exists in the target (many tests rely on that), but it
+    # doesn't necessarily have the unresolved variant.
+    spath = op.realpath(opj(path, 'remote'))
     base.create_sibling(
         name="local_target",
         sshurl="ssh://datalad-test",
