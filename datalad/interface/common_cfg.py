@@ -13,11 +13,13 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from os import environ
 from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureChoice
+from datalad.support.constraints import EnsureStr
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -162,6 +164,8 @@ definitions = {
     'datalad.tests.temp.dir': {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
+        'type': EnsureStr(),
+        'default': environ.get('TMPDIR'),
     },
     'datalad.tests.temp.keep': {
         'ui': ('yesno', {
