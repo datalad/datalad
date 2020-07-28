@@ -16,7 +16,7 @@ env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
-    - NOSE_OPTS=
+    - NOSE_OPTS=-v
     # Note, that there's "turtle" as well, which is always excluded from
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow"
