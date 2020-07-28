@@ -347,10 +347,13 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
     # now, if we clone another repo into this one, it will inherit the setting
     # without having to provide it explicitly
-    sub = ds.clone(srcsub, 'sub', result_xfm='datasets', return_type='item-or-list')
-    eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
-    if not is_crippled:
-        eq_(sub.config.get('annex.hardlink', None), 'true')
+    newsub = ds.clone(srcsub, 'newsub', result_xfm='datasets', return_type='item-or-list')
+    # and `get` the original subdataset
+    origsub = ds.get('sub', result_xfm='datasets', return_type='item-or-list')
+    for sds in (newsub, origsub):
+        eq_(sds.config.get('datalad.clone.reckless', None), 'auto')
+        if not is_crippled:
+            eq_(sds.config.get('annex.hardlink', None), 'true')
 
     if is_crippled:
         raise SkipTest("Remainder of test needs proper filesystem permissions")
@@ -359,13 +362,12 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         # the standard setup keeps the annex locks accessible to the user only
         nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
              & stat.S_IWGRP)
-    # but we can set it up for group-shared access too
-    sharedds = clone(
-        src, sharedpath,
-        reckless='shared-group',
-        result_xfm='datasets',
-        return_type='item-or-list')
-    if annex:
+        # but we can set it up for group-shared access too
+        sharedds = clone(
+            src, sharedpath,
+            reckless='shared-group',
+            result_xfm='datasets',
+            return_type='item-or-list')
         ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
             & stat.S_IWGRP)
 
