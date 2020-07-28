@@ -22,18 +22,20 @@ from datalad.support.external_versions import external_versions
 from datalad.utils import Path
 
 from datalad.tests.utils import (
+    assert_false,
+    assert_in,
+    assert_is_instance,
     assert_raises,
     eq_,
-    skip_ssh,
-    with_tempfile,
     get_most_obscure_supported_name,
-    swallow_logs,
-    assert_in,
-    assert_false,
     ok_,
-    assert_is_instance,
+    patch_config,
     skip_if_on_windows,
+    skip_ssh,
+    swallow_logs,
+    with_tempfile,
 )
+from datalad import cfg as dl_cfg
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
 
@@ -74,7 +76,7 @@ def test_ssh_get_connection():
 
 @skip_if_on_windows
 @skip_ssh
-@with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
+@with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
 def test_ssh_open_close(tfile1):
 
@@ -84,7 +86,6 @@ def test_ssh_open_close(tfile1):
                get_connection_hash('localhost', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
-    print("%s existed: %s" % (path, existed_before))
 
     c1 = manager.get_connection('ssh://localhost')
     c1.open()
@@ -99,11 +100,15 @@ def test_ssh_open_close(tfile1):
                  if entry != '.' and entry != '..']
     local_ls = os.listdir(local_home)
     eq_(set(remote_ls), set(local_ls))
+    ok_(exists(path))
 
     # now test for arguments containing spaces and other pleasant symbols
     out, err = c1('ls -l {}'.format(sh_quote(tfile1)))
     assert_in(tfile1, out)
-    eq_(err, '')
+    # on a crippled FS it will actually say something like
+    # Control socket connect(...6258b3a7): Connection refused\r\n'
+    # but still work.
+    #eq_(err, '')
 
     c1.close()
     # control master doesn't exist anymore:
@@ -215,10 +220,12 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
             eq_(content, fp.read())
 
     # and now a quick smoke test for get
-    togetfile = Path(targetdir) / '2|g>e"t.t&x;t'
+    # but simplify the most obscure filename slightly to not trip `scp` itself
+    togetfile = Path(targetdir) / (
+        get_most_obscure_supported_name().replace('`', '') + '2')
     togetfile.write_text(str('something'))
     ssh.get(opj(remote_url, str(togetfile)), sourcedir)
-    ok_((Path(sourcedir) / '2|g>e"t.t&x;t').exists())
+    ok_((Path(sourcedir) / togetfile.name).exists())
 
     ssh.close()
 
@@ -234,31 +241,46 @@ def test_ssh_compound_cmds():
 
 @skip_if_on_windows
 @skip_ssh
+def test_ssh_close_target():
+    manager = SSHManager()
+    path0 = manager.socket_dir / get_connection_hash(
+        'datalad-test', bundled=True)
+    path1 = manager.socket_dir / get_connection_hash(
+        'datalad-test', bundled=False)
+    existed0 = path0.exists()
+    existed1 = path1.exists()
+    manager.get_connection('ssh://datalad-test').open()
+    manager.get_connection('ssh://datalad-test',
+                           use_remote_annex_bundle=False).open()
+    manager.close(ctrl_path=[str(path0)])
+    # The requested path is closed.
+    eq_(existed0, path0.exists())
+    ok_(path1.exists())
+    if not existed1:
+        path1.unlink()
+
+
+@skip_if_on_windows
+@skip_ssh
 def test_ssh_custom_identity_file():
     ifile = "/tmp/dl-test-ssh-id"  # Travis
     if not op.exists(ifile):
         raise SkipTest("Travis-specific '{}' identity file does not exist"
                        .format(ifile))
 
-    from datalad import cfg
-    try:
-        with patch.dict("os.environ", {"DATALAD_SSH_IDENTITYFILE": ifile}):
-            cfg.reload(force=True)
-            with swallow_logs(new_level=logging.DEBUG) as cml:
-                manager = SSHManager()
-                ssh = manager.get_connection('ssh://localhost')
-                cmd_out, _ = ssh("echo blah")
-                expected_socket = op.join(
-                    str(manager.socket_dir),
-                    get_connection_hash("localhost", identity_file=ifile,
-                                        bundled=True))
-                ok_(exists(expected_socket))
-                manager.close()
-                assert_in("-i", cml.out)
-                assert_in(ifile, cml.out)
-    finally:
-        # Prevent overridden DATALAD_SSH_IDENTITYFILE from lingering.
-        cfg.reload(force=True)
+    with patch_config({"datalad.ssh.identityfile": ifile}):
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            manager = SSHManager()
+            ssh = manager.get_connection('ssh://localhost')
+            cmd_out, _ = ssh("echo blah")
+            expected_socket = op.join(
+                str(manager.socket_dir),
+                get_connection_hash("localhost", identity_file=ifile,
+                                    bundled=True))
+            ok_(exists(expected_socket))
+            manager.close()
+            assert_in("-i", cml.out)
+            assert_in(ifile, cml.out)
 
 
 @skip_if_on_windows

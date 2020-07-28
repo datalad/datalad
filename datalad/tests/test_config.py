@@ -45,6 +45,7 @@ from datalad.cmd import CommandError
 
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
+from datalad import cfg as dl_cfg
 
 
 # XXX tabs are intentional (part of the format)!
@@ -514,11 +515,10 @@ def test_global_config():
 
     # from within tests, global config should be read from faked $HOME (see
     # setup_package)
-    from datalad import cfg
     glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
-    assert any(glb_cfg_file.samefile(Path(p)) for p in cfg._cfgfiles)
-    assert_equal(cfg.get("user.name"), "DataLad Tester")
-    assert_equal(cfg.get("user.email"), "test@example.com")
+    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._cfgfiles)
+    assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
+    assert_equal(dl_cfg.get("user.email"), "test@example.com")
 
 
 @with_tempfile()
