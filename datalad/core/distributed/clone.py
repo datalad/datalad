@@ -454,7 +454,7 @@ def clone_dataset(
                 # or if PY35 is no longer supported
                 rmtree(str(dest_path), children_only=dest_path_existed)
 
-            if 'could not create work tree' in e_stderr.lower():
+            if e_stderr and 'could not create work tree' in e_stderr.lower():
                 # this cannot be fixed by trying another URL
                 re_match = re.match(r".*fatal: (.*)$", e_stderr,
                                     flags=re.MULTILINE | re.DOTALL)
