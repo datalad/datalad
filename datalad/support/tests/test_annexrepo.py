@@ -1119,10 +1119,8 @@ def test_annex_backends(path):
 
 
 @skip_ssh
-@with_tempfile
-@with_testrepos('basic_annex', flavors=['local'])
-@with_testrepos('basic_annex', flavors=['local'])
-def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
+@with_tempfile(mkdir=True)
+def test_annex_ssh(topdir):
     # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
     # 7.20191230-142-g75059c9f3. This is likely due to an interaction with an
     # older openssh version. See
@@ -1131,30 +1129,38 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
        '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
         raise SkipTest("Test known to hang")
 
+    topdir = Path(topdir)
+    rm1 = AnnexRepo(topdir / "remote1", create=True)
+    rm2 = AnnexRepo.clone(rm1.path, str(topdir / "remote2"))
+    rm2.remove_remote("origin")
+
+    main_tmp = AnnexRepo.clone(rm1.path, str(topdir / "main"))
+    main_tmp.remove_remote("origin")
+    repo_path = main_tmp.path
+    del main_tmp
+    remote_1_path = rm1.path
+    remote_2_path = rm2.path
+
+    # Clear instances so that __init__() is invoked and
+    # _set_shared_connection() the next time AnnexRepo is called.
+    AnnexRepo._unique_instances.clear()
+
     from datalad import ssh_manager
-    # create remotes:
-    rm1 = AnnexRepo(remote_1_path, create=False)
-    rm2 = AnnexRepo(remote_2_path, create=False)
 
     # check whether we are the first to use these sockets:
     hash_1 = get_connection_hash('datalad-test', bundled=True)
     socket_1 = opj(str(ssh_manager.socket_dir), hash_1)
-    hash_2 = get_connection_hash('localhost', bundled=True)
+    hash_2 = get_connection_hash('datalad-test2', bundled=True)
     socket_2 = opj(str(ssh_manager.socket_dir), hash_2)
     datalad_test_was_open = exists(socket_1)
-    localhost_was_open = exists(socket_2)
+    datalad_test2_was_open = exists(socket_2)
 
     # repo to test:AnnexRepo(repo_path)
     # At first, directly use git to add the remote, which should be recognized
     # by AnnexRepo's constructor
     gr = GitRepo(repo_path, create=True)
-    AnnexRepo(repo_path)
     gr.add_remote("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
 
-    # Now, make it an annex:
-    # Clear instances so that __init__() is invoked and
-    # _set_shared_connection() is called.
-    AnnexRepo._unique_instances.clear()
     ar = AnnexRepo(repo_path, create=False)
     ok_(any(hash_1 in opt for opt in ar._annex_common_options))
     ok_(all(hash_2 not in opt for opt in ar._annex_common_options))
@@ -1168,58 +1174,30 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
         ok_(not exists(socket_1))
 
     # remote interaction causes socket to be created:
-    try:
-        # Note: For some reason, it hangs if log_stdout/err True
-        # TODO: Figure out what's going on
-        #  yoh: I think it is because of what is "TODOed" within cmd.py --
-        #       trying to log/obtain both through PIPE could lead to lock
-        #       downs.
-        # here we use our swallow_logs to overcome a problem of running under
-        # nosetests without -s, when nose then tries to swallow stdout by
-        # mocking it with StringIO, which is not fully compatible with Popen
-        # which needs its .fileno()
-        with swallow_outputs():
-            ar._run_annex_command('sync',
-                                  expect_stderr=True,
-                                  log_stdout=False,
-                                  log_stderr=False,
-                                  expect_fail=True)
-    # sync should return exit code 1, since it can not merge
-    # doesn't matter for the purpose of this test
-    except CommandError as e:
-        if e.code == 1:
-            pass
+    (ar.pathobj / "foo").write_text("foo")
+    ar.add("foo")
+    ar.commit("add foo")
 
+    ar.copy_to(["foo"], remote="ssh-remote-1")
     ok_(exists(socket_1))
 
     # add another remote:
-    ar.add_remote('ssh-remote-2', "ssh://localhost" + remote_2_path)
+    ar.add_remote('ssh-remote-2', "ssh://datalad-test2" + remote_2_path)
 
-    # now, this connection to localhost was requested:
+    # now, this connection was requested:
     assert_in(socket_2, list(map(str, ssh_manager._connections)))
     ok_(any(hash_1 in opt for opt in ar._annex_common_options))
     ok_(any(hash_2 in opt for opt in ar._annex_common_options))
     # but socket was not touched:
-    if localhost_was_open:
+    if datalad_test2_was_open:
         # FIXME: occasionally(?) fails in V6:
         if not ar.supports_unlocked_pointers:
             ok_(exists(socket_2))
     else:
         ok_(not exists(socket_2))
 
-    # sync with the new remote:
-    try:
-        with swallow_outputs():
-            ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
-                                  expect_stderr=True,
-                                  log_stdout=False,
-                                  log_stderr=False,
-                                  expect_fail=True)
-    # sync should return exit code 1, since it can not merge
-    # doesn't matter for the purpose of this test
-    except CommandError as e:
-        if e.code == 1:
-            pass
+    # copy to the new remote:
+    ar.copy_to(["foo"], remote="ssh-remote-2")
 
     ok_(exists(socket_2))
     ssh_manager.close(ctrl_path=[socket_1, socket_2])

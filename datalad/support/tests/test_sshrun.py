@@ -28,7 +28,7 @@ from datalad.tests.utils import with_tempfile
 @skip_ssh
 def test_exit_code():
     # will relay actual exit code on CommandError
-    cmd = ['datalad', 'sshrun', 'localhost', 'exit 42']
+    cmd = ['datalad', 'sshrun', 'datalad-test', 'exit 42']
     with assert_raises(SystemExit) as cme:
         # running nosetests without -s
         if isinstance(sys.stdout, StringIO):  # pragma: no cover
@@ -45,7 +45,7 @@ def test_exit_code():
 @with_tempfile(content="123magic")
 def test_no_stdin_swallow(fname):
     # will relay actual exit code on CommandError
-    cmd = ['datalad', 'sshrun', 'localhost', 'cat']
+    cmd = ['datalad', 'sshrun', 'datalad-test', 'cat']
 
     out, err = Runner().run(cmd, stdin=open(fname))
     assert_equal(out.rstrip(), '123magic')
@@ -59,7 +59,7 @@ def test_no_stdin_swallow(fname):
 @skip_ssh
 @with_tempfile(suffix="1 space", content="magic")
 def test_fancy_quotes(f):
-    cmd = ['datalad', 'sshrun', 'localhost', """'cat '"'"'%s'"'"''""" % f]
+    cmd = ['datalad', 'sshrun', 'datalad-test', """'cat '"'"'%s'"'"''""" % f]
     out, err = Runner().run(cmd)
     assert_equal(out, 'magic')
 
@@ -73,7 +73,7 @@ def test_ssh_option():
     with patch.dict('os.environ', {"LC_DATALAD_HACK": 'hackbert'}):
         with swallow_outputs() as cmo:
             main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
-                  "localhost", "echo $LC_DATALAD_HACK"])
+                  "datalad-test", "echo $LC_DATALAD_HACK"])
             out = cmo.out.strip()
             if not out:
                 raise SkipTest(
@@ -86,17 +86,17 @@ def test_ssh_option():
 @skip_ssh
 def test_ssh_ipv4_6_incompatible():
     with assert_raises(SystemExit):
-        main(["datalad", "sshrun", "-4", "-6", "localhost", "true"])
+        main(["datalad", "sshrun", "-4", "-6", "datalad-test", "true"])
 
 
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_ipv4_6():
     # This should fail with a RuntimeError if a version is not supported (we're
-    # not bothering to check what localhost supports), but if the processing
+    # not bothering to check what datalad-test supports), but if the processing
     # fails, it should be something else.
     for kwds in [{"ipv4": True}, {"ipv6": True}]:
         try:
-            sshrun("localhost", "true", **kwds)
+            sshrun("datalad-test", "true", **kwds)
         except RuntimeError:
             pass

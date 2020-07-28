@@ -103,7 +103,7 @@ def test_smth_about_not_supported(p1, p2):
     source = Dataset(p1).create()
     from datalad.support.network import PathRI
     source.create_sibling(
-        'ssh://localhost' + PathRI(p2).posixpath,
+        'ssh://datalad-test' + PathRI(p2).posixpath,
         name='target1')
     # source.publish(to='target1')
     with chpwd(p1):
@@ -552,7 +552,7 @@ def test_publish_depends(
 
     # two remote sibling on two "different" hosts
     source.create_sibling(
-        'ssh://localhost' + target1_path,
+        'ssh://datalad-test' + target1_path,
         annex_wanted='standard',
         annex_group='backup',
         name='target1')
@@ -659,7 +659,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 
     # create the target(s):
     source.create_sibling(
-        'ssh://localhost:' + dst_path,
+        'ssh://datalad-test:' + dst_path,
         name='target', recursive=True)
 
     # publish recursively, which silently ignores non-installed datasets
@@ -681,7 +681,7 @@ def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
     ds.save('1')
-    ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
+    ds.create_sibling('ssh://datalad-test:%s/subdir' % desttop,
                       name='target',
                       target_url=desturl + 'subdir/.git')
     results = ds.publish(to='target', transfer_data='all')

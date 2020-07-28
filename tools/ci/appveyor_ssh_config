@@ -3,3 +3,6 @@ Host localhost
 
 Host datalad-test
 	StrictHostKeyChecking no
+
+Host datalad-test2
+	StrictHostKeyChecking no

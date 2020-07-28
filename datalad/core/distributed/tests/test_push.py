@@ -532,7 +532,7 @@ def test_publish_target_url(src, desttop, desturl):
         raise SkipTest(
             'Skipped due to https://github.com/datalad/datalad/issues/4075')
     ds.save('1')
-    ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
+    ds.create_sibling('ssh://datalad-test:%s/subdir' % desttop,
                       name='target',
                       target_url=desturl + 'subdir/.git')
     results = ds.push(to='target')

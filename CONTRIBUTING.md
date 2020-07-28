@@ -512,7 +512,18 @@ Refer datalad/config.py for information on how to add these environment variable
   Skips network tests completely if this flag is set
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
-  Skips SSH tests if this flag is **not** set
+  Skips SSH tests if this flag is **not** set.  If you enable this,
+  you need to set up a "datalad-test" and "datalad-test2" target in
+  your SSH configuration.  The second target is used by only a couple
+  of tests, so depending on the tests you're interested in, you can
+  get by with only "datalad-test" configured.
+
+  A Docker image that is used for DataLad's tests is available at
+  <https://github.com/datalad-tester/docker-ssh-target>.  Note that
+  the DataLad tests assume that target files exist in
+  `DATALAD_TESTS_TEMP_DIR`, which restricts the "datalad-test" target
+  to being either the localhost or a container that mounts
+  `DATALAD_TESTS_TEMP_DIR`.
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
 - *DATALAD_TESTS_USECASSETTE*:

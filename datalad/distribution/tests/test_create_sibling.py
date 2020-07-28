@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     eq_,
     get_mtimes_and_digests,
+    get_ssh_port,
     ok_,
     ok_endswith,
     ok_exists,
@@ -107,18 +108,10 @@ def assert_publish_with_ui(target_path, rootds=False, flat=True):
                         flags=re.DOTALL)
 
 
-# shortcut
-# but we can rely on it ATM only if "server" (i.e. localhost) has
-# recent enough git since then we expect an error msg to be spit out
-from datalad.support.external_versions import external_versions
-# But with custom GIT_PATH pointing to non-bundled annex, which would not be
-# used on remote, so we will compare against system-git
-assert_create_sshwebserver = (
-    assert_no_errors_logged(create_sibling)
-    if (external_versions['cmd:system-git'] >= '2.4' and
-        lgr.getEffectiveLevel() > logging.DEBUG)
-    else create_sibling
-)
+if lgr.getEffectiveLevel() > logging.DEBUG:
+    assert_create_sshwebserver = assert_no_errors_logged(create_sibling)
+else:
+    assert_create_sshwebserver = create_sibling
 
 
 def assert_postupdate_hooks(path, installed=True, flat=False):
@@ -156,14 +149,14 @@ def test_invalid_call(path):
         # needs an actual dataset
         assert_raises(
             ValueError,
-            create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
+            create_sibling, 'datalad-test:/tmp/somewhere', dataset='/nothere')
     # pre-configure a bogus remote
     ds = Dataset(path).create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
     # fails to reconfigure by default with generated
     # and also when given an existing name
     for res in (ds.create_sibling('bogus:/tmp/somewhere', on_failure='ignore'),
-                ds.create_sibling('localhost:/tmp/somewhere', name='bogus', on_failure='ignore')):
+                ds.create_sibling('datalad-test:/tmp/somewhere', name='bogus', on_failure='ignore')):
         assert_result_count(
             res, 1,
             status='error',
@@ -178,7 +171,7 @@ def test_invalid_call(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_target_ssh_simple(origin, src_path, target_rootpath):
-
+    port = get_ssh_port("datalad-test")
     # prepare src
     source = install(
         src_path, source=origin,
@@ -189,7 +182,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         create_sibling(
             dataset=source,
             name="local_target",
-            sshurl="ssh://localhost:22",
+            sshurl="ssh://datalad-test:{}".format(port),
             target_dir=target_path,
             ui=True)
         assert_not_in('enableremote local_target failed', cml.out)
@@ -212,7 +205,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         assert_create_sshwebserver(
             dataset=source,
             name="local_target_alt",
-            sshurl="ssh://localhost",
+            sshurl="ssh://datalad-test",
             target_dir=target_path)
     ok_(str(cm.exception).startswith(
         "Target path %s already exists." % target_path))
@@ -238,14 +231,14 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             assert_create_sshwebserver(
                 dataset=source,
                 name="local_target",
-                sshurl="ssh://localhost" + target_path,
+                sshurl="ssh://datalad-test" + target_path,
                 publish_by_default=DEFAULT_BRANCH,
                 existing='replace',
                 ui=True,
             )
         interactive_assert_create_sshwebserver()
 
-        eq_("ssh://localhost" + urlquote(target_path),
+        eq_("ssh://datalad-test" + urlquote(target_path),
             source.repo.get_remote_url("local_target"))
         ok_(source.repo.get_remote_url("local_target", push=True) is None)
 
@@ -260,15 +253,15 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             # should be added too, even if URL matches prior state
             eq_(lclcfg.get('remote.local_target.push'), DEFAULT_BRANCH)
 
-        # again, by explicitly passing urls. Since we are on localhost, the
+        # again, by explicitly passing urls. Since we are on datalad-test, the
         # local path should work:
         cpkwargs = dict(
             dataset=source,
             name="local_target",
-            sshurl="ssh://localhost",
+            sshurl="ssh://datalad-test",
             target_dir=target_path,
             target_url=target_path,
-            target_pushurl="ssh://localhost" + target_path,
+            target_pushurl="ssh://datalad-test" + target_path,
             ui=True,
         )
 
@@ -284,7 +277,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         eq_(target_path,
             source.repo.get_remote_url("local_target"))
-        eq_("ssh://localhost" + target_path,
+        eq_("ssh://datalad-test" + target_path,
             source.repo.get_remote_url("local_target", push=True))
 
         assert_publish_with_ui(target_path)
@@ -368,7 +361,7 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             sep = os.path.sep
 
         if use_ssh:
-            sshurl = "ssh://localhost" + target_path_
+            sshurl = "ssh://datalad-test" + target_path_
         else:
             sshurl = target_path_
 
@@ -433,7 +426,7 @@ def test_target_ssh_recursive():
 @with_tempfile
 def check_target_ssh_since(use_ssh, origin, src_path, target_path):
     if use_ssh:
-        sshurl = "ssh://localhost" + target_path
+        sshurl = "ssh://datalad-test" + target_path
     else:
         sshurl = target_path
     # prepare src
@@ -489,7 +482,7 @@ def test_target_ssh_since():
 @with_tempfile(mkdir=True)
 def check_failon_no_permissions(use_ssh, src_path, target_path):
     if use_ssh:
-        sshurl = "ssh://localhost" + opj(target_path, 'ds')
+        sshurl = "ssh://datalad-test" + opj(target_path, 'ds')
     else:
         sshurl = opj(target_path, 'ds')
     ds = Dataset(src_path).create()
@@ -522,13 +515,12 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     # different even though a datalad-test. So we need to query it
     if use_ssh:
         from datalad import ssh_manager
-        ssh = ssh_manager.get_connection('localhost')
+        ssh = ssh_manager.get_connection('datalad-test')
         remote_home, err = ssh('pwd')
-        assert not err
         remote_home = remote_home.rstrip('\n')
         dst_relpath = os.path.relpath(dst_path, remote_home)
-        url = 'localhost:%s' % dst_relpath
-        sibname = 'localhost'
+        url = 'datalad-test:%s' % dst_relpath
+        sibname = 'datalad-test'
     else:
         url = dst_path
         sibname = 'local'
@@ -597,7 +589,7 @@ def test_replace_and_relative_sshpath():
 def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
     ds = Dataset(src_path).create()
     if use_ssh:
-        target_url = 'localhost:%s' % target_path
+        target_url = 'datalad-test:%s' % target_path
     else:
         target_url = target_path
     remote = "magical"
@@ -708,7 +700,7 @@ def check_exists_interactive(use_ssh, path):
     create_tree(sibling_path, {'stuff': ''})
 
     if use_ssh:
-        sshurl = 'localhost:' + sibling_path
+        sshurl = 'datalad-test:' + sibling_path
     else:
         sshurl = sibling_path
 
