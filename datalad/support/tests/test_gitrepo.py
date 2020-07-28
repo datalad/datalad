@@ -523,7 +523,7 @@ def _path2localsshurl(path):
     p = Path(path)
     if p.drive:
         path = '/'.join(('/{}'.format(p.drive[0]),) + p.parts[1:])
-    url = "ssh://localhost{}".format(path)
+    url = "ssh://datalad-test{}".format(path)
     return url
 
 
@@ -539,7 +539,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     remote_repo = GitRepo(remote_path, create=False)
     url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
-                          get_connection_hash('localhost', bundled=True))
+                          get_connection_hash('datalad-test', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -573,7 +573,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     remote_repo = GitRepo(remote_path, create=True)
     url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
-                          get_connection_hash('localhost', bundled=True))
+                          get_connection_hash('datalad-test', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -612,7 +612,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     remote_repo = GitRepo(remote_path, create=True)
     url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
-                          get_connection_hash('localhost', bundled=True))
+                          get_connection_hash('datalad-test', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 

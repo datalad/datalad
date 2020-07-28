@@ -1,6 +1,8 @@
 # vim ft=yaml
 # travis-ci.org definition for DataLad build
 language: python
+services:
+  - docker
 
 python:
   - 3.5
@@ -216,7 +218,6 @@ before_install:
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
-  - sudo eatmydata tools/ci/prep-travis-forssh-sudo.sh
   - tools/ci/prep-travis-forssh.sh
   # Install nvm https://github.com/nvm-sh/nvm/blob/master/README.md
   - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash

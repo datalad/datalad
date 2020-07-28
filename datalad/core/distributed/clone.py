@@ -454,7 +454,7 @@ def clone_dataset(
                 # or if PY35 is no longer supported
                 rmtree(str(dest_path), children_only=dest_path_existed)
 
-            if 'could not create work tree' in e_stderr.lower():
+            if e_stderr and 'could not create work tree' in e_stderr.lower():
                 # this cannot be fixed by trying another URL
                 re_match = re.match(r".*fatal: (.*)$", e_stderr,
                                     flags=re.MULTILINE | re.DOTALL)
@@ -531,6 +531,14 @@ def clone_dataset(
     # source
     if result_props['source']['type'] == 'ria':
         yield from postclonecfg_ria(destds, result_props['source'])
+
+    if reckless:
+        # store the reckless setting in the dataset to make it
+        # known to later clones of subdatasets via get()
+        destds.config.set(
+            'datalad.clone.reckless', reckless,
+            where='local',
+            reload=True)
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
@@ -809,15 +817,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             # TODO: What level? + note, that annex-dead is independ
             lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
                         "this file system.")
-
-    if reckless:
-        # we successfully dealt with reckless here.
-        # store the reckless setting in the dataset to make it
-        # known to later clones of subdatasets via get()
-        ds.config.set(
-            'datalad.clone.reckless', reckless,
-            where='local',
-            reload=True)
 
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
