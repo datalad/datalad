@@ -323,37 +323,56 @@ def test_failed_clone(dspath):
                    res)
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_reckless(src, top_path, sharedpath):
-    ds = clone(src, top_path, reckless=True,
+@with_tempfile(mkdir=True)
+def check_reckless(annex, src_path, top_path, sharedpath):
+    # super with or without annex
+    src = Dataset(src_path).create(annex=annex)
+    # sub always with annex
+    srcsub = src.create('sub')
+
+    # and for the actual test
+    ds = clone(src.path, top_path, reckless=True,
                result_xfm='datasets', return_type='item-or-list')
-    eq_(ds.config.get('annex.hardlink', None), 'true')
+
+    is_crippled = srcsub.repo.is_managed_branch()
+
+    if annex and not is_crippled:
+        eq_(ds.config.get('annex.hardlink', None), 'true')
+
     # actual value is 'auto', because True is a legacy value and we map it
     eq_(ds.config.get('datalad.clone.reckless', None), 'auto')
-    eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+    if annex:
+        eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
     # now, if we clone another repo into this one, it will inherit the setting
     # without having to provide it explicitly
-    sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
+    sub = ds.clone(srcsub, 'sub', result_xfm='datasets', return_type='item-or-list')
     eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
-    eq_(sub.config.get('annex.hardlink', None), 'true')
+    if not is_crippled:
+        eq_(sub.config.get('annex.hardlink', None), 'true')
 
-    if ds.repo.is_managed_branch():
+    if is_crippled:
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
-    # the standard setup keeps the annex locks accessible to the user only
-    nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-         & stat.S_IWGRP)
+    if annex:
+        # the standard setup keeps the annex locks accessible to the user only
+        nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+             & stat.S_IWGRP)
     # but we can set it up for group-shared access too
     sharedds = clone(
         src, sharedpath,
         reckless='shared-group',
         result_xfm='datasets',
         return_type='item-or-list')
-    ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-        & stat.S_IWGRP)
+    if annex:
+        ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+            & stat.S_IWGRP)
 
+
+def test_reckless():
+    yield check_reckless, True
+    yield check_reckless, False
 
 @with_tempfile
 @with_tempfile
