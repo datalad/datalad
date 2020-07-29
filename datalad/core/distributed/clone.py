@@ -844,6 +844,15 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 sr_autoenable, sr_name, ds.path)
             continue
 
+        # If it looks like a type=git special remote, make sure we have up to
+        # date information. See gh-2897.
+        if sr_autoenable and repo_config.get("remote.{}.fetch".format(sr_name)):
+            try:
+                repo.fetch(remote=sr_name)
+            except CommandError as exc:
+                lgr.warning("Failed to fetch type=git special remote %s: %s",
+                            sr_name, exc_str(exc))
+
         # determine whether there is a registered remote with matching UUID
         if uuid:
             if remote_uuids is None:
