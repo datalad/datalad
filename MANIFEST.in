@@ -1,0 +1,15 @@
+include CHANGELOG.md CONTRIBUTORS COPYING Gruntfile.js Makefile asv.conf.json 
+include requirements-devel.txt requirements.txt tox.ini .coveragerc
+
+graft _datalad_build_support
+graft benchmarks
+graft docs
+graft tools
+
+prune .github
+prune sandbox
+
+exclude .gitignore .gitmodules .mailmap .noannex .travis.yml .zenodo.json
+exclude CODE_OF_CONDUCT.md CONTRIBUTING.md appveyor.yml readthedocs.yml
+
+global-exclude *.py[cod]
