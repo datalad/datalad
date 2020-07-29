@@ -37,6 +37,12 @@ Files organization
   benchmarking of DataLad.  Implemented in any most appropriate language
   (Python, bash, etc.)
 
+Whenever a new top-level file or folder is added to the repository, it should
+be listed in `MANIFEST.in` so that it will be either included in or excluded
+from source distributions as appropriate.  [See
+here](https://packaging.python.org/guides/using-manifest-in/) for information
+about writing a `MANIFEST.in`.
+
 How to contribute
 -----------------
 
