@@ -6,7 +6,8 @@
                                                   Read me
 
 [![Travis tests status](https://secure.travis-ci.org/datalad/datalad.png?branch=master)](https://travis-ci.org/datalad/datalad) [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master) [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master) [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/) [![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/) [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials) [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
-
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
 # 10000ft overview
@@ -109,8 +110,88 @@ MIT/Expat
 # Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
-contributing to the project.
+contributing to the project. The original repository provided a [.zenodo.json](.zenodo.json)
+file, and we generate a [.contributors file]() from that via:
 
+```bash
+pip install tributors
+tributors --version
+0.0.15
+```
+
+If you want to have Orcid identifiers, you need to export the following environment
+variables. It also helps to have a GitHub token to increase API limits:
+
+```bash
+export ORCID_ID=xxxxxxxxxx
+export ORCID_SECRET=xxxxxxxxxxxxxxxxxx
+export ORCID_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+export ORCID_REFRESH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxx
+export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment). 
+Then update zenodo:
+
+```bash
+tributors update  zenodo
+INFO:    zenodo:Updating .zenodo.json
+INFO:    zenodo:Updating .tributors cache from .zenodo.json
+WARNING:tributors:zenodo does not support updating from names.
+```
+
+In the case that there is more than one orcid found for a user, you will be given a list
+to check. Others will be updated in the file. You can then curate the file as you see fit.
+We next want to add the .allcontributors file:
+
+```bash
+$ tributors init allcontrib
+INFO:allcontrib:Generating .all-contributorsrc for datalad/datalad
+$ tributors update allcontrib
+INFO:allcontrib:Updating .all-contributorsrc
+INFO:allcontrib:Updating .tributors cache from .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor glalteva in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor adswa in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor soichih in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor mvdoc in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor mih in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor yarikoptic in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor loj in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor feilong in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor jhpoelen in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor andycon in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor nicholsn in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor adelavega in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor kskyten in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor TheChymera in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor effigies in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor jgors in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor debanjum in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor nellh in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor emdupre in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor aqw in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor vsoch in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor kyleam in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor driusan in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor overlake333 in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor akeshavan in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor jwodder in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor bhanuprasad14 in .all-contributorsrc
+WARNING:tributors:allcontrib does not support updating from orcids.
+WARNING:tributors:allcontrib does not support updating from email.
+```
+
+We can then populate the shared .tributors file:
+
+```bash
+$ tributors update-lookup allcontrib
+```
+
+And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors, and
+look for new orcids as we did above.
 
 ## Acknowledgements
 
@@ -123,6 +204,9 @@ is provided by the German federal state of Saxony-Anhalt and the European
 Regional Development Fund (ERDF), Project: Center for Behavioral Brain
 Sciences, Imaging Platform.  This work is further facilitated by the ReproNim
 project (NIH 1P41EB019936-01A1).
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 
 [Git]: https://git-scm.com
