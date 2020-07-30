@@ -1182,7 +1182,7 @@ def test_fetch_git_special_remote(url_path, url, path):
     path = Path(path)
     ds_special = Dataset(url_path / "special").create(force=True)
     if ds_special.repo.is_managed_branch():
-        # TODO: git-annex-init fails in the first clone call below when this is
+        # TODO: git-annex-init fails in the second clone call below when this is
         # executed under ./tools/eval_under_testloopfs.
         raise SkipTest("Test fails on managed branch")
     ds_special.save()
