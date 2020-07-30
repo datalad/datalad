@@ -1,7 +1,6 @@
 name: allcontributors-auto-detect
 
 on:
-  pull_request: []
   push:
     branches:
       - master
