@@ -1,6 +1,21 @@
 {
     "creators": [
         {
+            "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany",
+            "name": "Hanke, Michael",
+            "orcid": "0000-0001-6398-6370"
+        },
+        {
+            "affiliation": "Dartmouth College, Hanover, NH, United States",
+            "name": "Halchenko, Yaroslav O.",
+            "orcid": "0000-0003-3456-2493"
+        },
+        {
+            "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany",
+            "name": "Poldrack, Benjamin",
+            "orcid": "0000-0001-7628-0801"
+        },
+        {
             "affiliation": "Dartmouth College, Hanover, NH, United States",
             "name": "Meyer, Kyle"
         },
@@ -19,14 +34,33 @@
             "name": "MacFarlane, Dave"
         },
         {
+            "name": "Olaf Häusler, Christian",
+            "orcid": "0000-0002-0936-317X"
+        },
+        {
             "name": "Olson, Taylor"
         },
         {
-            "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, German",
+            "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany",
             "name": "Waite, Alex"
         },
         {
+            "affiliation": "University of Texas at Austin",
+            "name": "De La Vega, Alejandro",
+            "orcid": "0000-0001-9062-3778"
+        },
+        {
             "name": "Sochat, Vanessa"
+        },
+        {
+            "affiliation": "UC Berkeley - UCSF Graduate Program in Bioengineering",
+            "name": "Keshavan, Anisha",
+            "orcid": "0000-0003-3554-043X"
+        },
+        {
+            "affiliation": "Dartmouth College, Hanover, NH, United States",
+            "name": "Ma, Feilong",
+            "orcid": "0000-0002-6838-3971"
         },
         {
             "name": "Christian, Horea"
@@ -38,6 +72,11 @@
             "name": "Skytén, Kusti"
         },
         {
+            "affiliation": "UC Berkeley",
+            "name": "Visconti di Oleggio Castello, Matteo",
+            "orcid": "0000-0001-7931-5272"
+        },
+        {
             "name": "Hardcastle, Nell"
         },
         {
@@ -45,6 +84,21 @@
         },
         {
             "name": "C Lau, Vicky"
+        },
+        {
+            "affiliation": "Stanford University, Stanford, CA, United States",
+            "name": "Markiewicz, Christopher J.",
+            "orcid": "0000-0002-6533-164X"
+        },
+        {
+            "affiliation": "Psychoinformatics Lab, INM-7, Research Centre Juelich",
+            "name": "Wagner, Adina S.",
+            "orcid": "0000-0003-2917-3450"
+        },
+        {
+            "affiliation": "Maze Therapeutics, South San Francisco, CA, United States",
+            "name": "Nichols, B. Nolan",
+            "orcid": "0000-0003-1099-3328"
         }
     ],
     "grants": [
