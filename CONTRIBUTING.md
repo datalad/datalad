@@ -163,7 +163,7 @@ file, and we generate a [.contributors file](.all-contributorsrc) from that via:
 ```bash
 pip install tributors
 tributors --version
-0.0.15
+0.0.16
 ```
 
 If you want to have Orcid identifiers, you need to export the following environment
