@@ -1,7 +1,6 @@
 name: allcontributors-auto-detect
 
 on:
-  pull_request: []
   push:
     branches:
       - master
@@ -13,6 +12,7 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
+
       - name: Tributors Update      
         uses: con/tributors@0.0.15
         env:
