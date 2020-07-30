@@ -439,6 +439,10 @@ We welcome and recognize all contributions from documentation to testing to code
 
 You can see a list of current contributors in our [zenodo file][link_zenodo].
 If you are new to the project, don't forget to add your name and affiliation there!
+We also have an .all-contributorsrc that is updated automatically on merges. Once it's
+merged, if you helped in a non standard way (e.g., a contribution other than code)
+you can open a pull request to add any [All Contributors Emoji][contrib_emoji] that
+match your contribution types.
 
 Thank you!
 ----------
@@ -576,3 +580,4 @@ bet we will fix some bugs and make a world even a better place.
 
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
+[contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

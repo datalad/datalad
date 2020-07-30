@@ -111,7 +111,7 @@ MIT/Expat
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
 contributing to the project. The original repository provided a [.zenodo.json](.zenodo.json)
-file, and we generate a [.contributors file]() from that via:
+file, and we generate a [.contributors file](.all-contributorsrc) from that via:
 
 ```bash
 pip install tributors
@@ -153,30 +153,7 @@ INFO:allcontrib:Updating .tributors cache from .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor glalteva in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor adswa in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor soichih in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor mvdoc in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor mih in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor yarikoptic in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor loj in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor feilong in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor jhpoelen in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor andycon in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor nicholsn in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor adelavega in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor kskyten in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor TheChymera in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor effigies in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor jgors in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor debanjum in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor nellh in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor emdupre in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor aqw in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor vsoch in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor kyleam in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor driusan in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor overlake333 in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor akeshavan in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor jwodder in .all-contributorsrc
+...
 INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor bhanuprasad14 in .all-contributorsrc
