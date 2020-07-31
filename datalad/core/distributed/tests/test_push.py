@@ -212,7 +212,6 @@ def check_push(annex, src_path, dst_path):
         # push should be rejected (non-fast-forward):
         res = src.push(to='target', since='HEAD~2', on_failure='ignore')
         # fails before even touching the annex branch
-        assert_result_count(res, 1)
         assert_in_results(
             res,
             action='publish', status='error', target='target',
@@ -774,3 +773,17 @@ def test_auto_if_wanted_data_transfer_path_restriction(path):
         res,
         action="copy", target="b", status="ok",
         path=str(ds_a.pathobj / "sec.dat"))
+
+
+@with_tempfile(mkdir=True)
+def test_push_git_annex_branch_when_no_data(path):
+    path = Path(path)
+    ds = Dataset(path / "a").create()
+    target = mk_push_target(ds, "target", str(path / "target"),
+                            annex=False, bare=True)
+    (ds.pathobj / "f0").write_text("0")
+    ds.save()
+    ds.push(to="target", data="nothing")
+    assert_in("git-annex",
+              {d["refname:strip=2"]
+               for d in target.for_each_ref_(fields="refname:strip=2")})
