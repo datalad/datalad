@@ -19,6 +19,7 @@ from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureChoice
+from datalad.support.constraints import EnsureListOf
 from datalad.support.constraints import EnsureStr
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -158,6 +159,12 @@ definitions = {
     'datalad.tests.knownfailures.probe': {
         'ui': ('yesno', {
                'title': 'Probes tests that are known to fail on whether or not they are actually still failing'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.tests.setup.testrepos': {
+        'ui': ('question', {
+            'title': 'Pre-creates repositories for @with_testrepos within setup_package'}),
         'type': EnsureBool(),
         'default': False,
     },

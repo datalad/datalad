@@ -26,6 +26,7 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     skip_if_on_windows,
     skip_ssh,
+    slow,
     with_tempfile,
     with_tree,
 )
@@ -58,6 +59,7 @@ _dataset_hierarchy_template = {
 
 # underlying code cannot deal with adjusted branches
 # https://github.com/datalad/datalad/pull/3817
+@slow  # 20sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 def test_basic_aggregate(path):
@@ -149,6 +151,7 @@ def test_aggregate_query(path):
 
 
 # this is for gh-1971
+@slow  # 23sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 def test_reaggregate_with_unavailable_objects(path):
@@ -183,6 +186,7 @@ def test_reaggregate_with_unavailable_objects(path):
     )
 
 
+@slow  # 26sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
@@ -218,6 +222,7 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
 
 
 # this is for gh-1987
+@slow  # 23sec on Yarik's laptop
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree=_dataset_hierarchy_template)
@@ -307,6 +312,7 @@ def test_aggregate_removal(path):
 
 # underlying code cannot deal with adjusted branches
 # https://github.com/datalad/datalad/pull/3817
+@slow  # 22sec on Yarik's laptop
 @known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 def test_update_strategy(path):
@@ -363,6 +369,7 @@ def test_update_strategy(path):
     eq_(target_meta, base.metadata(return_type='list'))
 
 
+@slow  # 14sec on Yarik's laptop
 @known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
 @with_tree({
     'this': 'that',

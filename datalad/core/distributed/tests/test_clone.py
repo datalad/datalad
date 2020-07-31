@@ -679,6 +679,7 @@ def _move2store(storepath, d):
     Runner(cwd=store_loc).run(['git', 'update-server-info'])
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -925,6 +926,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
+@slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
     if not has_symlink_capability():
@@ -954,6 +956,7 @@ def test_ria_postclonecfg():
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
 
 
+@slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http

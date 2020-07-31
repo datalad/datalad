@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
@@ -33,6 +32,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     skip_if_on_windows,
     skip_ssh,
+    slow,
     with_tempfile,
     with_tree,
     SkipTest,
@@ -237,6 +237,7 @@ def test_push():
     yield check_push, True
 
 
+@slow  # 33sec on Yarik's laptop
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -369,6 +370,7 @@ def test_push_recursive(
             refspec=DEFAULT_REFSPEC)
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -644,6 +646,7 @@ def test_push_wanted(srcpath, dstpath):
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
 
 
+@slow  # 10sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_data_transfer(path):
     path = Path(path)
@@ -704,6 +707,7 @@ def test_auto_data_transfer(path):
         path=str(ds_a.pathobj / "bar.dat"))
 
 
+@slow  # 16sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_if_wanted_data_transfer_path_restriction(path):
     path = Path(path)

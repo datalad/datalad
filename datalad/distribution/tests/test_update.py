@@ -481,6 +481,7 @@ def test_merge_no_merge_target(path):
     assert_in_results(res, status="impossible", action="update")
 
 
+@slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict(path):
     path = Path(path)
@@ -535,6 +536,7 @@ def test_merge_conflict(path):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
+@slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict_in_subdataset_only(path):
     path = Path(path)
@@ -613,6 +615,7 @@ def test_merge_ff_only(path):
         action="merge", status="ok")
 
 
+@slow  # 11sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_other_branch(path):
     path = Path(path)
@@ -793,6 +796,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
         action="update")
 
 
+@slow  # 12 + 21sec on Yarik's laptop
 def test_merge_follow_parentds_subdataset_detached():
     yield check_merge_follow_parentds_subdataset_detached, True
     yield check_merge_follow_parentds_subdataset_detached, False

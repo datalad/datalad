@@ -124,7 +124,7 @@ matrix:
     - DATALAD_TESTS_SSH=0
     - _DL_TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad.tests datalad.support"
-  #
+    #
   # The ones to run only on weekends against master.
   # They will not contribute to coverage etc, but might lead to failed status
   #
@@ -203,8 +203,12 @@ before_install:
         exit 0;
       fi
     fi
-  # Life was so fast that we needed a slow down
-  # - sleep 60   # TEMP -- to spot diff
+  # If we requested to run only not slow (typically <10sec) tests, fail if a test
+  # takes 3x more than that - it needs to get @slow or @turtle annotation
+  - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
+      NOSE_OPTS=( --with-doctest --with-timer --timer-ok 5 --timer-warning 30 --timer-fail error --timer-filter warning,error );
+      export DATALAD_TESTS_SETUP_TESTREPOS=1;
+    fi
   # Just in case we need to check if nfs is there etc
   - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
@@ -260,7 +264,7 @@ script:
   # Run tests
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
+    $NOSE_WRAPPER `which nosetests` "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
       --with-cov --cover-package datalad

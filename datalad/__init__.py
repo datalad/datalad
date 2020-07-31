@@ -191,6 +191,11 @@ def setup_package():
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
 
+    if cfg.obtain('datalad.tests.setup.testrepos'):
+        lgr.debug("Pre-populating testrepos")
+        from datalad.tests.utils import with_testrepos
+        with_testrepos()(lambda repo: 1)()
+
 
 def teardown_package():
     import os

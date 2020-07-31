@@ -18,6 +18,7 @@ from datalad.tests.utils import (
     assert_not_in,
     assert_raises,
     known_failure_githubci_win,
+    slow,
     with_tempfile,
 )
 
@@ -29,6 +30,7 @@ from datalad.tests.utils import (
 )
 
 
+@slow  # 10sec on travis
 @known_failure_githubci_win
 @with_tempfile
 def test_get_content_info(path):
