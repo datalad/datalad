@@ -460,7 +460,7 @@ class Create(Interface):
         if _seed is None:
             # just the standard way
             # use a fully random identifier (i.e. UUID version 4)
-            uuid_id = uuid.uuid4().urn.split(':')[-1]
+            uuid_id = str(uuid.uuid4())
         else:
             # Let's generate preseeded ones
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
