@@ -267,7 +267,6 @@ def test_run_from_subds_gh3551(path):
 # unexpected content of state "modified", likely a more fundamental issue with the
 # testrepo setup
 @known_failure_githubci_win
-@slow  # ~10s
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)

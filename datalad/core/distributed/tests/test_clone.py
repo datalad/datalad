@@ -679,6 +679,7 @@ def _move2store(storepath, d):
     Runner(cwd=store_loc).run(['git', 'update-server-info'])
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -925,6 +926,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
+@slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
     if not has_symlink_capability():
@@ -954,6 +956,7 @@ def test_ria_postclonecfg():
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
 
 
+@slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
@@ -1172,3 +1175,38 @@ def test_gin_cloning(path):
     eq_(result[0]['path'], op.join(ds.path, annex_path))
     ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
     ok_file_has_content(op.join(ds.path, git_path), 'one\n')
+
+
+@with_tree(tree={"special": {"f0": "0"}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_fetch_git_special_remote(url_path, url, path):
+    url_path = Path(url_path)
+    path = Path(path)
+    ds_special = Dataset(url_path / "special").create(force=True)
+    if ds_special.repo.is_managed_branch():
+        # TODO: git-annex-init fails in the second clone call below when this is
+        # executed under ./tools/eval_under_testloopfs.
+        raise SkipTest("Test fails on managed branch")
+    ds_special.save()
+    ds_special.repo.call_git(["update-server-info"])
+
+    clone_url = url + "special/.git"
+    ds_a = clone(clone_url, path / "a")
+    ds_a.repo._run_annex_command(
+        "initremote",
+        annex_options=["special", "type=git", "autoenable=true",
+                       "location=" + clone_url])
+
+    # Set up a situation where a file is present only on the special remote,
+    # and its existence is known only to the special remote's git-annex branch.
+    (ds_special.pathobj / "f1").write_text("1")
+    ds_special.save()
+    ds_special.repo.call_git(["update-server-info"])
+
+    ds_a.repo.fetch("origin")
+    ds_a.repo.merge("origin/" + DEFAULT_BRANCH)
+
+    ds_b = clone(ds_a.path, path / "other")
+    ds_b.get("f1")
+    ok_(ds_b.repo.file_has_content("f1"))

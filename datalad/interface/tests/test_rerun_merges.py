@@ -317,7 +317,7 @@ def test_rerun_run_left_nonrun_right(path):
     eq_(hexsha_before, ds.repo.get_hexsha())
 
 
-@slow
+# @slow  # ~5sec on Yarik's laptop
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_mutator_left_nonrun_right(path):
@@ -412,7 +412,7 @@ def test_rerun_mutator_stem_nonrun_merges(path):
     assert_false(ds.repo.commit_exists("HEAD^2"))
 
 
-@slow
+# @slow  # ~4.5sec
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_exclude_side(path):
@@ -492,7 +492,7 @@ def test_rerun_unrelated_run_left_nonrun_right(path):
         ds.repo.get_hexsha())
 
 
-@slow
+# @slow  # ~3.5sec on Yarik's laptop
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_mutator_left_nonrun_right(path):

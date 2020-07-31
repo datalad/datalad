@@ -165,6 +165,7 @@ def test_invalid_call(path):
                 'bogus'))
 
 
+@slow  # 26sec on travis
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
@@ -415,6 +416,7 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
         publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
 
 
+@slow  # 28 + 19sec on travis
 def test_target_ssh_recursive():
     skip_if_on_windows()
     yield skip_ssh(check_target_ssh_recursive), True
@@ -470,6 +472,7 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
     assert_postupdate_hooks(_path_(target_path, 'brandnew'), installed=False)
 
 
+@slow  # 10sec + ? on travis
 def test_target_ssh_since():
     skip_if_on_windows()
     yield skip_ssh(check_target_ssh_since), True
@@ -578,6 +581,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     assert_postupdate_hooks(dst_path)
 
 
+@slow  # 14 + 10sec on travis
 def test_replace_and_relative_sshpath():
     skip_if_on_windows()
     yield skip_ssh(check_replace_and_relative_sshpath), True
@@ -789,6 +793,7 @@ def test_local_path_target_dir(path):
     ok_((path / "e" / "d-subds").exists())
 
 
+@slow  # 12sec on Yarik's laptop
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)

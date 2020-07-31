@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     eq_,
+    slow,
     with_tempfile,
 )
 
@@ -43,6 +44,7 @@ def _p(rpath):
     return str(Path(PurePosixPath(rpath)))
 
 
+@slow  # 13sec on travis
 @with_tempfile
 @with_tempfile
 def test_get_subdatasets(origpath, path):

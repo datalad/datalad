@@ -41,7 +41,6 @@ from datalad.tests.utils import (
     HTTPPath,
     known_failure_githubci_win,
     ok_exists,
-    slow,
     swallow_logs,
     with_tempfile,
     with_tree,
@@ -395,7 +394,6 @@ def test_addurls_dry_run(path):
                   cml.out)
 
 
-@slow  # ~9s
 class TestAddurls(object):
 
     @classmethod

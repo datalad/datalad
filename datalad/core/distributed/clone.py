@@ -821,6 +821,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
 
+    repo_config = repo.config
     # Note: The purpose of this function is to inform the user. So if something
     # looks misconfigured, we'll warn and move on to the next item.
     for uuid, config in repo.get_special_remotes().items():
@@ -843,6 +844,15 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 sr_autoenable, sr_name, ds.path)
             continue
 
+        # If it looks like a type=git special remote, make sure we have up to
+        # date information. See gh-2897.
+        if sr_autoenable and repo_config.get("remote.{}.fetch".format(sr_name)):
+            try:
+                repo.fetch(remote=sr_name)
+            except CommandError as exc:
+                lgr.warning("Failed to fetch type=git special remote %s: %s",
+                            sr_name, exc_str(exc))
+
         # determine whether there is a registered remote with matching UUID
         if uuid:
             if remote_uuids is None:
@@ -851,8 +861,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # this will point to the UUID for the configuration (i.e.
                     # the key returned by get_special_remotes) rather than the
                     # shared UUID.
-                    (repo.config.get('remote.%s.annex-config-uuid' % r) or
-                     repo.config.get('remote.%s.annex-uuid' % r))
+                    (repo_config.get('remote.%s.annex-config-uuid' % r) or
+                     repo_config.get('remote.%s.annex-uuid' % r))
                     for r in repo.get_remotes()
                 }
             if uuid not in remote_uuids:
