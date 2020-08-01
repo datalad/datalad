@@ -566,6 +566,11 @@ def postclone_check_head(ds):
         for rbranch in remote_branches:
             if rbranch in ["origin/git-annex", "HEAD"]:
                 continue
+            if rbranch.startswith("origin/adjusted/"):
+                # If necessary for this file system, a downstream
+                # git-annex-init call will handle moving into an
+                # adjusted state.
+                continue
             repo.call_git(["checkout", "-b", rbranch[7:],  # drop "origin/"
                            "--track", rbranch])
             lgr.debug("Checked out local branch from %s", rbranch)
