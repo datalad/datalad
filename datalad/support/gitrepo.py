@@ -4017,11 +4017,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
             for cand_sm in to_add_submodules:
                 try:
-                    self.add_submodule(
-                        str(cand_sm.relative_to(self.pathobj)),
-                        url=None,
-                        name=None,
-                    )
+                    self._save_add_submodule(cand_sm)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         action='add_submodule',
@@ -4132,6 +4128,52 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except OSError as e:
             lgr.error("add: %s" % e)
             raise
+
+    def _save_add_submodule(self, path):
+        def quote_config(v, section=False):
+            white = (' ', '\t')
+            # backslashed need to be quoted in any case
+            v = v.replace('\\', '\\\\')
+            if section:
+                # must not have additional unquoted quotes
+                v = v.replace('"', '\\"')
+            elif v and (v[0] in white or v[-1] in white):
+                # quoting the value due to leading/trailing whitespace
+                # prevent inner unquotes quotes
+                v = v.replace('"', '\\"')
+                v = '"{}"'.format(v)
+            return v
+
+        rpath = str(path.relative_to(self.pathobj).as_posix())
+        subm = GitRepo(path, create=False, init=False)
+        subm_commit = subm.get_hexsha()
+        if not subm_commit:
+            raise InvalidGitRepositoryError(
+                'cannot add subdataset {} with no commits'.format(subm))
+        # make an attempt to configure a submodule source URL based on the
+        # discovered remote configuration
+        remote, branch = subm.get_tracking_branch()
+        url = subm.get_remote_url(remote) if remote else None
+        if url is None:
+            url = './{}'.format(rpath)
+        self.call_git([
+            'update-index', '--add', '--replace', '--cacheinfo', '160000',
+            subm_commit, rpath
+        ])
+        subm_id = subm.config.get('datalad.dataset.id', None)
+        with (self.pathobj / '.gitmodules').open('a') as gmf:
+            gmf.write(
+                '[submodule {q}{sec}{q}]\n\tpath = {rpath}\n\turl = {url}\n{id}'.format(
+                    q='' if rpath.startswith('"') else '"',
+                    sec=quote_config(rpath, section=True),
+                    rpath=quote_config(rpath),
+                    url=quote_config(url),
+                    id='\tdatalad-id = {}\n'.format(subm_id) if subm_id else '',
+                ))
+        self.config.set('submodule.{}.active'.format(rpath), 'true',
+                        where='local', reload=False)
+        self.config.set('submodule.{}.url'.format(rpath), url,
+                        where='local', reload=True)
 
 
 # TODO
