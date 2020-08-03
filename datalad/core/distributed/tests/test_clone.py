@@ -1143,7 +1143,27 @@ def test_clone_unborn_head_sub(path):
     ds_origin = Dataset(op.join(path, "a")).create()
     ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
     managed = ds_origin_sub.repo.is_managed_branch()
-    ds_origin_sub.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
+    ds_origin.save(message="foo")
+    sub_repo = ds_origin_sub.repo
+    # As with test_clone_unborn_head(), the setup below is complicated mostly
+    # because it's accounting for adjusted branches, but the scenario itself
+    # isn't too complicated:
+    #
+    #   * a submodule's HEAD points to a checked out branch with no commits
+    #     while a (potentially adjusted) "other" branch has commits
+    #
+    #   * the parent repo has the tip of "other" as the last recorded state
+    for res in sub_repo.for_each_ref_(fields="refname"):
+        ref = res["refname"]
+        if DEFAULT_BRANCH in ref:
+            sub_repo.update_ref(ref.replace(DEFAULT_BRANCH, "other"), ref)
+            sub_repo.call_git(["update-ref", "-d", ref])
+    sub_repo.update_ref(
+        "HEAD",
+        "refs/heads/{}".format(
+            "adjusted/other(unlocked)" if managed else "other"),
+        symbolic=True)
+    # END complicated handling for adjusted branches
     ds_origin.save()
     ds_origin_sub.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
