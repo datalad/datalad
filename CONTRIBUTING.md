@@ -214,7 +214,7 @@ We can then populate the shared .tributors file:
 $ tributors update-lookup allcontrib
 ```
 
-And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors, and
+And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
 look for new orcids as we did above.
 
 
