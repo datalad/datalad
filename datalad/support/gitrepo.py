@@ -4006,7 +4006,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                           props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
-            to_add_submodules = [sm for sm, sm_props in
+            to_add_submodules = [
+                sm for sm, sm_props in
                 self.get_content_info(
                     untracked_dirs,
                     ref=None,
@@ -4015,30 +4016,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
-            for cand_sm in to_add_submodules:
-                try:
-                    self._save_add_submodule(cand_sm)
-                except (CommandError, InvalidGitRepositoryError) as e:
-                    yield get_status_dict(
-                        action='add_submodule',
-                        ds=self,
-                        path=self.pathobj / ut.PurePosixPath(cand_sm),
-                        status='error',
-                        message=e.stderr if hasattr(e, 'stderr')
-                        else ('not a Git repository: %s', exc_str(e)),
-                        logger=lgr)
-                    continue
-                # This mirrors the result structure yielded for
-                # to_stage_submodules below.
-                yield get_status_dict(
-                    action='add',
-                    refds=self.pathobj,
-                    type='file',
-                    key=None,
-                    path=self.pathobj / ut.PurePosixPath(cand_sm),
-                    status='ok',
-                    logger=lgr)
-                added_submodule = True
+            if to_add_submodules:
+                for r in self._save_add_submodules(to_add_submodules):
+                    if r.get('status', None) == 'ok':
+                        added_submodule = True
+                    yield r
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
@@ -4060,6 +4042,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     yield r
 
         if added_submodule or vanished_subds:
+            # the config has changed too
+            self.config.reload()
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
@@ -4129,8 +4113,22 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.error("add: %s" % e)
             raise
 
-    def _save_add_submodule(self, path):
+    def _save_add_submodules(self, paths):
+        """Add new submodules
+
+        This method does not use `git submodule add`, but aims to be more
+        efficient by limiting the scope to mere in-place registration of
+        multiple already present respositories.
+
+        Parameters
+        ----------
+        paths : list(Path)
+        """
+        from datalad.interface.results import get_status_dict
+
         def quote_config(v, section=False):
+            """Helper to perform minimal quoting of config setting in
+            .gitmodules"""
             white = (' ', '\t')
             # backslashed need to be quoted in any case
             v = v.replace('\\', '\\\\')
@@ -4144,37 +4142,73 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 v = '"{}"'.format(v)
             return v
 
-        rpath = str(path.relative_to(self.pathobj).as_posix())
-        subm = GitRepo(path, create=False, init=False)
-        subm_commit = subm.get_hexsha()
-        if not subm_commit:
-            raise InvalidGitRepositoryError(
-                'cannot add subdataset {} with no commits'.format(subm))
-        # make an attempt to configure a submodule source URL based on the
-        # discovered remote configuration
-        remote, branch = subm.get_tracking_branch()
-        url = subm.get_remote_url(remote) if remote else None
-        if url is None:
-            url = './{}'.format(rpath)
-        self.call_git([
-            'update-index', '--add', '--replace', '--cacheinfo', '160000',
-            subm_commit, rpath
-        ])
-        subm_id = subm.config.get('datalad.dataset.id', None)
-        with (self.pathobj / '.gitmodules').open('a') as gmf:
-            gmf.write(
-                '[submodule {q}{sec}{q}]\n\tpath = {rpath}\n\turl = {url}\n{id}'.format(
-                    q='' if rpath.startswith('"') else '"',
-                    sec=quote_config(rpath, section=True),
-                    rpath=quote_config(rpath),
-                    url=quote_config(url),
-                    id='\tdatalad-id = {}\n'.format(subm_id) if subm_id else '',
-                ))
-        self.config.set('submodule.{}.active'.format(rpath), 'true',
-                        where='local', reload=False)
-        self.config.set('submodule.{}.url'.format(rpath), url,
-                        where='local', reload=True)
+        def write_submodule_config(fobj, name, props):
+            fmt = '[submodule {_q_}{_name_}{_q_}]\n'
+            for p in props:
+                fmt += '\t{p} = {{{p}}}\n'.format(p=p)
+            fobj.write(
+                fmt.format(
+                    _q_='' if name.startswith('"') else '"',
+                    _name_=quote_config(name, section=True),
+                    **{k: quote_config(v) for k, v in props.items()}))
 
+        # first gather info from all datasets in read-only fashion, and then
+        # update index, .gitmodules and .git/config at once
+        info = []
+        for path in paths:
+            rpath = str(path.relative_to(self.pathobj).as_posix())
+            subm = GitRepo(path, create=False, init=False)
+            subm_commit = subm.get_hexsha()
+            if not subm_commit:
+                yield get_status_dict(
+                    action='add_submodule',
+                    ds=self,
+                    path=path,
+                    status='error',
+                    message=('cannot add subdataset %s with no commits', subm),
+                    logger=lgr)
+                continue
+            # make an attempt to configure a submodule source URL based on the
+            # discovered remote configuration
+            remote, branch = subm.get_tracking_branch()
+            url = subm.get_remote_url(remote) if remote else None
+            if url is None:
+                url = './{}'.format(rpath)
+            subm_id = subm.config.get('datalad.dataset.id', None)
+            info.append(
+                dict(path=path, rpath=rpath, commit=subm_commit, id=subm_id,
+                     url=url))
+
+        # bypass any convenience or safe-manipulator for speed reasons
+        # use case: saving many new subdatasets in a single run
+        with (self.pathobj / '.gitmodules').open('a') as gmf, \
+             (self.pathobj / '.git' / 'config').open('a') as gcf:
+            for i in info:
+                self.call_git([
+                    'update-index', '--add', '--replace', '--cacheinfo', '160000',
+                    i['commit'], i['rpath']
+                ])
+                gmprops = dict(path=i['rpath'], url=i['url'])
+                if i['id']:
+                    gmprops['datalad-id'] = i['id']
+                write_submodule_config(
+                    gmf, i['rpath'], gmprops)
+                write_submodule_config(
+                    gcf, i['rpath'], dict(active='true', url=i['url']))
+
+                # This mirrors the result structure yielded for
+                # to_stage_submodules below.
+                yield get_status_dict(
+                    action='add',
+                    refds=self.pathobj,
+                    # MIH: really? why not 'dataset', it seems "add" of an existing
+                    # subdataset (i.e. update) does that, and this one mimiks it
+                    # still, two wrongs don't make a right.
+                    type='file',
+                    key=None,
+                    path=i['path'],
+                    status='ok',
+                    logger=lgr)
 
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove
