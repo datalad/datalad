@@ -37,6 +37,11 @@ cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
+from concurrent.futures import (
+       ThreadPoolExecutor,
+       ProcessPoolExecutor,
+       as_completed,
+)
 
 _where_reload_doc = """
         where : {'dataset', 'local', 'global', 'override'}, optional
@@ -294,28 +299,44 @@ class ConfigManager(object):
         if self._gitconfig_has_showorgin:
             run_args.append('--show-origin')
 
+        to_run = {}
         if self._dataset_cfgfname:
             if exists(self._dataset_cfgfname):
-                stdout, stderr = self._run(
-                    run_args + ['--file', self._dataset_cfgfname],
-                    log_stderr=True
-                )
-                # overwrite existing value, do not amend to get multi-line
-                # values
-                self._store, self._cfgfiles = _parse_gitconfig_dump(
-                    stdout, self._store, self._cfgfiles, replace=False,
-                    cwd=self._runner.cwd)
+                to_run['dataset'] = run_args[:] + ['--file', self._dataset_cfgfname]
+
+        if self._src_mode == 'dataset-local':
+            run_args.append('--local')
+        to_run['main'] = run_args
+
+        # ? ProcessPoolExecutor
+        res = {}
+        if len(to_run) > 1:
+            with ThreadPoolExecutor(max_workers=len(to_run)) as executor:
+                for k, args in to_run.items():
+                    res[k] = executor.submit(self._run, args)
+            for r in res.values():
+                exc = r.exception()
+                if exc:
+                    raise exc
+            run_outputs = {k: r.result() for k, r in res.items()}
+        else:
+            run_outputs = {'main': self._run(to_run['main'])}
+
+        if 'dataset' in run_outputs:
+            stdout, stderr = run_outputs['dataset']
+            # overwrite existing value, do not amend to get multi-line
+            # values
+            self._store, self._cfgfiles = _parse_gitconfig_dump(
+                stdout, self._store, self._cfgfiles, replace=False,
+                cwd=self._runner.cwd)
 
         if self._src_mode == 'dataset':
             # superimpose overrides, and stop early
             self._store.update(self.overrides)
             return
 
-        if self._src_mode == 'dataset-local':
-            run_args.append('--local')
-        stdout, stderr = self._run(run_args, log_stderr=True)
         self._store, self._cfgfiles = _parse_gitconfig_dump(
-            stdout, self._store, self._cfgfiles, replace=True,
+            run_outputs['main'][0], self._store, self._cfgfiles, replace=True,
             cwd=self._runner.cwd)
 
         # always monitor the dataset cfg location, we know where it is in all cases
@@ -590,7 +611,7 @@ class ConfigManager(object):
     # Modify configuration (proxy respective git-config call)
     #
     @_where_reload
-    def _run(self, args, where=None, reload=False, **kwargs):
+    def _run(self, args, where=None, reload=False, log_stderr=True, **kwargs):
         """Centralized helper to run "git config" calls
 
         Parameters
@@ -603,7 +624,7 @@ class ConfigManager(object):
         """
         if where:
             args = self._get_location_args(where) + args
-        out = self._runner.run(self._config_cmd + args, **kwargs)
+        out = self._runner.run(self._config_cmd + args, log_stderr=log_stderr, **kwargs)
         if reload:
             self.reload()
         return out
