@@ -40,7 +40,7 @@ jobs:
       - name: Checkout New Branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH_AGAINST: "maint"
+          BRANCH_AGAINST: "master"
         run: |
           printf "GitHub Actor: ${GITHUB_ACTOR}\n"
           export BRANCH_FROM="contributors/update-$(date '+%Y-%m-%d')"
