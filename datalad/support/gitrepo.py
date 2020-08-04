@@ -3299,6 +3299,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             paths = [ut.PurePosixPath(p) for p in paths]
 
         path_strs = list(map(str, paths)) if paths else None
+        if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
+            # If a path points within a submodule, we need to map it to the
+            # containing submodule before feeding it to ls-files or ls-tree.
+            #
+            # Before Git 2.29.0, ls-tree and ls-files differed in how they
+            # reported paths within submodules: ls-files provided no output,
+            # and ls-tree listed the submodule. Now they both return no output.
+            submodules = [str(s["path"].relative_to(self.pathobj))
+                          for s in self.get_submodules_()]
+            path_strs = get_parent_paths(path_strs, submodules)
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -3324,14 +3334,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
-
-            if path_strs:
-                # we need to get their within repo elements since ls-tree
-                # for paths within submodules returns nothing!
-                # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
-                submodules = [str(s["path"].relative_to(self.pathobj))
-                              for s in self.get_submodules_()]
-                path_strs = get_parent_paths(path_strs, submodules)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(
