@@ -51,6 +51,7 @@ from datalad.tests.utils import (
     skip_if_on_windows,
     skip_ssh,
     SkipTest,
+    slow,
     swallow_logs,
     with_tempfile,
     with_testrepos,
@@ -1447,6 +1448,7 @@ def test_custom_runner_protocol(path):
     ok_(all(p['duration'] >= 0 for p in prot))
 
 
+@slow   # 15sec on Yarik's laptop and tripped Travis CI
 @with_tempfile(mkdir=True)
 def test_duecredit(path):
     # Just to check that no obvious side-effects

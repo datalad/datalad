@@ -481,15 +481,15 @@ Refer datalad/config.py for information on how to add these environment variable
   tests preferred to be set to http://datasets-tests.datalad.org
 - *DATALAD_LOG_LEVEL*:
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_LOG_CMD_OUTPUTS*:
+- *DATALAD_LOG_OUTPUTS*:
   Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
-- *DATALAD_LOG_CMD_ENV*:
+- *DATALAD_LOG_ENV*:
   If contains a digit (e.g. 1), would log entire environment passed into
   the Runner.run's popen call.  Otherwise could be a comma separated list
   of environment variables to log
-- *DATALAD_LOG_CMD_STDIN*:
+- *DATALAD_LOG_STDIN*:
   Whether to log stdin for the command
-- *DATALAD_LOG_CMD_CWD*:
+- *DATALAD_LOG_CWD*:
   Whether to log cwd where command to be executed
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
