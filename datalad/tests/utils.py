@@ -82,7 +82,10 @@ from datalad.utils import (
 
 from ..cmd import Runner
 from .. import utils
-from ..support.exceptions import CommandNotAvailableError
+from ..support.exceptions import (
+    CommandError,
+    CommandNotAvailableError,
+)
 from ..support.external_versions import external_versions
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
@@ -1864,6 +1867,49 @@ def skip_wo_symlink_capability(func):
     return newfunc
 
 
+def get_ssh_port(host):
+    """Get port of `host` in ssh_config.
+
+    Our tests depend on the host being defined in ssh_config, including its
+    port. This method can be used by tests that want to check handling of an
+    explicitly specified
+
+    Note that if `host` does not match a host in ssh_config, the default value
+    of 22 is returned.
+
+    Parameters
+    ----------
+    host : str
+
+    Returns
+    -------
+    port (int)
+
+    Raises
+    ------
+    SkipTest if port cannot be found.
+    """
+    out = ''
+    try:
+        out, err = Runner()(["ssh", "-G", host])
+    except Exception as exc:
+        err = str(exc)
+
+    port = None
+    for line in out.splitlines():
+        if line.startswith("port "):
+            try:
+                port = int(line.split()[1])
+            except Exception as exc:
+                err = str(exc)
+            break
+
+    if port is None:
+        raise SkipTest("port for {} could not be determined: {}"
+                       .format(host, err))
+    return port
+
+
 #
 # Context Managers
 #
@@ -1923,25 +1969,33 @@ from nose.plugins.attrib import attr
 def integration(f):
     """Mark test as an "integration" test which generally is not needed to be run
     
-    Generally tend to be slower
+    Generally tend to be slower.
+    Should be used in combination with @slow and @turtle if that is the case.
     """
     return attr('integration')(f)
 
 
 def slow(f):
     """Mark test as a slow, although not necessarily integration or usecase test
+
+    Rule of thumb cut-off to mark as slow is 10 sec
     """
     return attr('slow')(f)
 
 
 def turtle(f):
     """Mark test as very slow, meaning to not run it on Travis due to its
-    time limit"""
+    time limit
+
+    Rule of thumb cut-off to mark as turtle is 2 minutes
+    """
     return attr('turtle')(f)
 
 
 def usecase(f):
     """Mark test as a usecase user ran into and which (typically) caused bug report
     to be filed/troubleshooted
+
+    Should be used in combination with @slow and @turtle if slow.
     """
     return attr('usecase')(f)

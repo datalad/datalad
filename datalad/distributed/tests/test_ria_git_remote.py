@@ -26,6 +26,7 @@ from datalad.tests.utils import (
     assert_status,
     known_failure_windows,
     skip_ssh,
+    slow,
     with_tempfile
 )
 from datalad.distributed.ora_remote import (
@@ -142,6 +143,7 @@ def _test_bare_git_version_1(host, dspath, store):
     eq_(len(ds.repo.whereis('one.txt')), 3)
 
 
+@slow  # 12sec + ? on travis
 def test_bare_git_version_1():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_bare_git_version_1)), \
@@ -226,6 +228,7 @@ def _test_bare_git_version_2(host, dspath, store):
     eq_(len(ds.repo.whereis('one.txt')), 1)
 
 
+@slow  # 13sec + ? on travis
 def test_bare_git_version_2():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_bare_git_version_2)), \

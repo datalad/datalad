@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
@@ -33,6 +32,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     skip_if_on_windows,
     skip_ssh,
+    slow,
     with_tempfile,
     with_tree,
     SkipTest,
@@ -212,7 +212,6 @@ def check_push(annex, src_path, dst_path):
         # push should be rejected (non-fast-forward):
         res = src.push(to='target', since='HEAD~2', on_failure='ignore')
         # fails before even touching the annex branch
-        assert_result_count(res, 1)
         assert_in_results(
             res,
             action='publish', status='error', target='target',
@@ -238,6 +237,7 @@ def test_push():
     yield check_push, True
 
 
+@slow  # 33sec on Yarik's laptop
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -370,6 +370,7 @@ def test_push_recursive(
             refspec=DEFAULT_REFSPEC)
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -532,7 +533,7 @@ def test_publish_target_url(src, desttop, desturl):
         raise SkipTest(
             'Skipped due to https://github.com/datalad/datalad/issues/4075')
     ds.save('1')
-    ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
+    ds.create_sibling('ssh://datalad-test:%s/subdir' % desttop,
                       name='target',
                       target_url=desturl + 'subdir/.git')
     results = ds.push(to='target')
@@ -645,6 +646,7 @@ def test_push_wanted(srcpath, dstpath):
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
 
 
+@slow  # 10sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_data_transfer(path):
     path = Path(path)
@@ -705,6 +707,7 @@ def test_auto_data_transfer(path):
         path=str(ds_a.pathobj / "bar.dat"))
 
 
+@slow  # 16sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_if_wanted_data_transfer_path_restriction(path):
     path = Path(path)
@@ -774,3 +777,17 @@ def test_auto_if_wanted_data_transfer_path_restriction(path):
         res,
         action="copy", target="b", status="ok",
         path=str(ds_a.pathobj / "sec.dat"))
+
+
+@with_tempfile(mkdir=True)
+def test_push_git_annex_branch_when_no_data(path):
+    path = Path(path)
+    ds = Dataset(path / "a").create()
+    target = mk_push_target(ds, "target", str(path / "target"),
+                            annex=False, bare=True)
+    (ds.pathobj / "f0").write_text("0")
+    ds.save()
+    ds.push(to="target", data="nothing")
+    assert_in("git-annex",
+              {d["refname:strip=2"]
+               for d in target.for_each_ref_(fields="refname:strip=2")})

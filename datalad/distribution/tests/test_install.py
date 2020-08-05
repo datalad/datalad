@@ -254,6 +254,7 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@slow   # 25sec on Yarik's laptop
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_dataset_from_instance(src, dst):
@@ -307,6 +308,7 @@ def test_install_dataladri(src, topurl, path):
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@slow   # 46sec on Yarik's laptop and tripped Travis CI
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
@@ -431,6 +433,7 @@ def test_install_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
+@slow   # 15sec on Yarik's laptop
 @known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
@@ -819,12 +822,12 @@ def test_install_subds_with_space(opath, tpath):
     # works even now, boring
     # install(tpath, source=opath, recursive=True)
     if on_windows:
-        # on windows we cannot simply prepend localhost: to a path
+        # on windows we cannot simply prepend datalad-test: to a path
         # and get a working sshurl...
         install(tpath, source=opath, recursive=True)
     else:
         # do via ssh!
-        install(tpath, source="localhost:" + opath, recursive=True)
+        install(tpath, source="datalad-test:" + opath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
@@ -858,7 +861,7 @@ def test_install_subds_from_another_remote(topdir):
         origin = create(origin_, annex=False)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
-        clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
+        clone1.create_sibling('ssh://datalad-test%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
 
         # print("Creating clone2")
         clone1.publish(to=clone2_)

@@ -52,6 +52,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     skip_if_on_windows,
     skip_ssh,
+    slow,
     swallow_logs,
     with_tempfile,
     with_testrepos,
@@ -103,7 +104,7 @@ def test_smth_about_not_supported(p1, p2):
     source = Dataset(p1).create()
     from datalad.support.network import PathRI
     source.create_sibling(
-        'ssh://localhost' + PathRI(p2).posixpath,
+        'ssh://datalad-test' + PathRI(p2).posixpath,
         name='target1')
     # source.publish(to='target1')
     with chpwd(p1):
@@ -269,6 +270,7 @@ def test_publish_plain_git(origin, src_path, dst_path):
     eq_(res, [source])
 
 
+@slow  # 12sec on travis
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:380
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -438,6 +440,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
+@slow  # 10sec on Yarik's laptop
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
@@ -529,6 +532,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
         filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
+@slow  # 10sec on travis
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -552,7 +556,7 @@ def test_publish_depends(
 
     # two remote sibling on two "different" hosts
     source.create_sibling(
-        'ssh://localhost' + target1_path,
+        'ssh://datalad-test' + target1_path,
         annex_wanted='standard',
         annex_group='backup',
         name='target1')
@@ -659,7 +663,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 
     # create the target(s):
     source.create_sibling(
-        'ssh://localhost:' + dst_path,
+        'ssh://datalad-test:' + dst_path,
         name='target', recursive=True)
 
     # publish recursively, which silently ignores non-installed datasets
@@ -681,7 +685,7 @@ def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
     ds.save('1')
-    ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
+    ds.create_sibling('ssh://datalad-test:%s/subdir' % desttop,
                       name='target',
                       target_url=desturl + 'subdir/.git')
     results = ds.publish(to='target', transfer_data='all')
@@ -689,6 +693,7 @@ def test_publish_target_url(src, desttop, desturl):
     ok_file_has_content(_path_(desttop, 'subdir/1'), '123')
 
 
+@slow  # 11sec on Yarik's laptop
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
@@ -752,6 +757,7 @@ def test_publish_no_fetch_refspec_configured(path):
     ds.publish(to="origin")
 
 
+@slow  # 14sec on Yarik's laptop
 @skip_ssh
 @with_tempfile(mkdir=True)
 def test_publish_fetch_do_not_recurse_submodules(path):
