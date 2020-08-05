@@ -254,6 +254,7 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@slow   # 25sec on Yarik's laptop
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_dataset_from_instance(src, dst):
@@ -307,6 +308,7 @@ def test_install_dataladri(src, topurl, path):
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@slow   # 46sec on Yarik's laptop and tripped Travis CI
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
@@ -431,6 +433,7 @@ def test_install_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
+@slow   # 15sec on Yarik's laptop
 @known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
