@@ -39,8 +39,9 @@ from datalad.support.constraints import (
 from datalad.support.param import Parameter
 from datalad.utils import (
     getpwd,
-    assure_list,
+    ensure_list,
     get_dataset_root,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -268,7 +269,7 @@ class Create(Interface):
         assert(path is not None)
 
         # assure cfg_proc is a list (relevant if used via Python API)
-        cfg_proc = assure_list(cfg_proc)
+        cfg_proc = ensure_list(cfg_proc)
 
         # prep for yield
         res = dict(action='create', path=str(path),
@@ -499,8 +500,34 @@ class Create(Interface):
         )
 
         for cfg_proc_ in cfg_proc:
-            for r in tbds.run_procedure('cfg_' + cfg_proc_):
-                yield r
+            loc_var = 'datalad.locations.dataset-procedures'
+            proc_locs = None
+            if isinstance(refds, Dataset) and refds.path != tbds.path:
+                # we have a parent dataset, patch the config to temporarily also
+                # look into its procedure store, if there is any
+                # https://github.com/datalad/datalad/issues/4802
+                proc_locs = [
+                    l if Path(l).is_absolute() else str(refds.pathobj / l)
+                    for l in ensure_list(refds.config.obtain(loc_var))
+                ]
+            old_proc_locs = None
+            try:
+                if proc_locs:
+                    # save a possible existing override
+                    old_proc_locs = tbds.config.overrides.pop(loc_var, None)
+                    # place temp override, we do not need to worry about merging
+                    # them with prev existing ones. Any overrides must come from
+                    # a global source that would also have affected refds.config
+                    tbds.config.overrides[loc_var] = proc_locs
+                    tbds.config.reload(force=True)
+                for r in tbds.run_procedure('cfg_' + cfg_proc_):
+                    yield r
+            finally:
+                if old_proc_locs is None:
+                    tbds.config.overrides.pop(loc_var, None)
+                else:
+                    tbds.config.overrides[loc_var] = old_proc_locs
+                tbds.config.reload(force=True)
 
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
