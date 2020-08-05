@@ -307,6 +307,7 @@ def test_install_dataladri(src, topurl, path):
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@slow   # 46sec on Yarik's laptop and tripped Travis CI
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
