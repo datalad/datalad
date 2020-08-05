@@ -254,6 +254,7 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@slow   # 25sec on Yarik's laptop
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_dataset_from_instance(src, dst):
@@ -432,6 +433,7 @@ def test_install_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
+@slow   # 15sec on Yarik's laptop
 @known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
