@@ -1708,14 +1708,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         -------
         str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        # use git-log and not git-show due to faster performance with
+        # complex commits (e.g. octopus merges)
+        # https://github.com/datalad/datalad/issues/4801
+        cmd = ['log', '-1', '-z', '--format=' + fmt]
         if commitish is not None:
             cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
-            stdout, stderr = self._git_custom_command(
-                '', cmd, expect_stderr=True, expect_fail=True)
+            stdout = self.call_git(
+                cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
                 raise ValueError("Unknown commit identifier: %s" % commitish)
