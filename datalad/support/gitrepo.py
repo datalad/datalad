@@ -1744,14 +1744,28 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Returns
         -------
-        str or, if there are not commits yet, None.
+        str or, if no commitish was given and there are no commits yet, None.
+
+        Raises
+        ------
+        ValueError
+          If a commitish was given, but no corresponding commit could be
+          determined.
         """
-        stdout = self.format_commit("%{}".format('h' if short else 'H'),
-                                    commitish)
-        if stdout is not None:
-            stdout = stdout.splitlines()
-            assert(len(stdout) == 1)
-            return stdout[0]
+        # use --quiet because the 'Needed a single revision' error message
+        # that is the result of running this in a repo with no commits
+        # isn't useful to report
+        cmd = ['rev-parse', '--quiet', '--verify', '{}^{{commit}}'.format(
+            commitish if commitish else 'HEAD')
+        ]
+        if short:
+            cmd.append('--short')
+        try:
+            return self.call_git_oneline(cmd)
+        except CommandError as e:
+            if commitish is None:
+                return None
+            raise ValueError("Unknown commit identifier: %s" % commitish)
 
     @normalize_paths(match_return_type=False)
     def get_last_commit_hexsha(self, files):
