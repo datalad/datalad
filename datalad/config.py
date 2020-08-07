@@ -22,13 +22,7 @@ from distutils.version import LooseVersion
 
 import re
 import os
-from os.path import (
-    join as opj,
-    exists,
-    getmtime,
-    abspath,
-    isabs,
-)
+from pathlib import Path
 from time import time
 
 import logging
@@ -86,9 +80,9 @@ def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
             continue
         if line.startswith('file:'):
             # origin line
-            fname = line[5:]
-            if not isabs(fname):
-                fname = opj(cwd, fname) if cwd else abspath(fname)
+            fname = Path(line[5:])
+            if not fname.is_absolute():
+                fname = Path(cwd) / fname if cwd else Path.cwd() / fname
             fileset.add(fname)
             continue
         if line.startswith('command line:'):
@@ -203,9 +197,8 @@ class ConfigManager(object):
         self._store = {}
         self._cfgfiles = set()
         self._cfgmtimes = None
-        self._dataset_path = None
-        self._dataset_cfgfname = None
-        self._repo_cfgfname = None
+        self._repo = None if dataset is None else \
+            dataset if hasattr(dataset, 'dot_git') else dataset.repo
         self._config_cmd = ['git', 'config']
         # public dict to store variables that always override any setting
         # read from a file
@@ -224,13 +217,7 @@ class ConfigManager(object):
             # when calling 'git config' to prevent a repository in the current
             # working directory from leaking configuration into the output.
             self._config_cmd = ['git', '--git-dir=', 'config']
-        else:
-            self._dataset_path = dataset.path
-            if source != 'local':
-                self._dataset_cfgfname = opj(self._dataset_path,
-                                             DATASET_CONFIG_FILE)
-            if source != 'dataset':
-                self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
+
         self._src_mode = source
         # Since configs could contain sensitive information, to prevent
         # any "facilitated" leakage -- just disable logging of outputs for
@@ -263,7 +250,7 @@ class ConfigManager(object):
             # we aren't forcing and we have read files before
             # check if any file we read from has changed
             current_time = time()
-            curmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
+            curmtimes = {c: c.stat().st_mtime for c in self._cfgfiles if c.exists()}
             if all(curmtimes[c] == self._cfgmtimes.get(c) and
                    # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
                    # if mtime age is less than worst resolution assume modified
@@ -287,10 +274,12 @@ class ConfigManager(object):
         if self._gitconfig_has_showorgin:
             run_args.append('--show-origin')
 
-        if self._dataset_cfgfname:
-            if exists(self._dataset_cfgfname):
+        dataset_cfgfile = None
+        if self._repo and self._src_mode != 'local':
+            dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE
+            if dataset_cfgfile.exists():
                 stdout, stderr = self._run(
-                    run_args + ['--file', self._dataset_cfgfname],
+                    run_args + ['--file', str(dataset_cfgfile)],
                     log_stderr=True
                 )
                 # overwrite existing value, do not amend to get multi-line
@@ -312,10 +301,11 @@ class ConfigManager(object):
             cwd=self._runner.cwd)
 
         # always monitor the dataset cfg location, we know where it is in all cases
-        if self._dataset_cfgfname:
-            self._cfgfiles.add(self._dataset_cfgfname)
-            self._cfgfiles.add(self._repo_cfgfname)
-        self._cfgmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
+        if dataset_cfgfile:
+            self._cfgfiles.add(dataset_cfgfile)
+        if self._src_mode != 'dataset' and self._repo:
+            self._cfgfiles.add(self._repo.dot_git / 'config')
+        self._cfgmtimes = {c: c.stat().st_mtime for c in self._cfgfiles if c.exists()}
 
         # superimpose overrides
         self._store.update(self.overrides)
@@ -602,9 +592,9 @@ class ConfigManager(object):
 
         # all other calls are modifications
         lockfile = None
-        if self._repo_cfgfname and ('--local' in args or '--file' in args):
+        if self._repo and ('--local' in args or '--file' in args):
             # modification of config in a dataset
-            lockfile = self._repo_cfgfname + '_dataladlock'
+            lockfile = self._repo.dot_git / 'config_dataladlock'
 
         # we are not protecting against concurrent modification of the
         # global config, because MIH cannot think of a use case and
@@ -628,18 +618,19 @@ class ConfigManager(object):
                 "unknown configuration label '{}' (not in {})".format(
                     where, cfg_labels))
         if where == 'dataset':
-            if not self._dataset_cfgfname:
+            if not self._repo:
                 raise ValueError(
                     'ConfigManager cannot store configuration to dataset, '
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset_path, DATALAD_DOTDIR)
-            if not exists(dscfg_dirname):
-                os.makedirs(dscfg_dirname)
-            if not exists(self._dataset_cfgfname):
-                open(self._dataset_cfgfname, 'w').close()
-            args.extend(['--file', self._dataset_cfgfname])
+            dscfg_dir = self._repo.pathobj / DATALAD_DOTDIR
+            if not dscfg_dir.exists():
+                dscfg_dir.mkdir()
+            dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE
+            if not dataset_cfgfile.exists():
+                dataset_cfgfile.touch()
+            args.extend(['--file', str(dataset_cfgfile)])
         elif where == 'global':
             args.append('--global')
         elif where == 'local':
