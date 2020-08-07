@@ -9,6 +9,7 @@
 """
 """
 
+from fasteners import InterProcessLock
 from functools import lru_cache
 import datalad
 from datalad.consts import (
@@ -595,7 +596,25 @@ class ConfigManager(object):
         """
         if where:
             args = self._get_location_args(where) + args
-        out = self._runner.run(self._config_cmd + args, **kwargs)
+        if '-l' in args:
+            # we are just reading, no need to reload, no need to lock
+            return self._runner.run(self._config_cmd + args, **kwargs)
+
+        # all other calls are modifications
+        lockfile = None
+        if self._repo_cfgfname and ('--local' in args or '--file' in args):
+            # modification of config in a dataset
+            lockfile = self._repo_cfgfname + '_dataladlock'
+
+        # we are not protecting against concurrent modification of the
+        # global config, because MIH cannot think of a use case and
+        # it is unclear where a lockfile should be placed
+        if lockfile:
+            with InterProcessLock(lockfile, logger=lgr):
+                out = self._runner.run(self._config_cmd + args, **kwargs)
+        else:
+            out = self._runner.run(self._config_cmd + args, **kwargs)
+
         if reload:
             self.reload()
         return out
