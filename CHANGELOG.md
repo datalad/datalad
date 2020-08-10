@@ -9,11 +9,9 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.13.2 (??? ??, 2020) -- will be better than ever
+## 0.13.2 (August 10, 2020) -- .
 
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
+### Deprecations
 
 - The `allow_quick` parameter of `AnnexRepo.file_has_content` and
   `AnnexRepo.is_under_annex` is now ignored and will be removed in a
@@ -52,7 +50,7 @@ bet we will fix some bugs and make a world even a better place.
   `AnnexRepo` incorrectly took the "allow quick" code path on file
   systems that did not support it ([#4736][])
 
-### Enhancements and new features
+### Enhancements
 
 - [create][] now assigns version 4 (random) UUIDs instead of version 1
   UUIDs that encode the time and hardware address.  ([#4790][])
