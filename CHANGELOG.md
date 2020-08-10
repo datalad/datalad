@@ -41,9 +41,6 @@ bet we will fix some bugs and make a world even a better place.
 
 - [addurls][] learned how to read data from standard input.  ([#4669][])
 
-- [push][] now pushes the git-annex branch at the same time as the
-  other refspecs to avoid an unnecessary `git push` call.  ([#4693][])
-
 - Command-line scripts are now defined via the `entry_points` argument
   of `setuptools.setup` instead of the `scripts` argument.  ([#4695][])
 
@@ -3067,7 +3064,6 @@ publishing
 [#4684]: https://github.com/datalad/datalad/issues/4684
 [#4687]: https://github.com/datalad/datalad/issues/4687
 [#4692]: https://github.com/datalad/datalad/issues/4692
-[#4693]: https://github.com/datalad/datalad/issues/4693
 [#4695]: https://github.com/datalad/datalad/issues/4695
 [#4696]: https://github.com/datalad/datalad/issues/4696
 [#4703]: https://github.com/datalad/datalad/issues/4703
