@@ -1,0 +1,68 @@
+Update 0.13.1-1-g8145b4a3f:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    8145b4a3ff1ea73dccc7de0440a8bb4a241d53ad..f7a78ffbdfa600d7701b639f690e7dbf22b10909
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4745 from kyleam/racy-create-sibling-log
+   a00675f21^-1
++  Merge pull request #4746 from kyleam/upstream-git-setup
+   0dd5a5c30^-1
+-  Merge pull request #4761 from kyleam/annex-ssh-hang-upper-bound
+   9429ae296^-1
++  Merge pull request #4759 from mih/bf-4758
+   087669761^-1
++  Merge pull request #4757 from kyleam/ssh-ctrl-path-regression
+   e18a8f3c5^-1
++  Merge pull request #4736 from mih/bf-annexavail
+   2633d5e08^-1
++  Merge pull request #4763 from adswa/doc-create
+   36dee9976^-1
+-  Merge pull request #4733 from bpoldrack/tst-tmpdir
+   7cfc026dd^-1
+-  Merge pull request #4730 from mih/bf-sshconnector
+   f36560281^-1
++  Merge pull request #4760 from kyleam/git-annex-symlink-fail
+   6c82a6414^-1
++  Merge pull request #4776 from mih/bf-4749
+   9ea4eaf21^-1
++  Merge pull request #4775 from mih/bf-nostderr
+   d9fdcc167^-1
+-  Merge pull request #4762 from kyleam/ssh-test-setup
+   713e31f7b^-1
++  Merge pull request #4783 from kyleam/maybe-fetch-after-autoenable
+   c24de658a^-1
+-  DOC: clone: Correct a comment
+   55200cd3b^-1
++  Merge pull request #4786 from kyleam/push-git-annex-no-data
+   f7f15b9dd^-1
+-  Merge pull request #4768 from yarikoptic/enh-mark-slow-tests
+   06827c9ff^-1
++  Merge pull request #4788 from kyleam/ftp-better-error
+   a4bfd9f42^-1
++  Merge pull request #4792 from kyleam/sub-unborn-head-failure
+   e2ec849a5^-1
++  Merge pull request #4790 from mih/bf-4785
+   daacea955^-1
++  Merge pull request #4684 from kyleam/ls-tree-path-in-submod
+   4ff297387^-1
+-  Merge pull request #4796 from kyleam/log-env-var-names
+   926f2f849^-1
+-  Merge pull request #4798 from kyleam/skip-annex-commit-failure
+   e3c16a7aa^-1
+-  Merge pull request #4799 from yarikoptic/enh-slow
+   cf54d79c8^-1
+-  DOC: Sort _LOG envvars in CONTRIBUTING.md and add DATALAD_LOG_NAME
+   dee7cb2ce^-1
++  Merge pull request #4807 from mih/bf-4801-2
+   d8cb4c53b^-1
++  Merge pull request #4806 from mih/bf-4801-1
+   010636a50^-1
+-  Merge pull request #4811 from yarikoptic/enh-no-gitpython-fixture
+   f7a78ffbd^-1
