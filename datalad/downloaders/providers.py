@@ -29,6 +29,7 @@ from .http import (
     HTTPDownloader,
 )
 from .s3 import S3Authenticator, S3Downloader
+from .shub import SHubDownloader
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..support.network import RI
@@ -68,6 +69,7 @@ class Provider(object):
     DOWNLOADERS = {
         'http': {'class': HTTPDownloader, 'externals': {'requests'}},
         'https': {'class': HTTPDownloader, 'externals': {'requests'}},
+        'shub': {'class': SHubDownloader, 'externals': {'requests'}},
         'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
         's3': {'class': S3Downloader, 'externals': {'boto'}}
         # ... TODO
