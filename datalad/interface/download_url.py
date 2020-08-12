@@ -30,10 +30,13 @@ from ..distribution.dataset import path_under_rev_dataset
 from ..distribution.dataset import require_dataset
 from ..distribution.dataset import resolve_path
 from ..dochelpers import exc_str
-from ..support.annexrepo import AnnexRepo, AnnexBatchCommandError
+from ..support.annexrepo import AnnexRepo
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
-from ..support.exceptions import NoDatasetFound
+from ..support.exceptions import (
+    CommandError,
+    NoDatasetFound,
+)
 
 from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
@@ -243,7 +246,7 @@ URLs:
                                 batch=len(annex_paths) > 1,
                                 # bypass URL size check, we already have the file
                                 options=['--relaxed'])
-                        except AnnexBatchCommandError as exc:
+                        except CommandError as exc:
                             lgr.warning("Registering %s with %s failed: %s",
                                         path, url, exc_str(exc))
 
