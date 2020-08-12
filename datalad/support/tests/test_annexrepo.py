@@ -788,6 +788,7 @@ def test_AnnexRepo_commit(path):
     except FileNotInRepositoryError:
         pass   # expected result
     except CommandError:
+        # @known_failure (marked for grep)
         raise SkipTest("test_AnnexRepo_commit hit known failure (gh-4773)")
 
 
