@@ -89,6 +89,17 @@ from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario
 def test_interactions(tdir):
     # Just a placeholder since constructor expects a repo
     repo = AnnexRepo(tdir, create=True, init=True)
+
+    fetch_scenarios = [('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey http:')]
+    fetch_scenarios += [
+        ('VALUE', 'GETURLS somekey {}:'.format(scheme))
+        for scheme in DataladAnnexCustomRemote.SUPPORTED_SCHEMES
+        if scheme != "http"]
+    fetch_scenarios.append(
+        ('VALUE',
+         re.compile(
+             'TRANSFER-FAILURE RETRIEVE somekey Failed to download from any')))
+
     for scenario in BASE_INTERACTION_SCENARIOS + [
         [
             ('GETCOST', 'COST %d' % DataladAnnexCustomRemote.COST),
@@ -101,13 +112,7 @@ def test_interactions(tdir):
             #('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
 
         ],
-            # basic interaction failing to fetch content from archive
-        [
-            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey http:'),
-            ('VALUE', 'GETURLS somekey https:'),
-            ('VALUE', 'GETURLS somekey s3:'),
-            ('VALUE', re.compile(
-             'TRANSFER-FAILURE RETRIEVE somekey Failed to download from any'))
-        ],
+        # basic interaction failing to fetch content from archive
+        fetch_scenarios
     ]:
         check_interaction_scenario(DataladAnnexCustomRemote, tdir, scenario)
