@@ -1,10 +1,13 @@
-datalad (0.13.1-2) UNRELEASED; urgency=medium
+datalad (0.13.2-1) unstable; urgency=medium
 
+  * New upstream release
+    - since 0.12.x series, many tests instability issues were addressed.
+      (Closes: #903213, #966948)
   * debian/rules
     - remove WRAPT_DISABLE_EXTENSIONS=1 workaround -- wrapt should no longer
       cause segfaults
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 20 Jul 2020 10:57:12 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 13 Aug 2020 09:37:20 -0400
 
 datalad (0.13.1-1) neurodebian; urgency=medium
 
