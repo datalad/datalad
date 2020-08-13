@@ -6,6 +6,11 @@ datalad (0.13.2-1) unstable; urgency=medium
   * debian/rules
     - remove WRAPT_DISABLE_EXTENSIONS=1 workaround -- wrapt should no longer
       cause segfaults
+  * debian/patches
+    + 0001-BF-serve_path_via_http-HTTPPath-use-localhost-not-ha.patch
+      a semi-blind patch to avoid hardcoding 127.0.0.1 and use localhost
+      instead so to make it potentially work on IPv6 only setups.
+      Please reopen if that does not fix it (Closes: #963856)
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 13 Aug 2020 09:37:20 -0400
 
