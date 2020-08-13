@@ -22,18 +22,22 @@ from datalad.support.external_versions import external_versions
 from datalad.utils import Path
 
 from datalad.tests.utils import (
+    assert_false,
+    assert_in,
+    assert_is_instance,
     assert_raises,
     eq_,
-    skip_ssh,
-    with_tempfile,
     get_most_obscure_supported_name,
-    swallow_logs,
-    assert_in,
-    assert_false,
+    get_ssh_port,
     ok_,
-    assert_is_instance,
+    patch_config,
     skip_if_on_windows,
+    skip_ssh,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
 )
+from datalad import cfg as dl_cfg
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
 
@@ -44,23 +48,23 @@ def test_ssh_get_connection():
     manager = SSHManager()
     assert manager._socket_dir is None, \
         "Should be unset upon initialization. Got %s" % str(manager._socket_dir)
-    c1 = manager.get_connection('ssh://localhost')
+    c1 = manager.get_connection('ssh://datalad-test')
     assert manager._socket_dir, "Should be set after interactions with the manager"
     assert_is_instance(c1, SSHConnection)
 
     # subsequent call returns the very same instance:
-    ok_(manager.get_connection('ssh://localhost') is c1)
+    ok_(manager.get_connection('ssh://datalad-test') is c1)
 
     # fail on malformed URls (meaning: our fancy URL parser can't correctly
     # deal with them):
     #assert_raises(ValueError, manager.get_connection, 'localhost')
     # we now allow those simple specifications of host to get_connection
-    c2 = manager.get_connection('localhost')
+    c2 = manager.get_connection('datalad-test')
     assert_is_instance(c2, SSHConnection)
 
     # but should fail if it looks like something else
-    assert_raises(ValueError, manager.get_connection, 'localhost/')
-    assert_raises(ValueError, manager.get_connection, ':localhost')
+    assert_raises(ValueError, manager.get_connection, 'datalad-test/')
+    assert_raises(ValueError, manager.get_connection, ':datalad-test')
 
     # we can do what urlparse cannot
     # assert_raises(ValueError, manager.get_connection, 'someone@localhost')
@@ -74,36 +78,42 @@ def test_ssh_get_connection():
 
 @skip_if_on_windows
 @skip_ssh
-@with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
+@with_tree(tree={'f0': 'f0', 'f1': 'f1'})
+@with_tempfile(suffix=get_most_obscure_supported_name(),
                content="1")
-def test_ssh_open_close(tfile1):
+def test_ssh_open_close(tmp_path, tfile1):
 
     manager = SSHManager()
 
     path = opj(str(manager.socket_dir),
-               get_connection_hash('localhost', bundled=True))
+               get_connection_hash('datalad-test', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
-    print("%s existed: %s" % (path, existed_before))
 
-    c1 = manager.get_connection('ssh://localhost')
+    c1 = manager.get_connection('ssh://datalad-test')
     c1.open()
     # control master exists for sure now
     ok_(exists(path))
 
     # use connection to execute remote command:
-    local_home = os.path.expanduser('~')
     # we list explicitly local HOME since we override it in module_setup
-    out, err = c1('ls -a %r' % local_home)
+    #
+    # Note: Use realpath() below because we know that the resolved temporary
+    # test directory exists on the target (many tests rely on that), but it
+    # doesn't necessarily have the unresolved variant.
+    out, err = c1('ls -a {}'.format(sh_quote(op.realpath(tmp_path))))
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
-    local_ls = os.listdir(local_home)
-    eq_(set(remote_ls), set(local_ls))
+    eq_(set(remote_ls), {"f0", "f1"})
+    ok_(exists(path))
 
     # now test for arguments containing spaces and other pleasant symbols
     out, err = c1('ls -l {}'.format(sh_quote(tfile1)))
     assert_in(tfile1, out)
-    eq_(err, '')
+    # on a crippled FS it will actually say something like
+    # Control socket connect(...6258b3a7): Connection refused\r\n'
+    # but still work.
+    #eq_(err, '')
 
     c1.close()
     # control master doesn't exist anymore:
@@ -118,30 +128,30 @@ def test_ssh_manager_close():
 
     # check for previously existing sockets:
     existed_before_1 = exists(opj(str(manager.socket_dir),
-                                  get_connection_hash('localhost')))
-    existed_before_2 = exists(opj(str(manager.socket_dir),
                                   get_connection_hash('datalad-test')))
+    existed_before_2 = exists(opj(str(manager.socket_dir),
+                                  get_connection_hash('datalad-test2')))
 
-    manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
+    manager.get_connection('ssh://datalad-test2').open()
 
     if existed_before_1 and existed_before_2:
         # we need one connection to be closed and therefore being opened
         # by `manager`
-        manager.get_connection('ssh://localhost').close()
-        manager.get_connection('ssh://localhost').open()
+        manager.get_connection('ssh://datalad-test').close()
+        manager.get_connection('ssh://datalad-test').open()
 
     ok_(exists(opj(str(manager.socket_dir),
-                   get_connection_hash('localhost', bundled=True))))
-    ok_(exists(opj(str(manager.socket_dir),
                    get_connection_hash('datalad-test', bundled=True))))
+    ok_(exists(opj(str(manager.socket_dir),
+                   get_connection_hash('datalad-test2', bundled=True))))
 
     manager.close()
 
     still_exists_1 = exists(opj(str(manager.socket_dir),
-                                get_connection_hash('localhost')))
-    still_exists_2 = exists(opj(str(manager.socket_dir),
                                 get_connection_hash('datalad-test')))
+    still_exists_2 = exists(opj(str(manager.socket_dir),
+                                get_connection_hash('datalad-test2')))
 
     eq_(existed_before_1, still_exists_1)
     eq_(existed_before_2, still_exists_2)
@@ -179,8 +189,8 @@ def test_ssh_manager_close_no_throw(bogus_socket):
 @with_tempfile(content="one")
 @with_tempfile(content="two")
 def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
-
-    remote_url = 'ssh://localhost:22'
+    port = get_ssh_port('datalad-test')
+    remote_url = 'ssh://datalad-test:{}'.format(port)
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
 
@@ -215,10 +225,12 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
             eq_(content, fp.read())
 
     # and now a quick smoke test for get
-    togetfile = Path(targetdir) / '2|g>e"t.t&x;t'
+    # but simplify the most obscure filename slightly to not trip `scp` itself
+    togetfile = Path(targetdir) / (
+        get_most_obscure_supported_name().replace('`', '') + '2')
     togetfile.write_text(str('something'))
     ssh.get(opj(remote_url, str(togetfile)), sourcedir)
-    ok_((Path(sourcedir) / '2|g>e"t.t&x;t').exists())
+    ok_((Path(sourcedir) / togetfile.name).exists())
 
     ssh.close()
 
@@ -226,10 +238,31 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_compound_cmds():
-    ssh = SSHManager().get_connection('ssh://localhost')
+    ssh = SSHManager().get_connection('ssh://datalad-test')
     out, err = ssh('[ 1 = 2 ] && echo no || echo success')
     eq_(out.strip(), 'success')
     ssh.close()  # so we get rid of the possibly lingering connections
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_close_target():
+    manager = SSHManager()
+    path0 = manager.socket_dir / get_connection_hash(
+        'datalad-test', bundled=True)
+    path1 = manager.socket_dir / get_connection_hash(
+        'datalad-test', bundled=False)
+    existed0 = path0.exists()
+    existed1 = path1.exists()
+    manager.get_connection('ssh://datalad-test').open()
+    manager.get_connection('ssh://datalad-test',
+                           use_remote_annex_bundle=False).open()
+    manager.close(ctrl_path=[str(path0)])
+    # The requested path is closed.
+    eq_(existed0, path0.exists())
+    ok_(path1.exists())
+    if not existed1:
+        path1.unlink()
 
 
 @skip_if_on_windows
@@ -240,31 +273,25 @@ def test_ssh_custom_identity_file():
         raise SkipTest("Travis-specific '{}' identity file does not exist"
                        .format(ifile))
 
-    from datalad import cfg
-    try:
-        with patch.dict("os.environ", {"DATALAD_SSH_IDENTITYFILE": ifile}):
-            cfg.reload(force=True)
-            with swallow_logs(new_level=logging.DEBUG) as cml:
-                manager = SSHManager()
-                ssh = manager.get_connection('ssh://localhost')
-                cmd_out, _ = ssh("echo blah")
-                expected_socket = op.join(
-                    str(manager.socket_dir),
-                    get_connection_hash("localhost", identity_file=ifile,
-                                        bundled=True))
-                ok_(exists(expected_socket))
-                manager.close()
-                assert_in("-i", cml.out)
-                assert_in(ifile, cml.out)
-    finally:
-        # Prevent overridden DATALAD_SSH_IDENTITYFILE from lingering.
-        cfg.reload(force=True)
+    with patch_config({"datalad.ssh.identityfile": ifile}):
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            manager = SSHManager()
+            ssh = manager.get_connection('ssh://datalad-test')
+            cmd_out, _ = ssh("echo blah")
+            expected_socket = op.join(
+                str(manager.socket_dir),
+                get_connection_hash("datalad-test", identity_file=ifile,
+                                    bundled=True))
+            ok_(exists(expected_socket))
+            manager.close()
+            assert_in("-i", cml.out)
+            assert_in(ifile, cml.out)
 
 
 @skip_if_on_windows
 @skip_ssh
 def test_ssh_git_props():
-    remote_url = 'ssh://localhost'
+    remote_url = 'ssh://datalad-test'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
     # Note: Avoid comparing these versions directly to the versions in
@@ -282,7 +309,7 @@ def test_ssh_git_props():
 @skip_ssh
 @with_tempfile(mkdir=True)
 def test_bundle_invariance(path):
-    remote_url = 'ssh://localhost'
+    remote_url = 'ssh://datalad-test'
     manager = SSHManager()
     testfile = Path(path) / 'dummy'
     for flag in (True, False):

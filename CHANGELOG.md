@@ -9,6 +9,69 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.13.2 (August 10, 2020) -- .
+
+### Deprecations
+
+- The `allow_quick` parameter of `AnnexRepo.file_has_content` and
+  `AnnexRepo.is_under_annex` is now ignored and will be removed in a
+  later release.  This parameter was only relevant for git-annex
+  versions before 7.20190912.  ([#4736][])
+
+### Fixes
+
+- Updates for compatibility with recent git and git-annex releases.
+  ([#4746][]) ([#4760][]) ([#4684][])
+
+- [push][] didn't sync the git-annex branch when `--data=nothing` was
+  specified.  ([#4786][])
+
+- The `datalad.clone.reckless` configuration wasn't stored in
+  non-annex datasets, preventing the values from being inherited by
+  annex subdatasets.  ([#4749][])
+
+- Running the post-update hook installed by `create-sibling --ui`
+  could overwrite web log files from previous runs in the unlikely
+  event that the hook was executed multiple times in the same second.
+  ([#4745][])
+
+- [clone][] inspected git's standard error in a way that could cause
+  an attribute error.  ([#4775][])
+
+- When cloning a repository whose `HEAD` points to a branch without
+  commits, [clone][] tries to find a more useful branch to check out.
+  It unwisely considered adjusted branches.  ([#4792][])
+
+- Since v0.12.0, `SSHManager.close` hasn't closed connections when the
+  `ctrl_path` argument was explicitly given.  ([#4757][])
+
+- When working in a dataset in which `git annex init` had not yet been
+  called, the `file_has_content` and `is_under_annex` methods of
+  `AnnexRepo` incorrectly took the "allow quick" code path on file
+  systems that did not support it ([#4736][])
+
+### Enhancements
+
+- [create][] now assigns version 4 (random) UUIDs instead of version 1
+  UUIDs that encode the time and hardware address.  ([#4790][])
+
+- The documentation for [create][] now does a better job of describing
+  the interaction between `--dataset` and `PATH`.  ([#4763][])
+
+- The `format_commit` and `get_hexsha` methods of `GitRepo` have been
+  sped up.  ([#4807][]) ([#4806][])
+
+- A better error message is now shown when the `^` or `^.` shortcuts
+  for `--dataset` do not resolve to a dataset.  ([#4759][])
+
+- A more helpful error message is now shown if a caller tries to
+  download an `ftp://` link but does not have `request_ftp` installed.
+  ([#4788][])
+
+- [clone][] now tries harder to get up-to-date availability
+  information after auto-enabling `type=git` special remotes.  ([#2897][])
+
+
 ## 0.13.1 (July 17, 2020) -- .
 
 ### Fixes
@@ -2559,6 +2622,7 @@ publishing
 [#2892]: https://github.com/datalad/datalad/issues/2892
 [#2893]: https://github.com/datalad/datalad/issues/2893
 [#2894]: https://github.com/datalad/datalad/issues/2894
+[#2897]: https://github.com/datalad/datalad/issues/2897
 [#2900]: https://github.com/datalad/datalad/issues/2900
 [#2901]: https://github.com/datalad/datalad/issues/2901
 [#2902]: https://github.com/datalad/datalad/issues/2902
@@ -2957,8 +3021,24 @@ publishing
 [#4674]: https://github.com/datalad/datalad/issues/4674
 [#4675]: https://github.com/datalad/datalad/issues/4675
 [#4682]: https://github.com/datalad/datalad/issues/4682
+[#4684]: https://github.com/datalad/datalad/issues/4684
 [#4687]: https://github.com/datalad/datalad/issues/4687
 [#4692]: https://github.com/datalad/datalad/issues/4692
 [#4696]: https://github.com/datalad/datalad/issues/4696
 [#4703]: https://github.com/datalad/datalad/issues/4703
 [#4729]: https://github.com/datalad/datalad/issues/4729
+[#4736]: https://github.com/datalad/datalad/issues/4736
+[#4745]: https://github.com/datalad/datalad/issues/4745
+[#4746]: https://github.com/datalad/datalad/issues/4746
+[#4749]: https://github.com/datalad/datalad/issues/4749
+[#4757]: https://github.com/datalad/datalad/issues/4757
+[#4759]: https://github.com/datalad/datalad/issues/4759
+[#4760]: https://github.com/datalad/datalad/issues/4760
+[#4763]: https://github.com/datalad/datalad/issues/4763
+[#4775]: https://github.com/datalad/datalad/issues/4775
+[#4786]: https://github.com/datalad/datalad/issues/4786
+[#4788]: https://github.com/datalad/datalad/issues/4788
+[#4790]: https://github.com/datalad/datalad/issues/4790
+[#4792]: https://github.com/datalad/datalad/issues/4792
+[#4806]: https://github.com/datalad/datalad/issues/4806
+[#4807]: https://github.com/datalad/datalad/issues/4807

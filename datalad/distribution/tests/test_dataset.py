@@ -23,7 +23,7 @@ from ..dataset import (
     require_dataset,
     resolve_path,
 )
-from datalad import cfg
+from datalad import cfg as dl_cfg
 from datalad.api import (
     create,
     get,
@@ -59,7 +59,10 @@ from datalad.tests.utils import (
     with_tempfile,
     with_testrepos,
 )
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
+)
 
 
 def test_EnsureDataset():
@@ -126,10 +129,13 @@ def test_is_installed(src, path):
 
 
 @with_tempfile(mkdir=True)
-def test_dataset_contructor(path):
+def test_dataset_constructor(path):
     # dataset needs a path
     assert_raises(TypeError, Dataset)
     assert_raises(ValueError, Dataset, None)
+    with chpwd(path):
+        assert_raises(NoDatasetFound, Dataset, '^.')
+        assert_raises(NoDatasetFound, Dataset, '^')
     dsabs = Dataset(path)
     # always abspath
     ok_(os.path.isabs(dsabs.path))
@@ -217,7 +223,7 @@ def test_subdatasets(path):
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path,
-            cfg.obtain('datalad.locations.default-dataset'))
+            dl_cfg.obtain('datalad.locations.default-dataset'))
 
     with chpwd(ds.path):
         dstop = Dataset('^')

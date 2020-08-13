@@ -473,20 +473,22 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_DATASETS_TOPURL*:
   Used to point to an alternative location for `///` dataset. If running
   tests preferred to be set to http://datasets-tests.datalad.org
-- *DATALAD_LOG_LEVEL*:
-  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_LOG_CMD_OUTPUTS*:
-  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
-- *DATALAD_LOG_CMD_ENV*:
+- *DATALAD_LOG_CWD*:
+  Whether to log cwd where command to be executed
+- *DATALAD_LOG_ENV*:
   If contains a digit (e.g. 1), would log entire environment passed into
   the Runner.run's popen call.  Otherwise could be a comma separated list
   of environment variables to log
-- *DATALAD_LOG_CMD_STDIN*:
-  Whether to log stdin for the command
-- *DATALAD_LOG_CMD_CWD*:
-  Whether to log cwd where command to be executed
+- *DATALAD_LOG_LEVEL*:
+  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
+- *DATALAD_LOG_NAME*:
+  Whether to include logger name (e.g. `datalad.support.sshconnector`) in the log
+- *DATALAD_LOG_OUTPUTS*:
+  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
+- *DATALAD_LOG_STDIN*:
+  Whether to log stdin for the command
 - *DATALAD_LOG_TARGET*
   Where to log: `stderr` (default), `stdout`, or another filename
 - *DATALAD_LOG_TIMESTAMP*:
@@ -512,7 +514,18 @@ Refer datalad/config.py for information on how to add these environment variable
   Skips network tests completely if this flag is set
   Examples include test for s3, git_repositories, openfmri etc
 - *DATALAD_TESTS_SSH*: 
-  Skips SSH tests if this flag is **not** set
+  Skips SSH tests if this flag is **not** set.  If you enable this,
+  you need to set up a "datalad-test" and "datalad-test2" target in
+  your SSH configuration.  The second target is used by only a couple
+  of tests, so depending on the tests you're interested in, you can
+  get by with only "datalad-test" configured.
+
+  A Docker image that is used for DataLad's tests is available at
+  <https://github.com/datalad-tester/docker-ssh-target>.  Note that
+  the DataLad tests assume that target files exist in
+  `DATALAD_TESTS_TEMP_DIR`, which restricts the "datalad-test" target
+  to being either the localhost or a container that mounts
+  `DATALAD_TESTS_TEMP_DIR`.
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
 - *DATALAD_TESTS_USECASSETTE*:
@@ -547,7 +560,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.13.2 (??? ??, 2020) -- will be better than ever
+## 0.13.3 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

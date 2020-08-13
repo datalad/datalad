@@ -25,9 +25,11 @@ from datalad.tests.utils import (
     get_deeply_nested_structure,
     has_symlink_capability,
     OBSCURE_FILENAME,
+    SkipTest,
     with_tempfile,
 )
 from datalad.support.exceptions import (
+    CommandError,
     IncompleteResultsError,
     NoDatasetFound,
 )
@@ -242,3 +244,34 @@ def test_subds_status(path):
         type="dataset",
         path=op.join(subds.path, "someotherds"),
         refds=subds.path)
+
+
+@with_tempfile
+def test_status_symlinked_dir_within_repo(path):
+    if not has_symlink_capability():
+        raise SkipTest("Can't create symlinks")
+    # <path>
+    # |-- bar -> <path>/foo
+    # `-- foo
+    #     `-- f
+    ds = Dataset(path).create()
+    foo = ds.pathobj / "foo"
+    foo.mkdir()
+    (foo / "f").write_text("content")
+    (ds.pathobj / "bar").symlink_to(foo, target_is_directory=True)
+    ds.save()
+    bar_f = ds.pathobj / "bar" / "f"
+
+    def call():
+        return ds.status(path=[bar_f], annex="availability",
+                         on_failure="ignore", result_renderer=None)
+
+    if ds.repo.git_annex_version < "8.20200522":
+        assert_result_count(call(), 0)
+    else:
+        # As of 2a8fdfc7d (Display a warning message when asked to operate on a
+        # file inside a symlinked directory, 2020-05-11), git-annex will error.
+        #
+        # TODO: Consider providing better error handling in this case.
+        with assert_raises(CommandError):
+            call()

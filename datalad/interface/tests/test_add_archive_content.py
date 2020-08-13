@@ -181,7 +181,6 @@ tree4uargs = dict(
 
 
 @known_failure_windows
-@slow  # 29.4293s
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)

@@ -454,7 +454,7 @@ def clone_dataset(
                 # or if PY35 is no longer supported
                 rmtree(str(dest_path), children_only=dest_path_existed)
 
-            if 'could not create work tree' in e_stderr.lower():
+            if e_stderr and 'could not create work tree' in e_stderr.lower():
                 # this cannot be fixed by trying another URL
                 re_match = re.match(r".*fatal: (.*)$", e_stderr,
                                     flags=re.MULTILINE | re.DOTALL)
@@ -532,6 +532,14 @@ def clone_dataset(
     if result_props['source']['type'] == 'ria':
         yield from postclonecfg_ria(destds, result_props['source'])
 
+    if reckless:
+        # store the reckless setting in the dataset to make it
+        # known to later clones of subdatasets via get()
+        destds.config.set(
+            'datalad.clone.reckless', reckless,
+            where='local',
+            reload=True)
+
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
     # parent
@@ -557,6 +565,11 @@ def postclone_check_head(ds):
                 pattern="refs/remotes/origin"))
         for rbranch in remote_branches:
             if rbranch in ["origin/git-annex", "HEAD"]:
+                continue
+            if rbranch.startswith("origin/adjusted/"):
+                # If necessary for this file system, a downstream
+                # git-annex-init call will handle moving into an
+                # adjusted state.
                 continue
             repo.call_git(["checkout", "-b", rbranch[7:],  # drop "origin/"
                            "--track", rbranch])
@@ -810,18 +823,10 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
                         "this file system.")
 
-    if reckless:
-        # we successfully dealt with reckless here.
-        # store the reckless setting in the dataset to make it
-        # known to later clones of subdatasets via get()
-        ds.config.set(
-            'datalad.clone.reckless', reckless,
-            where='local',
-            reload=True)
-
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
 
+    repo_config = repo.config
     # Note: The purpose of this function is to inform the user. So if something
     # looks misconfigured, we'll warn and move on to the next item.
     for uuid, config in repo.get_special_remotes().items():
@@ -844,6 +849,15 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 sr_autoenable, sr_name, ds.path)
             continue
 
+        # If it looks like a type=git special remote, make sure we have up to
+        # date information. See gh-2897.
+        if sr_autoenable and repo_config.get("remote.{}.fetch".format(sr_name)):
+            try:
+                repo.fetch(remote=sr_name)
+            except CommandError as exc:
+                lgr.warning("Failed to fetch type=git special remote %s: %s",
+                            sr_name, exc_str(exc))
+
         # determine whether there is a registered remote with matching UUID
         if uuid:
             if remote_uuids is None:
@@ -852,8 +866,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # this will point to the UUID for the configuration (i.e.
                     # the key returned by get_special_remotes) rather than the
                     # shared UUID.
-                    (repo.config.get('remote.%s.annex-config-uuid' % r) or
-                     repo.config.get('remote.%s.annex-uuid' % r))
+                    (repo_config.get('remote.%s.annex-config-uuid' % r) or
+                     repo_config.get('remote.%s.annex-uuid' % r))
                     for r in repo.get_remotes()
                 }
             if uuid not in remote_uuids:

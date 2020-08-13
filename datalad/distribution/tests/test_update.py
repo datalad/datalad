@@ -51,7 +51,7 @@ from datalad.tests.utils import (
     slow,
     known_failure_windows,
 )
-
+from datalad import cfg as dl_cfg
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
 @known_failure_windows
@@ -223,7 +223,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
     rmt2.commit(msg="Add file to git.")
 
     # Let's init some special remote which we couldn't really update/fetch
-    if not os.environ.get('DATALAD_TESTS_DATALADREMOTE'):
+    if not dl_cfg.get('datalad.tests.dataladremote'):
         ds.repo.init_remote(
             'datalad',
             ['encryption=none', 'type=external', 'externaltype=datalad'])
@@ -481,6 +481,7 @@ def test_merge_no_merge_target(path):
     assert_in_results(res, status="impossible", action="update")
 
 
+@slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict(path):
     path = Path(path)
@@ -535,6 +536,7 @@ def test_merge_conflict(path):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
+@slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict_in_subdataset_only(path):
     path = Path(path)
@@ -613,6 +615,7 @@ def test_merge_ff_only(path):
         action="merge", status="ok")
 
 
+@slow  # 11sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_other_branch(path):
     path = Path(path)
@@ -793,6 +796,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
         action="update")
 
 
+@slow  # 12 + 21sec on Yarik's laptop
 def test_merge_follow_parentds_subdataset_detached():
     yield check_merge_follow_parentds_subdataset_detached, True
     yield check_merge_follow_parentds_subdataset_detached, False

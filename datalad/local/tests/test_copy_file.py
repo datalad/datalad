@@ -29,6 +29,7 @@ from datalad.tests.utils import (
     nok_,
     ok_file_has_content,
     serve_path_via_http,
+    slow,
     with_tempfile,
     with_tree,
 )
@@ -126,6 +127,7 @@ def test_copy_file_errors(dspath1, dspath2, nondspath):
         'impossible', copy_file(specs_from=['somepath'], on_failure='ignore'))
 
 
+@slow  # 11sec + ? on travis
 @with_tempfile(mkdir=True)
 @with_tree(tree={
     'webfile1': '123',
@@ -248,6 +250,7 @@ def test_copy_file_into_dshierarchy(srcdir, destdir):
     ])
 
 
+@slow  # 11sec on Yarik's laptop
 @with_tree(tree={
     'lvl1': {
         'file1': '123',

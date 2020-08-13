@@ -71,6 +71,7 @@ from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
 from nose import SkipTest
 
+from datalad import cfg as dl_cfg
 import datalad.utils as ut
 # TODO this must go
 from ..utils import *
@@ -81,7 +82,10 @@ from datalad.utils import (
 
 from ..cmd import Runner
 from .. import utils
-from ..support.exceptions import CommandNotAvailableError
+from ..support.exceptions import (
+    CommandError,
+    CommandNotAvailableError,
+)
 from ..support.external_versions import external_versions
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
@@ -161,7 +165,7 @@ def skip_if_no_network(func=None):
     check_not_generatorfunction(func)
 
     def check_and_raise():
-        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        if dl_cfg.get('datalad.tests.nonetwork'):
             raise SkipTest("Skipping since no network settings")
 
     if func:
@@ -261,8 +265,7 @@ def skip_ssh(func):
     @wraps(func)
     @attr('skip_ssh')
     def newfunc(*args, **kwargs):
-        from datalad import cfg
-        test_ssh = cfg.get("datalad.tests.ssh", '')
+        test_ssh = dl_cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
@@ -278,10 +281,9 @@ def skip_v6_or_later(func, method='raise'):
     installed git-annex.
     """
 
-    from datalad import cfg
     from datalad.support.annexrepo import AnnexRepo
 
-    version = cfg.obtain("datalad.repo.version")
+    version = dl_cfg.obtain("datalad.repo.version")
     info = AnnexRepo.check_repository_versions()
 
     @skip_if(version >= 6 or 5 not in info["supported"],
@@ -541,6 +543,10 @@ def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
+        if 'dir' not in tkwargs.keys():
+            # if not specified otherwise, respect datalad.tests.temp.dir config
+            # as this is a test helper
+            tkwargs['dir'] = dl_cfg.get("datalad.tests.temp.dir")
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
         d = tempfile.mkdtemp(**tkwargs_)
         create_tree(d, tree, archives_leading_dir=archives_leading_dir)
@@ -717,6 +723,10 @@ def with_tempfile(t, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
+        if 'dir' not in tkwargs.keys():
+            # if not specified otherwise, respect datalad.tests.temp.dir config
+            # as this is a test helper
+            tkwargs['dir'] = dl_cfg.get("datalad.tests.temp.dir")
         with make_tempfile(wrapped=t, **tkwargs) as filename:
             return t(*(arg + (filename,)), **kw)
 
@@ -738,8 +748,7 @@ def probe_known_failure(func):
     @wraps(func)
     @attr('probe_known_failure')
     def newfunc(*args, **kwargs):
-        from datalad import cfg
-        if cfg.obtain("datalad.tests.knownfailures.probe"):
+        if dl_cfg.obtain("datalad.tests.knownfailures.probe"):
             assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
             # Note: Since assert_raises lacks a `msg` argument, a comment
             # in the same line is helpful to determine what's going on whenever
@@ -757,9 +766,8 @@ def skip_known_failure(func, method='raise'):
     Setting config datalad.tests.knownfailures.skip to a bool enables/disables
     skipping.
     """
-    from datalad import cfg
 
-    @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
+    @skip_if(cond=dl_cfg.obtain("datalad.tests.knownfailures.skip"),
              msg="Skip test known to fail",
              method=method)
     @wraps(func)
@@ -795,10 +803,9 @@ def known_failure_v6_or_later(func):
     installed git-annex.
     """
 
-    from datalad import cfg
     from datalad.support.annexrepo import AnnexRepo
 
-    version = cfg.obtain("datalad.repo.version")
+    version = dl_cfg.obtain("datalad.repo.version")
     info = AnnexRepo.check_repository_versions()
 
     if (version and version >= 6) or 5 not in info["supported"]:
@@ -901,7 +908,7 @@ def _get_resolved_flavors(flavors):
     if not isinstance(flavors_, list):
         flavors_ = [flavors_]
 
-    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+    if dl_cfg.get('datalad.tests.nonetwork'):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
 
@@ -910,7 +917,8 @@ def clone_url(url):
     # delay import of our code until needed for certain
     from ..cmd import Runner
     runner = Runner()
-    tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
+    tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
+        {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
     if GitRepo(tdir).is_with_annex():
         AnnexRepo(tdir, init=True)
@@ -1030,13 +1038,13 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
         # we should always have at least one repo to test on, unless explicitly only
         # network was requested by we are running without networked tests
-        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+        if not (dl_cfg.get('datalad.tests.nonetwork') and flavors == ['network']):
             assert(testrepos_uris)
         else:
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
-        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
+        fake_dates = dl_cfg.get("datalad.fake-dates")
         ntested = 0
         for uri in testrepos_uris:
             if count and ntested >= count:
@@ -1085,7 +1093,7 @@ def with_sameas_remote(func, autoenabled=False):
         # indicator. See
         # https://git-annex.branchable.com/bugs/Recent_hang_with_rsync_remote_with_older_systems___40__Xenial__44___Jessie__41__/
         if external_versions['cmd:system-ssh'] < '7.4' and \
-           external_versions['cmd:annex'] > '8.20200522':
+           '8.20200522' < external_versions['cmd:annex'] < '8.20200720':
             raise SkipTest("Test known to hang")
 
         sr_path, repo_path = args[-2:]
@@ -1835,10 +1843,12 @@ def get_deeply_nested_structure(path):
     return ds
 
 
-def has_symlink_capability():
+@with_tempfile
+@with_tempfile
+def has_symlink_capability(p1, p2):
 
-    path = ut.Path(tempfile.mktemp())
-    target = ut.Path(tempfile.mktemp())
+    path = ut.Path(p1)
+    target = ut.Path(p2)
     return utils.check_symlink_capability(path, target)
 
 
@@ -1857,6 +1867,49 @@ def skip_wo_symlink_capability(func):
     return newfunc
 
 
+def get_ssh_port(host):
+    """Get port of `host` in ssh_config.
+
+    Our tests depend on the host being defined in ssh_config, including its
+    port. This method can be used by tests that want to check handling of an
+    explicitly specified
+
+    Note that if `host` does not match a host in ssh_config, the default value
+    of 22 is returned.
+
+    Parameters
+    ----------
+    host : str
+
+    Returns
+    -------
+    port (int)
+
+    Raises
+    ------
+    SkipTest if port cannot be found.
+    """
+    out = ''
+    try:
+        out, err = Runner()(["ssh", "-G", host])
+    except Exception as exc:
+        err = str(exc)
+
+    port = None
+    for line in out.splitlines():
+        if line.startswith("port "):
+            try:
+                port = int(line.split()[1])
+            except Exception as exc:
+                err = str(exc)
+            break
+
+    if port is None:
+        raise SkipTest("port for {} could not be determined: {}"
+                       .format(host, err))
+    return port
+
+
 #
 # Context Managers
 #
@@ -1865,8 +1918,7 @@ def skip_wo_symlink_capability(func):
 def patch_config(vars):
     """Patch our config with custom settings. Returns mock.patch cm
     """
-    from datalad import cfg
-    return patch.dict(cfg._store, vars)
+    return patch.dict(dl_cfg._store, vars)
 
 
 @contextmanager
@@ -1917,25 +1969,33 @@ from nose.plugins.attrib import attr
 def integration(f):
     """Mark test as an "integration" test which generally is not needed to be run
     
-    Generally tend to be slower
+    Generally tend to be slower.
+    Should be used in combination with @slow and @turtle if that is the case.
     """
     return attr('integration')(f)
 
 
 def slow(f):
     """Mark test as a slow, although not necessarily integration or usecase test
+
+    Rule of thumb cut-off to mark as slow is 10 sec
     """
     return attr('slow')(f)
 
 
 def turtle(f):
     """Mark test as very slow, meaning to not run it on Travis due to its
-    time limit"""
+    time limit
+
+    Rule of thumb cut-off to mark as turtle is 2 minutes
+    """
     return attr('turtle')(f)
 
 
 def usecase(f):
     """Mark test as a usecase user ran into and which (typically) caused bug report
     to be filed/troubleshooted
+
+    Should be used in combination with @slow and @turtle if slow.
     """
     return attr('usecase')(f)

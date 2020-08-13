@@ -948,6 +948,14 @@ fi
 
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
+# Avoid file name collisions.
+suffix=0
+logfile_orig="$logfile"
+while [ -f "$logfile" ]; do
+  suffix=$(( $suffix + 1 ))
+  logfile="$logfile_orig.$suffix"
+done
+
 ( which datalad > /dev/null \
   && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \

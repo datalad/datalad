@@ -50,10 +50,11 @@ lgr = getLogger('datalad.http')
 
 try:
     import requests_ftp
+    _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
     lgr.debug("Failed to import requests_ftp, thus no ftp support: %s" % exc_str(e))
-    pass
+    _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:
     # Let's also enable requests etc debugging
@@ -507,10 +508,15 @@ class HTTPDownloader(BaseDownloader):
                 # so let's rest and try again
                 if retry >= nretries:
                     #import epdb; epdb.serve()
+                    if not _FTP_SUPPORT and url.startswith("ftp://"):
+                        msg_ftp = "For ftp:// support, install requests_ftp. "
+                    else:
+                        msg_ftp = ""
+
                     raise AccessFailedError(
-                        "Failed to establish a new session %d times. "
+                        "Failed to establish a new session %d times. %s"
                         "Last exception was: %s"
-                        % (nretries, exc_str(exc)))
+                        % (nretries, msg_ftp, exc_str(exc)))
                 lgr.warning(
                     "Caught exception %s. Will retry %d out of %d times",
                     exc_str(exc), retry+1, nretries)

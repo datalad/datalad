@@ -36,7 +36,7 @@ from datalad.support.archive_utils_patool import unixify_path
 from datalad.support.exceptions import MissingExternalDependency
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
-
+from datalad import cfg as dl_cfg
 
 fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
@@ -201,7 +201,7 @@ def test_ExtractedArchive(path):
         ]))
 
     earchive.clean()
-    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
+    if not dl_cfg.get('datalad.tests.temp.keep'):
         assert_false(op.exists(earchive.path))
 
 #@with_tree(**tree_simplearchive)

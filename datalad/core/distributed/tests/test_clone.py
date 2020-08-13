@@ -323,37 +323,58 @@ def test_failed_clone(dspath):
                    res)
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_reckless(src, top_path, sharedpath):
-    ds = clone(src, top_path, reckless=True,
+@with_tempfile(mkdir=True)
+def check_reckless(annex, src_path, top_path, sharedpath):
+    # super with or without annex
+    src = Dataset(src_path).create(annex=annex)
+    # sub always with annex
+    srcsub = src.create('sub')
+
+    # and for the actual test
+    ds = clone(src.path, top_path, reckless=True,
                result_xfm='datasets', return_type='item-or-list')
-    eq_(ds.config.get('annex.hardlink', None), 'true')
+
+    is_crippled = srcsub.repo.is_managed_branch()
+
+    if annex and not is_crippled:
+        eq_(ds.config.get('annex.hardlink', None), 'true')
+
     # actual value is 'auto', because True is a legacy value and we map it
     eq_(ds.config.get('datalad.clone.reckless', None), 'auto')
-    eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+    if annex:
+        eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
     # now, if we clone another repo into this one, it will inherit the setting
     # without having to provide it explicitly
-    sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
-    eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
-    eq_(sub.config.get('annex.hardlink', None), 'true')
+    newsub = ds.clone(srcsub, 'newsub', result_xfm='datasets', return_type='item-or-list')
+    # and `get` the original subdataset
+    origsub = ds.get('sub', result_xfm='datasets', return_type='item-or-list')
+    for sds in (newsub, origsub):
+        eq_(sds.config.get('datalad.clone.reckless', None), 'auto')
+        if not is_crippled:
+            eq_(sds.config.get('annex.hardlink', None), 'true')
 
-    if ds.repo.is_managed_branch():
+    if is_crippled:
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
-    # the standard setup keeps the annex locks accessible to the user only
-    nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-         & stat.S_IWGRP)
-    # but we can set it up for group-shared access too
-    sharedds = clone(
-        src, sharedpath,
-        reckless='shared-group',
-        result_xfm='datasets',
-        return_type='item-or-list')
-    ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-        & stat.S_IWGRP)
+    if annex:
+        # the standard setup keeps the annex locks accessible to the user only
+        nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+             & stat.S_IWGRP)
+        # but we can set it up for group-shared access too
+        sharedds = clone(
+            src, sharedpath,
+            reckless='shared-group',
+            result_xfm='datasets',
+            return_type='item-or-list')
+        ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+            & stat.S_IWGRP)
 
+
+def test_reckless():
+    yield check_reckless, True
+    yield check_reckless, False
 
 @with_tempfile
 @with_tempfile
@@ -658,6 +679,7 @@ def _move2store(storepath, d):
     Runner(cwd=store_loc).run(['git', 'update-server-info'])
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -904,6 +926,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
+@slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
     if not has_symlink_capability():
@@ -933,6 +956,7 @@ def test_ria_postclonecfg():
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
 
 
+@slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
@@ -1119,7 +1143,27 @@ def test_clone_unborn_head_sub(path):
     ds_origin = Dataset(op.join(path, "a")).create()
     ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
     managed = ds_origin_sub.repo.is_managed_branch()
-    ds_origin_sub.repo.call_git(["branch", "-m", DEFAULT_BRANCH, "other"])
+    ds_origin.save(message="foo")
+    sub_repo = ds_origin_sub.repo
+    # As with test_clone_unborn_head(), the setup below is complicated mostly
+    # because it's accounting for adjusted branches, but the scenario itself
+    # isn't too complicated:
+    #
+    #   * a submodule's HEAD points to a checked out branch with no commits
+    #     while a (potentially adjusted) "other" branch has commits
+    #
+    #   * the parent repo has the tip of "other" as the last recorded state
+    for res in sub_repo.for_each_ref_(fields="refname"):
+        ref = res["refname"]
+        if DEFAULT_BRANCH in ref:
+            sub_repo.update_ref(ref.replace(DEFAULT_BRANCH, "other"), ref)
+            sub_repo.call_git(["update-ref", "-d", ref])
+    sub_repo.update_ref(
+        "HEAD",
+        "refs/heads/{}".format(
+            "adjusted/other(unlocked)" if managed else "other"),
+        symbolic=True)
+    # END complicated handling for adjusted branches
     ds_origin.save()
     ds_origin_sub.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
@@ -1151,3 +1195,38 @@ def test_gin_cloning(path):
     eq_(result[0]['path'], op.join(ds.path, annex_path))
     ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
     ok_file_has_content(op.join(ds.path, git_path), 'one\n')
+
+
+@with_tree(tree={"special": {"f0": "0"}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_fetch_git_special_remote(url_path, url, path):
+    url_path = Path(url_path)
+    path = Path(path)
+    ds_special = Dataset(url_path / "special").create(force=True)
+    if ds_special.repo.is_managed_branch():
+        # TODO: git-annex-init fails in the second clone call below when this is
+        # executed under ./tools/eval_under_testloopfs.
+        raise SkipTest("Test fails on managed branch")
+    ds_special.save()
+    ds_special.repo.call_git(["update-server-info"])
+
+    clone_url = url + "special/.git"
+    ds_a = clone(clone_url, path / "a")
+    ds_a.repo._run_annex_command(
+        "initremote",
+        annex_options=["special", "type=git", "autoenable=true",
+                       "location=" + clone_url])
+
+    # Set up a situation where a file is present only on the special remote,
+    # and its existence is known only to the special remote's git-annex branch.
+    (ds_special.pathobj / "f1").write_text("1")
+    ds_special.save()
+    ds_special.repo.call_git(["update-server-info"])
+
+    ds_a.repo.fetch("origin")
+    ds_a.repo.merge("origin/" + DEFAULT_BRANCH)
+
+    ds_b = clone(ds_a.path, path / "other")
+    ds_b.get("f1")
+    ok_(ds_b.repo.file_has_content("f1"))

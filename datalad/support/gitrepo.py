@@ -1708,14 +1708,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         -------
         str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        # use git-log and not git-show due to faster performance with
+        # complex commits (e.g. octopus merges)
+        # https://github.com/datalad/datalad/issues/4801
+        cmd = ['log', '-1', '-z', '--format=' + fmt]
         if commitish is not None:
             cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
-            stdout, stderr = self._git_custom_command(
-                '', cmd, expect_stderr=True, expect_fail=True)
+            stdout = self.call_git(
+                cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
                 raise ValueError("Unknown commit identifier: %s" % commitish)
@@ -1741,14 +1744,28 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Returns
         -------
-        str or, if there are not commits yet, None.
+        str or, if no commitish was given and there are no commits yet, None.
+
+        Raises
+        ------
+        ValueError
+          If a commitish was given, but no corresponding commit could be
+          determined.
         """
-        stdout = self.format_commit("%{}".format('h' if short else 'H'),
-                                    commitish)
-        if stdout is not None:
-            stdout = stdout.splitlines()
-            assert(len(stdout) == 1)
-            return stdout[0]
+        # use --quiet because the 'Needed a single revision' error message
+        # that is the result of running this in a repo with no commits
+        # isn't useful to report
+        cmd = ['rev-parse', '--quiet', '--verify', '{}^{{commit}}'.format(
+            commitish if commitish else 'HEAD')
+        ]
+        if short:
+            cmd.append('--short')
+        try:
+            return self.call_git_oneline(cmd)
+        except CommandError as e:
+            if commitish is None:
+                return None
+            raise ValueError("Unknown commit identifier: %s" % commitish)
 
     @normalize_paths(match_return_type=False)
     def get_last_commit_hexsha(self, files):
@@ -3299,6 +3316,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             paths = [ut.PurePosixPath(p) for p in paths]
 
         path_strs = list(map(str, paths)) if paths else None
+        if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
+            # If a path points within a submodule, we need to map it to the
+            # containing submodule before feeding it to ls-files or ls-tree.
+            #
+            # Before Git 2.29.0, ls-tree and ls-files differed in how they
+            # reported paths within submodules: ls-files provided no output,
+            # and ls-tree listed the submodule. Now they both return no output.
+            submodules = [str(s["path"].relative_to(self.pathobj))
+                          for s in self.get_submodules_()]
+            path_strs = get_parent_paths(path_strs, submodules)
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -3324,14 +3351,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
-
-            if path_strs:
-                # we need to get their within repo elements since ls-tree
-                # for paths within submodules returns nothing!
-                # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
-                submodules = [str(s["path"].relative_to(self.pathobj))
-                              for s in self.get_submodules_()]
-                path_strs = get_parent_paths(path_strs, submodules)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(

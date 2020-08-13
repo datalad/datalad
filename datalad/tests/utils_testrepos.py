@@ -25,12 +25,14 @@ from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
 from .utils import get_tempfile_kwargs
 from datalad.customremotes.base import init_datalad_remote
+from datalad import cfg as dl_cfg
 
 
 # we need a local file, that is supposed to be treated as a remote file via
 # file-scheme URL
 remote_file_fd, remote_file_path = \
-    tempfile.mkstemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+    tempfile.mkstemp(**get_tempfile_kwargs(
+        {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='testrepo'))
 # to be removed upon teardown
 _TEMP_PATHS_GENERATED.append(remote_file_path)
 with open(remote_file_path, "w") as f:
@@ -45,7 +47,10 @@ class TestRepo(object, metaclass=ABCMeta):
 
     def __init__(self, path=None, puke_if_exists=True):
         if not path:
-            path = tempfile.mktemp(**get_tempfile_kwargs({}, prefix='testrepo'))
+            path = \
+                tempfile.mktemp(**get_tempfile_kwargs(
+                    {'dir': dl_cfg.get("datalad.tests.temp.dir")},
+                    prefix='testrepo'))
             # to be removed upon teardown
             _TEMP_PATHS_GENERATED.append(path)
         if puke_if_exists and exists(path):
