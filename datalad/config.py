@@ -594,15 +594,13 @@ class ConfigManager(object):
         lockfile = None
         if self._repo and ('--local' in args or '--file' in args):
             # modification of config in a dataset
-            lockfile = self._repo.dot_git / 'config_dataladlock'
-
-        # we are not protecting against concurrent modification of the
-        # global config, because MIH cannot think of a use case and
-        # it is unclear where a lockfile should be placed
-        if lockfile:
-            with InterProcessLock(lockfile, logger=lgr):
-                out = self._runner.run(self._config_cmd + args, **kwargs)
+            lockfile = self._repo.dot_git / 'config.dataladlock'
         else:
+            # follow pattern in downloaders for lockfile location
+            lockfile = Path(self.obtain('datalad.locations.cache')) \
+                / 'locks' / 'gitconfig.lck'
+
+        with InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)
 
         if reload:
