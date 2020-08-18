@@ -865,7 +865,7 @@ class RIARemote(SpecialRemote):
                                      self.known_versions_dst)
             self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            reason = "Remote doesn't report any dataset tree version." \
+            reason = "Remote doesn't report any dataset tree version. " \
                      "Consider upgrading datalad or add a fitting " \
                      "'ria-layout-version' file at the RIA store's " \
                      "root."
@@ -882,7 +882,7 @@ class RIARemote(SpecialRemote):
                                self.known_versions_objt)
             self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            reason = "Remote doesn't report any object tree version." \
+            reason = "Remote doesn't report any object tree version. " \
                      "Consider upgrading datalad or add a fitting " \
                      "'ria-layout-version' file at the remote " \
                      "dataset root. "
