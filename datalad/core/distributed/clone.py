@@ -156,7 +156,7 @@ class Clone(Interface):
              code_py="clone(source='ria+http://store.datalad.org#~hcp-openaccess')",
              code_cmd="datalad clone ria+http://store.datalad.org#~hcp-openaccess"),
         dict(
-            text="Install a dataset in a specific version as identified by a"
+            text="Install a dataset in a specific version as identified by a "
                  "branch or tag name from store.datalad.org",
             code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier')",
             code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier"),
