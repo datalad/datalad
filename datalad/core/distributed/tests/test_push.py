@@ -10,6 +10,8 @@
 
 """
 
+import logging
+
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     IncompleteResultsError,
@@ -33,6 +35,7 @@ from datalad.tests.utils import (
     skip_if_on_windows,
     skip_ssh,
     slow,
+    swallow_logs,
     with_tempfile,
     with_tree,
     SkipTest,
@@ -791,3 +794,24 @@ def test_push_git_annex_branch_when_no_data(path):
     assert_in("git-annex",
               {d["refname:strip=2"]
                for d in target.for_each_ref_(fields="refname:strip=2")})
+
+
+@with_tree(tree={"ds": {"f0": "0", "f1": "0", "f2": "0",
+                        "f3": "1",
+                        "f4": "2", "f5": "2"}})
+def test_push_git_annex_branch_many_paths_same_data(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create(force=True)
+    ds.save()
+    mk_push_target(ds, "target", str(path / "target"),
+                   annex=True, bare=False)
+    nbytes = sum(ds.repo.get_content_annexinfo(paths=[f])[f]["bytesize"]
+                 for f in [ds.repo.pathobj / "f0",
+                           ds.repo.pathobj / "f3",
+                           ds.repo.pathobj / "f4"])
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res = ds.push(to="target")
+    assert_in("{} bytes of annex data".format(nbytes), cml.out)
+    # 3 files point to content already covered by another file.
+    assert_result_count(res, 3,
+                        action="copy", type="file", status="notneeded")
