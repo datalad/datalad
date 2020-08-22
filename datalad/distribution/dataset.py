@@ -347,7 +347,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             # However, if this was the case before as well, we don't want a new
             # instance of ConfigManager
             if self._cfg_bound in (True, None):
-                self._cfg = ConfigManager(dataset=None, dataset_only=False)
+                self._cfg = ConfigManager(dataset=None)
                 self._cfg_bound = False
 
         else:
