@@ -152,17 +152,15 @@ class ConfigManager(object):
     configurations items at once.  Instead, each modification results in a
     dedicated call to `git config`. This author thinks this is OK, as he
     cannot think of a situation where a large number of items need to be
-    written during normal operation. If such need arises, various solutions are
-    possible (via GitPython, or an independent writer).
+    written during normal operation.
 
     Each instance carries a public `overrides` attribute. This dictionary
     contains variables that override any setting read from a file. The overrides
-    are persistent across reloads, and are not modified by any of the
-    manipulation methods, such as `set` or `unset`.
+    are persistent across reloads.
 
     Any DATALAD_* environment variable is also presented as a configuration
     item. Settings read from environment variables are not stored in any of the
-    configuration file, but are read dynamically from the environment at each
+    configuration files, but are read dynamically from the environment at each
     `reload()` call. Their values take precedence over any specification in
     configuration files, and even overrides.
 
