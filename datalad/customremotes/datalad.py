@@ -28,7 +28,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
      Archives should also be under annex control.
     """
 
-    SUPPORTED_SCHEMES = ('http', 'https', 's3')
+    SUPPORTED_SCHEMES = ('http', 'https', 's3', 'shub')
 
     AVAILABILITY = "global"
 
