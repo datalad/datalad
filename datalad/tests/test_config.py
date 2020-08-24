@@ -387,10 +387,8 @@ def test_overrides():
     from datalad.utils import Path
     assert_not_in(
         'ups.name', cfg,
-        (cfg._store,
+        (cfg._stores,
          cfg.overrides,
-         cfg._cfgfiles,
-         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
     ))
 
 
@@ -456,11 +454,15 @@ def test_no_leaks(path1, path2):
         assert_not_in('i.was.here', ds2.config.keys())
 
         # and that we do not track the wrong files
-        assert_not_in(ds1.pathobj / '.git' / 'config', ds2.config._cfgfiles)
-        assert_not_in(ds1.pathobj / '.datalad' / 'config', ds2.config._cfgfiles)
+        assert_not_in(ds1.pathobj / '.git' / 'config',
+                      ds2.config._stores['git']['files'])
+        assert_not_in(ds1.pathobj / '.datalad' / 'config',
+                      ds2.config._stores['dataset']['files'])
         # these are the right ones
-        assert_in(ds2.pathobj / '.git' / 'config', ds2.config._cfgfiles)
-        assert_in(ds2.pathobj / '.datalad' / 'config', ds2.config._cfgfiles)
+        assert_in(ds2.pathobj / '.git' / 'config',
+                  ds2.config._stores['git']['files'])
+        assert_in(ds2.pathobj / '.datalad' / 'config',
+                  ds2.config._stores['dataset']['files'])
 
 
 @with_tempfile()
@@ -512,7 +514,7 @@ def test_global_config():
     # from within tests, global config should be read from faked $HOME (see
     # setup_package)
     glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
-    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._cfgfiles)
+    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._stores['git']['files'])
     assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
 
