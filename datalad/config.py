@@ -108,14 +108,13 @@ def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
     return store, fileset
 
 
-def _parse_env(store):
+def _update_from_env(store):
     dct = {}
     for k in os.environ:
         if not k.startswith('DATALAD_'):
             continue
         dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
     store.update(dct)
-    return store
 
 
 def anything2bool(val):
@@ -301,7 +300,7 @@ class ConfigManager(object):
         # override with environment variables, unless we only want to read the
         # dataset's commit config
         if self._src_mode != 'dataset':
-            merged = _parse_env(merged)
+            _update_from_env(merged)
         self._merged_store = merged
 
         if not ConfigManager._checked_git_identity:
