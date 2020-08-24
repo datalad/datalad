@@ -63,18 +63,10 @@ def _where_reload(obj):
     return obj
 
 
-def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
-    if replace:
-        # if we want to replace existing values in the store
-        # collect into a new dict and `update` the store at the
-        # end. This way we get the desired behavior of multi-value
-        # keys, but only for the current source
-        dct = {}
-        fileset = set()
-    else:
-        # if we don't want to replace value, perform the multi-value
-        # preserving addition on the existing store right away
-        dct = store
+# TODO document and make "public" (used in GitRepo too)
+def _parse_gitconfig_dump(dump, cwd=None):
+    dct = {}
+    fileset = set()
     for line in dump.split('\0'):
         if not line:
             continue
@@ -103,9 +95,7 @@ def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
                 dct[k] = present_v + (v,)
             else:
                 dct[k] = (present_v, v)
-    if replace:
-        store.update(dct)
-    return store, fileset
+    return dct, fileset
 
 
 def _update_from_env(store):
@@ -337,7 +327,7 @@ class ConfigManager(object):
         # overwrite existing value, do not amend to get multi-line
         # values
         store['cfg'], store['files'] = _parse_gitconfig_dump(
-            stdout, {}, None, True, cwd=self._runner.cwd)
+            stdout, cwd=self._runner.cwd)
 
         # TODO check if this is needed for anything but compat with Git versions
         # that have no `show-origin`
