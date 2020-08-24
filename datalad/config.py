@@ -18,7 +18,6 @@ from datalad.consts import (
 )
 from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
-from distutils.version import LooseVersion
 
 import re
 import os
@@ -229,13 +228,6 @@ class ConfigManager(object):
             # to pick up the right config files
             run_kwargs['cwd'] = dataset.path
         self._runner = GitRunner(**run_kwargs)
-        try:
-            self._gitconfig_has_showorgin = \
-                LooseVersion(get_git_version()) >= '2.8.0'
-        except Exception:
-            # no git something else broken, assume git is present anyway
-            # to not delay this, but assume it is old
-            self._gitconfig_has_showorgin = False
 
         self.reload(force=True)
 
@@ -247,9 +239,7 @@ class ConfigManager(object):
         is found for any file no reload is performed. This mechanism will not
         detect newly created global configuration files, use `force` in this case.
         """
-        run_args = ['-z', '-l']
-        if self._gitconfig_has_showorgin:
-            run_args.append('--show-origin')
+        run_args = ['-z', '-l', '--show-origin']
 
         # update from desired config sources only
         # 2-step strategy:
@@ -329,13 +319,9 @@ class ConfigManager(object):
         store['cfg'], store['files'] = _parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
-        # TODO check if this is needed for anything but compat with Git versions
-        # that have no `show-origin`
-        ## always monitor the dataset cfg location, we know where it is in all cases
-        #if dataset_cfgfile:
-        #    self._cfgfiles.add(dataset_cfgfile)
-        #if self._src_mode != 'dataset' and self._repo:
-        #    self._cfgfiles.add(self._repo.dot_git / 'config')
+        # update mtimes of existing config files
+        # TODO can we remove exist() test, the files are discovered by git-config
+        # so they should exist
         store['mtimes'] = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
 
     @_where_reload
