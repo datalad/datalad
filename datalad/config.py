@@ -319,10 +319,9 @@ class ConfigManager(object):
         store['cfg'], store['files'] = _parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
-        # update mtimes of existing config files
-        # TODO can we remove exist() test, the files are discovered by git-config
-        # so they should exist
-        store['mtimes'] = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
+        # update mtimes of config files, they have just been discovered
+        # and should still exist
+        store['mtimes'] = {c: c.stat().st_mtime for c in store['files']}
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
