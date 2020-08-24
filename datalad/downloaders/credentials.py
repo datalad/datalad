@@ -304,6 +304,7 @@ def _nda_adapter(composite, user=None, password=None):
         # but who knows what future would bring
         if "invalid" in exc_str and ("user" in exc_str or "password" in exc_str):
             raise AccessDeniedError(exc_str)
+        raise
     # There are also session and expiration we ignore... TODO anything about it?!!!
     # we could create a derived AWS_S3 which would also store session and expiration
     # and then may be Composite could use those????
