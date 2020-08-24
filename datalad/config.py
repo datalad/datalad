@@ -493,6 +493,40 @@ class ConfigManager(object):
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
         return self._merged_store.get(key, default)
 
+    def get_from_source(self, source, key, default=None):
+        """Like get(), but a source can be specific.
+
+        If `source` is 'dataset', only the commited configuration is queried,
+        overrides are applied. In the case of 'local', the committed
+        configuration is ignored, but overrides and configuration from
+        environment variables are applied as usual.
+        """
+        if source not in ('dataset', 'local'):
+            raise ValueError("source must be 'dataset' or 'local'")
+        if source == 'dataset':
+            return self.overrides.get(
+                key,
+                self._stores['dataset']['cfg'].get(
+                    key,
+                    default))
+        else:
+            if key not in self._stores['dataset']['cfg']:
+                # the key is not in the committed config, hence we can
+                # just report based on the merged representation
+                return self.get(key, default)
+            else:
+                # expensive case, rebuild a config without the committed
+                # dataset config contributing
+                env = {}
+                _update_from_env(env)
+                return env.get(
+                    key,
+                    self.overrides.get(
+                        key,
+                        self._stores['local']['cfg'].get(
+                            key,
+                            default)))
+
     #
     # Compatibility with ConfigParser API
     #
