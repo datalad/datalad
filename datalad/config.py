@@ -462,7 +462,7 @@ class ConfigManager(object):
         return "ConfigManager({}{})".format(
             [str(p) for p in self._stores['dataset']['files'].union(
                 self._stores['git']['files'])],
-            'with overrides' if self.overrides else '',
+            ', overrides={!r}'.format(self.overrides) if self.overrides else '',
         )
 
     def __str__(self):
