@@ -270,23 +270,18 @@ class ConfigManager(object):
                 dataset_cfgfile and
                 dataset_cfgfile.exists()) and (
                 force or self._need_reload(self._stores['dataset'])):
-            to_run['dataset'] = (
-                self._stores['dataset'],
-                run_args + ['--file', str(dataset_cfgfile)],
-            )
+            to_run['dataset'] = run_args + ['--file', str(dataset_cfgfile)]
 
         if self._src_mode != 'dataset' and (
                 force or self._need_reload(self._stores['git'])):
-            to_run['git'] = (
-                self._stores['git'],
-                run_args + ['--local']
-                if self._src_mode == 'dataset-local'
-                else run_args,
-            )
+            to_run['git'] = run_args + ['--local'] \
+                if self._src_mode == 'dataset-local' \
+                else run_args
 
         # reload everything that was found todo
         while to_run:
-            self._reload(*to_run.popitem()[1])
+            store_id, runargs = to_run.popitem()
+            self._stores[store_id] = self._reload(runargs)
 
         # always update the merged representation, even if we did not reload
         # anything from a file. ENV or overrides could change independently
@@ -317,20 +312,20 @@ class ConfigManager(object):
             return False
         return True
 
-    def _reload(self, store, run_args):
+    def _reload(self, run_args):
         # query git-config
         stdout, stderr = self._run(
             run_args,
             log_stderr=True
         )
-        # overwrite existing value, do not amend to get multi-line
-        # values
+        store = {}
         store['cfg'], store['files'] = _parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
         # update mtimes of config files, they have just been discovered
         # and should still exist
         store['mtimes'] = {c: c.stat().st_mtime for c in store['files']}
+        return store
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
