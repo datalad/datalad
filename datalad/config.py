@@ -640,6 +640,10 @@ class ConfigManager(object):
             return self._runner.run(self._config_cmd + args, **kwargs)
 
         # all other calls are modifications
+        if '--file' in args:
+            # all paths we are passing are absolute
+            custom_file = Path(args[args.index('--file') + 1])
+            custom_file.parent.mkdir(exist_ok=True)
         lockfile = None
         if self._repo and ('--local' in args or '--file' in args):
             # modification of config in a dataset
