@@ -14,7 +14,6 @@ from functools import lru_cache
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
-    DATALAD_DOTDIR,
 )
 from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
@@ -195,7 +194,7 @@ class ConfigManager(object):
         )
         # merged representation (the only one that existed pre datalad 0.14)
         # will be built on initial reload
-        self._merged_store = None
+        self._merged_store = {}
 
         self._repo = None if dataset is None else \
             dataset if hasattr(dataset, 'dot_git') else dataset.repo
@@ -249,28 +248,35 @@ class ConfigManager(object):
         # config from, but also allow to override persistent information
         # from dataset locally or globally
 
+        # figure out what needs to be reloaded at all
+        to_run = {}
         # committed dataset config
-        if self._repo and self._src_mode != 'local':
-            dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE
-            if dataset_cfgfile.exists():
-                self._reload(
-                    # update the dataset config store
-                    self._stores['dataset'],
-                    run_args + ['--file', str(dataset_cfgfile)],
-                    force=force,
-                )
+        dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE \
+            if self._repo else None
+        if (self._src_mode != 'local' and
+                dataset_cfgfile and
+                dataset_cfgfile.exists()) and (
+                force or self._need_reload(self._stores['dataset'])):
+            to_run['dataset'] = (
+                self._stores['dataset'],
+                run_args + ['--file', str(dataset_cfgfile)],
+            )
 
-        if self._src_mode != 'dataset':
-            self._reload(
-                # update the git config store
+        if self._src_mode != 'dataset' and (
+                force or self._need_reload(self._stores['git'])):
+            to_run['git'] = (
                 self._stores['git'],
                 run_args + ['--local']
                 if self._src_mode == 'dataset-local'
                 else run_args,
-                force=force,
             )
 
-        # always update the merged representation
+        # reload everything that was found todo
+        while to_run:
+            self._reload(*to_run.popitem()[1])
+
+        # always update the merged representation, even if we did not reload
+        # anything from a file. ENV or overrides could change independently
         # start with the commit dataset config
         merged = self._stores['dataset']['cfg'].copy()
         # local config always takes precedence
@@ -296,19 +302,22 @@ class ConfigManager(object):
                     )
             ConfigManager._checked_git_identity = True
 
-    def _reload(self, store, run_args, force=False):
-        if not force and store['mtimes']:
-            # we aren't forcing and we have read files before
-            # check if any file we read from has changed
-            current_time = time()
-            curmtimes = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
-            if all(curmtimes[c] == store['mtimes'].get(c) and
-                   # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
-                   # if mtime age is less than worst resolution assume modified
-                   (current_time - curmtimes[c]) > 2.0
-                   for c in curmtimes):
-                return
+    def _need_reload(self, store):
+        if not store['mtimes']:
+            return True
+        # we have read files before
+        # check if any file we read from has changed
+        current_time = time()
+        curmtimes = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
+        if all(curmtimes[c] == store['mtimes'].get(c) and
+               # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
+               # if mtime age is less than worst resolution assume modified
+               (current_time - curmtimes[c]) > 2.0
+               for c in curmtimes):
+            return False
+        return True
 
+    def _reload(self, store, run_args):
         # query git-config
         stdout, stderr = self._run(
             run_args,
