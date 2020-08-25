@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import OrderedDict
 import logging
 from tempfile import TemporaryFile
 
@@ -791,6 +792,14 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # input has type=dataset, but now it is about files
     res_kwargs.pop('type', None)
 
+    # A set and an OrderedDict is used to track files pointing to the
+    # same key.  The set could be dropped, using a single dictionary
+    # that has an entry for every seen key and a (likely empty) list
+    # of redundant files, but that would mean looping over potentially
+    # many keys to yield likely few if any notneeded results.
+    seen_keys = set()
+    repkey_paths = OrderedDict()
+
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative
     # to this location
@@ -799,10 +808,17 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     with TemporaryFile() as file_list:
         nbytes = 0
         for c in to_transfer:
-            file_list.write(
-                bytes(Path(c['path']).relative_to(ds.pathobj)))
-            file_list.write(b'\0')
-            nbytes += c['bytesize']
+            key = c['key']
+            if key in seen_keys:
+                repkey_paths.setdefault(key, []).append(c['path'])
+            else:
+                file_list.write(
+                    bytes(Path(c['path']).relative_to(ds.pathobj)))
+                file_list.write(b'\0')
+                nbytes += c['bytesize']
+                seen_keys.add(key)
+        lgr.debug('Counted %d bytes of annex data to transfer',
+                  nbytes)
 
         # rewind stdin buffer
         file_list.seek(0)
@@ -828,6 +844,13 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
                           c, res[c])
         for j in res['stdout_json']:
             yield annexjson2result(j, ds, type='file', **res_kwargs)
+
+    for annex_key, paths in repkey_paths.items():
+        for path in paths:
+            yield dict(
+                res_kwargs, action='copy', type='file', status='notneeded',
+                path=path, annexkey=annex_key,
+                message='Another file points to the same key')
     return
 
 
