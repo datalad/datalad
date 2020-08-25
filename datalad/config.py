@@ -660,14 +660,7 @@ class ConfigManager(object):
                 raise ValueError(
                     'ConfigManager cannot store configuration to dataset, '
                     'none specified')
-            # create an empty config file if none exists, `git config` will
-            # fail otherwise
-            dscfg_dir = self._repo.pathobj / DATALAD_DOTDIR
-            if not dscfg_dir.exists():
-                dscfg_dir.mkdir()
             dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE
-            if not dataset_cfgfile.exists():
-                dataset_cfgfile.touch()
             args.extend(['--file', str(dataset_cfgfile)])
         elif where == 'global':
             args.append('--global')
