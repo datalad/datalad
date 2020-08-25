@@ -1917,8 +1917,12 @@ def get_ssh_port(host):
 
 def patch_config(vars):
     """Patch our config with custom settings. Returns mock.patch cm
+
+    Only the merged configuration from all sources (global, local, dataset)
+    will be patched. Source-constrained patches (e.g. only committed dataset
+    configuration) are not supported.
     """
-    return patch.dict(dl_cfg._store, vars)
+    return patch.dict(dl_cfg._merged_store, vars)
 
 
 @contextmanager
