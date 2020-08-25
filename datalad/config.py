@@ -230,6 +230,19 @@ class ConfigManager(object):
 
         self.reload(force=True)
 
+        if not ConfigManager._checked_git_identity:
+            for cfg, envs in (
+                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
+                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
+                if cfg not in self \
+                        and not any(e in os.environ for e in envs):
+                    lgr.warning(
+                        "It is highly recommended to configure Git before using "
+                        "DataLad. Set both 'user.name' and 'user.email' "
+                        "configuration variables."
+                    )
+            ConfigManager._checked_git_identity = True
+
     def reload(self, force=False):
         """Reload all configuration items from the configured sources
 
@@ -288,19 +301,6 @@ class ConfigManager(object):
         if self._src_mode != 'dataset':
             _update_from_env(merged)
         self._merged_store = merged
-
-        if not ConfigManager._checked_git_identity:
-            for cfg, envs in (
-                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
-                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
-                if cfg not in merged \
-                        and not any(e in os.environ for e in envs):
-                    lgr.warning(
-                        "It is highly recommended to configure Git before using "
-                        "DataLad. Set both 'user.name' and 'user.email' "
-                        "configuration variables."
-                    )
-            ConfigManager._checked_git_identity = True
 
     def _need_reload(self, store):
         if not store['mtimes']:
