@@ -8,28 +8,28 @@ fs=${DATALAD_TESTS_TEMP_FS:-vfat}
 size=${DATALAD_TESTS_TEMP_FSSIZE:-10}
 
 set -u
-tmp=$(mktemp -u ${TMPDIR:-/tmp}/datalad-fs-XXXXX)
+tmp=$(mktemp -u "${TMPDIR:-/tmp}/datalad-fs-XXXXX")
 
 echo "I: $fs of $size:  $tmp"
 
 uid=$(id -u)
-mntimage=$tmp.img
-mntpoint=$tmp
+mntimage="$tmp.img"
+mntpoint="$tmp"
 
-dd if=/dev/zero of=$mntimage bs=1032192c count=$size
-loop=$(sudo losetup --find --show $mntimage)
-sudo mkfs.$fs $loop
-mkdir -p $mntpoint
-sudo mount -o uid=$uid $loop $mntpoint
+dd if=/dev/zero "of=$mntimage" bs=1032192c "count=$size"
+loop=$(sudo losetup --find --show "$mntimage")
+sudo "mkfs.$fs" "$loop"
+mkdir -p "$mntpoint"
+sudo mount -o "uid=$uid" "$loop" "$mntpoint"
 
 # Run the actual command
-echo "I: running $@"
+echo "I: running $*"
 set +e
-DATALAD_TESTS_TEMP_DIR=$mntpoint eval "$@"
+TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" eval "$@"
 ret=$?
 
 echo "I: done, unmounting"
-sudo umount $mntpoint
-sudo losetup -d $loop
-rm -rf $mntpoint $mntimage
-exit $ret
+sudo umount "$mntpoint"
+sudo losetup -d "$loop"
+rm -rf "$mntpoint" "$mntimage"
+exit "$ret"
