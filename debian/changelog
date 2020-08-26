@@ -1,3 +1,11 @@
+datalad (0.13.2-2) UNRELEASED; urgency=medium
+
+  * debian/control
+    - remove mentioning of Recommends for 'datalad' package which no longer
+      has any Recommends (Closes: #969034)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 26 Aug 2020 12:55:42 -0400
+
 datalad (0.13.2-1) unstable; urgency=medium
 
   * New upstream release

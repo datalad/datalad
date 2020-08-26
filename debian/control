@@ -74,9 +74,6 @@ Description: data files management and distribution platform
   - crawl web sites to automatically prepare and update git-annex
     repositories with content from online websites, S3, etc (install
     datalad-crawler)
- .
- This package provides the command line tools.  Install without
- Recommends if you need only core functionality.
 
 Package: python3-datalad
 Architecture: all
