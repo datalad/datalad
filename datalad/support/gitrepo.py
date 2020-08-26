@@ -238,11 +238,11 @@ def normalize_path(func):
     """
 
     @wraps(func)
-    def newfunc(self, file_, *args, **kwargs):
+    def  _wrap_normalize_path(self, file_, *args, **kwargs):
         file_new = _normalize_path(self.path, file_)
         return func(self, file_new, *args, **kwargs)
 
-    return newfunc
+    return  _wrap_normalize_path
 
 
 @optional_args
@@ -285,7 +285,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
     """
 
     @wraps(func)
-    def newfunc(self, files, *args, **kwargs):
+    def  _wrap_normalize_paths(self, files, *args, **kwargs):
 
         normalize = _normalize_path if kwargs.pop('normalize_paths', True) \
             else lambda rpath, filepath: filepath
@@ -349,7 +349,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
         else:
             return RuntimeError("should have not got here... check logic")
 
-    return newfunc
+    return  _wrap_normalize_paths
 
 
 if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":

@@ -155,7 +155,7 @@ def cached_dataset(f, url=None, version=None, paths=None):
     """
     @better_wraps(f)
     @with_tempfile
-    def newfunc(*arg, **kw):
+    def  _wrap_cached_dataset(*arg, **kw):
 
         if DATALAD_TESTS_CACHE:
             # Note: We can't pass keys based on `paths` parameter to
@@ -183,7 +183,7 @@ def cached_dataset(f, url=None, version=None, paths=None):
             clone_ds.get(paths)
         return f(*(arg[:-1] + (clone_ds,)), **kw)
 
-    return newfunc
+    return  _wrap_cached_dataset
 
 
 @optional_args
@@ -224,7 +224,7 @@ def cached_url(f, url=None, keys=None):
     #       URLs for clone etc.
 
     @better_wraps(f)
-    def newfunc(*arg, **kw):
+    def  _wrap_cached_url(*arg, **kw):
         if DATALAD_TESTS_CACHE:
             ds = get_cached_dataset(url, version=None)
             if keys:
@@ -235,4 +235,4 @@ def cached_url(f, url=None, keys=None):
 
         return f(*(arg + (new_url,)), **kw)
 
-    return newfunc
+    return  _wrap_cached_url
