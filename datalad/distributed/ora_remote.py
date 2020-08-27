@@ -579,7 +579,7 @@ def handle_errors(func):
     # TODO: configurable on remote end (flag within layout_version!)
 
     @wraps(func)
-    def new_func(self, *args, **kwargs):
+    def  _wrap_handle_errors(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
@@ -599,7 +599,7 @@ def handle_errors(func):
             else:
                 raise e
 
-    return new_func
+    return  _wrap_handle_errors
 
 
 class NoLayoutVersion(Exception):

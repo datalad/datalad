@@ -37,7 +37,7 @@ def with_store_insteadof(func):
 
     @wraps(func)
     @attr('with_config')
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_store_insteadof(*args, **kwargs):
         host = args[0]
         base_path = args[1]
         try:
@@ -53,7 +53,7 @@ def with_store_insteadof(func):
                                    host=host if host else '',
                                    path=base_path),
                          where='global', reload=True)
-    return newfunc
+    return  _wrap_with_store_insteadof
 
 
 @with_tempfile
