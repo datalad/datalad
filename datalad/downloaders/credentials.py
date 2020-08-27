@@ -294,8 +294,10 @@ class CompositeCredential(Credential):
 def _nda_adapter(composite, user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
     from .. import cfg
-    gen = NDATokenGenerator(cfg.obtain('datalad.externals.nda.dbserver'))
-    lgr.debug("Generating token for NDA user %s using %s", user, gen)
+    nda_auth_url = cfg.obtain('datalad.externals.nda.dbserver')
+    gen = NDATokenGenerator(nda_auth_url)
+    lgr.debug("Generating token for NDA user %s using %s talking to %s",
+              user, gen, nda_auth_url)
     try:
         token = gen.generate_token(user, password)
     except Exception as exc:  # it is really just an "Exception"
