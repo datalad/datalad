@@ -238,6 +238,20 @@ class S3Downloader(BaseDownloader):
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
+        if 'versionId' not in params and key.version_id:
+            # boto adds version_id to the request if it is known present.
+            # It is a good idea in general to avoid race between moment of retrieving
+            # the key information and actual download.
+            # But depending on permissions, we might be unable (like in the case with NDA)
+            # to download a guaranteed version of the key.
+            # So we will just download the latest version (if still there)
+            # if no versionId was specified in URL
+            # Alternative would be to make this a generator and generate sessions
+            # but also remember if the first download succeeded so we do not try
+            # again to get versioned one first.
+            key.version_id = None
+            # TODO: ask NDA to allow download of specific versionId?
+
         return S3DownloaderSession(
             size=target_size,
             filename=url_filename,
