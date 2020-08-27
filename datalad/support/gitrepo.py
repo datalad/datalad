@@ -40,7 +40,10 @@ from os.path import (
 
 import posixpath
 from functools import wraps
-from weakref import WeakValueDictionary
+from weakref import (
+    finalize,
+    WeakValueDictionary
+)
 
 from datalad.log import log_progress
 from datalad.support.due import due, Doi
@@ -962,6 +965,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
 
+        # Finally, register a finalizer (instead of having a __del__ method).
+        # This will be called by garbage collection as well as "atexit". By
+        # keeping the reference here, we can also call it explicitly.
+        # Note, that we can pass required attributes to the finalizer, but not
+        # `self` itself. This would create an additional reference to the object
+        # and thereby preventing it from being collected at all.
+        self._finalizer = finalize(self, GitRepo._cleanup, self.path)
+
+
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
             os.makedirs(path)
@@ -1129,10 +1141,25 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
         return gr
 
-    def __del__(self):
-        # unbind possibly bound ConfigManager, to prevent all kinds of weird
-        # stalls etc
-        self._cfg = None
+    # Note: __del__ shouldn't be needed anymore as we switched to
+    #       `weakref.finalize`.
+    #       https://docs.python.org/3/library/weakref.html#comparing-finalizers-with-del-methods
+    #
+    #       Keeping both methods and this comment around as a reminder to not
+    #       use __del__, if we figure there's a need for cleanup in the future.
+    #
+    # def __del__(self):
+    #     # unbind possibly bound ConfigManager, to prevent all kinds of weird
+    #     # stalls etc
+    #     self._cfg = None
+
+    @classmethod
+    def _cleanup(cls, path):
+        # Ben: I think in case of GitRepo there's nothing to do ATM. Statements
+        #      like the one in the out commented __del__ above, don't make sense
+        #      with python's GC, IMO, except for manually resolving cyclic
+        #      references (not the case w/ ConfigManager ATM).
+        lgr.log(1, "Finalizer called on: GitRepo(%s)", path)
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
