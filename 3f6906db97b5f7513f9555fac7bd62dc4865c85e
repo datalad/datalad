@@ -1,0 +1,32 @@
+Update 0.13.2-1-gb302a7eb7:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    b302a7eb7c05b437b592b9aa27c1a85415289773..4071d362b9c3c521db36769193f5e998f674fcec
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4817 from kyleam/download-url-widen-exception
+   58cd9bf0b^-1
+-  Merge pull request #4819 from yarikoptic/rf-travis
+   35e746d9a^-1
+-  Merge pull request #4820 from kyleam/annexrepo-skip-recent-flaky
+   4ff2cb05a^-1
+-  DOC: Add missing space in example description
+   8ae06f21d^-1
+-  Merge pull request #4826 from kyleam/ora-err-msg-spacing
+   adae2ae2a^-1
++  Merge pull request #4821 from kyleam/push-dedup-bytes
+   0ad7bc7d1^-1
+-  Merge branch 'enh-loopfs' into maint
+   bb327c9d4^-1
++  Merge pull request #4835 from kyleam/asyncio-too-fast
+   160d16a42^-1
++  Merge pull request #4834 from yarikoptic/enh-newfunc
+   fa65867a1^-1
+-  Merge pull request #4831 from yarikoptic/bf-nose-opts
+   4071d362b^-1
