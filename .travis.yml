@@ -17,7 +17,8 @@ env:
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_ENV=GIT_SSH_COMMAND
-    - TESTS_TO_PERFORM=datalad
+    - DATALAD_LOG_LEVEL=DEBUG
+    - TESTS_TO_PERFORM=datalad.support.tests.test_annexrepo
     # Should be an array, travis breaks on it, define/adjust in the "before_install"
     #- NOSE_OPTS=( -v )
     # Note, that there's "turtle" as well, which is always excluded from
@@ -204,7 +205,7 @@ before_install:
         exit 0;
       fi
     fi
-  - NOSE_OPTS=( -v )
+  - NOSE_OPTS=( -v -s )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
