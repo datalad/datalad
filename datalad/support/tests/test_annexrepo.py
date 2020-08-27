@@ -1695,6 +1695,31 @@ def test_AnnexRepo_flyweight(path1, path2):
     assert_is_instance(repo4, GitRepo)
     assert_not_is_instance(repo4, AnnexRepo)
 
+    orig_id = id(repo1)
+
+    # deleting one reference doesn't change anything - we still get the same
+    # thing:
+    del repo1
+    #gc.collect()
+    ok_(repo2 is not None)
+    ok_(repo2 is repo3)
+    ok_(repo2 == repo3)
+
+    repo1 = AnnexRepo(path1)
+    eq_(orig_id, id(repo1))
+
+    # killing all references should result in the instance being gc'd and
+    # re-request yields a new object:
+    del repo1
+    del repo2
+    del repo3
+    # Ben: Note, that gc.collect should only be necessary, if we manage to create
+    # cyclic references. Pure refcount collection is supposed to happen
+    # instantly, if I got that right.
+    #gc.collect()
+
+    repo1 = AnnexRepo(path1)
+    assert_not_equal(orig_id, id(repo1))
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
 @known_failure_windows
