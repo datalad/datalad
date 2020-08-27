@@ -292,7 +292,9 @@ class ConfigManager(object):
             if exists(self._dataset_cfgfname):
                 stdout, stderr = self._run(
                     run_args + ['--file', self._dataset_cfgfname],
-                    protocol=StdOutErrCapture
+                    protocol=StdOutErrCapture,
+                    # always expect git-config to output utf-8
+                    encoding='utf-8',
                 )
                 # overwrite existing value, do not amend to get multi-line
                 # values
