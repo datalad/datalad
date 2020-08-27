@@ -423,7 +423,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 res_kwargs,
                 status='impossible',
                 message='No push target given, and none could be '
-                        'auto-detected, please specific via --to',
+                        'auto-detected, please specify via --to',
             )
             return
         elif len(target) > 1:

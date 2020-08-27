@@ -132,7 +132,7 @@ def check_push(annex, src_path, dst_path):
     assert_in_results(
         res, status='impossible',
         message='No push target given, and none could be auto-detected, '
-        'please specific via --to')
+        'please specify via --to')
     eq_(orig_branches, src_repo.get_branches())
     # target sibling
     target = mk_push_target(src, 'target', dst_path, annex=annex)

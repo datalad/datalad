@@ -631,7 +631,7 @@ def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
         ds.publish(on_failure='ignore'),
         1,
         status='impossible',
-        message='No target sibling configured for default publication, please specific via --to')
+        message='No target sibling configured for default publication, please specify via --to')
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     assert_postupdate_hooks(target_path, installed=ui)
