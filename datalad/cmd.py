@@ -212,17 +212,22 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         **kwargs
     )
     transport = None
+    result = None
     try:
         lgr.debug('Launching process %s', cmd)
         transport, protocol = await proc
         lgr.debug('Waiting for process %i to complete', transport.get_pid())
+        # The next wait is a workaround that avoids losing the output of
+        # quickly exiting commands (https://bugs.python.org/issue41594).
+        await asyncio.ensure_future(transport._wait())
         await cmd_done
+        result = protocol._prepare_result()
     finally:
         # protect against a crash whe launching the process
         if transport:
             transport.close()
 
-    return cmd_done.result()
+    return result
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
@@ -298,11 +303,10 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
         Note for derived classes overwriting this method:
 
-        The result set for the `done` future must be a dict with keys
-        that do not unintentionally conflict with the API of
-        CommandError, as the result dict is passed to this exception
-        class as kwargs on error. The Runner will overwrite 'cmd' and
-        'cwd' on error, if they are present in the result.
+        The result must be a dict with keys that do not unintentionally
+        conflict with the API of CommandError, as the result dict is passed to
+        this exception class as kwargs on error. The Runner will overwrite
+        'cmd' and 'cwd' on error, if they are present in the result.
         """
         return_code = self.transport.get_returncode()
         lgr.debug(
@@ -320,7 +324,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     def process_exited(self):
         # actually fulfill the future promise and let the execution finish
-        self.done.set_result(self._prepare_result())
+        self.done.set_result(True)
 
 
 class NoCapture(WitlessProtocol):
