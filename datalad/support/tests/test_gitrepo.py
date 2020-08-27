@@ -1186,15 +1186,11 @@ def test_GitRepo_flyweight(path1, path2):
 
     orig_id = id(repo1)
 
-    import gc
+    # import gc
     # deleting one reference doesn't change anything - we still get the same
     # thing:
     del repo1
-
-    # Ben: Note, that ATM gc.collect() seems necessary here, which makes little
-    #      sense, since the refcount based collection should be instant and `gc`
-    #      be only required for cyclic references.
-    gc.collect()
+    # gc.collect()
     ok_(repo2 is not None)
     ok_(repo2 is repo3)
     ok_(repo2 == repo3)
@@ -1207,7 +1203,11 @@ def test_GitRepo_flyweight(path1, path2):
     del repo1
     del repo2
     del repo3
-    gc.collect()
+    # gc.collect()
+
+    # give garbage collection some time
+    from time import sleep
+    sleep(0.1)
 
     repo1 = GitRepo(path1)
     assert_not_equal(orig_id, id(repo1))

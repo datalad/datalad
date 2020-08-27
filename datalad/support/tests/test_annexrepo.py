@@ -1694,7 +1694,7 @@ def test_AnnexRepo_flyweight(path1, path2):
     # deleting one reference doesn't change anything - we still get the same
     # thing:
     del repo1
-    #gc.collect()
+    # gc.collect()
     ok_(repo2 is not None)
     ok_(repo2 is repo3)
     ok_(repo2 == repo3)
@@ -1710,10 +1710,31 @@ def test_AnnexRepo_flyweight(path1, path2):
     # Ben: Note, that gc.collect should only be necessary, if we manage to create
     # cyclic references. Pure refcount collection is supposed to happen
     # instantly, if I got that right.
-    #gc.collect()
+    # gc.collect()
+
+    # give garbage collection some time
+    from time import sleep
+    sleep(0.1)
 
     repo1 = AnnexRepo(path1)
     assert_not_equal(orig_id, id(repo1))
+
+    # destroying the object calls close() on BatchedAnnex
+    class Dummy:
+        def __init__(self, *args, **kwargs):
+            self.close_called = False
+
+        def close(self):
+            self.close_called = True
+
+    fake_batch = Dummy()
+    with patch.object(repo1._batched, 'close', fake_batch.close):
+        del repo1
+        # gc.collect()  # same as above: shouldn't be necessary
+    # deleting last strong reference lets it vanish from WeakValueDict, too:
+    assert_not_in(path1, AnnexRepo._unique_instances.keys())
+    assert_true(fake_batch.close_called)
+
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
 @known_failure_windows
