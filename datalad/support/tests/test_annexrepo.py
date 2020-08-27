@@ -783,13 +783,7 @@ def test_AnnexRepo_commit(path):
         f.write("some")
     assert_raises(FileNotInRepositoryError, ds.commit, files="untracked")
     # not existing file as well:
-    try:
-        ds.commit(files="not-existing")
-    except FileNotInRepositoryError:
-        pass   # expected result
-    except CommandError:  # pragma: no cover
-        # @known_failure (marked for grep)
-        raise SkipTest("test_AnnexRepo_commit hit known failure (gh-4773)")
+    assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
