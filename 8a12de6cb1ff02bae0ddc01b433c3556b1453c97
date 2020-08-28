@@ -1,0 +1,36 @@
+Update 0.13.3-112-gf5366e89e:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    3e3361fd08b32db7b1d3eaac134dbcfa1d36ba03..83f9d98ae5b8c6e2114f83ae6a6882312909a5ba
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4810 from kyleam/update-script-test
+   531c37013^-1
+-  Merge branch 'maint'
+   bd5e21a23^-1
+-  Merge branch 'maint'
+   3074d536a^-1
++  Merge pull request #4816 from kyleam/shub-downloader
+   fa9c72eb8^-1
++  Merge pull request #4828 from mih/rf-config
+   8df310629^-1
++  Merge remote-tracking branch 'gh-master/maint'
+   3d4d788cb^-1
++* Merge pull request #4829 from mih/nf-cfgsrcquery
+   be47e8d66^-1
++  Merge branch 'maint'
+   f5366e89e^-1
+-  Merge pull request #4841 from mih/rf-gitwitless3
+   83f9d98ae^-1
+
+Manually added entries
+----------------------
+
++  Merge pull request #4769 from nicholsn/nf-create-github-sibling-private
+   6f0e488cf^-1
