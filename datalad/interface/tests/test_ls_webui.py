@@ -69,7 +69,7 @@ def test_ignored(topdir):
 
 
 # https://github.com/datalad/datalad/pull/4808#issuecomment-674381095
-@known_failure_windows
+#@known_failure_windows
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
                   'subdir': {'file1.txt': '124', 'file2.txt': '123'},
