@@ -324,8 +324,9 @@ def check_extract_csv_json_equal(input_type):
     eq_(json_output, csv_output)
 
 
-def test_extract_csv_json_equal():
+def test_extract_csv_tsv_json_equal():
     yield check_extract_csv_json_equal, "csv"
+    yield check_extract_csv_json_equal, "tsv"
 
 
 def test_extract_wrong_input_type():
@@ -667,10 +668,11 @@ class TestAddurls(object):
             assert_in("Failed to read", str(exc.exception))
 
     @with_tree({"in.csv": "url,name,subdir",
+                "in.tsv": "url\tname\tsubdir",
                 "in.json": "[]"})
     def test_addurls_no_rows(self, path):
         ds = Dataset(path).create(force=True)
-        for fname in ["in.csv", "in.json"]:
+        for fname in ["in.csv", "in.tsv", "in.json"]:
             with swallow_logs(new_level=logging.WARNING) as cml:
                 assert_in_results(
                     ds.addurls(fname, "{url}", "{name}"),
@@ -706,6 +708,7 @@ class TestAddurls(object):
                 [row.format(**rec) for rec in json.loads(json_text)])
 
         yield make_test(make_delim_text(","), "csv", "csv,csv input type")
+        yield make_test(make_delim_text("\t"), "tsv", "tsv,tsv input type")
 
     @with_tempfile(mkdir=True)
     def test_addurls_stdin_input_command_line(self, path):
