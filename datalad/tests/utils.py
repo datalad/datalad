@@ -172,10 +172,10 @@ def skip_if_no_network(func=None):
         @wraps(func)
         @attr('network')
         @attr('skip_if_no_network')
-        def newfunc(*args, **kwargs):
+        def  _wrap_skip_if_no_network(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        return newfunc
+        return  _wrap_skip_if_no_network
     else:
         check_and_raise()
 
@@ -192,10 +192,10 @@ def skip_if_on_windows(func=None):
     if func:
         @wraps(func)
         @attr('skip_if_on_windows')
-        def newfunc(*args, **kwargs):
+        def  _wrap_skip_if_on_windows(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        return newfunc
+        return  _wrap_skip_if_on_windows
     else:
         check_and_raise()
 
@@ -215,10 +215,10 @@ def skip_if_root(func=None):
     if func:
         @wraps(func)
         @attr('skip_if_root')
-        def newfunc(*args, **kwargs):
+        def  _wrap_skip_if_root(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        return newfunc
+        return  _wrap_skip_if_root
     else:
         check_and_raise()
 
@@ -244,7 +244,7 @@ def skip_if(func, cond=True, msg=None, method='raise'):
     check_not_generatorfunction(func)
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_if(*args, **kwargs):
         if cond:
             if method == 'raise':
                 raise SkipTest(msg if msg else "condition was True")
@@ -252,7 +252,7 @@ def skip_if(func, cond=True, msg=None, method='raise'):
                 print(msg if msg else "condition was True")
                 return
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_if
 
 
 def skip_ssh(func):
@@ -264,12 +264,12 @@ def skip_ssh(func):
 
     @wraps(func)
     @attr('skip_ssh')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_ssh(*args, **kwargs):
         test_ssh = dl_cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_ssh
 
 
 @optional_args
@@ -291,9 +291,9 @@ def skip_v6_or_later(func, method='raise'):
     @wraps(func)
     @attr('skip_v6_or_later')
     @attr('v6_or_later')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_v6_or_later(*args, **kwargs):
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_v6_or_later
 
 
 #
@@ -542,7 +542,7 @@ def ok_file_has_content(path, content, strip=False, re_=False,
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
     @wraps(t)
-    def newfunc(*arg, **kw):
+    def  _wrap_with_tree(*arg, **kw):
         if 'dir' not in tkwargs.keys():
             # if not specified otherwise, respect datalad.tests.temp.dir config
             # as this is a test helper
@@ -555,7 +555,7 @@ def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
         finally:
             if delete:
                 rmtemp(d)
-    return newfunc
+    return  _wrap_with_tree
 
 
 lgr = logging.getLogger('datalad.tests')
@@ -650,7 +650,7 @@ def serve_path_via_http(tfunc, *targs):
 
     @wraps(tfunc)
     @attr('serve_path_via_http')
-    def newfunc(*args, **kwargs):
+    def  _wrap_serve_path_via_http(*args, **kwargs):
 
         if targs:
             # if a path is passed into serve_path_via_http, then it's in targs
@@ -664,7 +664,7 @@ def serve_path_via_http(tfunc, *targs):
 
         with HTTPPath(path) as url:
             return tfunc(*(args + (path, url)), **kwargs)
-    return newfunc
+    return  _wrap_serve_path_via_http
 
 
 @optional_args
@@ -673,12 +673,12 @@ def with_memory_keyring(t):
     """
     @wraps(t)
     @attr('with_memory_keyring')
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_memory_keyring(*args, **kwargs):
         keyring = MemoryKeyring()
         with patch("datalad.downloaders.credentials.keyring_", keyring):
             return t(*(args + (keyring,)), **kwargs)
 
-    return newfunc
+    return  _wrap_with_memory_keyring
 
 
 @optional_args
@@ -688,7 +688,7 @@ def without_http_proxy(tfunc):
 
     @wraps(tfunc)
     @attr('without_http_proxy')
-    def newfunc(*args, **kwargs):
+    def  _wrap_without_http_proxy(*args, **kwargs):
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
@@ -697,7 +697,7 @@ def without_http_proxy(tfunc):
         with patch.dict('os.environ', env, clear=True):
             return tfunc(*args, **kwargs)
 
-    return newfunc
+    return  _wrap_without_http_proxy
 
 
 @borrowkwargs(methodname=make_tempfile)
@@ -722,7 +722,7 @@ def with_tempfile(t, **tkwargs):
     """
 
     @wraps(t)
-    def newfunc(*arg, **kw):
+    def  _wrap_with_tempfile(*arg, **kw):
         if 'dir' not in tkwargs.keys():
             # if not specified otherwise, respect datalad.tests.temp.dir config
             # as this is a test helper
@@ -730,7 +730,7 @@ def with_tempfile(t, **tkwargs):
         with make_tempfile(wrapped=t, **tkwargs) as filename:
             return t(*(arg + (filename,)), **kw)
 
-    return newfunc
+    return  _wrap_with_tempfile
 
 
 # ### ###
@@ -747,7 +747,7 @@ def probe_known_failure(func):
 
     @wraps(func)
     @attr('probe_known_failure')
-    def newfunc(*args, **kwargs):
+    def  _wrap_probe_known_failure(*args, **kwargs):
         if dl_cfg.obtain("datalad.tests.knownfailures.probe"):
             assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
             # Note: Since assert_raises lacks a `msg` argument, a comment
@@ -756,7 +756,7 @@ def probe_known_failure(func):
             # wouldn't be very telling.
         else:
             return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_probe_known_failure
 
 
 @optional_args
@@ -772,9 +772,9 @@ def skip_known_failure(func, method='raise'):
              method=method)
     @wraps(func)
     @attr('skip_known_failure')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_known_failure(*args, **kwargs):
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_known_failure
 
 
 def known_failure(func):
@@ -788,9 +788,9 @@ def known_failure(func):
     @probe_known_failure
     @wraps(func)
     @attr('known_failure')
-    def newfunc(*args, **kwargs):
+    def  _wrap_known_failure(*args, **kwargs):
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_known_failure
 
 
 def known_failure_v6_or_later(func):
@@ -1030,7 +1030,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     """
     @wraps(t)
     @attr('with_testrepos')
-    def newfunc(*arg, **kw):
+    def  _wrap_with_testrepos(*arg, **kw):
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1065,7 +1065,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
-    return newfunc
+    return  _wrap_with_testrepos
 with_testrepos.__test__ = False
 
 
@@ -1086,7 +1086,7 @@ def with_sameas_remote(func, autoenabled=False):
     @skip_ssh
     @with_tempfile(mkdir=True)
     @with_tempfile(mkdir=True)
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_sameas_remote(*args, **kwargs):
         # With git-annex's 8.20200522-77-g1f2e2d15e, transferring from an rsync
         # special remote hangs on Xenial. This is likely due to an interaction
         # with an older rsync or openssh version. Use openssh as a rough
@@ -1117,7 +1117,7 @@ def with_sameas_remote(func, autoenabled=False):
             # This should have --sameas support.
             raise
         return func(*(fn_args + (repo,)), **kwargs)
-    return newfunc
+    return  _wrap_with_sameas_remote
 
 
 @optional_args
@@ -1128,14 +1128,14 @@ def with_fake_cookies_db(func, cookies={}):
 
     @wraps(func)
     @attr('with_fake_cookies_db')
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_fake_cookies_db(*args, **kwargs):
         try:
             orig_cookies_db = cookies_db._cookies_db
             cookies_db._cookies_db = cookies.copy()
             return func(*args, **kwargs)
         finally:
             cookies_db._cookies_db = orig_cookies_db
-    return newfunc
+    return  _wrap_with_fake_cookies_db
 
 
 @optional_args
@@ -1150,7 +1150,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
     """
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_assert_cwd_unchanged(*args, **kwargs):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
         exc_info = None
@@ -1189,7 +1189,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         return ret
 
-    return newfunc
+    return  _wrap_assert_cwd_unchanged
 
 
 @optional_args
@@ -1207,7 +1207,7 @@ def run_under_dir(func, newdir='.'):
     """
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_run_under_dir(*args, **kwargs):
         pwd_before = getpwd()
         try:
             chpwd(newdir)
@@ -1216,7 +1216,7 @@ def run_under_dir(func, newdir='.'):
             chpwd(pwd_before)
 
 
-    return newfunc
+    return  _wrap_run_under_dir
 
 
 def assert_re_in(regex, c, flags=0, match=True, msg=None):
@@ -1402,11 +1402,11 @@ def skip_httpretty_on_problematic_pythons(func):
     """
 
     @make_decorator(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_httpretty_on_problematic_pythons(*args, **kwargs):
         if sys.version_info[:3] == (3, 4, 2):
             raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_httpretty_on_problematic_pythons
 
 
 @optional_args
@@ -1414,11 +1414,11 @@ def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
     """
     @wraps(t)
-    def newfunc():
+    def  _wrap_with_parametric_batch():
         for batch in (False, True):
                 yield t, batch
 
-    return newfunc
+    return  _wrap_with_parametric_batch
 
 
 # List of most obscure filenames which might or not be supported by different
@@ -1485,7 +1485,7 @@ def with_testsui(t, responses=None, interactive=True):
     """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
 
     @wraps(t)
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_testsui(*args, **kwargs):
         from datalad.ui import ui
         old_backend = ui.backend
         try:
@@ -1503,7 +1503,7 @@ def with_testsui(t, responses=None, interactive=True):
     if not interactive and responses is not None:
         raise ValueError("Non-interactive UI cannot provide responses")
 
-    return newfunc
+    return  _wrap_with_testsui
 
 with_testsui.__test__ = False
 
@@ -1511,7 +1511,7 @@ with_testsui.__test__ = False
 def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
-    def new_func(*args, **kwargs):
+    def  _wrap_assert_no_errors_logged(*args, **kwargs):
         with swallow_logs(new_level=logging.ERROR) as cml:
             out = func(*args, **kwargs)
             if cml.out:
@@ -1522,7 +1522,7 @@ def assert_no_errors_logged(func, skip_re=None):
                     )
         return out
 
-    return new_func
+    return  _wrap_assert_no_errors_logged
 
 
 def get_mtimes_and_digests(target_path):
@@ -1860,11 +1860,11 @@ def skip_wo_symlink_capability(func):
     """
     @wraps(func)
     @attr('skip_wo_symlink_capability')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_wo_symlink_capability(*args, **kwargs):
         if not has_symlink_capability():
             raise SkipTest("no symlink capabilities")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_wo_symlink_capability
 
 
 def get_ssh_port(host):

@@ -1083,13 +1083,13 @@ def line_profile(func):
     prof = line_profiler.LineProfiler()
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_line_profile(*args, **kwargs):
         try:
             pfunc = prof(func)
             return pfunc(*args, **kwargs)
         finally:
             prof.print_stats()
-    return newfunc
+    return  _wrap_line_profile
 
 
 @optional_args
@@ -1119,7 +1119,7 @@ def collect_method_callstats(func):
     toppath = op.dirname(__file__) + op.sep
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_collect_method_callstats(*args, **kwargs):
         try:
             self = args[0]
             stack = traceback.extract_stack()
@@ -1156,7 +1156,7 @@ def collect_method_callstats(func):
     import atexit
     atexit.register(print_stats)
 
-    return newfunc
+    return  _wrap_collect_method_callstats
 
 
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
