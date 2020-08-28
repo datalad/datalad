@@ -325,7 +325,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Note, that we can pass required attributes to the finalizer, but not
         # `self` itself. This would create an additional reference to the object
         # and thereby preventing it from being collected at all.
-        self._finalizer = finalize(self, AnnexRepo._cleanup, self._batched)
+        self._finalizer = finalize(self, AnnexRepo._cleanup, self._batched,
+                                   self.path)
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
@@ -379,7 +380,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set('annex.backends', backend, where='local')
 
     @classmethod
-    def _cleanup(cls, batched):
+    def _cleanup(cls, batched, path):
+
+        lgr.log(1, "Finalizer called on: AnnexRepo(%s)", path)
 
         # Ben: With switching to finalize rather than del, I think the
         #      safe_del_debug isn't needed anymore. However, time will tell and

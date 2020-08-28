@@ -1167,17 +1167,22 @@ def test_optimized_cloning(path):
 @with_tempfile(mkdir=True)
 def test_GitRepo_flyweight(path1, path2):
 
+    import gc
+
     repo1 = GitRepo(path1, create=True)
     assert_is_instance(repo1, GitRepo)
+
     # instantiate again:
     repo2 = GitRepo(path1, create=False)
     assert_is_instance(repo2, GitRepo)
+
     # the very same object:
     ok_(repo1 is repo2)
 
     # reference the same in a different way:
     with chpwd(path1):
         repo3 = GitRepo(op.relpath(path1, start=path2), create=False)
+
     # it's the same object:
     ok_(repo1 is repo3)
 
@@ -1186,15 +1191,18 @@ def test_GitRepo_flyweight(path1, path2):
 
     orig_id = id(repo1)
 
-    # import gc
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
     # deleting one reference doesn't change anything - we still get the same
     # thing:
     del repo1
-    # gc.collect()
     ok_(repo2 is not None)
     ok_(repo2 is repo3)
     ok_(repo2 == repo3)
 
+    # re-requesting still delivers the same thing:
     repo1 = GitRepo(path1)
     assert_equal(orig_id, id(repo1))
 
@@ -1202,15 +1210,31 @@ def test_GitRepo_flyweight(path1, path2):
     # re-request yields a new object:
     del repo1
     del repo2
-    del repo3
-    # gc.collect()
 
-    # give garbage collection some time
-    from time import sleep
-    sleep(0.1)
+    # Killing last reference will lead to garbage collection which will call
+    # GitRepo's finalizer:
+    with swallow_logs(new_level=1) as cml:
+        del repo3
+        # Note, that we currently seem to require gc.collect! First instantiation
+        # creates 6 references according to sys.getrefcount (returns 7). Not
+        # entirely clear to me why (gc.get_referrers points out several function
+        # frames), but that means that refcount isn't down to zero after last del
+        # and therefore gc.collect() is needed.
+        gc.collect()
+        cml.assert_logged(msg="Finalizer called on: GitRepo(%s)" % path1,
+                          level="Level 1",
+                          regex=False)
 
+    # Flyweight is gone:
+    assert_not_in(path1, GitRepo._unique_instances.keys())
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, GitRepo) and o.path == path1])
+
+    # new object is created on re-request:
     repo1 = GitRepo(path1)
-    assert_not_equal(orig_id, id(repo1))
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
