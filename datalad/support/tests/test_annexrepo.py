@@ -1697,10 +1697,19 @@ def test_AnnexRepo_flyweight(path1, path2):
 
     orig_id = id(repo1)
 
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
+
+
+    # But we have two GitRepos in memory (the AnnexRepo and repo4):
+    assert_equal(2, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
     # deleting one reference doesn't change anything - we still get the same
     # thing:
     del repo1
-    # gc.collect()
+    gc.collect()  # shouldn't do anything
     ok_(repo2 is not None)
     ok_(repo2 is repo3)
     ok_(repo2 == repo3)
@@ -1708,24 +1717,10 @@ def test_AnnexRepo_flyweight(path1, path2):
     repo1 = AnnexRepo(path1)
     eq_(orig_id, id(repo1))
 
-    # killing all references should result in the instance being gc'd and
-    # re-request yields a new object:
     del repo1
     del repo2
-    del repo3
-    # Ben: Note, that gc.collect should only be necessary, if we manage to create
-    # cyclic references. Pure refcount collection is supposed to happen
-    # instantly, if I got that right.
-    # gc.collect()
 
-    # give garbage collection some time
-    from time import sleep
-    sleep(0.1)
-
-    repo1 = AnnexRepo(path1)
-    assert_not_equal(orig_id, id(repo1))
-
-    # destroying the object calls close() on BatchedAnnex
+    # for testing that destroying the object calls close() on BatchedAnnex:
     class Dummy:
         def __init__(self, *args, **kwargs):
             self.close_called = False
@@ -1734,12 +1729,38 @@ def test_AnnexRepo_flyweight(path1, path2):
             self.close_called = True
 
     fake_batch = Dummy()
-    with patch.object(repo1._batched, 'close', fake_batch.close):
-        del repo1
-        # gc.collect()  # same as above: shouldn't be necessary
-    # deleting last strong reference lets it vanish from WeakValueDict, too:
+
+    # Killing last reference will lead to garbage collection which will call
+    # AnnexRepo's finalizer:
+    with patch.object(repo3._batched, 'close', fake_batch.close):
+        with swallow_logs(new_level=1) as cml:
+            del repo3
+            # Note, that we currently seem to require gc.collect! First instantiation
+            # creates 6 references according to sys.getrefcount (returns 7). Not
+            # entirely clear to me why (gc.get_referrers points out several function
+            # frames), but that means that refcount isn't down to zero after last del
+            # and therefore gc.collect() is needed.
+            gc.collect()
+            cml.assert_logged(msg="Finalizer called on: AnnexRepo(%s)" % path1,
+                              level="Level 1",
+                              regex=False)
+            # finalizer called close() on BatchedAnnex:
+            assert_true(fake_batch.close_called)
+
+    # Flyweight is gone:
     assert_not_in(path1, AnnexRepo._unique_instances.keys())
-    assert_true(fake_batch.close_called)
+
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, AnnexRepo) and o.path == path1])
+    # GitRepo is unaffected:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # new object is created on re-request:
+    repo1 = AnnexRepo(path1)
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
