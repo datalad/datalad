@@ -306,10 +306,12 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-def test_extract_csv_json_equal():
+def check_extract_csv_json_equal(input_type):
+    delim = "\t" if input_type == "tsv" else ","
+
     keys = ST_DATA["header"]
-    csv_rows = [",".join(keys)]
-    csv_rows.extend(",".join(str(row[k]) for k in keys)
+    csv_rows = [delim.join(keys)]
+    csv_rows.extend(delim.join(str(row[k]) for k in keys)
                     for row in ST_DATA["rows"])
 
     kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -317,9 +319,13 @@ def test_extract_csv_json_equal():
                 meta=["group={age_group}"])
 
     json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
-    csv_output = au.extract(csv_rows, "csv", **kwds)
+    csv_output = au.extract(csv_rows, input_type, **kwds)
 
     eq_(json_output, csv_output)
+
+
+def test_extract_csv_json_equal():
+    yield check_extract_csv_json_equal, "csv"
 
 
 def test_extract_wrong_input_type():
@@ -693,11 +699,13 @@ class TestAddurls(object):
         yield make_test(json_text, "ext", "json,default input type")
         yield make_test(json_text, "json", "json,json input type")
 
-        csv_text = "\n".join(
-            ["name,url"] +
-            ["{name},{url}".format(**rec) for rec in json.loads(json_text)])
-        yield make_test(csv_text, "csv", "csv,csv input type")
+        def make_delim_text(delim):
+            row = "{name}" + delim + "{url}"
+            return "\n".join(
+                [row.format(name="name", url="url")] +
+                [row.format(**rec) for rec in json.loads(json_text)])
 
+        yield make_test(make_delim_text(","), "csv", "csv,csv input type")
 
     @with_tempfile(mkdir=True)
     def test_addurls_stdin_input_command_line(self, path):
