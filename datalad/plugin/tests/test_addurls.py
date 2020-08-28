@@ -324,7 +324,7 @@ def test_extract_csv_json_equal():
 
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  au.extract, None, "not_csv_or_json")
+                  au.extract, None, "invalid_input_type")
 
 
 @with_tempfile(mkdir=True)
