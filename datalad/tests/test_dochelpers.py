@@ -144,12 +144,15 @@ def test_borrow_kwargs():
     assert_true('B.met_nodockwargs' in B.met_nodockwargs.__doc__)
     assert_true('boguse' in B.met_excludes.__doc__)
 
+
 def test_exc_str():
     try:
         raise Exception("my bad")
     except Exception as e:
         estr = exc_str(e)
+        estr_tb_only = exc_str(e, include_str=False)
     assert_re_in("my bad \[test_dochelpers.py:test_exc_str:...\]", estr)
+    assert_re_in("^\[.*\]", estr_tb_only)  # only traceback
 
     def f():
         def f2():
