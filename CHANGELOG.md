@@ -9,13 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.13.3 (??? ??, 2020) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+## 0.13.3 (August 28, 2020) -- .
 
 ### Fixes
 
