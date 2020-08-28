@@ -73,7 +73,7 @@ def test_something(path, new_home):
     # will refuse to work on dataset without a dataset
     assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
     assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
@@ -226,7 +226,7 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
@@ -387,10 +387,8 @@ def test_overrides():
     from datalad.utils import Path
     assert_not_in(
         'ups.name', cfg,
-        (cfg._store,
+        (cfg._stores,
          cfg.overrides,
-         cfg._cfgfiles,
-         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
     ))
 
 
@@ -456,11 +454,15 @@ def test_no_leaks(path1, path2):
         assert_not_in('i.was.here', ds2.config.keys())
 
         # and that we do not track the wrong files
-        assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_not_in(ds1.pathobj / '.git' / 'config',
+                      ds2.config._stores['git']['files'])
+        assert_not_in(ds1.pathobj / '.datalad' / 'config',
+                      ds2.config._stores['dataset']['files'])
         # these are the right ones
-        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_in(ds2.pathobj / '.git' / 'config',
+                  ds2.config._stores['git']['files'])
+        assert_in(ds2.pathobj / '.datalad' / 'config',
+                  ds2.config._stores['dataset']['files'])
 
 
 @with_tempfile()
@@ -512,7 +514,7 @@ def test_global_config():
     # from within tests, global config should be read from faked $HOME (see
     # setup_package)
     glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
-    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._cfgfiles)
+    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._stores['git']['files'])
     assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
 

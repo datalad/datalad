@@ -55,7 +55,6 @@ from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
-from datalad.config import ConfigManager
 from datalad.core.local.resulthooks import (
     get_jsonhooks_from_config,
     match_jsonhook2result,
@@ -367,20 +366,8 @@ def eval_results(func):
         from datalad.distribution.dataset import Dataset
         ds = dataset_arg if isinstance(dataset_arg, Dataset) \
             else Dataset(dataset_arg) if dataset_arg else None
-        # do not reuse a dataset's existing config manager here
-        # they are configured to read the committed dataset configuration
-        # too. That means a datalad update can silently bring in new
-        # procedure definitions from the outside, and in some sense enable
-        # remote code execution by a 3rd-party
-        # To avoid that, create a new config manager that only reads local
-        # config (system and .git/config), plus any overrides given to this
-        # datalad session
-        proc_cfg = ConfigManager(
-            ds, source='local', overrides=dlcfg.overrides
-        ) if ds and ds.is_installed() else dlcfg
-
         # look for hooks
-        hooks = get_jsonhooks_from_config(proc_cfg)
+        hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,

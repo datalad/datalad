@@ -46,6 +46,7 @@ from .utils import (
     generate_file_chunks,
     get_tempfile_kwargs,
     split_cmdline,
+    try_multiple,
     unlink,
 )
 
@@ -1327,9 +1328,27 @@ class BatchedCommand(SafeDelCloseMixin):
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
-            process.wait()
+            # try waiting for the annex process to finish 3 times for 3 sec
+            # with 1s pause in between
+            try:
+                try_multiple(
+                    # ntrials
+                    3,
+                    # exception to catch
+                    subprocess.TimeoutExpired,
+                    # base waiting period
+                    1.0,
+                    # function to run
+                    process.wait,
+                    timeout=3.0,
+                )
+            except subprocess.TimeoutExpired:
+                lgr.warning(
+                    "Batched process %s did not finish, abandoning it without killing it",
+                    process)
+            if process.returncode is not None:
+                lgr.debug("Process %s has finished", process)
             self._process = None
-            lgr.debug("Process %s has finished", process)
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
             if return_stderr:
                 with open(self._stderr_out_fname, 'r') as f:
