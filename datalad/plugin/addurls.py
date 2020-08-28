@@ -254,6 +254,9 @@ def fmt_to_name(format_string, num_to_name):
         return name
 
 
+INPUT_TYPES = ["ext", "csv", "json"]
+
+
 def _read(stream, input_type):
     if input_type == "csv":
         import csv
@@ -278,7 +281,9 @@ def _read(stream, input_type):
         # only names.
         idx_map = {}
     else:
-        raise ValueError("input_type must be 'csv', 'json', or 'ext'")
+        raise ValueError(
+            "input_type {} is invalid. Known values: {}"
+            .format(input_type, ", ".join(INPUT_TYPES)))
     return rows, idx_map
 
 
@@ -704,7 +709,7 @@ class Addurls(Interface):
             file.  The default value, "ext", means to consider `URL-FILE` as a
             JSON file if it ends with ".json".  Otherwise, treat it as a CSV
             file.""",
-            constraints=EnsureChoice("ext", "csv", "json")),
+            constraints=EnsureChoice(*INPUT_TYPES)),
         exclude_autometa=Parameter(
             args=("-x", "--exclude_autometa"),
             metavar="REGEXP",
