@@ -8,15 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+from collections.abc import Callable
 import hashlib
 import re
 import builtins
 import time
-
-try:
-    from collections.abc import Callable
-except ImportError:  # Python <= 3.3
-    from collections import Callable
 
 import logging
 import shutil
