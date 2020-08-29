@@ -254,14 +254,19 @@ def fmt_to_name(format_string, num_to_name):
         return name
 
 
+INPUT_TYPES = ["ext", "csv", "tsv", "json"]
+
+
 def _read(stream, input_type):
-    if input_type == "csv":
+    if input_type in ["csv", "tsv"]:
         import csv
-        csvrows = csv.reader(stream)
+        csvrows = csv.reader(stream,
+                             delimiter="\t" if input_type == "tsv" else ",")
         try:
             headers = next(csvrows)
         except StopIteration:
-            raise ValueError("Failed to read CSV rows from {}".format(stream))
+            raise ValueError("Failed to read {} rows from {}"
+                             .format(input_type.upper(), stream))
         lgr.debug("Taking %s fields from first line as headers: %s",
                   len(headers), headers)
         idx_map = dict(enumerate(headers))
@@ -278,7 +283,9 @@ def _read(stream, input_type):
         # only names.
         idx_map = {}
     else:
-        raise ValueError("input_type must be 'csv', 'json', or 'ext'")
+        raise ValueError(
+            "input_type {} is invalid. Known values: {}"
+            .format(input_type, ", ".join(INPUT_TYPES)))
     return rows, idx_map
 
 
@@ -433,7 +440,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     ----------
     stream : file object
         Items used to construct the file names and URLs.
-    input_type : {'csv', 'json'}
+    input_type : {'csv', 'tsv', 'json'}
 
     All other parameters match those described in `AddUrls`.
 
@@ -582,10 +589,11 @@ class Addurls(Interface):
     *Format specification*
 
     Several arguments take format strings.  These are similar to normal Python
-    format strings where the names from `URL-FILE` (column names for a CSV or
-    properties for JSON) are available as placeholders.  If `URL-FILE` is a CSV
-    file, a positional index can also be used (i.e., "{0}" for the first
-    column).  Note that a placeholder cannot contain a ':' or '!'.
+    format strings where the names from `URL-FILE` (column names for a comma-
+    or tab-separated file or properties for JSON) are available as
+    placeholders. If `URL-FILE` is a CSV or TSV file, a positional index can
+    also be used (i.e., "{0}" for the first column). Note that a placeholder
+    cannot contain a ':' or '!'.
 
     In addition, the `FILENAME-FORMAT` arguments has a few special
     placeholders.
@@ -677,10 +685,11 @@ class Addurls(Interface):
             metavar="URL-FILE",
             doc="""A file that contains URLs or information that can be used to
             construct URLs.  Depending on the value of --input-type, this
-            should be a CSV file (with a header as the first row) or a JSON
-            file (structured as a list of objects with string values). If '-',
-            read from standard input, taking the content as JSON when
-            --input-type is at its default value of 'ext'."""),
+            should be a comma- or tab-separated file (with a header as the
+            first row) or a JSON file (structured as a list of objects with
+            string values). If '-', read from standard input, taking the
+            content as JSON when --input-type is at its default value of
+            'ext'."""),
         urlformat=Parameter(
             args=("urlformat",),
             metavar="URL-FORMAT",
@@ -700,11 +709,11 @@ class Addurls(Interface):
         input_type=Parameter(
             args=("-t", "--input-type"),
             metavar="TYPE",
-            doc="""Whether `URL-FILE` should be considered a CSV file or a JSON
-            file.  The default value, "ext", means to consider `URL-FILE` as a
-            JSON file if it ends with ".json".  Otherwise, treat it as a CSV
-            file.""",
-            constraints=EnsureChoice("ext", "csv", "json")),
+            doc="""Whether `URL-FILE` should be considered a CSV file, TSV
+            file, or JSON file. The default value, "ext", means to consider
+            `URL-FILE` as a JSON file if it ends with ".json" or a TSV file if
+            it ends with ".tsv". Otherwise, treat it as a CSV file.""",
+            constraints=EnsureChoice(*INPUT_TYPES)),
         exclude_autometa=Parameter(
             args=("-x", "--exclude_autometa"),
             metavar="REGEXP",
@@ -804,7 +813,12 @@ class Addurls(Interface):
                 input_type = "json"
             else:
                 extension = os.path.splitext(url_file)[1]
-                input_type = "json" if extension == ".json" else "csv"
+                if extension == ".json":
+                    input_type = "json"
+                elif extension == ".tsv":
+                    input_type = "tsv"
+                else:
+                    input_type = "csv"
 
         fd = sys.stdin if url_file == "-" else open(url_file)
         try:
