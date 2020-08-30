@@ -541,6 +541,8 @@ def ok_file_has_content(path, content, strip=False, re_=False,
 @optional_args
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
+    import gc
+
     @wraps(t)
     def newfunc(*arg, **kw):
         if 'dir' not in tkwargs.keys():
@@ -553,6 +555,7 @@ def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
         try:
             return t(*(arg + (d,)), **kw)
         finally:
+            gc.collect()
             if delete:
                 rmtemp(d)
     return newfunc
