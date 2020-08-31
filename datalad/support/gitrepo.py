@@ -939,6 +939,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if kwargs:
             git_opts.update(kwargs)
 
+        self._git_runner = GitWitlessRunner(cwd=self.path)
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._cfg = None
 
@@ -964,8 +965,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
             try:
-                stdout, _ = self._git_custom_command(
-                    None, ['git', 'ls-files'], cwd=path, expect_fail=True
+                stdout, _ = self._call_git(
+                    ['-C', path, 'ls-files'],
+                    expect_fail=True,
+                    check_fake_dates=False,
                 )
                 if stdout:
                     raise PathKnownToRepositoryError(
@@ -977,26 +980,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # assume that all is good -- we are not under any repo
                 pass
 
-        cmd = ['git', 'init']
+        cmd = ['-C', path, 'init']
         cmd.extend(kwargs.pop('_from_cmdline_', []))
         cmd.extend(to_options(**kwargs))
         lgr.debug(
             "Initialize empty Git repository at '%s'%s",
             path,
-            ' %s' % cmd[2:] if cmd[2:] else '')
+            ' %s' % cmd[3:] if cmd[3:] else '')
 
         try:
-            stdout, stderr = self._git_custom_command(
-                None,
+            stdout, stderr = self._call_git(
                 cmd,
-                cwd=path,
-                log_stderr=True,
-                log_stdout=True,
-                log_online=False,
-                expect_stderr=False,
-                shell=False,
                 # we don't want it to scream on stdout
-                expect_fail=True)
+                expect_fail=True,
+                # there is no commit, and none will be made
+                check_fake_dates=False)
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
@@ -1373,13 +1371,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         try:
             # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                files,
+            add_out = self._call_git(
                 # Set annex.largefiles to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
+                ['-c', 'annex.largefiles=nothing', 'add'] +
                 ensure_list(git_options) +
-                to_options(update=update) + ['--verbose']
+                to_options(update=update) + ['--verbose'],
+                files=files,
+                check_fake_dates=True,
             )
             # get all the entries
             for o in self._process_git_get_output(*add_out):
@@ -1509,7 +1508,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             raise ValueError('no `fields` provided, refuse to proceed')
         fields = ensure_list(fields)
         cmd = [
-            "git",
             "for-each-ref",
             "--format={}".format(
                 '%00'.join(
@@ -1527,7 +1525,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if count:
             cmd.append('--count={:d}'.format(count))
 
-        out, _ = self._git_custom_command(None, cmd)
+        # cannot use call_git_items_() which would perform fake_dates
+        # processing. Going one level deeper to avoid it, no date
+        # modification possible here
+        out, _ = self._call_git(cmd, check_fake_dates=False)
         for line in out.splitlines():
             props = line.split('\0')
             if len(fields) != len(props):
@@ -2102,6 +2103,71 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     # Convenience wrappers for one-off git calls that don't require further
     # processing or error handling.
 
+    def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
+                  env=None, check_fake_dates=True):
+        """Allows for calling arbitrary commands.
+
+        Internal helper to the call_git*() methods.
+
+        Parameters
+        ----------
+        args : list of str
+          Arguments to pass to `git`.
+        files : list of str, optional
+          File arguments to pass to `git`. The advantage of passing these here
+          rather than as part of `args` is that the call will be split into
+          multiple calls to avoid exceeding the maximum command line length.
+        expect_stderr : bool, optional
+          Standard error is expected and should not be elevated above the DEBUG
+          level.
+        expect_fail : bool, optional
+          A non-zero exit is expected and should not be elevated above the
+          DEBUG level.
+        check_fake_dates : bool, optional
+          TODO
+
+        Returns
+        -------
+        stdout, stderr
+
+        Raises
+        ------
+        CommandError if the call exits with a non-zero status.
+        """
+        runner = self._git_runner
+        stderr_log_level = {True: 5, False: 11}[expect_stderr]
+
+        cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
+
+        env = None
+        if check_fake_dates and self.fake_dates_enabled:
+            env = self.add_fake_dates(runner.env)
+
+        out = err = None
+        try:
+            out, err = run_gitcommand_on_file_list_chunks(
+                self._git_runner.run,
+                cmd,
+                files,
+                protocol=StdOutErrCapture,
+                env=env,
+            )
+        except CommandError as e:
+            ignored = re.search(GitIgnoreError.pattern, e.stderr)
+            if ignored:
+                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
+                                     code=e.code, stdout=e.stdout,
+                                     stderr=e.stderr,
+                                     paths=ignored.groups()[0].splitlines())
+            lgr.log(5 if expect_fail else 11, e)
+            raise
+
+        if err:
+            for line in err.splitlines():
+                lgr.log(stderr_log_level,
+                        "stderr| " + line.rstrip('\n'))
+        return out, err
+
     def call_git(self, args, files=None,
                  expect_stderr=False, expect_fail=False):
         """Call git and return standard output.
@@ -2226,12 +2292,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
         """
-        cmd = ['git', 'remote', 'add']
+        cmd = ['remote', 'add']
         if options:
             cmd += options
         cmd += [name, url]
 
-        result = self._git_custom_command('', cmd)
+        # for historical reasons this method returns stdout and
+        # stderr, keeping that for now
+        result = self._call_git(cmd)
         self.config.reload()
         return result
 
@@ -2242,8 +2310,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # TODO: testing and error handling!
         from .exceptions import RemoteNotAvailableError
         try:
-            out, err = self._git_custom_command(
-                '', ['git', 'remote', 'remove', name])
+            self.call_git(['remote', 'remove', name])
         except CommandError as e:
             if 'fatal: No such remote' in e.stderr:
                 raise RemoteNotAvailableError(name,
@@ -2254,7 +2321,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             else:
                 raise e
 
-        # TODO: config.reload necessary?
+        # config.reload necessary, because the associated remote config
+        # will vanish
         self.config.reload()
         return
 
@@ -2263,8 +2331,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         options = ["-v"] if verbose else []
         name = [name] if name else []
-        self._git_custom_command(
-            '', ['git', 'remote'] + name + ['update'] + options,
+        self.call_git(
+            ['remote'] + name + ['update'] + options,
             expect_stderr=True
         )
 
@@ -4039,12 +4107,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         from datalad.interface.results import get_status_dict
         try:
             # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                list(files.keys()),
+            add_out = self._call_git(
                 # Set annex.largefiles to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
-                ensure_list(git_opts) + ['--verbose']
+                ['-c', 'annex.largefiles=nothing', 'add'] +
+                ensure_list(git_opts) + ['--verbose'],
+                files=list(files.keys()),
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
