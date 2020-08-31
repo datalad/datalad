@@ -2124,7 +2124,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
         check_fake_dates : bool, optional
-          TODO
+          If enabled (default), inspect if dates should be faked for dataset
+          commits and set up the Git environment to ensure that. Must be
+          disabled for repository initialization.
 
         Returns
         -------
@@ -2195,10 +2197,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._git_custom_command(files, ["git"] + args,
-                                          expect_stderr=expect_stderr,
-                                          expect_fail=expect_fail,
-                                          check_fake_dates=True)
+        out, _ = self._call_git(args, files,
+                                expect_stderr=expect_stderr,
+                                expect_fail=expect_fail)
         return out
 
     def call_git_items_(self, args, files=None, expect_stderr=False, sep=None):
@@ -2226,9 +2227,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._git_custom_command(files, ["git"] + args,
-                                          expect_stderr=expect_stderr,
-                                          check_fake_dates=True)
+        out, _ = self._call_git(args, files, expect_stderr=expect_stderr)
         yield from (out.split(sep) if sep else out.splitlines())
 
     def call_git_oneline(self, args, files=None, expect_stderr=False):
@@ -2281,10 +2280,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         bool
         """
         try:
-            self._git_custom_command(files, ["git"] + args,
-                                     expect_fail=True,
-                                     expect_stderr=expect_stderr,
-                                     check_fake_dates=True)
+            self._call_git(
+                args, files, expect_fail=True, expect_stderr=expect_stderr)
+
         except CommandError:
             return False
         return True
@@ -3242,7 +3240,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cmd.append('--cached')
         # make sure we have one entry for each query path to
         # simplify work with the result
-        attributes = {_normalize_path(self.path, p): {} for p in path}
+        attributes = {p: {} for p in path}
         attr = []
         for item in self.call_git_items_(cmd, files=path, sep='\0'):
             attr.append(item)
@@ -3255,7 +3253,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 True if value == 'set' else False if value == 'unset' else value
             # done, reset item
             attr = []
-        return attributes
+        return {relpath(k, self.path) if isabs(k) else k: v
+                for k, v in attributes.items()}
 
     def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
         """Set gitattributes
