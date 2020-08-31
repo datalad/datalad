@@ -938,10 +938,27 @@ class AnnexRepo(GitRepo, RepoInterface):
           working with a sameas remote, the presence of either "sameas-name" or
           "sameas-uuid" is a reliable indicator.
         """
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
         try:
-            stdout, stderr = self._git_custom_command(
-                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
-                expect_fail=True)
+            for line in self.call_git_items_(
+                    ['cat-file', 'blob', 'git-annex:remote.log']):
+                # be precise and split by spaces
+                fields = line.split(' ')
+                # special remote UUID
+                sr_id = fields[0]
+                # the rest are config args for enableremote
+                sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+                if "name" not in sr_info:
+                    name = sr_info.get("sameas-name")
+                    if name is None:
+                        lgr.warning(
+                            "Encountered git-annex remote without a name or "
+                            "sameas-name value: %s",
+                            sr_info)
+                    else:
+                        sr_info["name"] = name
+                srs[sr_id] = sr_info
         except CommandError as e:
             if 'Not a valid object name git-annex:remote.log' in e.stderr:
                 # no special remotes configures
@@ -949,25 +966,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 # some unforseen error
                 raise e
-        argspec = re.compile(r'^([^=]*)=(.*)$')
-        srs = {}
-        for line in stdout.splitlines():
-            # be precise and split by spaces
-            fields = line.split(' ')
-            # special remote UUID
-            sr_id = fields[0]
-            # the rest are config args for enableremote
-            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
-            if "name" not in sr_info:
-                name = sr_info.get("sameas-name")
-                if name is None:
-                    lgr.warning(
-                        "Encountered git-annex remote without a name or "
-                        "sameas-name value: %s",
-                        sr_info)
-                else:
-                    sr_info["name"] = name
-            srs[sr_id] = sr_info
         return srs
 
     def _run_annex_command(self, annex_cmd,
