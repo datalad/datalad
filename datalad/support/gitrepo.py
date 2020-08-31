@@ -2161,7 +2161,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                      code=e.code, stdout=e.stdout,
                                      stderr=e.stderr,
                                      paths=ignored.groups()[0].splitlines())
-            lgr.log(5 if expect_fail else 11, e)
+            lgr.log(5 if expect_fail else 11, str(e))
             raise
 
         if err:
