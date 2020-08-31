@@ -445,10 +445,13 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-    # TODO:  yoh thinks that if we could quickly check our Flyweight for
-    #        repos if any of them is under the path, and could call .precommit
-    #        on those to possibly stop batched processes etc, we did not have
-    #        to do it on case by case
+
+    # Make sure *Repo instances that used to point to `path` are
+    # actually destructed before trying to delete anything. This is particularly
+    # important regarding git-annex batch processes that might not have been
+    # closed yet otherwise.
+    gc.collect()
+
     # Check for open files
     assert_no_open_files(path)
 
@@ -468,6 +471,13 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
 
 def rmdir(path, *args, **kwargs):
     """os.rmdir with our optional checking for open files"""
+
+    # Make sure *Repo instances that used to point to `path` are
+    # actually destructed before trying to delete anything. This is particularly
+    # important regarding git-annex batch processes that might not have been
+    # closed yet otherwise.
+    gc.collect()
+
     assert_no_open_files(path)
     os.rmdir(path)
 
