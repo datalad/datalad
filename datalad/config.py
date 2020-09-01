@@ -847,3 +847,57 @@ def rewrite_url(cfg, url):
 
 # for convenience, bind to class too
 ConfigManager.rewrite_url = rewrite_url
+
+#
+# Helpers for bypassing git-config when _writing_ config items,
+# mostly useful when a large number of changes needs to be made
+# and directly file manipulation without a safety net is worth
+# the risk for performance reasons.
+#
+
+def quote_config(v):
+    """Helper to perform minimal quoting of config keys/value parts
+
+    Parameters
+    ----------
+    v : str
+      To-be-quoted string
+    """
+    white = (' ', '\t')
+    # backslashes need to be quoted in any case
+    v = v.replace('\\', '\\\\')
+    # must not have additional unquoted quotes
+    v = v.replace('"', '\\"')
+    if v[0] in white or v[-1] in white:
+        # quoting the value due to leading/trailing whitespace
+        v = '"{}"'.format(v)
+    return v
+
+
+def write_config_section(fobj, suite, name, props):
+    """Write a config section with (multiple) settings.
+
+    Parameters
+    ----------
+    fobj : File
+       Opened target file
+    suite : str
+       First item of the section name, e.g. 'submodule', or
+       'datalad'
+    name : str
+       Remainder of the section name
+    props : dict
+       Keys are configuration setting names within the section
+       context (i.e. not duplicating `suite` and/or `name`, values
+       are configuration setting values.
+    """
+    fmt = '[{_suite_} {_q_}{_name_}{_q_}]\n'
+    for p in props:
+        fmt += '\t{p} = {{{p}}}\n'.format(p=p)
+    quoted_name = quote_config(name)
+    fobj.write(
+        fmt.format(
+            _suite_=suite,
+            _q_='' if quoted_name.startswith('"') else '"',
+            _name_=quoted_name,
+            **{k: quote_config(v) for k, v in props.items()}))

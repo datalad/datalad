@@ -52,7 +52,8 @@ from datalad.cmd import (
 )
 from datalad.config import (
     ConfigManager,
-    _parse_gitconfig_dump
+    _parse_gitconfig_dump,
+    write_config_section,
 )
 
 from datalad.dochelpers import exc_str
@@ -4126,32 +4127,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         from datalad.interface.results import get_status_dict
 
-        def quote_config(v, section=False):
-            """Helper to perform minimal quoting of config setting in
-            .gitmodules"""
-            white = (' ', '\t')
-            # backslashed need to be quoted in any case
-            v = v.replace('\\', '\\\\')
-            if section:
-                # must not have additional unquoted quotes
-                v = v.replace('"', '\\"')
-            elif v and (v[0] in white or v[-1] in white):
-                # quoting the value due to leading/trailing whitespace
-                # prevent inner unquotes quotes
-                v = v.replace('"', '\\"')
-                v = '"{}"'.format(v)
-            return v
-
-        def write_submodule_config(fobj, name, props):
-            fmt = '[submodule {_q_}{_name_}{_q_}]\n'
-            for p in props:
-                fmt += '\t{p} = {{{p}}}\n'.format(p=p)
-            fobj.write(
-                fmt.format(
-                    _q_='' if name.startswith('"') else '"',
-                    _name_=quote_config(name, section=True),
-                    **{k: quote_config(v) for k, v in props.items()}))
-
         # first gather info from all datasets in read-only fashion, and then
         # update index, .gitmodules and .git/config at once
         info = []
@@ -4191,19 +4166,18 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 gmprops = dict(path=i['rpath'], url=i['url'])
                 if i['id']:
                     gmprops['datalad-id'] = i['id']
-                write_submodule_config(
-                    gmf, i['rpath'], gmprops)
-                write_submodule_config(
-                    gcf, i['rpath'], dict(active='true', url=i['url']))
+                write_config_section(
+                    gmf, 'submodule', i['rpath'], gmprops)
+                write_config_section(
+                    gcf, 'submodule', i['rpath'], dict(active='true', url=i['url']))
 
                 # This mirrors the result structure yielded for
                 # to_stage_submodules below.
                 yield get_status_dict(
                     action='add',
                     refds=self.pathobj,
-                    # MIH: really? why not 'dataset', it seems "add" of an existing
-                    # subdataset (i.e. update) does that, and this one mimiks it
-                    # still, two wrongs don't make a right.
+                    # should become type='dataset'
+                    # https://github.com/datalad/datalad/pull/4793#discussion_r464515331
                     type='file',
                     key=None,
                     path=i['path'],
