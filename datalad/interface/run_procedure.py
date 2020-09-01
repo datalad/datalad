@@ -454,6 +454,16 @@ class RunProcedure(Interface):
         ):
             yield r
 
+        if ds:
+            # the procedure ran and we have to anticipate that it might have
+            # changed the dataset config, so we need to trigger an unforced
+            # reload.
+            # we have to do this despite "being done here", because
+            # run_procedure() runs in the same process and reuses dataset (config
+            # manager) instances, and the next interaction with a dataset should
+            # be able to count on an up-to-date config
+            ds.config.reload()
+
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui

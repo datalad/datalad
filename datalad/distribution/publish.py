@@ -497,13 +497,13 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             cand_remotes = [r for r in ds.repo.get_remotes()
                             if 'remote.{}.push'.format(r) in ds.config]
             if len(cand_remotes) > 1:
-                lgr.warning('Target sibling ambiguous, please specific via --to')
+                lgr.warning('Target sibling ambiguous, please specify via --to')
             elif len(cand_remotes) == 1:
                 track_remote = cand_remotes[0]
             else:
                 return ('impossible',
                         'No target sibling configured for default publication, '
-                        'please specific via --to')
+                        'please specify via --to')
         if track_remote:
             ds_remote_info[ds_path] = dict(zip(
                 ('remote', 'refspec'),

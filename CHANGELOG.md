@@ -28,6 +28,9 @@ bet we will fix some bugs and make a world even a better place.
 - The `saver` argument of `datalad.core.local.run.run_command`, marked
   as obsolete in 0.12.0, has been removed.  ([#4583][])
 
+- The `dataset_only` argument of the `ConfigManager` class was
+  deprecated in 0.12 and has now been removed.  ([#4828][])
+
 - The `linux_distribution_name`, `linux_distribution_release`, and
   `on_debian_wheezy` attributes in `datalad.utils` are no longer set
   at import time and will be removed in a later release.  Use
@@ -39,10 +42,45 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
+- [create-sibling-github][] learned how to create private repositories
+  (thanks to Nolan Nichols).  ([#4769][])
+
+- The download machinery (and thus the `datalad` special remote)
+  gained support for a new scheme, `shub://`, which follows the same
+  format used by `singularity run` and friends.  In contrast to the
+  short-lived URLs obtained by querying Singularity Hub directly,
+  `shub://` URLs are suitable for registering with git-annex.  ([#4816][])
+
 - [addurls][] learned how to read data from standard input.  ([#4669][])
+
+- The class for handling configuration values, `ConfigManager`, now
+  takes a lock before writes to allow for multiple processes to modify
+  the configuration of a dataset.  ([#4829][])
 
 - Command-line scripts are now defined via the `entry_points` argument
   of `setuptools.setup` instead of the `scripts` argument.  ([#4695][])
+
+
+## 0.13.3 (August 28, 2020) -- .
+
+### Fixes
+
+- Work around a Python bug that led to our asyncio-based command
+  runner intermittently failing to capture the output of commands that
+  exit very quickly.  ([#4835][])
+
+- [push][] displayed an overestimate of the transfer size when
+  multiple files pointed to the same key.  ([#4821][])
+
+- When [download-url][] calls `git annex addurl`, it catches and
+  reports any failures rather than crashing.  A change in v0.12.0
+  broke this handling in a particular case.  ([#4817][])
+
+### Enhancements and new features
+
+- The wrapper functions returned by decorators are now given more
+  meaningful names to hopefully make tracebacks easier to digest.
+  ([#4834][])
 
 
 ## 0.13.2 (August 10, 2020) -- .
@@ -3076,6 +3114,7 @@ publishing
 [#4759]: https://github.com/datalad/datalad/issues/4759
 [#4760]: https://github.com/datalad/datalad/issues/4760
 [#4763]: https://github.com/datalad/datalad/issues/4763
+[#4769]: https://github.com/datalad/datalad/issues/4769
 [#4775]: https://github.com/datalad/datalad/issues/4775
 [#4786]: https://github.com/datalad/datalad/issues/4786
 [#4788]: https://github.com/datalad/datalad/issues/4788
@@ -3083,3 +3122,10 @@ publishing
 [#4792]: https://github.com/datalad/datalad/issues/4792
 [#4806]: https://github.com/datalad/datalad/issues/4806
 [#4807]: https://github.com/datalad/datalad/issues/4807
+[#4816]: https://github.com/datalad/datalad/issues/4816
+[#4817]: https://github.com/datalad/datalad/issues/4817
+[#4821]: https://github.com/datalad/datalad/issues/4821
+[#4828]: https://github.com/datalad/datalad/issues/4828
+[#4829]: https://github.com/datalad/datalad/issues/4829
+[#4834]: https://github.com/datalad/datalad/issues/4834
+[#4835]: https://github.com/datalad/datalad/issues/4835

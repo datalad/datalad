@@ -9,28 +9,21 @@
 """
 """
 
+from fasteners import InterProcessLock
 from functools import lru_cache
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
-    DATALAD_DOTDIR,
 )
 from datalad.cmd import (
     GitWitlessRunner,
     StdOutErrCapture,
 )
 from datalad.dochelpers import exc_str
-from distutils.version import LooseVersion
 
 import re
 import os
-from os.path import (
-    join as opj,
-    exists,
-    getmtime,
-    abspath,
-    isabs,
-)
+from pathlib import Path
 from time import time
 
 import logging
@@ -72,26 +65,18 @@ def _where_reload(obj):
     return obj
 
 
-def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
-    if replace:
-        # if we want to replace existing values in the store
-        # collect into a new dict and `update` the store at the
-        # end. This way we get the desired behavior of multi-value
-        # keys, but only for the current source
-        dct = {}
-        fileset = set()
-    else:
-        # if we don't want to replace value, perform the multi-value
-        # preserving addition on the existing store right away
-        dct = store
+# TODO document and make "public" (used in GitRepo too)
+def _parse_gitconfig_dump(dump, cwd=None):
+    dct = {}
+    fileset = set()
     for line in dump.split('\0'):
         if not line:
             continue
         if line.startswith('file:'):
             # origin line
-            fname = line[5:]
-            if not isabs(fname):
-                fname = opj(cwd, fname) if cwd else abspath(fname)
+            fname = Path(line[5:])
+            if not fname.is_absolute():
+                fname = Path(cwd) / fname if cwd else Path.cwd() / fname
             fileset.add(fname)
             continue
         if line.startswith('command line:'):
@@ -112,19 +97,16 @@ def _parse_gitconfig_dump(dump, store, fileset, replace, cwd=None):
                 dct[k] = present_v + (v,)
             else:
                 dct[k] = (present_v, v)
-    if replace:
-        store.update(dct)
-    return store, fileset
+    return dct, fileset
 
 
-def _parse_env(store):
+def _update_from_env(store):
     dct = {}
     for k in os.environ:
         if not k.startswith('DATALAD_'):
             continue
         dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
     store.update(dct)
-    return store
 
 
 def anything2bool(val):
@@ -161,17 +143,15 @@ class ConfigManager(object):
     configurations items at once.  Instead, each modification results in a
     dedicated call to `git config`. This author thinks this is OK, as he
     cannot think of a situation where a large number of items need to be
-    written during normal operation. If such need arises, various solutions are
-    possible (via GitPython, or an independent writer).
+    written during normal operation.
 
     Each instance carries a public `overrides` attribute. This dictionary
     contains variables that override any setting read from a file. The overrides
-    are persistent across reloads, and are not modified by any of the
-    manipulation methods, such as `set` or `unset`.
+    are persistent across reloads.
 
     Any DATALAD_* environment variable is also presented as a configuration
     item. Settings read from environment variables are not stored in any of the
-    configuration file, but are read dynamically from the environment at each
+    configuration files, but are read dynamically from the environment at each
     `reload()` call. Their values take precedence over any specification in
     configuration files, and even overrides.
 
@@ -200,15 +180,28 @@ class ConfigManager(object):
         if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
                 'Unkown ConfigManager(source=) setting: {}'.format(source))
-        # store in a simple dict
-        # no subclassing, because we want to be largely read-only, and implement
-        # config writing separately
-        self._store = {}
-        self._cfgfiles = set()
-        self._cfgmtimes = None
-        self._dataset_path = None
-        self._dataset_cfgfname = None
-        self._repo_cfgfname = None
+        store = dict(
+            # store in a simple dict
+            # no subclassing, because we want to be largely read-only, and implement
+            # config writing separately
+            cfg={},
+            # track the files that jointly make up the config in this store
+            files=set(),
+            # and their modification times to be able to avoid needless unforced reloads
+            mtimes=None,
+        )
+        self._stores = dict(
+            # populated with info from git
+            git=store,
+            # only populated with info from commited dataset config
+            dataset=store.copy(),
+        )
+        # merged representation (the only one that existed pre datalad 0.14)
+        # will be built on initial reload
+        self._merged_store = {}
+
+        self._repo = None if dataset is None else \
+            dataset if hasattr(dataset, 'dot_git') else dataset.repo
         self._config_cmd = ['git', 'config']
         # public dict to store variables that always override any setting
         # read from a file
@@ -227,13 +220,7 @@ class ConfigManager(object):
             # when calling 'git config' to prevent a repository in the current
             # working directory from leaking configuration into the output.
             self._config_cmd = ['git', '--git-dir=', 'config']
-        else:
-            self._dataset_path = dataset.path
-            if source != 'local':
-                self._dataset_cfgfname = opj(self._dataset_path,
-                                             DATASET_CONFIG_FILE)
-            if source != 'dataset':
-                self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
+
         self._src_mode = source
         run_kwargs = dict()
         if dataset is not None:
@@ -241,16 +228,21 @@ class ConfigManager(object):
             # to pick up the right config files
             run_kwargs['cwd'] = dataset.path
         self._runner = GitWitlessRunner(**run_kwargs)
-        try:
-            # reuse the runner we already have for the version check
-            self._gitconfig_has_showorgin = \
-                LooseVersion(get_git_version(self._runner)) >= '2.8.0'
-        except Exception:
-            # no git something else broken, assume git is present anyway
-            # to not delay this, but assume it is old
-            self._gitconfig_has_showorgin = False
 
         self.reload(force=True)
+
+        if not ConfigManager._checked_git_identity:
+            for cfg, envs in (
+                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
+                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
+                if cfg not in self \
+                        and not any(e in os.environ for e in envs):
+                    lgr.warning(
+                        "It is highly recommended to configure Git before using "
+                        "DataLad. Set both 'user.name' and 'user.email' "
+                        "configuration variables."
+                    )
+            ConfigManager._checked_git_identity = True
 
     def reload(self, force=False):
         """Reload all configuration items from the configured sources
@@ -260,84 +252,83 @@ class ConfigManager(object):
         is found for any file no reload is performed. This mechanism will not
         detect newly created global configuration files, use `force` in this case.
         """
-        if not force and self._cfgmtimes:
-            # we aren't forcing and we have read files before
-            # check if any file we read from has changed
-            current_time = time()
-            curmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
-            if all(curmtimes[c] == self._cfgmtimes.get(c) and
-                   # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
-                   # if mtime age is less than worst resolution assume modified
-                   (current_time - curmtimes[c]) > 2.0
-                   for c in curmtimes):
-                # all the same, nothing to do, except for
-                # superimpose overrides, could have changed in the meantime
-                self._store.update(self.overrides)
-                # reread env, is quick
-                self._store = _parse_env(self._store)
-                return
+        run_args = ['-z', '-l', '--show-origin']
 
-        self._store = {}
+        # update from desired config sources only
         # 2-step strategy:
         #   - load datalad dataset config from dataset
         #   - load git config from all supported by git sources
         # in doing so we always stay compatible with where Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
-        run_args = ['-z', '-l']
-        if self._gitconfig_has_showorgin:
-            run_args.append('--show-origin')
 
-        if self._dataset_cfgfname:
-            if exists(self._dataset_cfgfname):
-                stdout, stderr = self._run(
-                    run_args + ['--file', self._dataset_cfgfname],
-                    protocol=StdOutErrCapture,
-                    # always expect git-config to output utf-8
-                    encoding='utf-8',
-                )
-                # overwrite existing value, do not amend to get multi-line
-                # values
-                self._store, self._cfgfiles = _parse_gitconfig_dump(
-                    stdout, self._store, self._cfgfiles, replace=False,
-                    cwd=self._runner.cwd)
+        # figure out what needs to be reloaded at all
+        to_run = {}
+        # committed dataset config
+        dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE \
+            if self._repo else None
+        if (self._src_mode != 'local' and
+                dataset_cfgfile and
+                dataset_cfgfile.exists()) and (
+                force or self._need_reload(self._stores['dataset'])):
+            to_run['dataset'] = run_args + ['--file', str(dataset_cfgfile)]
 
-        if self._src_mode == 'dataset':
-            # superimpose overrides, and stop early
-            self._store.update(self.overrides)
-            return
+        if self._src_mode != 'dataset' and (
+                force or self._need_reload(self._stores['git'])):
+            to_run['git'] = run_args + ['--local'] \
+                if self._src_mode == 'dataset-local' \
+                else run_args
 
-        if self._src_mode == 'dataset-local':
-            run_args.append('--local')
-        stdout, stderr = self._run(run_args, protocol=StdOutErrCapture)
-        self._store, self._cfgfiles = _parse_gitconfig_dump(
-            stdout, self._store, self._cfgfiles, replace=True,
-            cwd=self._runner.cwd)
+        # reload everything that was found todo
+        while to_run:
+            store_id, runargs = to_run.popitem()
+            self._stores[store_id] = self._reload(runargs)
 
-        # always monitor the dataset cfg location, we know where it is in all cases
-        if self._dataset_cfgfname:
-            self._cfgfiles.add(self._dataset_cfgfname)
-            self._cfgfiles.add(self._repo_cfgfname)
-        self._cfgmtimes = {c: getmtime(c) for c in self._cfgfiles if exists(c)}
-
+        # always update the merged representation, even if we did not reload
+        # anything from a file. ENV or overrides could change independently
+        # start with the commit dataset config
+        merged = self._stores['dataset']['cfg'].copy()
+        # local config always takes precedence
+        merged.update(self._stores['git']['cfg'])
         # superimpose overrides
-        self._store.update(self.overrides)
+        merged.update(self.overrides)
+        # override with environment variables, unless we only want to read the
+        # dataset's commit config
+        if self._src_mode != 'dataset':
+            _update_from_env(merged)
+        self._merged_store = merged
 
-        # override with environment variables
-        self._store = _parse_env(self._store)
+    def _need_reload(self, store):
+        if not store['mtimes']:
+            return True
+        # we have read files before
+        # check if any file we read from has changed
+        current_time = time()
+        curmtimes = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
+        if all(curmtimes[c] == store['mtimes'].get(c) and
+               # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
+               # if mtime age is less than worst resolution assume modified
+               (current_time - curmtimes[c]) > 2.0
+               for c in curmtimes):
+            return False
+        return True
 
-        if not ConfigManager._checked_git_identity:
-            for cfg, envs in (
-                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
-                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
-                if cfg not in self._store \
-                        and not any(e in os.environ for e in envs):
-                    lgr.warning(
-                        "It is highly recommended to configure Git before using "
-                        "DataLad. Set both 'user.name' and 'user.email' "
-                        "configuration variables."
-                    )
-            ConfigManager._checked_git_identity = True
+    def _reload(self, run_args):
+        # query git-config
+        stdout, stderr = self._run(
+            run_args,
+            protocol=StdOutErrCapture,
+            # always expect git-config to output utf-8
+            encoding='utf-8',
+        )
+        store = {}
+        store['cfg'], store['files'] = _parse_gitconfig_dump(
+            stdout, cwd=self._runner.cwd)
+
+        # update mtimes of config files, they have just been discovered
+        # and should still exist
+        store['mtimes'] = {c: c.stat().st_mtime for c in store['files']}
+        return store
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
@@ -473,44 +464,87 @@ class ConfigManager(object):
             self.add(var, '{}'.format(_value), where=where, reload=reload)
         return value
 
-    def __str__(self):
+    def __repr__(self):
+        # give full list of all tracked config files, plus overrides
         return "ConfigManager({}{})".format(
-            self._cfgfiles,
-            '+ overrides' if self.overrides else '',
+            [str(p) for p in self._stores['dataset']['files'].union(
+                self._stores['git']['files'])],
+            ', overrides={!r}'.format(self.overrides) if self.overrides else '',
+        )
+
+    def __str__(self):
+        # give path of dataset, if there is any, plus overrides
+        return "ConfigManager({}{})".format(
+            self._repo.path if self._repo else '',
+            'with overrides' if self.overrides else '',
         )
 
     #
     # Compatibility with dict API
     #
     def __len__(self):
-        return len(self._store)
+        return len(self._merged_store)
 
     def __getitem__(self, key):
-        return self._store.__getitem__(key)
+        return self._merged_store.__getitem__(key)
 
     def __contains__(self, key):
-        return self._store.__contains__(key)
+        return self._merged_store.__contains__(key)
 
     def keys(self):
         """Returns list of configuration item names"""
-        return self._store.keys()
+        return self._merged_store.keys()
 
     # XXX should this be *args?
     def get(self, key, default=None):
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-        return self._store.get(key, default)
+        return self._merged_store.get(key, default)
+
+    def get_from_source(self, source, key, default=None):
+        """Like get(), but a source can be specific.
+
+        If `source` is 'dataset', only the commited configuration is queried,
+        overrides are applied. In the case of 'local', the committed
+        configuration is ignored, but overrides and configuration from
+        environment variables are applied as usual.
+        """
+        if source not in ('dataset', 'local'):
+            raise ValueError("source must be 'dataset' or 'local'")
+        if source == 'dataset':
+            return self.overrides.get(
+                key,
+                self._stores['dataset']['cfg'].get(
+                    key,
+                    default))
+        else:
+            if key not in self._stores['dataset']['cfg']:
+                # the key is not in the committed config, hence we can
+                # just report based on the merged representation
+                return self.get(key, default)
+            else:
+                # expensive case, rebuild a config without the committed
+                # dataset config contributing
+                env = {}
+                _update_from_env(env)
+                return env.get(
+                    key,
+                    self.overrides.get(
+                        key,
+                        self._stores['local']['cfg'].get(
+                            key,
+                            default)))
 
     #
     # Compatibility with ConfigParser API
     #
     def sections(self):
         """Returns a list of the sections available"""
-        return list(set([cfg_section_regex.match(k).group(1) for k in self._store]))
+        return list(set([cfg_section_regex.match(k).group(1) for k in self._merged_store]))
 
     def options(self, section):
         """Returns a list of options available in the specified section."""
         opts = []
-        for k in self._store:
+        for k in self._merged_store:
             sec, opt = cfg_sectionoption_regex.match(k).groups()
             if sec == section:
                 opts.append(opt)
@@ -518,14 +552,14 @@ class ConfigManager(object):
 
     def has_section(self, section):
         """Indicates whether a section is present in the configuration"""
-        for k in self._store:
+        for k in self._merged_store:
             if k.startswith(section):
                 return True
         return False
 
     def has_option(self, section, option):
         """If the given section exists, and contains the given option"""
-        for k in self._store:
+        for k in self._merged_store:
             sec, opt = cfg_sectionoption_regex.match(k).groups()
             if sec == section and opt == option:
                 return True
@@ -559,8 +593,8 @@ class ConfigManager(object):
         Optionally limited to a given section.
         """
         if section is None:
-            return self._store.items()
-        return [(k, v) for k, v in self._store.items()
+            return self._merged_store.items()
+        return [(k, v) for k, v in self._merged_store.items()
                 if cfg_section_regex.match(k).group(1) == section]
 
     #
@@ -599,7 +633,28 @@ class ConfigManager(object):
         """
         if where:
             args = self._get_location_args(where) + args
-        out = self._runner.run(self._config_cmd + args, **kwargs)
+        if '-l' in args:
+            # we are just reading, no need to reload, no need to lock
+            out = self._runner.run(self._config_cmd + args, **kwargs)
+            return out['stdout'], out['stderr']
+
+        # all other calls are modifications
+        if '--file' in args:
+            # all paths we are passing are absolute
+            custom_file = Path(args[args.index('--file') + 1])
+            custom_file.parent.mkdir(exist_ok=True)
+        lockfile = None
+        if self._repo and ('--local' in args or '--file' in args):
+            # modification of config in a dataset
+            lockfile = self._repo.dot_git / 'config.dataladlock'
+        else:
+            # follow pattern in downloaders for lockfile location
+            lockfile = Path(self.obtain('datalad.locations.cache')) \
+                / 'locks' / 'gitconfig.lck'
+
+        with InterProcessLock(lockfile, logger=lgr):
+            out = self._runner.run(self._config_cmd + args, **kwargs)
+
         if reload:
             self.reload()
         return out['stdout'], out['stderr']
@@ -613,18 +668,12 @@ class ConfigManager(object):
                 "unknown configuration label '{}' (not in {})".format(
                     where, cfg_labels))
         if where == 'dataset':
-            if not self._dataset_cfgfname:
+            if not self._repo:
                 raise ValueError(
                     'ConfigManager cannot store configuration to dataset, '
                     'none specified')
-            # create an empty config file if none exists, `git config` will
-            # fail otherwise
-            dscfg_dirname = opj(self._dataset_path, DATALAD_DOTDIR)
-            if not exists(dscfg_dirname):
-                os.makedirs(dscfg_dirname)
-            if not exists(self._dataset_cfgfname):
-                open(self._dataset_cfgfname, 'w').close()
-            args.extend(['--file', self._dataset_cfgfname])
+            dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE
+            args.extend(['--file', str(dataset_cfgfile)])
         elif where == 'global':
             args.append('--global')
         elif where == 'local':

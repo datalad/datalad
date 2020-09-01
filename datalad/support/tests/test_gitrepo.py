@@ -1420,34 +1420,6 @@ def test_fake_dates(path):
     eq_(seconds_initial + 3, gr.get_commit_date())
 
 
-@with_tree(tree={"foo": "foo content"})
-def test_custom_runner_protocol(path):
-    # Check that a runner with a non-default protocol gets wired up correctly.
-    prot = ExecutionTimeProtocol()
-    gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
-
-    ok_(len(prot) > 0)
-    ok_(prot[0]['duration'] >= 0)
-
-    def check(prev_len, prot, command):
-        # Check that the list grew and has the expected command without
-        # assuming that it gained _only_ a one command.
-        ok_(len(prot) > prev_len)
-        assert_in(command,
-                  sum([p["command"] for p in prot[prev_len:]], []))
-
-    prev_len = len(prot)
-    gr.add("foo")
-    check(prev_len, prot, "add")
-
-    # commit no longer uses a Runner with protocol capabilities
-    #prev_len = len(prot)
-    #gr.commit("commit foo")
-    #check(prev_len, prot, "commit")
-
-    ok_(all(p['duration'] >= 0 for p in prot))
-
-
 @slow   # 15sec on Yarik's laptop and tripped Travis CI
 @with_tempfile(mkdir=True)
 def test_duecredit(path):
@@ -1552,7 +1524,7 @@ def test_gitrepo_call_git_methods(path):
             with assert_raises(CommandError):
                 gr.call_git(["mv"], files=["notthere", "dest"],
                             expect_fail=expect_fail)
-            check("notthere", cml.out)
+            check("fatal: bad source", cml.out)
 
     eq_(list(gr.call_git_items_(["ls-files"])),
         ["bar", "foo.txt"])
@@ -1570,7 +1542,7 @@ def test_gitrepo_call_git_methods(path):
     ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
     with swallow_logs(new_level=logging.DEBUG) as cml:
         assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
-        assert_not_in("blob", cml.out)
+        assert_not_in("expected blob type", cml.out)
 
 
 @skip_if_no_network
