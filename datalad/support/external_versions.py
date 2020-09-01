@@ -66,7 +66,7 @@ def _get_annex_version():
         out = _runner.run(
             ['git', 'annex', 'version'],
             protocol=StdOutErrCapture)
-        return out['stdout'].split('\n')[0].split(':')[1].strip()
+        return out['stdout'].splitlines()[0].split(':')[1].strip()
 
 
 def _get_git_version():
