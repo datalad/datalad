@@ -1172,6 +1172,13 @@ def test_GitRepo_flyweight(path1, path2):
     repo1 = GitRepo(path1, create=True)
     assert_is_instance(repo1, GitRepo)
 
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instatiation that isn't picked up immediatly, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = GitRepo(path1, create=False)
     assert_is_instance(repo2, GitRepo)
@@ -1215,12 +1222,6 @@ def test_GitRepo_flyweight(path1, path2):
     # GitRepo's finalizer:
     with swallow_logs(new_level=1) as cml:
         del repo3
-        # Note, that we currently seem to require gc.collect! First instantiation
-        # creates 6 references according to sys.getrefcount (returns 7). Not
-        # entirely clear to me why (gc.get_referrers points out several function
-        # frames), but that means that refcount isn't down to zero after last del
-        # and therefore gc.collect() is needed.
-        gc.collect()
         cml.assert_logged(msg="Finalizer called on: GitRepo(%s)" % path1,
                           level="Level 1",
                           regex=False)

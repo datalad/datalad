@@ -299,8 +299,6 @@ def test_require_dataset():
 @with_tempfile(mkdir=True)
 def test_dataset_id(path):
 
-    import gc
-
     ds = Dataset(path)
     assert_equal(ds.id, None)
     ds.create()
@@ -320,13 +318,11 @@ def test_dataset_id(path):
     # creating a new object for the same path
     # yields the same ID
     del ds
-    gc.collect()
     newds = Dataset(path)
     assert_equal(dsorigid, newds.id)
 
     # recreating the dataset does NOT change the id
     del newds
-    gc.collect()
 
     ds = Dataset(path)
     ds.create(annex=False, force=True)
@@ -334,7 +330,6 @@ def test_dataset_id(path):
 
     # even adding an annex doesn't
     del ds
-    gc.collect()
     ds = Dataset(path)
     ds.create(force=True)
     assert_equal(ds.id, dsorigid)
@@ -354,9 +349,15 @@ def test_dataset_id(path):
 def test_Dataset_flyweight(path1, path2):
 
     import gc
+    import sys
 
     ds1 = Dataset(path1)
     assert_is_instance(ds1, Dataset)
+    ds1.create()
+
+    # Don't create circular references or anything similar
+    assert_equal(1, sys.getrefcount(ds1) - 1)
+
     # instantiate again:
     ds2 = Dataset(path1)
     assert_is_instance(ds2, Dataset)
@@ -399,7 +400,6 @@ def test_Dataset_flyweight(path1, path2):
 
     with swallow_logs(new_level=1) as cml:
         del ds3
-        gc.collect()
         # flyweight vanished:
         assert_not_in(path1, Dataset._unique_instances.keys())
         # no such instance known to gc anymore:

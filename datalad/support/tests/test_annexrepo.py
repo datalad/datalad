@@ -1665,8 +1665,18 @@ def test_get_description(path1, path2):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_flyweight(path1, path2):
 
+    import sys
+
     repo1 = AnnexRepo(path1, create=True)
     assert_is_instance(repo1, AnnexRepo)
+
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instatiation that isn't picked up immediatly, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = AnnexRepo(path1, create=False)
     assert_is_instance(repo2, AnnexRepo)
@@ -1703,7 +1713,6 @@ def test_AnnexRepo_flyweight(path1, path2):
     # deleting one reference doesn't change anything - we still get the same
     # thing:
     del repo1
-    gc.collect()  # shouldn't do anything
     ok_(repo2 is not None)
     ok_(repo2 is repo3)
     ok_(repo2 == repo3)
@@ -1729,12 +1738,6 @@ def test_AnnexRepo_flyweight(path1, path2):
     with patch.object(repo3._batched, 'close', fake_batch.close):
         with swallow_logs(new_level=1) as cml:
             del repo3
-            # Note, that we currently seem to require gc.collect! First instantiation
-            # creates 6 references according to sys.getrefcount (returns 7). Not
-            # entirely clear to me why (gc.get_referrers points out several function
-            # frames), but that means that refcount isn't down to zero after last del
-            # and therefore gc.collect() is needed.
-            gc.collect()
             cml.assert_logged(msg="Finalizer called on: AnnexRepo(%s)" % path1,
                               level="Level 1",
                               regex=False)
