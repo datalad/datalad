@@ -40,6 +40,7 @@ from datalad.api import create
 from datalad.config import (
     ConfigManager,
     rewrite_url,
+    write_config_section,
 )
 from datalad.cmd import CommandError
 
@@ -533,3 +534,37 @@ def test_bare(path):
     assert_equal(gr.config.get(obscure_key), 'myvalue')
     # now make sure the config is where we think it is
     assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
+
+
+@with_tempfile()
+def test_write_config_section(path):
+    # can we handle a bare repo?
+    gr = GitRepo(path, create=True, bare=True)
+
+    # test cases
+    # first 3 args are write_config_section() parameters
+    # 4th arg is a list with key/value pairs that should end up in a
+    # ConfigManager after a reload
+    testcfg = [
+        ('submodule', 'sub', dict(active='true', url='http://example.com'), [
+            ('submodule.sub.active', 'true'),
+            ('submodule.sub.url', 'http://example.com'),
+        ]),
+        ('submodule', 'sub"quote', {"a-b": '"quoted"', 'c': 'with"quote'}, [
+            ('submodule.sub"quote.a-b', '"quoted"'),
+            ('submodule.sub"quote.c', 'with"quote'),
+        ]),
+        ('short', ' s p a c e ', {"a123": ' space all over '}, [
+            ('short. s p a c e .a123', ' space all over '),
+        ]),
+    ]
+
+    for tc in testcfg:
+        # using append mode to provoke potential interference by
+        # successive calls
+        with (gr.pathobj / 'config').open('a') as fobj:
+            write_config_section(fobj, tc[0], tc[1], tc[2])
+        gr.config.reload()
+        for testcase in tc[3]:
+            assert_in(testcase[0], gr.config)
+            assert_equal(testcase[1], gr.config[testcase[0]])
