@@ -309,9 +309,30 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 res.get('path', None) == dest_path:
             _fixup_submodule_dotgit_setup(ds, sm_path)
 
-            # do fancy update
             lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
-            ds.repo.update_submodule(sm_path, init=True)
+            section_name = 'submodule.{}'.format(sm['gitmodule_name'])
+            # do not use `git-submodule update --init`, it would make calls
+            # to git-config which will not obey datalad inter-process locks for
+            # modifying .git/config
+            sub = GitRepo(res['path'])
+            # TODO we could simulatanously check out a configured branch
+            # and setup a tracking branch. This should be fine, as the implied
+            # config manipulation is local to the subdataset.
+            sub.call_git(['reset', '--hard', sm['gitshasum']])
+            ds.config.set(
+                '{}.active'.format(section_name),
+                'true',
+                reload=False, force=True, where='local',
+            )
+            ds.config.set(
+                '{}.url'.format(section_name),
+                # record the actual source URL of the successful clone
+                # and not a funky prediction based on the parent ds
+                # like ds.repo.update_submodule() would do (does not
+                # accept a URL)
+                res['source']['giturl'],
+                reload=True, force=True, where='local',
+            )
         yield res
 
     subds = Dataset(dest_path)
