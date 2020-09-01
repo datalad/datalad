@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
+import os
 import re
 import sys
 from io import StringIO
@@ -20,7 +21,10 @@ from ..main import (
     _fix_datalad_ri,
 )
 from datalad import __version__
-from datalad.cmd import Runner
+from datalad.cmd import (
+    WitlessRunner as Runner,
+    StdOutErrCapture,
+)
 from datalad.ui.utils import get_console_width
 from datalad.api import create
 from datalad.utils import (
@@ -189,7 +193,7 @@ def test_script_shims():
         'git-annex-remote-datalad']:
         if not on_windows:
             # those must be available for execution, and should not contain
-            which, _ = runner(['which', script])
+            which = runner.run(['which', script], protocol=StdOutErrCapture)['stdout']
             # test if there is no easy install shim in there
             with open(which.rstrip()) as f:
                 content = f.read()
@@ -202,8 +206,8 @@ def test_script_shims():
             assert_not_in('pkg_resources', content)
 
         # and let's check that it is our script
-        out, err = runner([script, '--version'])
-        version = (out + err).splitlines()[0].split(' ', 1)[1]
+        out = runner.run([script, '--version'], protocol=StdOutErrCapture)
+        version = (out['stdout'] + out['stderr']).splitlines()[0].split(' ', 1)[1]
         # we can get git and non git .dev version... so for now
         # relax
         get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
@@ -217,39 +221,36 @@ def test_script_shims():
 @with_tempfile(mkdir=True)
 def test_cfg_override(path):
     with chpwd(path):
+        cmd = ['datalad', 'wtf', '-s', 'some']
         # control
-        out, err = Runner()('datalad wtf -s some', shell=True)
+        out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
         assert_not_in('datalad.dummy: this', out)
         # ensure that this is not a dataset's cfg manager
         assert_not_in('datalad.dataset.id', out)
         # env var
-        if on_windows:
-            cmd_str = 'set DATALAD_DUMMY=this&& datalad wtf -s some'
-        else:
-            cmd_str = 'DATALAD_DUMMY=this datalad wtf -s some'
-        out, err = Runner()(cmd_str, shell=True)
+        out = Runner(env=dict(os.environ, DATALAD_DUMMY='this')).run(
+            cmd, protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
         # cmdline arg
-        out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
+        out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
+                           protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
 
         # now create a dataset in the path. the wtf plugin will switch to
         # using the dataset's config manager, which must inherit the overrides
         create(dataset=path)
         # control
-        out, err = Runner()('datalad wtf -s some', shell=True)
+        out = Runner().run(cmd, protocol=StdOutErrCapture)['stdout']
         assert_not_in('datalad.dummy: this', out)
         # ensure that this is a dataset's cfg manager
         assert_in('datalad.dataset.id', out)
         # env var
-        if on_windows:
-            cmd_str = 'set DATALAD_DUMMY=this&& datalad wtf -s some'
-        else:
-            cmd_str = 'DATALAD_DUMMY=this datalad wtf -s some'
-        out, err = Runner()(cmd_str, shell=True)
+        out = Runner(env=dict(os.environ, DATALAD_DUMMY='this')).run(
+            cmd, protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
         # cmdline arg
-        out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
+        out = Runner().run([cmd[0], '-c', 'datalad.dummy=this'] + cmd[1:],
+                           protocol=StdOutErrCapture)['stdout']
         assert_in('datalad.dummy: this', out)
 
 

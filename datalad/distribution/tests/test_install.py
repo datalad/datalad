@@ -34,7 +34,6 @@ from datalad.utils import (
     Path,
 )
 from datalad.support import path as op
-from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
@@ -42,7 +41,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner as Runner
 from datalad.tests.utils import (
     skip_ssh,
     create_tree,
@@ -73,7 +72,6 @@ from datalad.tests.utils import (
     slow,
     usecase,
     get_datasets_topdir,
-    SkipTest,
     known_failure_windows,
     known_failure_githubci_win,
 )
@@ -97,7 +95,7 @@ def _test_guess_dot_git(annex, path, url, tdir):
         assert_raises(IncompleteResultsError, install, path=tdir, source=url)
     ok_(not exists(tdir))
 
-    Runner(cwd=path)(['git', 'update-server-info'])
+    Runner(cwd=path).run(['git', 'update-server-info'])
 
     with swallow_logs() as cml:
         installed = install(tdir, source=url)
@@ -297,7 +295,7 @@ def test_install_dataladri(src, topurl, path):
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
-    Runner(cwd=gr.path)(['git', 'update-server-info'])
+    Runner(cwd=gr.path).run(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.consts.DATASETS_TOPURL', topurl), \
             swallow_logs():
