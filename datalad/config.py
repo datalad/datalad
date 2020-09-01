@@ -196,8 +196,16 @@ class ConfigManager(object):
         # will be built on initial reload
         self._merged_store = {}
 
-        self._repo = None if dataset is None else \
-            dataset if hasattr(dataset, 'dot_git') else dataset.repo
+        self._repo_dot_git = None
+        self._repo_pathobj = None
+        if dataset:
+            if hasattr(dataset, 'dot_git'):
+                self._repo_dot_git = dataset.dot_git
+                self._repo_pathobj = dataset.pathobj
+            elif dataset.repo:
+                self._repo_dot_git = dataset.repo.dot_git
+                self._repo_pathobj = dataset.repo.pathobj
+
         self._config_cmd = ['git', 'config']
         # public dict to store variables that always override any setting
         # read from a file
@@ -264,8 +272,8 @@ class ConfigManager(object):
         # figure out what needs to be reloaded at all
         to_run = {}
         # committed dataset config
-        dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE \
-            if self._repo else None
+        dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE \
+            if self._repo_pathobj else None
         if (self._src_mode != 'local' and
                 dataset_cfgfile and
                 dataset_cfgfile.exists()) and (
@@ -472,7 +480,7 @@ class ConfigManager(object):
     def __str__(self):
         # give path of dataset, if there is any, plus overrides
         return "ConfigManager({}{})".format(
-            self._repo.path if self._repo else '',
+            self._repo_pathobj if self._repo_pathobj else '',
             'with overrides' if self.overrides else '',
         )
 
@@ -640,9 +648,9 @@ class ConfigManager(object):
             custom_file = Path(args[args.index('--file') + 1])
             custom_file.parent.mkdir(exist_ok=True)
         lockfile = None
-        if self._repo and ('--local' in args or '--file' in args):
+        if self._repo_dot_git and ('--local' in args or '--file' in args):
             # modification of config in a dataset
-            lockfile = self._repo.dot_git / 'config.dataladlock'
+            lockfile = self._repo_dot_git / 'config.dataladlock'
         else:
             # follow pattern in downloaders for lockfile location
             lockfile = Path(self.obtain('datalad.locations.cache')) \
@@ -664,11 +672,11 @@ class ConfigManager(object):
                 "unknown configuration label '{}' (not in {})".format(
                     where, cfg_labels))
         if where == 'dataset':
-            if not self._repo:
+            if not self._repo_pathobj:
                 raise ValueError(
                     'ConfigManager cannot store configuration to dataset, '
                     'none specified')
-            dataset_cfgfile = self._repo.pathobj / DATASET_CONFIG_FILE
+            dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE
             args.extend(['--file', str(dataset_cfgfile)])
         elif where == 'global':
             args.append('--global')
