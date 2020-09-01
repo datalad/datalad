@@ -164,10 +164,10 @@ def test_custom_versions():
 def test_ancient_annex():
 
     class _runner(object):
-        def run(self, cmd):
+        def run(self, cmd, *args, **kwargs):
             if '--raw' in cmd:
                 raise CommandError
-            return "git-annex version: 0.1", ""
+            return dict(stdout="git-annex version: 0.1", stderr="")
 
     ev = ExternalVersions()
     with patch('datalad.support.external_versions._runner', _runner()):
@@ -176,8 +176,8 @@ def test_ancient_annex():
 
 def _test_annex_version_comparison(v, cmp_):
     class _runner(object):
-        def run(self, cmd):
-            return v, ""
+        def run(self, cmd, *args, **kwargs):
+            return dict(stdout=v, stderr="")
 
     ev = ExternalVersions()
     with set_annex_version(None), \
@@ -237,8 +237,8 @@ def test_system_ssh_version():
         ev = ExternalVersions()
         # TODO: figure out leaner way
         class _runner(object):
-            def run(self, cmd, expect_fail, expect_stderr):
-                return "", s
+            def run(self, cmd, *args, **kwargs):
+                return dict(stdout="", stderr=s)
         with patch('datalad.support.external_versions._runner', _runner()):
             assert_equal(ev['cmd:system-ssh'], v)
 

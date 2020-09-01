@@ -15,7 +15,10 @@ import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
 )
-from datalad.cmd import GitRunner
+from datalad.cmd import (
+    GitWitlessRunner,
+    StdOutErrCapture,
+)
 from datalad.dochelpers import exc_str
 
 import re
@@ -51,8 +54,9 @@ _where_reload_doc = """
 @lru_cache()
 def get_git_version(runner=None):
     """Return version of available git"""
-    runner = runner or GitRunner()
-    return runner.run('git version'.split())[0].split()[2]
+    runner = runner or GitWitlessRunner()
+    return runner.run('git version'.split(),
+                      protocol=StdOutErrCapture)['stdout'].split()[2]
 
 
 def _where_reload(obj):
@@ -218,15 +222,12 @@ class ConfigManager(object):
             self._config_cmd = ['git', '--git-dir=', 'config']
 
         self._src_mode = source
-        # Since configs could contain sensitive information, to prevent
-        # any "facilitated" leakage -- just disable logging of outputs for
-        # this runner
-        run_kwargs = dict(log_outputs=False)
+        run_kwargs = dict()
         if dataset is not None:
             # make sure we run the git config calls in the dataset
             # to pick up the right config files
             run_kwargs['cwd'] = dataset.path
-        self._runner = GitRunner(**run_kwargs)
+        self._runner = GitWitlessRunner(**run_kwargs)
 
         self.reload(force=True)
 
@@ -316,7 +317,9 @@ class ConfigManager(object):
         # query git-config
         stdout, stderr = self._run(
             run_args,
-            log_stderr=True
+            protocol=StdOutErrCapture,
+            # always expect git-config to output utf-8
+            encoding='utf-8',
         )
         store = {}
         store['cfg'], store['files'] = _parse_gitconfig_dump(
@@ -632,7 +635,8 @@ class ConfigManager(object):
             args = self._get_location_args(where) + args
         if '-l' in args:
             # we are just reading, no need to reload, no need to lock
-            return self._runner.run(self._config_cmd + args, **kwargs)
+            out = self._runner.run(self._config_cmd + args, **kwargs)
+            return out['stdout'], out['stderr']
 
         # all other calls are modifications
         if '--file' in args:
@@ -653,7 +657,7 @@ class ConfigManager(object):
 
         if reload:
             self.reload()
-        return out
+        return out['stdout'], out['stderr']
 
     def _get_location_args(self, where, args=None):
         if args is None:
@@ -697,7 +701,8 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
+        self._run(['--add', var, value], where=where, reload=reload,
+                  protocol=StdOutErrCapture)
 
     @_where_reload
     def set(self, var, value, where='dataset', reload=True, force=False):
@@ -727,7 +732,7 @@ class ConfigManager(object):
         from datalad.support.gitrepo import to_options
 
         self._run(to_options(replace_all=force) + [var, value],
-                  where=where, reload=reload, log_stderr=True)
+                  where=where, reload=reload, protocol=StdOutErrCapture)
 
     @_where_reload
     def rename_section(self, old, new, where='dataset', reload=True):

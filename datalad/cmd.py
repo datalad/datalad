@@ -250,8 +250,16 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
     proc_out = None
     proc_err = None
 
-    def __init__(self, done_future):
-        # future promise to be fulfilled when process exits
+    def __init__(self, done_future, encoding=None):
+        """
+        Parameters
+        ----------
+        done_future : asyncio.Future
+          Future promise to be fulfilled when process exits.
+        encoding : str
+          Encoding to be used for process output bytes decoding. By default,
+          the preferred system encoding is guessed.
+        """
         self.done = done_future
         # capture output in bytearrays while the process is running
         Streams = namedtuple('Streams', ['out', 'err'])
@@ -261,7 +269,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         )
         self.pid = None
         super().__init__()
-        self.encoding = getpreferredencoding(do_setlocale=False)
+        self.encoding = encoding or getpreferredencoding(do_setlocale=False)
 
         self._log_outputs = False
         if lgr.isEnabledFor(5):
