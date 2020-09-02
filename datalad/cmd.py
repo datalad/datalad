@@ -485,6 +485,7 @@ class WitlessRunner(object):
             event_loop = asyncio.SelectorEventLoop()
         asyncio.set_event_loop(event_loop)
         # include the subprocess manager in the asyncio event loop
+        lgr.debug("XXXXX: START %s", cmd)
         results = event_loop.run_until_complete(
             run_async_cmd(
                 event_loop,
@@ -496,6 +497,7 @@ class WitlessRunner(object):
                 env=env,
             )
         )
+        lgr.debug("XXXXX: END %s", cmd)
         # terminate the event loop, cannot be undone, hence we start a fresh
         # one each time (see BlockingIOError notes above)
         event_loop.close()

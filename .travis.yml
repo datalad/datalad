@@ -186,6 +186,14 @@ matrix:
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
 #    - _DL_CRON=1
+  - python: 3.5
+    # DEBUG run for SSH stalls
+    env:
+    - DATALAD_TESTS_SSH=1
+    - TESTS_TO_PERFORM="datalad.core.distributed.tests"
+    - NOSE_SELECTION_OP=""
+    - DATALAD_LOG_LEVEL=8
+    - DATALAD_LOG_TRACEBACK=collide
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -216,7 +224,7 @@ before_install:
         exit 0;
       fi
     fi
-  - NOSE_OPTS=( )
+  - NOSE_OPTS=( -s -v )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
