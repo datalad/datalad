@@ -190,10 +190,20 @@ matrix:
     # DEBUG run for SSH stalls
     env:
     - DATALAD_TESTS_SSH=1
-    - TESTS_TO_PERFORM="datalad.core.distributed.tests"
+    - TESTS_TO_PERFORM="datalad.core.distributed.tests.test_clone"
     - NOSE_SELECTION_OP=""
     - DATALAD_LOG_LEVEL=8
     - DATALAD_LOG_TRACEBACK=collide
+
+  - python: 3.8
+    # DEBUG run for SSH stalls
+    env:
+    - DATALAD_TESTS_SSH=1
+    - TESTS_TO_PERFORM="datalad.core.distributed.tests.test_clone"
+    - NOSE_SELECTION_OP=""
+    - DATALAD_LOG_LEVEL=8
+    - DATALAD_LOG_TRACEBACK=collide
+
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
