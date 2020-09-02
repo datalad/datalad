@@ -810,6 +810,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
 
     #with swallow_logs(new_level=logging.INFO) as cml:
 
+    logging.getLogger("asyncio").setLevel(logging.DEBUG)
         # First, the super ds:
     print("\n\nTEST: CLONE START")
     riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
