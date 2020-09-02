@@ -220,8 +220,12 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         lgr.debug('Waiting for process %i to complete', transport.get_pid())
         # The next wait is a workaround that avoids losing the output of
         # quickly exiting commands (https://bugs.python.org/issue41594).
+
+        lgr.debug("XXX: Awaiting transport")
         await asyncio.ensure_future(transport._wait())
+        lgr.debug("XXX: Awaiting cmd_done")
         await cmd_done
+        lgr.debug("XXX: Calling prepare_result")
         result = protocol._prepare_result()
     finally:
         # protect against a crash whe launching the process
