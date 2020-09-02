@@ -300,6 +300,11 @@ class SSHConnection(object):
         # stop controlmaster:
         cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
+
+        lgr.debug("\nXXXX: runner: %s\n" % self.runner)
+        lgr.debug("\nXXXX: socket exists: %s" % Path(self._ssh_args[self._ssh_args.index("-o") + 1]).exists())
+        lgr.debug("\nXXXX: is_open(): %s" % self.is_open())
+
         try:
             self.runner.run(cmd, protocol=StdOutErrCapture)
         except CommandError as e:
