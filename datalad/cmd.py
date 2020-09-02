@@ -221,8 +221,8 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         # The next wait is a workaround that avoids losing the output of
         # quickly exiting commands (https://bugs.python.org/issue41594).
 
-        lgr.debug("XXX: Awaiting transport")
-        await asyncio.ensure_future(transport._wait())
+        #lgr.debug("XXX: Awaiting transport")
+        #await asyncio.ensure_future(transport._wait())
         lgr.debug("XXX: Awaiting cmd_done")
         await cmd_done
         lgr.debug("XXX: Calling prepare_result")
