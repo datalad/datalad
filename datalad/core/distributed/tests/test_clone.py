@@ -804,13 +804,21 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
 
     # Autoenabling should fail initially by git-annex-init and we would report
     # on INFO level. Only postclone routine would deal with it.
-    with swallow_logs(new_level=logging.INFO) as cml:
+
+
+
+
+    #with swallow_logs(new_level=logging.INFO) as cml:
+
         # First, the super ds:
-        riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
-        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
-                              "auto-enabled",
-                          level="INFO",
-                          regex=False)
+    print("\n\nTEST: CLONE START")
+    riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
+
+    print("\n\nTEST: CLONE DONE")
+    #    cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+    #                          "auto-enabled",
+    #                      level="INFO",
+    #                      regex=False)
 
     # However, we now can retrieve content since clone should have enabled the
     # special remote with new URL (or origin in case of HTTP).
