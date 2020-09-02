@@ -19,7 +19,7 @@ import gzip
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
-from ..cmd import Runner
+from ..cmd import WitlessRunner as Runner
 from ..log import is_interactive
 from ..utils import (
     getpwd,
