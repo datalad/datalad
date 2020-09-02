@@ -32,7 +32,10 @@ from os.path import (
     normpath
 )
 from multiprocessing import cpu_count
-from weakref import WeakValueDictionary
+from weakref import (
+    finalize,
+    WeakValueDictionary
+)
 
 from datalad import ssh_manager
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
@@ -316,6 +319,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         # will be evaluated lazily
         self._n_auto_jobs = None
 
+        # Finally, register a finalizer (instead of having a __del__ method).
+        # This will be called by garbage collection as well as "atexit". By
+        # keeping the reference here, we can also call it explicitly.
+        # Note, that we can pass required attributes to the finalizer, but not
+        # `self` itself. This would create an additional reference to the object
+        # and thereby preventing it from being collected at all.
+        self._finalizer = finalize(self, AnnexRepo._cleanup, self.path,
+                                   self._batched)
+
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
 
@@ -367,7 +379,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
             self.config.set('annex.backends', backend, where='local')
 
-    def __del__(self):
+    @classmethod
+    def _cleanup(cls, path, batched):
+
+        lgr.log(1, "Finalizer called on: AnnexRepo(%s)", path)
+
+        # Ben: With switching to finalize rather than del, I think the
+        #      safe_del_debug isn't needed anymore. However, time will tell and
+        #      it doesn't hurt.
 
         def safe__del__debug(e):
             """We might be too late in the game and either .debug or exc_str
@@ -378,8 +397,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return
 
         try:
-            if hasattr(self, '_batched') and self._batched is not None:
-                self._batched.close()
+            if batched is not None:
+                batched.close()
         except TypeError as e:
             # Workaround:
             # most likely something wasn't accessible anymore; doesn't really
@@ -389,11 +408,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
-            safe__del__debug(e)
-        try:
-            super(AnnexRepo, self).__del__()
-        except TypeError as e:
-            # see above
             safe__del__debug(e)
 
     def _set_shared_connection(self, remote_name, url):
