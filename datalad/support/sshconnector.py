@@ -301,9 +301,10 @@ class SSHConnection(object):
         cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
 
-        lgr.debug("\nXXXX: runner: %s\n" % self.runner)
-        lgr.debug("\nXXXX: socket exists: %s" % Path(self._ssh_args[self._ssh_args.index("-o") + 1]).exists())
-        lgr.debug("\nXXXX: is_open(): %s" % self.is_open())
+        lgr.debug("XXXX: runner: %s", self.runner)
+        lgr.debug("XXXX: ctrl_path: %s", self.ctrl_path)
+        lgr.debug("XXXX: ctrl_path exists: %s", Path(self.ctrl_path).exists())
+        lgr.debug("XXXX: is_open(): %s" % self.is_open())
 
         try:
             self.runner.run(cmd, protocol=StdOutErrCapture)
@@ -571,6 +572,7 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
+            lgr.debug("SSHMANAGER: Me (%s) creating connection for %s", id(self), ctrl_path)
             c = SSHConnection(
                 ctrl_path, sshri, identity_file=identity_file,
                 use_remote_annex_bundle=use_remote_annex_bundle,
@@ -599,6 +601,8 @@ class SSHManager(object):
                         and (not ctrl_paths
                              or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
+                lgr.debug("SSHMANAGER: Me (%s) closing connections for %s",
+                          id(self), [to_close])
                 lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
