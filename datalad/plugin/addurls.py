@@ -515,7 +515,7 @@ def add_urls(rows, ifexists=None, options=None):
     for row in rows:
         filename_abs = row["filename_abs"]
         ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+        lgr.debug("Adding URLs to %s in %s", filename, ds.path)
 
         if os.path.exists(filename_abs) or os.path.islink(filename_abs):
             if ifexists == "skip":
