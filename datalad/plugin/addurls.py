@@ -14,13 +14,15 @@ try:
 except ImportError:  # Python <= 3.3
     from collections import Mapping
 
-from functools import partial
+import itertools
 import logging
 import os
 import re
 import string
 import sys
 
+from functools import partial
+from operator import itemgetter
 from urllib.parse import urlparse
 
 from datalad.distribution.dataset import resolve_path
@@ -556,16 +558,19 @@ def add_meta(rows):
     """
     from unittest.mock import patch
 
-    for row in rows:
-        ds, filename = row["ds"], row["ds_filename"]
+    # OPT: group by dataset first so to not patch/unpatch always_commit
+    # per each file of which we could have thousands
+    for ds, ds_rows in itertools.groupby(rows, itemgetter("ds")):
         with patch.object(ds.repo, "always_commit", False):
-            lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
-                res = annexjson2result(a, ds, type="file", logger=lgr)
-                # Don't show all added metadata for the file because that
-                # could quickly flood the output.
-                del res["message"]
-                yield res
+            for row in ds_rows:
+                filename = row["ds_filename"]
+                lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+                for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
+                    res = annexjson2result(a, ds, type="file", logger=lgr)
+                    # Don't show all added metadata for the file because that
+                    # could quickly flood the output.
+                    del res["message"]
+                    yield res
 
 
 @build_doc
