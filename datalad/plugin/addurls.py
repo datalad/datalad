@@ -559,20 +559,6 @@ def add_meta(rows):
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
         with patch.object(ds.repo, "always_commit", False):
-            res = ds.repo.add(filename)
-            res_status = 'notneeded' if not res \
-                else 'ok' if res.get('success', False) \
-                else 'error'
-
-            yield dict(
-                action='add',
-                # decorator dies with Path()
-                path=str(ds.pathobj / filename),
-                type='file',
-                status=res_status,
-                parentds=ds.path,
-            )
-
             lgr.debug("Adding metadata to %s in %s", filename, ds.path)
             for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
