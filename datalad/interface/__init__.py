@@ -77,7 +77,9 @@ _group_misc = (
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
         ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
         ('datalad.distributed.export_archive_ora', 'ExportArchiveORA',
-         'export-archive-ora')
+         'export-archive-ora'),
+        ('datalad.local.snakemake', 'SnakeMake',
+         'snakemake'),
     ])
 
 _group_plumbing = (
