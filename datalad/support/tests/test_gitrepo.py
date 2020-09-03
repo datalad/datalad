@@ -47,7 +47,6 @@ from datalad.tests.utils import (
     local_testrepo_flavors,
     neq_,
     ok_,
-    skip_if,
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
@@ -148,7 +147,6 @@ def test_GitRepo_init_options(path):
     ok_(gr.config.getbool(section="core", option="bare"))
 
 
-@skip_if(external_versions['cmd:git'] < '2.14.0')
 @with_tree(
     tree={
         'subds': {
@@ -1473,7 +1471,8 @@ def test_duecredit(path):
     out, err = run(cmd, env=env, expect_stderr=True)
     outs = out + err  # Let's not depend on where duecredit decides to spit out
     # All quiet
-    eq_(outs, '')
+    test_string = 'Data management and distribution platform'
+    assert_not_in(test_string, outs)
 
     # and now enable DUECREDIT - output could come to stderr
     env['DUECREDIT_ENABLE'] = '1'
@@ -1481,9 +1480,9 @@ def test_duecredit(path):
     outs = out + err
 
     if external_versions['duecredit']:
-        assert_in('Data management and distribution platform', outs)
+        assert_in(test_string, outs)
     else:
-        eq_(outs, '')
+        assert_not_in(test_string, outs)
 
 
 @with_tempfile(mkdir=True)
