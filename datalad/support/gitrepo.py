@@ -825,8 +825,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     @classmethod
     def _check_git_version(cls):
-        external_versions.check("cmd:git", min_version=cls.GIT_MIN_VERSION)
-        cls.git_version = external_versions['cmd:git']
+        git_version = external_versions["cmd:git"]
+        if git_version < "2.13.0":
+            lgr.warning("Detected Git version %s. "
+                        "DataLad has known incompatibilities "
+                        "with versions below 2.13.0",
+                        git_version)
+        cls.git_version = git_version
 
     # This is the least common denominator to claim that a user
     # used DataLad.
