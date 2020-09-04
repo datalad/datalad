@@ -39,6 +39,8 @@ definitions = {
                'title': 'NDA database server',
                'text': 'Hostname of the database server'}),
         'destination': 'global',
+        # Development one is https://development.nimhda.org
+        'default': 'https://nda.nih.gov/DataManager/dataManager',
     },
     'datalad.locations.cache': {
         'ui': ('question', {
