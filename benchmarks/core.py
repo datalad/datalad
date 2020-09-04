@@ -108,24 +108,24 @@ class runner(SuprocBenchmarks):
         #overhead = round(min(overheads), 2)
         return overhead
 
-    def track_overhead_echo(self):
+    #def track_overhead_echo(self):
         return self._get_overhead("echo")
 
     # 100ms chosen below as providing some sensible stability for me.
     # at 10ms -- too much variability
-    def track_overhead_100ms(self):
+    #def track_overhead_100ms(self):
         return self._get_overhead("sleep 0.1")
 
-    def track_overhead_heavyout(self):
+    #def track_overhead_heavyout(self):
         # run busyloop for 100ms outputing as much as it could
         return self._get_overhead(heavyout_cmd)
 
-    def track_overhead_heavyout_online_through(self):
+    #def track_overhead_heavyout_online_through(self):
         return self._get_overhead(heavyout_cmd,
                                   log_stderr='offline',  # needed to would get stuck
                                   log_online=True)
 
-    def track_overhead_heavyout_online_process(self):
+    #def track_overhead_heavyout_online_process(self):
         return self._get_overhead(heavyout_cmd,
                                   log_stdout=lambda s: '',
                                   log_stderr='offline',  # needed to would get stuck

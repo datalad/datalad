@@ -92,8 +92,8 @@ def skip_non_ssh(func):
 
     @wraps(func)
     @attr('skip_ssh')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_non_ssh(*args, **kwargs):
         if 'DATALAD_TESTS_SSH' in os.environ:
             raise SkipTest("Disabled, since DATALAD_TESTS_SSH is set")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_non_ssh

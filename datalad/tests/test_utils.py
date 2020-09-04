@@ -134,17 +134,17 @@ def test_better_wraps():
 
     def wraps_decorator(func):
         @wraps(func)
-        def new_func(*args, **kwargs):
+        def  _wrap_wraps_decorator(*args, **kwargs):
             return func(*args, **kwargs)
 
-        return new_func
+        return  _wrap_wraps_decorator
 
     def better_decorator(func):
         @better_wraps(func)
-        def new_func(*args, **kwargs):
+        def  _wrap_better_decorator(*args, **kwargs):
             return func(*args, **kwargs)
 
-        return new_func
+        return  _wrap_better_decorator
 
     @wraps_decorator
     def function1(a, b, c):

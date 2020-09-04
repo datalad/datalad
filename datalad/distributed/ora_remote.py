@@ -579,7 +579,7 @@ def handle_errors(func):
     # TODO: configurable on remote end (flag within layout_version!)
 
     @wraps(func)
-    def new_func(self, *args, **kwargs):
+    def  _wrap_handle_errors(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
@@ -599,7 +599,7 @@ def handle_errors(func):
             else:
                 raise e
 
-    return new_func
+    return  _wrap_handle_errors
 
 
 class NoLayoutVersion(Exception):
@@ -865,7 +865,7 @@ class RIARemote(SpecialRemote):
                                      self.known_versions_dst)
             self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            reason = "Remote doesn't report any dataset tree version." \
+            reason = "Remote doesn't report any dataset tree version. " \
                      "Consider upgrading datalad or add a fitting " \
                      "'ria-layout-version' file at the RIA store's " \
                      "root."
@@ -882,7 +882,7 @@ class RIARemote(SpecialRemote):
                                self.known_versions_objt)
             self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            reason = "Remote doesn't report any object tree version." \
+            reason = "Remote doesn't report any object tree version. " \
                      "Consider upgrading datalad or add a fitting " \
                      "'ria-layout-version' file at the remote " \
                      "dataset root. "

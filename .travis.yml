@@ -18,7 +18,8 @@ env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
-    - NOSE_OPTS=
+    # Should be an array, travis breaks on it, define/adjust in the "before_install"
+    #- NOSE_OPTS=( -v )
     # Note, that there's "turtle" as well, which is always excluded from
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow or network"
@@ -203,10 +204,11 @@ before_install:
         exit 0;
       fi
     fi
+  - NOSE_OPTS=( )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
   - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
-      NOSE_OPTS=( --with-doctest --with-timer --timer-ok 5 --timer-warning 30 --timer-fail error --timer-filter warning,error );
+      NOSE_OPTS=( "${NOSE_OPTS[@]}" --with-doctest --with-timer --timer-ok 5 --timer-warning 30 --timer-fail error --timer-filter warning,error );
       export DATALAD_TESTS_SETUP_TESTREPOS=1;
     fi
   # Just in case we need to check if nfs is there etc
@@ -259,6 +261,10 @@ script:
   - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
   - sudo pip install .
+  # Run javascript tests
+  - grunt test --verbose
+  # Report WTF information using system wide installed version
+  - datalad wtf
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
@@ -271,10 +277,6 @@ script:
       --logging-level=INFO
       $TESTS_TO_PERFORM
   - cd ..
-  # Run javascript tests
-  - grunt test --verbose
-  # Report WTF information using system wide installed version
-  - datalad wtf
 
 after_success:
   # submit only what we have covered in the PRs

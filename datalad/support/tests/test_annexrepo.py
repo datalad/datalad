@@ -783,12 +783,7 @@ def test_AnnexRepo_commit(path):
         f.write("some")
     assert_raises(FileNotInRepositoryError, ds.commit, files="untracked")
     # not existing file as well:
-    try:
-        ds.commit(files="not-existing")
-    except FileNotInRepositoryError:
-        pass   # expected result
-    except CommandError:
-        raise SkipTest("test_AnnexRepo_commit hit known failure (gh-4773)")
+    assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -1204,7 +1199,10 @@ def test_annex_ssh(topdir):
     # copy to the new remote:
     ar.copy_to(["foo"], remote="ssh-remote-2")
 
-    ok_(exists(socket_2))
+    if not exists(socket_2):  # pragma: no cover
+        # @known_failure (marked for grep)
+        raise SkipTest("test_annex_ssh hit known failure (gh-4781)")
+
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 
