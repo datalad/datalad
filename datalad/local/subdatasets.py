@@ -284,13 +284,20 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
     repo = ds.repo
     if not GitRepo.is_valid_repo(dspath):
         return
+    # expand all test cases for the contains test in the loop below
+    # leads to ~20% speedup per loop iteration of a non-match
+    expanded_contains = [
+        # convert to strings, as sm_path below will be a string and
+        # we do not want repeated type-conversion
+        [c] + list(c.parents)
+        for c in (contains if contains is not None else [])
+    ]
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(ds.pathobj, repo, paths):
-        contains_hits = []
+        sm_path = sm['path']
+        contains_hits = None
         if contains:
-            contains_hits = [
-                c for c in contains if sm['path'] == c or sm['path'] in c.parents
-            ]
+            contains_hits = [c[0] for c in expanded_contains if sm_path in c]
             if not contains_hits:
                 # we are not looking for this subds, because it doesn't
                 # match the target path
@@ -298,7 +305,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \
-            or any(p == sm['path'] or p in sm['path'].parents
+            or any(p == sm_path or p in sm_path.parents
                    for p in paths)
         if to_report and (set_property or delete_property):
             # first deletions
@@ -331,9 +338,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     val = val[1:-1].format(
                         **dict(
                             sm,
-                            refds_relpath=sm['path'].relative_to(refds_path),
+                            refds_relpath=sm_path.relative_to(refds_path),
                             refds_relname=str(
-                                sm['path'].relative_to(refds_path)
+                                sm_path.relative_to(refds_path)
                             ).replace(os.sep, '-')))
                 try:
                     repo.call_git(
@@ -381,7 +388,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 subdsres['contains'] = contains_hits
             if (not bottomup and \
                 (fulfilled is None or
-                 GitRepo.is_valid_repo(sm['path']) == fulfilled)):
+                 GitRepo.is_valid_repo(sm_path) == fulfilled)):
                 yield subdsres
 
         # expand list with child submodules. keep all paths relative to parent
@@ -391,7 +398,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                  (isinstance(recursion_limit, int) and
                   recursion_limit > 1)):
             for r in _get_submodules(
-                    Dataset(sm['path']),
+                    Dataset(sm_path),
                     paths,
                     fulfilled, recursive,
                     (recursion_limit - 1)
@@ -405,5 +412,5 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 yield r
         if to_report and (bottomup and \
                 (fulfilled is None or
-                 GitRepo.is_valid_repo(sm['path']) == fulfilled)):
+                 GitRepo.is_valid_repo(sm_path) == fulfilled)):
             yield subdsres
