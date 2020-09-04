@@ -9,18 +9,17 @@
 """Create and update a dataset from a list of URLs.
 """
 
-try:
-    from collections.abc import Mapping
-except ImportError:  # Python <= 3.3
-    from collections import Mapping
+from collections.abc import Mapping
 
-from functools import partial
+import itertools
 import logging
 import os
 import re
 import string
 import sys
 
+from functools import partial
+from operator import itemgetter
 from urllib.parse import urlparse
 
 from datalad.distribution.dataset import resolve_path
@@ -515,7 +514,7 @@ def add_urls(rows, ifexists=None, options=None):
     for row in rows:
         filename_abs = row["filename_abs"]
         ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+        lgr.debug("Adding URLs to %s in %s", filename, ds.path)
 
         if os.path.exists(filename_abs) or os.path.islink(filename_abs):
             if ifexists == "skip":
@@ -556,30 +555,19 @@ def add_meta(rows):
     """
     from unittest.mock import patch
 
-    for row in rows:
-        ds, filename = row["ds"], row["ds_filename"]
+    # OPT: group by dataset first so to not patch/unpatch always_commit
+    # per each file of which we could have thousands
+    for ds, ds_rows in itertools.groupby(rows, itemgetter("ds")):
         with patch.object(ds.repo, "always_commit", False):
-            res = ds.repo.add(filename)
-            res_status = 'notneeded' if not res \
-                else 'ok' if res.get('success', False) \
-                else 'error'
-
-            yield dict(
-                action='add',
-                # decorator dies with Path()
-                path=str(ds.pathobj / filename),
-                type='file',
-                status=res_status,
-                parentds=ds.path,
-            )
-
-            lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
-                res = annexjson2result(a, ds, type="file", logger=lgr)
-                # Don't show all added metadata for the file because that
-                # could quickly flood the output.
-                del res["message"]
-                yield res
+            for row in ds_rows:
+                filename = row["ds_filename"]
+                lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+                for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
+                    res = annexjson2result(a, ds, type="file", logger=lgr)
+                    # Don't show all added metadata for the file because that
+                    # could quickly flood the output.
+                    del res["message"]
+                    yield res
 
 
 @build_doc
@@ -939,7 +927,7 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
+            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add and r["meta_args"]]
             for r in add_meta(meta_rows):
                 yield r
 
