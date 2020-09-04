@@ -96,16 +96,12 @@ def test_invalid_call(origin, tdir):
         type='dataset')
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
-@skip_ssh
 @with_tempfile
 @with_tempfile
 def test_since_empty_and_unsupported(p1, p2):
     source = Dataset(p1).create()
     from datalad.support.network import PathRI
-    source.create_sibling(
-        'ssh://datalad-test' + PathRI(p2).posixpath,
-        name='target1')
+    source.create_sibling(p2, name='target1')
     # see https://github.com/datalad/datalad/pull/4448#issuecomment-620847327
     # Test that it doesn't fail without a prior push
     source.publish(to='target1', since='')
