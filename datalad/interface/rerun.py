@@ -360,6 +360,7 @@ def _rerun(dset, results, explicit=False):
     branch_to_restore = dset.repo.get_active_branch()
     head = onto = dset.repo.get_hexsha()
     for res in results:
+        lgr.info(_get_rerun_log_msg(res))
         rerun_action = res.get("rerun_action")
         if not rerun_action:
             yield res
@@ -490,6 +491,26 @@ def _rerun(dset, results, explicit=False):
         dset.repo.update_ref("refs/heads/" + branch_to_restore,
                              "HEAD")
         dset.repo.checkout(branch_to_restore)
+
+
+def _get_rerun_log_msg(res):
+    "Prepare log message for a rerun to summarize an action about to happen"
+    msg = ''
+    rerun_action = res.get("rerun_action")
+    if rerun_action:
+        msg += rerun_action
+    if res.get('commit'):
+        msg += " commit %s;" % res.get('commit')[:7]
+    rerun_run_message = res.get("run_message")
+    if rerun_run_message:
+        if len(rerun_run_message) > 20:
+            rerun_run_message = rerun_run_message[:17] + '...'
+        msg += " (%s)" % rerun_run_message
+    rerun_message = res.get("message")
+    if rerun_message:
+        msg += " " + rerun_message[0] % rerun_message[1:]
+    msg = msg.lstrip()
+    return msg
 
 
 def _report(dset, results):
