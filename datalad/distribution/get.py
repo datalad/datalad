@@ -323,7 +323,28 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             # if we are on a branch this hexsha will be the tip of that branch
             sub_orig_hexsha = sub.get_hexsha()
             # make sure we have the desired commit locally
-            sub.fetch(remote='origin', refspec=target_commit)
+            # expensive and possibly error-prone fetch conditional on cheap
+            # local check
+            if not sub.commit_exists(target_commit):
+                sub.fetch(remote='origin', refspec=target_commit)
+                # instead of inspecting the fetch results for possible ways
+                # with which it could failed to produced the desired result
+                # let's verify the presence of the commit directly, we are in
+                # expensive-land already anyways
+                if not sub.commit_exists(target_commit):
+                    res.update(
+                        status='error',
+                        message=(
+                            'Target commit %s does not exist in the clone, and '
+                            'a fetch that commit from origin failed',
+                            target_commit[:8]),
+                    )
+                    yield res
+                    # there is nothing we can do about this
+                    # MIH thinks that removing the clone is not needed, as a likely
+                    # next step will have to be a manual recovery intervention
+                    # and not another blind attempt
+                    break
             # checkout the desired commit
             sub.call_git(['checkout', target_commit])
             # did we detach?
