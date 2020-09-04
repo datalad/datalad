@@ -3,6 +3,7 @@ datalad (0.13.3-1) unstable; urgency=medium
   * debian/control
     - remove mentioning of Recommends for 'datalad' package which no longer
       has any Recommends (Closes: #969034)
+    - remove python3-git from *Depends - no longer used
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 04 Sep 2020 09:23:57 -0400
 
