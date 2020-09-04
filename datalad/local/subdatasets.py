@@ -73,20 +73,17 @@ def _parse_git_submodules(ds_pathobj, repo, paths):
             else:
                 # we had path contraints, but none matched this dataset
                 return
+    # can we use the reported as such, or do we need to recode wrt to the
+    # query context dataset?
+    recode_paths = ds_pathobj != repo.pathobj
     for props in repo.get_submodules_(paths=paths):
         path = props["path"]
         if props.get('type', None) != 'dataset':
             continue
-        if ds_pathobj != repo.pathobj:
+        if recode_paths:
             props['path'] = ds_pathobj / path.relative_to(repo.pathobj)
         else:
             props['path'] = path
-        if not path.exists() or not GitRepo.is_valid_repo(str(path)):
-            props['state'] = 'absent'
-        # TODO kill this after some time. We used to do custom things here
-        # and gitshasum was called revision. Be nice and duplicate for a bit
-        # wipe out when patience is gone
-        props['revision'] = props['gitshasum']
         yield props
 
 
@@ -302,6 +299,11 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 # we are not looking for this subds, because it doesn't
                 # match the target path
                 continue
+        # the following used to be done by _parse_git_submodules()
+        # but is expensive and does not need to be done for submodules
+        # no matching `contains`
+        if not sm_path.exists() or not GitRepo.is_valid_repo(sm_path):
+            sm['state'] = 'absent'
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \
