@@ -158,3 +158,12 @@ def test_boto_host_specification(tempfile):
     with swallow_outputs():
         providers.download(url_dandi1, path=tempfile)
     assert_equal(md5sum(tempfile), '97f4290b2d369816c052607923e372d4')
+
+
+def test_restricted_bucket_on_NDA():
+    get_test_providers('s3://NDAR_Central_4/', reload=True)  # to verify having credentials to access
+    for url, success_str, failed_str in [
+        ("s3://NDAR_Central_4/submission_23075/README", 'BIDS', 'error'),
+        ("s3://NDAR_Central_4/submission_23075/dataset_description.json", 'DA041147', 'error'),
+    ]:
+        yield check_download_external_url, url, failed_str, success_str
