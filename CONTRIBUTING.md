@@ -351,7 +351,7 @@ below passes ref names instead of commit IDs, which requires asv v0.3
 or later.)
 
 ```shell
-> asv compare -m hopa 0.9.x master
+> asv compare -m hopa maint master
 
 All benchmarks:
 
@@ -377,9 +377,9 @@ All benchmarks:
 [asv continuous] could be used to first run benchmarks for the to-be-tested
 commits and then provide stats:
 
-- `asv continuous 0.9.x master` - would run and compare 0.9.x and master branches
-- `asv continuous HEAD` - would compare HEAD against HEAD^
-- `asv continuous master HEAD` - would compare HEAD against state of master
+- `asv continuous maint master` - would run and compare `maint` and `master` branches
+- `asv continuous HEAD` - would compare `HEAD` against `HEAD^`
+- `asv continuous master HEAD` - would compare `HEAD` against state of master
 - [TODO: contineous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
 
 Notes:
