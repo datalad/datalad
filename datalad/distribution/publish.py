@@ -623,11 +623,11 @@ class Publish(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
-            from which to look for changes
-            to decide whether updated publishing is necessary for this and which children.
-            If empty argument is provided, then we would take from the previously 
-            published to that remote/sibling state (for the current branch)"""),
+            doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
+            changes to decide whether pushing is necessary.
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point. An empty string ('') for the same effect is
+            still supported)."""),
         # since: commit => .gitmodules diff to head => submodules to publish
         missing=missing_sibling_opt,
         path=Parameter(
@@ -689,12 +689,12 @@ class Publish(Interface):
             dataset = require_dataset(
                 dataset, check_installed=True, purpose='publishing')
 
-        if since and not dataset:
+        if (since and since != '^') and not dataset:
             raise InsufficientArgumentsError(
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
-        if dataset and since == '':
+        if dataset and since in ('', '^'):
             # only update since last update so we figure out what was the last update
             active_branch = dataset.repo.get_active_branch()
             if to:
