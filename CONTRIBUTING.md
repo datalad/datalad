@@ -564,15 +564,6 @@ Refer datalad/config.py for information on how to add these environment variable
 - `master` branch accepts PRs with new functionality
 - `master` branch merges `maint` as frequently as needed
 
-## Code flow
-
-- new functionality is initially introduced outside of the `datalad.core.` namespace
-- new functionality should mature for at least a single full `MAJOR.MINOR` release until considered
-  for migration to `datalad.core.`
-  - convenience shim imports remain in-place in old locations for at least a single `MAJOR.MINOR` cycle
-  - they should be accompanied with deprecation warnings to trigger downstream code fixups
-  - our internal code should get adjusted immediately upon migration and testing should fail if was not
-
 ## Helpers
 
 [Makefile](./Makefile) provides a number of useful `make` targets:
