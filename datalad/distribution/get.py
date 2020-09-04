@@ -47,6 +47,7 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CommandError,
     InsufficientArgumentsError,
 )
 from datalad.support.network import (
@@ -326,7 +327,10 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             # expensive and possibly error-prone fetch conditional on cheap
             # local check
             if not sub.commit_exists(target_commit):
-                sub.fetch(remote='origin', refspec=target_commit)
+                try:
+                    sub.fetch(remote='origin', refspec=target_commit)
+                except CommandError:
+                    pass
                 # instead of inspecting the fetch results for possible ways
                 # with which it could failed to produced the desired result
                 # let's verify the presence of the commit directly, we are in
