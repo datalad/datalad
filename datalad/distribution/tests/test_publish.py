@@ -434,15 +434,6 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # Don't fail when a string is passed as `dataset` and since="".
     assert_status("notneeded", publish(since='^', dataset=source.path))
 
-    # TODO: introduced after 0.13, remove with 0.15
-    import warnings
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        publish(since='', dataset=source.path)
-        assert len(w) == 1
-        assert issubclass(w[-1].category, DeprecationWarning)
-        assert "deprecated" in str(w[-1].message)
-
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
 @known_failure_windows

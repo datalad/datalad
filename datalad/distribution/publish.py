@@ -627,7 +627,7 @@ class Publish(Interface):
             changes to decide whether pushing is necessary.
             If '^' is given, the last state of the current branch at the sibling
             is taken as a starting point. An empty string ('') for the same effect is
-            still supported but will be removed in 0.15.0).."""),
+            still supported)."""),
         # since: commit => .gitmodules diff to head => submodules to publish
         missing=missing_sibling_opt,
         path=Parameter(
@@ -695,11 +695,6 @@ class Publish(Interface):
                 'is not supported')
 
         if dataset and since in ('', '^'):
-            # TODO: '' deprecated in favor of '^': remove handling of since='' in 0.15
-            if since == '':
-                import warnings
-                warnings.warn("since='' is deprecated. Use since='^' instead.",
-                              DeprecationWarning)
             # only update since last update so we figure out what was the last update
             active_branch = dataset.repo.get_active_branch()
             if to:
