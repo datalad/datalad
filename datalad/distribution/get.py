@@ -348,7 +348,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                     # MIH thinks that removing the clone is not needed, as a likely
                     # next step will have to be a manual recovery intervention
                     # and not another blind attempt
-                    break
+                    continue
             # checkout the desired commit
             sub.call_git(['checkout', target_commit])
             # did we detach?
