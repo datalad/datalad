@@ -124,6 +124,7 @@ def check_compress_dir(ext, path, name):
 def test_compress_dir():
     yield check_compress_dir, '.tar.xz'
     yield check_compress_dir, '.tar.gz'
+    yield check_compress_dir, '.tgz'
     yield check_compress_dir, '.tar'
     yield check_compress_dir, '.zip'
     yield check_compress_dir, '.7z'
