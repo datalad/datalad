@@ -153,8 +153,7 @@ def check_compress_file(ext, annex, path, name):
         # key
         from datalad.support.annexrepo import AnnexRepo
         repo = AnnexRepo(path, init=True)
-        repo.add(_filename)
-        repo.commit(files=[_filename], msg="commit")
+        repo.save("commit", paths=[_filename])
 
     dir_extracted = name + "_extracted"
     try:

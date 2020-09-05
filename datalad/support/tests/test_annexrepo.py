@@ -543,8 +543,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 def test_find_batch_equivalence(path):
     ar = AnnexRepo(path)
     files = ["a.txt", "b", OBSCURE_FILENAME]
-    ar.add(files + ["subdir"])
-    ar.commit("add files")
+    ar.save("add files", files + ["subdir"])
     query = ["not-there"] + files
     expected = {f: f for f in files}
     expected.update({"not-there": ""})
@@ -614,7 +613,7 @@ def test_AnnexRepo_migrating_backends(src, dst):
     f.write("What to write?")
     f.close()
 
-    ar.add(filename, backend='MD5')
+    ar._save_add(filename)
     eq_(ar.get_file_backend(filename), 'MD5')
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
 
@@ -652,8 +651,7 @@ tree1_md5e_keys = {
 #     # was used just to generate above dict
 #     annex = AnnexRepo(path, init=True, backend='MD5E')
 #     files = [basename(f) for f in find_files('.*', path)]
-#     annex.add(files)
-#     annex.commit()
+#     annex.save(paths=files)
 #     print({f: p['key'] for f, p in annex.get_content_annexinfo(files)})
 
 
@@ -663,8 +661,7 @@ def test_dropkey(batch, path):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = list(tree1_md5e_keys)
-    annex.add(files)
-    annex.commit()
+    annex.save(paths=files)
     # drop one key
     annex.drop_key(tree1_md5e_keys[files[0]], **kw)
     # drop multiple
@@ -677,32 +674,6 @@ def test_dropkey(batch, path):
     # AnnexRepo is not able to guarantee that all batched processes are
     # terminated when test cleanup code runs, avoid a crash (i.e. resource busy)
     annex._batched.close()
-
-
-@with_tree(**tree1args)
-@serve_path_via_http()
-def test_AnnexRepo_backend_option(path, url):
-    ar = AnnexRepo(path, backend='MD5')
-
-    # backend recorded in .gitattributes
-    eq_(ar.get_gitattributes('.')['.']['annex.backend'], 'MD5')
-
-    ar.add('firstfile', backend='SHA1')
-    ar.add('secondfile')
-    eq_(ar.get_file_backend('firstfile'), 'SHA1')
-    eq_(ar.get_file_backend('secondfile'), 'MD5')
-
-    with swallow_outputs() as cmo:
-        # must be added under different name since annex 20160114
-        ar.add_url_to_file('remotefile2', url + 'remotefile', backend='SHA1')
-    eq_(ar.get_file_backend('remotefile2'), 'SHA1')
-
-    with swallow_outputs() as cmo:
-        ar.add_urls([url + 'faraway'], backend='SHA1')
-    # TODO: what's the annex-generated name of this?
-    # For now, workaround:
-    ok_(ar.get_file_backend(f) == 'SHA1'
-        for f in ar.get_indexed_files() if 'faraway' in f)
 
 
 @with_tempfile
@@ -740,7 +711,7 @@ def test_AnnexRepo_always_commit(path):
         f.write("Second file.")
 
     # always_commit == True is expected to be default
-    repo.add(file1)
+    repo._save_add(file1)
 
     # Now git-annex log should show the addition:
     out_list = list(repo.call_annex_items_(['log']))
@@ -752,7 +723,7 @@ def test_AnnexRepo_always_commit(path):
     eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
     with patch.object(repo, "always_commit", False):
-        repo.add(file2)
+        repo._save_add(file2)
 
         # No additional git commit:
         eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
@@ -801,7 +772,7 @@ def test_AnnexRepo_commit(path):
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
-    ds.add(filename, git=True)
+    ds._save_add(filename, git=True)
 
     assert_raises(AssertionError, assert_repo_status, path, annex=True)
 
@@ -831,14 +802,14 @@ def test_AnnexRepo_add_to_annex(path):
     with open(filename_abs, "w") as f:
         f.write("some")
 
-    out_json = repo.add(filename)
+    out_json = repo._save_add(filename)
     # file is known to annex:
     ok_(repo.is_under_annex(filename_abs),
         "Annexed file is not a link.")
-    assert_in('key', out_json)
+    assert_in('key', out_json[0])
     key = repo.get_file_annexinfo(filename)['key']
     assert_false(key == '')
-    assert_equal(key, out_json['key'])
+    assert_equal(key, out_json[0]['key'])
     ok_(repo.file_has_content(filename))
 
     # uncommitted:
@@ -852,8 +823,7 @@ def test_AnnexRepo_add_to_annex(path):
     with open(opj(repo.path, filename), "w") as f:
         f.write("something else")
 
-    repo.add(filename)
-    repo.commit(msg="Added another file to annex.")
+    repo.save("Added another file to annex.", paths=[filename])
     # known to annex:
     fileprops = repo.get_file_annexinfo(filename, eval_availability=True)
     ok_(fileprops['key'])
@@ -871,7 +841,7 @@ def test_AnnexRepo_add_to_git(path):
     filename = get_most_obscure_supported_name()
     with open(opj(repo.path, filename), "w") as f:
         f.write("some")
-    repo.add(filename, git=True)
+    repo._save_add(filename, git=True)
 
     # not in annex, but in git:
     eq_(repo.get_file_annexinfo(filename), {})
@@ -885,8 +855,7 @@ def test_AnnexRepo_add_to_git(path):
     with open(opj(repo.path, filename), "w") as f:
         f.write("something else")
 
-    repo.add(filename, git=True)
-    repo.commit(msg="Added another file to annex.")
+    repo.save("Added another file to annex.", paths=[filename], git=True)
     # not in annex, but in git:
     eq_(repo.get_file_annexinfo(filename), {})
 
@@ -943,7 +912,8 @@ def test_AnnexRepo_get(src, dst):
 def test_v7_detached_get(opath, path):
     # http://git-annex.branchable.com/bugs/get_fails_to_place_v7_unlocked_file_content_into_the_file_tree_in_v7_in_repo_with_detached_HEAD/
     origin = AnnexRepo(opath, create=True, version=7)
-    GitRepo.add(origin, 'file.dat')  # force direct `git add` invocation
+    # force direct `git add` invocation
+    origin.call_git(['add', '--', 'file.dat'])
     origin.commit('added')
 
     AnnexRepo.clone(opath, path)
@@ -1060,7 +1030,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
     # add to an existing and staged annex file
     copyfile(opj(sitepath, 'about2.txt'), opj(dst, testfile2))
-    ar.add(testfile2)
+    ar._save_add(testfile2)
     ar.add_url_to_file(testfile2, testurl2, batch=True)
     assert(ar.info(testfile2))
     # not committed yet
@@ -1068,7 +1038,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
     # add to an existing and committed annex file
     copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
-    ar.add(testfile2_)
+    ar._save_add(testfile2_)
     if ar.is_direct_mode():
         assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile))
     else:
@@ -1132,8 +1102,7 @@ def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
             level="DEBUG",
             regex=False)
 
-    ar.add("bar")
-    ar.commit("add bar")
+    ar.save("add bar", ['bar'])
     key = ar.get_content_annexinfo(["bar"]).popitem()[1]['key']
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
@@ -1216,9 +1185,7 @@ def test_annex_ssh(topdir):
     # remote interaction causes socket to be created:
     (ar.pathobj / "foo").write_text("foo")
     (ar.pathobj / "bar").write_text("bar")
-    ar.add("foo")
-    ar.add("bar")
-    ar.commit("add files")
+    ar.save("add files", ['foo', 'bar'])
 
     ar.copy_to(["foo"], remote="ssh-remote-1")
     # copy_to() opens it if needed.
@@ -1278,7 +1245,7 @@ def test_annex_remove(path):
         f.write("whatever")
 
     # add it
-    repo.add("rm-test.dat")
+    repo._save_add("rm-test.dat")
 
     # remove without '--force' should fail, due to staged changes:
     assert_raises(CommandError, repo.remove, "rm-test.dat")
@@ -1483,8 +1450,7 @@ def test_annex_drop(src, dst):
 @with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
 def test_annex_get_annexed_files(path):
     repo = AnnexRepo(path)
-    repo.add(".")
-    repo.commit()
+    repo.save(paths=['.'])
     eq_(set(repo.get_annexed_files()), {"a.txt", "b.txt", "c.py", "d"})
 
     repo.drop("a.txt", options=["--force"])
@@ -1580,7 +1546,7 @@ def test_annex_add_no_dotfiles(path):
     # make sure the repo is considered dirty now
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
-    ar.add('.', git=True)
+    ar._save_add('.', git=True)
     # all in index
     assert_true(ar.dirty)
     # TODO: has been more specific:
@@ -1653,8 +1619,7 @@ def test_get_description(path1, path2):
     annex1 = AnnexRepo(path1, create=True)
     # some content for git-annex branch
     create_tree(path1, {'1.dat': 'content'})
-    annex1.add('1.dat', git=False)
-    annex1.commit("msg")
+    annex1.save("msg", ['1.dat'], git=False)
     annex1_description = annex1.get_description()
     assert_not_equal(annex1_description, path1)
 
@@ -1825,7 +1790,7 @@ def test_AnnexRepo_dirty(path):
         f.write('whatever')
     ok_(repo.dirty)
     # staged file
-    repo.add('file1.txt', git=True)
+    repo._save_add('file1.txt', git=True)
     ok_(repo.dirty)
     # clean again
     repo.commit("file1.txt added")
@@ -1839,8 +1804,7 @@ def test_AnnexRepo_dirty(path):
         f.write('something else')
     ok_(repo.dirty)
     # clean again
-    repo.add('file1.txt', git=True)
-    repo.commit("file1.txt modified")
+    repo.save("file1.txt modified", ['file1.txt'], git=True)
     ok_(not repo.dirty)
 
     # annex operations:
@@ -1849,7 +1813,7 @@ def test_AnnexRepo_dirty(path):
         f.write('different content')
     ok_(repo.dirty)
     # annexed file
-    repo.add('file2.txt', git=False)
+    repo._save_add('file2.txt', git=False)
     ok_(repo.dirty)
     # commit
     repo.commit("file2.txt annexed")
@@ -1910,8 +1874,7 @@ def test_wanted(path):
         eq_(ar.get_preferred_content('wanted'), v)
     # give it some file so clone/checkout works without hiccups
     create_tree(ar.path, {'1.dat': 'content'})
-    ar.add('1.dat')
-    ar.commit(msg="blah")
+    ar.save("blah", paths=['1.dat'])
     # make a clone and see if all cool there
     # intentionally clone as pure Git and do not annex init so to see if we
     # are ignoring crummy log msgs
@@ -1938,8 +1901,7 @@ def test_AnnexRepo_metadata(path):
                 obscure_name + '.dat': 'lowcontent'
             }
         })
-    ar.add('.', git=False)
-    ar.commit('content')
+    ar.save('content', ['.'], git=False)
     assert_repo_status(path)
     # fugue
     # doesn't do anything if there is nothing to do
@@ -2327,10 +2289,10 @@ def check_files_split_exc(cls, topdir):
     if isinstance(r, AnnexRepo):
         # Annex'es add first checks for what is being added and does not fail
         # for non existing files either ATM :-/  TODO: make consistent etc
-        r.add(files)
+        r._save_add(files)
     else:
         with assert_raises(Exception) as ecm:
-            r.add(files)
+            r._save_add(files)
         assert_not_in('too long', str(ecm.exception))
         assert_not_in('too many', str(ecm.exception))
 
@@ -2364,16 +2326,15 @@ _HEAVY_TREE = {
 @with_tree(tree=_HEAVY_TREE)
 def check_files_split(cls, topdir):
     from glob import glob
+    import datalad.api as dl
     r = cls(topdir)
     dirs = glob(op.join(topdir, '*'))
     files = glob(op.join(topdir, '*', '*'))
 
-    r.add(files)
-    r.commit(files=files)
+    dl.save(dataset=r.path, path=files)
 
     # Let's modify and do dl.add for even a heavier test
     # Now do for real on some heavy directory
-    import datalad.api as dl
     for f in files:
         os.unlink(f)
         with open(f, 'w') as f:
@@ -2404,16 +2365,14 @@ def test_ro_operations(path):
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
     repo = AnnexRepo(op.join(path, 'repo'), init=True)
-    repo.add('file1')
-    repo.commit()
+    repo.save(paths=['file1'])
 
     # make a clone
     repo2 = repo.clone(repo.path, op.join(path, 'clone'))
     repo2.get('file1')
 
     # progress forward original repo and fetch (but nothing else) it into repo2
-    repo.add('file2')
-    repo.commit()
+    repo.save(paths=['file2'])
     repo2.fetch(DEFAULT_REMOTE)
 
     # Assure that regardless of umask everyone could read it all

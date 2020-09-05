@@ -104,7 +104,7 @@ def test_dirty(path):
     # we don't want to auto-add untracked files by saving (anymore)
     assert_raises(AssertionError, _check_auto_save, ds, orig_state)
     # tainted: staged
-    ds.repo.add('something', git=True)
+    ds.repo._save_add('something', git=True)
     orig_state = _check_auto_save(ds, orig_state)
     # tainted: submodule
     # not added to super on purpose!

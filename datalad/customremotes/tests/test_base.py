@@ -40,8 +40,7 @@ from ..base import (
 @with_tree(tree={'file.dat': ''})
 def test_get_contentlocation(tdir):
     repo = AnnexRepo(tdir, create=True, init=True)
-    repo.add('file.dat')
-    repo.commit('added file.dat')
+    repo.save('added file.dat', ['file.dat'])
 
     # TODO contentlocation would come with eval_availability=True
     key = repo.get_file_annexinfo('file.dat')['key']

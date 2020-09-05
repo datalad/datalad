@@ -71,7 +71,10 @@ def test_save(path):
     with open(op.join(path, "new_file.tst"), "w") as f:
         f.write("something")
 
-    ds.repo.add("new_file.tst", git=True)
+    if isinstance(ds.repo, AnnexRepo):
+        ds.repo._save_add("new_file.tst", git=True)
+    else:
+        ds.repo._save_add("new_file.tst")
     ok_(ds.repo.dirty)
 
     ds.save(message="add a new file")
@@ -94,7 +97,11 @@ def test_save(path):
     # and also without `-a` when things are staged
     with open(op.join(path, "new_file.tst"), "w") as f:
         f.write("exotic")
-    ds.repo.add("new_file.tst", git=True)
+    if isinstance(ds.repo, AnnexRepo):
+        ds.repo._save_add("new_file.tst", git=True)
+    else:
+        ds.repo._save_add("new_file.tst")
+
     with chpwd(path):
         save(message="love marsians")
     assert_repo_status(path, annex=isinstance(ds.repo, AnnexRepo))
@@ -150,7 +157,7 @@ def test_save_message_file(path):
 
     create_tree(path, {"foo": "x",
                        "msg": "add foo"})
-    ds.repo.add("foo")
+    ds.repo._save_add("foo")
     ds.save(message_file=op.join(ds.path, "msg"))
     # ATTN: Consider corresponding branch so that this check works when we're
     # on an adjusted branch too (e.g., when this test is executed under
@@ -164,7 +171,7 @@ def test_renamed_file():
     def check_renamed_file(recursive, annex, path):
         ds = Dataset(path).create(annex=annex)
         create_tree(path, {'old': ''})
-        ds.repo.add('old')
+        ds.repo._save_add('old')
         ds.repo.call_git(["mv"], files=["old", "new"])
         ds.save(recursive=recursive)
         assert_repo_status(path)
@@ -258,7 +265,7 @@ def test_symlinked_relpath(path):
 
     # in the root of ds
     with chpwd(dspath):
-        ds.repo.add("mike1", git=True)
+        ds.repo._save_add("mike1", git=True)
         ds.save(message="committing", path="./mike1")
 
     # Let's also do in subdirectory as CWD, check that relative path
@@ -270,7 +277,6 @@ def test_symlinked_relpath(path):
              path="mike2")
 
         later = op.join(op.pardir, "later")
-        ds.repo.add(later, git=True)
         save(dataset=ds.path, message="committing", path=later)
 
     assert_repo_status(dspath)
@@ -358,7 +364,7 @@ def test_gh2043p1(path):
     'untracked': 'untracked'})
 def test_bf2043p2(path):
     ds = Dataset(path).create(force=True)
-    ds.repo.add('staged')
+    ds.repo._save_add('staged')
     assert_repo_status(ds.path, added=['staged'], untracked=['untracked'])
     # save -u does not commit untracked content
     # this tests the second issue in #2043
@@ -374,7 +380,7 @@ def test_encoding(path):
     staged = OBSCURE_FILENAME + u'_staged'
     untracked = OBSCURE_FILENAME + u'_untracked'
     ds = Dataset(path).create(force=True)
-    ds.repo.add(staged)
+    ds.repo._save_add(staged)
     assert_repo_status(ds.path, added=[staged], untracked=[untracked])
     ds.save(updated=True)
     assert_repo_status(ds.path, untracked=[untracked])
@@ -464,8 +470,7 @@ def test_add_subdataset(path, other):
 )
 def test_add_mimetypes(path):
     ds = Dataset(path).create(force=True)
-    ds.repo.add('.gitattributes')
-    ds.repo.commit('added attributes to git explicitly')
+    ds.repo.save('added attributes to git explicitly', ['.gitattributes'])
     # now test that those files will go into git/annex correspondingly
     # WINDOWS FAILURE NEXT
     __not_tested__ = ds.save(['file.txt', 'empty'])
@@ -661,7 +666,7 @@ def test_save_partial_commit_shrinking_annex(path):
     # Even without this staged change, a plain 'git commit -- foo' would fail
     # with git-annex's partial index error, but save (or more specifically
     # GitRepo.save_) drops the pathspec if there are no staged changes.
-    ds.repo.add("staged", git=True)
+    ds.repo._save_add("staged", git=True)
     ds.save(path="foo")
     assert_repo_status(ds.path, added=["staged"])
 

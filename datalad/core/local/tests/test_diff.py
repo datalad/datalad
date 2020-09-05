@@ -216,7 +216,7 @@ def test_diff(path, norepo):
         ds.diff(path='new', result_renderer='disabled'), 1,
         action='diff', path=op.join(ds.path, 'new'), state='modified')
     # stage changes
-    ds.repo.add('.', git=True)
+    ds.repo._save_add('.', git=True)
     # no change in diff, staged is not committed
     assert_result_count(_dirty_results(ds.diff(result_renderer='disabled')), 1)
     ds.save()
@@ -246,7 +246,7 @@ def test_diff(path, norepo):
     assert_result_count(
         ds.diff(path='deep', result_renderer='disabled'), 1,
         state='untracked', path=op.join(ds.path, 'deep'))
-    ds.repo.add(op.join('deep', 'down2'), git=True)
+    ds.repo._save_add(op.join('deep', 'down2'), git=True)
     # now the remaining file is the only untracked one
     assert_result_count(
         ds.diff(result_renderer='disabled'), 1, state='untracked',

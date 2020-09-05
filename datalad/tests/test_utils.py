@@ -903,7 +903,7 @@ def test_get_dataset_root(path):
         os.makedirs(subdir)
         with open(fname, 'w') as f:
             f.write('some')
-        repo.add(fname)
+        repo._save_add(fname)
         # we can find this repo
         eq_(get_dataset_root(os.curdir), os.curdir)
         # and we get the type of path that we fed in

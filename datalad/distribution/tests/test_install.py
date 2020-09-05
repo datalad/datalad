@@ -88,8 +88,7 @@ from ..dataset import Dataset
 @with_tempfile
 def _test_guess_dot_git(annex, path, url, tdir):
     repo = (AnnexRepo if annex else GitRepo)(path, create=True)
-    repo.add('file.txt', git=not annex)
-    repo.commit()
+    repo.save(paths=['file.txt'], git=not annex)
 
     # we need to prepare to be served via http, otherwise it must fail
     with swallow_logs() as cml:
@@ -291,8 +290,7 @@ def test_install_dataladri(src, topurl, path):
     # make plain git repo
     ds_path = opj(src, 'ds')
     gr = GitRepo(ds_path, create=True)
-    gr.add('test.txt')
-    gr.commit('demo')
+    gr.save('demo', paths=['test.txt'])
     Runner(cwd=gr.path).run(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.consts.DATASETS_TOPURL', topurl), \

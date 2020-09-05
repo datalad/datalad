@@ -77,10 +77,8 @@ def test_basic_scenario(d, d2):
     assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_in_archive_obscure)
-    annex.add(fn_archive)
-    annex.commit(msg="Added tarball")
-    annex.add(fn_extracted)
-    annex.commit(msg="Added the load file")
+    annex.save("Added tarball", [fn_archive])
+    annex.save("Added the load file", [fn_extracted])
 
     # Operations with archive remote URL
     # this is not using this class for its actual purpose

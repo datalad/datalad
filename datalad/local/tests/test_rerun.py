@@ -536,8 +536,7 @@ def test_new_or_modified(path):
 
     with open(op.join(path, "to_add"), "w") as f:
         f.write("content5")
-    ds.repo.add(["to_add"])
-    ds.repo.commit("add one, remove another")
+    ds.repo.save("add one, remove another", ["to_add"])
 
     eq_(get_new_or_modified(ds, "HEAD"),
         ["to_add"])
@@ -797,7 +796,7 @@ def test_rerun_explicit(path):
     # But checking out a new HEAD can fail when there are modifications.
     ds.repo.checkout(DEFAULT_BRANCH)
     ok_(ds.repo.dirty)
-    ds.repo.add(["to_modify"], git=True)
+    ds.repo._save_add(["to_modify"], git=True)
     ds.save()
     assert_false(ds.repo.dirty)
     with open(op.join(ds.path, "to_modify"), "a") as ofh:

@@ -674,9 +674,8 @@ def test_ignore_nose_capturing_stdout():
 def test_ok_file_under_git_symlinks(path):
     # Test that works correctly under symlinked path
     orepo = GitRepo(path)
-    orepo.add('ingit')
-    orepo.commit('msg')
-    orepo.add('staged')
+    orepo.save('msg', ['ingit'])
+    orepo._save_add('staged')
     lpath = path + "-symlink"  # will also be removed AFAIK by our tempfile handling
     Path(lpath).symlink_to(Path(path))
     ok_symlink(lpath)

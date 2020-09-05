@@ -38,8 +38,7 @@ def test_check_dates(path):
             return ar.call_git_oneline(
                 ["rev-parse", "refs/tags/{}".format(tag)], read_only=True)
 
-        ar.add("foo")
-        ar.commit("add foo")
+        ar.save("add foo", ["foo"])
         foo_commit = ar.get_hexsha()
         ar.commit("add foo")
         ar.tag("foo-tag", "tag before refdate")
@@ -47,8 +46,7 @@ def test_check_dates(path):
         # Make a lightweight tag to make sure `tag_dates` doesn't choke on it.
         ar.tag("light")
     with set_date(refdate + 1):
-        ar.add("bar")
-        ar.commit("add bar")
+        ar.save("add bar", ["bar"])
         bar_commit = ar.get_hexsha()
         ar.tag("bar-tag", "tag after refdate")
         bar_tag = tag_object("bar-tag")
