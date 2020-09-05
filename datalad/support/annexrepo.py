@@ -349,7 +349,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 self.set_gitattributes(
                     [('*', {'annex.backend': backend})],
                     git_attributes_file)
-                self.add(git_attributes_file, git=True)
+                # list to consume the generator
+                # TODO evaluate whether the `commit=False` possibility is
+                # needed/used and replace all this with a plain save()
+                list(self._save_add_({git_attributes_file: {}}, git=True))
                 if commit:
                     self.commit(
                         "Set default backend for all files to be %s" % backend,
@@ -3348,7 +3351,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._mark_content_availability(info)
         return info
 
-    def _save_add(self, files, git=None, git_opts=None):
+    def _save_add_(self, files, git=None, git_opts=None):
         """Simple helper to add files in save()"""
         from datalad.interface.results import get_status_dict
         # alter default behavior of git-annex by considering dotfiles
@@ -3370,7 +3373,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 p: props for p, props in files.items()
                 if props.get('type', None) == 'symlink'}
             if symlinks_toadd:
-                for r in GitRepo._save_add(
+                for r in GitRepo._save_add_(
                         self,
                         symlinks_toadd,
                         git_opts=git_opts):
@@ -3387,7 +3390,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             expected_additions = {p: self.get_file_size(p) for p in files}
 
         if git is True:
-            yield from GitRepo._save_add(self, files, git_opts=git_opts)
+            yield from GitRepo._save_add_(self, files, git_opts=git_opts)
         else:
             for r in self._call_annex_records(
                     ['add'] + options,

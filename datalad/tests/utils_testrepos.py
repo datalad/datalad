@@ -71,11 +71,14 @@ class TestRepo(object, metaclass=ABCMeta):
         if add:
             if annex:
                 if isinstance(self.repo, AnnexRepo):
-                    self.repo.add(name)
+                    self.repo._save_add(name)
                 else:
                     raise ValueError("Can't annex add to a non-annex repo.")
             else:
-                self.repo.add(name, git=True)
+                if isinstance(self.repo, AnnexRepo):
+                    self.repo._save_add(name, git=True)
+                else:
+                    self.repo._save_add(name)
 
     def create(self):
         if self._created:

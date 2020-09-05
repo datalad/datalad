@@ -96,8 +96,7 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.add(fn, git=True)
-    repo.commit(msg="Added %s" % fn)
+    repo.save("Added %s" % fn, paths=[fn], git=True)
 
     yield path
 
