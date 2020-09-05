@@ -3944,7 +3944,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     len(to_stage_submodules), self,
                     to_stage_submodules
                     if len(to_stage_submodules) < 10 else '')
-                for r in GitRepo._save_add(
+                for r in GitRepo._save_add_(
                         self,
                         to_stage_submodules,
                         git_opts=None):
@@ -3963,7 +3963,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # in any normal DataLad dataset .gitattributes will
                 # prevent this, but in a plain repo it won't
                 # https://github.com/datalad/datalad/issues/3306
-                for r in GitRepo._save_add(
+                for r in GitRepo._save_add_(
                         self,
                         {op.join(self.path, '.gitmodules'): None}):
                     yield r
@@ -3978,7 +3978,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.debug(
                 '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
-            for r in self._save_add(
+            for r in self._save_add_(
                     to_add,
                     git_opts=None,
                     **{k: kwargs[k] for k in kwargs
@@ -3990,7 +3990,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
 
-    def _save_add(self, files, git_opts=None):
+    def _save_add_(self, files, git_opts=None):
         """Simple helper to add files in save()"""
         from datalad.interface.results import get_status_dict
         try:
@@ -4021,6 +4021,18 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         except OSError as e:
             lgr.error("add: %s" % e)
             raise
+
+    def _save_add(self, files, *args, **kwargs):
+        """Internal convenience test helper function
+
+        For staging files `_save_add_()` should be used to maintain generator
+        abilities of a caller. This method is only provides to simplify
+        test code.
+        """
+        # do this dance in order to be able to use this method directly
+        # as a test helper (transitioning from GitRepo.add())
+        files = {f: {} for f in ensure_list(files)}
+        return list(self._save_add_(files, *args, **kwargs))
 
     def _save_add_submodules(self, paths):
         """Add new submodules
