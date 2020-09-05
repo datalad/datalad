@@ -89,10 +89,8 @@ def test_basic_scenario(d, d2):
     assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_in_archive_obscure)
-    annex.add(fn_archive)
-    annex.commit(msg="Added tarball")
-    annex.add(fn_extracted)
-    annex.commit(msg="Added the load file")
+    annex.save("Added tarball", [fn_archive])
+    annex.save("Added the load file", [fn_extracted])
 
     # Operations with archive remote URL
     annexcr = ArchiveAnnexCustomRemote(path=d)
@@ -166,8 +164,7 @@ def test_basic_scenario(d, d2):
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)
-    annex.add('a.tar.gz')
-    annex.commit()
+    annex.save(paths=['a.tar.gz'])
     add_archive_content('a.tar.gz', annex=annex, delete=True)
     fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
@@ -219,8 +216,7 @@ def test_no_rdflib_loaded():
 def test_interactions(tdir):
     # Just a placeholder since constructor expects a repo
     repo = AnnexRepo(tdir, create=True, init=True)
-    repo.add('archive.tar.gz')
-    repo.commit('added')
+    repo.save('added', ['archive.tar.gz'])
     for scenario in BASE_INTERACTION_SCENARIOS + [
         [
             ('GETCOST', 'COST %d' % ArchiveAnnexCustomRemote.COST),

@@ -230,8 +230,7 @@ def test_ignore_nondatasets(path):
         r = cls(subm_path, create=True)
         with open(opj(subm_path, 'test'), 'w') as f:
             f.write('test')
-        r.add('test')
-        r.commit('some')
+        r.save('some', ['test'])
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either

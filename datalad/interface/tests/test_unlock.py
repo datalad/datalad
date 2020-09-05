@@ -128,7 +128,7 @@ def test_unlock(path):
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content")
 
-    ds.repo.add('test-annex.dat')
+    ds.repo._save_add('test-annex.dat')
     # in V6+ we need to explicitly re-lock it:
     if ds.repo.supports_unlocked_pointers:
         # TODO: RF: make 'lock' a command as well
@@ -152,7 +152,7 @@ def test_unlock(path):
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content again")
 
-    ds.repo.add('test-annex.dat')
+    ds.repo._save_add('test-annex.dat')
     # in V6+ we need to explicitly re-lock it:
     if ds.repo.supports_unlocked_pointers:
         # TODO: RF: make 'lock' a command as well

@@ -346,8 +346,7 @@ def test_add_archive_content_zip(repo_path):
     repo = AnnexRepo(repo_path, create=True)
     with chpwd(repo_path):
         with swallow_outputs():
-            repo.add(["1.zip"])
-        repo.commit("add 1.zip")
+            repo.save("add 1.zip", ["1.zip"])
         add_archive_content("1.zip")
         ok_file_under_git(opj(repo.path, "1", "foo"), annexed=True)
         ok_file_under_git(opj("1", "dir", "bar"), annexed=True)
@@ -359,8 +358,7 @@ def test_add_archive_content_zip(repo_path):
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
     repo = AnnexRepo(opj(path, "ds"), create=True)
-    repo.add(["1.tar.gz"])
-    repo.commit("1.tar.gz")
+    repo.save("1.tar.gz", ["1.tar.gz"])
     abs_tar_gz = opj(path, "ds", "1.tar.gz")
     add_archive_content(abs_tar_gz, annex=repo)
     ok_file_under_git(opj(path, "ds", "1", "foo"), annexed=True)
@@ -392,8 +390,7 @@ def test_add_archive_use_archive_dir(repo_path):
             str(cmr.exception), match=False
         )
         with swallow_outputs():
-            repo.add(archive_path)
-        repo.commit("added 1.tar.gz")
+            repo.save("added 1.tar.gz", [archive_path])
 
         ok_archives_caches(repo.path, 0)
         add_archive_content(archive_path, strip_leading_dirs=True, use_current_dir=True)
@@ -423,8 +420,7 @@ class TestAddArchiveOptions():
         self.pwd = getpwd()
         self.annex = annex = AnnexRepo(repo_path, create=True)
         # Let's add first archive to the annex so we could test
-        annex.add('1.tar')
-        annex.commit(msg="added 1.tar")
+        annex.save("added 1.tar", paths=['1.tar'])
 
     def teardown(self):
         assert_equal(self.pwd, getpwd())
@@ -444,8 +440,7 @@ class TestAddArchiveOptions():
         f123 = opj('sub', '123.tar')
         os.rename(opj(self.annex.path, '1.tar'), opj(self.annex.path, f123))
         self.annex.remove('1.tar', force=True)
-        self.annex.add(f123)
-        self.annex.commit(msg="renamed")
+        self.annex.save("renamed")
         add_archive_content(
             f123,
             annex=self.annex,
@@ -545,8 +540,7 @@ class TestAddArchiveOptions():
     @known_failure_windows
     def test_override_existing_under_git(self):
         create_tree(self.annex.path, {'1.dat': 'load2'})
-        self.annex.add('1.dat', git=True)
-        self.annex.commit('added to git')
+        self.annex.save('added to git', ['1.dat'], git=True)
         add_archive_content(
             '1.tar', annex=self.annex, strip_leading_dirs=True,
         )

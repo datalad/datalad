@@ -27,8 +27,7 @@ from ..base import (
 @with_tree(tree={'file.dat': ''})
 def test_get_contentlocation(tdir):
     repo = AnnexRepo(tdir, create=True, init=True)
-    repo.add('file.dat')
-    repo.commit('added file.dat')
+    repo.save('added file.dat', ['file.dat'])
 
     key = repo.get_file_key('file.dat')
     cr = AnnexCustomRemote(tdir)
@@ -139,8 +138,7 @@ BASE_INTERACTION_SCENARIOS = [
 def test_interactions(tdir):
     # Just a placeholder since constructor expects a repo
     repo = AnnexRepo(tdir, create=True, init=True)
-    repo.add('file.dat')
-    repo.commit('added file.dat')
+    repo.save('added file.dat', ['file.dat'])
     for scenario in BASE_INTERACTION_SCENARIOS + [
         [
             ('GETAVAILABILITY', 'AVAILABILITY %s' % DEFAULT_AVAILABILITY),

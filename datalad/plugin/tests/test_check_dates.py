@@ -65,8 +65,7 @@ def test_check_dates(path):
     repo = os.path.join(path, "repo")
     with set_date(ref_ts + 5000):
         ar = AnnexRepo(repo)
-        ar.add(".")
-        ar.commit()
+        ar.save(paths=["."])
 
     # The standard renderer outputs json.
     with swallow_outputs() as cmo:

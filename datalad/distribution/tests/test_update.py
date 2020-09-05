@@ -213,14 +213,12 @@ def test_update_fetch_all(src, remote_1, remote_2):
     # modify the remotes:
     with open(opj(remote_1, "first.txt"), "w") as f:
         f.write("some file load")
-    rmt1.add("first.txt")
-    rmt1.commit()
+    rmt1.save(paths=["first.txt"])
     # TODO: Modify an already present file!
 
     with open(opj(remote_2, "second.txt"), "w") as f:
         f.write("different file load")
-    rmt2.add("second.txt", git=True)
-    rmt2.commit(msg="Add file to git.")
+    rmt2.save("Add file to git.", paths=["second.txt"], git=True)
 
     # Let's init some special remote which we couldn't really update/fetch
     if not dl_cfg.get('datalad.tests.dataladremote'):

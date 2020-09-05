@@ -158,7 +158,7 @@ def test_GitRepo_init_options(path):
 )
 def test_init_fail_under_known_subdir(path):
     repo = GitRepo(path, create=True)
-    repo.add(op.join('subds', 'file_name'))
+    repo._save_add(op.join('subds', 'file_name'))
     # Should fail even if we do not commit but only add to index:
     with assert_raises(PathKnownToRepositoryError) as cme:
         GitRepo(op.join(path, 'subds'), create=True)
@@ -196,9 +196,9 @@ def test_GitRepo_add(src, path):
     filename = get_most_obscure_supported_name()
     with open(op.join(path, filename), 'w') as f:
         f.write("File to add to git")
-    added = gr.add(filename)
+    added = gr._save_add(filename)
 
-    eq_(added, {'success': True, 'file': filename})
+    assert_in_results(added, status='ok', path=Path(path, filename))
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
     # uncommitted:
@@ -209,9 +209,9 @@ def test_GitRepo_add(src, path):
         f.write("Another file to add to git")
 
     # include committing:
-    added2 = gr.add(filename)
+    added2 = gr._save_add(filename)
     gr.commit(msg="Add two files.")
-    eq_(added2, {'success': True, 'file': filename})
+    assert_in_results(added2, status='ok', path=Path(path, filename))
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
@@ -231,8 +231,7 @@ def test_GitRepo_add(src, path):
 def test_GitRepo_remove(path):
 
     gr = GitRepo(path, create=True)
-    gr.add('*')
-    gr.commit("committing all the files")
+    gr.save("committing all the files", ['*'])
 
     eq_(gr.remove('file'), ['file'])
     eq_(set(gr.remove('d', r=True, f=True)), {'d/f1', 'd/f2'})
@@ -249,8 +248,7 @@ def test_GitRepo_commit(path):
     with open(op.join(path, filename), 'w') as f:
         f.write("File to add to git")
 
-    gr.add(filename)
-    gr.commit("Testing GitRepo.commit().")
+    gr.save("Testing GitRepo.commit().", [filename])
     assert_repo_status(gr)
     eq_("Testing GitRepo.commit().",
         gr.format_commit("%B").strip())
@@ -258,7 +256,7 @@ def test_GitRepo_commit(path):
     with open(op.join(path, filename), 'w') as f:
         f.write("changed content")
 
-    gr.add(filename)
+    gr._save_add(filename)
     gr.commit("commit with options", options=to_options(dry_run=True))
     # wasn't actually committed:
     ok_(gr.dirty)
@@ -467,8 +465,7 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
 
     with open(op.join(orig_path, filename), 'w') as f:
         f.write("New file.")
-    origin.add(filename)
-    origin.commit("new file added.")
+    origin.save("new file added.", [filename])
     clone.pull()
     ok_(op.exists(op.join(clone_path, filename)))
 
@@ -499,8 +496,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     origin.checkout("new_branch", ['-b'])
     with open(op.join(orig_path, filename), 'w') as f:
         f.write("New file.")
-    origin.add(filename)
-    origin.commit("new file added.")
+    origin.save("new file added.", [filename])
 
     fetched = clone.fetch(remote='origin')
     # test FetchInfo list returned by fetch
@@ -584,8 +580,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     remote_repo.checkout("ssh-test", ['-b'])
     with open(op.join(remote_repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
-    remote_repo.add("ssh_testfile.dat")
-    remote_repo.commit("ssh_testfile.dat added.")
+    remote_repo.save("ssh_testfile.dat added.", ["ssh_testfile.dat"])
 
     # file is not locally known yet:
     assert_not_in("ssh_testfile.dat", repo.get_indexed_files())
@@ -623,8 +618,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     repo.checkout("ssh-test", ['-b'])
     with open(op.join(repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
-    repo.add("ssh_testfile.dat")
-    repo.commit("ssh_testfile.dat added.")
+    repo.save("ssh_testfile.dat added.", ["ssh_testfile.dat"])
 
     # file is not known to the remote yet:
     assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
@@ -676,8 +670,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
 
     with open(op.join(clone_path, filename), 'w') as f:
         f.write("New file.")
-    clone.add(filename)
-    clone.commit("new file added.")
+    clone.save("new file added.", [filename])
     # TODO: need checkout first:
     clone.push('origin', '+{}:new-branch'.format(DEFAULT_BRANCH))
     origin.checkout('new-branch')
@@ -699,24 +692,20 @@ def test_GitRepo_remote_update(path1, path2, path3):
     # Setting up remote 'git2'
     with open(op.join(path2, 'masterfile'), 'w') as f:
         f.write("git2 in master")
-    git2.add('masterfile')
-    git2.commit("Add something to master.")
+    git2.save("Add something to master.", ['masterfile'])
     git2.checkout('branch2', ['-b'])
     with open(op.join(path2, 'branch2file'), 'w') as f:
         f.write("git2 in branch2")
-    git2.add('branch2file')
-    git2.commit("Add something to branch2.")
+    git2.save("Add something to branch2.", ['branch2file'])
 
     # Setting up remote 'git3'
     with open(op.join(path3, 'masterfile'), 'w') as f:
         f.write("git3 in master")
-    git3.add('masterfile')
-    git3.commit("Add something to master.")
+    git3.save("Add something to master.", ['masterfile'])
     git3.checkout('branch3', ['-b'])
     with open(op.join(path3, 'branch3file'), 'w') as f:
         f.write("git3 in branch3")
-    git3.add('branch3file')
-    git3.commit("Add something to branch3.")
+    git3.save("Add something to branch3.", ['branch3file'])
 
     git1.update_remote()
 
@@ -759,8 +748,7 @@ def test_GitRepo_get_files(url, path):
     filename = 'another_file.dat'
     with open(op.join(path, filename), 'w') as f:
         f.write("something")
-    gr.add(filename)
-    gr.commit("Added.")
+    gr.save("Added.", [filename])
 
     # now get the files again:
     local_files = set(gr.get_files())
@@ -808,7 +796,7 @@ def test_GitRepo_dirty(path):
         f.write('whatever')
     ok_(repo.dirty)
     # staged file
-    repo.add('file1.txt')
+    repo._save_add('file1.txt')
     ok_(repo.dirty)
     # clean again
     repo.commit("file1.txt added")
@@ -822,8 +810,7 @@ def test_GitRepo_dirty(path):
         f.write('something else')
     ok_(repo.dirty)
     # clean again
-    repo.add('file1.txt')
-    repo.commit("file1.txt modified")
+    repo.save("file1.txt modified", ['file1.txt'])
     ok_(not repo.dirty)
 
     # An empty directory doesn't count as dirty.
@@ -861,8 +848,7 @@ def test_GitRepo_get_merge_base(src):
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
         f.write('load')
-    repo.add('*')
-    repo.commit('committing')
+    repo.save('committing', ['*'])
 
     assert_raises(ValueError, repo.get_merge_base, [])
     branch1 = repo.get_active_branch()
@@ -876,10 +862,9 @@ def test_GitRepo_get_merge_base(src):
     # it will have all the files
     # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
     # repo.git_add('.')
-    repo.add('*')
     # NOTE: fun part is that we should have at least a different commit message
     # so it results in a different checksum ;)
-    repo.commit("committing again")
+    repo.save("committing again", ['*'])
     assert(repo.get_indexed_files())  # we did commit
     assert(repo.get_merge_base(branch1) is None)
     assert(repo.get_merge_base([branch2, branch1]) is None)
@@ -898,8 +883,7 @@ def test_GitRepo_git_get_branch_commits_(src):
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
         f.write('load')
-    repo.add('*')
-    repo.commit('committing')
+    repo.save('committing', ['*'])
 
     commits_default = list(repo.get_branch_commits_())
     commits = list(repo.get_branch_commits_(DEFAULT_BRANCH))
@@ -1146,8 +1130,7 @@ def test_optimized_cloning(path):
     repo = GitRepo(originpath, create=True)
     with open(op.join(originpath, 'test'), 'w') as f:
         f.write('some')
-    repo.add('test')
-    repo.commit('init')
+    repo.save('init', ['test'])
     assert_repo_status(originpath, annex=False)
     from glob import glob
 
@@ -1272,8 +1255,7 @@ def test_GitRepo_gitignore(path):
     sub = GitRepo(op.join(path, 'ignore-sub.me'))
     # we need to commit something, otherwise add_submodule
     # will already refuse the submodule for having no commit
-    sub.add('a_file.txt')
-    sub.commit()
+    sub.save(paths=['a_file.txt'])
 
     from ..exceptions import GitIgnoreError
 
@@ -1281,7 +1263,7 @@ def test_GitRepo_gitignore(path):
         f.write("*.me")
 
     with assert_raises(GitIgnoreError) as cme:
-        gr.add('ignore.me')
+        gr._save_add('ignore.me')
     eq_(cme.exception.paths, ['ignore.me'])
 
     with assert_raises(GitIgnoreError) as cme:
@@ -1289,7 +1271,7 @@ def test_GitRepo_gitignore(path):
     eq_(cme.exception.paths, ['ignore-sub.me'])
 
     with assert_raises(GitIgnoreError) as cme:
-        gr.add(['ignore.me', 'dontigno.re', op.join('ignore-sub.me', 'a_file.txt')])
+        gr._save_add(['ignore.me', 'dontigno.re', op.join('ignore-sub.me', 'a_file.txt')])
     eq_(set(cme.exception.paths), {'ignore.me', 'ignore-sub.me'})
 
     eq_(gr.get_gitattributes('.')['.'], {})  # nothing is recorded within .gitattributes
@@ -1397,8 +1379,7 @@ def test_get_tags(path):
     with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
                                    "Thu, 07 Apr 2005 22:13:13 +0200"}):
         create_tree(gr.path, {'file': ""})
-        gr.add('file')
-        gr.commit(msg="msg")
+        gr.save("msg", paths=['file'])
         eq_(gr.get_tags(), [])
         eq_(gr.describe(), None)
 
@@ -1414,8 +1395,7 @@ def test_get_tags(path):
                                    "Fri, 08 Apr 2005 22:13:13 +0200"}):
 
         create_tree(gr.path, {'file': "123"})
-        gr.add('file')
-        gr.commit(msg="changed")
+        gr.save("changed", paths=['file'])
 
     with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
                                    "Fri, 09 Apr 2005 22:13:13 +0200"}):
@@ -1457,7 +1437,7 @@ def test_get_commit_date(path):
     # Let's make a commit with a custom date
     DATE = "Wed Mar 14 03:47:30 2018 -0000"
     DATE_EPOCH = 1520999250
-    gr.add('1')
+    gr._save_add('1')
     gr.commit("committed", date=DATE)
     gr = GitRepo(path, create=True)
     date = gr.get_commit_date()
@@ -1476,8 +1456,7 @@ def test_get_commit_date(path):
 def test_fake_dates(path):
     gr = GitRepo(path, create=True, fake_dates=True)
 
-    gr.add("foo")
-    gr.commit("commit foo")
+    gr.save("commit foo", ['foo'])
 
     seconds_initial = gr.config.obtain("datalad.fake-dates-start")
 
@@ -1485,8 +1464,7 @@ def test_fake_dates(path):
     eq_(seconds_initial + 1, gr.get_commit_date())
 
     # The second commit by 2.
-    gr.add("bar")
-    gr.commit("commit bar")
+    gr.save("commit bar", ['bar'])
     eq_(seconds_initial + 2, gr.get_commit_date())
 
     # If we checkout another branch, its time is still based on the latest
@@ -1494,8 +1472,7 @@ def test_fake_dates(path):
     gr.checkout("other", options=["--orphan"])
     with open(op.join(path, "baz"), "w") as ofh:
         ofh.write("baz content")
-    gr.add("baz")
-    gr.commit("commit baz")
+    gr.save("commit baz", ['baz'])
     eq_(gr.get_active_branch(), "other")
     eq_(seconds_initial + 3, gr.get_commit_date())
 
@@ -1585,16 +1562,14 @@ def test_gitrepo_add_to_git_with_annex_v7(path):
     from datalad.support.annexrepo import AnnexRepo
     ar = AnnexRepo(path, create=True, version=7)
     gr = GitRepo(path)
-    gr.add("foo")
-    gr.commit(msg="c1")
+    gr.save("c1", paths=['foo'])
     assert_false(ar.is_under_annex("foo"))
 
 
 @with_tree({"foo": "foo", "bar": "bar"})
 def test_gitrepo_call_git_methods(path):
     gr = GitRepo(path)
-    gr.add(["foo", "bar"])
-    gr.commit(msg="foobar")
+    gr.save("foobar", paths=["foo", "bar"])
     gr.call_git(["mv"], files=["foo", "foo.txt"])
     ok_(op.exists(op.join(gr.path, 'foo.txt')))
 

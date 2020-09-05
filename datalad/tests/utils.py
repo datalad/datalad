@@ -1766,7 +1766,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
             },
         }
     )
-    ds.repo.add(['file_added', op.join('subdir', 'file_added')])
+    ds.repo._save_add(['file_added', op.join('subdir', 'file_added')])
     # untracked subdatasets
     create(op.join(ds.path, 'subds_untracked'))
     create(op.join(ds.path, 'subdir', 'subds_untracked'))

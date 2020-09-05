@@ -80,10 +80,8 @@ def test_fs_traverse(topdir):
     AnnexRepo(opj(topdir, 'annexdir'), create=True)
     GitRepo(opj(topdir, 'gitdir'), create=True)
     subgit = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
-    subgit.add(".")
-    subgit.commit(msg="c1")
-    annex.add(opj(topdir, 'dir'))
-    annex.commit()
+    subgit.save("c1", paths=["."])
+    annex.save(paths=[opj(topdir, 'dir')])
     annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])
 
     # traverse file system in recursive and non-recursive modes
@@ -175,15 +173,13 @@ def test_ls_json(topdir, topurl):
     subdirds.save('file')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
-    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'))                           # commit to git to init git repo
-    git.commit()
-    annex.add(opj(topdir, 'dir', 'subgit'))                                     # add the non-dataset git repo to annex
-    annex.add(opj(topdir, 'dir'))                                               # add to annex (links)
+    git._save_add([opj(topdir, 'dir', 'subgit', 'fgit.txt')])                  # commit to git to init git repo
+    annex._save_add(opj(topdir, 'dir', 'subgit'))                                     # add the non-dataset git repo to annex
+    annex._save_add(opj(topdir, 'dir'))                                               # add to annex (links)
     annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])  # broken-link
     annex.commit()
 
-    git.add('fgit.txt')              # commit to git to init git repo
-    git.commit()
+    git.save(paths=['fgit.txt'])              # commit to git to init git repo
     # annex.add doesn't add submodule, so using ds.add
     ds.save(opj('dir', 'subgit'))                   # add the non-dataset git repo to annex
     ds.save('dir')                                  # add to annex (links)

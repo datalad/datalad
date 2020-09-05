@@ -92,7 +92,7 @@ def test_diff(path, norepo):
         ds._diff('new'), 1,
         action='diff', path=opj(ds.path, 'new'), state='modified')
     # stage changes
-    ds.repo.add('.', git=True)
+    ds.repo._save_add('.', git=True)
     # no diff, because we staged the modification
     assert_result_count(ds._diff(), 0)
     # but we can get at it
@@ -127,7 +127,7 @@ def test_diff(path, norepo):
         ds._diff(path='deep'), 1,
         state='untracked', path=opj(ds.path, 'deep'))
     # now we stage on of the two files in deep
-    ds.repo.add(opj('deep', 'down2'), git=True)
+    ds.repo._save_add(opj('deep', 'down2'), git=True)
     # without any reference it will ignore the staged stuff and report the remaining
     # untracked file
     assert_result_count(
