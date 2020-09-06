@@ -1153,23 +1153,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         # on crippled filesystem for example (think so)?
         self.config.reload()
 
-    @normalize_paths
-    def get(self, files, remote=None, options=None, jobs=None, key=False):
+    def get_(self, files, options=None, jobs=None):
         """Get the actual content of files
 
         Parameters
         ----------
         files : list of str
             paths to get
-        remote : str, optional
-            from which remote to fetch content
         options : list of str, optional
             commandline options for the git annex get command
         jobs : int or None, optional
             how many jobs to run in parallel (passed to git-annex call).
             If not specified (None), then
-        key : bool, optional
-            If provided file value is actually a key
 
         Returns
         -------
@@ -1177,45 +1172,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         options = options[:] if options else []
 
-        if remote:
-            if remote not in self.get_remotes():
-                raise RemoteNotAvailableError(
-                    remote=remote,
-                    cmd="get",
-                    msg="Remote is not known. Known are: %s"
-                    % (self.get_remotes(),)
-                )
-            options += ['--from', remote]
-
-        # analyze provided files to decide which actually are needed to be
-        # fetched
-
-        if not key:
-            expected_downloads, fetch_files = self._get_expected_files(
-                files, ['--not', '--in', '.'],
-                merge_annex_branches=False  # interested only in local info
-            )
-        else:
-            fetch_files = files
-            assert len(files) == 1, "When key=True only a single file be provided"
-            expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
+        expected_downloads, fetch_files = self._get_expected_files(
+            files, ['--not', '--in', '.'],
+            merge_annex_branches=False  # interested only in local info
+        )
 
         if not fetch_files:
             lgr.debug("No files found needing fetching.")
             return []
 
         if len(fetch_files) != len(files):
-            lgr.debug("Actually getting %d files", len(fetch_files))
+            lgr.debug("Getting %d files", len(fetch_files))
 
-        # TODO: provide more meaningful message (possibly aggregating 'note'
-        #  from annex failed ones
-        # TODO: reproduce DK's bug on OSX, and either switch to
-        #  --batch mode (I don't think we have --progress support in long
-        #  alive batch processes ATM),
-        if key:
-            kwargs = {'opts': options + ['--key'] + files}
-        else:
-            kwargs = {'opts': options, 'files': files}
+        kwargs = {'opts': options, 'files': files}
         results = self._run_annex_command_json(
             'get',
             # TODO: eventually make use of --batch mode
@@ -1224,10 +1193,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             progress=True,
             **kwargs
         )
-        results_list = list(results)
-        # TODO:  should we here compare fetch_files against result_list
-        # and vomit an exception of incomplete download????
-        return results_list
+        return results
 
     def _get_expected_files(self, files, expr, merge_annex_branches=True):
         """Given a list of files, figure out what to be downloaded

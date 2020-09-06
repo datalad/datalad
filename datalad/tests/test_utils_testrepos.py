@@ -32,7 +32,7 @@ def _test_BasicAnnexTestRepo(repodir):
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
     ok_(trepo.repo.file_has_content('test-annex.dat') is False)
     with swallow_outputs():
-        trepo.repo.get('test-annex.dat')
+        trepo.repo.get_('test-annex.dat')
     ok_(trepo.repo.file_has_content('test-annex.dat'))
 
 

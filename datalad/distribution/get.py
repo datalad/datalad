@@ -672,7 +672,7 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             yield r
         return
     respath_by_status = {}
-    for res in ds_repo.get(
+    for res in ds_repo.get_(
             content,
             options=['--from=%s' % source] if source else [],
             jobs=jobs):
