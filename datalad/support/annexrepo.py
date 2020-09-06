@@ -65,7 +65,6 @@ from datalad.support.json_py import json_loads
 from datalad.cmd import (
     BatchedCommand,
     GitRunner,
-    GitWitlessRunner,
     # KillOutput,
     run_gitcommand_on_file_list_chunks,
     SafeDelCloseMixin,
@@ -1091,7 +1090,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             #    record
             kwargs.pop('expect_fail', False)
             kwargs.pop('expect_stderr', False)
-            run_func = GitWitlessRunner(cwd=self.path, env=env).run
+            run_func = self._git_runner.run
             kwargs['protocol'] = _protocol
         elif runner is None:
             run_func = self.cmd_call_wrapper.run

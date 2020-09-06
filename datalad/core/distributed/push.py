@@ -16,7 +16,6 @@ from collections import OrderedDict
 import logging
 from tempfile import TemporaryFile
 
-from datalad.cmd import GitWitlessRunner
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -831,7 +830,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         # and go
         # TODO try-except and yield what was captured before the crash
         #res = GitWitlessRunner(
-        res = GitWitlessRunner(
+        res = ds_repo._git_runner(
             cwd=ds.path,
         ).run(
             cmd,

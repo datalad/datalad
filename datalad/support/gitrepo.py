@@ -1667,7 +1667,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd.extend(options)
 
         # set up env for commit
-        env = GitRunner.get_git_environ_adjusted()
+        env = self._git_runner.get_git_environ_adjusted()
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
         if index_file:
@@ -1676,8 +1676,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
-
-        runner = GitWitlessRunner(cwd=self.path, env=env)
 
         try:
             for i, chunk in enumerate(file_chunks):
@@ -1690,10 +1688,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if i > 0 and '--dry-run' not in cmd
                     else []
                 ) + ['--'] + chunk
-                runner.run(
+                self._git_runner.run(
                     cur_cmd,
                     protocol=StdOutErrCapture,
                     stdin=None,
+                    env=env,
                 )
         except CommandError as e:
             # real errors first
@@ -2459,7 +2458,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         url = self.config.get('remote.{}.url'.format(remote), None)
         if url and is_ssh(url):
             ssh_manager.get_connection(url).open()
-        GitWitlessRunner(cwd=self.path).run(
+        self._git_runner.run(
             cmd,
             protocol=StdOutCaptureWithGitProgress,
         )
@@ -2598,7 +2597,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if url and is_ssh(url):
                     ssh_manager.get_connection(url).open()
                 try:
-                    out = GitWitlessRunner(cwd=self.path).run(
+                    out = self._git_runner.run(
                         r_cmd,
                         protocol=protocol,
                     )
