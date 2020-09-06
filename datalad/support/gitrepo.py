@@ -1111,7 +1111,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         "retrying",
                         trial)
                     continue
-                    (lgr.debug if expect_fail else lgr.error)(e_str)
+                    #(lgr.debug if expect_fail else lgr.error)(e_str)
 
                 if "Clone succeeded, but checkout failed." in str(e):
                     fix_annex = e

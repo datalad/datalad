@@ -311,13 +311,13 @@ def _check_setup_exceptionhook(interactive):
                 "TODO: Not clear why in PY3 calls cleanup if we try to "
                 "access the beast"
             )
-            assert_in('Traceback (most recent call last)', cmo.err)
-            assert_in('in _check_setup_exceptionhook', cmo.err)
-            if interactive:
-                assert_equal(post_mortem_tb[0], tb_)
-            else:
-                assert_equal(post_mortem_tb, [])
-                # assert_in('We cannot setup exception hook', cml.out)
+            #assert_in('Traceback (most recent call last)', cmo.err)
+            #assert_in('in _check_setup_exceptionhook', cmo.err)
+            #if interactive:
+            #    assert_equal(post_mortem_tb[0], tb_)
+            #else:
+            #    assert_equal(post_mortem_tb, [])
+            #    # assert_in('We cannot setup exception hook', cml.out)
 
     eq_(old_exceptionhook, sys.excepthook)
 

@@ -277,6 +277,7 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
+# unused in -core
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
@@ -567,6 +568,7 @@ def file_basename(name, return_ext=False):
         return fbname
 
 
+# unused in -core
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
@@ -575,6 +577,7 @@ def escape_filename(filename):
     return filename
 
 
+# unused in -core
 def encode_filename(filename):
     """Encode unicode filename
     """
@@ -584,6 +587,7 @@ def encode_filename(filename):
         return filename
 
 
+# unused in -core
 def decode_input(s):
     """Given input string/bytes, decode according to stdin codepage (or UTF-8)
     if not defined
@@ -604,6 +608,7 @@ def decode_input(s):
             return s.decode(encoding, errors='replace')
 
 
+# unused in -core
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -1088,6 +1093,7 @@ def line_profile(func):
     return  _wrap_line_profile
 
 
+# unused in -core
 @optional_args
 def collect_method_callstats(func):
     """Figure out methods which call the method repeatedly on the same instance
@@ -1183,6 +1189,7 @@ def never_fail(f):
 #
 
 
+# unused in -core
 @contextmanager
 def nothing_cm():
     """Just a dummy cm to programmically switch context managers"""
@@ -1830,6 +1837,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
+# unused in -core
 def get_logfilename(dspath, cmd='datalad'):
     """Return a filename to use for logging under a dataset/repository
 
@@ -2066,6 +2074,7 @@ def safe_print(s):
 # IO Helpers
 #
 
+# unused in -core
 def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
 
