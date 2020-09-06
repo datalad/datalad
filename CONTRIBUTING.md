@@ -557,9 +557,9 @@ Refer datalad/config.py for information on how to add these environment variable
 
 ## Workflow
 
-- upon release of `MAJOR.MINOR.0`, `maint` branch need to be fast-forwarded to that release
-- bug fixes to functionality released within the `maint` branch, should be
-  submitted against `maint ` branch
+- upon release of `MAJOR.MINOR.0`, `maint` branch needs to be fast-forwarded to that release
+- bug fixes to functionality released within the `maint` branch should be
+  submitted against `maint` branch
 - cherry-picking fixes from `master` into `maint` is allowed where needed
 - `master` branch accepts PRs with new functionality
 - `master` branch merges `maint` as frequently as needed
