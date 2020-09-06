@@ -1667,9 +1667,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd.extend(options)
 
         # set up env for commit
-        env = self._git_runner.get_git_environ_adjusted()
-        if self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
+        env = self.add_fake_dates(None) \
+            if self.fake_dates_enabled else os.environ.copy()
         if index_file:
             env['GIT_INDEX_FILE'] = index_file
 
