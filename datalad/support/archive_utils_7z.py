@@ -30,6 +30,8 @@ from datalad.cmd import Runner
 def _normalize_fname_suffixes(suffixes):
     if suffixes == ['.tgz']:
         suffixes = ['.tar', '.gz']
+    elif suffixes == ['.tbz2']:
+        suffixes = ['.tar', '.bzip2']
     return suffixes
 
 
