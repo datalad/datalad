@@ -2,17 +2,11 @@ build: false
 
 environment:
   matrix:
-    - PYTHON: "C:\\Python35"
-      PYTHON_VERSION: "3.5.1"
+    - PYTHON: "C:\\Python36"
+      PYTHON_VERSION: "3.6.8"
       PYTHON_ARCH: "32"
-      MINICONDA: C:\Miniconda35
+      MINICONDA: C:\Miniconda36
       DATALAD_TESTS_SSH: 1
-    - PYTHON: "C:\\Python35"
-      PYTHON_VERSION: "3.5.1"
-      PYTHON_ARCH: "32"
-      MINICONDA: C:\Miniconda35
-      DATALAD_TESTS_SSH: 1
-      DATALAD_REPO_VERSION: 6
 
 cache:
   # cache the pip cache
