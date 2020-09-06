@@ -943,12 +943,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if kwargs:
             git_opts.update(kwargs)
 
-        self._git_runner = GitWitlessRunner(cwd=self.path)
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._cfg = None
 
         if do_create:  # we figured it out earlier
+            # we briefly need a runner to create the repo, and cannot
+            # use the config manager runner yet, as it would try to
+            # access the repo config which didn't materialize yet
+            self._git_runner = GitWitlessRunner(cwd=self.path)
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
+        # there is a repo (now), we can use the config runner from now on
+        self._git_runner = self.config._runner
 
         # with DryRunProtocol path might still not exist
         if exists(self.path):
@@ -968,7 +973,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # `self` itself. This would create an additional reference to the object
         # and thereby preventing it from being collected at all.
         self._finalizer = finalize(self, GitRepo._cleanup, self.path)
-
 
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
