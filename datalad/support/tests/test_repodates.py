@@ -40,7 +40,6 @@ def test_check_dates(path):
 
         ar.save("add foo", ["foo"])
         foo_commit = ar.get_hexsha()
-        ar.commit("add foo")
         ar.tag("foo-tag", "tag before refdate")
         foo_tag = tag_object("foo-tag")
         # Make a lightweight tag to make sure `tag_dates` doesn't choke on it.
