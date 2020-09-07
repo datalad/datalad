@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 from collections import OrderedDict
 import logging
+import re
 from tempfile import TemporaryFile
 
 from datalad.cmd import GitWitlessRunner
@@ -637,7 +638,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             raise
         lgr.debug('Remote does not have a git-annex branch: %s', e)
 
-    if is_annex_repo:
+    # try to anticipate any flavor of an idea of a git-annex branch ending up
+    # in a refspec
+    looks_like_annex_branch = re.compile(r'((^|.*:)refs/heads/|.*:|^)git-annex$')
+    if is_annex_repo and not (
+            any(looks_like_annex_branch.match(r) for r in refspecs2push)):
         refspecs2push += [
             'git-annex'
             if ds.config.get('branch.git-annex.merge', None)
