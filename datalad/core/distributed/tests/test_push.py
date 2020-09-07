@@ -823,9 +823,11 @@ def test_push_matching(path):
     ds = Dataset(path / "ds").create(force=True)
     ds.config.set('push.default', 'matching', where='local')
     ds.save()
-    remote_ds = ds.create_sibling(path / 'dssibling', result_xfm='datasets')[0]
+    remote_ds = mk_push_target(ds, 'local', str(path / 'dssibling'),
+                               annex=True, bare=False)
     # that fact that the next one even runs makes sure that we are in a better
     # place than https://github.com/datalad/datalad/issues/4888
     ds.push(to='local')
     # and we pushed the commit in the current branch
-    eq_(remote_ds.repo.get_hexsha(DEFAULT_BRANCH), ds.repo.get_hexsha())
+    eq_(remote_ds.get_hexsha(DEFAULT_BRANCH),
+        ds.repo.get_hexsha(DEFAULT_BRANCH))
