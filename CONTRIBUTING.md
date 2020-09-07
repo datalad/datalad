@@ -1,10 +1,8 @@
-Contributing to DataLad
-=======================
+# Contributing to DataLad
 
 [gh-datalad]: http://github.com/datalad/datalad
 
-Files organization
-------------------
+## Files organization
 
 - [datalad/](./datalad) is the main Python module where major development is happening,
   with major submodules being:
@@ -37,8 +35,7 @@ Files organization
   benchmarking of DataLad.  Implemented in any most appropriate language
   (Python, bash, etc.)
 
-How to contribute
------------------
+## How to contribute
 
 The preferred way to contribute to the DataLad code base is
 to fork the [main repository][gh-datalad] on GitHub.  Here
@@ -120,8 +117,7 @@ we outline the workflow used by the developers:
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
 
-Development environment
------------------------
+## Development environment
 
 We support Python 3 only (>= 3.5).
 
@@ -155,8 +151,7 @@ and you will need to install recent git-annex using appropriate for your
 OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
 
 
-Documentation
--------------
+## Documentation
 
 ### Docstrings
 
@@ -171,8 +166,7 @@ provided by [Sphinx].
 [Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
 [Sphinx]: http://www.sphinx-doc.org/en/stable/
 
-Additional Hints
-----------------
+## Additional Hints
 
 ### Merge commits
 
@@ -187,8 +181,7 @@ in "Conflicts" listing within the merge commit
 (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
 
 
-Quality Assurance
------------------
+## Quality Assurance
 
 It is recommended to check that your contribution complies with the following
 rules before submitting a pull request:
@@ -358,7 +351,7 @@ below passes ref names instead of commit IDs, which requires asv v0.3
 or later.)
 
 ```shell
-> asv compare -m hopa 0.9.x master
+> asv compare -m hopa maint master
 
 All benchmarks:
 
@@ -384,9 +377,9 @@ All benchmarks:
 [asv continuous] could be used to first run benchmarks for the to-be-tested
 commits and then provide stats:
 
-- `asv continuous 0.9.x master` - would run and compare 0.9.x and master branches
-- `asv continuous HEAD` - would compare HEAD against HEAD^
-- `asv continuous master HEAD` - would compare HEAD against state of master
+- `asv continuous maint master` - would run and compare `maint` and `master` branches
+- `asv continuous HEAD` - would compare `HEAD` against `HEAD^`
+- `asv continuous master HEAD` - would compare `HEAD` against state of master
 - [TODO: contineous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
 
 Notes:
@@ -422,8 +415,7 @@ Example (replace with the benchmark of interest)
 [asv]: http://asv.readthedocs.io
 
 
-Easy Issues
------------
+## Easy Issues
 
 A great way to start contributing to DataLad is to pick an item from the list of
 [Easy issues](https://github.com/datalad/datalad/labels/easy) in the issue
@@ -432,25 +424,22 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
-Recognizing contributions
--------------------------
+## Recognizing contributions
 
 We welcome and recognize all contributions from documentation to testing to code development.
 
 You can see a list of current contributors in our [zenodo file][link_zenodo].
 If you are new to the project, don't forget to add your name and affiliation there!
 
-Thank you!
-----------
+## Thank you!
 
 You're awesome. :wave::smiley:
 
 
 
-Various hints for developers
-----------------------------
+# Various hints for developers
 
-### Useful tools
+## Useful tools
 
 - While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
   for quick logging of various health stats in a separate terminal window:
@@ -467,7 +456,8 @@ Various hints for developers
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
 
-### Useful Environment Variables
+## Useful Environment Variables
+
 Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
 
 - *DATALAD_DATASETS_TOPURL*:
@@ -556,10 +546,37 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_ALLOW_FAIL*:
   Instructs `@never_fail` decorator to allow to fail, e.g. to ease debugging.
 
-# Changelog section
+# Release(s) workflow
+
+## Branches
+
+- `master`: changes toward the next `MAJOR.MINOR.0` release.
+  Release candidates (tagged with an `rcX` suffix) are cut from this branch
+- `maint`: bug fixes for the latest released `MAJOR.MINOR.PATCH`
+- `maint-MAJOR.MINOR`: generally not used, unless some bug fix release with a critical bug fix is needed.
+
+## Workflow
+
+- upon release of `MAJOR.MINOR.0`, `maint` branch needs to be fast-forwarded to that release
+- bug fixes to functionality released within the `maint` branch should be
+  submitted against `maint` branch
+- cherry-picking fixes from `master` into `maint` is allowed where needed
+- `master` branch accepts PRs with new functionality
+- `master` branch merges `maint` as frequently as needed
+
+## Helpers
+
+[Makefile](./Makefile) provides a number of useful `make` targets:
+
+- `linkissues-changelog`: converts `(#ISSUE)` placeholders into proper markdown within [CHANGELOG.md]()
+- `update-changelog`: uses above `linkissues-changelog` and updates .rst changelog
+- `release-pypi`: ensures no `dist/` exists yet, creates a wheel and a source distribution and uploads to pypi.
+
+## Changelog section
 
 For the upcoming release use this template
 
+```markdown
 ## 0.13.5 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
@@ -575,6 +592,6 @@ bet we will fix some bugs and make a world even a better place.
 ### Enhancements and new features
 
 ?
-
+```
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
