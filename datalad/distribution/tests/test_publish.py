@@ -96,17 +96,15 @@ def test_invalid_call(origin, tdir):
         type='dataset')
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
-@skip_ssh
 @with_tempfile
 @with_tempfile
-def test_smth_about_not_supported(p1, p2):
+def test_since_empty_and_unsupported(p1, p2):
     source = Dataset(p1).create()
     from datalad.support.network import PathRI
-    source.create_sibling(
-        'ssh://datalad-test' + PathRI(p2).posixpath,
-        name='target1')
-    # source.publish(to='target1')
+    source.create_sibling(p2, name='target1')
+    # see https://github.com/datalad/datalad/pull/4448#issuecomment-620847327
+    # Test that it doesn't fail without a prior push
+    source.publish(to='target1', since='')
     with chpwd(p1):
         # since we have only two commits (set backend, init dataset)
         # -- there is no HEAD^^
@@ -114,7 +112,7 @@ def test_smth_about_not_supported(p1, p2):
             publish(to='target1', since='HEAD^^', on_failure='ignore'),
             1,
             status='impossible',
-            message="fatal: bad revision 'HEAD^^'")
+            message="fatal: bad revision 'HEAD^^..HEAD'")
         # but now let's add one more commit, we should be able to pusblish
         source.repo.commit("msg", options=['--allow-empty'])
         publish(to='target1', since='HEAD^')  # must not fail now

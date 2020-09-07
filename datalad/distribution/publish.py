@@ -701,6 +701,10 @@ class Publish(Interface):
                 # XXX here we assume one to one mapping of names from local branches
                 # to the remote
                 since = '%s/%s' % (to, active_branch)
+                # test if such branch already exists,
+                if since not in dataset.repo.get_remote_branches():
+                    lgr.debug("No remote branch %s yet, so since will not be used", since)
+                    since = None
             else:
                 # take tracking remote for the active branch
                 tracked_remote, tracked_refspec = dataset.repo.get_tracking_branch()
@@ -737,7 +741,7 @@ class Publish(Interface):
                 action='publish',
                 unavailable_path_status='impossible',
                 nondataset_path_status='error',
-                modified=since,
+                modified="%s..HEAD" % since if since else since,
                 return_type='generator',
                 on_failure='ignore',
                 force_no_revision_change_discovery=False, # we cannot publish what was not committed

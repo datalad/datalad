@@ -28,6 +28,14 @@ lgr = logging.getLogger('datalad.support.archive_utils_7z')
 from datalad.cmd import Runner
 
 
+def _normalize_fname_suffixes(suffixes):
+    if suffixes == ['.tgz']:
+        suffixes = ['.tar', '.gz']
+    elif suffixes == ['.tbz2']:
+        suffixes = ['.tar', '.bzip2']
+    return suffixes
+
+
 def decompress_file(archive, dir_):
     """Decompress `archive` into a directory `dir_`
 
@@ -40,7 +48,8 @@ def decompress_file(archive, dir_):
     """
     apath = Path(archive)
     runner = Runner(cwd=dir_)
-    if len(apath.suffixes) > 1 and apath.suffixes[-2] == '.tar':
+    suffixes = _normalize_fname_suffixes(apath.suffixes)
+    if len(suffixes) > 1 and suffixes[-2] == '.tar':
         # we have a compressed tar file that needs to be fed through the
         # decompressor first
         # hangs somehow, do via single string arg
@@ -75,7 +84,8 @@ def compress_files(files, archive, path=None, overwrite=True):
                 'Target archive {} already exists and overwrite is forbidden'.format(
                     apath)
             )
-    if len(apath.suffixes) > 1 and apath.suffixes[-2] == '.tar':
+    suffixes = _normalize_fname_suffixes(apath.suffixes)
+    if len(suffixes) > 1 and suffixes[-2] == '.tar':
         cmd = '7z u .tar -so -- {} | 7z u -si -- {}'.format(
             join_cmdline(files),
             quote_cmdlinearg(str(apath)),
