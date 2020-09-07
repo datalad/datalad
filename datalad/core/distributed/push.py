@@ -830,9 +830,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         # and go
         # TODO try-except and yield what was captured before the crash
         #res = GitWitlessRunner(
-        res = ds_repo._git_runner(
-            cwd=ds.path,
-        ).run(
+        res = ds_repo._git_runner.run(
             cmd,
             # TODO report how many in total, and give global progress too
             protocol=TailoredPushAnnexJsonProtocol,
