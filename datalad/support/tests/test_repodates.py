@@ -56,7 +56,10 @@ def test_check_dates(path):
 
     results = {}
     for which in ["older", "newer"]:
-        result = check_dates(ar, refdate, which=which)["objects"]
+        # Note: Use --all so that we can pick up foo_commit even when using an
+        # adjusted branch (which the last save call have rebased).
+        result = check_dates(
+            ar, refdate, revs=["--all"], which=which)["objects"]
         ok_(result)
         if which == "newer":
             assert_in(bar_commit, result)
