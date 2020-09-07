@@ -828,4 +828,4 @@ def test_push_matching(path):
     # place than https://github.com/datalad/datalad/issues/4888
     ds.push(to='local')
     # and we pushed the commit in the current branch
-    ok_(remote_ds.repo.get_hexsha(DEFAULT_BRANCH), ds.repo.get_hexsha())
+    eq_(remote_ds.repo.get_hexsha(DEFAULT_BRANCH), ds.repo.get_hexsha())
