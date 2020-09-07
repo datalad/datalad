@@ -541,9 +541,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     if is_annex_repo:
         must_have_branches.append('git-annex')
     for branch in must_have_branches:
-        # active_branch could be None
-        if branch is not None:
-            _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
+        _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
 
     # we know what to push and where, now dependency processing first
     for r in publish_depends:
