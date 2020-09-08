@@ -32,6 +32,7 @@ from datalad.support.path import (
 
 from datalad.support.locking import lock_if_check_fails
 from datalad.support.external_versions import external_versions
+from datalad.support.archive_utils_7z import _normalize_fname_suffixes
 from datalad.consts import ARCHIVES_TEMP_DIR
 from datalad.utils import (
     any_re_search,
@@ -291,7 +292,7 @@ class ExtractedArchive(object):
     def assure_extracted(self):
         """Return path to the extracted `archive`.  Extract archive if necessary
         """
-        path = self.path
+        path = _normalize_fname_suffixes(self.path)
 
         with lock_if_check_fails(
             check=(lambda s: s.is_extracted, (self,)),
