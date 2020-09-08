@@ -86,7 +86,7 @@ class Create(Interface):
     to it, even if the target directory already contains additional files or
     directories.
 
-    Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
+    Plain Git repositories can be created via [PY: `annex=False` PY][CMD: --no-annex CMD].
     However, the result will not be a full dataset, and, consequently,
     not all features are supported (e.g. a description).
 
@@ -125,7 +125,7 @@ class Create(Interface):
              code_py="create(force=True)",
              code_cmd="datalad create --force"),
         dict(text="Create a plain Git repository",
-             code_py="create(path='mydataset', no_annex=True)",
+             code_py="create(path='mydataset', annex=False)",
              code_cmd="datalad create --no-annex mydataset"),
     ]
 
