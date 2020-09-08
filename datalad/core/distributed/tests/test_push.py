@@ -815,3 +815,19 @@ def test_push_git_annex_branch_many_paths_same_data(path):
     # 3 files point to content already covered by another file.
     assert_result_count(res, 3,
                         action="copy", type="file", status="notneeded")
+
+
+@with_tree(tree={"ds": {"f0": "0"}})
+def test_push_matching(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create(force=True)
+    ds.config.set('push.default', 'matching', where='local')
+    ds.save()
+    remote_ds = mk_push_target(ds, 'local', str(path / 'dssibling'),
+                               annex=True, bare=False)
+    # that fact that the next one even runs makes sure that we are in a better
+    # place than https://github.com/datalad/datalad/issues/4888
+    ds.push(to='local')
+    # and we pushed the commit in the current branch
+    eq_(remote_ds.get_hexsha(DEFAULT_BRANCH),
+        ds.repo.get_hexsha(DEFAULT_BRANCH))
