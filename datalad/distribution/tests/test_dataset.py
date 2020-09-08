@@ -353,10 +353,24 @@ def test_Dataset_flyweight(path1, path2):
 
     ds1 = Dataset(path1)
     assert_is_instance(ds1, Dataset)
-    ds1.create()
-
     # Don't create circular references or anything similar
     assert_equal(1, sys.getrefcount(ds1) - 1)
+
+    ds1.create()
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # refcount still fine after repo creation:
+    assert_equal(1, sys.getrefcount(ds1) - 1)
+
 
     # instantiate again:
     ds2 = Dataset(path1)
@@ -390,6 +404,7 @@ def test_Dataset_flyweight(path1, path2):
 
     # deleting one reference has no effect on the other:
     del ds1
+    gc.collect()  # TODO: see first comment above
     ok_(ds2 is not None)
     ok_(ds2.repo is ds3.repo)
     if not on_windows:
@@ -400,6 +415,7 @@ def test_Dataset_flyweight(path1, path2):
 
     with swallow_logs(new_level=1) as cml:
         del ds3
+        gc.collect()  # TODO: see first comment above
         # flyweight vanished:
         assert_not_in(path1, Dataset._unique_instances.keys())
         # no such instance known to gc anymore:
