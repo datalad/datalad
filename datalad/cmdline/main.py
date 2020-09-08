@@ -31,8 +31,8 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
 from ..utils import (
-    ensure_unicode,
     chpwd,
+    ensure_unicode,
     get_suggestions_msg,
     on_msys_tainted_paths,
     setup_exceptionhook,

@@ -34,8 +34,8 @@ from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..support.network import RI
 from ..support import path
-from ..utils import ensure_list_from_str
 from ..utils import auto_repr
+from ..utils import ensure_list_from_str
 from ..utils import get_dataset_root
 
 from ..interface.common_cfg import dirs

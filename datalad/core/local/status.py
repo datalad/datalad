@@ -17,9 +17,9 @@ import os.path as op
 from collections import OrderedDict
 
 from datalad.utils import (
+    bytes2human,
     ensure_list,
     ensure_unicode,
-    bytes2human,
     get_dataset_root,
 )
 from datalad.interface.base import (

@@ -40,9 +40,9 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
+    auto_repr,
     ensure_bytes,
     ensure_unicode,
-    auto_repr,
     generate_file_chunks,
     get_tempfile_kwargs,
     split_cmdline,

@@ -29,8 +29,8 @@ from datalad.metadata.metadata import (
     query_aggregated_metadata,
 )
 from datalad.utils import (
-    ensure_unicode,
     chpwd,
+    ensure_unicode,
 )
 from datalad.tests.utils import (
     assert_dict_equal,

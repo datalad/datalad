@@ -13,8 +13,8 @@ import glob
 import logging
 import os.path as op
 
-from datalad.utils import ensure_unicode
 from datalad.utils import chpwd
+from datalad.utils import ensure_unicode
 from datalad.utils import getpwd
 from datalad.utils import partition
 

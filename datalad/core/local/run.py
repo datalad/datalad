@@ -50,9 +50,9 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import (
+    chpwd,
     ensure_bytes,
     ensure_unicode,
-    chpwd,
     get_dataset_root,
     getpwd,
     join_cmdline,
