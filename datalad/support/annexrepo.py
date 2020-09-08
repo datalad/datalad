@@ -25,10 +25,8 @@ from os.path import (
     curdir,
     join as opj,
     exists,
-    islink,
     lexists,
     isdir,
-    isabs,
     normpath
 )
 from multiprocessing import cpu_count
@@ -76,7 +74,6 @@ from datalad.cmd import (
 from .repo import RepoInterface
 from .gitrepo import (
     GitRepo,
-    _normalize_path,
     normalize_path,
     normalize_paths,
     to_options
@@ -279,7 +276,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._init(version=version, description=description)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
-        # and _set_direct_mode
         self._direct_mode = None
 
         # Handle cases of detecting repositories with no longer supported
@@ -1106,46 +1102,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # If annex.version isn't set (e.g., an uninitialized repo), assume
             # that unlocked pointers aren't supported.
             return False
-
-    # TODO: RM DIRECT  might be gone but pieces might be useful for establishing
-    #       migration to v6+ mode and testing. For now is made protected to
-    #       avoid use by users
-    def _set_direct_mode(self, enable_direct_mode=True):
-        """Switch to direct or indirect mode
-
-        WARNING!  To be used only for internal development purposes.
-                  We no longer support direct mode and thus setting it in a
-                  repository would render it unusable for DataLad
-
-        Parameters
-        ----------
-        enable_direct_mode: bool
-            True means switch to direct mode,
-            False switches to indirect mode
-
-        Raises
-        ------
-        CommandNotAvailableError
-            in case you try to switch to indirect mode on a crippled filesystem
-        """
-        if self.is_crippled_fs() and not enable_direct_mode:
-            # TODO: ?? DIRECT - should we call git annex upgrade?
-            raise CommandNotAvailableError(
-                cmd="git-annex indirect",
-                msg="Can't switch to indirect mode on that filesystem.")
-
-        self._run_annex_command(
-            'direct' if enable_direct_mode else 'indirect',
-            expect_stderr=True,
-            runner="gitwitless"
-        )
-        self.config.reload()
-
-        # For paranoid we will just re-request
-        self._direct_mode = None
-        assert(self.is_direct_mode() == enable_direct_mode)
-
-        # All further workarounds were stripped - no direct mode is supported
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
