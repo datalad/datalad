@@ -81,7 +81,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     ds = Dataset(ds_path).create(force=True)
 
     subds = ds.create('sub', force=True)
-    subds2 = ds.create('sub2', force=True, no_annex=True)
+    subds2 = ds.create('sub2', force=True, annex=False)
     ds.save(recursive=True)
     assert_repo_status(ds.path)
 
