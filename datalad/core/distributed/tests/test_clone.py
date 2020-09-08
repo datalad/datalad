@@ -850,8 +850,6 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
     assert_result_count(res, 2)
 
 
-
-
 @with_tempfile
 def _postclonetest_prepare(lcl, storepath, link):
 

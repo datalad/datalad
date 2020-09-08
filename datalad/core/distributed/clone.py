@@ -808,8 +808,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     gc_response = GitWitlessRunner(
                         cwd=origin_git_path,
                     ).run(['git', 'config', '--local', '--get', 'core.bare'],
-                          protocol=StdOutErrCapture,
-                          encoding='utf-8')
+                          protocol=StdOutErrCapture)
                     if gc_response['stdout'].lower().strip() == 'true':
                         # origin is a bare repo -> use path as is
                         pass
