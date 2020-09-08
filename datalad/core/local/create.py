@@ -213,7 +213,9 @@ class Create(Interface):
             fake_dates=False,
             cfg_proc=None
     ):
-        # TODO: introduced with 0.13, remove with 0.14
+        # TODO: The current release of datalad-metalad (v0.2.1) still uses
+        # no_annex in its tests. Remove this compatibility kludge once a
+        # release is made, which will include 16a170e (2020-09-08).
         if no_annex is not _NoAnnexDefault:
             # the two mirror options do not agree and the deprecated one is
             # not at default value
