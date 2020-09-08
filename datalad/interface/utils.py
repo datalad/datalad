@@ -35,7 +35,7 @@ from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge c
 from datalad.utils import (
     path_startswith,
     path_is_subpath,
-    assure_unicode,
+    ensure_unicode,
     getargspec,
     get_wrapped_class,
 )
@@ -230,7 +230,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     filematch = False
     if isdir(basepath):
         for p in listdir(basepath):
-            p = assure_unicode(opj(basepath, p))
+            p = ensure_unicode(opj(basepath, p))
             if not isdir(p):
                 if p in targetpaths:
                     filematch = True

@@ -32,7 +32,7 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.utils import Path
 
 from .base import Interface
@@ -91,7 +91,7 @@ class Unlock(Interface):
         paths_nondir = set()
         paths_lexist = None
         if path:
-            path = resolve_path(assure_list(path), ds=dataset)
+            path = resolve_path(ensure_list(path), ds=dataset)
             paths_lexist = []
             for p in path:
                 if p.exists() or p.is_symlink():

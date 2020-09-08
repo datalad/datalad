@@ -52,7 +52,7 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     path_is_subpath,
     path_startswith,
     as_unicode,
@@ -465,7 +465,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             )
 
     # pull out potential metadata field blacklist config settings
-    blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
+    blacklist = [re.compile(bl) for bl in ensure_list(ds.config.obtain(
         'datalad.metadata.aggregate-ignore-fields',
         default=[]))]
     # enforce size limits
@@ -1080,4 +1080,4 @@ class Metadata(Interface):
                           if k not in ('tag', '@context', '@id'))
                  if meta else ' -' if 'metadata' in res else ' aggregated',
             tags='' if 'tag' not in meta else ' [{}]'.format(
-                 ','.join(assure_list(meta['tag'])))))
+                 ','.join(ensure_list(meta['tag'])))))

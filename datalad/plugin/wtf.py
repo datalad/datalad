@@ -21,7 +21,7 @@ from collections import OrderedDict
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
-    assure_unicode,
+    ensure_unicode,
     getpwd,
     unlink,
 )
@@ -83,8 +83,8 @@ def get_max_path_length(top_path=None, maxl=1000):
 def _describe_datalad():
 
     return {
-        'version': assure_unicode(__version__),
-        'full_version': assure_unicode(__full_version__),
+        'version': ensure_unicode(__version__),
+        'full_version': ensure_unicode(__full_version__),
     }
 
 
@@ -370,7 +370,7 @@ class WTF(Interface):
         infos = OrderedDict()
         res = get_status_dict(
             action='wtf',
-            path=ds.path if ds else assure_unicode(op.abspath(op.curdir)),
+            path=ds.path if ds else ensure_unicode(op.abspath(op.curdir)),
             type='dataset' if ds else 'directory',
             status='ok',
             logger=lgr,

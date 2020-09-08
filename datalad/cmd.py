@@ -40,8 +40,8 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    assure_bytes,
-    assure_unicode,
+    ensure_bytes,
+    ensure_unicode,
     auto_repr,
     generate_file_chunks,
     get_tempfile_kwargs,
@@ -290,7 +290,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
                 len(data), self.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
-            log_data = assure_unicode(data)
+            log_data = ensure_unicode(data)
             # The way we log is to stay consistent with Runner.
             # TODO: later we might just log in a single entry, without
             # fd_name prefix
@@ -779,13 +779,13 @@ class Runner(object):
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
             # Let it be processed
-            line = log_(assure_unicode(line))
+            line = log_(ensure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = assure_bytes(line)
+                line = ensure_bytes(line)
         if line:
             if out_type == 'stdout':
-                self._log_out(assure_unicode(line))
+                self._log_out(ensure_unicode(line))
             elif out_type == 'stderr':
                 self._log_err(line.decode('utf-8'),
                               expected)
@@ -1154,7 +1154,7 @@ class GitRunner(Runner, GitRunnerBase):
             *args, **kwargs)
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
-        return assure_unicode(out), assure_unicode(err)
+        return ensure_unicode(out), ensure_unicode(err)
 
 
 class GitWitlessRunner(WitlessRunner, GitRunnerBase):
@@ -1309,7 +1309,7 @@ class BatchedCommand(SafeDelCloseMixin):
         #       it is just a "get"er - we could resend it few times
         # The default output_proc expects a single line output.
         # TODO: timeouts etc
-        stdout = assure_unicode(self.output_proc(process.stdout)) \
+        stdout = ensure_unicode(self.output_proc(process.stdout)) \
             if not process.stdout.closed else None
         if stderr:
             lgr.warning("Received output in stderr: %r", stderr)

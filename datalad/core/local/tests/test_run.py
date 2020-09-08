@@ -26,7 +26,7 @@ import sys
 from unittest.mock import patch
 
 from datalad.utils import (
-    assure_unicode,
+    ensure_unicode,
     chpwd,
     on_windows,
 )
@@ -336,7 +336,7 @@ def test_inputs_quotes_needed(path):
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
     with open(op.join(path, "out0")) as ifh:
-        eq_(assure_unicode(ifh.read()), expected)
+        eq_(ensure_unicode(ifh.read()), expected)
     # ... but the list form of a command does not. (Don't test this failure
     # with the obscure file name because we'd need to know its composition to
     # predict the failure.)

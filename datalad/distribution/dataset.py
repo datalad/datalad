@@ -48,7 +48,7 @@ from datalad.utils import (
     get_dataset_root as rev_get_dataset_root,
     Path,
     PurePath,
-    assure_list,
+    ensure_list,
     quote_cmdlinearg,
 )
 
@@ -623,7 +623,7 @@ def resolve_path(path, ds=None):
         ds = require_dataset(
             ds, check_installed=False, purpose='path resolution')
     out = []
-    for p in assure_list(path):
+    for p in ensure_list(path):
         if ds is None or not got_ds_instance:
             # no dataset at all or no instance provided -> CWD is always the reference
             # nothing needs to be done here. Path-conversion and absolutification

@@ -109,12 +109,12 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # nothing to filter
             paths = None
 
-    from datalad.utils import assure_unicode
+    from datalad.utils import ensure_unicode
 
     for line in stdout.split('\0'):
         if not line:
             continue
-        line = assure_unicode(line)
+        line = ensure_unicode(line)
         if not line.startswith('?? '):
             # nothing untracked, ignore, task of `diff`
             continue

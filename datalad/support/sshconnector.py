@@ -36,7 +36,7 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
     Path,
-    assure_list,
+    ensure_list,
     on_windows,
 )
 from datalad.cmd import Runner
@@ -349,7 +349,7 @@ class SSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command
-        scp_cmd += assure_list(source)
+        scp_cmd += ensure_list(source)
         # add destination path
         scp_cmd += ['%s:%s' % (
             self.sshri.hostname,
@@ -388,7 +388,7 @@ class SSHConnection(object):
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
         scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
-                    for s in assure_list(source)]
+                    for s in ensure_list(source)]
         # add destination path
         scp_cmd += [destination]
         return self.runner.run(scp_cmd)
@@ -581,7 +581,7 @@ class SSHManager(object):
           If specified, only the path(s) provided would be considered
         """
         if self._connections:
-            ctrl_paths = [Path(p) for p in assure_list(ctrl_path)]
+            ctrl_paths = [Path(p) for p in ensure_list(ctrl_path)]
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path

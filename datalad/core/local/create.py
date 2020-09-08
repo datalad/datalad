@@ -39,7 +39,7 @@ from datalad.support.constraints import (
 from datalad.support.param import Parameter
 from datalad.utils import (
     getpwd,
-    assure_list,
+    ensure_list,
     get_dataset_root,
 )
 
@@ -268,7 +268,7 @@ class Create(Interface):
         assert(path is not None)
 
         # assure cfg_proc is a list (relevant if used via Python API)
-        cfg_proc = assure_list(cfg_proc)
+        cfg_proc = ensure_list(cfg_proc)
 
         # prep for yield
         res = dict(action='create', path=str(path),

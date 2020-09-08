@@ -45,7 +45,6 @@ from datalad.dochelpers import (
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
-    assure_list,
     auto_repr,
     ensure_list,
     get_linux_distribution,
@@ -1770,7 +1769,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                content=content, no_content=not content,
                                all=all,
                                fast=fast))
-        args.extend(assure_list(remotes))
+        args.extend(ensure_list(remotes))
         self._run_annex_command('sync', annex_options=args, runner="gitwitless")
 
     @normalize_path
@@ -1976,12 +1975,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise InsufficientArgumentsError("drop() requires at least to "
                                              "specify 'files' or 'options'")
 
-        options = assure_list(options)
+        options = ensure_list(options)
 
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
-            files = assure_list(files)
+            files = ensure_list(files)
             options = options + ['--key']
             res = [
                 self._run_annex_command_json(
@@ -2302,7 +2301,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 % (output, ', '.join(map(repr, OUTPUTS)))
             )
 
-        options = assure_list(options, copy=True)
+        options = ensure_list(options, copy=True)
         if key:
             kwargs = {'opts': options + ["--key"] + files}
         else:
@@ -3012,7 +3011,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return
         if batch is False:
             # we can be lazy
-            files = assure_list(files)
+            files = ensure_list(files)
         else:
             if isinstance(files, str):
                 files = [files]
@@ -3077,7 +3076,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """Like set_metadata() but returns a generator"""
 
         def _genspec(expr, d):
-            return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]
+            return [expr.format(k, v) for k, vs in d.items() for v in ensure_list(vs)]
 
         args = []
         spec = []
@@ -3385,7 +3384,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         had_synced_branch = synced_branch in self.get_branches()
         cmd = ['annex', 'sync']
         if remote:
-            cmd.extend(assure_list(remote))
+            cmd.extend(ensure_list(remote))
         cmd.extend([
             # disable any external interaction and other magic
             '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge',
