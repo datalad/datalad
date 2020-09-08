@@ -1094,7 +1094,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             kwargs['protocol'] = _protocol
         elif runner is None:
             run_func = self.cmd_call_wrapper.run
-            kwargs['env'] = env
         else:
             raise ValueError("Unknown runner %r" % runner)
 
@@ -1105,6 +1104,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 run_func,
                 cmd_list,
                 files,
+                env=env,
                 **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
