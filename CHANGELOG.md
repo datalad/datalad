@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.13.3 (??? ??, 2020) -- will be better than ever
+## 0.13.4 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -24,6 +24,28 @@ bet we will fix some bugs and make a world even a better place.
 ### Enhancements and new features
 
 ?
+
+
+## 0.13.3 (August 28, 2020) -- .
+
+### Fixes
+
+- Work around a Python bug that led to our asyncio-based command
+  runner intermittently failing to capture the output of commands that
+  exit very quickly.  ([#4835][])
+
+- [push][] displayed an overestimate of the transfer size when
+  multiple files pointed to the same key.  ([#4821][])
+
+- When [download-url][] calls `git annex addurl`, it catches and
+  reports any failures rather than crashing.  A change in v0.12.0
+  broke this handling in a particular case.  ([#4817][])
+
+### Enhancements and new features
+
+- The wrapper functions returned by decorators are now given more
+  meaningful names to hopefully make tracebacks easier to digest.
+  ([#4834][])
 
 
 ## 0.13.2 (August 10, 2020) -- .
@@ -3059,3 +3081,7 @@ publishing
 [#4792]: https://github.com/datalad/datalad/issues/4792
 [#4806]: https://github.com/datalad/datalad/issues/4806
 [#4807]: https://github.com/datalad/datalad/issues/4807
+[#4817]: https://github.com/datalad/datalad/issues/4817
+[#4821]: https://github.com/datalad/datalad/issues/4821
+[#4834]: https://github.com/datalad/datalad/issues/4834
+[#4835]: https://github.com/datalad/datalad/issues/4835

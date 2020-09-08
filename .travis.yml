@@ -142,6 +142,13 @@ matrix:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
     - _DL_CRON=1
+  # Run with our reported minimum Git version.
+  - python: 3.5
+    env:
+    - DATALAD_USE_DEFAULT_GIT=1
+    - _DL_MIN_GIT=1
+    - PATH="$PWD/git-src/bin-wrappers/:$PATH"
+    - _DL_CRON=1
   - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -240,6 +247,7 @@ before_install:
   # Install git-annex
   - eval source tools/ci/install-annex.sh --adjust-bashrc ${_DL_ANNEX_INSTALL_SCENARIO}
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
+  - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
 
 install:
   - git config --global user.email "test@travis.land"

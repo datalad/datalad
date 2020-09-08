@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 from collections import OrderedDict
 import logging
+import re
 from tempfile import TemporaryFile
 
 from datalad.cmd import GitWitlessRunner
@@ -423,7 +424,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 res_kwargs,
                 status='impossible',
                 message='No push target given, and none could be '
-                        'auto-detected, please specific via --to',
+                        'auto-detected, please specify via --to',
             )
             return
         elif len(target) > 1:
@@ -508,12 +509,21 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             # managed branch directly, instead of the corresponding branch
             'refs/heads/adjusted' not in p['from_ref'])
     ]
-    if not refspecs2push:
-        lgr.debug(
-            'No refspecs configured for push, attempting to use active branch')
-        # nothing was set up for push, push the current branch at minimum
-        # TODO this is not right with managed branches
-        active_branch = repo.get_active_branch()
+    # TODO this is not right with managed branches
+    active_branch = repo.get_active_branch()
+    if active_branch and is_annex_repo:
+        # we could face a managed branch, in which case we need to
+        # determine the actual one and make sure it is sync'ed with the
+        # managed one, and push that one instead. following methods can
+        # be called unconditionally
+        repo.localsync(managed_only=True)
+        active_branch = repo.get_corresponding_branch(
+            active_branch) or active_branch
+
+    if not refspecs2push and not active_branch:
+        # nothing was set up for push, and we have no active branch
+        # this is a weird one, let's confess and stop here
+        # I don't think we need to support such a scenario
         if not active_branch:
             yield dict(
                 res_kwargs,
@@ -523,20 +533,15 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 'branch'
             )
             return
-        if is_annex_repo:
-            # we could face a managed branch, in which case we need to
-            # determine the actual one and make sure it is sync'ed with the
-            # managed one, and push that one instead. following methods can
-            # be called unconditionally
-            repo.localsync(managed_only=True)
-            active_branch = repo.get_corresponding_branch(
-                active_branch) or active_branch
-        refspecs2push.append(
-            # same dance as above
-            active_branch
-            if ds.config.get('branch.{}.merge'.format(active_branch), None)
-            else '{ab}:{ab}'.format(ab=active_branch)
-        )
+
+    # make sure that we always push the active branch (the context for the
+    # potential path arguments) and the annex branch -- because we claim
+    # to know better than any git config
+    must_have_branches = [active_branch] if active_branch else []
+    if is_annex_repo:
+        must_have_branches.append('git-annex')
+    for branch in must_have_branches:
+        _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
 
     # we know what to push and where, now dependency processing first
     for r in publish_depends:
@@ -637,11 +642,10 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             raise
         lgr.debug('Remote does not have a git-annex branch: %s', e)
 
-    if is_annex_repo:
-        refspecs2push += [
-            'git-annex'
-            if ds.config.get('branch.git-annex.merge', None)
-            else 'git-annex:git-annex']
+    if not refspecs2push:
+        lgr.debug('No refspecs found that need to be pushed')
+        return
+
     # and push all relevant branches, plus the git-annex branch to announce
     # local availability info too
     yield from _push_refspecs(
@@ -651,6 +655,18 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         force_git_push,
         res_kwargs.copy(),
     )
+
+
+def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
+    # try to anticipate any flavor of an idea of a branch ending up in a refspec
+    looks_like_that_branch = re.compile(
+        r'((^|.*:)refs/heads/|.*:|^){}$'.format(branch))
+    if all(not looks_like_that_branch.match(r) for r in refspecs):
+        refspecs.append(
+            branch
+            if ds.config.get('branch.{}.merge'.format(branch), None)
+            else '{branch}:{branch}'.format(branch=branch)
+        )
 
 
 def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):

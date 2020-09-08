@@ -740,12 +740,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd = ['git']
             if git_options:
                 cmd.extend(git_options)
-
-            cmd.append("rev-parse")
-            if external_versions['cmd:git'] >= '2.13.0':
-                cmd.append("--absolute-git-dir")
-            else:
-                cmd.append("--git-dir")
+            cmd.extend(["rev-parse", "--absolute-git-dir"])
 
             try:
                 toppath, err = GitRunner().run(
@@ -760,10 +755,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 toppath = AnnexRepo.get_toppath(dirname(path),
                                                 follow_up=follow_up,
                                                 git_options=git_options)
-
-            if external_versions['cmd:git'] < '2.13.0':
-                # we got a path relative to `path` instead of an absolute one
-                toppath = opj(path, toppath)
 
             # we got the git-dir. Assuming the root dir we are looking for is
             # one level up:
@@ -1744,6 +1735,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         pointers = self.supports_unlocked_pointers
         # We're only concerned about modified files in V6+ mode. In V5
         # `find` returns an empty string for unlocked files.
+        #
+        # ATTN: test_AnnexRepo_file_has_content has a failure before Git
+        # v2.13 (tested back to v2.9) because this diff call unexpectedly
+        # reports a type change as modified.
         modified = [
             f for f in self.call_git_items_(
                 ['diff', '--name-only', '-z'], sep='\0')

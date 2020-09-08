@@ -84,14 +84,14 @@ def get_bucket(conn, bucket_name):
     bucket_name: str
         Name of the bucket to connect to
     """
-    bucket = None
     try:
-        bucket = conn.get_bucket(bucket_name)
+        return conn.get_bucket(bucket_name)
     except S3ResponseError as e:
         # can initially deny or error to connect to the specific bucket by name,
         # and we would need to list which buckets are available under following
         # credentials:
-        lgr.debug("Cannot access bucket %s by name: %s", bucket_name, exc_str(e))
+        lgr.debug("Cannot access bucket %s by name with validation: %s",
+                  bucket_name, exc_str(e))
         if conn.anon:
             raise AnonymousAccessDeniedError(
                 "Access to the bucket %s did not succeed.  Requesting "
@@ -99,19 +99,28 @@ def get_bucket(conn, bucket_name):
                 "little sense and thus not supported." % bucket_name,
                 supported_types=['aws-s3']
             )
-        all_buckets = []
+
+        if e.reason == "Forbidden":
+            # Could be just HEAD call boto issues is not allowed, and we should not
+            # try to verify that bucket is "reachable".  Just carry on
+            try:
+                return conn.get_bucket(bucket_name, validate=False)
+            except S3ResponseError as e2:
+                lgr.debug("Cannot access bucket %s even without validation: %s",
+                          bucket_name, exc_str(e2))
+                _handle_exception(e, bucket_name)
+
         try:
             all_buckets = conn.get_all_buckets()
+            all_bucket_names = [b.name for b in all_buckets]
+            lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
+            if bucket_name in all_bucket_names:
+                return all_buckets[all_bucket_names.index(bucket_name)]
         except S3ResponseError as e2:
             lgr.debug("Cannot access all buckets: %s", exc_str(e2))
             _handle_exception(e, 'any (originally requested %s)' % bucket_name)
-        all_bucket_names = [b.name for b in all_buckets]
-        lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
-        if bucket_name in all_bucket_names:
-            bucket = all_buckets[all_bucket_names.index(bucket_name)]
         else:
             _handle_exception(e, bucket_name)
-    return bucket
 
 
 class VersionedFilesPool(object):

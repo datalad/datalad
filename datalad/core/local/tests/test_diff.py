@@ -16,7 +16,6 @@ import os
 import os.path as op
 from unittest.mock import patch
 
-from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
@@ -377,7 +376,7 @@ def test_path_diff(_path, linkpath):
     eq_(plain_recursive, ds.diff(path=['.', '.'], recursive=True, annex='all',
                                  result_renderer=None))
     # neither do nested paths
-    if not ("2.24.0" <= external_versions["cmd:git"] < "2.25.0"):
+    if not "2.24.0" <= ds.repo.git_version < "2.25.0":
         # Release 2.24.0 contained a regression that was fixed with 072a231016
         # (2019-12-10).
         eq_(plain_recursive,
