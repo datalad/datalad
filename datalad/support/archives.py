@@ -289,7 +289,7 @@ class ExtractedArchive(object):
         return exists(self.path) and exists(self.stamp_path) \
             and os.stat(self.stamp_path).st_mtime >= os.stat(self.path).st_mtime
 
-    def assure_extracted(self):
+    def ensure_extracted(self):
         """Return path to the extracted `archive`.  Extract archive if necessary
         """
         path = _normalize_fname_suffixes(self.path)
@@ -347,7 +347,7 @@ class ExtractedArchive(object):
     def get_extracted_files(self):
         """Generator to provide filenames which are available under extracted archive
         """
-        path = self.assure_extracted()
+        path = self.ensure_extracted()
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
         for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
@@ -406,7 +406,7 @@ class ExtractedArchive(object):
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back
         # "fixed" up names since they are only to point to the load
-        self.assure_extracted()
+        self.ensure_extracted()
         path = self.get_extracted_filename(afile)
         # TODO: make robust
         lgr.log(2, "Verifying that %s exists" % abspath(path))
