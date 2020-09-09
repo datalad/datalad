@@ -27,7 +27,7 @@ lgr = logging.getLogger('datalad.support.archive_utils_7z')
 
 from datalad.cmd import (
     WitlessRunner as Runner,
-    StdOutErrCapture,
+    KillOutput,
 )
 
 
@@ -62,7 +62,7 @@ def decompress_file(archive, dir_):
     else:
         # fire and forget
         cmd = ['7z', 'x', archive]
-    runner.run(cmd, protocol=StdOutErrCapture)
+    runner.run(cmd, protocol=KillOutput)
 
 
 def compress_files(files, archive, path=None, overwrite=True):
@@ -99,4 +99,4 @@ def compress_files(files, archive, path=None, overwrite=True):
         ]
     else:
         cmd = ['7z', 'u', str(apath), '--'] + files
-    runner.run(cmd, protocol=StdOutErrCapture)
+    runner.run(cmd, protocol=KillOutput)
