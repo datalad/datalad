@@ -304,7 +304,7 @@ def _gen_github_entity(
 
 def _make_github_repos(
         github_login, github_passwd, github_organization, rinfo, existing,
-        access_protocol, dryrun):
+        access_protocol, private, dryrun):
     res = []
     if not rinfo:
         return res  # no need to even try!
@@ -327,6 +327,7 @@ def _make_github_repos(
                     reponame,
                     existing,
                     access_protocol,
+                    private,
                     dryrun)
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
@@ -360,7 +361,8 @@ def _make_github_repos(
         raise RuntimeError("Did not even try to create a repo on github")
 
 
-def _make_github_repo(github_login, entity, reponame, existing, access_protocol, dryrun):
+def _make_github_repo(github_login, entity, reponame, existing,
+                      access_protocol, private, dryrun):
     repo = None
     try:
         repo = entity.get_repo(reponame)
@@ -391,7 +393,7 @@ def _make_github_repo(github_login, entity, reponame, existing, access_protocol,
                 reponame,
                 # TODO description='',
                 # TODO homepage='',
-                # TODO private=False,
+                private=private,
                 has_issues=False,
                 has_wiki=False,
                 has_downloads=False,

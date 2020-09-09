@@ -38,7 +38,15 @@ def get_jsonhooks_from_config(cfg):
             continue
         hook_basevar = h[:-11]
         hook_name = hook_basevar[20:]
-        call = cfg.get('{}.call-json'.format(hook_basevar), None)
+        # do not use a normal `get()` here, because it reads the committed dataset
+        # config too. That means a datalad update can silently bring in new
+        # procedure definitions from the outside, and in some sense enable
+        # remote code execution by a 3rd-party
+        call = cfg.get_from_source(
+            'local',
+            '{}.call-json'.format(hook_basevar),
+            None
+        )
         if not call:
             lgr.warning(
                 'Incomplete result hook configuration %s in %s' % (

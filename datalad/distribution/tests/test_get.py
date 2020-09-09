@@ -45,12 +45,16 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_message,
     serve_path_via_http,
+    skip_ssh,
+    skip_if_on_windows,
+    SkipTest,
     slow,
     known_failure_windows,
 )
 from datalad.utils import (
     with_pathsep,
     chpwd,
+    Path,
     rmtree,
 )
 from ..dataset import Dataset
@@ -634,3 +638,48 @@ def test_gh3356(src, path):
     assert_result_count(
         clone.status(recursive=True, annex='all', report_filetype='eval'), 2,
         action='status', has_content=True)
+
+
+@slow  # ~12s
+@skip_if_on_windows
+@skip_ssh
+@with_tempfile(mkdir=True)
+def test_get_subdataset_direct_fetch(path):
+    path = Path(path)
+    origin = Dataset(path / "origin").create()
+    if origin.repo.is_managed_branch():
+        # The setup here probably breaks down with adjusted branches.
+        raise SkipTest("Test assumes non-adjusted branches")
+
+    for sub in ["s0", "s1"]:
+        sds = origin.create(origin.pathobj / sub)
+        sds.repo.commit(msg="another commit", options=["--allow-empty"])
+    origin.save()
+    s0 = Dataset(origin.pathobj / "s0")
+    s1 = Dataset(origin.pathobj / "s1")
+    # Abandon the recorded commit so that it needs to be brought down by a
+    # direct fetch.
+    s0.repo.call_git(["reset", "--hard", "HEAD~"])
+    s1.repo.call_git(["reset", "--hard", "HEAD~"])
+
+    # Tweak the configuration of s0 to make the direct fetch fail.
+    # Disallow direct oid fetch (default).
+    s0.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
+                       where="local")
+    # Configure the fetcher to avoid v2, which allows fetching unadvertised
+    # objects regardless of the value of uploadpack.allowAnySHA1InWant.
+    s0.repo.config.set("protocol.version", "0", where="local")
+
+    # Configure s1 to succeed with direct fetch.
+    s1.repo.config.set("uploadpack.allowAnySHA1InWant", "true",
+                       where="local")
+
+    clone = install(
+        str(path / "clone"),
+        source="ssh://datalad-test:" + origin.repo.pathobj.as_posix())
+
+    res = clone.get(["s0", "s1"], on_failure="ignore")
+    assert_result_count(res, 1,
+                        action="install", type="dataset", status="error")
+    assert_result_count(res, 1,
+                        action="install", type="dataset", status="ok")

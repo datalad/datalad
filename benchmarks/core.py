@@ -17,7 +17,12 @@ import timeit
 from time import time
 from subprocess import call
 
-from datalad.cmd import Runner
+from datalad.cmd import (
+    Runner,
+    WitlessRunner,
+    GitWitlessRunner,
+    StdOutErrCapture,
+)
 
 from datalad.api import save
 from datalad.api import create
@@ -138,3 +143,21 @@ class runner(SuprocBenchmarks):
     #                               log_stderr='offline')
 
     # TODO: track the one with in/out, i.e. for those BatchedProcesses
+
+
+class witlessrunner(SuprocBenchmarks):
+    """Some rudimentary tests to see if there is no major slowdowns of WitlessRunner
+    """
+
+    def setup(self):
+        self.runner = WitlessRunner()
+        self.git_runner = GitWitlessRunner()
+
+    def time_echo(self):
+        self.runner.run(["echo"])
+
+    def time_echo_gitrunner(self):
+        self.git_runner.run(["echo"])
+
+    def time_echo_gitrunner_fullcapture(self):
+        self.git_runner.run(["echo"], protocol=StdOutErrCapture)

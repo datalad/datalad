@@ -10,12 +10,16 @@
 """
 
 from collections.abc import Mapping
-from functools import partial
+
+import itertools
 import logging
 import os
 import re
 import string
+import sys
 
+from functools import partial
+from operator import itemgetter
 from urllib.parse import urlparse
 
 from datalad.distribution.dataset import resolve_path
@@ -249,14 +253,19 @@ def fmt_to_name(format_string, num_to_name):
         return name
 
 
+INPUT_TYPES = ["ext", "csv", "tsv", "json"]
+
+
 def _read(stream, input_type):
-    if input_type == "csv":
+    if input_type in ["csv", "tsv"]:
         import csv
-        csvrows = csv.reader(stream)
+        csvrows = csv.reader(stream,
+                             delimiter="\t" if input_type == "tsv" else ",")
         try:
             headers = next(csvrows)
         except StopIteration:
-            raise ValueError("Failed to read CSV rows from {}".format(stream))
+            raise ValueError("Failed to read {} rows from {}"
+                             .format(input_type.upper(), stream))
         lgr.debug("Taking %s fields from first line as headers: %s",
                   len(headers), headers)
         idx_map = dict(enumerate(headers))
@@ -273,7 +282,9 @@ def _read(stream, input_type):
         # only names.
         idx_map = {}
     else:
-        raise ValueError("input_type must be 'csv', 'json', or 'ext'")
+        raise ValueError(
+            "input_type {} is invalid. Known values: {}"
+            .format(input_type, ", ".join(INPUT_TYPES)))
     return rows, idx_map
 
 
@@ -428,7 +439,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     ----------
     stream : file object
         Items used to construct the file names and URLs.
-    input_type : {'csv', 'json'}
+    input_type : {'csv', 'tsv', 'json'}
 
     All other parameters match those described in `AddUrls`.
 
@@ -503,7 +514,7 @@ def add_urls(rows, ifexists=None, options=None):
     for row in rows:
         filename_abs = row["filename_abs"]
         ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+        lgr.debug("Adding URLs to %s in %s", filename, ds.path)
 
         if os.path.exists(filename_abs) or os.path.islink(filename_abs):
             if ifexists == "skip":
@@ -544,30 +555,19 @@ def add_meta(rows):
     """
     from unittest.mock import patch
 
-    for row in rows:
-        ds, filename = row["ds"], row["ds_filename"]
+    # OPT: group by dataset first so to not patch/unpatch always_commit
+    # per each file of which we could have thousands
+    for ds, ds_rows in itertools.groupby(rows, itemgetter("ds")):
         with patch.object(ds.repo, "always_commit", False):
-            res = ds.repo.add(filename)
-            res_status = 'notneeded' if not res \
-                else 'ok' if res.get('success', False) \
-                else 'error'
-
-            yield dict(
-                action='add',
-                # decorator dies with Path()
-                path=str(ds.pathobj / filename),
-                type='file',
-                status=res_status,
-                parentds=ds.path,
-            )
-
-            lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
-                res = annexjson2result(a, ds, type="file", logger=lgr)
-                # Don't show all added metadata for the file because that
-                # could quickly flood the output.
-                del res["message"]
-                yield res
+            for row in ds_rows:
+                filename = row["ds_filename"]
+                lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+                for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
+                    res = annexjson2result(a, ds, type="file", logger=lgr)
+                    # Don't show all added metadata for the file because that
+                    # could quickly flood the output.
+                    del res["message"]
+                    yield res
 
 
 @build_doc
@@ -577,10 +577,11 @@ class Addurls(Interface):
     *Format specification*
 
     Several arguments take format strings.  These are similar to normal Python
-    format strings where the names from `URL-FILE` (column names for a CSV or
-    properties for JSON) are available as placeholders.  If `URL-FILE` is a CSV
-    file, a positional index can also be used (i.e., "{0}" for the first
-    column).  Note that a placeholder cannot contain a ':' or '!'.
+    format strings where the names from `URL-FILE` (column names for a comma-
+    or tab-separated file or properties for JSON) are available as
+    placeholders. If `URL-FILE` is a CSV or TSV file, a positional index can
+    also be used (i.e., "{0}" for the first column). Note that a placeholder
+    cannot contain a ':' or '!'.
 
     In addition, the `FILENAME-FORMAT` arguments has a few special
     placeholders.
@@ -639,6 +640,12 @@ class Addurls(Interface):
 
       $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
+    If the information is represented as JSON lines instead of comma separated
+    values or a JSON array, you can use a utility like jq to transform the JSON
+    lines into an array that addurls accepts::
+
+      $ ... | jq --slurp . | datalad addurls - '{link}' '{who}.{ext}'
+
     .. note::
 
        For users familiar with 'git annex addurl': A large part of this
@@ -666,8 +673,11 @@ class Addurls(Interface):
             metavar="URL-FILE",
             doc="""A file that contains URLs or information that can be used to
             construct URLs.  Depending on the value of --input-type, this
-            should be a CSV file (with a header as the first row) or a JSON
-            file (structured as a list of objects with string values)."""),
+            should be a comma- or tab-separated file (with a header as the
+            first row) or a JSON file (structured as a list of objects with
+            string values). If '-', read from standard input, taking the
+            content as JSON when --input-type is at its default value of
+            'ext'."""),
         urlformat=Parameter(
             args=("urlformat",),
             metavar="URL-FORMAT",
@@ -687,11 +697,11 @@ class Addurls(Interface):
         input_type=Parameter(
             args=("-t", "--input-type"),
             metavar="TYPE",
-            doc="""Whether `URL-FILE` should be considered a CSV file or a JSON
-            file.  The default value, "ext", means to consider `URL-FILE` as a
-            JSON file if it ends with ".json".  Otherwise, treat it as a CSV
-            file.""",
-            constraints=EnsureChoice("ext", "csv", "json")),
+            doc="""Whether `URL-FILE` should be considered a CSV file, TSV
+            file, or JSON file. The default value, "ext", means to consider
+            `URL-FILE` as a JSON file if it ends with ".json" or a TSV file if
+            it ends with ".tsv". Otherwise, treat it as a CSV file.""",
+            constraints=EnsureChoice(*INPUT_TYPES)),
         exclude_autometa=Parameter(
             args=("-x", "--exclude_autometa"),
             metavar="REGEXP",
@@ -783,13 +793,23 @@ class Addurls(Interface):
                                   message="not an annex repo")
             return
 
-        url_file = str(resolve_path(url_file, dataset))
+        if url_file != "-":
+            url_file = str(resolve_path(url_file, dataset))
 
         if input_type == "ext":
-            extension = os.path.splitext(url_file)[1]
-            input_type = "json" if extension == ".json" else "csv"
+            if url_file == "-":
+                input_type = "json"
+            else:
+                extension = os.path.splitext(url_file)[1]
+                if extension == ".json":
+                    input_type = "json"
+                elif extension == ".tsv":
+                    input_type = "tsv"
+                else:
+                    input_type = "csv"
 
-        with open(url_file) as fd:
+        fd = sys.stdin if url_file == "-" else open(url_file)
+        try:
             try:
                 rows, subpaths = extract(fd, input_type,
                                          url_format, filename_format,
@@ -802,6 +822,9 @@ class Addurls(Interface):
                                       status="error",
                                       message=exc_str(exc))
                 return
+        finally:
+            if fd is not sys.stdin:
+                fd.close()
 
         if not rows:
             yield get_status_dict(action="addurls",
@@ -904,7 +927,7 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
+            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add and r["meta_args"]]
             for r in add_meta(meta_rows):
                 yield r
 

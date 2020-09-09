@@ -9,13 +9,32 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.13.4 (??? ??, 2020) -- will be better than ever
+## 0.14.0 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- Git versions below v2.19.1 are no longer supported.  ([#4650][])
+
+- The `get_git_dir` static method of `GitRepo` is deprecated and will
+  be removed in a later release.  Use the `dot_git` attribute of an
+  instance instead.  ([#4597][])
+
+- The `datalad.inteface.run` module, which was deprecated in 0.12.0
+  and kept as a compatibility shim for `datalad.core.local.run`, has
+  been removed.  ([#4583][])
+
+- The `saver` argument of `datalad.core.local.run.run_command`, marked
+  as obsolete in 0.12.0, has been removed.  ([#4583][])
+
+- The `dataset_only` argument of the `ConfigManager` class was
+  deprecated in 0.12 and has now been removed.  ([#4828][])
+
+- The `linux_distribution_name`, `linux_distribution_release`, and
+  `on_debian_wheezy` attributes in `datalad.utils` are no longer set
+  at import time and will be removed in a later release.  Use
+  `datalad.utils.get_linux_distribution` instead.  ([#4696][])
 
 ### Fixes
 
@@ -23,7 +42,23 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-?
+- [create-sibling-github][] learned how to create private repositories
+  (thanks to Nolan Nichols).  ([#4769][])
+
+- The download machinery (and thus the `datalad` special remote)
+  gained support for a new scheme, `shub://`, which follows the same
+  format used by `singularity run` and friends.  In contrast to the
+  short-lived URLs obtained by querying Singularity Hub directly,
+  `shub://` URLs are suitable for registering with git-annex.  ([#4816][])
+
+- [addurls][] learned how to read data from standard input.  ([#4669][])
+
+- The class for handling configuration values, `ConfigManager`, now
+  takes a lock before writes to allow for multiple processes to modify
+  the configuration of a dataset.  ([#4829][])
+
+- Command-line scripts are now defined via the `entry_points` argument
+  of `setuptools.setup` instead of the `scripts` argument.  ([#4695][])
 
 
 ## 0.13.3 (August 28, 2020) -- .
@@ -3051,11 +3086,15 @@ publishing
 [#4560]: https://github.com/datalad/datalad/issues/4560
 [#4568]: https://github.com/datalad/datalad/issues/4568
 [#4581]: https://github.com/datalad/datalad/issues/4581
+[#4583]: https://github.com/datalad/datalad/issues/4583
+[#4597]: https://github.com/datalad/datalad/issues/4597
 [#4617]: https://github.com/datalad/datalad/issues/4617
 [#4619]: https://github.com/datalad/datalad/issues/4619
 [#4620]: https://github.com/datalad/datalad/issues/4620
+[#4650]: https://github.com/datalad/datalad/issues/4650
 [#4657]: https://github.com/datalad/datalad/issues/4657
 [#4666]: https://github.com/datalad/datalad/issues/4666
+[#4669]: https://github.com/datalad/datalad/issues/4669
 [#4673]: https://github.com/datalad/datalad/issues/4673
 [#4674]: https://github.com/datalad/datalad/issues/4674
 [#4675]: https://github.com/datalad/datalad/issues/4675
@@ -3063,6 +3102,7 @@ publishing
 [#4684]: https://github.com/datalad/datalad/issues/4684
 [#4687]: https://github.com/datalad/datalad/issues/4687
 [#4692]: https://github.com/datalad/datalad/issues/4692
+[#4695]: https://github.com/datalad/datalad/issues/4695
 [#4696]: https://github.com/datalad/datalad/issues/4696
 [#4703]: https://github.com/datalad/datalad/issues/4703
 [#4729]: https://github.com/datalad/datalad/issues/4729
@@ -3074,6 +3114,7 @@ publishing
 [#4759]: https://github.com/datalad/datalad/issues/4759
 [#4760]: https://github.com/datalad/datalad/issues/4760
 [#4763]: https://github.com/datalad/datalad/issues/4763
+[#4769]: https://github.com/datalad/datalad/issues/4769
 [#4775]: https://github.com/datalad/datalad/issues/4775
 [#4786]: https://github.com/datalad/datalad/issues/4786
 [#4788]: https://github.com/datalad/datalad/issues/4788
@@ -3081,7 +3122,10 @@ publishing
 [#4792]: https://github.com/datalad/datalad/issues/4792
 [#4806]: https://github.com/datalad/datalad/issues/4806
 [#4807]: https://github.com/datalad/datalad/issues/4807
+[#4816]: https://github.com/datalad/datalad/issues/4816
 [#4817]: https://github.com/datalad/datalad/issues/4817
 [#4821]: https://github.com/datalad/datalad/issues/4821
+[#4828]: https://github.com/datalad/datalad/issues/4828
+[#4829]: https://github.com/datalad/datalad/issues/4829
 [#4834]: https://github.com/datalad/datalad/issues/4834
 [#4835]: https://github.com/datalad/datalad/issues/4835

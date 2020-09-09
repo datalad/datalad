@@ -46,6 +46,7 @@ from .utils import (
     generate_file_chunks,
     get_tempfile_kwargs,
     split_cmdline,
+    try_multiple,
     unlink,
 )
 
@@ -249,8 +250,16 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
     proc_out = None
     proc_err = None
 
-    def __init__(self, done_future):
-        # future promise to be fulfilled when process exits
+    def __init__(self, done_future, encoding=None):
+        """
+        Parameters
+        ----------
+        done_future : asyncio.Future
+          Future promise to be fulfilled when process exits.
+        encoding : str
+          Encoding to be used for process output bytes decoding. By default,
+          the preferred system encoding is guessed.
+        """
         self.done = done_future
         # capture output in bytearrays while the process is running
         Streams = namedtuple('Streams', ['out', 'err'])
@@ -260,7 +269,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         )
         self.pid = None
         super().__init__()
-        self.encoding = getpreferredencoding(do_setlocale=False)
+        self.encoding = encoding or getpreferredencoding(do_setlocale=False)
 
         self._log_outputs = False
         if lgr.isEnabledFor(5):
@@ -1327,9 +1336,27 @@ class BatchedCommand(SafeDelCloseMixin):
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
-            process.wait()
+            # try waiting for the annex process to finish 3 times for 3 sec
+            # with 1s pause in between
+            try:
+                try_multiple(
+                    # ntrials
+                    3,
+                    # exception to catch
+                    subprocess.TimeoutExpired,
+                    # base waiting period
+                    1.0,
+                    # function to run
+                    process.wait,
+                    timeout=3.0,
+                )
+            except subprocess.TimeoutExpired:
+                lgr.warning(
+                    "Batched process %s did not finish, abandoning it without killing it",
+                    process)
+            if process.returncode is not None:
+                lgr.debug("Process %s has finished", process)
             self._process = None
-            lgr.debug("Process %s has finished", process)
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
             if return_stderr:
                 with open(self._stderr_out_fname, 'r') as f:

@@ -25,14 +25,15 @@ from os.path import (
     curdir,
     join as opj,
     exists,
-    islink,
     lexists,
     isdir,
-    isabs,
     normpath
 )
 from multiprocessing import cpu_count
-from weakref import WeakValueDictionary
+from weakref import (
+    finalize,
+    WeakValueDictionary
+)
 
 from datalad import ssh_manager
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
@@ -48,11 +49,11 @@ from datalad.utils import (
     auto_repr,
     ensure_list,
     get_linux_distribution,
+    join_cmdline,
     on_windows,
     partition,
     Path,
     PurePosixPath,
-    quote_cmdlinearg,
     split_cmdline,
     unlink,
 )
@@ -73,7 +74,6 @@ from datalad.cmd import (
 from .repo import RepoInterface
 from .gitrepo import (
     GitRepo,
-    _normalize_path,
     normalize_path,
     normalize_paths,
     to_options
@@ -276,7 +276,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._init(version=version, description=description)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
-        # and _set_direct_mode
         self._direct_mode = None
 
         # Handle cases of detecting repositories with no longer supported
@@ -315,6 +314,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # will be evaluated lazily
         self._n_auto_jobs = None
+
+        # Finally, register a finalizer (instead of having a __del__ method).
+        # This will be called by garbage collection as well as "atexit". By
+        # keeping the reference here, we can also call it explicitly.
+        # Note, that we can pass required attributes to the finalizer, but not
+        # `self` itself. This would create an additional reference to the object
+        # and thereby preventing it from being collected at all.
+        self._finalizer = finalize(self, AnnexRepo._cleanup, self.path,
+                                   self._batched)
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
@@ -367,7 +375,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
             self.config.set('annex.backends', backend, where='local')
 
-    def __del__(self):
+    @classmethod
+    def _cleanup(cls, path, batched):
+
+        lgr.log(1, "Finalizer called on: AnnexRepo(%s)", path)
+
+        # Ben: With switching to finalize rather than del, I think the
+        #      safe_del_debug isn't needed anymore. However, time will tell and
+        #      it doesn't hurt.
 
         def safe__del__debug(e):
             """We might be too late in the game and either .debug or exc_str
@@ -378,8 +393,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return
 
         try:
-            if hasattr(self, '_batched') and self._batched is not None:
-                self._batched.close()
+            if batched is not None:
+                batched.close()
         except TypeError as e:
             # Workaround:
             # most likely something wasn't accessible anymore; doesn't really
@@ -389,11 +404,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
-            safe__del__debug(e)
-        try:
-            super(AnnexRepo, self).__del__()
-        except TypeError as e:
-            # see above
             safe__del__debug(e)
 
     def _set_shared_connection(self, remote_name, url):
@@ -687,91 +697,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         fpath = opj(self.path, path)
         return 0 if not exists(fpath) else os.stat(fpath).st_size
 
-    # TODO: Once the PR containing super class 'Repo' was merged, move there and
-    # melt with GitRepo.get_toppath including tests for both
-    @classmethod
-    def get_toppath(cls, path, follow_up=True, git_options=None):
-        """Return top-level of a repository given the path.
-
-        Parameters
-        -----------
-        follow_up : bool
-          If path has symlinks -- they get resolved by git.  If follow_up is
-          True, we will follow original path up until we hit the same resolved
-          path.  If no such path found, resolved one would be returned.
-        git_options: list of str
-          options to be passed to the git rev-parse call
-
-        Return None if no parent directory contains a git repository.
-        """
-
-        # first try plain git result:
-        toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-                                      git_options=git_options)
-        if toppath == '':
-            # didn't fail, so git itself didn't come to the conclusion
-            # there is no repo, but we have no actual result;
-            # might be an annex in direct mode
-            if git_options is None:
-                git_options = []
-            # TODO: Apparently doesn't work with git 2.11.0
-            # Note: Since we are in a classmethod, GitRepo.get_toppath uses
-            # Runner directly instead of _git_custom_command, which is why the
-            # common mechanics for direct mode are not applied.
-            # This is why there is no solution for git 2.11 yet
-
-            # Note 2: Actually, the above issue is irrelevant. The git
-            # executable has no repository it is bound to, since it's the
-            # purpose of the call to find this repository. Therefore
-            # core.bare=False has no effect at all.
-
-            # Disabled. See notes.
-            # git_options.extend(['-c', 'core.bare=False'])
-            # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-            #                               git_options=git_options)
-
-            # basically a copy of code in GitRepo.get_toppath
-            # except it uses 'git rev-parse --git-dir' as a workaround for
-            # direct mode:
-
-            from os.path import dirname
-            from os import pardir
-
-            cmd = ['git']
-            if git_options:
-                cmd.extend(git_options)
-            cmd.extend(["rev-parse", "--absolute-git-dir"])
-
-            try:
-                toppath, err = GitRunner().run(
-                    cmd,
-                    cwd=path,
-                    log_stdout=True, log_stderr=True,
-                    expect_fail=True, expect_stderr=True)
-                toppath = toppath.rstrip('\n\r')
-            except CommandError:
-                return None
-            except OSError:
-                toppath = AnnexRepo.get_toppath(dirname(path),
-                                                follow_up=follow_up,
-                                                git_options=git_options)
-
-            # we got the git-dir. Assuming the root dir we are looking for is
-            # one level up:
-            toppath = Path(toppath, pardir).resolve()
-
-            if follow_up:
-                path_ = path
-                path_prev = ""
-                while path_ and path_ != path_prev:  # on top /.. = /
-                    if Path(path_).resolve() == toppath:
-                        toppath = path_
-                        break
-                    path_prev = path_
-                    path_ = dirname(path_)
-
-        return str(toppath) if toppath else toppath
-
     def is_initialized(self):
         """quick check whether this appears to be an annex-init'ed repo
         """
@@ -938,10 +863,27 @@ class AnnexRepo(GitRepo, RepoInterface):
           working with a sameas remote, the presence of either "sameas-name" or
           "sameas-uuid" is a reliable indicator.
         """
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
         try:
-            stdout, stderr = self._git_custom_command(
-                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
-                expect_fail=True)
+            for line in self.call_git_items_(
+                    ['cat-file', 'blob', 'git-annex:remote.log']):
+                # be precise and split by spaces
+                fields = line.split(' ')
+                # special remote UUID
+                sr_id = fields[0]
+                # the rest are config args for enableremote
+                sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+                if "name" not in sr_info:
+                    name = sr_info.get("sameas-name")
+                    if name is None:
+                        lgr.warning(
+                            "Encountered git-annex remote without a name or "
+                            "sameas-name value: %s",
+                            sr_info)
+                    else:
+                        sr_info["name"] = name
+                srs[sr_id] = sr_info
         except CommandError as e:
             if 'Not a valid object name git-annex:remote.log' in e.stderr:
                 # no special remotes configures
@@ -949,25 +891,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 # some unforseen error
                 raise e
-        argspec = re.compile(r'^([^=]*)=(.*)$')
-        srs = {}
-        for line in stdout.splitlines():
-            # be precise and split by spaces
-            fields = line.split(' ')
-            # special remote UUID
-            sr_id = fields[0]
-            # the rest are config args for enableremote
-            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
-            if "name" not in sr_info:
-                name = sr_info.get("sameas-name")
-                if name is None:
-                    lgr.warning(
-                        "Encountered git-annex remote without a name or "
-                        "sameas-name value: %s",
-                        sr_info)
-                else:
-                    sr_info["name"] = name
-            srs[sr_id] = sr_info
         return srs
 
     def _run_annex_command(self, annex_cmd,
@@ -1179,46 +1102,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # If annex.version isn't set (e.g., an uninitialized repo), assume
             # that unlocked pointers aren't supported.
             return False
-
-    # TODO: RM DIRECT  might be gone but pieces might be useful for establishing
-    #       migration to v6+ mode and testing. For now is made protected to
-    #       avoid use by users
-    def _set_direct_mode(self, enable_direct_mode=True):
-        """Switch to direct or indirect mode
-
-        WARNING!  To be used only for internal development purposes.
-                  We no longer support direct mode and thus setting it in a
-                  repository would render it unusable for DataLad
-
-        Parameters
-        ----------
-        enable_direct_mode: bool
-            True means switch to direct mode,
-            False switches to indirect mode
-
-        Raises
-        ------
-        CommandNotAvailableError
-            in case you try to switch to indirect mode on a crippled filesystem
-        """
-        if self.is_crippled_fs() and not enable_direct_mode:
-            # TODO: ?? DIRECT - should we call git annex upgrade?
-            raise CommandNotAvailableError(
-                cmd="git-annex indirect",
-                msg="Can't switch to indirect mode on that filesystem.")
-
-        self._run_annex_command(
-            'direct' if enable_direct_mode else 'indirect',
-            expect_stderr=True,
-            runner="gitwitless"
-        )
-        self.config.reload()
-
-        # For paranoid we will just re-request
-        self._direct_mode = None
-        assert(self.is_direct_mode() == enable_direct_mode)
-
-        # All further workarounds were stripped - no direct mode is supported
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
@@ -2812,7 +2695,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         stdout, stderr
         """
         cmd = split_cmdline(
-            cmd_str + " " + " ".join(quote_cmdlinearg(f) for f in files)) \
+            cmd_str + " " + join_cmdline(files)) \
             if isinstance(cmd_str, str) \
             else cmd_str + files
 

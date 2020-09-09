@@ -18,6 +18,7 @@ external_versions.check(
 
 from datalad.utils import (
     Path,
+    join_cmdline,
     quote_cmdlinearg,
 )
 
@@ -86,7 +87,7 @@ def compress_files(files, archive, path=None, overwrite=True):
     suffixes = _normalize_fname_suffixes(apath.suffixes)
     if len(suffixes) > 1 and suffixes[-2] == '.tar':
         cmd = '7z u .tar -so -- {} | 7z u -si -- {}'.format(
-            ' '.join(quote_cmdlinearg(f) for f in files),
+            join_cmdline(files),
             quote_cmdlinearg(str(apath)),
         )
     else:

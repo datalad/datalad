@@ -1665,8 +1665,28 @@ def test_get_description(path1, path2):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_flyweight(path1, path2):
 
+    import sys
+
     repo1 = AnnexRepo(path1, create=True)
     assert_is_instance(repo1, AnnexRepo)
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instantiation that isn't picked up immediately, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = AnnexRepo(path1, create=False)
     assert_is_instance(repo2, AnnexRepo)
@@ -1688,6 +1708,68 @@ def test_AnnexRepo_flyweight(path1, path2):
     repo4 = GitRepo(path1)
     assert_is_instance(repo4, GitRepo)
     assert_not_is_instance(repo4, AnnexRepo)
+
+    orig_id = id(repo1)
+
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
+
+
+    # But we have two GitRepos in memory (the AnnexRepo and repo4):
+    assert_equal(2, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # deleting one reference doesn't change anything - we still get the same
+    # thing:
+    del repo1
+    gc.collect()  # TODO: see first comment above
+    ok_(repo2 is not None)
+    ok_(repo2 is repo3)
+    ok_(repo2 == repo3)
+
+    repo1 = AnnexRepo(path1)
+    eq_(orig_id, id(repo1))
+
+    del repo1
+    del repo2
+
+    # for testing that destroying the object calls close() on BatchedAnnex:
+    class Dummy:
+        def __init__(self, *args, **kwargs):
+            self.close_called = False
+
+        def close(self):
+            self.close_called = True
+
+    fake_batch = Dummy()
+
+    # Killing last reference will lead to garbage collection which will call
+    # AnnexRepo's finalizer:
+    with patch.object(repo3._batched, 'close', fake_batch.close):
+        with swallow_logs(new_level=1) as cml:
+            del repo3
+            gc.collect()  # TODO: see first comment above
+            cml.assert_logged(msg="Finalizer called on: AnnexRepo(%s)" % path1,
+                              level="Level 1",
+                              regex=False)
+            # finalizer called close() on BatchedAnnex:
+            assert_true(fake_batch.close_called)
+
+    # Flyweight is gone:
+    assert_not_in(path1, AnnexRepo._unique_instances.keys())
+
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, AnnexRepo) and o.path == path1])
+    # GitRepo is unaffected:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # new object is created on re-request:
+    repo1 = AnnexRepo(path1)
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417

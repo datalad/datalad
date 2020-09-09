@@ -21,6 +21,7 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
+from datalad.cmd import Runner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
@@ -305,10 +306,12 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-def test_extract_csv_json_equal():
+def check_extract_csv_json_equal(input_type):
+    delim = "\t" if input_type == "tsv" else ","
+
     keys = ST_DATA["header"]
-    csv_rows = [",".join(keys)]
-    csv_rows.extend(",".join(str(row[k]) for k in keys)
+    csv_rows = [delim.join(keys)]
+    csv_rows.extend(delim.join(str(row[k]) for k in keys)
                     for row in ST_DATA["rows"])
 
     kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -316,14 +319,19 @@ def test_extract_csv_json_equal():
                 meta=["group={age_group}"])
 
     json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
-    csv_output = au.extract(csv_rows, "csv", **kwds)
+    csv_output = au.extract(csv_rows, input_type, **kwds)
 
     eq_(json_output, csv_output)
 
 
+def test_extract_csv_tsv_json_equal():
+    yield check_extract_csv_json_equal, "csv"
+    yield check_extract_csv_json_equal, "tsv"
+
+
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  au.extract, None, "not_csv_or_json")
+                  au.extract, None, "invalid_input_type")
 
 
 @with_tempfile(mkdir=True)
@@ -654,19 +662,62 @@ class TestAddurls(object):
     def test_addurls_invalid_input(self, path):
         ds = Dataset(path).create(force=True)
         in_file = op.join(path, "in")
-        for in_type in ["csv", "json"]:
+        for in_type in au.INPUT_TYPES:
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
             assert_in("Failed to read", str(exc.exception))
 
     @with_tree({"in.csv": "url,name,subdir",
+                "in.tsv": "url\tname\tsubdir",
                 "in.json": "[]"})
     def test_addurls_no_rows(self, path):
         ds = Dataset(path).create(force=True)
-        for fname in ["in.csv", "in.json"]:
+        for fname in ["in.csv", "in.tsv", "in.json"]:
             with swallow_logs(new_level=logging.WARNING) as cml:
                 assert_in_results(
                     ds.addurls(fname, "{url}", "{name}"),
                     action="addurls",
                     status="notneeded")
                 cml.assert_logged("No rows", regex=False)
+
+    @with_tempfile(mkdir=True)
+    def check_addurls_stdin_input(self, input_text, input_type, path):
+        ds = Dataset(path).create(force=True)
+        with patch("sys.stdin", new=StringIO(input_text)):
+            ds.addurls("-", "{url}", "{name}", input_type=input_type)
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(ds.path, fname))
+
+    def test_addurls_stdin_input(self):
+        def make_test(text, input_type, description):
+            def fn():
+                self.check_addurls_stdin_input(json_text, "ext")
+            fn.description = description
+            return fn
+
+        with open(self.json_file) as jfh:
+            json_text = jfh.read()
+
+        yield make_test(json_text, "ext", "json,default input type")
+        yield make_test(json_text, "json", "json,json input type")
+
+        def make_delim_text(delim):
+            row = "{name}" + delim + "{url}"
+            return "\n".join(
+                [row.format(name="name", url="url")] +
+                [row.format(**rec) for rec in json.loads(json_text)])
+
+        yield make_test(make_delim_text(","), "csv", "csv,csv input type")
+        yield make_test(make_delim_text("\t"), "tsv", "tsv,tsv input type")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_stdin_input_command_line(self, path):
+        # The previous test checks all the cases, but it overrides sys.stdin.
+        # Do a simple check that's closer to a command line call.
+        Dataset(path).create(force=True)
+        runner = Runner(cwd=path)
+        with open(self.json_file) as jfh:
+            runner.run(["datalad", "addurls", '-', '{url}', '{name}'],
+                       stdin=jfh)
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(path, fname))

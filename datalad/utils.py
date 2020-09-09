@@ -277,6 +277,7 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
+# unused in -core
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
@@ -369,31 +370,6 @@ from pathlib import (
     PurePath,
     PurePosixPath,
 )
-
-if sys.version_info.major == 3 and sys.version_info.minor < 6:
-    # Path.resolve() doesn't have strict=False until 3.6
-    # monkey patch it -- all code imports this class from this
-    # module
-    Path._datalad_moved_resolve = Path.resolve
-
-    def _resolve_without_strict(self, strict=False):
-        if strict or self.exists():
-            # this is pre 3.6 behavior
-            return self._datalad_moved_resolve()
-
-        # if strict==False, find the closest component
-        # that actually exists and resolve that one
-        for p in self.parents:
-            if not p.exists():
-                continue
-            resolved = p._datalad_moved_resolve()
-            # append the rest that did not exist
-            return resolved / self.relative_to(p)
-        # pathlib return the unresolved if nothing resolved
-        return self
-
-    Path.resolve = _resolve_without_strict
-
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -567,6 +543,7 @@ def file_basename(name, return_ext=False):
         return fbname
 
 
+# unused in -core
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
@@ -575,6 +552,7 @@ def escape_filename(filename):
     return filename
 
 
+# unused in -core
 def encode_filename(filename):
     """Encode unicode filename
     """
@@ -584,6 +562,7 @@ def encode_filename(filename):
         return filename
 
 
+# unused in -core
 def decode_input(s):
     """Given input string/bytes, decode according to stdin codepage (or UTF-8)
     if not defined
@@ -604,6 +583,7 @@ def decode_input(s):
             return s.decode(encoding, errors='replace')
 
 
+# unused in -core
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -1088,6 +1068,7 @@ def line_profile(func):
     return  _wrap_line_profile
 
 
+# unused in -core
 @optional_args
 def collect_method_callstats(func):
     """Figure out methods which call the method repeatedly on the same instance
@@ -1183,6 +1164,7 @@ def never_fail(f):
 #
 
 
+# unused in -core
 @contextmanager
 def nothing_cm():
     """Just a dummy cm to programmically switch context managers"""
@@ -1602,8 +1584,6 @@ class chpwd(object):
     def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
-            # PY35 has no auto-conversion of Path to str
-            path = str(path)
             pwd = getpwd()
             self._prev_pwd = pwd
         else:
@@ -1619,7 +1599,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = path
+        os.environ['PWD'] = str(path)
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1830,6 +1810,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
+# unused in -core
 def get_logfilename(dspath, cmd='datalad'):
     """Return a filename to use for logging under a dataset/repository
 
@@ -2066,6 +2047,7 @@ def safe_print(s):
 # IO Helpers
 #
 
+# unused in -core
 def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
 
@@ -2436,6 +2418,12 @@ def quote_cmdlinearg(arg):
     return '"{}"'.format(
         arg.replace('"', '""')
     ) if on_windows else shlex_quote(arg)
+
+
+def join_cmdline(args):
+    """Join command line args into a string using quote_cmdlinearg
+    """
+    return ' '.join(map(quote_cmdlinearg, args))
 
 
 def split_cmdline(s):

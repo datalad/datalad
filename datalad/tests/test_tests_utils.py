@@ -219,14 +219,9 @@ def test_with_tempfile_specified_prefix(d1):
     ok_('test_with_tempfile_specified_prefix' not in d1)
 
 
-@known_failure_githubci_win
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
-    if platform.system() in ('Linux', 'Darwin'):
-        eq_(n, OBSCURE_PREFIX + OBSCURE_FILENAMES[1])
-    else:
-        # ATM no one else is as good
-        ok_(n in OBSCURE_PREFIX + OBSCURE_FILENAMES[2:])
+    assert_in(n, [OBSCURE_PREFIX + OF for OF in OBSCURE_FILENAMES[1:]])
 
 
 def test_keeptemp_via_env_variable():

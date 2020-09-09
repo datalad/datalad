@@ -32,14 +32,14 @@ class CommandError(RuntimeError):
         from datalad.utils import (
             ensure_unicode,
             ensure_list,
-            quote_cmdlinearg,
+            join_cmdline,
         )
         to_str = "{}: ".format(self.__class__.__name__)
         if self.cmd:
             to_str += "'{}'".format(
                 # go for a compact, normal looking, properly quoted
                 # command rendering
-                ' '.join(quote_cmdlinearg(c) for c in ensure_list(self.cmd))
+                join_cmdline(ensure_list(self.cmd))
             )
         if self.code:
             to_str += " failed with exitcode {}".format(self.code)

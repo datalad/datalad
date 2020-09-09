@@ -32,9 +32,11 @@ from datalad.utils import (
 )
 from datalad.tests.utils import (
     assert_cwd_unchanged,
+    assert_equal,
     assert_false,
     assert_in,
     assert_in_results,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_repo_status,
@@ -1165,22 +1167,87 @@ def test_optimized_cloning(path):
 @with_tempfile(mkdir=True)
 def test_GitRepo_flyweight(path1, path2):
 
+    import gc
+
     repo1 = GitRepo(path1, create=True)
     assert_is_instance(repo1, GitRepo)
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instantiation that isn't picked up immediately, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = GitRepo(path1, create=False)
     assert_is_instance(repo2, GitRepo)
+
     # the very same object:
     ok_(repo1 is repo2)
 
     # reference the same in a different way:
     with chpwd(path1):
         repo3 = GitRepo(op.relpath(path1, start=path2), create=False)
+
     # it's the same object:
     ok_(repo1 is repo3)
 
     # and realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)
+
+    orig_id = id(repo1)
+
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # deleting one reference doesn't change anything - we still get the same
+    # thing:
+    gc.collect()  #  TODO: see first comment above
+    del repo1
+    ok_(repo2 is not None)
+    ok_(repo2 is repo3)
+    ok_(repo2 == repo3)
+
+    # re-requesting still delivers the same thing:
+    repo1 = GitRepo(path1)
+    assert_equal(orig_id, id(repo1))
+
+    # killing all references should result in the instance being gc'd and
+    # re-request yields a new object:
+    del repo1
+    del repo2
+
+    # Killing last reference will lead to garbage collection which will call
+    # GitRepo's finalizer:
+    with swallow_logs(new_level=1) as cml:
+        del repo3
+        gc.collect()  # TODO: see first comment above
+        cml.assert_logged(msg="Finalizer called on: GitRepo(%s)" % path1,
+                          level="Level 1",
+                          regex=False)
+
+    # Flyweight is gone:
+    assert_not_in(path1, GitRepo._unique_instances.keys())
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, GitRepo) and o.path == path1])
+
+    # new object is created on re-request:
+    repo1 = GitRepo(path1)
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
@@ -1420,34 +1487,6 @@ def test_fake_dates(path):
     eq_(seconds_initial + 3, gr.get_commit_date())
 
 
-@with_tree(tree={"foo": "foo content"})
-def test_custom_runner_protocol(path):
-    # Check that a runner with a non-default protocol gets wired up correctly.
-    prot = ExecutionTimeProtocol()
-    gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
-
-    ok_(len(prot) > 0)
-    ok_(prot[0]['duration'] >= 0)
-
-    def check(prev_len, prot, command):
-        # Check that the list grew and has the expected command without
-        # assuming that it gained _only_ a one command.
-        ok_(len(prot) > prev_len)
-        assert_in(command,
-                  sum([p["command"] for p in prot[prev_len:]], []))
-
-    prev_len = len(prot)
-    gr.add("foo")
-    check(prev_len, prot, "add")
-
-    # commit no longer uses a Runner with protocol capabilities
-    #prev_len = len(prot)
-    #gr.commit("commit foo")
-    #check(prev_len, prot, "commit")
-
-    ok_(all(p['duration'] >= 0 for p in prot))
-
-
 @slow   # 15sec on Yarik's laptop and tripped Travis CI
 @with_tempfile(mkdir=True)
 def test_duecredit(path):
@@ -1552,7 +1591,7 @@ def test_gitrepo_call_git_methods(path):
             with assert_raises(CommandError):
                 gr.call_git(["mv"], files=["notthere", "dest"],
                             expect_fail=expect_fail)
-            check("notthere", cml.out)
+            check("fatal: bad source", cml.out)
 
     eq_(list(gr.call_git_items_(["ls-files"])),
         ["bar", "foo.txt"])
@@ -1570,7 +1609,7 @@ def test_gitrepo_call_git_methods(path):
     ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
     with swallow_logs(new_level=logging.DEBUG) as cml:
         assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
-        assert_not_in("blob", cml.out)
+        assert_not_in("expected blob type", cml.out)
 
 
 @skip_if_no_network

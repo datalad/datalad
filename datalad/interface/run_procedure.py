@@ -35,6 +35,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetFound
 from datalad.utils import (
+    join_cmdline,
     quote_cmdlinearg,
     split_cmdline,
 )
@@ -438,7 +439,7 @@ class RunProcedure(Interface):
         cmd = ex['template'].format(
             script=quote_cmdlinearg(procedure_file),
             ds=quote_cmdlinearg(ds.path) if ds else '',
-            args=(u' '.join(quote_cmdlinearg(a) for a in args) if args else ''))
+            args=join_cmdline(args) if args else '')
         lgr.info(u"Running procedure %s", name)
         lgr.debug(u'Full procedure command: %r', cmd)
         for r in Run.__call__(
@@ -452,6 +453,16 @@ class RunProcedure(Interface):
                 return_type='generator'
         ):
             yield r
+
+        if ds:
+            # the procedure ran and we have to anticipate that it might have
+            # changed the dataset config, so we need to trigger an unforced
+            # reload.
+            # we have to do this despite "being done here", because
+            # run_procedure() runs in the same process and reuses dataset (config
+            # manager) instances, and the next interaction with a dataset should
+            # be able to count on an up-to-date config
+            ds.config.reload()
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):

@@ -35,6 +35,12 @@
   benchmarking of DataLad.  Implemented in any most appropriate language
   (Python, bash, etc.)
 
+Whenever a new top-level file or folder is added to the repository, it should
+be listed in `MANIFEST.in` so that it will be either included in or excluded
+from source distributions as appropriate.  [See
+here](https://packaging.python.org/guides/using-manifest-in/) for information
+about writing a `MANIFEST.in`.
+
 ## How to contribute
 
 The preferred way to contribute to the DataLad code base is
@@ -119,7 +125,7 @@ we outline the workflow used by the developers:
 
 ## Development environment
 
-We support Python 3 only (>= 3.5).
+We support Python 3 only (>= 3.6).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -577,7 +583,7 @@ Refer datalad/config.py for information on how to add these environment variable
 For the upcoming release use this template
 
 ```markdown
-## 0.13.5 (??? ??, 2020) -- will be better than ever
+## 0.15.0 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
