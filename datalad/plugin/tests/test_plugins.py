@@ -27,6 +27,7 @@ from ..wtf import SECTION_CALLABLES
 
 from datalad.utils import assure_unicode
 from datalad.tests.utils import (
+    assert_greater,
     assert_in,
     assert_not_in,
     assert_repo_status,
@@ -139,6 +140,17 @@ def test_wtf(topdir):
         wtf(sections=['dependencies'], decor='html_details')
         ok_startswith(cmo.out, '<details><summary>DataLad %s WTF' % __version__)
         assert_in('## dependencies', cmo.out)
+
+    # short flavor
+    with swallow_outputs() as cmo:
+        wtf(flavor='short')
+        assert_in("- datalad: version=%s" % __version__, cmo.out)
+        assert_in("- dependencies: ", cmo.out)
+        eq_(len(cmo.out.splitlines()), 4)  # #WTF, datalad, dependencies, trailing new line
+
+    with swallow_outputs() as cmo:
+        wtf(flavor='short', sections='*')
+        assert_greater(len(cmo.out.splitlines()), 10)  #  many more
 
     # should result only in '# WTF'
     skip_if_no_module('pyperclip')
