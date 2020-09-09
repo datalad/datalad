@@ -789,7 +789,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
         if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
                                     ds.repo.dot_git / 'dl_target_test'):
-            # symlink the annex to avoid needless copies in an emphemeral clone
+            # symlink the annex to avoid needless copies in an ephemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
             origin_annex_url = ds.config.get("remote.origin.url", None)
             origin_git_path = None
@@ -801,13 +801,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
                     # we are local; check for a bare repo first to not mess w/
                     # the path
-                    # Note, that w/o support for bare repos in GitRepo we also
-                    # can't use ConfigManager ATM.
-                    gc_response = GitWitlessRunner(
-                        cwd=origin_git_path,
-                    ).run(['git', 'config', '--local', '--get', 'core.bare'],
-                          protocol=StdOutErrCapture)
-                    if gc_response['stdout'].lower().strip() == 'true':
+                    if GitRepo(origin_git_path).bare:
                         # origin is a bare repo -> use path as is
                         pass
                     elif origin_git_path.name != '.git':
