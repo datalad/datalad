@@ -894,16 +894,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # repository.
         self.pathobj = ut.Path(self.path)
         self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
-
-        # We'll need some awareness of whether or not this is a bare repo, if we
-        # are to support it beyond instantiation
-        # TODO: We should prob. double check config for core.bare=true! However,
-        #       at this point it would sabotage the lazy loading of
-        #       ConfigManager. May be `bare` property, that would check config +
-        #       path == dot_git for consistency? Once at it: To what extend can
-        #       this (or the location of .git in general) change during runtime?
-        self.bare = self.pathobj == self.dot_git
-
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
@@ -961,7 +951,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
             # after creation we need to reconsider .git path
             self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
-            self.bare = self.pathobj == self.dot_git
 
         # there is a repo (now), we can use the config runner from now on
         self._git_runner = self.config._runner
@@ -984,6 +973,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # `self` itself. This would create an additional reference to the object
         # and thereby preventing it from being collected at all.
         self._finalizer = finalize(self, GitRepo._cleanup, self.path)
+
+
+    @property
+    def bare(self):
+        if self.config.getbool("core", "bare") and \
+                self.pathobj == self.dot_git:
+            return True
+        elif not self.config.getbool("core", "bare") and \
+                not self.pathobj == self.dot_git:
+            return False
+        else:
+            raise InvalidGitRepositoryError("GitRepo contains inconsistent hints"
+                                            " on whether or not it is a bare "
+                                            "repository.")
 
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
