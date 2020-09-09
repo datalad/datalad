@@ -46,7 +46,7 @@ from datalad.support.constraints import (
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
     Path,
-    assure_list,
+    ensure_list,
 )
 
 from datalad.distribution.dataset import (
@@ -198,7 +198,7 @@ class Push(Interface):
             raise ValueError("'since' should point to commitish or use '^'.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
-        paths = [resolve_path(p, dataset) for p in assure_list(path)]
+        paths = [resolve_path(p, dataset) for p in ensure_list(path)]
 
         ds = require_dataset(
             dataset, check_installed=True, purpose='pushing')
@@ -462,7 +462,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     depvar = 'remote.{}.datalad-publish-depends'.format(target)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = assure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, []))
     if publish_depends:
         lgr.debug("Discovered publication dependencies for '%s': %s'",
                   target, publish_depends)

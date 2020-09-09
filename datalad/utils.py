@@ -2479,16 +2479,32 @@ def get_wrapped_class(wrapped):
     return _func_class
 
 
-# TODO whenever we feel ready for English kill the compat block below
-assure_tuple_or_list = ensure_tuple_or_list
-assure_iter = ensure_iter
-assure_list = ensure_list
-assure_list_from_str = ensure_list_from_str
-assure_dict_from_str = ensure_dict_from_str
-assure_bytes = ensure_bytes
-assure_unicode = ensure_unicode
-assure_bool = ensure_bool
-assure_dir = ensure_dir
+def _make_assure_kludge(fn):
+    old_name = fn.__name__.replace("ensure", "assure")
+
+    @wraps(fn)
+    def compat_fn(*args, **kwargs):
+        warnings.warn(
+            "{} is deprecated and will be removed in a future release. "
+            "Use {} instead."
+            .format(old_name, fn.__name__),
+            DeprecationWarning)
+        return fn(*args, **kwargs)
+
+    compat_fn.__doc__ = ("Note: This function is deprecated. Use {} instead."
+                         .format(fn.__name__))
+    return compat_fn
+
+
+assure_tuple_or_list = _make_assure_kludge(ensure_tuple_or_list)
+assure_iter = _make_assure_kludge(ensure_iter)
+assure_list = _make_assure_kludge(ensure_list)
+assure_list_from_str = _make_assure_kludge(ensure_list_from_str)
+assure_dict_from_str = _make_assure_kludge(ensure_dict_from_str)
+assure_bytes = _make_assure_kludge(ensure_bytes)
+assure_unicode = _make_assure_kludge(ensure_unicode)
+assure_bool = _make_assure_kludge(ensure_bool)
+assure_dir = _make_assure_kludge(ensure_dir)
 
 
 lgr.log(5, "Done importing datalad.utils")

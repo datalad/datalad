@@ -701,8 +701,8 @@ class ConfigManager(object):
           Variable value
         %s"""
         if where == 'override':
-            from datalad.utils import assure_list
-            val = assure_list(self.overrides.pop(var, None))
+            from datalad.utils import ensure_list
+            val = ensure_list(self.overrides.pop(var, None))
             val.append(value)
             self.overrides[var] = val[0] if len(val) == 1 else val
             if reload:

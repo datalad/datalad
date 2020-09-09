@@ -58,7 +58,7 @@ from datalad.dochelpers import (
     single_or_plural,
 )
 from datalad.utils import (
-    assure_bool,
+    ensure_bool,
     knows_annex,
     make_tempfile,
     Path,
@@ -839,7 +839,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             continue
         sr_autoenable = config.get('autoenable', False)
         try:
-            sr_autoenable = assure_bool(sr_autoenable)
+            sr_autoenable = ensure_bool(sr_autoenable)
         except ValueError:
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '

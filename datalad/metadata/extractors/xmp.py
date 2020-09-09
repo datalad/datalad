@@ -20,7 +20,7 @@ from datalad.log import log_progress
 from libxmp.utils import file_to_dict
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.extractors.base import BaseMetadataExtractor
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 
 
 xmp_field_re = re.compile(r'^([^\[\]]+)(\[\d+\]|)(/?.*|)')
@@ -87,7 +87,7 @@ class MetadataExtractor(BaseMetadataExtractor):
                         # we'll catch the actuall array values later
                         continue
                     # normalize value
-                    val = assure_unicode(val)
+                    val = ensure_unicode(val)
                     # non-breaking space
                     val = val.replace(u"\xa0", ' ')
 
