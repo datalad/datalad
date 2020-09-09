@@ -942,18 +942,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._cfg = None
+        self._git_runner = GitWitlessRunner(cwd=self.path)
 
         if do_create:  # we figured it out earlier
             # we briefly need a runner to create the repo, and cannot
             # use the config manager runner yet, as it would try to
             # access the repo config which didn't materialize yet
-            self._git_runner = GitWitlessRunner(cwd=self.path)
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
             # after creation we need to reconsider .git path
             self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
-
-        # there is a repo (now), we can use the config runner from now on
-        self._git_runner = self.config._runner
 
         # with DryRunProtocol path might still not exist
         if exists(self.path):
