@@ -881,17 +881,29 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             self._check_git_version()
 
         # BEGIN Repo validity test
-        # We want to fail early for tests, that would be performed a lot. In particular this is about
-        # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
-        # __init__ to then test the same things again. If we fail early we can save the additional test from outer
-        # scope.
+        # We want to fail early for tests, that would be performed a lot. In
+        # particular this is about GitRepo.is_valid_repo. We would use the
+        # latter to decide whether or not to call GitRepo() only for __init__ to
+        # then test the same things again. If we fail early we can save the
+        # additional test from outer scope.
         self.path = path
 
-        # Note, that the following three path objects are used often and therefore
-        # are stored for performance. Path object creation comes with a cost. Most noteably,
-        # this is used for validity checking of the repository.
+        # Note, that the following three path objects are used often and
+        # therefore are stored for performance. Path object creation comes with
+        # a cost. Most notably, this is used for validity checking of the
+        # repository.
         self.pathobj = ut.Path(self.path)
         self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
+
+        # We'll need some awareness of whether or not this is a bare repo, if we
+        # are to support it beyond instantiation
+        # TODO: We should prob. double check config for core.bare=true! However,
+        #       at this point it would sabotage the lazy loading of
+        #       ConfigManager. May be `bare` property, that would check config +
+        #       path == dot_git for consistency? Once at it: To what extend can
+        #       this (or the location of .git in general) change during runtime?
+        self.bare = self.pathobj == self.dot_git
+
         self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
@@ -947,6 +959,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # access the repo config which didn't materialize yet
             self._git_runner = GitWitlessRunner(cwd=self.path)
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
+            # after creation we need to reconsider .git path
+            self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
+            self.bare = self.pathobj == self.dot_git
+
         # there is a repo (now), we can use the config runner from now on
         self._git_runner = self.config._runner
 
@@ -1163,15 +1179,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def is_valid_git(self):
         """Returns whether the underlying repository appears to be still valid
 
-        Note, that this almost identical to the classmethod is_valid_repo(). However,
-        if we are testing an existing instance, we can save Path object creations. Since this testing
-        is done a lot, this is relevant. Creation of the Path objects in is_valid_repo() takes nearly half the time of
-        the entire function.
+        Note, that this almost identical to the classmethod is_valid_repo().
+        However, if we are testing an existing instance, we can save Path object
+        creations. Since this testing is done a lot, this is relevant. Creation
+        of the Path objects in is_valid_repo() takes nearly half the time of the
+        entire function.
 
-        Also note, that this method is bound to an instance but still class-dependent, meaning that a subclass
-        cannot simply overwrite it. This is particularly important for the call from within __init__(),
-        which in turn is called by the subclasses' __init__. Using an overwrite would lead to the wrong thing being
-        called.
+        Also note, that this method is bound to an instance but still
+        class-dependent, meaning that a subclass cannot simply overwrite it.
+        This is particularly important for the call from within __init__(),
+        which in turn is called by the subclasses' __init__. Using an overwrite
+        would lead to the wrong thing being called.
         """
 
         return self.dot_git.exists() and (
@@ -1189,19 +1207,28 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # it is performed a lot
         # recognize two things as good-enough indicators of a present
         # repo: 1) a non-empty .git directory (#3473)
-        #          NOTE: It's actually faster (and more accurate) to test for existence of a particular subpath.
-        #                This should be something that's there right after git-init. Going for .git/HEAD ATM.
+        #          NOTE: It's actually faster (and more accurate) to test for
+        #                existence of a particular subpath.
+        #                This should be something that's there right after
+        #                git-init. Going for .git/HEAD ATM.
         #
-        #                In [11]: %timeit path.exists() and (not path.is_dir() or head_path.exists())
-        #                4.93 µs ± 34.8 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
-        #                In [12]: %timeit path.exists() and (not path.is_dir() or any(path.iterdir()))
-        #                12.8 µs ± 150 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+        #                In [11]: %timeit path.exists() and (not path.is_dir()
+        #                          or head_path.exists())
+        #                4.93 µs ± 34.8 ns per loop
+        #                (mean ± std. dev. of 7 runs, 100000 loops each)
+        #                In [12]: %timeit path.exists() and (not path.is_dir()
+        #                          or any(path.iterdir()))
+        #                12.8 µs ± 150 ns per loop
+        #                (mean ± std. dev. of 7 runs, 100000 loops each)
         #
-        #   and 2) a pointer file or symlink
+        #       2) a pointer file or symlink
+        #       3) path itself looks like a .git -> bare repo
 
-        return dot_git_path.exists() and (
+        return (dot_git_path.exists() and (
             not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
-        )
+        )) or (path / 'HEAD').exists()
+        # TODO: Same as in _get_dot_git: How expensive a check is okay for
+        #       testing for a bare repo? And how expensive is necessary?
 
     @staticmethod
     def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
@@ -1211,7 +1238,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ----------
         pathobj: Path
         ok_missing: bool, optional
-          Allow for .git to be missing (useful while sensing before repo is initialized)
+          Allow for .git to be missing (useful while sensing before repo is
+          initialized)
         maybe_relative: bool, optional
           Return path relative to pathobj
 
@@ -1235,6 +1263,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     raise InvalidGitRepositoryError("Invalid .git file")
         elif dot_git.is_symlink():
             dot_git = dot_git.resolve()
+        elif not dot_git.exists() and \
+                (pathobj / 'HEAD').exists() and \
+                (pathobj / 'config').exists():
+                # looks like a bare repo
+                dot_git = pathobj
+                # TODO: How expensive a check is okay?
+                #       Is an existing HEAD sufficient?
+                #       We might want to double-check config for core.bare=true.
+                #       And/or check for ./refs + ./objects dirs in addition
+
         elif not (ok_missing or dot_git.exists()):
             raise RuntimeError("Missing .git in %s." % pathobj)
         # Primarily a compat kludge for get_git_dir, remove when it is deprecated
