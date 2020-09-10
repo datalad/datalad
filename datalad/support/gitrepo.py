@@ -1227,8 +1227,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return (dot_git_path.exists() and (
             not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
         )) or (path / 'HEAD').exists()
-        # TODO: Same as in _get_dot_git: How expensive a check is okay for
-        #       testing for a bare repo? And how expensive is necessary?
 
     @staticmethod
     def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
@@ -1268,11 +1266,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 (pathobj / 'config').exists():
                 # looks like a bare repo
                 dot_git = pathobj
-                # TODO: How expensive a check is okay?
-                #       Is an existing HEAD sufficient?
-                #       We might want to double-check config for core.bare=true.
-                #       And/or check for ./refs + ./objects dirs in addition
-
         elif not (ok_missing or dot_git.exists()):
             raise RuntimeError("Missing .git in %s." % pathobj)
         # Primarily a compat kludge for get_git_dir, remove when it is deprecated

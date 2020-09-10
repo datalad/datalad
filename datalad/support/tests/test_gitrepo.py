@@ -156,10 +156,11 @@ def test_GitRepo_init_options(path):
 
 @with_tempfile
 @with_tempfile(mkdir=True)
-@with_tree(tree={'somefile': 'content'})
+@with_tree(tree={'somefile': 'content', 'config': 'not a git config'})
 @with_tree(tree={'afile': 'other',
                  '.git': {}})
-def test_GitRepo_bare(path1, empty_dir, non_empty_dir, empty_dot_git):
+@with_tempfile
+def test_GitRepo_bare(path1, empty_dir, non_empty_dir, empty_dot_git, non_bare):
 
     import gc
 
@@ -194,6 +195,9 @@ def test_GitRepo_bare(path1, empty_dir, non_empty_dir, empty_dot_git):
     assert_raises(InvalidGitRepositoryError, GitRepo, empty_dot_git,
                   create=False)
 
+    # a regular repo is not bare
+    non_bare = GitRepo(non_bare, create=True)
+    assert_false(non_bare.bare)
 
 @with_tree(
     tree={

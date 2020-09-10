@@ -801,7 +801,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
                     # we are local; check for a bare repo first to not mess w/
                     # the path
-                    if GitRepo(origin_git_path).bare:
+                    if GitRepo(origin_git_path, create=False).bare:
                         # origin is a bare repo -> use path as is
                         pass
                     elif origin_git_path.name != '.git':
