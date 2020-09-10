@@ -160,12 +160,14 @@ def test_GitRepo_init_options(path):
 @with_tree(tree={'afile': 'other',
                  '.git': {}})
 @with_tempfile
-def test_GitRepo_bare(path1, empty_dir, non_empty_dir, empty_dot_git, non_bare):
+@with_tempfile
+def test_GitRepo_bare(path, empty_dir, non_empty_dir, empty_dot_git, non_bare,
+                      clone_path):
 
     import gc
 
     # create a bare repo:
-    gr = GitRepo(path1, create=True, bare=True)
+    gr = GitRepo(path, create=True, bare=True)
     assert_equal(gr.dot_git, gr.pathobj)
     assert_true(gr.bare)
     assert_true(gr.config.getbool("core", "bare"))
@@ -176,7 +178,7 @@ def test_GitRepo_bare(path1, empty_dir, non_empty_dir, empty_dot_git, non_bare):
     del gr
     gc.collect()
 
-    gr = GitRepo(path1, create=False)
+    gr = GitRepo(path, create=False)
     assert_equal(gr.dot_git, gr.pathobj)
     assert_true(gr.bare)
     assert_true(gr.config.getbool("core", "bare"))
@@ -196,8 +198,12 @@ def test_GitRepo_bare(path1, empty_dir, non_empty_dir, empty_dot_git, non_bare):
                   create=False)
 
     # a regular repo is not bare
-    non_bare = GitRepo(non_bare, create=True)
-    assert_false(non_bare.bare)
+    non_bare_repo = GitRepo(non_bare, create=True)
+    assert_false(non_bare_repo.bare)
+
+    # we can have a bare clone
+    clone = GitRepo.clone(non_bare, clone_path, clone_options={'bare': True})
+    assert_true(clone.bare)
 
 @with_tree(
     tree={
