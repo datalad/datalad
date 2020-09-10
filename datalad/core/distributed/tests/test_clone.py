@@ -1014,7 +1014,10 @@ def test_ria_http_storedataladorg(path):
 })
 @with_tempfile
 @with_tempfile
-def test_ephemeral(origin_path, clone1_path, clone2_path):
+@with_tempfile
+@with_tempfile
+def test_ephemeral(origin_path, bare_path,
+                   clone1_path, clone2_path, clone3_path):
 
     file_test = Path('ds') / 'test.txt'
     file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
@@ -1048,8 +1051,8 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
         ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
         if not clone2.repo.is_managed_branch():
             # TODO: We can't properly handle adjusted branch yet
-            eq_((clone1.pathobj / file_test).read_text(), 'some')
-            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
+            eq_((clone2.pathobj / file_test).read_text(), 'some')
+            eq_((clone2.pathobj / file_testsub).read_text(), 'somemore')
 
     # 3. add something to clone1 and push back to origin availability from
     # clone1 should not be propagated (we declared 'here' dead to that end)
@@ -1076,6 +1079,26 @@ def test_ephemeral(origin_path, clone1_path, clone2_path):
         # now origin knows:
     res = origin.repo.whereis("addition.txt")
     eq_(res, [origin.config.get("annex.uuid")])
+
+    # 4. ephemeral clone from a bare repo
+    from datalad.cmd import GitWitlessRunner
+    runner = GitWitlessRunner()
+    runner.run(['git', 'clone', '--bare', origin_path, bare_path])
+    runner.run(['git', 'annex', 'init'], cwd=bare_path)
+
+    eph_from_bare = clone(bare_path, clone3_path, reckless='ephemeral')
+    can_symlink = has_symlink_capability()
+
+    if can_symlink:
+        # Bare repo uses dirhashlower by default, while a standard repo uses
+        # dirhashmixed. Symlinking different object trees doesn't really work.
+        # Don't test that here, since this is not a matter of the "ephemeral"
+        # option alone. We should have such a setup in the RIA tests and test
+        # for data access there.
+        # Here we only test for the correct linking.
+        eph_annex = eph_from_bare.repo.dot_git / 'annex'
+        ok_(eph_annex.is_symlink())
+        ok_(eph_annex.resolve().samefile(Path(bare_path) / 'annex'))
 
 
 @with_tempfile(mkdir=True)
