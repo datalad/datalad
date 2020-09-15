@@ -151,7 +151,10 @@ reckless_opt = Parameter(
     w/o git-annex being aware of it. In case of a change in origin you need to
     update the clone before you're able to save new content on your end.
     Alternative to 'auto' when hardlinks are not an option, or number of consumed
-    inodes needs to be minimized.
+    inodes needs to be minimized. Please note, that this is meant to be used
+    with either non-bare repositories or a RIA store as origin! Do not come up
+    with your own usecase unless you are absolutely sure you know your git-annex 
+    internals very well!
     ['shared-<mode>']: set up repository and annex permission to enable multi-user
     access. This disables the standard write protection of annex'ed files.
     <mode> can be any value support by 'git init --shared=', such as 'group', or
