@@ -504,9 +504,27 @@ class ConfigManager(object):
         return self._merged_store.keys()
 
     # XXX should this be *args?
-    def get(self, key, default=None):
-        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-        return self._merged_store.get(key, default)
+    def get(self, key, default=None, get_all=False):
+        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.
+
+        Parameters
+        ----------
+        default : optional
+          Value to return when key is not present. `None` by default.
+        get_all : bool, optional
+          If True, return all values of multiple identical configuration keys.
+          By default only the last specified value is returned.
+        """
+        try:
+            val = self[key]
+            if get_all or not isinstance(val, tuple):
+                return val
+            else:
+                return val[-1]
+        except KeyError:
+            # return as-is, default could be a tuple, hence do not subject to
+            # get_all processing
+            return default
 
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
