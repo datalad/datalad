@@ -648,11 +648,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     if sidecar is None:
         use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
-        # If ConfigManager gets the ability to say "return single value",
-        # update this code to use that.
-        if isinstance(use_sidecar, tuple):
-            # Use same precedence as 'git config'.
-            use_sidecar = use_sidecar[-1]
         use_sidecar = anything2bool(use_sidecar)
     else:
         use_sidecar = sidecar
