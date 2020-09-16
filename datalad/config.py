@@ -591,13 +591,21 @@ class ConfigManager(object):
                 return True
         return False
 
+    def _get_type(self, typefn, section, option):
+        key = '.'.join([section, option])
+        # Mimic the handling of get_value(..., default=None), while still going
+        # through get() in order to get its default tuple handling.
+        if key not in self:
+            raise KeyError(key)
+        return typefn(self.get(key))
+
     def getint(self, section, option):
         """A convenience method which coerces the option value to an integer"""
-        return int(self.get_value(section, option))
+        return self._get_type(int, section, option)
 
     def getfloat(self, section, option):
         """A convenience method which coerces the option value to a float"""
-        return float(self.get_value(section, option))
+        return self._get_type(float, section, option)
 
     def getbool(self, section, option, default=None):
         """A convenience method which coerces the option value to a bool
@@ -607,7 +615,12 @@ class ConfigManager(object):
         False
         TypeError is raised for other values.
         """
-        val = self.get_value(section, option, default=default)
+        key = '.'.join([section, option])
+        # Mimic the handling of get_value(..., default=None), while still going
+        # through get() in order to get its default tuple handling.
+        if default is None and key not in self:
+            raise KeyError(key)
+        val = self.get(key, default=default)
         if val is None:  # no value at all, git treats it as True
             return True
         return anything2bool(val)
