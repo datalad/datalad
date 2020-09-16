@@ -322,6 +322,8 @@ class AnnexCustomRemote(object):
            arguments to be joined by a space and passed to git-annex
         """
         msg = " ".join(map(str, args))
+        # Sanitize since there must be no new lines
+        msg = msg.replace(os.linesep, r'\n')
         if not self._in_the_loop:
             lgr.debug("We are not yet in the loop, thus should not send to annex"
                       " anything.  Got: %s" % msg.encode())
