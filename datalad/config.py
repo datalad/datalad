@@ -595,6 +595,10 @@ class ConfigManager(object):
         """A convenience method which coerces the option value to an integer"""
         return int(self.get_value(section, option))
 
+    def getfloat(self, section, option):
+        """A convenience method which coerces the option value to a float"""
+        return float(self.get_value(section, option))
+
     def getbool(self, section, option, default=None):
         """A convenience method which coerces the option value to a bool
 
@@ -607,10 +611,6 @@ class ConfigManager(object):
         if val is None:  # no value at all, git treats it as True
             return True
         return anything2bool(val)
-
-    def getfloat(self, section, option):
-        """A convenience method which coerces the option value to a float"""
-        return float(self.get_value(section, option))
 
     # this is a hybrid of ConfigParser and dict API
     def items(self, section=None):
