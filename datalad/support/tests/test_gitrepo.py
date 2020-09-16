@@ -1042,8 +1042,21 @@ def test_update_submodules_sub_on_unborn_branch(path):
     assert_in("unborn branch", str(cme.exception))
 
 
-def test_GitRepo_get_submodules():
-    raise SkipTest("TODO")
+@with_tempfile
+def test_GitRepo_get_submodules(path):
+    repo = GitRepo(path, create=True)
+
+    s_abc = GitRepo(op.join(path, "s_abc"), create=True)
+    s_abc.commit(msg="c s_abc", options=["--allow-empty"])
+    repo.add_submodule(path="s_abc")
+
+    s_xyz = GitRepo(op.join(path, "s_xyz"), create=True)
+    s_xyz.commit(msg="c s_xyz", options=["--allow-empty"])
+    repo.add_submodule(path="s_xyz")
+
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(sorted_=True)],
+        ["s_abc", "s_xyz"])
 
 
 @with_tempfile

@@ -101,10 +101,6 @@ from .exceptions import (
 
 lgr = logging.getLogger('datalad.annex')
 
-# TODO Constant is no longer used, but left defined to avoid breakage in
-# dependent code. Remove in 0.14 release.
-N_AUTO_JOBS = 1
-
 
 class AnnexRepo(GitRepo, RepoInterface):
     """Representation of an git-annex repository.

@@ -882,7 +882,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     subds.save()
     # add a plain git dataset as well
     subgit = Dataset(lcl / 'ds' / 'subdir' / 'subgit').create(force=True,
-                                                              no_annex=True)
+                                                              annex=False)
     subgit.save()
     ds = Dataset(lcl / 'ds').create(force=True)
     ds.save(version_tag='original')

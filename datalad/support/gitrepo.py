@@ -14,7 +14,6 @@ import re
 import time
 import os
 import os.path as op
-import warnings
 
 import logging
 from collections import (
@@ -774,10 +773,6 @@ class PushInfo(dict):
             note=summary.strip(),
             old_commit=old_commit,
         )
-
-
-# Compatibility kludge.  See GitRepo.get_submodules().
-Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
 @path_based_str_repr
@@ -2857,7 +2852,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             props.update(modinfo.get(path, {}))
             yield props
 
-    def get_submodules(self, sorted_=True, paths=None, compat=True):
+    def get_submodules(self, sorted_=True, paths=None):
         """Return list of submodules.
 
         Parameters
@@ -2866,12 +2861,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             Sort submodules by path name.
         paths : list(pathlib.PurePath), optional
             Restrict submodules to those under `paths`.
-        compat : bool, optional
-            If true, return a namedtuple that incompletely mimics the
-            attributes of GitPython's Submodule object in hope of backwards
-            compatibility with previous callers. Note that this form should be
-            considered temporary and callers should be updated; this flag will
-            be removed in a future release.
 
         Returns
         -------
@@ -2879,24 +2868,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         of dictionaries as returned by `get_submodules_`.
         """
         xs = self.get_submodules_(paths=paths)
-        if compat:
-            warnings.warn("The attribute-based return value of get_submodules() "
-                          "exists for compatibility purposes and will be removed "
-                          "in an upcoming release",
-                          DeprecationWarning)
-            xs = (Submodule(name=p["gitmodule_name"],
-                            path=str(p["path"].relative_to(self.pathobj)),
-                            url=p["gitmodule_url"])
-                  for p in xs)
 
         if sorted_:
-            if compat:
-                def key(x):
-                    return x.path
-            else:
-                def key(x):
-                    return x["path"]
-            xs = sorted(xs, key=key)
+            xs = sorted(xs, key=lambda x: x["path"])
         return list(xs)
 
     def add_submodule(self, path, name=None, url=None, branch=None):
