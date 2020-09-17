@@ -202,7 +202,7 @@ def iso8601_to_epoch(datestr):
     iso8601 is used to parse properly the time zone information, which
     can't be parsed with standard datetime strptime
     """
-    return calendar.timegm(iso8601.parse_date(datestr).timetuple())
+    return calendar.timegm(iso8601.parse_date(datestr).utctimetuple())
 
 
 def __urlopen_requests(url):

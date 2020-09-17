@@ -21,7 +21,6 @@ https://github.com/omab/python-social-auth
 """
 
 import time
-import calendar
 
 from collections import OrderedDict
 
@@ -212,7 +211,7 @@ class AWS_S3(Credential):
         if not exp:
             return True
         exp_epoch = iso8601_to_epoch(exp)
-        expire_in = (exp_epoch - calendar.timegm(time.localtime())) / 3600.
+        expire_in = (exp_epoch - time.time()) / 3600.
 
         lgr.debug(
             ("Credential %s has expired %.2fh ago"
