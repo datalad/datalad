@@ -500,42 +500,60 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
 def add_urls(rows, ifexists=None, options=None):
     """Call `git annex addurl` using information in `rows`.
     """
+    ntries = 3
     for row in rows:
-        filename_abs = row["filename_abs"]
-        ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-
-        if os.path.exists(filename_abs) or os.path.islink(filename_abs):
-            if ifexists == "skip":
+        for try_ in range(ntries):
+            try:
+                yield from _add_url(row, ifexists=ifexists, options=options)
+            except AnnexBatchCommandError as exc:
+                ds = row["ds"]
+                if try_ < ntries - 1:
+                    lgr.debug(
+                        "Adding URL %s for %s has failed. "
+                        "pre-committed and trying again. Exception: %s",
+                        row["url"],
+                        row["filename_abs"],
+                        exc_str(exc)
+                    )
+                    ds.repo.precommit()  # so we start afresh batch processes etc
+                    continue
                 yield get_status_dict(action="addurls",
                                       ds=ds,
                                       type="file",
-                                      path=filename_abs,
-                                      status="notneeded")
-                continue
-            elif ifexists == "overwrite":
-                lgr.debug("Removing %s", filename_abs)
-                unlink(filename_abs)
-            else:
-                lgr.debug("File %s already exists", filename_abs)
+                                      path=row["filename_abs"],
+                                      message=exc_str(exc),
+                                      status="error")
 
-        try:
-            out_json = ds.repo.add_url_to_file(filename, row["url"],
-                                               batch=True, options=options)
-        except AnnexBatchCommandError as exc:
+
+def _add_url(row, ifexists, options):
+    """Call `git annex addurl` using information in a `row`.
+    """
+    filename_abs = row["filename_abs"]
+    ds, filename = row["ds"], row["ds_filename"]
+    lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+
+    if os.path.exists(filename_abs) or os.path.islink(filename_abs):
+        if ifexists == "skip":
             yield get_status_dict(action="addurls",
                                   ds=ds,
                                   type="file",
                                   path=filename_abs,
-                                  message=exc_str(exc),
-                                  status="error")
-            continue
+                                  status="notneeded")
+            return
+        elif ifexists == "overwrite":
+            lgr.debug("Removing %s", filename_abs)
+            unlink(filename_abs)
+        else:
+            lgr.debug("File %s already exists", filename_abs)
 
-        # In the case of an error, the json object has file=None.
-        if out_json["file"] is None:
-            out_json["file"] = filename_abs
-        yield annexjson2result(out_json, ds, action="addurls",
-                               type="file", logger=lgr)
+    out_json = ds.repo.add_url_to_file(filename, row["url"],
+                                       batch=True, options=options)
+    # In the case of an error, the json object has file=None.
+    if out_json["file"] is None:
+        out_json["file"] = filename_abs
+    yield annexjson2result(out_json, ds, action="addurls",
+                           type="file", logger=lgr)
+
 
 
 @with_result_progress("Adding metadata")
