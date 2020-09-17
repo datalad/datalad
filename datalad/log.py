@@ -449,7 +449,8 @@ class LoggerHelper(object):
             loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
             use_color = is_interactive()  # explicitly decide here
         else:
-            # must be a simple filename
+            # must be a filename .format pattern
+            logtarget = logtarget.format(pid=os.getpid())
             # Use RotatingFileHandler for possible future parametrization to keep
             # log succinct and rotating
             loghandler = logging.handlers.RotatingFileHandler(logtarget)
