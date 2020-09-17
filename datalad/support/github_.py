@@ -99,7 +99,9 @@ def _gen_github_ses(github_login, github_passwd):
 
     # see if we have tokens - might be many. Doesn't cost us much so get at once
     all_tokens = tokens = unique(
-        ensure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None)),
+        # use get_all=True to support specification of multiple tokens
+        # using identical config keys
+        ensure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None, get_all=True)),
         reverse=True
     )
 
