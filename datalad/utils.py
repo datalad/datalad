@@ -1981,7 +1981,7 @@ def try_multiple_dec(
     exceptions: Exception or tuple of Exceptions, optional
       Exception or a tuple of multiple exceptions, on which to retry
     exceptions_filter: callable, optional
-      If provided, this unction will be called with a caught exception
+      If provided, this function will be called with a caught exception
       instance.  If function returns True - we will re-try, if False - exception
       will be re-raised without retrying.
     logger: callable, optional
