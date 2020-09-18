@@ -234,6 +234,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
 
         """
         if dict_or_list_or_value is None:
+            yield basekey, None
             return
 
         # Special treatment of studyminimeta. This should really be done in an object associated with studyminimeta,
@@ -248,7 +249,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
 
         if isinstance(dict_or_list_or_value, list):
             for index, element in enumerate(dict_or_list_or_value):
-                yield from _deep_kv(basekey + f"[{index}]", element)
+                yield basekey, dict_or_list_or_value
             return
 
         # We know that dict_or_list_or_value is a dict now.
@@ -272,7 +273,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
             )
 
         for k, v in dict_or_list_or_value.items():
-            if k in ('@type', '@list', '@graph', 'datalad_unique_content_properties'):
+            if k in ('@type', '@list', '@graph', '@context', 'datalad_unique_content_properties'):
                 continue
             key = _encode_key(k)
             new_basekey = u'{}.{}'.format(basekey, key) if basekey else u'{}'.format(key)
@@ -938,7 +939,6 @@ class _EGrepCSSearch(_Search):
         # After #2156 datasets may not necessarily carry all
         # keys in the "unique" summary
         lgr.warning('In this search mode, the reported list of metadata keys may be incomplete')
-
 
     def _get_keys(self, mode=None):
         """Return keys and their statistics if mode != 'name'."""
