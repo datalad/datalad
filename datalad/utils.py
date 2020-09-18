@@ -1959,7 +1959,10 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
 
 
 @optional_args
-def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+def try_multiple_dec(
+        f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
+        exceptions_filter=None
+):
     """Decorator to try function multiple times.
 
     Main purpose is to decorate functions dealing with removal of files/directories
@@ -1974,7 +1977,12 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     increment_type: {None, 'exponential'}
       Note that if it is exponential, duration should typically be > 1.0
       so it grows with higher power
-
+    exceptions: Exception or tuple of Exceptions, optional
+      Exception or a tuple of multiple exceptions, on which to retry
+    exceptions_filter: callable, optional
+      If provided, this unction will be called with a caught exception
+      instance.  If function returns True - we will re-try, if False - exception
+      will be re-raised without retrying.
     """
     from .dochelpers import exc_str
     if not exceptions:
@@ -1987,24 +1995,26 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
-    def wrapped(*args, **kwargs):
+    def _wrap_try_multiple_dec(*args, **kwargs):
         t = duration
         for trial in range(ntrials):
             try:
                 return f(*args, **kwargs)
             except exceptions as exc:
-                if increment_type == 'exponential':
-                    t = duration ** (trial + 1)
-                lgr.log(
-                    5,
-                    "Caught %s on trial #%d. Sleeping %f and retrying",
-                    exc_str(exc), trial, t)
+                if exceptions_filter and not exceptions_filter(exc):
+                    raise
                 if trial < ntrials - 1:
+                    if increment_type == 'exponential':
+                        t = duration ** (trial + 1)
+                    lgr.log(
+                        5,
+                        "Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
                     sleep(t)
                 else:
                     raise
 
-    return wrapped
+    return _wrap_try_multiple_dec
 
 
 @try_multiple_dec
