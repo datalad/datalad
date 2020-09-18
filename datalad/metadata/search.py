@@ -11,7 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-import collections
 import logging
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
@@ -142,36 +141,58 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
 
     srcmeta = None   # for paranoids to avoid some kind of manipulation of the last
 
-    def _deep_kv(basekey, dct):
+    def _encode_key(key: str) -> str:
+        return (key.lstrip('@')
+                .replace(os.sep, '_')
+                .replace(' ', '_')
+                .replace('-', '_')
+                .replace('.', '_')
+                .replace(':', '-'))
+
+    def _deep_kv(basekey, dict_or_list_or_value):
         """Return key/value pairs of any depth following a rule for key
         composition
 
-        dct must be a dict
         """
-        for k, v in dct.items():
-            if (k != '@id' and k.startswith('@')) or k == 'datalad_unique_content_properties':
-                # ignore all JSON-LD specials, but @id
-                continue
-            # TODO `k` might need remapping, if another key was already found
-            # with the same definition
-            key = u'{}{}'.format(
-                basekey,
-                # replace now special chars, and avoid spaces
-                # `os.sep` needs to go, because whoosh uses the field name for
-                # temp files during index staging, and trips over absent "directories"
-                # TODO maybe even kill parentheses
-                # TODO actually, it might be better to have an explicit whitelist
-                k.lstrip('@').replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
-            )
-            if isinstance(v, list):
-                v = _listdict2dictlist(v)
+        if dict_or_list_or_value is None:
+            return
 
-            if isinstance(v, dict):
-                # dive
-                for i in _deep_kv('{}.'.format(key), v):
-                    yield i
-            else:
-                yield key, v
+        if not isinstance(dict_or_list_or_value, (dict, list)):
+            yield basekey, str(dict_or_list_or_value)
+            return
+
+        if isinstance(dict_or_list_or_value, list):
+            for index, element in enumerate(dict_or_list_or_value):
+                yield from _deep_kv(basekey + f"[{index}]", element)
+            return
+
+        # We know that dict_or_list_or_value is a dict now.
+        if '@list' in dict_or_list_or_value:
+            # Handle the @list node of JSON-LD here
+            new_key_name = dict_or_list_or_value.get('@id', 'list')
+            for index, element in enumerate(dict_or_list_or_value['@list']):
+                yield from _deep_kv(basekey + f".{new_key_name}[{index}]", element)
+
+        if '@graph' in dict_or_list_or_value:
+            # Handle the @graph node of JSON-LD here
+            for index, element in enumerate(dict_or_list_or_value['@graph']):
+                yield from _deep_kv(basekey + f".graph[{index}]", element)
+
+        if "@type" in dict_or_list_or_value:
+            key = _encode_key(dict_or_list_or_value['@type'])
+            basekey = (
+                u'{}.{}'.format(basekey, key)
+                if basekey
+                else u'{}'.format(key)
+            )
+
+        for k, v in dict_or_list_or_value.items():
+            if k in ('@type', '@list', '@graph', 'datalad_unique_content_properties'):
+                continue
+            key = _encode_key(k)
+            new_basekey = u'{}.{}'.format(basekey, key) if basekey else u'{}'.format(key)
+            yield from _deep_kv(new_basekey, v)
+        return
 
     return {
         k:
