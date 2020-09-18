@@ -217,7 +217,8 @@ class S3Downloader(BaseDownloader):
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
 
         lgr.debug("S3 session: Reconnecting to the bucket")
-        self._bucket = self.authenticator.authenticate(bucket_name, self.credential)
+        self._bucket = try_multiple_dec_s3(self.authenticator.authenticate)(
+            bucket_name, self.credential)
         return False
 
     def get_downloader_session(self, url, **kwargs):

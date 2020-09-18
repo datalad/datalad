@@ -108,7 +108,7 @@ def get_bucket(conn, bucket_name):
         Name of the bucket to connect to
     """
     try:
-        return conn.get_bucket(bucket_name)
+        return try_multiple_dec_s3(conn.get_bucket)(bucket_name)
     except S3ResponseError as e:
         # can initially deny or error to connect to the specific bucket by name,
         # and we would need to list which buckets are available under following
@@ -127,14 +127,14 @@ def get_bucket(conn, bucket_name):
             # Could be just HEAD call boto issues is not allowed, and we should not
             # try to verify that bucket is "reachable".  Just carry on
             try:
-                return conn.get_bucket(bucket_name, validate=False)
+                return try_multiple_dec_s3(conn.get_bucket)(bucket_name, validate=False)
             except S3ResponseError as e2:
                 lgr.debug("Cannot access bucket %s even without validation: %s",
                           bucket_name, exc_str(e2))
                 _handle_exception(e, bucket_name)
 
         try:
-            all_buckets = conn.get_all_buckets()
+            all_buckets = try_multiple_dec_s3(conn.get_all_buckets)()
             all_bucket_names = [b.name for b in all_buckets]
             lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
             if bucket_name in all_bucket_names:
