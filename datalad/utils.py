@@ -1961,7 +1961,8 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
 @optional_args
 def try_multiple_dec(
         f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
-        exceptions_filter=None
+        exceptions_filter=None,
+        logger=None,
 ):
     """Decorator to try function multiple times.
 
@@ -1983,6 +1984,9 @@ def try_multiple_dec(
       If provided, this unction will be called with a caught exception
       instance.  If function returns True - we will re-try, if False - exception
       will be re-raised without retrying.
+    logger: callable, optional
+      Logger to log upon failure.  If not provided, will use stock logger
+      at the level of 5 (heavy debug).
     """
     from .dochelpers import exc_str
     if not exceptions:
@@ -1991,7 +1995,9 @@ def try_multiple_dec(
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
         ntrials = 100 if on_windows else 10
-
+    if logger is None:
+        def logger(*args, **kwargs):
+            return lgr.log(5, *args, **kwargs)
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
@@ -2006,8 +2012,7 @@ def try_multiple_dec(
                 if trial < ntrials - 1:
                     if increment_type == 'exponential':
                         t = duration ** (trial + 1)
-                    lgr.log(
-                        5,
+                    logger(
                         "Caught %s on trial #%d. Sleeping %f and retrying",
                         exc_str(exc), trial, t)
                     sleep(t)
