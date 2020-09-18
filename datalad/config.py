@@ -504,9 +504,27 @@ class ConfigManager(object):
         return self._merged_store.keys()
 
     # XXX should this be *args?
-    def get(self, key, default=None):
-        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-        return self._merged_store.get(key, default)
+    def get(self, key, default=None, get_all=False):
+        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.
+
+        Parameters
+        ----------
+        default : optional
+          Value to return when key is not present. `None` by default.
+        get_all : bool, optional
+          If True, return all values of multiple identical configuration keys.
+          By default only the last specified value is returned.
+        """
+        try:
+            val = self[key]
+            if get_all or not isinstance(val, tuple):
+                return val
+            else:
+                return val[-1]
+        except KeyError:
+            # return as-is, default could be a tuple, hence do not subject to
+            # get_all processing
+            return default
 
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
@@ -573,9 +591,21 @@ class ConfigManager(object):
                 return True
         return False
 
+    def _get_type(self, typefn, section, option):
+        key = '.'.join([section, option])
+        # Mimic the handling of get_value(..., default=None), while still going
+        # through get() in order to get its default tuple handling.
+        if key not in self:
+            raise KeyError(key)
+        return typefn(self.get(key))
+
     def getint(self, section, option):
         """A convenience method which coerces the option value to an integer"""
-        return int(self.get_value(section, option))
+        return self._get_type(int, section, option)
+
+    def getfloat(self, section, option):
+        """A convenience method which coerces the option value to a float"""
+        return self._get_type(float, section, option)
 
     def getbool(self, section, option, default=None):
         """A convenience method which coerces the option value to a bool
@@ -585,14 +615,15 @@ class ConfigManager(object):
         False
         TypeError is raised for other values.
         """
-        val = self.get_value(section, option, default=default)
+        key = '.'.join([section, option])
+        # Mimic the handling of get_value(..., default=None), while still going
+        # through get() in order to get its default tuple handling.
+        if default is None and key not in self:
+            raise KeyError(key)
+        val = self.get(key, default=default)
         if val is None:  # no value at all, git treats it as True
             return True
         return anything2bool(val)
-
-    def getfloat(self, section, option):
-        """A convenience method which coerces the option value to a float"""
-        return float(self.get_value(section, option))
 
     # this is a hybrid of ConfigParser and dict API
     def items(self, section=None):

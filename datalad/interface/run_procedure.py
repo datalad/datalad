@@ -77,24 +77,21 @@ def _get_proc_config(name, ds=None):
     """
     # figure what ConfigManager to ask
     cm = cfg if ds is None else ds.config
+    # ConfigManager might return a tuple for different reasons.
+    # The config might have been defined multiple times in the same location
+    # (within .datalad/config for example) or there are multiple values for
+    # it on different levels of git-config (system, user, repo). git-config
+    # in turn does report such things ordered from most general to most
+    # specific configuration. We do want the most specific one here, so
+    # config.get(), which returns the last entry, works here.
+    # TODO: At this point we cannot determine whether it was actually
+    # configured to yield several values by the very same config, in which
+    # case we should actually issue a warning, since we then have no idea
+    # of a priority. But ConfigManager isn't able yet to tell us or to
+    # restrict the possibility to define multiple values to particular items
     v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
     h = cm.get('datalad.procedures.{}.help'.format(name), None)
-    if isinstance(v, tuple):
-        # ConfigManager might return a tuple for different reasons.
-        # The config might have been defined multiple times in the same location
-        # (within .datalad/config for example) or there are multiple values for
-        # it on different levels of git-config (system, user, repo). git-config
-        # in turn does report such things ordered from most general to most
-        # specific configuration. We do want the most specific one here, so we
-        # go with the last entry of that tuple.
-        # TODO: At this point we cannot determine whether it was actually
-        # configured to yield several values by the very same config, in which
-        # case we should actually issue a warning, since we then have no idea
-        # of a priority. But ConfigManager isn't able yet to tell us or to
-        # restrict the possibility to define multiple values to particular items
-        return v[-1], h
-    else:
-        return v, h
+    return v, h
 
 
 def _get_procedure_implementation(name='*', ds=None):
