@@ -32,6 +32,7 @@ from datalad.support.exceptions import (
     AccessDeniedError,
     AnonymousAccessDeniedError,
 )
+from datalad.utils import try_multiple_dec
 
 from urllib.request import urlopen, Request
 
@@ -74,6 +75,28 @@ def _handle_exception(e, bucket_name):
             "Cannot connect to %s S3 bucket. Exception: %s"
             % (bucket_name, exc_str(e))
         )
+
+
+def try_multiple_dec_s3(func):
+    """An S3 specific adapter to @try_multiple_dec
+
+    To decorate func to try multiple times after some sleep upon encountering
+    some intermittent error from S3
+    """
+    return try_multiple_dec(
+                ntrials=4,
+                duration=2.,
+                increment_type='exponential',
+                exceptions=S3ResponseError,
+                # https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
+                exceptions_filter=lambda e: e.status in (
+                    307,  # MovedTemporarily -- DNS updates etc
+                    400,  # Generic Bad Request -- we kept hitting it once in a while
+                    # 403,
+                    503,  # Slow down -- too many requests, so perfect fit to sleep a bit
+                    ),
+                logger=lgr.debug,
+    )(func)
 
 
 def get_bucket(conn, bucket_name):
