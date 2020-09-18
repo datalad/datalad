@@ -13,11 +13,16 @@ import re
 
 from urllib.parse import urlsplit, unquote as urlunquote
 
-from ..utils import auto_repr
-from ..utils import assure_dict_from_str
+from ..utils import (
+    assure_dict_from_str,
+    auto_repr,
+)
 from ..dochelpers import borrowkwargs
-from ..support.network import get_url_straight_filename
-from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
+from ..support.network import (
+    get_url_straight_filename,
+    iso8601_to_epoch,
+    rfc2822_to_epoch,
+)
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
@@ -25,8 +30,13 @@ from ..support.exceptions import (
     DownloadError,
     TargetFileAbsent,
 )
-from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
-from ..support.s3 import get_bucket
+from ..support.s3 import (
+    OrdinaryCallingFormat,
+    S3ResponseError,
+    try_multiple_dec_s3,
+    boto,
+    get_bucket,
+)
 from ..support.status import FileStatus
 
 import logging
@@ -219,7 +229,9 @@ class S3Downloader(BaseDownloader):
         assert(self._bucket.name == bucket_name)  # must be the same
 
         try:
-            key = self._bucket.get_key(url_filepath, version_id=params.get('versionId', None))
+            key = try_multiple_dec_s3(self._bucket.get_key)(
+                url_filepath, version_id=params.get('versionId', None)
+            )
         except S3ResponseError as e:
             raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
