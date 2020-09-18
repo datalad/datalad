@@ -149,12 +149,97 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                 .replace('.', '_')
                 .replace(':', '-'))
 
+    def _create_study_mini_meta_kv(basekey, study_mini_meta):
+        persons = [element for element in study_mini_meta["@graph"] if element.get("@id", None) == "#personList"][0]
+        study = [element for element in study_mini_meta["@graph"] if element.get("@id", None) == "#study"][0]
+        dataset = [element for element in study_mini_meta["@graph"] if element.get("@type", None) == "Dataset"][0]
+        standards = ([
+            part["termCode"]
+            for part in dataset.get("hasPart", {"hasDefinedTerm": []})["hasDefinedTerm"]
+            if part["@type"] == "DefinedTerm"
+        ])
+        publications = (
+                [element for element in study_mini_meta["@graph"]
+                 if element.get("@id", None) == "#publicationList"] or [None]
+        )[0]
+
+        yield (
+            basekey + ".dataset.author",
+            ", ".join([
+                p["name"]
+                for author_spec in dataset["author"]
+                for p in persons["@list"] if p["@id"] == author_spec["@id"]
+            ])
+        )
+        yield (basekey + ".dataset.name", dataset["name"])
+        yield (basekey + ".dataset.location", dataset["url"])
+
+        if "description" in dataset:
+            yield (basekey + ".dataset.description", dataset["description"])
+
+        if "funder" in dataset:
+            yield (
+                basekey + ".dataset.funder",
+                ", ".join([funder["name"] for funder in dataset["funder"]])
+            )
+
+        if "keywords" in dataset:
+            yield (basekey + ".dataset.keywords", ", ".join(dataset["keywords"]))
+
+        if standards:
+            yield (basekey + ".dataset.standards", ", ".join(standards))
+
+        yield (basekey + ".person.email", ", ".join([person["email"] for person in persons["@list"]]))
+        yield (basekey + ".person.name", ", ".join([person["name"] for person in persons["@list"]]))
+
+        yield (basekey + ".name", study["name"])
+
+        yield (
+            basekey + ".accountable_person",
+            [
+                p["name"]
+                for p in persons["@list"] if p["email"] == study["accountablePerson"]
+            ][0]
+        )
+        if "contributor" in study:
+            yield (
+                basekey + ".contributor",
+                ", ".join([
+                    p["name"]
+                    for contributor_spec in study["contributor"]
+                    for p in persons["@list"] if p["@id"] == contributor_spec["@id"]
+                ])
+            )
+
+        if publications:
+            for publication in publications["@list"]:
+                # Emit authors
+                yield (
+                    basekey + ".publication.author",
+                    ", ".join([
+                        p["name"]
+                        for author_spec in publication["author"]
+                        for p in persons["@list"] if p["@id"] == author_spec["@id"]
+                    ])
+                )
+                yield (basekey + ".publication.title", publication["headline"])
+                yield (basekey + ".publication.year", publication["datePublished"])
+
+        if "keywords" in study:
+            yield (basekey + ".keywords", ", ".join(study.get("keywords", [])))
+
     def _deep_kv(basekey, dict_or_list_or_value):
         """Return key/value pairs of any depth following a rule for key
         composition
 
         """
         if dict_or_list_or_value is None:
+            return
+
+        # Special treatment of studyminimeta. This should really be done in an object associated with studyminimeta,
+        # for example in the extractor, because it requires internal knowledge of the studyminimeta-format.
+        if basekey == "metalad_studyminimeta":
+            yield from _create_study_mini_meta_kv(basekey, dict_or_list_or_value)
             return
 
         if not isinstance(dict_or_list_or_value, (dict, list)):
