@@ -1349,12 +1349,11 @@ class BatchedCommand(SafeDelCloseMixin):
             if return_stderr:
                 ret = stderr
             if log_stderr:
-                # only the last 100 lines
                 stderr = ensure_unicode(stderr)
                 stderr = stderr.splitlines()
-                lgr.log(5, "stderr had %d lines. Last lines (up to 100) were:", len(stderr))
-                for l in stderr[-100:]:
-                    lgr.log(5, "stderr| %s ", l)
+                lgr.log(5, "stderr of %s had %d lines:", process.pid, len(stderr))
+                for l in stderr:
+                    lgr.log(5, "| " + l)
 
             # remove the file where we kept dumping stderr
             unlink(self._stderr_out_fname)
