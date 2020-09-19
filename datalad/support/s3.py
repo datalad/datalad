@@ -92,7 +92,6 @@ def try_multiple_dec_s3(func):
                 exceptions_filter=lambda e: e.status in (
                     307,  # MovedTemporarily -- DNS updates etc
                     400,  # Generic Bad Request -- we kept hitting it once in a while
-                    # 403,
                     503,  # Slow down -- too many requests, so perfect fit to sleep a bit
                     ),
                 logger=lgr.debug,
