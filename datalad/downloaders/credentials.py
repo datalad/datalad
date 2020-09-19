@@ -261,6 +261,10 @@ class CompositeCredential(Credential):
         for c in self._credentials[1:]:
             c.delete()
 
+    @property
+    def is_expired(self):
+        return any(c.is_expired for c in self._credentials)
+
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
         # Start from the tail until we have credentials set

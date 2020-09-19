@@ -167,3 +167,18 @@ def test_restricted_bucket_on_NDA():
         ("s3://NDAR_Central_4/submission_23075/dataset_description.json", 'DA041147', 'error'),
     ]:
         yield check_download_external_url, url, failed_str, success_str
+
+
+@use_cassette('test_download_multiple_NDA')
+@with_tempfile(mkdir=True)
+def test_download_multiple_NDA(outdir):
+    # This would smoke/integration test logic for composite credential testing expiration
+    # of the token while reusing session from first url on the 2nd one
+    urls = [
+        "s3://NDAR_Central_4/submission_23075/README",
+        "s3://NDAR_Central_4/submission_23075/dataset_description.json",
+    ]
+    providers = get_test_providers(urls[0], reload=True)  # to verify having credentials to access
+
+    for url in urls:
+        ret = providers.download(url, outdir)
