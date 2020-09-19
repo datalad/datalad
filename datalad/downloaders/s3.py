@@ -17,7 +17,10 @@ from ..utils import (
     assure_dict_from_str,
     auto_repr,
 )
-from ..dochelpers import borrowkwargs
+from ..dochelpers import (
+    borrowkwargs,
+    exc_str,
+)
 from ..support.network import (
     get_url_straight_filename,
     iso8601_to_epoch,
@@ -27,7 +30,7 @@ from ..support.network import (
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
 from ..support.exceptions import (
-    DownloadError,
+    AccessDeniedError,
     TargetFileAbsent,
 )
 from ..support.s3 import (
@@ -237,6 +240,13 @@ class S3Downloader(BaseDownloader):
                 url_filepath, version_id=params.get('versionId', None)
             )
         except S3ResponseError as e:
+            # e.g. 400 Bad request could happen due to timed out key.
+            # Since likely things went bad if credential expired, just raise general
+            # AccessDeniedError. Logic upstream should retry
+            if self.credential and self.credential.is_expired:
+                raise AccessDeniedError(
+                    "Failed to get a key likely due to expired key: %s"
+                    % exc_str(e))
             raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
         if key is None:
