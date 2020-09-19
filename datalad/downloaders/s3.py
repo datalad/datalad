@@ -208,11 +208,14 @@ class S3Downloader(BaseDownloader):
         bucket_name = self._parse_url(url, bucket_only=True)
         if allow_old and self._bucket:
             if self._bucket.name == bucket_name:
-                lgr.debug(
-                    "S3 session: Reusing previous connection to bucket %s",
-                    bucket_name
-                )
-                return True  # we used old
+                if self.credential and self.credential.is_expired:
+                    lgr.debug("S3 session: credential expired")
+                else:
+                    lgr.debug(
+                        "S3 session: Reusing previous connection to bucket %s",
+                        bucket_name
+                    )
+                    return True  # we used old
             else:
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
 
