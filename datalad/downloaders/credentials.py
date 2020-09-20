@@ -258,8 +258,19 @@ class CompositeCredential(Credential):
     def enter_new(self):
         # should invalidate/remove all tail credentials to avoid failing attempts to login
         self._credentials[0].enter_new()
+        self.refresh()
+
+    def refresh(self):
+        """Re-establish "dependent" credentials
+
+        E.g. if code outside was reported that it expired somehow before known expiration datetime
+        """
         for c in self._credentials[1:]:
             c.delete()
+        # trigger re-establishing the chain
+        _ = self()
+        if self.is_expired:
+            raise RuntimeError("Credential %s expired right upon refresh: should have not happened")
 
     @property
     def is_expired(self):
