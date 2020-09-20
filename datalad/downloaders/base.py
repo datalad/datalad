@@ -137,7 +137,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         if authenticator:
             needs_authentication = authenticator.requires_authentication
         else:
-            needs_authentication = self.credential is None
+            needs_authentication = self.credential
         attempt, incomplete_attempt = 0, 0
         result = None
         while True:
@@ -242,7 +242,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     auth_types=supported_auth_types,
                     new_provider=False)
         else:  # None or False
-            if not needs_authentication:
+            if needs_authentication is False:
                 # those urls must or should NOT require authentication
                 # but we got denied
                 raise DownloadError(
@@ -251,6 +251,8 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     "Adjust your configuration for the provider.%s"
                     % (url, msg_types))
             else:
+                # how could be None or any other non-False bool(False)
+                assert (needs_authentication is None)
                 # So we didn't know if authentication necessary, and it
                 # seems to be necessary, so Let's ask the user to setup
                 # authentication mechanism for this website
