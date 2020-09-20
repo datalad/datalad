@@ -30,6 +30,7 @@ from datalad.dochelpers import exc_str
 from datalad.support.exceptions import (
     DownloadError,
     AccessDeniedError,
+    AccessPermissionExpiredError,
     AnonymousAccessDeniedError,
 )
 from datalad.utils import try_multiple_dec
@@ -77,6 +78,31 @@ def _handle_exception(e, bucket_name):
         )
 
 
+def _check_S3ResponseError(e):
+    """Returns True if should be retried.
+
+    raises ... if token has expired"""
+    # https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
+    if e.status in (
+                    307,  # MovedTemporarily -- DNS updates etc
+                    503,  # Slow down -- too many requests, so perfect fit to sleep a bit
+                    ):
+        return True
+    if e.status == 400:
+        # Generic Bad Request -- could be many things! generally -- we retry, but
+        # some times provide more directed reaction
+        # ATM, as used, many requests we send with boto might be just HEAD requests
+        # (if I got it right) and we would not receive BODY back with the detailed
+        # error_code.  Then we will allow to retry until we get something we know how to
+        # handle it more specifically
+        if e.error_code == 'ExpiredToken':
+            raise AccessPermissionExpiredError("Used token to access S3 has expired: %s" % exc_str(e))
+        elif not e.error_code:
+            lgr.log(5, "Empty error_code in %s", e)
+        return True
+    return False
+
+
 def try_multiple_dec_s3(func):
     """An S3 specific adapter to @try_multiple_dec
 
@@ -88,12 +114,7 @@ def try_multiple_dec_s3(func):
                 duration=2.,
                 increment_type='exponential',
                 exceptions=S3ResponseError,
-                # https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList
-                exceptions_filter=lambda e: e.status in (
-                    307,  # MovedTemporarily -- DNS updates etc
-                    400,  # Generic Bad Request -- we kept hitting it once in a while
-                    503,  # Slow down -- too many requests, so perfect fit to sleep a bit
-                    ),
+                exceptions_filter=_check_S3ResponseError,
                 logger=lgr.debug,
     )(func)
 

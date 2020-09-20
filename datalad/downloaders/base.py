@@ -29,9 +29,13 @@ from ..utils import (
     unlink,
 )
 from ..dochelpers import exc_str
-from .credentials import CREDENTIAL_TYPES
+from .credentials import (
+    CREDENTIAL_TYPES,
+    CompositeCredential,
+)
 from ..support.exceptions import (
     AccessDeniedError,
+    AccessPermissionExpiredError,
     AnonymousAccessDeniedError,
     DownloadError,
     IncompleteDownloadError,
@@ -140,6 +144,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             needs_authentication = self.credential
         attempt, incomplete_attempt = 0, 0
         result = None
+        credential_was_refreshed = False
         while True:
             attempt += 1
             if attempt > 20:
@@ -191,10 +196,20 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # got it to return back
                 with try_lock(self._lock) as got_lock:
                     if got_lock:
-                        self._handle_authentication(url, needs_authentication, e,
-                                                    access_denied, msg_types,
-                                                    supported_auth_types,
-                                                    used_old_session)
+                        if isinstance(e, AccessPermissionExpiredError) \
+                                and not credential_was_refreshed \
+                                and self.credential \
+                                and isinstance(self.credential, CompositeCredential):
+                            lgr.debug("Requesting refresh of the credential (once)")
+                            self.credential.refresh()
+                            # to avoid a loop of refreshes without giving a chance to
+                            # enter a new one, we will allow only a single refresh
+                            credential_was_refreshed = True
+                        else:
+                            self._handle_authentication(url, needs_authentication, e,
+                                                        access_denied, msg_types,
+                                                        supported_auth_types,
+                                                        used_old_session)
                     else:
                         lgr.debug("The lock for downloader authentication was not available.")
                         # We will just wait for the lock to become available,

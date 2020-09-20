@@ -30,7 +30,7 @@ from ..support.network import (
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
 from ..support.exceptions import (
-    AccessDeniedError,
+    AccessPermissionExpiredError,
     TargetFileAbsent,
 )
 from ..support.s3 import (
@@ -244,7 +244,7 @@ class S3Downloader(BaseDownloader):
             # Since likely things went bad if credential expired, just raise general
             # AccessDeniedError. Logic upstream should retry
             if self.credential and self.credential.is_expired:
-                raise AccessDeniedError(
+                raise AccessPermissionExpiredError(
                     "Failed to get a key likely due to expired key: %s"
                     % exc_str(e))
             raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
