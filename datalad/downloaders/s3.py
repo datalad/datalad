@@ -211,14 +211,15 @@ class S3Downloader(BaseDownloader):
         bucket_name = self._parse_url(url, bucket_only=True)
         if allow_old and self._bucket:
             if self._bucket.name == bucket_name:
-                if self.credential and self.credential.is_expired:
-                    lgr.debug("S3 session: credential expired")
-                else:
+                try:
+                    self._check_credential()
                     lgr.debug(
                         "S3 session: Reusing previous connection to bucket %s",
                         bucket_name
                     )
                     return True  # we used old
+                except AccessPermissionExpiredError:
+                    lgr.debug("S3 session: credential expired")
             else:
                 lgr.warning("No support yet for multiple buckets per S3Downloader")
 
@@ -226,6 +227,18 @@ class S3Downloader(BaseDownloader):
         self._bucket = try_multiple_dec_s3(self.authenticator.authenticate)(
             bucket_name, self.credential)
         return False
+
+    def _check_credential(self):
+        """Quick check of the credential if known on either it has not expired
+
+        Raises
+        ------
+        AccessPermissionExpiredError
+          if credential is found to be expired
+        """
+        if self.credential and self.credential.is_expired:
+            raise AccessPermissionExpiredError(
+                "Credential %s has expired" % self.credential)
 
     def get_downloader_session(self, url, **kwargs):
         bucket_name, url_filepath, params = self._parse_url(url)
@@ -235,6 +248,7 @@ class S3Downloader(BaseDownloader):
                 raise NotImplementedError("Did not implement support for %s" % newkeys)
         assert(self._bucket.name == bucket_name)  # must be the same
 
+        self._check_credential()
         try:
             key = try_multiple_dec_s3(self._bucket.get_key)(
                 url_filepath, version_id=params.get('versionId', None)
@@ -243,10 +257,7 @@ class S3Downloader(BaseDownloader):
             # e.g. 400 Bad request could happen due to timed out key.
             # Since likely things went bad if credential expired, just raise general
             # AccessDeniedError. Logic upstream should retry
-            if self.credential and self.credential.is_expired:
-                raise AccessPermissionExpiredError(
-                    "Failed to get a key likely due to expired key: %s"
-                    % exc_str(e))
+            self._check_credential()
             raise TargetFileAbsent("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
         if key is None:
