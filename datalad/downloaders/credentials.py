@@ -211,7 +211,10 @@ class AWS_S3(Credential):
         if not exp:
             return False
         exp_epoch = iso8601_to_epoch(exp)
-        expire_in = (exp_epoch - time.time()) / 3600.
+        # -2 to artificially shorten duration of the allotment to avoid
+        # possible race conditions between us checking either it has
+        # already expired before submitting a request.
+        expire_in = (exp_epoch - time.time() - 2) / 3600.
 
         lgr.debug(
             ("Credential %s has expired %.2fh ago"
