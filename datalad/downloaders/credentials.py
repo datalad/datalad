@@ -209,7 +209,7 @@ class AWS_S3(Credential):
     def is_expired(self):
         exp = self.get('expiration', None)
         if not exp:
-            return True
+            return False
         exp_epoch = iso8601_to_epoch(exp)
         expire_in = (exp_epoch - time.time()) / 3600.
 
