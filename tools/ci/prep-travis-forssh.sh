@@ -31,8 +31,9 @@ curl -fSsL \
 sh setup-docker-ssh --key=/tmp/dl-test-ssh-id.pub -2 \
    --from=dataladtester/docker-ssh-target:latest
 
-# FIXME: This is hacky and likely too long, but we need to sleep at least a
-# little.
-sleep 8
+until nc -vz localhost 42241 && nc -vz localhost 42242
+do sleep 1
+done
+
 ssh -v datalad-test exit
 ssh -v datalad-test2 exit
