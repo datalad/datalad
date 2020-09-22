@@ -28,6 +28,7 @@ from datalad.tests.utils import (
     assert_status,
     DEFAULT_BRANCH,
     eq_,
+    known_failure_githubci_osx,
     neq_,
     ok_,
     ok_file_has_content,
@@ -796,6 +797,7 @@ def test_push_git_annex_branch_when_no_data(path):
                for d in target.for_each_ref_(fields="refname:strip=2")})
 
 
+@known_failure_githubci_osx
 @with_tree(tree={"ds": {"f0": "0", "f1": "0", "f2": "0",
                         "f3": "1",
                         "f4": "2", "f5": "2"}})
@@ -817,6 +819,7 @@ def test_push_git_annex_branch_many_paths_same_data(path):
                         action="copy", type="file", status="notneeded")
 
 
+@known_failure_githubci_osx
 @with_tree(tree={"ds": {"f0": "0"}})
 def test_push_matching(path):
     path = Path(path)

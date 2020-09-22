@@ -893,6 +893,20 @@ def known_failure_githubci_win(func):
     return func
 
 
+def known_failure_githubci_osx(func):
+    """Test decorator for a known test failure on Github's macOS CI
+    """
+    if 'GITHUB_WORKFLOW' in os.environ and on_osx:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_githubci_osx')
+        @attr('githubci_osx')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
 # ### ###
 # END known failure decorators
 # ### ###
