@@ -186,6 +186,34 @@ def test_download_multiple_NDA(outdir):
         ret = providers.download(url, outdir)
 
 
+def check_get_key(b, key, version_id):
+    url = "s3://%s/%s" % (b, key)
+    if version_id:
+        url += '?versionId=' + version_id
+    providers = get_test_providers(url, reload=True)  # to verify having credentials to access
+    downloader = providers.get_provider(url).get_downloader(url)
+    downloader._establish_session(url)
+
+    keys = [f(key, version_id=version_id)
+            for f in (downloader._bucket.get_key,
+                      downloader._get_key_via_get)]
+    # key1 != key2 probably due to some reasons, so we will just compare fields we care about
+    for f in ['name', 'version_id', 'size', 'content_type', 'last_modified']:
+        vals = [getattr(k, f) for k in keys]
+        assert_equal(*vals, msg="%s differs between two keys: %s" % (f, vals))
+
+
+@use_cassette('test_get_key')
+def test_get_key():
+    for b, p, v in [
+        ('NDAR_Central_4', 'submission_23075/README', None),
+        ('datalad-test0-versioned', '1version-nonversioned1.txt', None),
+        ('datalad-test0-versioned', '3versions-allversioned.txt', None),
+        ('datalad-test0-versioned', '3versions-allversioned.txt', 'pNsV5jJrnGATkmNrP8.i_xNH6CY4Mo5s'),
+    ]:
+        yield check_get_key, b, p, v
+
+
 # not really to be ran as part of the tests since it does
 # largely nothing but wait for token to expire!
 # It is still faster than waiting for real case to crash
