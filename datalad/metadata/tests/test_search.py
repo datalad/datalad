@@ -358,3 +358,265 @@ def test_meta2autofield_dict():
             'extr1': {'prop1': 'value'}}),
         {'extr1.prop1': 'value'}
     )
+
+
+def test_meta2autofield_jsonld_graph():
+    """ check proper handling of JSON-LD @graph nodes """
+    # Just a test that we would obtain the value stored for that extractor
+    # instead of what unique values it already had (whatever that means)
+    eq_(
+        _meta2autofield_dict({"r": {"@graph": ["a", "b", "c"]}}),
+        {'r.graph[0]': 'a', 'r.graph[1]': 'b', 'r.graph[2]': 'c'}
+    )
+
+
+def test_meta2autofield_jsonld_list():
+    """ check proper handling of JSON-LD @list nodes """
+    # Just a test that we would obtain the value stored for that extractor
+    # instead of what unique values it already had (whatever that means)
+    eq_(
+        _meta2autofield_dict({"r": {"@list": ["a", "b", "c"]}}),
+        {'r.list[0]': 'a', 'r.list[1]': 'b', 'r.list[2]': 'c'}
+    )
+
+
+_mocked_studyminimeta_jsonld = {
+    "@context": {
+        "@vocab": "http://schema.org/"
+    },
+    "@graph": [
+        {
+            "@id": "#study",
+            "@type": "CreativeWork",
+            "name": "Eine Studie",
+            "abstract": "a short description of the study",
+            "accountablePerson": "a@example.com",
+            "keywords": [
+                "k1",
+                "k2"
+            ],
+            "dateCreated": "01.01.2020",
+            "description": "end_date: 02.02.2020",
+            "contributor": [
+                {
+                    "@id": "https://schema.datalad.org/person#a@example.com"
+                },
+                {
+                    "@id": "https://schema.datalad.org/person#b@example.com"
+                }
+            ],
+            "funder": [
+                {
+                    "@id": "https://schema.datalad.org/organization#DFG",
+                    "@type": "Organization",
+                    "name": "DFG"
+                },
+                {
+                    "@id": "https://schema.datalad.org/organization#NHO",
+                    "@type": "Organization",
+                    "name": "NHO"
+                }
+            ]
+        },
+        {
+            "@id": "https://schema.datalad.org/datalad_dataset#id-0000--0000",
+            "@type": "Dataset",
+            "version": "a02312398324778972389472834",
+            "name": "Datenddaslk",
+            "url": "http://dlksdfs.comom.com",
+            "description": "Ein paar Daten, die ich mal gesammelt habe. Ein paar Daten, die ich mal gesammelt habe.",
+            "keywords": [
+                "d_k1",
+                "d_k2",
+                "d_k3"
+            ],
+            "author": [
+                {
+                    "@id": "https://schema.datalad.org/person#a@example.com"
+                },
+                {
+                    "@id": "https://schema.datalad.org/person#b@example.com"
+                }
+            ],
+            "hasPart": {
+                "@id": "#standards",
+                "@type": "DefinedTermSet",
+                "hasDefinedTerm": [
+                    {
+                        "@id": "https://schema.datalad.org/standard#dicom",
+                        "@type": "DefinedTerm",
+                        "termCode": "dicom"
+                    },
+                    {
+                        "@id": "https://schema.datalad.org/standard#ebdsi",
+                        "@type": "DefinedTerm",
+                        "termCode": "ebdsi"
+                    }
+                ]
+            }
+        },
+        {
+            "@id": "#personList",
+            "@list": [
+                {
+                    "@id": "https://schema.datalad.org/person#a@example.com",
+                    "@type": "Person",
+                    "email": "a@example.com",
+                    "name": "Prof. Dr.  Alex Meyer",
+                    "givenName": "Alex",
+                    "familyName": "Meyer",
+                    "sameAs": "0000-0001-0002-0033",
+                    "honorificSuffix": "Prof. Dr.",
+                    "affiliation": "Big Old University",
+                    "contactPoint": {
+                        "@id": "#contactPoint(a@example.com)",
+                        "@type": "ContactPoint",
+                        "description": "Corner broadway and main"
+                    }
+                },
+                {
+                    "@id": "https://schema.datalad.org/person#b@example.com",
+                    "@type": "Person",
+                    "email": "b@example.com",
+                    "name": "MD  Bernd Muller",
+                    "givenName": "Bernd",
+                    "familyName": "Muller",
+                    "sameAs": "0000-0001-0002-0034",
+                    "honorificSuffix": "MD",
+                    "affiliation": "RRU-SSLT",
+                    "contactPoint": {
+                        "@id": "#contactPoint(b@example.com)",
+                        "@type": "ContactPoint",
+                        "description": "central plaza"
+                    }
+                }
+            ]
+        },
+        {
+            "@id": "#publicationList",
+            "@list": [
+                {
+                    "@id": "#publication[0]",
+                    "@type": "ScholarlyArticle",
+                    "headline": "Publication Numero Unos",
+                    "datePublished": 2001,
+                    "author": [
+                        {
+                            "@id": "https://schema.datalad.org/person#a@example.com"
+                        },
+                        {
+                            "@id": "https://schema.datalad.org/person#b@example.com"
+                        }
+                    ],
+                    "publisher": {
+                        "@id": "https://schema.datalad.org/publisher#Renato",
+                        "@type": "Organization",
+                        "name": "Renato"
+                    },
+                    "isPartOf": {
+                        "@id": "#issue(4)",
+                        "@type": "PublicationIssue",
+                        "issueNumber": 4,
+                        "isPartOf": {
+                            "@id": "#volume(30)",
+                            "@type": "PublicationVolume",
+                            "volumeNumber": 30
+                        }
+                    }
+                },
+                {
+                    "@id": "#publication[1]",
+                    "@type": "ScholarlyArticle",
+                    "headline": "Publication Numero Dos",
+                    "datePublished": 2002,
+                    "author": [
+                        {
+                            "@id": "https://schema.datalad.org/person#a@example.com"
+                        },
+                        {
+                            "@id": "https://schema.datalad.org/person#b@example.com"
+                        }
+                    ],
+                    "publisher": {
+                        "@id": "https://schema.datalad.org/publisher#Vorndran",
+                        "@type": "Organization",
+                        "name": "Vorndran"
+                    },
+                    "isPartOf": {
+                        "@id": "#volume(400)",
+                        "@type": "PublicationVolume",
+                        "volumeNumber": 400
+                    }
+                },
+                {
+                    "@id": "#publication[2]",
+                    "@type": "ScholarlyArticle",
+                    "headline": "Publication Numero Tres",
+                    "datePublished": 2003,
+                    "author": [
+                        {
+                            "@id": "https://schema.datalad.org/person#a@example.com"
+                        },
+                        {
+                            "@id": "https://schema.datalad.org/person#b@example.com"
+                        }
+                    ],
+                    "publisher": {
+                        "@id": "https://schema.datalad.org/publisher#Eisenberg",
+                        "@type": "Organization",
+                        "name": "Eisenberg"
+                    },
+                    "isPartOf": {
+                        "@id": "#issue(500)",
+                        "@type": "PublicationIssue",
+                        "issueNumber": 500
+                    }
+                },
+                {
+                    "@id": "#publication[3]",
+                    "@type": "ScholarlyArticle",
+                    "headline": "Publication Numero Quatro",
+                    "datePublished": 2004,
+                    "author": [
+                        {
+                            "@id": "https://schema.datalad.org/person#a@example.com"
+                        },
+                        {
+                            "@id": "https://schema.datalad.org/person#b@example.com"
+                        }
+                    ],
+                    "publisher": {
+                        "@id": "https://schema.datalad.org/publisher#Killian-Tumler",
+                        "@type": "Organization",
+                        "name": "Killian-Tumler"
+                    }
+                }
+            ]
+        }
+    ]
+}
+
+
+def test_meta2autofield_studyminimeta():
+    """ check proper handling of JSON-LD @list nodes """
+    # Just a test that we would obtain the value stored for that extractor
+    # instead of what unique values it already had (whatever that means)
+    eq_(
+        _meta2autofield_dict({"metalad_studyminimeta": _mocked_studyminimeta_jsonld}),
+        {
+            'metalad_studyminimeta.dataset.author': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+            'metalad_studyminimeta.dataset.name': 'Datenddaslk',
+            'metalad_studyminimeta.dataset.location': 'http://dlksdfs.comom.com',
+            'metalad_studyminimeta.dataset.description': 'Ein paar Daten, die ich mal gesammelt habe. Ein paar Daten, die ich mal gesammelt habe.',
+            'metalad_studyminimeta.dataset.keywords': 'd_k1, d_k2, d_k3',
+            'metalad_studyminimeta.dataset.standards': 'dicom, ebdsi',
+            'metalad_studyminimeta.person.email': 'a@example.com, b@example.com',
+            'metalad_studyminimeta.person.name': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+            'metalad_studyminimeta.name': 'Eine Studie',
+            'metalad_studyminimeta.accountable_person': 'Prof. Dr.  Alex Meyer',
+            'metalad_studyminimeta.contributor': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+            'metalad_studyminimeta.publication.author': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+            'metalad_studyminimeta.publication.title': 'Publication Numero Quatro',
+            'metalad_studyminimeta.publication.year': '2004', 'metalad_studyminimeta.keywords': 'k1, k2'
+        }
+    )
