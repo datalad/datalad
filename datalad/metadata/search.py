@@ -257,12 +257,20 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
             # Handle the @list node of JSON-LD here
             new_key_name = dict_or_list_or_value.get('@id', 'list')
             for index, element in enumerate(dict_or_list_or_value['@list']):
-                yield from _deep_kv(basekey + f".{new_key_name}[{index}]", element)
+                yield from _deep_kv(
+                    basekey
+                    + ".{new_key_name}[{index}]".format(
+                        new_key_name=new_key_name,
+                        index=index),
+                    element)
 
         if '@graph' in dict_or_list_or_value:
             # Handle the @graph node of JSON-LD here
             for index, element in enumerate(dict_or_list_or_value['@graph']):
-                yield from _deep_kv(basekey + f".graph[{index}]", element)
+                yield from _deep_kv(
+                    basekey
+                    + ".graph[{index}]".format(index=index),
+                    element)
 
         if "@type" in dict_or_list_or_value:
             key = _encode_key(dict_or_list_or_value['@type'])
