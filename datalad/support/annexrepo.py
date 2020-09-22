@@ -3772,7 +3772,8 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch']  # , '--debug']
+            ['--batch'] + \
+            (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None
         super(BatchedAnnex, self).__init__(
