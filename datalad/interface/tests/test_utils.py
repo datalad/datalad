@@ -50,6 +50,7 @@ from ..utils import (
     eval_results,
     handle_dirty_dataset,
 )
+from ..results import get_status_dict
 from datalad.interface.base import build_doc
 
 
@@ -460,3 +461,26 @@ def test_utils_suppress_similar():
         assert_in("path10", cmo.out)
         assert_not_in("path20", cmo.out)
         assert_re_in("[^-0-9]1 .* suppressed", cmo.out, match=False)
+
+
+class TestUtils2(Interface):
+    # result_renderer = custom_renderer
+    _params_ = dict()
+    @staticmethod
+    @eval_results
+    def __call__():
+        def logger(msg, *args):
+            return msg % args
+        yield get_status_dict(
+            action="test",
+            status="ok",
+            message=("kaboom %s %s", "greedy"),
+            logger=logger,
+        )
+
+
+def test_incorrect_msg_interpolation():
+    with assert_raises(TypeError) as cme:
+        TestUtils2().__call__()
+    # this must be our custom exception
+    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.exception))

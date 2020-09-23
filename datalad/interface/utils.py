@@ -583,7 +583,13 @@ def _process_results(
                     msg, res['action'], res['path'])
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
-                res_lgr(msg, *msgargs)
+                try:
+                    res_lgr(msg, *msgargs)
+                except TypeError as exc:
+                    raise TypeError(
+                        "Failed to render %r with %r from %r: %s"
+                        % (msg, msgargs, res, exc_str(exc))
+                    )
             else:
                 res_lgr(msg)
 
