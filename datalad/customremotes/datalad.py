@@ -92,7 +92,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
         lgr.debug("VERIFYING key %s" % key)
         resp = None
-        for url in self.get_URLS(key):
+        for url in self.gen_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
                 status = self._providers.get_status(url)
@@ -142,11 +142,12 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
         # TODO: We might want that one to be a generator so we do not bother requesting
         # all possible urls at once from annex.
-        urls = self.get_URLS(key)
+        urls = []
 
         # TODO: priorities etc depending on previous experience or settings
 
-        for url in urls:
+        for url in self.gen_URLS(key):
+            urls.append(url)
             try:
                 downloaded_path = self._providers.download(
                     url, path=path, overwrite=True
