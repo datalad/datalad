@@ -17,6 +17,8 @@ import errno
 import os
 import sys
 
+from collections import Counter
+
 from ..support.path import exists, join as opj, dirname, lexists
 
 from urllib.parse import urlparse
@@ -257,6 +259,12 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
+
+        # OPT: a counter to increment upon successful encounter of the scheme
+        # (ATM only in gen_URLS but later could also be used in other requests).
+        # This would allow to consider schemes in order of decreasing success instead
+        # of arbitrary hardcoded order
+        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -624,7 +632,7 @@ class AnnexCustomRemote(object):
 
         """
         nurls = 0
-        for scheme in self.SUPPORTED_SCHEMES:
+        for scheme, _ in self._scheme_hits.most_common():
             scheme_ = scheme + ":"
             self.send("GETURLS", key, scheme_)
             # we need to first to slurp in all for a given SCHEME
@@ -642,8 +650,12 @@ class AnnexCustomRemote(object):
                     scheme_urls.append(url[0])
                 else:
                     break
-            for url in scheme_urls:
-                yield url
+            if scheme_urls:
+                # note: generator would ceise to exist thus not asking
+                # for URLs for other schemes if this scheme is good enough
+                self._scheme_hits[scheme] += 1
+                for url in scheme_urls:
+                    yield url
 
         self.heavydebug("Got %d URL(s) for key %s", nurls, key)
 
