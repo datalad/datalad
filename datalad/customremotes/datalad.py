@@ -38,7 +38,6 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
-        self._last_url = None  # for heuristic to choose among multiple URLs
         self._providers = Providers.from_config_files()
 
     #
@@ -144,11 +143,6 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         # TODO: We might want that one to be a generator so we do not bother requesting
         # all possible urls at once from annex.
         urls = self.get_URLS(key)
-
-        if self._last_url in urls:
-            # place it first among candidates... some kind of a heuristic
-            urls.pop(self._last_url)
-            urls = [self._last_url] + urls
 
         # TODO: priorities etc depending on previous experience or settings
 
