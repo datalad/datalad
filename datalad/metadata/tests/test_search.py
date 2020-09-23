@@ -388,7 +388,7 @@ _mocked_studyminimeta_jsonld = {
         {
             "@id": "#study",
             "@type": "CreativeWork",
-            "name": "Eine Studie",
+            "name": "A small study",
             "abstract": "a short description of the study",
             "accountablePerson": "a@example.com",
             "keywords": [
@@ -424,7 +424,7 @@ _mocked_studyminimeta_jsonld = {
             "version": "a02312398324778972389472834",
             "name": "Datenddaslk",
             "url": "http://dlksdfs.comom.com",
-            "description": "Ein paar Daten, die ich mal gesammelt habe. Ein paar Daten, die ich mal gesammelt habe.",
+            "description": "Some data I collected once upon a time, spending hours and hours in dark places.",
             "keywords": [
                 "d_k1",
                 "d_k2",
@@ -601,22 +601,135 @@ def test_meta2autofield_studyminimeta():
     """ check proper handling of JSON-LD @list nodes """
     # Just a test that we would obtain the value stored for that extractor
     # instead of what unique values it already had (whatever that means)
-    eq_(
-        _meta2autofield_dict({"metalad_studyminimeta": _mocked_studyminimeta_jsonld}),
-        {
-            'metalad_studyminimeta.dataset.author': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
-            'metalad_studyminimeta.dataset.name': 'Datenddaslk',
-            'metalad_studyminimeta.dataset.location': 'http://dlksdfs.comom.com',
-            'metalad_studyminimeta.dataset.description': 'Ein paar Daten, die ich mal gesammelt habe. Ein paar Daten, die ich mal gesammelt habe.',
-            'metalad_studyminimeta.dataset.keywords': 'd_k1, d_k2, d_k3',
-            'metalad_studyminimeta.dataset.standards': 'dicom, ebdsi',
-            'metalad_studyminimeta.person.email': 'a@example.com, b@example.com',
-            'metalad_studyminimeta.person.name': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
-            'metalad_studyminimeta.name': 'Eine Studie',
-            'metalad_studyminimeta.accountable_person': 'Prof. Dr.  Alex Meyer',
-            'metalad_studyminimeta.contributor': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
-            'metalad_studyminimeta.publication.author': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
-            'metalad_studyminimeta.publication.title': 'Publication Numero Quatro',
-            'metalad_studyminimeta.publication.year': '2004', 'metalad_studyminimeta.keywords': 'k1, k2'
+    generated_dict = _meta2autofield_dict({"metalad_studyminimeta": _mocked_studyminimeta_jsonld})
+    template_dict = {
+        'metalad_studyminimeta.dataset.author': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+        'metalad_studyminimeta.dataset.name': 'Datenddaslk',
+        'metalad_studyminimeta.dataset.location': 'http://dlksdfs.comom.com',
+        'metalad_studyminimeta.dataset.description': 'Some data I collected once upon a time, '
+                                                     'spending hours and hours in dark places.',
+        'metalad_studyminimeta.dataset.keywords': 'd_k1, d_k2, d_k3',
+        'metalad_studyminimeta.dataset.standards': 'dicom, ebdsi',
+        'metalad_studyminimeta.person.email': 'a@example.com, b@example.com',
+        'metalad_studyminimeta.person.name': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+        'metalad_studyminimeta.name': 'A small study',
+        'metalad_studyminimeta.accountable_person': 'Prof. Dr.  Alex Meyer',
+        'metalad_studyminimeta.contributor': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+        'metalad_studyminimeta.publication.author': 'Prof. Dr.  Alex Meyer, MD  Bernd Muller',
+        'metalad_studyminimeta.publication.title': 'Publication Numero Quatro',
+        'metalad_studyminimeta.publication.year': '2004', 'metalad_studyminimeta.keywords': 'k1, k2'
+    }
+    eq_(generated_dict, template_dict)
+
+
+@known_failure_githubci_win
+@with_tempfile(mkdir=True)
+def test_ds_studyminimeta_show_keys_full(path):
+    from ..search import _EGrepSearch
+    from unittest.mock import patch, MagicMock
+
+    def _mock_metadata_aggregator(**kwargs):
+        yield {
+            'path': "/mocked/static/path",
+            'status': 'ok',
+            'type': 'dataset',
+            'metadata': {
+                'metalad_studyminimeta': _mocked_studyminimeta_jsonld
+            }
         }
+
+    with patch('datalad.metadata.search.query_aggregated_metadata',
+               MagicMock(side_effect=_mock_metadata_aggregator)), \
+            swallow_outputs() as cmo:
+        ds = Dataset(path).create(force=True)
+        searcher = _EGrepSearch(ds)
+        searcher.show_keys(mode='full')
+        out_lines = [line for line in cmo.out.split(os.linesep) if line]
+
+    # Test that the studyminimeta-indexer is called and working
+    assert_equal(
+        [key_line for key_line in out_lines if not key_line.startswith(' ')],
+        [
+            'metalad_studyminimeta.accountable_person',
+            'metalad_studyminimeta.contributor',
+            'metalad_studyminimeta.dataset.author',
+            'metalad_studyminimeta.dataset.description',
+            'metalad_studyminimeta.dataset.keywords',
+            'metalad_studyminimeta.dataset.location',
+            'metalad_studyminimeta.dataset.name',
+            'metalad_studyminimeta.dataset.standards',
+            'metalad_studyminimeta.keywords',
+            'metalad_studyminimeta.name',
+            'metalad_studyminimeta.person.email',
+            'metalad_studyminimeta.person.name',
+            'metalad_studyminimeta.publication.author',
+            'metalad_studyminimeta.publication.title',
+            'metalad_studyminimeta.publication.year',
+            'parentds',
+            'path',
+            'type'
+        ]
     )
+
+    # Test correct value composition
+    assert_equal(
+        out_lines,
+        [
+            "metalad_studyminimeta.accountable_person",
+            " in  1 datasets",
+            " has 1 unique values: 'Prof. Dr.  Alex Meyer'",
+            "metalad_studyminimeta.contributor",
+            " in  1 datasets",
+            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+            "metalad_studyminimeta.dataset.author",
+            " in  1 datasets",
+            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+            "metalad_studyminimeta.dataset.description",
+            " in  1 datasets",
+            " has 1 unique values: <<'Some data I collected once upon a++44 chars++es.'>>",
+            "metalad_studyminimeta.dataset.keywords",
+            " in  1 datasets",
+            " has 1 unique values: 'd_k1, d_k2, d_k3'",
+            "metalad_studyminimeta.dataset.location",
+            " in  1 datasets",
+            " has 1 unique values: 'http://dlksdfs.comom.com'",
+            "metalad_studyminimeta.dataset.name",
+            " in  1 datasets",
+            " has 1 unique values: 'Datenddaslk'",
+            "metalad_studyminimeta.dataset.standards",
+            " in  1 datasets",
+            " has 1 unique values: 'dicom, ebdsi'",
+            "metalad_studyminimeta.keywords",
+            " in  1 datasets",
+            " has 1 unique values: 'k1, k2'",
+            "metalad_studyminimeta.name",
+            " in  1 datasets",
+            " has 1 unique values: 'A small study'",
+            "metalad_studyminimeta.person.email",
+            " in  1 datasets",
+            " has 1 unique values: 'a@example.com, b@example.com'",
+            "metalad_studyminimeta.person.name",
+            " in  1 datasets",
+            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+            "metalad_studyminimeta.publication.author",
+            " in  1 datasets",
+            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+            "metalad_studyminimeta.publication.title",
+            " in  1 datasets",
+            " has 1 unique values: 'Publication Numero Quatro'",
+            "metalad_studyminimeta.publication.year",
+            " in  1 datasets",
+            " has 1 unique values: 2004",
+            "parentds",
+            " in  1 datasets",
+            " has 0 unique values: ",
+            "path",
+            " in  1 datasets",
+            " has 1 unique values: '/mocked/static/path'",
+            "type",
+            " in  1 datasets",
+            " has 1 unique values: 'dataset'"
+        ]
+    )
+
+    return
