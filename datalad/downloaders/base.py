@@ -26,6 +26,8 @@ from .. import cfg
 from ..ui import ui
 from ..utils import (
     auto_repr,
+    ensure_unicode,
+    read_file_ensure_unicode,
     unlink,
 )
 from ..dochelpers import exc_str
@@ -366,8 +368,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 % self.authenticator
 
             if file_:
-                with open(file_) as fp:
-                    content = fp.read(self._DOWNLOAD_SIZE_TO_VERIFY_AUTH)
+                content = read_file_ensure_unicode(file_)
             else:
                 assert(content is not None)
 
@@ -574,7 +575,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
             # now that we know size based on encoded content, let's decode into string type
             if isinstance(content, bytes) and decode:
-                content = content.decode()
+                content = ensure_unicode(content)
             # downloaded_size = os.stat(temp_filepath).st_size
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)

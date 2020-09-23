@@ -79,6 +79,7 @@ from ...support.exceptions import (
 )
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
+from ...utils import read_file_ensure_unicode
 
 
 def test_docstring():
@@ -266,12 +267,11 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     with swallow_outputs() as cmo:
         downloaded_path = downloader.download(url, path=d)
     assert_equal(fpath, downloaded_path)
-    with open(fpath) as f:
-        content = f.read()
-        if success_str is not None:
-            assert_in(success_str, content)
-        if failed_str is not None:
-            assert_false(failed_str in content)
+    content = read_file_ensure_unicode(fpath)
+    if success_str is not None:
+        assert_in(success_str, content)
+    if failed_str is not None:
+        assert_false(failed_str in content)
 
     # And if we specify size
     for s in [1, 2]:
@@ -279,8 +279,7 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
             downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
         # should not be affected
         assert_equal(downloaded_path, downloaded_path_)
-        with open(fpath) as f:
-            content_ = f.read()
+        content_ = read_file_ensure_unicode(fpath)
         assert_equal(len(content_), s)
         assert_equal(content_, content[:s])
 
@@ -334,6 +333,17 @@ def test_authenticate_external_portals():
           "failed", \
           "'Scan','FilePath'"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
+
+
+@skip_if_no_network
+@use_cassette('test_detect_login_error')
+def test_detect_login_error():
+    # we had unicode decode issue: https://github.com/datalad/datalad/issues/4951
+    check_download_external_url(
+          "https://portal.nersc.gov/project/crcns/download/ac-5/docs/data_analysis_instructions.txt",
+          "<form action=",
+          "DMR stimulus")
+test_detect_login_error.tags = ['external-portal', 'network']
 
 
 @known_failure_githubci_win
@@ -489,9 +499,8 @@ def test_HTMLFormAuthenticator_httpretty(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file_ensure_unicode(fpath)
+    assert_equal(content, "correct body")
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
@@ -639,9 +648,8 @@ def test_scenario_2(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file_ensure_unicode(fpath)
+    assert_equal(content, "correct body")
 
 
 class FakeCredential3(Token):
@@ -687,9 +695,9 @@ def test_HTTPBearerTokenAuthenticator(d):
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file_ensure_unicode(fpath)
+    assert_equal(content, "correct body")
+
 
 class FakeLorisCredential(Token):
     """Credential to test scenarios."""
@@ -729,9 +737,9 @@ def test_HTTPLorisTokenAuthenticator(d):
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file_ensure_unicode(fpath)
+    assert_equal(content, "correct body")
+
 
 @skip_if(not httpretty, "no httpretty")
 @without_http_proxy
@@ -773,6 +781,5 @@ def test_lorisadapter(d, keyring):
     assert_equal(r.headers['Authorization'], "Bearer testtoken33")
     # Verify credentials correctly set to test user:pass
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file_ensure_unicode(fpath)
+    assert_equal(content, "correct body")
