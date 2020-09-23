@@ -27,7 +27,6 @@ from ..ui import ui
 from ..utils import (
     auto_repr,
     ensure_unicode,
-    read_file_ensure_unicode,
     unlink,
 )
 from ..dochelpers import exc_str
@@ -368,7 +367,10 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 % self.authenticator
 
             if file_:
-                content = read_file_ensure_unicode(file_)
+                # just read bytes and pass to check_for_auth_failure which
+                # will then encode regex into bytes (assuming utf-8 though)
+                with open(file_, 'rb') as fp:
+                    content = fp.read(self._DOWNLOAD_SIZE_TO_VERIFY_AUTH)
             else:
                 assert(content is not None)
 

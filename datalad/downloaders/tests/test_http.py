@@ -79,7 +79,7 @@ from ...support.exceptions import (
 )
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
-from ...utils import read_file_ensure_unicode
+from ...utils import read_file
 
 
 def test_docstring():
@@ -263,15 +263,22 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     provider = providers.get_provider(url)
     downloader = provider.get_downloader(url)
 
+    # we will load/fetch binary blobs
+    success_bytes, failed_bytes = None, None
+    if success_str is not None:
+        success_bytes = success_str.encode()
+    if failed_str is not None:
+        failed_bytes = failed_str.encode()
+
     # Download way
     with swallow_outputs() as cmo:
         downloaded_path = downloader.download(url, path=d)
     assert_equal(fpath, downloaded_path)
-    content = read_file_ensure_unicode(fpath)
-    if success_str is not None:
-        assert_in(success_str, content)
+    content = read_file(fpath, decode=False)
+    if success_bytes is not None:
+        assert_in(success_bytes, content)
     if failed_str is not None:
-        assert_false(failed_str in content)
+        assert_false(failed_bytes in content)
 
     # And if we specify size
     for s in [1, 2]:
@@ -279,21 +286,21 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
             downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
         # should not be affected
         assert_equal(downloaded_path, downloaded_path_)
-        content_ = read_file_ensure_unicode(fpath)
+        content_ = read_file(fpath, decode=False)
         assert_equal(len(content_), s)
         assert_equal(content_, content[:s])
 
     # Fetch way
-    content = downloader.fetch(url)
-    if success_str is not None:
-        assert_in(success_str, content)
-    if failed_str is not None:
-        assert_false(failed_str in content)
+    content = downloader.fetch(url, decode=False)
+    if success_bytes is not None:
+        assert_in(success_bytes, content)
+    if failed_bytes is not None:
+        assert_false(failed_bytes in content)
 
     # And if we specify size
     for s in [1, 2]:
         with swallow_outputs() as cmo:
-            content_ = downloader.fetch(url, size=s)
+            content_ = downloader.fetch(url, size=s, decode=False)
         assert_equal(len(content_), s)
         assert_equal(content_, content[:s])
 
@@ -336,14 +343,25 @@ test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
 @skip_if_no_network
-@use_cassette('test_detect_login_error')
-def test_detect_login_error():
+@use_cassette('test_detect_login_error1')
+def test_detect_login_error1():
     # we had unicode decode issue: https://github.com/datalad/datalad/issues/4951
     check_download_external_url(
           "https://portal.nersc.gov/project/crcns/download/ac-5/docs/data_analysis_instructions.txt",
           "<form action=",
           "DMR stimulus")
-test_detect_login_error.tags = ['external-portal', 'network']
+test_detect_login_error1.tags = ['external-portal', 'network']
+
+
+@skip_if_no_network
+@use_cassette('test_detect_login_error2')
+def test_detect_login_error2():
+    # a tiny binary file so we do fetch it but it cannot be decoded, we must not fail
+    check_download_external_url(
+          "https://portal.nersc.gov/project/crcns/download/mt-3/example_scripts.zip",
+          "<form action=",
+          None)
+test_detect_login_error2.tags = ['external-portal', 'network']
 
 
 @known_failure_githubci_win
@@ -499,7 +517,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
 
-    content = read_file_ensure_unicode(fpath)
+    content = read_file(fpath)
     assert_equal(content, "correct body")
 
     # Unsuccesfull scenarios to test:
@@ -648,7 +666,7 @@ def test_scenario_2(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
 
-    content = read_file_ensure_unicode(fpath)
+    content = read_file(fpath)
     assert_equal(content, "correct body")
 
 
@@ -695,7 +713,7 @@ def test_HTTPBearerTokenAuthenticator(d):
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
-    content = read_file_ensure_unicode(fpath)
+    content = read_file(fpath)
     assert_equal(content, "correct body")
 
 
@@ -737,7 +755,7 @@ def test_HTTPLorisTokenAuthenticator(d):
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
-    content = read_file_ensure_unicode(fpath)
+    content = read_file(fpath)
     assert_equal(content, "correct body")
 
 
@@ -781,5 +799,5 @@ def test_lorisadapter(d, keyring):
     assert_equal(r.headers['Authorization'], "Bearer testtoken33")
     # Verify credentials correctly set to test user:pass
 
-    content = read_file_ensure_unicode(fpath)
+    content = read_file(fpath)
     assert_equal(content, "correct body")
