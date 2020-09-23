@@ -1497,8 +1497,8 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     # so we break the loop as soon as we get it
     for candidate in [' ' + good + ' ', ' ' + good, good + ' ', good]:
         candidate = OBSCURE_PREFIX + candidate
-        # if on_windows and filename.rstrip() != filename:
-        #     continue
+        if on_windows and candidate.rstrip() != candidate:
+            continue
         if good_filename(candidate):
             good = candidate
             break
