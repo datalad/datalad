@@ -619,14 +619,17 @@ class AnnexCustomRemote(object):
         else:
             return val
 
-    def get_URLS(self, key):
-        """Gets URL(s) associated with a Key.
+    def gen_URLS(self, key):
+        """Yield URL(s) associated with a Key.
 
         """
-        urls = []
+        nurls = 0
         for scheme in self.SUPPORTED_SCHEMES:
             scheme_ = scheme + ":"
             self.send("GETURLS", key, scheme_)
+            # we need to first to slurp in all for a given SCHEME
+            # since annex would be expecting to send its final empty VALUE
+            scheme_urls = []
             while True:
                 url = self.read("VALUE", 1)
                 if not url or len(url) <= 1:
@@ -635,16 +638,22 @@ class AnnexCustomRemote(object):
                 url = url[1:]
                 if url:
                     assert(len(url) == 1)
-                    urls.append(url[0])
+                    nurls += 1
+                    scheme_urls.append(url[0])
                 else:
                     break
+            for url in scheme_urls:
+                yield url
 
-        self.heavydebug("Got %d URL(s) for key %s: %s", len(urls), key, urls)
+        self.heavydebug("Got %d URL(s) for key %s", nurls, key)
 
-        #if not urls:
-        #    raise ValueError("Did not get any URLs for %s which we support" % key)
+    def get_URLS(self, key):
+        """Gets URL(s) associated with a Key.
 
-        return urls
+        Use a generator gen_URLS where possible.
+        This one should be deprecated in 0.15.
+        """
+        return list(self.gen_URLS(key))
 
     def _get_key_path(self, key):
         """Return path to the KEY file
