@@ -2092,11 +2092,17 @@ def open_r_encdetect(fname, readahead=1000):
     return io.open(fname, encoding=denc)
 
 
-def read_file_ensure_unicode(fname):
-    """A helper to read file passing content via ensure_unicode"""
+def read_file(fname, decode=True):
+    """A helper to read file passing content via ensure_unicode
+
+    Parameters
+    ----------
+    decode: bool, optional
+      if False, no ensure_unicode and file content returned as bytes
+    """
     with open(fname, 'rb') as f:
         content = f.read()
-    return ensure_unicode(content)
+    return ensure_unicode(content) if decode else content
 
 
 def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
