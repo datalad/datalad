@@ -780,6 +780,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
                     "confidence. Highest confidence was %s for %s"
                     % (denc_confidence, denc)
                 )
+            lgr.log(5, "Auto-detected encoding to be %s", denc)
             return s.decode(denc)
         else:
             raise ValueError(
@@ -2089,6 +2090,13 @@ def open_r_encdetect(fname, readahead=1000):
               fname,
               enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_file_ensure_unicode(fname):
+    """A helper to read file passing content via ensure_unicode"""
+    with open(fname, 'rb') as f:
+        content = f.read()
+    return ensure_unicode(content)
 
 
 def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
