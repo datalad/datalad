@@ -1472,7 +1472,7 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     TODO: we might want to use it as a function where we would provide tdir
     """
     # we need separate good_base so we do not breed leading/trailing spaces
-    initial = good = OBSCURE_PREFIX + 'a'  # everyone should support that!
+    initial = good = 'a'  # everyone should support that!
     system = platform.system()
 
     OBSCURE_FILENAMES = []
@@ -1490,12 +1490,13 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     # incrementally build up the most obscure filename from parts
     for part in OBSCURE_FILENAME_PARTS:
         candidate = good + part
-        if good_filename(candidate):
+        if good_filename(OBSCURE_PREFIX + candidate):
             good = candidate
 
     # now we will compose some candidates with trailing spaces - trickier ones first
     # so we break the loop as soon as we get it
     for candidate in [' ' + good + ' ', ' ' + good, good + ' ', good]:
+        candidate = OBSCURE_PREFIX + candidate
         # if on_windows and filename.rstrip() != filename:
         #     continue
         if good_filename(candidate):
