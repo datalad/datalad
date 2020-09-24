@@ -10,14 +10,15 @@
 """Some additional tests for search command (some are within test_base)"""
 
 import logging
-from shutil import copy
-from unittest.mock import patch
 import os
+from shutil import copy
+from unittest.mock import patch, MagicMock
 from os import makedirs
 from os.path import (
     dirname,
     join as opj,
 )
+
 from datalad.api import Dataset
 from datalad.utils import (
     chpwd,
@@ -626,32 +627,31 @@ def test_meta2autofield_studyminimeta():
     eq_(generated_dict, template_dict)
 
 
+# Mock the aggregation of studyminimeta-metadata since the extractor
+# is not necessarily installed
+def _mock_query_aggregated_metadata(**kwargs):
+    yield {
+        'path': "/mocked/static/path",
+        'status': 'ok',
+        'type': 'dataset',
+        'metadata': {
+            'metalad_studyminimeta': _mocked_studyminimeta_jsonld
+        }
+    }
+
+# When the studyminimeta-indexer is moved into datalad-metalad, these tests will
+# move there too. Until then, we might not have the studyminimeta-plugins available,
+# therefore we have to mock out datalad.metadata.metadata.load_ds_aggregate_db.
+# (Issue #4944 <https://github.com/datalad/datalad/issues/4944>)
+def _mock_load_ds_aggregate_db(*args, **kwargs):
+    return {
+        '.': {
+            'path': '/mocked/ds/path',
+        }
+    }
+
+
 def _test_ds_studyminimeta_show_keys_full_with_searcher(ds, search_class, mode):
-    from unittest.mock import patch, MagicMock
-
-    # Mock the aggregation of studyminimeta-metadata since the extractor
-    # is not necessarily installed
-    def _mock_query_aggregated_metadata(**kwargs):
-        yield {
-            'path': "/mocked/static/path",
-            'status': 'ok',
-            'type': 'dataset',
-            'metadata': {
-                'metalad_studyminimeta': _mocked_studyminimeta_jsonld
-            }
-        }
-
-    # When the studyminimeta-indexer is moved into datalad-metalad, these tests will
-    # move there too. Until then, we might not have the studyminimeta-plugins available,
-    # therefore we have to mock out datalad.metadata.metadata.load_ds_aggregate_db.
-    # (Issue #4944 <https://github.com/datalad/datalad/issues/4944>)
-    def _mock_load_ds_aggregate_db(*args, **kwargs):
-        return {
-            '.': {
-                'path': '/mocked/ds/path',
-            }
-        }
-
     with \
             patch('datalad.metadata.search.query_aggregated_metadata',
                   MagicMock(side_effect=_mock_query_aggregated_metadata)),\
@@ -768,7 +768,7 @@ def _test_ds_studyminimeta_show_keys_full_with_searcher(ds, search_class, mode):
 
 
 @with_tempfile(mkdir=True)
-def test_ds_studyminimeta_show_keys(path):
+def test_studyminimeta_ds_show_keys(path):
     ds = Dataset(path).create(force=True)
 
     metadata_dir = opj(ds.path, '.datalad', 'metadata')
@@ -783,3 +783,50 @@ def test_ds_studyminimeta_show_keys(path):
     return
 
 
+@with_tempfile(mkdir=True)
+def test_studyminimeta_ds_search(path):
+    ds = Dataset(path).create(force=True)
+
+    metadata_dir = opj(ds.path, '.datalad', 'metadata')
+    aggregate_json_file_name = opj(metadata_dir, 'aggregate_v1.json')
+    makedirs(metadata_dir)
+    with open(aggregate_json_file_name, 'tw+') as f:
+        f.write('{"info": "this is a dummy json object, used for testing"}')
+    ds.save()
+
+    with \
+            patch('datalad.metadata.search.query_aggregated_metadata',
+                  MagicMock(side_effect=_mock_query_aggregated_metadata)),\
+            patch('datalad.metadata.metadata.load_ds_aggregate_db',
+                  MagicMock(side_effect=_mock_load_ds_aggregate_db)):
+
+        for search_mode in ('egrep', 'egrepcs'):
+            for search_result in ds.search(mode=search_mode, query='Meyer'):
+                template = tuple(_mock_query_aggregated_metadata())[0]
+                assert_equal(search_result['metadata'], template['metadata'])
+                assert_equal(
+                    search_result['query_matched'],
+                    {
+                        'metalad_studyminimeta.dataset.author': 'Meyer',
+                        'metalad_studyminimeta.person.name': 'Meyer',
+                        'metalad_studyminimeta.accountable_person': 'Meyer',
+                        'metalad_studyminimeta.contributor': 'Meyer',
+                        'metalad_studyminimeta.publication.author': 'Meyer'
+                    }
+                )
+
+        for search_result in ds.search(mode='textblob', query='Meyer'):
+            assert_equal(search_result['query_matched'], {'meta': 'meyer'})
+
+        for search_result in ds.search(mode='autofield', query='Meyer'):
+            assert_equal(
+                search_result['query_matched'],
+                {
+                    'metalad_studyminimeta.person.name': 'meyer',
+                    'metalad_studyminimeta.publication.author': 'meyer',
+                    'metalad_studyminimeta.accountable_person': 'meyer',
+                    'metalad_studyminimeta.contributor': 'meyer',
+                    'metalad_studyminimeta.dataset.author': 'meyer'
+                }
+            )
+    return
