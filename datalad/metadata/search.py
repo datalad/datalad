@@ -25,6 +25,8 @@ from os.path import normpath
 import sys
 from time import time
 
+from pkg_resources import EntryPoint, iter_entry_points
+
 from datalad import cfg
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
@@ -173,16 +175,48 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
             else:
                 yield key, v
 
+    def get_indexer_for(metadata_format_name: str) -> callable:
+        indexer = (tuple(iter_entry_points('datalad.metadata.indexers', metadata_format_name)) or (None,))[0]
+        if isinstance(indexer, EntryPoint):
+            try:
+                indexer_object = indexer.load()(metadata_format_name)
+                return indexer_object.create_index
+            except Exception as e:
+                lgr.warning('Failed to load indexer %s: %s', indexer.name, exc_str(e))
+        return lambda metadata: _deep_kv('', metadata)
+
+    def _iterable_to_unicode_string(value, perform_operation):
+        if perform_operation:
+            if isinstance(value, (list, tuple)):
+                return u' '.join(_any2unicode(i) for i in value)
+            return _any2unicode(value)
+        return value
+
+    meta = meta or {}
     return {
-        k:
-        # turn lists into space-separated value strings
-            (u' '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
-            # and the rest into unicode
-            _any2unicode(v)) if val2str else v
-        for k, v in _deep_kv('', meta or {})
-        # auto-exclude any key that is not a defined field in the schema (if there is
-        # a schema
-        if schema is None or k in schema
+        # Collect all meta-items which have a non-dict value type and where
+        # the key not absent in a given schema.
+        **{
+            key: _iterable_to_unicode_string(value, val2str)
+            for key, value in filter(lambda kv: not isinstance(kv[1], dict), meta.items())
+            if schema is None or key in schema
+        },
+
+        # Collect all meta-items which have a dict value type and where
+        # the key is neither 'datalad_unique_content_properties' nor absent
+        # in a given schema.
+        # These values are considered as metadata, the keys are considered to
+        # be the name of the extractor, i.e. the metadata_format_name, that created
+        # the metadata.
+        **{
+            metadata_format_name + '.' + sub_key: _iterable_to_unicode_string(sub_key_value, val2str)
+            for metadata_format_name, metadata_content in filter(
+                lambda kv: isinstance(kv[1], dict) and kv[0] != 'datalad_unique_content_properties',
+                meta.items()
+            )
+            for sub_key, sub_key_value in get_indexer_for(metadata_format_name)(metadata_content)
+            if schema is None or metadata_format_name + '.' + sub_key in schema
+        }
     }
 
 
