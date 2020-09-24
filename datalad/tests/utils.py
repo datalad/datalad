@@ -1440,7 +1440,7 @@ def with_parametric_batch(t):
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
 OBSCURE_FILENAME_PARTS = ['/', '|', ';', '&',
-                          # TODO: add '%b5',
+                          '%b5',
                           ' ']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
