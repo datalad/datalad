@@ -45,6 +45,10 @@ from datalad.support.exceptions import NoDatasetFound
 from datalad.api import search
 
 from ..search import (
+    _AutofieldSearch,
+    _BlobSearch,
+    _EGrepCSSearch,
+    _EGrepSearch,
     _listdict2dictlist,
     _meta2autofield_dict,
 )
@@ -622,13 +626,12 @@ def test_meta2autofield_studyminimeta():
     eq_(generated_dict, template_dict)
 
 
-@known_failure_githubci_win
-@with_tempfile(mkdir=True)
-def test_ds_studyminimeta_show_keys_full(path):
-    from ..search import _EGrepSearch
+def _test_ds_studyminimeta_show_keys_full_with_searcher(ds, search_class, mode):
     from unittest.mock import patch, MagicMock
 
-    def _mock_metadata_aggregator(**kwargs):
+    # Mock the aggregation of studyminimeta-metadata since the extractor
+    # is not necessarily installed
+    def _mock_query_aggregated_metadata(**kwargs):
         yield {
             'path': "/mocked/static/path",
             'status': 'ok',
@@ -638,98 +641,145 @@ def test_ds_studyminimeta_show_keys_full(path):
             }
         }
 
-    with patch('datalad.metadata.search.query_aggregated_metadata',
-               MagicMock(side_effect=_mock_metadata_aggregator)), \
+    # When the studyminimeta-indexer is moved into datalad-metalad, these tests will
+    # move there too. Until then, we might not have the studyminimeta-plugins available,
+    # therefore we have to mock out datalad.metadata.metadata.load_ds_aggregate_db.
+    # (Issue #4944 <https://github.com/datalad/datalad/issues/4944>)
+    def _mock_load_ds_aggregate_db(*args, **kwargs):
+        return {
+            '.': {
+                'path': '/mocked/ds/path',
+            }
+        }
+
+    with \
+            patch('datalad.metadata.search.query_aggregated_metadata',
+                  MagicMock(side_effect=_mock_query_aggregated_metadata)),\
+            patch('datalad.metadata.metadata.load_ds_aggregate_db',
+                  MagicMock(side_effect=_mock_load_ds_aggregate_db)), \
             swallow_outputs() as cmo:
-        ds = Dataset(path).create(force=True)
-        searcher = _EGrepSearch(ds)
-        searcher.show_keys(mode='full')
+
+        searcher = search_class(ds)
+        searcher.show_keys(mode=mode)
         out_lines = [line for line in cmo.out.split(os.linesep) if line]
 
-    # Test that the studyminimeta-indexer is called and working
-    assert_equal(
-        [key_line for key_line in out_lines if not key_line.startswith(' ')],
-        [
-            'metalad_studyminimeta.accountable_person',
-            'metalad_studyminimeta.contributor',
-            'metalad_studyminimeta.dataset.author',
-            'metalad_studyminimeta.dataset.description',
-            'metalad_studyminimeta.dataset.keywords',
-            'metalad_studyminimeta.dataset.location',
-            'metalad_studyminimeta.dataset.name',
-            'metalad_studyminimeta.dataset.standards',
-            'metalad_studyminimeta.keywords',
-            'metalad_studyminimeta.name',
-            'metalad_studyminimeta.person.email',
-            'metalad_studyminimeta.person.name',
-            'metalad_studyminimeta.publication.author',
-            'metalad_studyminimeta.publication.title',
-            'metalad_studyminimeta.publication.year',
-            'parentds',
-            'path',
-            'type'
-        ]
-    )
+    key_lines = [key_line for key_line in out_lines if not key_line.startswith(' ')]
+    if issubclass(search_class, _BlobSearch):
+        # On blobsearch, check for the existence of the meta-blob
+        assert_equal(
+            key_lines,
+            [
+                'id',
+                'meta',
+                'parentds',
+                'path',
+                'type'
+            ]
+        )
+    else:
+        # Test that the studyminimeta-indexer is called and working
+        assert_equal(
+            key_lines,
+            (['id'] if issubclass(search_class, _AutofieldSearch) else [])
+            + [
+                'metalad_studyminimeta.accountable_person',
+                'metalad_studyminimeta.contributor',
+                'metalad_studyminimeta.dataset.author',
+                'metalad_studyminimeta.dataset.description',
+                'metalad_studyminimeta.dataset.keywords',
+                'metalad_studyminimeta.dataset.location',
+                'metalad_studyminimeta.dataset.name',
+                'metalad_studyminimeta.dataset.standards',
+                'metalad_studyminimeta.keywords',
+                'metalad_studyminimeta.name',
+                'metalad_studyminimeta.person.email',
+                'metalad_studyminimeta.person.name',
+                'metalad_studyminimeta.publication.author',
+                'metalad_studyminimeta.publication.title',
+                'metalad_studyminimeta.publication.year',
+                'parentds',
+                'path',
+                'type'
+            ]
+        )
 
-    # Test correct value composition
-    assert_equal(
-        out_lines,
-        [
-            "metalad_studyminimeta.accountable_person",
-            " in  1 datasets",
-            " has 1 unique values: 'Prof. Dr.  Alex Meyer'",
-            "metalad_studyminimeta.contributor",
-            " in  1 datasets",
-            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
-            "metalad_studyminimeta.dataset.author",
-            " in  1 datasets",
-            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
-            "metalad_studyminimeta.dataset.description",
-            " in  1 datasets",
-            " has 1 unique values: <<'Some data I collected once upon a++44 chars++es.'>>",
-            "metalad_studyminimeta.dataset.keywords",
-            " in  1 datasets",
-            " has 1 unique values: 'd_k1, d_k2, d_k3'",
-            "metalad_studyminimeta.dataset.location",
-            " in  1 datasets",
-            " has 1 unique values: 'http://dlksdfs.comom.com'",
-            "metalad_studyminimeta.dataset.name",
-            " in  1 datasets",
-            " has 1 unique values: 'Datenddaslk'",
-            "metalad_studyminimeta.dataset.standards",
-            " in  1 datasets",
-            " has 1 unique values: 'dicom, ebdsi'",
-            "metalad_studyminimeta.keywords",
-            " in  1 datasets",
-            " has 1 unique values: 'k1, k2'",
-            "metalad_studyminimeta.name",
-            " in  1 datasets",
-            " has 1 unique values: 'A small study'",
-            "metalad_studyminimeta.person.email",
-            " in  1 datasets",
-            " has 1 unique values: 'a@example.com, b@example.com'",
-            "metalad_studyminimeta.person.name",
-            " in  1 datasets",
-            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
-            "metalad_studyminimeta.publication.author",
-            " in  1 datasets",
-            " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
-            "metalad_studyminimeta.publication.title",
-            " in  1 datasets",
-            " has 1 unique values: 'Publication Numero Quatro'",
-            "metalad_studyminimeta.publication.year",
-            " in  1 datasets",
-            " has 1 unique values: 2004",
-            "parentds",
-            " in  1 datasets",
-            " has 0 unique values: ",
-            "path",
-            " in  1 datasets",
-            " has 1 unique values: '/mocked/static/path'",
-            "type",
-            " in  1 datasets",
-            " has 1 unique values: 'dataset'"
-        ]
-    )
-
+    if mode == 'full':
+        # Test correct value composition
+        assert_equal(
+            out_lines,
+            [
+                "metalad_studyminimeta.accountable_person",
+                " in  1 datasets",
+                " has 1 unique values: 'Prof. Dr.  Alex Meyer'",
+                "metalad_studyminimeta.contributor",
+                " in  1 datasets",
+                " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+                "metalad_studyminimeta.dataset.author",
+                " in  1 datasets",
+                " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+                "metalad_studyminimeta.dataset.description",
+                " in  1 datasets",
+                " has 1 unique values: <<'Some data I collected once upon a++44 chars++es.'>>",
+                "metalad_studyminimeta.dataset.keywords",
+                " in  1 datasets",
+                " has 1 unique values: 'd_k1, d_k2, d_k3'",
+                "metalad_studyminimeta.dataset.location",
+                " in  1 datasets",
+                " has 1 unique values: 'http://dlksdfs.comom.com'",
+                "metalad_studyminimeta.dataset.name",
+                " in  1 datasets",
+                " has 1 unique values: 'Datenddaslk'",
+                "metalad_studyminimeta.dataset.standards",
+                " in  1 datasets",
+                " has 1 unique values: 'dicom, ebdsi'",
+                "metalad_studyminimeta.keywords",
+                " in  1 datasets",
+                " has 1 unique values: 'k1, k2'",
+                "metalad_studyminimeta.name",
+                " in  1 datasets",
+                " has 1 unique values: 'A small study'",
+                "metalad_studyminimeta.person.email",
+                " in  1 datasets",
+                " has 1 unique values: 'a@example.com, b@example.com'",
+                "metalad_studyminimeta.person.name",
+                " in  1 datasets",
+                " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+                "metalad_studyminimeta.publication.author",
+                " in  1 datasets",
+                " has 1 unique values: 'Prof. Dr.  Alex Meyer, MD  Bernd Muller'",
+                "metalad_studyminimeta.publication.title",
+                " in  1 datasets",
+                " has 1 unique values: 'Publication Numero Quatro'",
+                "metalad_studyminimeta.publication.year",
+                " in  1 datasets",
+                " has 1 unique values: 2004",
+                "parentds",
+                " in  1 datasets",
+                " has 0 unique values: ",
+                "path",
+                " in  1 datasets",
+                " has 1 unique values: '/mocked/static/path'",
+                "type",
+                " in  1 datasets",
+                " has 1 unique values: 'dataset'"
+            ]
+        )
     return
+
+
+@with_tempfile(mkdir=True)
+def test_ds_studyminimeta_show_keys(path):
+    ds = Dataset(path).create(force=True)
+
+    metadata_dir = opj(ds.path, '.datalad', 'metadata')
+    aggregate_json_file_name = opj(metadata_dir, 'aggregate_v1.json')
+    makedirs(metadata_dir)
+    with open(aggregate_json_file_name, 'tw+') as f:
+        f.write('{"info": "this is a dummy json object, used for testing"}')
+    ds.save()
+
+    for search_class, mode in ((_BlobSearch, 'name'), (_AutofieldSearch, 'name'), (_EGrepSearch, 'full'), (_EGrepCSSearch, 'full'),):
+        _test_ds_studyminimeta_show_keys_full_with_searcher(ds, search_class, mode)
+    return
+
+
