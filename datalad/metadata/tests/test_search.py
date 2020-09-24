@@ -661,7 +661,7 @@ def _test_ds_studyminimeta_show_keys_full_with_searcher(ds, search_class, mode):
 
         searcher = search_class(ds)
         searcher.show_keys(mode=mode)
-        out_lines = [line for line in cmo.out.split(os.linesep) if line]
+        out_lines = [line for line in cmo.out.splitlines() if line]
 
     key_lines = [key_line for key_line in out_lines if not key_line.startswith(' ')]
     if issubclass(search_class, _BlobSearch):
