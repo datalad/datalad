@@ -1438,21 +1438,12 @@ def with_parametric_batch(t):
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
-OBSCURE_FILENAMES = (
-    u" \"';a&b/&c `| ",  # shouldn't be supported anywhere I guess due to /
-    u" \"';a&b&c `| ",
-    u" \"';abc `| ",
-    u" \"';abc | ",
-    u" \"';abc ",
-    u" ;abc ",
-    u" ;abc",
-    u" ab c ",
-    u" ab c",
-    u"ac",
-    u" ab .datc ",
-    u"ab .datc ",  # they all should at least support spaces and dots
-)
+# Those will be tried to be added to the base name if filesystem allows
+OBSCURE_FILENAME_PARTS = ['/', '|', ';', '&',
+                          # TODO: add '%b5',
+                          ' ']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
+
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
@@ -1463,35 +1454,66 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_windows:
         # TODO: really figure out unicode handling on windows
         UNICODE_FILENAME = ''
-    # Prepend the list with unicode names first
-    OBSCURE_FILENAMES = tuple(
-        f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
-    ) + OBSCURE_FILENAMES
+    if UNICODE_FILENAME:
+        OBSCURE_FILENAME_PARTS.append(UNICODE_FILENAME)
+# simple extension to finish it up
+OBSCURE_FILENAME_PARTS.append('.datc')
 
 
 @with_tempfile(mkdir=True)
-def get_most_obscure_supported_name(tdir):
+def get_most_obscure_supported_name(tdir, return_candidates=False):
     """Return the most obscure filename that the filesystem would support under TEMPDIR
 
+    Parameters
+    ----------
+    return_candidates: bool, optional
+      if True, return a tuple of (good, candidates) where candidates are "partially"
+      sorted from trickiest considered
     TODO: we might want to use it as a function where we would provide tdir
     """
-    for filename in OBSCURE_FILENAMES:
-        filename = OBSCURE_PREFIX + filename
-        if on_windows and filename.rstrip() != filename:
-            continue
+    # we need separate good_base so we do not breed leading/trailing spaces
+    initial = good = 'a'  # everyone should support that!
+    system = platform.system()
+
+    OBSCURE_FILENAMES = []
+    def good_filename(filename):
+        OBSCURE_FILENAMES.append(candidate)
         try:
             with open(opj(tdir, filename), 'w') as f:
                 f.write("TEST LOAD")
-            return filename  # it will get removed as a part of wiping up the directory
+            return True
         except:
             lgr.debug("Filename %r is not supported on %s under %s",
-                      filename, platform.system(), tdir)
-            pass
-    raise RuntimeError("Could not create any of the files under %s among %s"
+                      filename, system, tdir)
+            return False
+
+    # incrementally build up the most obscure filename from parts
+    for part in OBSCURE_FILENAME_PARTS:
+        candidate = good + part
+        if good_filename(OBSCURE_PREFIX + candidate):
+            good = candidate
+
+    # now we will compose some candidates with trailing spaces - trickier ones first
+    # so we break the loop as soon as we get it
+    for candidate in [' ' + good + ' ', ' ' + good, good + ' ', good]:
+        candidate = OBSCURE_PREFIX + candidate
+        if on_windows and candidate.rstrip() != candidate:
+            continue
+        if good_filename(candidate):
+            good = candidate
+            break
+
+    if good == initial:
+        raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+    lgr.debug("Tested %d obscure filename candidates. The winner: %r", len(OBSCURE_FILENAMES), good)
+    if return_candidates:
+        return good, OBSCURE_FILENAMES[::-1]
+    else:
+        return good
 
 
-OBSCURE_FILENAME = get_most_obscure_supported_name()
+OBSCURE_FILENAME, OBSCURE_FILENAMES = get_most_obscure_supported_name(return_candidates=True)
 
 
 @optional_args
