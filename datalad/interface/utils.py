@@ -579,8 +579,12 @@ def _process_results(
                 msgargs = msg[1:]
                 msg = msg[0]
             if 'path' in res:
+                path = res['path']
+                if msgargs:
+                    # we will pass the msg for %-polation, so % should be doubled
+                    path = path.replace('%', '%%')
                 msg = '{} [{}({})]'.format(
-                    msg, res['action'], res['path'])
+                    msg, res['action'], path)
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
                 try:

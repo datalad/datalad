@@ -465,17 +465,27 @@ def test_utils_suppress_similar():
 
 class TestUtils2(Interface):
     # result_renderer = custom_renderer
-    _params_ = dict()
+    _params_ = dict(
+        number=Parameter(
+            args=("--path",),
+            constraints=EnsureStr() | EnsureNone()),
+    )
     @staticmethod
     @eval_results
-    def __call__():
+    def __call__(path=None):
         def logger(msg, *args):
             return msg % args
+        if path:
+            # we will be testing for path %s
+            message = ("all good %s", "my friend")
+        else:
+            message = ("kaboom %s %s", "greedy")
         yield get_status_dict(
             action="test",
             status="ok",
-            message=("kaboom %s %s", "greedy"),
+            message=message,
             logger=logger,
+            path=path or ''
         )
 
 
@@ -484,3 +494,6 @@ def test_incorrect_msg_interpolation():
         TestUtils2().__call__()
     # this must be our custom exception
     assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.exception))
+
+    # there should be no exception if reported in the record path contains %
+    TestUtils2().__call__("%eatthis")
