@@ -566,11 +566,21 @@ def _process_results(
                 msgargs = msg[1:]
                 msg = msg[0]
             if 'path' in res:
+                path = res['path']
+                if msgargs:
+                    # we will pass the msg for %-polation, so % should be doubled
+                    path = path.replace('%', '%%')
                 msg = '{} [{}({})]'.format(
-                    msg, res['action'], res['path'])
+                    msg, res['action'], path)
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
-                res_lgr(msg, *msgargs)
+                try:
+                    res_lgr(msg, *msgargs)
+                except TypeError as exc:
+                    raise TypeError(
+                        "Failed to render %r with %r from %r: %s"
+                        % (msg, msgargs, res, exc_str(exc))
+                    )
             else:
                 res_lgr(msg)
 

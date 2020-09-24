@@ -111,10 +111,9 @@ def test_composite_credential1():
     cred.enter_new()
     assert_equal(keyring.get('name', 'user'), 'user2')
     assert_equal(keyring.get('name', 'password'), 'password2')
-    assert_equal(keyring.get('name:1', 'user'), None)
-    assert_equal(keyring.get('name:1', 'password'), None)
-    # which would get reevaluated if requested
-    assert_equal(keyring.entries, {'name:1': {}, 'name': {'user': 'user2', 'password': 'password2'}})
+    # we immediately refresh all credentials in the chain
+    assert_equal(keyring.get('name:1', 'user'), 'user2_1')
+    assert_equal(keyring.get('name:1', 'password'), 'password2_2')
     assert_equal(cred(), {'user': 'user2_1', 'password': 'password2_2'})
 
 

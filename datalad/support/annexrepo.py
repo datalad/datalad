@@ -1863,7 +1863,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise AnnexBatchCommandError(
                     cmd="addurl",
                     msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
-            assert(out_json['command'] == 'addurl')
+            assert \
+                (out_json['command'] == 'addurl'), \
+                "no exception was raised and no 'command' in result out_json=%s" % str(out_json)
         if not out_json.get('success', False):
             raise (AnnexBatchCommandError if batch else CommandError)(
                     cmd="addurl",
@@ -3649,7 +3651,8 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch']  # , '--debug']
+            ['--batch'] + \
+            (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None
         super(BatchedAnnex, self).__init__(

@@ -760,6 +760,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
                     "confidence. Highest confidence was %s for %s"
                     % (denc_confidence, denc)
                 )
+            lgr.log(5, "Auto-detected encoding to be %s", denc)
             return s.decode(denc)
         else:
             raise ValueError(
@@ -1940,7 +1941,11 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
 
 
 @optional_args
-def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+def try_multiple_dec(
+        f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
+        exceptions_filter=None,
+        logger=None,
+):
     """Decorator to try function multiple times.
 
     Main purpose is to decorate functions dealing with removal of files/directories
@@ -1955,7 +1960,15 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     increment_type: {None, 'exponential'}
       Note that if it is exponential, duration should typically be > 1.0
       so it grows with higher power
-
+    exceptions: Exception or tuple of Exceptions, optional
+      Exception or a tuple of multiple exceptions, on which to retry
+    exceptions_filter: callable, optional
+      If provided, this function will be called with a caught exception
+      instance.  If function returns True - we will re-try, if False - exception
+      will be re-raised without retrying.
+    logger: callable, optional
+      Logger to log upon failure.  If not provided, will use stock logger
+      at the level of 5 (heavy debug).
     """
     from .dochelpers import exc_str
     if not exceptions:
@@ -1964,28 +1977,31 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
         ntrials = 100 if on_windows else 10
-
+    if logger is None:
+        def logger(*args, **kwargs):
+            return lgr.log(5, *args, **kwargs)
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
-    def wrapped(*args, **kwargs):
+    def _wrap_try_multiple_dec(*args, **kwargs):
         t = duration
         for trial in range(ntrials):
             try:
                 return f(*args, **kwargs)
             except exceptions as exc:
-                if increment_type == 'exponential':
-                    t = duration ** (trial + 1)
-                lgr.log(
-                    5,
-                    "Caught %s on trial #%d. Sleeping %f and retrying",
-                    exc_str(exc), trial, t)
+                if exceptions_filter and not exceptions_filter(exc):
+                    raise
                 if trial < ntrials - 1:
+                    if increment_type == 'exponential':
+                        t = duration ** (trial + 1)
+                    logger(
+                        "Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
                     sleep(t)
                 else:
                     raise
 
-    return wrapped
+    return _wrap_try_multiple_dec
 
 
 @try_multiple_dec
@@ -2071,6 +2087,19 @@ def open_r_encdetect(fname, readahead=1000):
               fname,
               enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_file(fname, decode=True):
+    """A helper to read file passing content via ensure_unicode
+
+    Parameters
+    ----------
+    decode: bool, optional
+      if False, no ensure_unicode and file content returned as bytes
+    """
+    with open(fname, 'rb') as f:
+        content = f.read()
+    return ensure_unicode(content) if decode else content
 
 
 def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
