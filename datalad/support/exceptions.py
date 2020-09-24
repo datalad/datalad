@@ -423,6 +423,14 @@ class AnonymousAccessDeniedError(AccessDeniedError):
     pass
 
 
+class AccessPermissionExpiredError(AccessDeniedError):
+    """To raise when there is a belief that it is due to expiration of a credential
+
+    which we might possibly be able to refresh, like in the case of CompositeCredential
+    """
+    pass
+
+
 class AccessFailedError(DownloadError):
     pass
 
