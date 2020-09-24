@@ -10,9 +10,7 @@ curbin=$(which "$bin")
 curdatalad=$(which datalad)
 curdir=$(dirname $curdatalad)
 
-
-COVERAGE=${COVERAGE:-python-coverage}
-COVERAGE_RUN="`which $COVERAGE` run"
+COVERAGE_RUN="-m coverage run"
 
 export PATH=${PATH//$curdir:/}
 newdatalad=$(which datalad)

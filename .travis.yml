@@ -24,8 +24,6 @@ env:
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow or network"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
-    # Special settings/helper for combined coverage from special remotes execution
-    - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
