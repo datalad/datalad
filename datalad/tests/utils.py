@@ -1439,7 +1439,7 @@ def with_parametric_batch(t):
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
-OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}']
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
