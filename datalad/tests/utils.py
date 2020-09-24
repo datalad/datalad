@@ -1477,7 +1477,12 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     def good_filename(filename):
         OBSCURE_FILENAMES.append(candidate)
         try:
-            with open(opj(tdir, filename), 'w') as f:
+            # Windows seems to not tollerate trailing spaces and
+            # ATM we do not distinguish obscure filename and dirname.
+            # So here we will test for both - being able to create dir
+            # with obscure name and obscure filename under
+            os.mkdir(opj(tdir, filename))
+            with open(opj(tdir, filename, filename), 'w') as f:
                 f.write("TEST LOAD")
             return True
         except:
@@ -1488,8 +1493,6 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     # incrementally build up the most obscure filename from parts
     for part in OBSCURE_FILENAME_PARTS:
         candidate = good + part
-        if on_windows and candidate.rstrip() != candidate:
-            continue
         if good_filename(candidate):
             good = candidate
 
