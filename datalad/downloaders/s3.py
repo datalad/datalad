@@ -152,7 +152,7 @@ class S3DownloaderSession(DownloaderSession):
             # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
             self.key.get_contents_to_file(f, **kwargs)
         else:
-            return self.key.get_contents_as_string(encoding='utf-8', **kwargs)
+            return self.key.get_contents_as_string(encoding=None, **kwargs)
 
 
 @auto_repr
