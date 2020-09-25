@@ -15,6 +15,9 @@ from pprint import pformat
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
+
+    Note: Subclasses should override `to_str` rather than `__str__` because
+    `to_str` is called directly in datalad.cmdline.main.
     """
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
@@ -156,8 +159,10 @@ class FileNotInAnnexError(IOError, CommandError):
         CommandError.__init__(self, cmd=cmd, msg=msg, code=code)
         IOError.__init__(self, code, "%s: %s" % (cmd, msg), filename)
 
-    def __str__(self):
-        return "%s\n%s" % (CommandError.__str__(self), IOError.__str__(self))
+    def to_str(self, include_output=True):
+        return "%s\n%s" % (
+            CommandError.to_str(self, include_output=include_output),
+            IOError.__str__(self))
 
 
 class FileInGitError(FileNotInAnnexError):
@@ -207,7 +212,8 @@ class GitIgnoreError(CommandError):
             cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
         self.paths = paths
 
-    def __str__(self):
+    def to_str(self, include_output=True):
+        # Override CommandError.to_str(), ignoring include_output.
         return self.msg
 
 
@@ -282,8 +288,9 @@ class OutOfSpaceError(CommandError):
         super(OutOfSpaceError, self).__init__(**kwargs)
         self.sizemore_msg = sizemore_msg
 
-    def __str__(self):
-        super_str = super(OutOfSpaceError, self).__str__().rstrip(linesep + '.')
+    def to_str(self, include_output=True):
+        super_str = super().to_str(
+            include_output=include_output).rstrip(linesep + '.')
         return "%s needs %s more" % (super_str, self.sizemore_msg)
 
 
@@ -307,8 +314,8 @@ class RemoteNotAvailableError(CommandError):
         super(RemoteNotAvailableError, self).__init__(**kwargs)
         self.remote = remote
 
-    def __str__(self):
-        super_str = super(RemoteNotAvailableError, self).__str__()
+    def to_str(self, include_output=True):
+        super_str = super().to_str(include_output=include_output)
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
 
