@@ -11,7 +11,7 @@
 
 import logging
 from shutil import copy
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import os
 from os import makedirs
 from os.path import (
@@ -357,4 +357,85 @@ def test_meta2autofield_dict():
                 {'extr1': {"prop1": "v1"}},
             'extr1': {'prop1': 'value'}}),
         {'extr1.prop1': 'value'}
+    )
+
+
+def test_external_indexer():
+    """ check that external indexer are called """
+    from pkg_resources import EntryPoint
+
+    class MockedIndexer:
+        def __init__(self, metadata_format_name: str):
+            pass
+
+        def create_index(self, metadata):
+            yield from {
+                "jubel": 1,
+                "trubel": 2
+            }.items()
+
+    class MockedEntryPoint(EntryPoint):
+        def __init__(self):
+            pass
+
+        def load(self, *args):
+            return MockedIndexer
+
+    def _mocked_iter_entry_points(group, metadata):
+        yield MockedEntryPoint()
+
+    with patch('datalad.metadata.search.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+        index = _meta2autofield_dict({
+            'datalad_unique_content_properties': {
+                'extr1': {
+                    "prop1": "v1"
+                }
+            },
+            'extr1': {
+                'prop1': 'value'
+            }
+        })
+
+    eq_(
+        index,
+        {
+            'extr1.jubel': '1',
+            'extr1.trubel': '2'
+        }
+    )
+
+
+def test_faulty_external_indexer():
+    """ check that generic indexer is called on external indexer faults """
+    from pkg_resources import EntryPoint
+
+    class MockedEntryPoint(EntryPoint):
+        def __init__(self):
+            self.name = 'MockedEntryPoint'
+
+        def load(self, *args):
+            raise Exception('Mocked indexer error')
+
+    def _mocked_iter_entry_points(group, metadata):
+        yield MockedEntryPoint()
+
+    with patch('datalad.metadata.search.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+        index = _meta2autofield_dict({
+            'datalad_unique_content_properties': {
+                'extr1': {
+                    "prop1": "v1"
+                }
+            },
+            'extr1': {
+                'prop1': 'value'
+            }
+        })
+
+    eq_(
+        index,
+        {
+            'extr1.prop1': 'value'
+        }
     )
