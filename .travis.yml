@@ -289,7 +289,7 @@ script:
 after_success:
   # submit only what we have covered in the PRs
   - if [ -z "${_DL_CRON:-}" ]; then
-      cp __testhome__/.coverage .;
+      cd __testhome__;
       coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi
