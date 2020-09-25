@@ -294,16 +294,6 @@ class RemoteNotAvailableError(CommandError):
     where 'MyRemote' doesn't exist.
     """
 
-    # TODO: Raise this from GitRepo. Currently depends on method:
-    # Either it's a direct git call
-    #   => CommandError and stderr:
-    #       fatal: 'notthere' does not appear to be a git repository
-    #       fatal: Could not read from remote repository.
-    # or it's a GitPython call
-    #   => ValueError "Remote named 'NotExistingRemote' didn't exist"
-    # and another one:
-    #   see GitRepo.remove_remote()
-
     def __init__(self, remote, **kwargs):
         """
 
