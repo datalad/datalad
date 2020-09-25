@@ -35,11 +35,13 @@ class CommandError(RuntimeError):
             quote_cmdlinearg,
         )
         to_str = "{}: ".format(self.__class__.__name__)
-        if self.cmd:
+        cmd = self.cmd
+        if cmd:
             to_str += "'{}'".format(
                 # go for a compact, normal looking, properly quoted
-                # command rendering
-                ' '.join(quote_cmdlinearg(c) for c in ensure_list(self.cmd))
+                # command rendering if the command is in list form
+                ' '.join(quote_cmdlinearg(c) for c in cmd)
+                if isinstance(cmd, list) else cmd
             )
         if self.code:
             to_str += " failed with exitcode {}".format(self.code)
