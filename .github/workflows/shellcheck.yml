@@ -15,7 +15,7 @@ jobs:
         sudo apt-get install shellcheck
     - name: Run shellcheck
       run: |
-      shellcheck \
+        shellcheck \
           tools/bisect-git-annex.scripts/bisect-git-annex-lock.sh \
           tools/ci/install-annex.sh \
           tools/ci/install-minimum-git.sh \
