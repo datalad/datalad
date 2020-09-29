@@ -1238,6 +1238,16 @@ def swallow_outputs():
             self._err.close()
             out_name = self._out.name
             err_name = self._err.name
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False) \
+                    and lgr.getEffectiveLevel() <= logging.DEBUG:
+                for s, sname in ((self.out, 'stdout'),
+                                 (self.err, 'stderr')):
+                    if s:
+                        pref = os.linesep + "| "
+                        lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
+                    else:
+                        lgr.debug("Nothing was swallowed for %s", sname)
             del self._out
             del self._err
             gc.collect()
