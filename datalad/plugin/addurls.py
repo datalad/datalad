@@ -896,7 +896,7 @@ class Addurls(Interface):
                 files_to_add.add(r["path"])
             yield r
 
-            msg = message or """\
+        msg = message or """\
 [DATALAD] add files from URLs
 
 url_file='{}'
