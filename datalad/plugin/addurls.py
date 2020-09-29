@@ -11,11 +11,14 @@
 
 from collections.abc import Mapping
 from functools import partial
+
+import itertools
 import logging
 import os
 import re
 import string
 
+from operator import itemgetter
 from urllib.parse import urlparse
 
 from datalad.distribution.dataset import resolve_path
@@ -876,25 +879,44 @@ class Addurls(Interface):
                              update=1, increment=True)
             log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
 
-        for row in rows:
-            # Add additional information that we'll need for various
-            # operations.
-            filename_abs = os.path.join(ds.path, row["filename"])
-            if row["subpath"]:
-                ds_current = Dataset(os.path.join(ds.path,
-                                                  row["subpath"]))
+        files_to_add = set()
+        # We need to group by dataset since otherwise we will initiate
+        # batched annex process per each subdataset, which might be infeasible
+        # in any use-case with a considerable number of subdatasets.
+        # TODO: logical spot for parallel run across (sub)datasets
+        for subpath, ds_rows in itertools.groupby(rows, itemgetter("subpath")):
+            # Serialize the ds_rows since we will use it multiple times and
+            # add_urls expects a container to run len() on
+            ds_rows = tuple(ds_rows)
+            ds_files_to_add = set()
+            # ds_rows is guaranteed to have at least a single entry and they
+            # all should have the same subpath.
+            if subpath:
+                ds_current = Dataset(os.path.join(ds.path, subpath))
             else:
                 ds_current = ds
-            ds_filename = os.path.relpath(filename_abs, ds_current.path)
-            row.update({"filename_abs": filename_abs,
-                        "ds": ds_current,
-                        "ds_filename": ds_filename})
 
-        files_to_add = set()
-        for r in add_urls(rows, ifexists=ifexists, options=annex_options):
-            if r["status"] == "ok":
-                files_to_add.add(r["path"])
-            yield r
+            for row in ds_rows:
+                # Add additional information that we'll need for various
+                # operations.
+                filename_abs = os.path.join(ds.path, row["filename"])
+                ds_filename = os.path.relpath(filename_abs, ds_current.path)
+                row.update({"filename_abs": filename_abs,
+                            "ds": ds_current,
+                            "ds_filename": ds_filename})
+
+            for r in add_urls(ds_rows, ifexists=ifexists, options=annex_options):
+                if r["status"] == "ok":
+                    ds_files_to_add.add(r["path"])
+                yield r
+
+            meta_rows = [r for r in ds_rows if r["filename_abs"] in ds_files_to_add]
+            for r in add_meta(meta_rows):
+                yield r
+
+            files_to_add.update(ds_files_to_add)
+            # stop all batched processes etc before considering next dataset
+            ds.repo.precommit()
 
         msg = message or """\
 [DATALAD] add files from URLs
@@ -903,14 +925,12 @@ url_file='{}'
 url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
-        if files_to_add:
-            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
-            for r in add_meta(meta_rows):
+        # Perform a single save call (not per dataset) so we do not leave some
+        # subdatasets saved in updated state while others not, if some dd_urls failed
+        # and we stopped processing.
+        if files_to_add and save:
+            for r in ds.save(path=files_to_add, message=msg, recursive=True):
                 yield r
-
-            if save:
-                for r in ds.save(path=files_to_add, message=msg, recursive=True):
-                    yield r
 
 
 __datalad_plugin__ = Addurls
