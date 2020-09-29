@@ -1,0 +1,62 @@
+Update 0.13.3-1-ge216dc3b67:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    e216dc3b6702e766902570c84f447d20d38df944..acca5786d6667952337453a293ac31d2bfc1e60e
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4844 from kyleam/drop-abc-compat
+   663c5c6fcf^-1
++  Merge pull request #4866 from kyleam/min-git-version-warning
+   eac6cfc4d4^-1
++  Merge pull request #4764 from yarikoptic/enh-rerun-logging
+   0ec59da675^-1
++  Merge pull request #4683 from yarikoptic/enhrf-publish
+   3c4d99c1e8^-1
++  Merge pull request #4824 from yarikoptic/bf-nda
+   6a0087597b^-1
+-  Merge pull request #4869 from yarikoptic/enh-benchmarks-compare
+   32a3e6cd3b^-1
++  Merge pull request #4877 from mih/bf-4875maint
+   7ae434f015^-1
++  Merge pull request #4448 from yarikoptic/opt-publish-since=
+   b38acb5bab^-1
+-  Merge pull request #4628 from yarikoptic/enh-contributing
+   7f7a0d5063^-1
++  Merge pull request #4896 from mih/bf-4888
+   249a5620a7^-1
++  Merge pull request #4899 from bpoldrack/gh-4893
+   44d798bdc8^-1
+-  Add "set -eu" to prep-travis-forssh.sh
+   213a1696c4^-1
++  Merge pull request #4926 from yarikoptic/bf-no-annex-multilinesend
+   84538cf866^-1
++  Merge pull request #4927 from yarikoptic/bf-s3-expire
+   0d27a8e226^-1
+-  Merge pull request #4934 from yarikoptic/rf-donot-disable-log
+   0c88b031f9^-1
+-  Merge pull request #4940 from jwodder/nc-sleep
+   ab7213e221^-1
+-  Merge pull request #4937 from yarikoptic/enh-debug-batched-annex
+   021aa5faeb^-1
+-  Merge pull request #4947 from jwodder/gh-4942
+   a2e70deb38^-1
+-  Merge pull request #4949 from yarikoptic/enh-obscure
+   aecac478b6^-1
+-  Merge pull request #4948 from jwodder/osx-coverage
+   ca31bbaf71^-1
++* Merge pull request #4931 from yarikoptic/enh-try-multiple
+   4d9b065364^-1
++  Merge pull request #4953 from yarikoptic/bf-obscure%
+   09879794b4^-1
++* Merge pull request #4952 from yarikoptic/bf-check-auth-downloader
+   3e03cfa5d9^-1
+-  Merge pull request #4965 from jwodder/gh-4956
+   7570d7a77e^-1
+-  Merge pull request #4960 from yarikoptic/enh-log-swallowed-outputs
+   acca5786d6^-1
