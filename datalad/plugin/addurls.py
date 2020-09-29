@@ -505,7 +505,7 @@ def add_urls(rows, ifexists=None, options=None):
     """
     for row in rows:
         filename_abs = row["filename_abs"]
-        ds, filename = row["ds"], row["ds_filename"]
+        ds, repo, filename = row["ds"], row["repo"], row["ds_filename"]
         lgr.debug("Adding metadata to %s in %s", filename, ds.path)
 
         if os.path.exists(filename_abs) or os.path.islink(filename_abs):
@@ -523,7 +523,7 @@ def add_urls(rows, ifexists=None, options=None):
                 lgr.debug("File %s already exists", filename_abs)
 
         try:
-            out_json = ds.repo.add_url_to_file(filename, row["url"],
+            out_json = repo.add_url_to_file(filename, row["url"],
                                                batch=True, options=options)
         except AnnexBatchCommandError as exc:
             yield get_status_dict(action="addurls",
@@ -548,9 +548,13 @@ def add_meta(rows):
     from unittest.mock import patch
 
     for row in rows:
-        ds, filename = row["ds"], row["ds_filename"]
-        with patch.object(ds.repo, "always_commit", False):
-            res = ds.repo.add(filename)
+        ds, repo, filename = row["ds"], row["repo"], row["ds_filename"]
+        # TODO: in principle in current implementation add_meta can be called
+        # only with rows for the same dataset/repository, so we could have
+        # patch.object oustide of the loop. But ideally it is just that
+        # signature of add_files should change to accept repo (and ds?) arg
+        with patch.object(repo, "always_commit", False):
+            res = repo.add(filename)
             res_status = 'notneeded' if not res \
                 else 'ok' if res.get('success', False) \
                 else 'error'
@@ -565,7 +569,7 @@ def add_meta(rows):
             )
 
             lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
+            for a in repo.set_metadata_(filename, add=row["meta_args"]):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
                 # Don't show all added metadata for the file because that
                 # could quickly flood the output.
@@ -895,6 +899,7 @@ class Addurls(Interface):
                 ds_current = Dataset(os.path.join(ds.path, subpath))
             else:
                 ds_current = ds
+            repo = ds_current.repo  # OPT: relatively expensive, pass along
 
             for row in ds_rows:
                 # Add additional information that we'll need for various
@@ -903,7 +908,9 @@ class Addurls(Interface):
                 ds_filename = os.path.relpath(filename_abs, ds_current.path)
                 row.update({"filename_abs": filename_abs,
                             "ds": ds_current,
-                            "ds_filename": ds_filename})
+                            "ds_filename": ds_filename,
+                            "repo": repo,
+                            })
 
             for r in add_urls(ds_rows, ifexists=ifexists, options=annex_options):
                 if r["status"] == "ok":
