@@ -854,20 +854,6 @@ class Addurls(Interface):
                                    return_type='generator'):
                     yield r
 
-        for row in rows:
-            # Add additional information that we'll need for various
-            # operations.
-            filename_abs = os.path.join(ds.path, row["filename"])
-            if row["subpath"]:
-                ds_current = Dataset(os.path.join(ds.path,
-                                                  row["subpath"]))
-            else:
-                ds_current = ds
-            ds_filename = os.path.relpath(filename_abs, ds_current.path)
-            row.update({"filename_abs": filename_abs,
-                        "ds": ds_current,
-                        "ds_filename": ds_filename})
-
         if version_urls:
             num_urls = len(rows)
             log_progress(lgr.info, "addurls_versionurls",
@@ -889,6 +875,20 @@ class Addurls(Interface):
                              "Versioned result for %s: %s", url, row["url"],
                              update=1, increment=True)
             log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
+
+        for row in rows:
+            # Add additional information that we'll need for various
+            # operations.
+            filename_abs = os.path.join(ds.path, row["filename"])
+            if row["subpath"]:
+                ds_current = Dataset(os.path.join(ds.path,
+                                                  row["subpath"]))
+            else:
+                ds_current = ds
+            ds_filename = os.path.relpath(filename_abs, ds_current.path)
+            row.update({"filename_abs": filename_abs,
+                        "ds": ds_current,
+                        "ds_filename": ds_filename})
 
         files_to_add = set()
         for r in add_urls(rows, ifexists=ifexists, options=annex_options):
