@@ -923,7 +923,7 @@ class Addurls(Interface):
 
             files_to_add.update(ds_files_to_add)
             # stop all batched processes etc before considering next dataset
-            ds.repo.precommit()
+            repo.precommit()
 
         msg = message or """\
 [DATALAD] add files from URLs
