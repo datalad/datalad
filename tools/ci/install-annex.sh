@@ -183,7 +183,7 @@ case "$scenario" in
                     ;;
             esac
             wget -q -O "$_TMPDIR/git-annex.dmg" https://downloads.kitenet.net/git-annex/$_subpath/git-annex.dmg
-            install_from_dmg "$_TMDPIR"/*.dmg
+            install_from_dmg "$_TMPDIR"/*.dmg
             ;;
         *)
             echo "E: Unsupported OS: $(uname)"
