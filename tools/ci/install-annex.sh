@@ -251,6 +251,7 @@ case "$scenario" in
     ;;
   brew)
     brew install git-annex
+    _annex_bin=/usr/local/bin
     ;;
   *)
     echo "E: internal error: '$scenario' should be handled above" >&2
