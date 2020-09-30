@@ -13,6 +13,7 @@ import logging
 import os
 import sys
 import platform
+import random
 import logging.handlers
 
 from os.path import basename, dirname
@@ -385,6 +386,43 @@ def with_result_progress(fn, label="Total", unit=" Files"):
     return _wrap_with_result_progress_ \
         if inspect.isgeneratorfunction(fn) \
         else _wrap_with_result_progress
+
+
+def with_progress(items, lgrcall=None, label="Total", unit=" Files"):
+    """Wrap a progress bar, with status counts, around an iterable.
+
+    Parameters
+    ----------
+    items : some iterable
+    lgrcall: callable
+      Callable for logging. If not specified - lgr.info is used
+    label, unit : str
+        Passed to log.log_progress.
+
+    Yields
+    ------
+    Items of it while displaying the progress
+    """
+    pid = "with_progress-%d" % random.randint(0, 100000)
+    base_label = label
+    if lgrcall is None:
+        lgrcall = lgr.info
+
+    label = base_label
+    log_progress(lgrcall, pid,
+                 "%s: starting", label,
+                 total=len(items), label=label, unit=unit)
+
+    for item in items:
+        # Since we state "processed", and actual processing might be happening
+        # outside on the yielded value, we will yield before stating that
+        yield item
+        log_progress(
+            lgrcall,
+            pid,
+            "%s: processed", base_label,
+            label=label, update=1, increment=True)
+    log_progress(lgr.info, pid, "%s: done", base_label)
 
 
 class LoggerHelper(object):

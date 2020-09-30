@@ -22,6 +22,7 @@ from datalad.log import (
     LoggerHelper,
     log_progress,
     TraceBack,
+    with_progress,
     with_result_progress,
 )
 from datalad import cfg as dl_cfg
@@ -219,3 +220,11 @@ def test_with_result_progress_generator():
 
     # just to make sure all good to redo
     assert_equal(list(gen(recs)), recs)
+
+
+def test_with_progress_generator():
+    # Well, we could also pass an iterable directly now and display
+    # progress iterative over it
+    g = with_progress(range(3))
+    ok_generator(g)
+    assert_equal(list(g), list(range(3)))
