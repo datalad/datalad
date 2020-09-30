@@ -16,6 +16,7 @@ jobs:
     - uses: actions/checkout@v1
     - name: Run shellcheck
       run: |
+        # I: running only on a subset of scripts which are shellcheck clean ATM
         shellcheck \
           tools/bisect-git-annex.scripts/bisect-git-annex-lock.sh \
           tools/ci/install-annex.sh \
