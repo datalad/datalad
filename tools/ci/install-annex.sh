@@ -56,7 +56,8 @@ function install_from_dmg() {
   hdiutil attach "$1"
   rsync -a /Volumes/git-annex/git-annex.app /Applications/
   hdiutil detach /Volumes/git-annex/
-  export PATH="/Applications/git-annex.app/Contents/MacOS:$PATH"
+  _annex_bin=/Applications/git-annex.app/Contents/MacOS
+  export PATH="$_annex_bin:$PATH"
 }
 
 _conda_annex_version=
