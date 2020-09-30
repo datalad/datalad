@@ -262,7 +262,7 @@ if [ -n "$adjust_bashrc" ]; then
     # distributions (including Debian and Ubuntu) come with a snippet to exit
     # early in that case.
     if [ "$PATH" != "$_PATH_OLD" ]; then
-        sed -i -e "1iexport PATH=\"$PATH\"" ~/.bashrc
+        perl -pli -e 'print "PATH=\"$ENV{PATH}\"" if $. == 1' ~/.bashrc
         echo "I: Adjusted first line of ~/.bashrc:"
         head -n1 ~/.bashrc
     fi
