@@ -12,14 +12,14 @@
 
 function _show_schemes() {
   _schemes_doc=(
-    "autobuild"
-    "conda-forge [version]"
-    "conda-forge-last [version]"
-    "datalad-extensions-build"
-    "deb-url URL"
-    "neurodebian"
-    "neurodebian-devel"
-    "snapshot"
+    "autobuild  # Linux, macOS"
+    "conda-forge [version]  # Linux"
+    "conda-forge-last [version]  # Linux"
+    "datalad-extensions-build  # Linux, macOS"
+    "deb-url URL  # Linux"
+    "neurodebian  # Linux"
+    "neurodebian-devel  # Linux"
+    "snapshot  # Linux, macOS"
   )
   for s in "${_schemes_doc[@]}"; do
     echo "    $s"
@@ -49,6 +49,13 @@ function setup_neurodebian_devel() {
   # configure
   sed -e 's,/debian ,/debian-devel ,g' /etc/apt/sources.list.d/neurodebian.sources.list | sudo tee /etc/apt/sources.list.d/neurodebian-devel.sources.list
   sudo apt-get update
+}
+
+function install_from_dmg() {
+  hdiutil attach "$1"
+  rsync -a /Volumes/git-annex/git-annex.app /Applications/
+  hdiutil detach /Volumes/git-annex/
+  export PATH="/Applications/git-annex.app/Contents/MacOS:$PATH"
 }
 
 _conda_annex_version=
@@ -140,24 +147,48 @@ case "$scenario" in
     )
     ;;
   autobuild|snapshot)
-    _annex_bin="$_TMPDIR/git-annex.linux"
-    echo "I: downloading and extracting under $_annex_bin"
-    case "$scenario" in
-        autobuild)
-            _subpath=autobuild/amd64
+    case "$(uname)" in
+        Linux)
+            _annex_bin="$_TMPDIR/git-annex.linux"
+            echo "I: downloading and extracting under $_annex_bin"
+            case "$scenario" in
+                autobuild)
+                    _subpath=autobuild/amd64
+                    ;;
+                snapshot)
+                    _subpath=linux/current
+                    ;;
+                *)
+                    echo "E: internal error: scenario '$scenario' should not reach here" >&2
+                    exit 1
+                    ;;
+            esac
+            tar -C "$_TMPDIR" -xzf <(
+              wget -q -O- https://downloads.kitenet.net/git-annex/$_subpath/git-annex-standalone-amd64.tar.gz
+            )
+            export PATH="${_annex_bin}:$PATH"
             ;;
-        snapshot)
-            _subpath=linux/current
+        Darwin)
+            case "$scenario" in
+                autobuild)
+                    _subpath=autobuild/x86_64-apple-yosemite
+                    ;;
+                snapshot)
+                    _subpath=OSX/current/10.10_Yosemite
+                    ;;
+                *)
+                    echo "E: internal error: scenario '$scenario' should not reach here" >&2
+                    exit 1
+                    ;;
+            esac
+            wget -q -O "$_TMPDIR/git-annex.dmg" https://downloads.kitenet.net/git-annex/$_subpath/git-annex.dmg
+            install_from_dmg "$_TMDPIR"/*.dmg
             ;;
         *)
-            echo "E: internal error: scenario '$scenario' should not reach here" >&2
+            echo "E: Unsupported OS: $(uname)"
             exit 1
             ;;
     esac
-    tar -C "$_TMPDIR" -xzf <(
-      wget -q -O- https://downloads.kitenet.net/git-annex/$_subpath/git-annex-standalone-amd64.tar.gz
-    )
-    export PATH="${_annex_bin}:$PATH"
     ;;
   conda-forge|conda-forge-last)
     _miniconda_script=Miniconda3-latest-Linux-x86_64.sh
@@ -201,8 +232,20 @@ case "$scenario" in
     unset _conda_annex_version
     ;;
   datalad-extensions-build)
-    TARGET_PATH="$_TMPDIR" "$_this_dir/download-latest-artifact"
-    sudo dpkg -i "$_TMPDIR"/*.deb
+    case "$(uname)" in
+      Linux)
+        TARGET_PATH="$_TMPDIR" "$_this_dir/download-latest-artifact"
+        sudo dpkg -i "$_TMPDIR"/*.deb
+        ;;
+      Darwin)
+        TARGET_PATH="$_TMPDIR" TARGET_ARTIFACT=git-annex-macos-dmg "$_this_dir/download-latest-artifact"
+        install_from_dmg "$_TMPDIR"/*.dmg
+        ;;
+      *)
+        echo "E: Unsupported OS: $(uname)"
+        exit 1
+        ;;
+    esac
     ;;
   *)
     echo "E: internal error: '$scenario' should be handled above" >&2
