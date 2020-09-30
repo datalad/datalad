@@ -1,0 +1,80 @@
+Update 0.13.3-332-gde2ba494a2:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    8a12de6cb1ff02bae0ddc01b433c3556b1453c97..de2ba494a2ec483fe0cf9375d91de1946a1ad6b2
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4845 from kyleam/addurls-tsv
+   00096ee542^-1
+-  Merge pull request #4848 from mih/rf-gitcustomcommandtst
+   0586aebe8d^-1
+-  Merge pull request #4847 from mih/rf-gitcustomcommand
+   04e294b4a1^-1
+-  Merge pull request #4850 from mih/rf-nogitcustomcommand
+   7b416b4049^-1
++* Merge pull request #4699 from mih/rf-witlessconfig
+   a5ed5f521a^-1
++  Merge pull request #4793 from mih/opt-subdsadd
+   023bfc2c65^-1
++* Merge pull request #4855 from mih/rf-witlessinvasion
+   6d871f8e7c^-1
+-  Merge pull request #4838 from bpoldrack/gh-4827
+   996368d323^-1
++  Merge pull request #4867 from yarikoptic/opt-addurls-no-metadataloop
+   c8397d272b^-1
+-  Merge pull request #4851 from mih/rf-witlessbenchmark
+   d370696683^-1
+-  Merge branch 'maint'
+   d6bdee4b5e^-1
+-  Merge branch 'maint'
+   f67fc69acd^-1
++  Merge pull request #4853 from mih/opt-subdsupdate
+   105e1ff0c2^-1
+-  Merge pull request #4886 from mih/rf-dx
+   1b76ff7d14^-1
++  Merge pull request #4879 from mih/rf-minpy36
+   99ad2be47e^-1
+-  Merge pull request #4882 from mih/rf-annexdirect1
+   28308f30db^-1
+-  Merge branch 'maint'
+   75de40055d^-1
+-  Merge pull request #4891 from mih/opt-repoconfigrunner
+   92594a7414^-1
+-  Merge pull request #4883 from mih/rf-annexdirect2
+   51ceae28ca^-1
+-  Merge pull request #4897 from bpoldrack/gh-4862
+   727d1689f9^-1
+-  Merge branch 'maint' into master
+   4f8fe6e4a8^-1
+-  Merge pull request #4909 from yarikoptic/rf-addurls-yield-from
+   478637e473^-1
++  Merge pull request #4908 from kyleam/deprecate-assure
+   680ac0c2d9^-1
+-  Merge pull request #4889 from mih/rf-gitrunner
+   6cbb11a28d^-1
++* Merge pull request #4900 from mih/rf-witlessarchives
+   90cf732590^-1
+-  Merge branch 'maint'
+   c33bd4e447^-1
++  Merge pull request #4904 from kyleam/prune-obsolete
+   dc8f781665^-1
+-  Merge branch 'maint'
+   a364f3cfc3^-1
++  Merge pull request #4924 from mih/bf-2628
+   454baaac13^-1
+-  Merge pull request #4939 from yarikoptic/bf-fasteners
+   4d9e8c657b^-1
+-  Merge branch 'maint'
+   f6cf0ae383^-1
+-  Merge branch 'maint'
+   73e03e325c^-1
+-  Merge branch 'maint'
+   79758d2ced^-1
+-  Merge branch 'maint'
+   de2ba494a2^-1
