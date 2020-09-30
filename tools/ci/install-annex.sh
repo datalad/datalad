@@ -13,6 +13,7 @@
 function _show_schemes() {
   _schemes_doc=(
     "autobuild  # Linux, macOS"
+    "brew  # macOS"
     "conda-forge [version]  # Linux"
     "conda-forge-last [version]  # Linux"
     "datalad-extensions-build  # Linux, macOS"
@@ -80,7 +81,7 @@ while [ $# != 0 ]; do
             scenario="$1"
             shift
             case "$scenario" in
-                neurodebian|neurodebian-devel|autobuild|snapshot|datalad-extensions-build)
+                neurodebian|neurodebian-devel|autobuild|snapshot|datalad-extensions-build|brew)
                     ;;
                 conda-forge|conda-forge-last)
                     if [ -n "$1" ]; then
@@ -246,6 +247,9 @@ case "$scenario" in
         exit 1
         ;;
     esac
+    ;;
+  brew)
+    brew install git-annex
     ;;
   *)
     echo "E: internal error: '$scenario' should be handled above" >&2
