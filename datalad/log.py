@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from functools import partial
+import inspect
 import logging
 import os
 import sys
@@ -351,7 +352,7 @@ def with_result_progress(fn, label="Total", unit=" Files"):
     pid = str(fn)
     base_label = label
 
-    def wrapped(items, **kwargs):
+    def _wrap_with_result_progress_(items, **kwargs):
         counts = defaultdict(int)
 
         label = base_label
@@ -359,7 +360,6 @@ def with_result_progress(fn, label="Total", unit=" Files"):
                      "%s: starting", label,
                      total=len(items), label=label, unit=unit)
 
-        results = []
         for res in fn(items, **kwargs):
             counts[res["status"]] += 1
             count_strs = (count_str(*args)
@@ -376,10 +376,15 @@ def with_result_progress(fn, label="Total", unit=" Files"):
                 "%s: processed result%s", base_label,
                 " for " + res["path"] if "path" in res else "",
                 label=label, update=1, increment=True)
-            results.append(res)
+            yield res
         log_progress(lgr.info, pid, "%s: done", base_label)
-        return results
-    return wrapped
+
+    def _wrap_with_result_progress(items, **kwargs):
+        return list(_wrap_with_result_progress_(items, **kwargs))
+
+    return _wrap_with_result_progress_ \
+        if inspect.isgeneratorfunction(fn) \
+        else _wrap_with_result_progress
 
 
 class LoggerHelper(object):
