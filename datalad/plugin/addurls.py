@@ -888,7 +888,9 @@ class Addurls(Interface):
         # batched annex process per each subdataset, which might be infeasible
         # in any use-case with a considerable number of subdatasets.
         # TODO: logical spot for parallel run across (sub)datasets
-        for subpath, ds_rows in itertools.groupby(rows, itemgetter("subpath")):
+        get_subpath = itemgetter("subpath")
+        for subpath, ds_rows in itertools.groupby(
+                sorted(rows, key=get_subpath), get_subpath):
             # Serialize the ds_rows since we will use it multiple times and
             # add_urls expects a container to run len() on
             ds_rows = tuple(ds_rows)
