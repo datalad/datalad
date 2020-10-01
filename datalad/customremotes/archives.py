@@ -153,7 +153,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         Made "generators all the way" as an exercise but also to delay any
         checks etc until really necessary.
         """
-        urls = self.get_URLS(key)
+        # we will need all URLs anyways later on ATM, so lets list() them
+        # Anyways here we have a single scheme (archive) so there is not
+        # much optimization possible
+        urls = list(self.gen_URLS(key))
 
         akey_afiles = [
             self._parse_url(url)[:2]  # skip size

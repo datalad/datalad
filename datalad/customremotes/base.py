@@ -17,6 +17,8 @@ import errno
 import os
 import sys
 
+from collections import Counter
+
 from ..support.path import exists, join as opj, dirname, lexists
 
 from urllib.parse import urlparse
@@ -257,6 +259,12 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
+
+        # OPT: a counter to increment upon successful encounter of the scheme
+        # (ATM only in gen_URLS but later could also be used in other requests).
+        # This would allow to consider schemes in order of decreasing success instead
+        # of arbitrary hardcoded order
+        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -619,14 +627,17 @@ class AnnexCustomRemote(object):
         else:
             return val
 
-    def get_URLS(self, key):
-        """Gets URL(s) associated with a Key.
+    def gen_URLS(self, key):
+        """Yield URL(s) associated with a Key.
 
         """
-        urls = []
-        for scheme in self.SUPPORTED_SCHEMES:
+        nurls = 0
+        for scheme, _ in self._scheme_hits.most_common():
             scheme_ = scheme + ":"
             self.send("GETURLS", key, scheme_)
+            # we need to first to slurp in all for a given SCHEME
+            # since annex would be expecting to send its final empty VALUE
+            scheme_urls = []
             while True:
                 url = self.read("VALUE", 1)
                 if not url or len(url) <= 1:
@@ -635,16 +646,26 @@ class AnnexCustomRemote(object):
                 url = url[1:]
                 if url:
                     assert(len(url) == 1)
-                    urls.append(url[0])
+                    nurls += 1
+                    scheme_urls.append(url[0])
                 else:
                     break
+            if scheme_urls:
+                # note: generator would ceise to exist thus not asking
+                # for URLs for other schemes if this scheme is good enough
+                self._scheme_hits[scheme] += 1
+                for url in scheme_urls:
+                    yield url
 
-        self.heavydebug("Got %d URL(s) for key %s: %s", len(urls), key, urls)
+        self.heavydebug("Got %d URL(s) for key %s", nurls, key)
 
-        #if not urls:
-        #    raise ValueError("Did not get any URLs for %s which we support" % key)
+    def get_URLS(self, key):
+        """Gets URL(s) associated with a Key.
 
-        return urls
+        Use a generator gen_URLS where possible.
+        This one should be deprecated in 0.15.
+        """
+        return list(self.gen_URLS(key))
 
     def _get_key_path(self, key):
         """Return path to the KEY file
