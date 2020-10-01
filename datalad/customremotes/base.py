@@ -651,7 +651,7 @@ class AnnexCustomRemote(object):
                 else:
                     break
             if scheme_urls:
-                # note: generator would ceise to exist thus not asking
+                # note: generator would cease to exist thus not asking
                 # for URLs for other schemes if this scheme is good enough
                 self._scheme_hits[scheme] += 1
                 for url in scheme_urls:
