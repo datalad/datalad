@@ -628,8 +628,7 @@ def postclonecfg_ria(ds, props):
         # get that config file the same way:
         config_content = None
         scheme = props['giturl'].split(':', 1)[0]
-        if scheme == 'http':
-
+        if scheme in ['http', 'https']:
             try:
                 response = requests.get("{}{}config".format(
                     props['giturl'],
