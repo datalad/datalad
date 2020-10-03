@@ -34,7 +34,6 @@ class CommandError(RuntimeError):
     def to_str(self, include_output=True):
         from datalad.utils import (
             ensure_unicode,
-            ensure_list,
             quote_cmdlinearg,
         )
         to_str = "{}: ".format(self.__class__.__name__)
