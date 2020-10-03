@@ -1181,7 +1181,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(
                     remote=remote,
-                    cmd="get",
+                    cmd="annex get",
                     msg="Remote is not known. Known are: %s"
                     % (self.get_remotes(),)
                 )
