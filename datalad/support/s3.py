@@ -457,8 +457,8 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     if url_rec.hostname.endswith('.s3.amazonaws.com'):
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
-        # we know how to slice this cat
-        s3_bucket = url_rec.hostname.split('.', 1)[0]
+        # bucket name could have . in it, e.g. openneuro.org
+        s3_bucket = url_rec.hostname[:-len('.s3.amazonaws.com')]
     elif url_rec.hostname == 's3.amazonaws.com':
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
@@ -483,11 +483,16 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             providers = Providers.from_config_files()
             s3url = "s3://%s/" % s3_bucket
             s3provider = providers.get_provider(s3url)
-            if s3provider.authenticator.bucket is not None and s3provider.authenticator.bucket.name == s3_bucket:
+            authenticator = s3provider.authenticator
+            if not authenticator:
+                # We will use anonymous one
+                from ..downloaders.s3 import S3Authenticator
+                authenticator = S3Authenticator()
+            if authenticator.bucket is not None and authenticator.bucket.name == s3_bucket:
                 # we have established connection before, so let's just reuse
-                bucket = s3provider.authenticator.bucket
+                bucket = authenticator.bucket
             else:
-                bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
+                bucket = authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
         else:
             bucket = s3conn.get_bucket(s3_bucket)
 
