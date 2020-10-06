@@ -27,20 +27,20 @@ bet we will fix some bugs and make a world even a better place.
 - DataLad custom remotes didn't escape newlines in messages sent to
   git-annex.  ([#4926][])
 
-- The datalad-archives special remote didn't work with file names that
-  appeared to have percent-encoded character.  ([#4953][])
+- The datalad-archives special remote incorrectly treated file names
+  as percent-encoded.  ([#4953][])
 
 - The result handler didn't properly escape "%" when constructing its
   message template.  ([#4953][])
 
-- In v0.13.0, the tailored rendering for particular types of external
+- In v0.13.0, the tailored rendering for specific subtypes of external
   command failures (e.g., "out of space" or "remote not available")
   was unintentionally switched to the default rendering.  ([#4966][])
 
+- Various fixes and updates for the NDA authenticator.  ([#4824][])
+
 - The helper for getting a versioned S3 URL did not support anonymous
   access or buckets with "." in their name.  ([#4985][])
-
-- Various fixes and updates for the NDA authenticator.  ([#4824][])
 
 - Several issues with the handling of S3 credentials and token
   expiration have been addressed.  ([#4927][]) ([#4931][]) ([#4952][])
