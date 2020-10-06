@@ -21,6 +21,9 @@ bet we will fix some bugs and make a world even a better place.
 
 - Ephemeral clones mishandled bare repositories.  ([#4899][])
 
+- The post-clone logic for configuring RIA stores didn't consider
+  `https://` URLs.  ([#4977][])
+
 - DataLad custom remotes didn't escape newlines in messages sent to
   git-annex.  ([#4926][])
 
@@ -29,6 +32,13 @@ bet we will fix some bugs and make a world even a better place.
 
 - The result handler didn't properly escape "%" when constructing its
   message template.  ([#4953][])
+
+- In v0.13.0, the tailored rendering for particular types of external
+  command failures (e.g., "out of space" or "remote not available")
+  was unintentionally switched to the default rendering.  ([#4966][])
+
+- The helper for getting a versioned S3 URL did not support anonymous
+  access or buckets with "." in their name.  ([#4985][])
 
 - Various fixes and updates for the NDA authenticator.  ([#4824][])
 
@@ -3132,3 +3142,6 @@ publishing
 [#4931]: https://github.com/datalad/datalad/issues/4931
 [#4952]: https://github.com/datalad/datalad/issues/4952
 [#4953]: https://github.com/datalad/datalad/issues/4953
+[#4966]: https://github.com/datalad/datalad/issues/4966
+[#4977]: https://github.com/datalad/datalad/issues/4977
+[#4985]: https://github.com/datalad/datalad/issues/4985
