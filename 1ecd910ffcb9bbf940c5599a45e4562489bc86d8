@@ -1,0 +1,24 @@
+Update 0.13.3-120-gf2a1f93d40:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    f2a1f93d403e913b2cc86457af2b7c928fcaca00..dcad257988817412ba512e7455d2b304c583fcb8
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4974 from jwodder/gh-4971
+   009d21cd60^-1
+-  Merge pull request #4972 from yarikoptic/enh-shellcheck
+   d71e3f1cc3^-1
++  Merge pull request #4966 from kyleam/command-error-subclass-tostr
+   5697b16ac0^-1
+-  CLN: exceptions: Drop a recently unused import
+   c06644a7e4^-1
++  BF: Accept ria+https URLs in clone
+   c66363a6b2^-1
++  Merge pull request #4985 from yarikoptic/bf-s3verurl
+   dcad257988^-1
