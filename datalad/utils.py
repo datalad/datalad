@@ -1238,6 +1238,16 @@ def swallow_outputs():
             self._err.close()
             out_name = self._out.name
             err_name = self._err.name
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False) \
+                    and lgr.getEffectiveLevel() <= logging.DEBUG:
+                for s, sname in ((self.out, 'stdout'),
+                                 (self.err, 'stderr')):
+                    if s:
+                        pref = os.linesep + "| "
+                        lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
+                    else:
+                        lgr.debug("Nothing was swallowed for %s", sname)
             del self._out
             del self._err
             gc.collect()
@@ -2465,6 +2475,16 @@ def quote_cmdlinearg(arg):
     return '"{}"'.format(
         arg.replace('"', '""')
     ) if on_windows else shlex_quote(arg)
+
+
+def guard_for_format(arg):
+    """Replace { and } with {{ and }}
+
+    To be used in cases if arg is not expected to have provided
+    by user .format() placeholders, but 'arg' might become a part
+    of a composite passed to .format(), e.g. via 'Run'
+    """
+    return arg.replace('{', '{{').replace('}', '}}')
 
 
 def split_cmdline(s):

@@ -89,6 +89,16 @@ def test_get_versioned_url():
 
 
 @skip_if_no_network
+@use_cassette('s3_test_version_url_anon')
+def test_get_versioned_url_anon():
+    # The one without any authenticator, was crashing.
+    # Also it triggered another bug about having . in the bucket name
+    url_on = "http://openneuro.org.s3.amazonaws.com/ds000001/dataset_description.json"
+    url_on_versioned = get_versioned_url(url_on)
+    ok_startswith(url_on_versioned, url_on + "?versionId=")
+
+
+@skip_if_no_network
 @use_cassette('s3_test_version_url_deleted')
 def test_version_url_deleted():
     get_test_providers('s3://datalad-test0-versioned/', reload=True)  # to verify having credentials to access
