@@ -1439,9 +1439,7 @@ def with_parametric_batch(t):
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
-OBSCURE_FILENAME_PARTS = ['/', '|', ';', '&',
-                          '%b5',
-                          ' ']
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
@@ -1456,8 +1454,8 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
         UNICODE_FILENAME = ''
     if UNICODE_FILENAME:
         OBSCURE_FILENAME_PARTS.append(UNICODE_FILENAME)
-# simple extension to finish it up
-OBSCURE_FILENAME_PARTS.append('.datc')
+# space before extension, simple extension and trailing space to finish it up
+OBSCURE_FILENAME_PARTS += [' ', '.datc', ' ']
 
 
 @with_tempfile(mkdir=True)
@@ -1472,14 +1470,19 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     TODO: we might want to use it as a function where we would provide tdir
     """
     # we need separate good_base so we do not breed leading/trailing spaces
-    initial = good = 'a'  # everyone should support that!
+    initial = good = OBSCURE_PREFIX
     system = platform.system()
 
     OBSCURE_FILENAMES = []
     def good_filename(filename):
         OBSCURE_FILENAMES.append(candidate)
         try:
-            with open(opj(tdir, filename), 'w') as f:
+            # Windows seems to not tollerate trailing spaces and
+            # ATM we do not distinguish obscure filename and dirname.
+            # So here we will test for both - being able to create dir
+            # with obscure name and obscure filename under
+            os.mkdir(opj(tdir, filename))
+            with open(opj(tdir, filename, filename), 'w') as f:
                 f.write("TEST LOAD")
             return True
         except:
@@ -1490,18 +1493,8 @@ def get_most_obscure_supported_name(tdir, return_candidates=False):
     # incrementally build up the most obscure filename from parts
     for part in OBSCURE_FILENAME_PARTS:
         candidate = good + part
-        if good_filename(OBSCURE_PREFIX + candidate):
-            good = candidate
-
-    # now we will compose some candidates with trailing spaces - trickier ones first
-    # so we break the loop as soon as we get it
-    for candidate in [' ' + good + ' ', ' ' + good, good + ' ', good]:
-        candidate = OBSCURE_PREFIX + candidate
-        if on_windows and candidate.rstrip() != candidate:
-            continue
         if good_filename(candidate):
             good = candidate
-            break
 
     if good == initial:
         raise RuntimeError("Could not create any of the files under %s among %s"
