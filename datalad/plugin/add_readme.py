@@ -129,7 +129,7 @@ class AddReadme(Interface):
 This is a DataLad dataset{id}.
 
 For more information on DataLad and on how to work with its datasets,
-see the DataLad documentation at: http://docs.datalad.org
+see the DataLad documentation at: http://handbook.datalad.org
 """.format(
             title='Dataset "{}"'.format(meta['title']) if 'title' in meta else 'About this dataset',
             metainfo=metainfo,
