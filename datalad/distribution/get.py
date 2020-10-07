@@ -323,70 +323,71 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             sub_orig_branch = sub.get_active_branch()
             # if we are on a branch this hexsha will be the tip of that branch
             sub_orig_hexsha = sub.get_hexsha()
-            # make sure we have the desired commit locally
-            # expensive and possibly error-prone fetch conditional on cheap
-            # local check
-            if not sub.commit_exists(target_commit):
-                try:
-                    sub.fetch(remote='origin', refspec=target_commit)
-                except CommandError:
-                    pass
-                # instead of inspecting the fetch results for possible ways
-                # with which it could failed to produced the desired result
-                # let's verify the presence of the commit directly, we are in
-                # expensive-land already anyways
+            if sub_orig_hexsha != target_commit:
+                # make sure we have the desired commit locally
+                # expensive and possibly error-prone fetch conditional on cheap
+                # local check
                 if not sub.commit_exists(target_commit):
-                    res.update(
-                        status='error',
-                        message=(
-                            'Target commit %s does not exist in the clone, and '
-                            'a fetch that commit from origin failed',
-                            target_commit[:8]),
-                    )
-                    yield res
-                    # there is nothing we can do about this
-                    # MIH thinks that removing the clone is not needed, as a likely
-                    # next step will have to be a manual recovery intervention
-                    # and not another blind attempt
-                    continue
-            # checkout the desired commit
-            sub.call_git(['checkout', target_commit])
-            # did we detach?
-            # XXX: This is a less generic variant of a part of
-            # GitRepo.update_submodule(). It makes use of already available
-            # information and trusts the existence of the just cloned repo
-            # and avoids (redoing) some safety checks
-            if sub_orig_branch and not sub.get_active_branch():
-                # trace if current state is a predecessor of the branch_hexsha
-                lgr.debug(
-                    "Detached HEAD after updating submodule %s "
-                    "(original branch: %s)", sub, sub_orig_branch)
-                if sub.get_merge_base(
-                        [sub_orig_hexsha, target_commit]) == target_commit:
-                    # TODO: config option?
-                    # MIH: There is no real need here. IMHO this should all not
-                    # happen, unless the submodule record has a branch
-                    # configured. And Datalad should leave such a record, when
-                    # a submodule is registered.
+                    try:
+                        sub.fetch(remote='origin', refspec=target_commit)
+                    except CommandError:
+                        pass
+                    # instead of inspecting the fetch results for possible ways
+                    # with which it could failed to produced the desired result
+                    # let's verify the presence of the commit directly, we are in
+                    # expensive-land already anyways
+                    if not sub.commit_exists(target_commit):
+                        res.update(
+                            status='error',
+                            message=(
+                                'Target commit %s does not exist in the clone, and '
+                                'a fetch that commit from origin failed',
+                                target_commit[:8]),
+                        )
+                        yield res
+                        # there is nothing we can do about this
+                        # MIH thinks that removing the clone is not needed, as a likely
+                        # next step will have to be a manual recovery intervention
+                        # and not another blind attempt
+                        continue
+                # checkout the desired commit
+                sub.call_git(['checkout', target_commit])
+                # did we detach?
+                # XXX: This is a less generic variant of a part of
+                # GitRepo.update_submodule(). It makes use of already available
+                # information and trusts the existence of the just cloned repo
+                # and avoids (redoing) some safety checks
+                if sub_orig_branch and not sub.get_active_branch():
+                    # trace if current state is a predecessor of the branch_hexsha
+                    lgr.debug(
+                        "Detached HEAD after updating submodule %s "
+                        "(original branch: %s)", sub, sub_orig_branch)
+                    if sub.get_merge_base(
+                            [sub_orig_hexsha, target_commit]) == target_commit:
+                        # TODO: config option?
+                        # MIH: There is no real need here. IMHO this should all not
+                        # happen, unless the submodule record has a branch
+                        # configured. And Datalad should leave such a record, when
+                        # a submodule is registered.
 
-                    # we assume the target_commit to be from the same branch,
-                    # because it is an ancestor -- update that original branch
-                    # to point to the target_commit, and update HEAD to point to
-                    # that location -- this readies the subdataset for
-                    # further modification
-                    lgr.info(
-                        "Reset subdataset branch '%s' to %s (from %s) to "
-                        "avoid a detached HEAD",
-                        sub_orig_branch, target_commit[:8], sub_orig_hexsha[:8])
-                    branch_ref = 'refs/heads/%s' % sub_orig_branch
-                    sub.update_ref(branch_ref, target_commit)
-                    sub.update_ref('HEAD', branch_ref, symbolic=True)
-                else:
-                    lgr.warning(
-                        "%s has a detached HEAD, because the recorded "
-                        "subdataset state %s has no unique ancestor with "
-                        "branch '%s'",
-                        sub, target_commit[:8], sub_orig_branch)
+                        # we assume the target_commit to be from the same branch,
+                        # because it is an ancestor -- update that original branch
+                        # to point to the target_commit, and update HEAD to point to
+                        # that location -- this readies the subdataset for
+                        # further modification
+                        lgr.info(
+                            "Reset subdataset branch '%s' to %s (from %s) to "
+                            "avoid a detached HEAD",
+                            sub_orig_branch, target_commit[:8], sub_orig_hexsha[:8])
+                        branch_ref = 'refs/heads/%s' % sub_orig_branch
+                        sub.update_ref(branch_ref, target_commit)
+                        sub.update_ref('HEAD', branch_ref, symbolic=True)
+                    else:
+                        lgr.warning(
+                            "%s has a detached HEAD, because the recorded "
+                            "subdataset state %s has no unique ancestor with "
+                            "branch '%s'",
+                            sub, target_commit[:8], sub_orig_branch)
 
             # register the submodule as "active" in the superdataset
             ds.config.set(
