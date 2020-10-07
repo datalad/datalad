@@ -35,6 +35,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetFound
 from datalad.utils import (
+    guard_for_format,
     join_cmdline,
     quote_cmdlinearg,
     split_cmdline,
@@ -434,8 +435,8 @@ class RunProcedure(Interface):
                              "Missing 'execute' permissions?" % procedure_file)
 
         cmd = ex['template'].format(
-            script=quote_cmdlinearg(procedure_file),
-            ds=quote_cmdlinearg(ds.path) if ds else '',
+            script=guard_for_format(quote_cmdlinearg(procedure_file)),
+            ds=guard_for_format(quote_cmdlinearg(ds.path)) if ds else '',
             args=join_cmdline(args) if args else '')
         lgr.info(u"Running procedure %s", name)
         lgr.debug(u'Full procedure command: %r', cmd)

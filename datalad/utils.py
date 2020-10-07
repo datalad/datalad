@@ -2459,6 +2459,16 @@ def quote_cmdlinearg(arg):
     ) if on_windows else shlex_quote(arg)
 
 
+def guard_for_format(arg):
+    """Replace { and } with {{ and }}
+
+    To be used in cases if arg is not expected to have provided
+    by user .format() placeholders, but 'arg' might become a part
+    of a composite passed to .format(), e.g. via 'Run'
+    """
+    return arg.replace('{', '{{').replace('}', '}}')
+
+
 def join_cmdline(args):
     """Join command line args into a string using quote_cmdlinearg
     """
