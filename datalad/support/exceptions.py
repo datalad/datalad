@@ -15,6 +15,9 @@ from pprint import pformat
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
+
+    Note: Subclasses should override `to_str` rather than `__str__` because
+    `to_str` is called directly in datalad.cmdline.main.
     """
 
     def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
@@ -31,15 +34,15 @@ class CommandError(RuntimeError):
     def to_str(self, include_output=True):
         from datalad.utils import (
             ensure_unicode,
-            ensure_list,
             join_cmdline,
         )
         to_str = "{}: ".format(self.__class__.__name__)
-        if self.cmd:
+        cmd = self.cmd
+        if cmd:
             to_str += "'{}'".format(
                 # go for a compact, normal looking, properly quoted
-                # command rendering
-                join_cmdline(ensure_list(self.cmd))
+                # command rendering if the command is in list form
+                join_cmdline(cmd) if isinstance(cmd, list) else cmd
             )
         if self.code:
             to_str += " failed with exitcode {}".format(self.code)
@@ -154,8 +157,10 @@ class FileNotInAnnexError(IOError, CommandError):
         CommandError.__init__(self, cmd=cmd, msg=msg, code=code)
         IOError.__init__(self, code, "%s: %s" % (cmd, msg), filename)
 
-    def __str__(self):
-        return "%s\n%s" % (CommandError.__str__(self), IOError.__str__(self))
+    def to_str(self, include_output=True):
+        return "%s\n%s" % (
+            CommandError.to_str(self, include_output=include_output),
+            IOError.__str__(self))
 
 
 class FileInGitError(FileNotInAnnexError):
@@ -205,7 +210,8 @@ class GitIgnoreError(CommandError):
             cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
         self.paths = paths
 
-    def __str__(self):
+    def to_str(self, include_output=True):
+        # Override CommandError.to_str(), ignoring include_output.
         return self.msg
 
 
@@ -280,8 +286,9 @@ class OutOfSpaceError(CommandError):
         super(OutOfSpaceError, self).__init__(**kwargs)
         self.sizemore_msg = sizemore_msg
 
-    def __str__(self):
-        super_str = super(OutOfSpaceError, self).__str__().rstrip(linesep + '.')
+    def to_str(self, include_output=True):
+        super_str = super().to_str(
+            include_output=include_output).rstrip(linesep + '.')
         return "%s needs %s more" % (super_str, self.sizemore_msg)
 
 
@@ -291,16 +298,6 @@ class RemoteNotAvailableError(CommandError):
     Example is "annex get somefile --from=MyRemote",
     where 'MyRemote' doesn't exist.
     """
-
-    # TODO: Raise this from GitRepo. Currently depends on method:
-    # Either it's a direct git call
-    #   => CommandError and stderr:
-    #       fatal: 'notthere' does not appear to be a git repository
-    #       fatal: Could not read from remote repository.
-    # or it's a GitPython call
-    #   => ValueError "Remote named 'NotExistingRemote' didn't exist"
-    # and another one:
-    #   see GitRepo.remove_remote()
 
     def __init__(self, remote, **kwargs):
         """
@@ -315,8 +312,8 @@ class RemoteNotAvailableError(CommandError):
         super(RemoteNotAvailableError, self).__init__(**kwargs)
         self.remote = remote
 
-    def __str__(self):
-        super_str = super(RemoteNotAvailableError, self).__str__()
+    def to_str(self, include_output=True):
+        super_str = super().to_str(include_output=include_output)
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
 
@@ -420,6 +417,14 @@ class AccessDeniedError(DownloadError):
 
 
 class AnonymousAccessDeniedError(AccessDeniedError):
+    pass
+
+
+class AccessPermissionExpiredError(AccessDeniedError):
+    """To raise when there is a belief that it is due to expiration of a credential
+
+    which we might possibly be able to refresh, like in the case of CompositeCredential
+    """
     pass
 
 

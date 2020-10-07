@@ -33,7 +33,7 @@ from ..support.constraints import (
     EnsureStr,
 )
 from ..utils import (
-    assure_list,
+    ensure_list,
 )
 from .dataset import (
     datasetmethod,
@@ -233,7 +233,7 @@ class CreateSiblingGithub(Interface):
     @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
-        res = assure_list(res)
+        res = ensure_list(res)
         if args.dryrun:
             ui.message('DRYRUN -- Anticipated results:')
         if not len(res):

@@ -9,6 +9,7 @@ import os.path as op
 from datalad.consts import (
     DATASET_CONFIG_FILE
 )
+from datalad.utils import ensure_tuple_or_list
 from datalad.distribution.dataset import require_dataset
 
 ds = require_dataset(
@@ -16,8 +17,11 @@ ds = require_dataset(
     check_installed=True,
     purpose='configuration')
 
+existing_types = ensure_tuple_or_list(
+    ds.config.get('datalad.metadata.nativetype', [], get_all=True))
+
 for nt in sys.argv[2:]:
-    if nt in ds.config.get('datalad.metadata.nativetype', []):
+    if nt in existing_types:
         # do not duplicate
         continue
     ds.config.add(

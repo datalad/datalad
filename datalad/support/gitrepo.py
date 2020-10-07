@@ -14,7 +14,6 @@ import re
 import time
 import os
 import os.path as op
-import warnings
 
 import logging
 from collections import (
@@ -774,10 +773,6 @@ class PushInfo(dict):
             note=summary.strip(),
             old_commit=old_commit,
         )
-
-
-# Compatibility kludge.  See GitRepo.get_submodules().
-Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
 @path_based_str_repr
@@ -1671,17 +1666,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd.extend(options)
 
         # set up env for commit
-        env = GitRunner.get_git_environ_adjusted()
-        if self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
+        env = self.add_fake_dates(None) \
+            if self.fake_dates_enabled else os.environ.copy()
         if index_file:
             env['GIT_INDEX_FILE'] = index_file
 
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
-
-        runner = GitWitlessRunner(cwd=self.path, env=env)
 
         try:
             for i, chunk in enumerate(file_chunks):
@@ -1694,10 +1686,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if i > 0 and '--dry-run' not in cmd
                     else []
                 ) + ['--'] + chunk
-                runner.run(
+                self._git_runner.run(
                     cur_cmd,
                     protocol=StdOutErrCapture,
                     stdin=None,
+                    env=env,
                 )
         except CommandError as e:
             # real errors first
@@ -2463,7 +2456,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         url = self.config.get('remote.{}.url'.format(remote), None)
         if url and is_ssh(url):
             ssh_manager.get_connection(url).open()
-        GitWitlessRunner(cwd=self.path).run(
+        self._git_runner.run(
             cmd,
             protocol=StdOutCaptureWithGitProgress,
         )
@@ -2602,7 +2595,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if url and is_ssh(url):
                     ssh_manager.get_connection(url).open()
                 try:
-                    out = GitWitlessRunner(cwd=self.path).run(
+                    out = self._git_runner.run(
                         r_cmd,
                         protocol=protocol,
                     )
@@ -2859,7 +2852,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             props.update(modinfo.get(path, {}))
             yield props
 
-    def get_submodules(self, sorted_=True, paths=None, compat=True):
+    def get_submodules(self, sorted_=True, paths=None):
         """Return list of submodules.
 
         Parameters
@@ -2868,12 +2861,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             Sort submodules by path name.
         paths : list(pathlib.PurePath), optional
             Restrict submodules to those under `paths`.
-        compat : bool, optional
-            If true, return a namedtuple that incompletely mimics the
-            attributes of GitPython's Submodule object in hope of backwards
-            compatibility with previous callers. Note that this form should be
-            considered temporary and callers should be updated; this flag will
-            be removed in a future release.
 
         Returns
         -------
@@ -2881,24 +2868,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         of dictionaries as returned by `get_submodules_`.
         """
         xs = self.get_submodules_(paths=paths)
-        if compat:
-            warnings.warn("The attribute-based return value of get_submodules() "
-                          "exists for compatibility purposes and will be removed "
-                          "in an upcoming release",
-                          DeprecationWarning)
-            xs = (Submodule(name=p["gitmodule_name"],
-                            path=str(p["path"].relative_to(self.pathobj)),
-                            url=p["gitmodule_url"])
-                  for p in xs)
 
         if sorted_:
-            if compat:
-                def key(x):
-                    return x.path
-            else:
-                def key(x):
-                    return x["path"]
-            xs = sorted(xs, key=key)
+            xs = sorted(xs, key=lambda x: x["path"])
         return list(xs)
 
     def add_submodule(self, path, name=None, url=None, branch=None):

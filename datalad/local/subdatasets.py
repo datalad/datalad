@@ -37,7 +37,7 @@ from datalad.distribution.dataset import (
 from datalad.support.gitrepo import GitRepo
 from datalad.dochelpers import exc_str
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     partition,
 )
 
@@ -221,7 +221,7 @@ class Subdatasets(Interface):
         # no constraints given -> query subdatasets under curdir
         if not path and dataset is None:
             path = os.curdir
-        paths = [resolve_path(p, dataset) for p in assure_list(path)] \
+        paths = [resolve_path(p, dataset) for p in ensure_list(path)] \
             if path else None
 
         ds = require_dataset(
@@ -242,7 +242,7 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must "
                         "start with a letter)" % k)
         if contains:
-            contains = [resolve_path(c, dataset) for c in assure_list(contains)]
+            contains = [resolve_path(c, dataset) for c in ensure_list(contains)]
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
@@ -302,7 +302,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                    for p in paths)
         if to_report and (set_property or delete_property):
             # first deletions
-            for dprop in assure_list(delete_property):
+            for dprop in ensure_list(delete_property):
                 try:
                     repo.call_git(
                         ['config', '--file', '.gitmodules',
@@ -324,7 +324,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 # also kick from the info we just read above
                 sm.pop('gitmodule_{}'.format(dprop), None)
             # and now setting values
-            for sprop in assure_list(set_property):
+            for sprop in ensure_list(set_property):
                 prop, val = sprop
                 if val.startswith('<') and val.endswith('>') and '{' in val:
                     # expand template string

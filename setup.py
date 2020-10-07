@@ -31,7 +31,7 @@ requires = {
         'distro; python_version >= "3.8"',
         'iso8601',
         'humanize',
-        'fasteners',
+        'fasteners>=0.14',
         'patool>=1.7',
         'tqdm',
         'wrapt',

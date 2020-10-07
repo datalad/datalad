@@ -29,8 +29,8 @@ from datalad.metadata.metadata import (
     query_aggregated_metadata,
 )
 from datalad.utils import (
-    assure_unicode,
     chpwd,
+    ensure_unicode,
 )
 from datalad.tests.utils import (
     assert_dict_equal,
@@ -163,7 +163,7 @@ def test_aggregation(path):
     for name in ('MOTHER_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(
             sum([s['metadata']['frictionless_datapackage']['name'] \
-                    == assure_unicode(name) for s in origres
+                    == ensure_unicode(name) for s in origres
                  if s['type'] == 'dataset']))
 
     # now clone the beast to simulate a new user installing an empty dataset

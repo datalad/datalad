@@ -35,7 +35,7 @@ from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge c
 from datalad.utils import (
     path_startswith,
     path_is_subpath,
-    assure_unicode,
+    ensure_unicode,
     getargspec,
     get_wrapped_class,
 )
@@ -230,7 +230,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     filematch = False
     if isdir(basepath):
         for p in listdir(basepath):
-            p = assure_unicode(opj(basepath, p))
+            p = ensure_unicode(opj(basepath, p))
             if not isdir(p):
                 if p in targetpaths:
                     filematch = True
@@ -566,11 +566,21 @@ def _process_results(
                 msgargs = msg[1:]
                 msg = msg[0]
             if 'path' in res:
+                path = res['path']
+                if msgargs:
+                    # we will pass the msg for %-polation, so % should be doubled
+                    path = path.replace('%', '%%')
                 msg = '{} [{}({})]'.format(
-                    msg, res['action'], res['path'])
+                    msg, res['action'], path)
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
-                res_lgr(msg, *msgargs)
+                try:
+                    res_lgr(msg, *msgargs)
+                except TypeError as exc:
+                    raise TypeError(
+                        "Failed to render %r with %r from %r: %s"
+                        % (msg, msgargs, res, exc_str(exc))
+                    )
             else:
                 res_lgr(msg)
 

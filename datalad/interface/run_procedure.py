@@ -40,7 +40,7 @@ from datalad.utils import (
     split_cmdline,
 )
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 import datalad.support.ansi_colors as ac
 
 from datalad.core.local.run import Run
@@ -77,24 +77,21 @@ def _get_proc_config(name, ds=None):
     """
     # figure what ConfigManager to ask
     cm = cfg if ds is None else ds.config
+    # ConfigManager might return a tuple for different reasons.
+    # The config might have been defined multiple times in the same location
+    # (within .datalad/config for example) or there are multiple values for
+    # it on different levels of git-config (system, user, repo). git-config
+    # in turn does report such things ordered from most general to most
+    # specific configuration. We do want the most specific one here, so
+    # config.get(), which returns the last entry, works here.
+    # TODO: At this point we cannot determine whether it was actually
+    # configured to yield several values by the very same config, in which
+    # case we should actually issue a warning, since we then have no idea
+    # of a priority. But ConfigManager isn't able yet to tell us or to
+    # restrict the possibility to define multiple values to particular items
     v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
     h = cm.get('datalad.procedures.{}.help'.format(name), None)
-    if isinstance(v, tuple):
-        # ConfigManager might return a tuple for different reasons.
-        # The config might have been defined multiple times in the same location
-        # (within .datalad/config for example) or there are multiple values for
-        # it on different levels of git-config (system, user, repo). git-config
-        # in turn does report such things ordered from most general to most
-        # specific configuration. We do want the most specific one here, so we
-        # go with the last entry of that tuple.
-        # TODO: At this point we cannot determine whether it was actually
-        # configured to yield several values by the very same config, in which
-        # case we should actually issue a warning, since we then have no idea
-        # of a priority. But ConfigManager isn't able yet to tell us or to
-        # restrict the possibility to define multiple values to particular items
-        return v[-1], h
-    else:
-        return v, h
+    return v, h
 
 
 def _get_procedure_implementation(name='*', ds=None):
@@ -122,13 +119,13 @@ def _get_procedure_implementation(name='*', ds=None):
     # 1. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
-        for dir in assure_list(loc):
+        for dir in ensure_list(loc):
             for m, n in _get_file_match(dir, name):
                 yield (m, n,) + _get_proc_config(n)
     # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
-        dirs = assure_list(
+        dirs = ensure_list(
                 ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
             # TODO `get` dirs if necessary

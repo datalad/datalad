@@ -20,8 +20,8 @@ import io
 from time import sleep
 
 from ..utils import (
-    assure_list_from_str,
-    assure_dict_from_str,
+    ensure_list_from_str,
+    ensure_dict_from_str,
     ensure_bytes,
 )
 from ..dochelpers import borrowkwargs
@@ -142,9 +142,9 @@ class HTTPBaseAuthenticator(Authenticator):
         """
         super(HTTPBaseAuthenticator, self).__init__(**kwargs)
         self.url = url
-        self.failure_re = assure_list_from_str(failure_re)
-        self.success_re = assure_list_from_str(success_re)
-        self.session_cookies = assure_list_from_str(session_cookies)
+        self.failure_re = ensure_list_from_str(failure_re)
+        self.success_re = ensure_list_from_str(success_re)
+        self.session_cookies = ensure_list_from_str(session_cookies)
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
@@ -217,6 +217,11 @@ class HTTPBaseAuthenticator(Authenticator):
             # verify that we actually logged in
             for failure_re in self.failure_re:
                 if content_is_bytes:
+                    # content could be not in utf-8. But I do not think that
+                    # it is worth ATM messing around with guessing encoding
+                    # of the content to figure out what to encode it into
+                    # since typically returned "auth failed" should be in
+                    # utf-8 or plain ascii
                     failure_re = ensure_bytes(failure_re)
                 if re.search(failure_re, content):
                     raise AccessDeniedError(
@@ -262,7 +267,7 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
           Passed to super class HTTPBaseAuthenticator
         """
         super(HTMLFormAuthenticator, self).__init__(**kwargs)
-        self.fields = assure_dict_from_str(fields)
+        self.fields = ensure_dict_from_str(fields)
         self.tagid = tagid
 
     def _post_credential(self, credentials, post_url, session):

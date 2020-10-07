@@ -58,7 +58,7 @@ from datalad.dochelpers import (
     single_or_plural,
 )
 from datalad.utils import (
-    assure_bool,
+    ensure_bool,
     knows_annex,
     make_tempfile,
     Path,
@@ -628,8 +628,7 @@ def postclonecfg_ria(ds, props):
         # get that config file the same way:
         config_content = None
         scheme = props['giturl'].split(':', 1)[0]
-        if scheme == 'http':
-
+        if scheme in ['http', 'https']:
             try:
                 response = requests.get("{}{}config".format(
                     props['giturl'],
@@ -799,7 +798,20 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # Deal with file:// scheme URLs as well as plain paths.
                     # If origin isn't local, we have nothing to do.
                     origin_git_path = Path(RI(origin_annex_url).localpath)
-                    if origin_git_path.name != '.git':
+
+                    # we are local; check for a bare repo first to not mess w/
+                    # the path
+                    # Note, that w/o support for bare repos in GitRepo we also
+                    # can't use ConfigManager ATM.
+                    from datalad.cmd import GitWitlessRunner, StdOutErrCapture
+                    gc_response = GitWitlessRunner(
+                        cwd=origin_git_path,
+                    ).run(['git', 'config', '--local', '--get', 'core.bare'],
+                          protocol=StdOutErrCapture)
+                    if gc_response['stdout'].lower().strip() == 'true':
+                        # origin is a bare repo -> use path as is
+                        pass
+                    elif origin_git_path.name != '.git':
                         origin_git_path /= '.git'
                 except ValueError:
                     # Note, that accessing localpath on a non-local RI throws
@@ -839,7 +851,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             continue
         sr_autoenable = config.get('autoenable', False)
         try:
-            sr_autoenable = assure_bool(sr_autoenable)
+            sr_autoenable = ensure_bool(sr_autoenable)
         except ValueError:
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '

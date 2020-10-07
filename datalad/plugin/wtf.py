@@ -21,9 +21,10 @@ from collections import OrderedDict
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
-    assure_unicode,
+    ensure_unicode,
     getpwd,
     unlink,
+    Path,
 )
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
@@ -83,8 +84,8 @@ def get_max_path_length(top_path=None, maxl=1000):
 def _describe_datalad():
 
     return {
-        'version': assure_unicode(__version__),
-        'full_version': assure_unicode(__full_version__),
+        'version': ensure_unicode(__version__),
+        'full_version': ensure_unicode(__full_version__),
     }
 
 
@@ -261,6 +262,32 @@ def _describe_location(res):
     }
 
 
+def _describe_credentials():
+    import keyring
+    from keyring.util import platform_
+
+    def describe_keyring_backend(be):
+        be_repr = repr(be)
+        return be.name if 'object at 0' in be_repr else be_repr.strip('<>')
+
+    # might later add information on non-keyring credentials gh-4981
+    props = {}
+
+    active_keyring = keyring.get_keyring()
+    krp = {
+        'config_file': Path(platform_.config_root(), 'keyringrc.cfg'),
+        'data_root': platform_.data_root(),
+        'active_backends': [
+            describe_keyring_backend(be)
+            for be in getattr(active_keyring, 'backends', [active_keyring])
+        ],
+    }
+    props.update(
+        keyring=krp,
+    )
+    return props
+
+
 # Actuall callables for WTF. If None -- should be bound later since depend on
 # the context
 SECTION_CALLABLES = {
@@ -275,6 +302,7 @@ SECTION_CALLABLES = {
     'metadata_extractors': _describe_metadata_extractors,
     'dependencies': _describe_dependencies,
     'dataset': None,
+    'credentials': _describe_credentials,
 }
 
 
@@ -370,7 +398,7 @@ class WTF(Interface):
         infos = OrderedDict()
         res = get_status_dict(
             action='wtf',
-            path=ds.path if ds else assure_unicode(op.abspath(op.curdir)),
+            path=ds.path if ds else ensure_unicode(op.abspath(op.curdir)),
             type='dataset' if ds else 'directory',
             status='ok',
             logger=lgr,

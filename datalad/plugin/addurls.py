@@ -34,7 +34,7 @@ from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     get_suggestions_msg,
     unlink,
 )
@@ -426,8 +426,7 @@ def sort_paths(paths):
     def level_and_name(p):
         return p.count(os.path.sep), p
 
-    for path in sorted(paths, key=level_and_name):
-        yield path
+    yield from sorted(paths, key=level_and_name)
 
 
 def extract(stream, input_type, url_format="{0}", filename_format="{1}",
@@ -449,7 +448,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     for each row in `stream` and the second item a list subdataset paths,
     sorted breadth-first.
     """
-    meta = assure_list(meta)
+    meta = ensure_list(meta)
 
     rows, colidx_to_name = _read(stream, input_type)
     if not rows:
@@ -859,10 +858,10 @@ class Addurls(Interface):
 
         if not ds.repo:
             # Populate a new dataset with the URLs.
-            for r in ds.create(result_xfm=None,
-                               return_type='generator',
-                               cfg_proc=cfg_proc):
-                yield r
+            yield from ds.create(
+                result_xfm=None,
+                return_type='generator',
+                cfg_proc=cfg_proc)
 
         annex_options = ["--fast"] if fast else []
 
@@ -872,10 +871,11 @@ class Addurls(Interface):
                     "Not creating subdataset at existing path: %s",
                     spath)
             else:
-                for r in ds.create(spath, result_xfm=None,
-                                   cfg_proc=cfg_proc,
-                                   return_type='generator'):
-                    yield r
+                yield from ds.create(
+                    spath,
+                    result_xfm=None,
+                    cfg_proc=cfg_proc,
+                    return_type='generator')
 
         for row in rows:
             # Add additional information that we'll need for various
@@ -928,12 +928,10 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add and r["meta_args"]]
-            for r in add_meta(meta_rows):
-                yield r
+            yield from add_meta(meta_rows)
 
             if save:
-                for r in ds.save(path=files_to_add, message=msg, recursive=True):
-                    yield r
+                yield from ds.save(path=files_to_add, message=msg, recursive=True)
 
 
 __datalad_plugin__ = Addurls

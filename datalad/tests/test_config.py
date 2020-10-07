@@ -105,9 +105,12 @@ def test_something(path, new_home):
          ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
 
-    # always get all values
+    # by default get last value only
     assert_equal(
-        cfg.get('something.user'),
+        cfg.get('something.user'), 'email=jd@example.com')
+    # but can get all values
+    assert_equal(
+        cfg.get('something.user', get_all=True),
         ('name=Jane Doe', 'email=jd@example.com'))
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
     assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)

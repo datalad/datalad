@@ -28,7 +28,7 @@ from ..support.locking import lock_if_check_fails
 from ..support.path import exists
 from ..utils import getpwd
 from ..utils import unique
-from ..utils import assure_bytes
+from ..utils import ensure_bytes
 from ..utils import unlink
 from .base import AnnexCustomRemote
 from .main import main as super_main
@@ -153,7 +153,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         Made "generators all the way" as an exercise but also to delay any
         checks etc until really necessary.
         """
-        urls = self.get_URLS(key)
+        # we will need all URLs anyways later on ATM, so lets list() them
+        # Anyways here we have a single scheme (archive) so there is not
+        # much optimization possible
+        urls = list(self.gen_URLS(key))
 
         akey_afiles = [
             self._parse_url(url)[:2]  # skip size
@@ -257,7 +260,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 # if for testing we want to force getting the archive extracted
                 # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
                 efile = self.cache[akey_path].get_extracted_filename(afile)
-                efile = assure_bytes(efile)
+                efile = ensure_bytes(efile)
 
                 if exists(efile):
                     size = os.stat(efile).st_size

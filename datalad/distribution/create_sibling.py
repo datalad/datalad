@@ -89,7 +89,7 @@ from datalad.utils import (
     make_tempfile,
     _path_,
     slash_join,
-    assure_list,
+    ensure_list,
     quote_cmdlinearg,
 )
 
@@ -673,7 +673,7 @@ class CreateSibling(Interface):
                 # make sure dependencies are valid
                 # TODO: inherit -- we might want to automagically create
                 # those dependents as well???
-                unknown_deps = set(assure_list(publish_depends)).difference(checkds_remotes)
+                unknown_deps = set(ensure_list(publish_depends)).difference(checkds_remotes)
                 if unknown_deps:
                     ap['status'] = 'error'
                     ap['message'] = (

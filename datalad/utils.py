@@ -760,6 +760,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
                     "confidence. Highest confidence was %s for %s"
                     % (denc_confidence, denc)
                 )
+            lgr.log(5, "Auto-detected encoding to be %s", denc)
             return s.decode(denc)
         else:
             raise ValueError(
@@ -1219,6 +1220,16 @@ def swallow_outputs():
             self._err.close()
             out_name = self._out.name
             err_name = self._err.name
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False) \
+                    and lgr.getEffectiveLevel() <= logging.DEBUG:
+                for s, sname in ((self.out, 'stdout'),
+                                 (self.err, 'stderr')):
+                    if s:
+                        pref = os.linesep + "| "
+                        lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
+                    else:
+                        lgr.debug("Nothing was swallowed for %s", sname)
             del self._out
             del self._err
             gc.collect()
@@ -1940,7 +1951,11 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
 
 
 @optional_args
-def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+def try_multiple_dec(
+        f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
+        exceptions_filter=None,
+        logger=None,
+):
     """Decorator to try function multiple times.
 
     Main purpose is to decorate functions dealing with removal of files/directories
@@ -1955,7 +1970,15 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     increment_type: {None, 'exponential'}
       Note that if it is exponential, duration should typically be > 1.0
       so it grows with higher power
-
+    exceptions: Exception or tuple of Exceptions, optional
+      Exception or a tuple of multiple exceptions, on which to retry
+    exceptions_filter: callable, optional
+      If provided, this function will be called with a caught exception
+      instance.  If function returns True - we will re-try, if False - exception
+      will be re-raised without retrying.
+    logger: callable, optional
+      Logger to log upon failure.  If not provided, will use stock logger
+      at the level of 5 (heavy debug).
     """
     from .dochelpers import exc_str
     if not exceptions:
@@ -1964,28 +1987,31 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
         ntrials = 100 if on_windows else 10
-
+    if logger is None:
+        def logger(*args, **kwargs):
+            return lgr.log(5, *args, **kwargs)
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
-    def wrapped(*args, **kwargs):
+    def _wrap_try_multiple_dec(*args, **kwargs):
         t = duration
         for trial in range(ntrials):
             try:
                 return f(*args, **kwargs)
             except exceptions as exc:
-                if increment_type == 'exponential':
-                    t = duration ** (trial + 1)
-                lgr.log(
-                    5,
-                    "Caught %s on trial #%d. Sleeping %f and retrying",
-                    exc_str(exc), trial, t)
+                if exceptions_filter and not exceptions_filter(exc):
+                    raise
                 if trial < ntrials - 1:
+                    if increment_type == 'exponential':
+                        t = duration ** (trial + 1)
+                    logger(
+                        "Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
                     sleep(t)
                 else:
                     raise
 
-    return wrapped
+    return _wrap_try_multiple_dec
 
 
 @try_multiple_dec
@@ -2071,6 +2097,19 @@ def open_r_encdetect(fname, readahead=1000):
               fname,
               enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_file(fname, decode=True):
+    """A helper to read file passing content via ensure_unicode
+
+    Parameters
+    ----------
+    decode: bool, optional
+      if False, no ensure_unicode and file content returned as bytes
+    """
+    with open(fname, 'rb') as f:
+        content = f.read()
+    return ensure_unicode(content) if decode else content
 
 
 def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
@@ -2479,16 +2518,32 @@ def get_wrapped_class(wrapped):
     return _func_class
 
 
-# TODO whenever we feel ready for English kill the compat block below
-assure_tuple_or_list = ensure_tuple_or_list
-assure_iter = ensure_iter
-assure_list = ensure_list
-assure_list_from_str = ensure_list_from_str
-assure_dict_from_str = ensure_dict_from_str
-assure_bytes = ensure_bytes
-assure_unicode = ensure_unicode
-assure_bool = ensure_bool
-assure_dir = ensure_dir
+def _make_assure_kludge(fn):
+    old_name = fn.__name__.replace("ensure", "assure")
+
+    @wraps(fn)
+    def compat_fn(*args, **kwargs):
+        warnings.warn(
+            "{} is deprecated and will be removed in a future release. "
+            "Use {} instead."
+            .format(old_name, fn.__name__),
+            DeprecationWarning)
+        return fn(*args, **kwargs)
+
+    compat_fn.__doc__ = ("Note: This function is deprecated. Use {} instead."
+                         .format(fn.__name__))
+    return compat_fn
+
+
+assure_tuple_or_list = _make_assure_kludge(ensure_tuple_or_list)
+assure_iter = _make_assure_kludge(ensure_iter)
+assure_list = _make_assure_kludge(ensure_list)
+assure_list_from_str = _make_assure_kludge(ensure_list_from_str)
+assure_dict_from_str = _make_assure_kludge(ensure_dict_from_str)
+assure_bytes = _make_assure_kludge(ensure_bytes)
+assure_unicode = _make_assure_kludge(ensure_unicode)
+assure_bool = _make_assure_kludge(ensure_bool)
+assure_dir = _make_assure_kludge(ensure_dir)
 
 
 lgr.log(5, "Done importing datalad.utils")

@@ -18,7 +18,7 @@ from os.path import join as opj
 from os.path import isabs
 from os.path import normpath
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -80,7 +80,7 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
         kwargs['action'] = 'drop'
     # always need to make sure that we pass a list
     # `normalize_paths` decorator will otherwise screw all logic below
-    paths = assure_list(paths)
+    paths = ensure_list(paths)
     if not hasattr(ds.repo, 'drop'):
         for p in paths:
             r = get_status_dict(

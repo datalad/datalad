@@ -22,7 +22,7 @@ from functools import wraps
 from itertools import dropwhile
 
 from ..utils import (
-    assure_bytes,
+    ensure_bytes,
     getpwd,
 )
 
@@ -34,7 +34,7 @@ def _get_unicode_robust_version(f):
         try:
             return f(*args, **kwargs)
         except UnicodeEncodeError:
-            return f(assure_bytes(*args, **kwargs))
+            return f(ensure_bytes(*args, **kwargs))
     doc = getattr(f, '__doc__', None)
     # adjust only if __doc__ is not completely absent (None)
     if doc is not None:

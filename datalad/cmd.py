@@ -40,9 +40,9 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    assure_bytes,
-    assure_unicode,
     auto_repr,
+    ensure_bytes,
+    ensure_unicode,
     generate_file_chunks,
     get_tempfile_kwargs,
     split_cmdline,
@@ -290,7 +290,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
                 len(data), self.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
-            log_data = assure_unicode(data)
+            log_data = ensure_unicode(data)
             # The way we log is to stay consistent with Runner.
             # TODO: later we might just log in a single entry, without
             # fd_name prefix
@@ -779,13 +779,13 @@ class Runner(object):
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
             # Let it be processed
-            line = log_(assure_unicode(line))
+            line = log_(ensure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = assure_bytes(line)
+                line = ensure_bytes(line)
         if line:
             if out_type == 'stdout':
-                self._log_out(assure_unicode(line))
+                self._log_out(ensure_unicode(line))
             elif out_type == 'stderr':
                 self._log_err(line.decode('utf-8'),
                               expected)
@@ -1154,7 +1154,7 @@ class GitRunner(Runner, GitRunnerBase):
             *args, **kwargs)
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
-        return assure_unicode(out), assure_unicode(err)
+        return ensure_unicode(out), ensure_unicode(err)
 
 
 class GitWitlessRunner(WitlessRunner, GitRunnerBase):
@@ -1309,7 +1309,7 @@ class BatchedCommand(SafeDelCloseMixin):
         #       it is just a "get"er - we could resend it few times
         # The default output_proc expects a single line output.
         # TODO: timeouts etc
-        stdout = assure_unicode(self.output_proc(process.stdout)) \
+        stdout = ensure_unicode(self.output_proc(process.stdout)) \
             if not process.stdout.closed else None
         if stderr:
             lgr.warning("Received output in stderr: %r", stderr)
@@ -1326,12 +1326,14 @@ class BatchedCommand(SafeDelCloseMixin):
           None otherwise
         """
         ret = None
+        process = self._process
         if self._stderr_out:
             # close possibly still open fd
+            lgr.debug(
+                "Closing stderr of %s", process)
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
-        if self._process:
-            process = self._process
+        if process:
             lgr.debug(
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
@@ -1357,10 +1359,28 @@ class BatchedCommand(SafeDelCloseMixin):
             if process.returncode is not None:
                 lgr.debug("Process %s has finished", process)
             self._process = None
+
+        # It is hard to debug when something is going wrong. Hopefully logging stderr
+        # if generally asked might be of help
+        if lgr.isEnabledFor(5):
+            from . import cfg
+            log_stderr = cfg.getbool('datalad.log', 'outputs', default=False)
+        else:
+            log_stderr = False
+
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
-            if return_stderr:
+            if return_stderr or log_stderr:
                 with open(self._stderr_out_fname, 'r') as f:
-                    ret = f.read()
+                    stderr = f.read()
+            if return_stderr:
+                ret = stderr
+            if log_stderr:
+                stderr = ensure_unicode(stderr)
+                stderr = stderr.splitlines()
+                lgr.log(5, "stderr of %s had %d lines:", process.pid, len(stderr))
+                for l in stderr:
+                    lgr.log(5, "| " + l)
+
             # remove the file where we kept dumping stderr
             unlink(self._stderr_out_fname)
             self._stderr_out_fname = None

@@ -40,8 +40,8 @@ from datalad.support.constraints import EnsureInt
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import (
     as_unicode,
-    assure_list,
-    assure_unicode,
+    ensure_list,
+    ensure_unicode,
     get_suggestions_msg,
     shortened_repr,
     unicode_srctypes,
@@ -314,7 +314,7 @@ class _WhooshSearch(_Search):
         self._mk_parser()
         # for convenience we accept any number of args-words from the
         # shell and put them together to a single string here
-        querystr = ' '.join(assure_list(query))
+        querystr = ' '.join(ensure_list(query))
         # this gives a formal whoosh query
         wquery = self.parser.parse(querystr)
         return wquery
@@ -470,7 +470,7 @@ class _WhooshSearch(_Search):
                 old_ds_rpath = admin['path']
                 admin['id'] = res.get('dsid', None)
 
-            doc.update({k: assure_unicode(v) for k, v in admin.items()})
+            doc.update({k: ensure_unicode(v) for k, v in admin.items()})
             lgr.debug("Adding document to search index: {}".format(doc))
             # inject into index
             idx.add_document(**doc)
@@ -536,7 +536,7 @@ class _WhooshSearch(_Search):
             for i, hit in enumerate(hits):
                 annotated_hit = dict(
                     path=normpath(opj(self.ds.path, hit['path'])),
-                    query_matched={assure_unicode(k): assure_unicode(v)
+                    query_matched={ensure_unicode(k): ensure_unicode(v)
                                    if isinstance(v, unicode_srctypes) else v
                                    for k, v in hit.matched_terms()},
                     parentds=normpath(
@@ -799,7 +799,7 @@ class _EGrepCSSearch(_Search):
             stat = keys[k]
             all_uvals = uvals = sorted(stat.uvals)
 
-            stat.uvals_str = assure_unicode(
+            stat.uvals_str = ensure_unicode(
                 "{} unique values: ".format(len(all_uvals))
             )
 
@@ -882,7 +882,7 @@ class _EGrepCSSearch(_Search):
         return set(shortened_repr(x, 50) for x in kvals_iter)
 
     def get_query(self, query):
-        query = assure_list(query)
+        query = ensure_list(query)
         simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
         quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
         query_rec_matches = [

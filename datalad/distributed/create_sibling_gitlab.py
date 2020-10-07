@@ -31,7 +31,7 @@ from ..support.constraints import (
     EnsureStr,
 )
 from ..utils import (
-    assure_list,
+    ensure_list,
 )
 from ..distribution.dataset import (
     datasetmethod,
@@ -219,7 +219,7 @@ class CreateSiblingGitlab(Interface):
             publish_depends=None,
             description=None,
             dryrun=False):
-        path = resolve_path(assure_list(path), ds=dataset) \
+        path = resolve_path(ensure_list(path), ds=dataset) \
             if path else None
 
         if project and (recursive or (path and len(path) > 1)):

@@ -13,8 +13,8 @@ import glob
 import logging
 import os.path as op
 
-from datalad.utils import assure_unicode
 from datalad.utils import chpwd
+from datalad.utils import ensure_unicode
 from datalad.utils import getpwd
 from datalad.utils import partition
 
@@ -45,7 +45,7 @@ class GlobbedPaths(object):
             self._maybe_dot = []
             self._paths = {"patterns": [], "sub_patterns": {}}
         else:
-            patterns = list(map(assure_unicode, patterns))
+            patterns = list(map(ensure_unicode, patterns))
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {
