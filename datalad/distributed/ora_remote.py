@@ -207,16 +207,19 @@ class LocalIO(IOBase):
             # no archive, not file
             return False
         loc = str(file_path)
-        from datalad.cmd import Runner
-        runner = Runner()
+        from datalad.cmd import (
+            StdOutErrCapture,
+            WitlessRunner,
+        )
+        runner = WitlessRunner()
         # query 7z for the specific object location, keeps the output
         # lean, even for big archives
-        out, err = runner(
+        out = runner.run(
             ['7z', 'l', str(archive_path),
              loc],
-            log_stdout=True,
+            protocol=StdOutErrCapture,
         )
-        return loc in out
+        return loc in out['stdout']
 
     def read_file(self, file_path):
 
