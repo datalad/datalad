@@ -417,6 +417,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         remote_name: str
         url: str
         """
+        if on_windows:
+            # there is presently no possibility for connection sharing on windows
+            # outside WSL: https://github.com/datalad/datalad/issues/2575
+            return
+
         from datalad.support.network import is_ssh
         # Note:
         #
