@@ -61,10 +61,11 @@ from datalad.log import log_progress
 from datalad.support.json_py import json_loads
 from datalad.cmd import (
     BatchedCommand,
-    GitRunner,
+    GitWitlessRunner,
     # KillOutput,
     run_gitcommand_on_file_list_chunks,
     SafeDelCloseMixin,
+    StdOutErrCapture,
     WitlessProtocol,
 )
 
@@ -606,12 +607,13 @@ class AnnexRepo(GitRepo, RepoInterface):
           upgradable -> list of upgradable versions (int)
         """
         if cls.repository_versions is None:
-            from datalad.cmd import Runner
             key_remap = {
                 "supported repository versions": "supported",
                 "upgrade supported from repository versions": "upgradable"}
-            out, _ = Runner().run(["git", "annex", "version"])
-            kvs = (ln.split(":", 1) for ln in out.splitlines())
+            out = GitWitlessRunner().run(
+                ["git", "annex", "version"],
+                protocol=StdOutErrCapture)
+            kvs = (ln.split(":", 1) for ln in out['stdout'].splitlines())
             cls.repository_versions = {
                 key_remap[k]: list(map(int, v.strip().split()))
                 for k, v in kvs if k in key_remap}

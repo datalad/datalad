@@ -1532,8 +1532,8 @@ def test_duecredit(path):
 
     # and now enable DUECREDIT - output could come to stderr
     env['DUECREDIT_ENABLE'] = '1'
-    out, err = run(cmd, env=env)
-    outs = out + err
+    out = run(cmd, env=env, protocol=StdOutErrCapture)
+    outs = ''.join(out.values())
 
     if external_versions['duecredit']:
         assert_in(test_string, outs)
