@@ -30,7 +30,8 @@ from datalad.ui import ui
 
 from datalad.cmd import (
     CommandError,
-    Runner,
+    StdOutErrCapture,
+    WitlessRunner,
 )
 from datalad.consts import (
     TIMESTAMP_FMT,
@@ -96,8 +97,15 @@ from datalad.utils import (
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
 
-class _RunnerAdapter(Runner):
+class _RunnerAdapter(WitlessRunner):
     """An adapter to use interchanegably with SSH connection"""
+
+    def __call__(self, cmd):
+        # all commands used in here are plain strings
+        out = self.run(
+            ['sh', '-c', cmd] if isinstance(cmd, str) else cmd,
+            protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get_git_version(self):
         return external_versions['cmd:git']
