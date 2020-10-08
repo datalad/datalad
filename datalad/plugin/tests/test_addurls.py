@@ -21,7 +21,7 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
@@ -715,7 +715,7 @@ class TestAddurls(object):
         # The previous test checks all the cases, but it overrides sys.stdin.
         # Do a simple check that's closer to a command line call.
         Dataset(path).create(force=True)
-        runner = Runner(cwd=path)
+        runner = WitlessRunner(cwd=path)
         with open(self.json_file) as jfh:
             runner.run(["datalad", "addurls", '-', '{url}', '{name}'],
                        stdin=jfh)

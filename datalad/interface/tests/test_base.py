@@ -16,6 +16,10 @@ from datalad.utils import (
     swallow_outputs,
     updated,
 )
+from datalad.cmd import (
+    StdOutCapture,
+    WitlessRunner,
+)
 
 from ..base import (
     Interface,
@@ -159,7 +163,6 @@ def test_nadict():
 @with_tempfile(mkdir=True)
 def test_status_custom_summary_no_repeats(path):
     from datalad.api import Dataset
-    from datalad.cmd import Runner
     from datalad.core.local.status import Status
 
     # This regression test depends on the command having a custom summary
@@ -176,7 +179,8 @@ def test_status_custom_summary_no_repeats(path):
     (ds.pathobj / "foo").write_text("foo content")
     ds.save()
 
-    out, _ = Runner(cwd=path).run(
-        ["datalad", "--output-format=tailored", "status", "--annex"])
-    out_lines = out.splitlines()
+    out = WitlessRunner(cwd=path).run(
+        ["datalad", "--output-format=tailored", "status", "--annex"],
+        protocol=StdOutCapture)
+    out_lines = out['stdout'].splitlines()
     eq_(len(out_lines), len(set(out_lines)))

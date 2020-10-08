@@ -49,6 +49,9 @@ from datalad.customremotes.ria_utils import (
     create_ds_in_store,
     get_layout_locations
 )
+from datalad.cmd import (
+    GitWitlessRunner,
+)
 
 
 # Note, that exceptions to test for are generally CommandError since we are
@@ -385,11 +388,6 @@ def test_version_check():
 @with_tempfile
 @with_tempfile
 def _test_gitannex(host, store, dspath):
-
-    from datalad.cmd import (
-        GitRunner,
-        WitlessRunner
-    )
     store = Path(store)
 
     dspath = Path(dspath)
@@ -435,7 +433,7 @@ def _test_gitannex(host, store, dspath):
     # run git-annex-testremote
     # note, that we don't want to capture output. If something goes wrong we
     # want to see it in test build's output log.
-    WitlessRunner(cwd=dspath, env=GitRunner.get_git_environ_adjusted()).run(
+    GitWitlessRunner(cwd=dspath).run(
         ['git', 'annex', 'testremote', 'store']
     )
 
