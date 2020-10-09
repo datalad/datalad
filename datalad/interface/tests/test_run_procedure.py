@@ -304,13 +304,12 @@ def test_quoting(path):
 
         runner = WitlessRunner(cwd=ds.path)
         runner.run(
-            ['sh', '-c',
-             "datalad run-procedure just2args \"with ' sing\" 'with \" doub'"],
+            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'",
             protocol=KillOutput)
         with assert_raises(CommandError):
             runner.run(
-                ['sh', '-c', "datalad run-procedure just2args 'still-one arg'"],
-            protocol=KillOutput)
+                "datalad run-procedure just2args 'still-one arg'",
+                protocol=KillOutput)
 
 
 @skip_if_on_windows

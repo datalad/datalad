@@ -45,7 +45,7 @@ def py2cmd(code):
 def test_runner(tempfile):
     runner = Runner()
     content = 'Testing äöü東 real run'
-    cmd = ['sh', '-c', 'echo %s > %r' % (content, tempfile)]
+    cmd = 'echo %s > %r' % (content, tempfile)
     res = runner.run(cmd)
     # no capture of any kind, by default
     ok_(not res['stdout'])

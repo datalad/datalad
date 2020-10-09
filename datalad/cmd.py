@@ -179,8 +179,9 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
     loop : asyncio.AbstractEventLoop
       asyncio event loop instance. Must support subprocesses on the
       target platform.
-    cmd : list
-      Command to be executed, passed to `subprocess_exec`.
+    cmd : list or str
+      Command to be executed, passed to `subprocess_exec` (list), or
+      `subprocess_shell` (str).
     protocol : WitlessProtocol
       Protocol class to be instantiated for managing communication
       with the subprocess.
@@ -203,15 +204,16 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         protocol_kwargs = {}
     cmd_done = asyncio.Future(loop=loop)
     factory = functools.partial(protocol, cmd_done, **protocol_kwargs)
-    proc = loop.subprocess_exec(
-        factory,
-        *cmd,
+    kwargs.update(
         stdin=stdin,
         # ask the protocol which streams to capture
         stdout=asyncio.subprocess.PIPE if protocol.proc_out else None,
         stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
-        **kwargs
     )
+    if isinstance(cmd, str):
+        proc = loop.subprocess_shell(factory, cmd, **kwargs)
+    else:
+        proc = loop.subprocess_exec(factory, *cmd, **kwargs)
     transport = None
     result = None
     try:
@@ -420,10 +422,9 @@ class WitlessRunner(object):
 
         Parameters
         ----------
-        cmd : list
-          Sequence of program arguments. Passing a single string means
-          that it is simply the name of the program, no complex shell
-          commands are supported.
+        cmd : list or str
+          Sequence of program arguments. Passing a single string causes
+          execution via the platform shell.
         protocol : WitlessProtocol, optional
           Protocol class handling interaction with the running process
           (e.g. output capture). A number of pre-crafted classes are
