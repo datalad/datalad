@@ -65,7 +65,7 @@ def test_magic_number():
     # given the level of dark magic, we better test whether this stays
     # constant across Git versions (it should!)
     out = GitWitlessRunner().run(
-        ['git', 'hash-object', '-t', 'tree', '/dev/null'],
+        'cd ./ | git hash-object --stdin -t tree',
         protocol=StdOutCapture)
     eq_(out['stdout'].strip(), PRE_INIT_COMMIT_SHA)
 
