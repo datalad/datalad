@@ -451,8 +451,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def is_managed_branch(self, branch=None):
         """Whether `branch` is managed by git-annex.
 
-        ATM this returns true in direct mode (branch 'annex/direct/my_branch')
-        and if on an adjusted branch (annex v6+ repository:
+        ATM this returns True if on an adjusted branch of annex v6+ repository:
         either 'adjusted/my_branch(unlocked)' or 'adjusted/my_branch(fixed)'
 
         Note: The term 'managed branch' is used to make clear it's meant to be
@@ -473,11 +472,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
         # Note: `branch` might still be None, due to detached HEAD
         # (or no checkout at all)
-        if branch and \
-            (branch.startswith('annex/direct/') or
-             branch.startswith('adjusted/')):
-            return True
-        return False
+        return (branch and branch.startswith('adjusted/'))
 
     def get_corresponding_branch(self, branch=None):
         """Get the name of a potential corresponding branch.
@@ -499,9 +494,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
 
         if self.is_managed_branch(branch):
-            if branch.startswith('annex/direct/'):
-                cor_branch = branch[13:]
-            elif branch.startswith('adjusted/'):
+            if branch.startswith('adjusted/'):
                 if branch.endswith('(unlocked)'):
                     cor_branch = branch[9:-10]
                 elif branch.endswith('(fixed)'):

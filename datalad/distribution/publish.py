@@ -446,11 +446,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # TODO: this should become it own helper
             if is_annex_repo:
                 # annex could manage this branch
-                if current_branch.startswith('annex/direct') \
-                        and ds.config.getbool('annex', 'direct', default=False):
-                    # this is a "fake" annex direct mode branch
-                    # we want to publish the underlying branch
-                    current_branch = current_branch[12:]
                 match_adjusted = re.match(
                     r'adjusted/(.*)\([a-z]*\)',
                     current_branch)
