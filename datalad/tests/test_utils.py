@@ -59,6 +59,7 @@ from datalad.utils import (
     import_module_from_file,
     import_modules,
     is_explicit_path,
+    is_interactive,
     join_cmdline,
     knows_annex,
     line_profile,
@@ -1283,12 +1284,22 @@ def test_never_fail():
 def test_is_interactive(fout):
     # must not fail if one of the streams is no longer open:
     # https://github.com/datalad/datalad/issues/3267
-    from ..cmd import Runner
+    from datalad.cmd import (
+        KillOutput,
+        NoCapture,
+        StdOutErrCapture,
+        WitlessRunner,
+    )
+    from datalad.support.gitrepo import GitProgress
+    from datalad.support.annexrepo import (
+        AnnexInitOutput,
+        AnnexJsonProtocol,
+    )
 
     bools = ["False", "True"]
 
     def get_interactive(py_pre="", **run_kwargs):
-        out, err = Runner().run(
+        out = WitlessRunner().run(
             [sys.executable,
              "-c",
              py_pre +
@@ -1305,8 +1316,19 @@ def test_is_interactive(fout):
         assert_in(out, bools)
         return bool(bools.index(out))
 
-    # we never request for pty in our Runner, so can't be interactive
-    eq_(get_interactive(), False)
+    # verify that NoCapture can make fully interactive execution
+    # happen, also test the core protocols
+    # (we can only be interactive in a runner, if the test execution
+    # itself happens in an interactive environment)
+    for proto, interactive in ((NoCapture, is_interactive()),
+                               (KillOutput, False),
+                               (StdOutErrCapture, False),
+                               (GitProgress, False),
+                               (AnnexInitOutput, False),
+                               (AnnexJsonProtocol, False)):
+        eq_(get_interactive(protocol=proto),
+            interactive,
+            msg='{} -> {}'.format(str(proto), interactive))
     # and it must not crash if smth is closed
     for o in ('stderr', 'stdin', 'stdout'):
         eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
