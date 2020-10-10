@@ -387,8 +387,25 @@ def _make_github_repo(github_login, entity, reponame, existing, access_protocol,
             else:
                 raise ValueError(msg)
         elif existing == 'replace':
-            lgr.info('repository "%s" already exists on Github. Deleting', reponame)
-            if not dryrun:
+            _msg = 'repository "%s" already exists on GitHub.' % reponame
+            if dryrun:
+                lgr.info(_msg + " Deleting (dry)")
+            else:
+                # Since we are running in the loop trying different tokens,
+                # this message might appear twice. TODO: avoid
+                if ui.is_interactive:
+                    remove = ui.yesno(
+                        "Do you really want to remove it?",
+                        title=_msg,
+                        default=False
+                    )
+                else:
+                    raise RuntimeError(
+                        _msg +
+                        " Remove it manually first on GitHub or rerun datalad in "
+                        "interactive shell to confirm this action.")
+                if not remove:
+                    raise RuntimeError(_msg)
                 repo.delete()
                 repo = None
         else:

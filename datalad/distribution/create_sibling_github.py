@@ -103,10 +103,15 @@ class CreateSiblingGithub(Interface):
             constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
             metavar='MODE',
             doc="""desired behavior when already existing or configured
-            siblings are discovered. 'skip': ignore; 'error': fail immediately;
-            'reconfigure': use the existing repository and reconfigure the
-            local dataset to use it as a sibling; 'replace': delete existing
-            one on github""",),
+            siblings are discovered. In this case, a dataset can be skipped
+            ('skip'), the sibling configuration be updated ('reconfigure'),
+            or process interrupts with error ('error'). DANGER ZONE: If 'replace'
+            is used, an existing github repository will be irreversibly removed,
+            re-initialized, and the sibling (re-)configured (thus implies 'reconfigure').
+            `replace` could lead to data loss, so use with care.  To minimize
+            possibility of data loss, in interactive mode DataLad will ask for
+            confirmation, but it would just issue a warning and proceed in
+            non-interactive mode.""",),
         github_login=Parameter(
             args=('--github-login',),
             constraints=EnsureStr() | EnsureNone(),
