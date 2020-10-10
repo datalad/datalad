@@ -2416,6 +2416,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
              all_=False, git_options=None, **kwargs):
         """Push changes to a remote (or all remotes).
 
+        If remote is specified but lacks any branches and refspec contains
+        multiple entries, we will first push the first refspec separately
+        to possibly ensure that the first refspec is chosen by remote as the
+        "default branch".  See https://github.com/datalad/datalad/issues/4997
+
         Parameters
         ----------
         remote : str, optional
@@ -2437,14 +2442,26 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if all_remotes:
             # be nice to the elderly
             all_ = True
-        return list(
-            self.push_(
-                remote=remote,
-                refspec=refspec,
-                all_=all_,
-                git_options=git_options,
+
+        push_refspecs = [refspec]
+        if remote and refspec:
+            refspec = ensure_list(refspec)
+            if not any(b.startswith(remote + "/") for b in self.get_remote_branches()):
+                lgr.debug("No branches on remote %s yet, push first refspec %s separately first",
+                          remote, refspec[0])
+                push_refspecs = [[refspec[0]], refspec[1:]]
+
+        push_res = []
+        for refspecs in push_refspecs:
+            push_res.extend(
+                self.push_(
+                    remote=remote,
+                    refspec=refspecs,
+                    all_=all_,
+                    git_options=git_options,
+                )
             )
-        )
+        return push_res
 
     def push_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `push`, but returns a generator"""
