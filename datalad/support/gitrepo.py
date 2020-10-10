@@ -50,6 +50,7 @@ from datalad.cmd import (
     GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
+    NoCapture,
     StdOutErrCapture,
 )
 from datalad.config import (
@@ -71,6 +72,7 @@ from datalad.utils import (
     ensure_dir,
     generate_file_chunks,
     ensure_unicode,
+    is_interactive,
     split_cmdline,
 )
 
@@ -1684,6 +1686,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if date:
             options += ["--date", date]
 
+        orig_msg = msg
         if not msg:
             msg = 'Recorded changes'
             _datalad_msg = True
@@ -1703,6 +1706,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
+
+        # store pre-commit state to be able to check if anything was committed
+        prev_sha = self.get_hexsha()
 
         try:
             for i, chunk in enumerate(file_chunks):
@@ -1744,6 +1750,24 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
+
+        if orig_msg \
+                or '--dry-run' in cmd \
+                or prev_sha == self.get_hexsha() \
+                or (not is_interactive()) \
+                or self.config.obtain('datalad.save.no-message') != 'interactive':
+            # we had a message given, or nothing was committed, or we are not
+            # connected to a terminal, or no interactive message input is desired:
+            # we can go home
+            return
+
+        # handle interactive message entry by running another `git-commit`
+        self._git_runner.run(
+            cmd + ['--amend', '--edit'],
+            protocol=NoCapture,
+            stdin=None,
+            env=env,
+        )
 
     # TODO usage is primarily in the tests, consider making a test helper and
     # remove from GitRepo API
