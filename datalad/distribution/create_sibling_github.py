@@ -100,12 +100,13 @@ class CreateSiblingGithub(Interface):
             constraints=EnsureStr()),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'error', 'reconfigure'),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
             metavar='MODE',
             doc="""desired behavior when already existing or configured
             siblings are discovered. 'skip': ignore; 'error': fail immediately;
             'reconfigure': use the existing repository and reconfigure the
-            local dataset to use it as a sibling""",),
+            local dataset to use it as a sibling; 'replace': delete existing
+            one on github""",),
         github_login=Parameter(
             args=('--github-login',),
             constraints=EnsureStr() | EnsureNone(),
