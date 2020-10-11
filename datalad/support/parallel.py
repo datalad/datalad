@@ -13,7 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import datetime as dt
-import humanize
+# import humanize
 import inspect
 import uuid
 from collections import defaultdict
@@ -72,7 +72,7 @@ def producer_consumer(
     count = Count()
     it = IteratorWithAggregation(producer, count)
     producer_finished = False
-    t0 = dt.datetime.now()
+    # t0 = dt.datetime.now()
     for item in it:
         # keep updating total as producer gives more items
         if not producer_finished:
@@ -113,9 +113,13 @@ def producer_consumer(
             yield res
     log_progress(lgr.info, pid, "%s: done", base_label)
     # ??? how to make it leave the final record "automagically" or there is no such thing
-    # so will log manually
-    lgr.info("Finished processing %d %s which started %s", count.n, unit,
-             # needs fresh humanize, 2.3.0-1 did not have it
-             # humanize.precisedelta(dt.datetime.now() - t0),
-             humanize.naturaltime(dt.datetime.now() - t0)
-             )
+    # so will log manually.  Actually it does duplicate the message already given
+    # in non-interactive mode:
+    #  [INFO   ]  Total 3 items done in 11 seconds at 0.254582 items/sec
+    #  [INFO   ] Finished processing 3 items which started 11 seconds ago
+    # so disabling for now -- I just think we should display that "Finished" in either case, how?
+    # lgr.info("Finished processing %d %s which started %s", count.n, unit,
+    #          # needs fresh humanize, 2.3.0-1 did not have it
+    #          # humanize.precisedelta(dt.datetime.now() - t0),
+    #          humanize.naturaltime(dt.datetime.now() - t0)
+    #          )
