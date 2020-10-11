@@ -89,7 +89,7 @@ def producer_consumer(
             producer_finished = True
         res = consumer(item)
 
-        if inspect.isgeneratorfunction(consumer):
+        if inspect.isgenerator(res):
             ress = res
         else:
             ress = [res]
