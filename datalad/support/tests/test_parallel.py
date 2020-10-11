@@ -11,7 +11,7 @@ from time import sleep, time
 
 # absolute import only to be able to run test without `nose` so to see progress bar
 from datalad.support.parallel import producer_consumer
-
+from datalad.tests.utils import with_tempfile
 
 def test_producer_consumer():
     def slowprod(n, secs=0.1):
@@ -35,5 +35,17 @@ def test_producer_consumer():
     ))
 
 
+@with_tempfile(mkdir=True)
+def test_creatsubdatasets(topds_path, n=10):
+    from datalad import lgr
+    from datalad.distribution.dataset import Dataset
+    ds = Dataset(topds_path).create(cfg_proc="yoda")
+    list(producer_consumer(
+        ("subds%d" % i for i in range(n)),
+        lambda n: ds.create(n, cfg_proc="yoda", result_xfm=None, return_type='generator')
+    ))
+
+
 if __name__ == '__main__':
     test_producer_consumer()
+    # test_creatsubdatasets()
