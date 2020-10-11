@@ -74,15 +74,19 @@ def producer_consumer(
     producer_finished = False
     t0 = dt.datetime.now()
     for item in it:
-        if not producer_finished and it.finished:
-            producer_finished = True
+        # keep updating total as producer gives more items
+        if not producer_finished:
             log_progress(
                 lgr.info,
                 pid,
                 None,  # I do not think there is something valuable to announce
                 total=count.n,
+                # unfortunately of no effect, so we cannot inform that more items to come
+                # unit=("+" if not it.finished else "") + " " + unit,
                 update=0  # not None, so it does not stop
             )
+        if it.finished:
+            producer_finished = True
         res = consumer(item)
 
         if inspect.isgeneratorfunction(consumer):
