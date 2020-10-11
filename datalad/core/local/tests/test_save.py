@@ -52,7 +52,10 @@ from datalad.api import (
     install,
     save,
 )
-
+from datalad.cmd import (
+    StdOutCapture,
+    WitlessRunner,
+)
 
 tree_arg = dict(tree={'test.txt': 'some',
                       'test_annex.txt': 'some annex',
@@ -888,4 +891,19 @@ def test_save_diff_ignore_submodules_config(path):
                        where="local", reload=True)
     # Saving a subdataset doesn't fail when diff.ignoreSubmodules=all.
     ds.save()
+    assert_repo_status(ds.path)
+
+
+@with_tree({"subdir": {"foo": "foocontent"}})
+def test_save_git_mv_fixup(path):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    assert_repo_status(ds.path)
+    ds.repo.call_git(["mv", op.join("subdir", "foo"), "foo"])
+    ds.save()
+    # Was link adjusted properly?  (gh-3686)
+    eq_(WitlessRunner(cwd=ds.path).run(
+        ["cat", "foo"], protocol=StdOutCapture)['stdout'],
+        "foocontent")
+    # FIXME: But only the deletion was saved.
     assert_repo_status(ds.path)
