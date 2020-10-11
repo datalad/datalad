@@ -267,7 +267,7 @@ def test_runner_failure(dir_):
     from ..support.annexrepo import AnnexRepo
     repo = AnnexRepo(dir_, create=True)
     runner = Runner()
-    failing_cmd = ['git-annex', 'add', 'notexistent.dat']
+    failing_cmd = ['git', 'annex', 'add', 'notexistent.dat']
 
     with assert_raises(CommandError) as cme, \
          swallow_logs() as cml:
