@@ -9,10 +9,13 @@
 
 from time import sleep, time
 
+from datalad.support import path as op
+
 # absolute import only to be able to run test without `nose` so to see progress bar
 from datalad.support.parallel import ProducerConsumer
 from datalad.tests.utils import (
     assert_equal,
+    assert_repo_status,
     with_tempfile,
 )
 
@@ -43,15 +46,22 @@ def test_ProducerConsumer():
 @with_tempfile(mkdir=True)
 def test_creatsubdatasets(topds_path, n=10):
     from datalad.distribution.dataset import Dataset
-    ds = Dataset(topds_path).create() # cfg_proc="yoda")
+    from datalad.api import create
+    ds = Dataset(topds_path).create()
+    paths = [op.join(topds_path, "subds%d" % i) for i in range(n)]
+    # To allow for parallel execution without hitting the problem of
+    # a lock in the super dataset, we create all subdatasets, and then
+    # save them all within their superdataset
     list(ProducerConsumer(
-        ("subds%d" % i for i in range(n)),
-        lambda n: ds.create(n, #cfg_proc="yoda",
-                            result_xfm=None, return_type='generator'),
-        #njobs=5
+        paths,
+        lambda p: create(p, #cfg_proc="yoda",
+                         result_xfm=None, return_type='generator'),
+        njobs=5
     ))
+    ds.save(paths)
+    assert_repo_status(ds.repo)
 
 
 if __name__ == '__main__':
-    test_ProducerConsumer()
-    #test_creatsubdatasets()
+    # test_ProducerConsumer()
+    test_creatsubdatasets()
