@@ -427,7 +427,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         def progress_indicators(l):
             self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
 
-        self.runner(["git-annex", "get",
+        self.runner(["git", "annex", "get",
                      "--json", "--json-progress",
                      "--key", akey
                      ],

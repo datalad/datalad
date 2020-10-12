@@ -946,7 +946,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             cmd_list = ['git'] + git_options + ['annex']
         else:
-            cmd_list = ['git-annex']
+            # Note: On Windows machines, for a yet unclear reason, git-annex may
+            # not be found as an executable. This is mitigated (again, for an
+            # unclear reason) by seperating the invocation into "git annex". See
+            # https://github.com/datalad/datalad/issues/4892 for original issue.
+            cmd_list = ['git', 'annex']
         if jobs:
             annex_options += ['-J%d' % jobs]
 
