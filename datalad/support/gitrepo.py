@@ -4041,7 +4041,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             else:
                 need_partial_commit = True
         if unstage:
-            self.call_git(['restore', '--staged'], files=unstage)
+            # keep compat with older Git versions for now
+            #self.call_git(['restore', '--staged'], files=unstage)
+            self.call_git(['reset', 'HEAD'], files=unstage)
 
         # remove first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list
