@@ -57,7 +57,7 @@ def setup_parser(backend):
     helpers.parser_add_common_opt(
         parser,
         'version',
-        version='datalad %s\n\n%s' % (m__version__,))
+        version='datalad %s' % m__version__)
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
