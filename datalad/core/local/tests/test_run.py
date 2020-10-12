@@ -210,6 +210,18 @@ def test_sidecar(path):
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
 
+    # make sure sidecar file is committed when explicitly specifiying outputs
+    ds.run("cd .> dummy4",
+           outputs=["dummy4"],
+           sidecar=True,
+           explicit=True,
+           message="sidecar + specified outputs")
+    assert_not_in('"cmd":', last_commit_msg(ds.repo))
+    assert_repo_status(ds.path)
+
+
+
+
 @with_tree(tree={"to_remove": "abc"})
 def test_run_save_deletion(path):
     ds = Dataset(path).create(force=True)
