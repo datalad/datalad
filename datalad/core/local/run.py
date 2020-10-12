@@ -686,6 +686,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record_id) if use_sidecar else record)
 
     outputs_to_save = outputs.expand() if explicit else None
+    if outputs_to_save is not None and use_sidecar:
+        outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
     if not rerun_info and cmd_exitcode:
         if do_save:
