@@ -195,22 +195,23 @@ class ColorFormatter(logging.Formatter):
 class ProgressHandler(logging.Handler):
     from datalad.ui import ui
 
-    def __init__(self):
+    def __init__(self, other_handler=None):
         super(self.__class__, self).__init__()
+        self._other_handler = other_handler
         self.pbars = {}
 
     def emit(self, record):
         from datalad.ui import ui
+        if not hasattr(record, 'dlm_progress'):
+            self._clear_all()
+            self._other_handler.emit(record)
+            self._refresh_all()
+            return
         maint = getattr(record, 'dlm_progress_maint', None)
         if maint == 'clear':
-            # remove the progress bar
-            for pb in self.pbars.values():
-                pb.clear()
-            return
+            return self._clear_all()
         elif maint == 'refresh':
-            for pb in self.pbars.values():
-                pb.refresh()
-            return
+            return self._refresh_all()
         pid = getattr(record, 'dlm_progress')
         update = getattr(record, 'dlm_progress_update', None)
         # would be an actual message, not used ATM here,
@@ -242,6 +243,15 @@ class ProgressHandler(logging.Handler):
                 update,
                 increment=getattr(record, 'dlm_progress_increment', False),
                 total=getattr(record, 'dlm_progress_total', None))
+
+    def _refresh_all(self):
+        for pb in self.pbars.values():
+            pb.refresh()
+
+    def _clear_all(self):
+        # remove the progress bar
+        for pb in self.pbars.values():
+            pb.clear()
 
 
 class NoProgressLog(logging.Filter):
@@ -485,18 +495,13 @@ class LoggerHelper(object):
                            log_pid=self._get_config("pid", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
-        self.lgr.addHandler(loghandler)
-
         if is_interactive():
-            phandler = ProgressHandler()
-            # progress only when interactive
-            phandler.addFilter(OnlyProgressLog())
-            # no stream logs of progress messages when interactive
-            loghandler.addFilter(NoProgressLog())
+            phandler = ProgressHandler(other_handler=loghandler)
             self.lgr.addHandler(phandler)
         else:
             loghandler.addFilter(partial(filter_noninteractive_progress,
                                          self.lgr))
+            self.lgr.addHandler(loghandler)
 
         self.set_level()  # set default logging level
         return self.lgr
