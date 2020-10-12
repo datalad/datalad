@@ -4024,7 +4024,24 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # - commit (with all paths that have been touched, to bypass
         #   potential pre-staged bits)
 
-        need_partial_commit = True if self.get_staged_paths() else False
+        need_partial_commit = False
+        # we need to look out for git-mv'ed annexed files. if annex
+        # needs to fix up a symlink after `add`, we would loose track of
+        # it when the change was staged. look through all staged paths,
+        # and unstage them, if they would be added anyways, according
+        # to the given status info. That approach normalizes this special
+        # case to the addition of an untracked file.
+        # see https://github.com/datalad/datalad/issues/4967
+        unstage = []
+        for sp in self.get_staged_paths():
+            qp = self.pathobj / Path(sp)
+            if status.get(qp, {}).get('state', None) == 'added':
+                unstage.append(sp)
+                status[qp]['state'] = 'untracked'
+            else:
+                need_partial_commit = True
+        if unstage:
+            self.call_git(['restore', '--staged'], files=unstage)
 
         # remove first, because removal of a subds would cause a
         # modification of .gitmodules to be added to the todo list

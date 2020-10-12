@@ -905,5 +905,5 @@ def test_save_git_mv_fixup(path):
     eq_(WitlessRunner(cwd=ds.path).run(
         ["cat", "foo"], protocol=StdOutCapture)['stdout'],
         "foocontent")
-    # FIXME: But only the deletion was saved.
+    # all clean
     assert_repo_status(ds.path)
