@@ -12,21 +12,18 @@
 
 __docformat__ = 'restructuredtext'
 
-import datetime as dt
-# import humanize
+import concurrent.futures
 import inspect
 import time
 import uuid
+
 from collections import defaultdict
-
-from ..log import log_progress
-from .iterators import IteratorWithAggregation
-
-from . import ansi_colors as colors
-
 from queue import Queue, Empty
 from threading import Thread
-import concurrent.futures
+
+from . import ansi_colors as colors
+from ..log import log_progress
+from ..utils import path_is_subpath
 
 
 def _count_str(count, verb, omg=False):
@@ -37,6 +34,16 @@ def _count_str(count, verb, omg=False):
         return msg
 
 
+def no_parentds_in_futures(futures, path):
+    """Return True if no path in futures keys is parentds for provided path
+
+    Assumes that the future's key is the path.
+    """
+    # TODO: OPT.  Could benefit from smarter than linear time if not one at a time?
+    #   or may be we should only go through active futures (still linear!)?
+    return not any(path_is_subpath(path, p) for p in futures)
+
+
 class ProducerConsumer:
     """
     """
@@ -44,7 +51,7 @@ class ProducerConsumer:
     def __init__(self,
                  producer, consumer,
                  njobs=None,
-                 consumer_depchecker=None,
+                 safe_to_consume=None,
                  reraise_immediately=False,
                  agg=None,
                  # TODO: "absorb" into some more generic "logging" helper
@@ -58,6 +65,11 @@ class ProducerConsumer:
         Parameters
         ----------
         ...
+        safe_to_consume: callable
+          A callable which gets a dict of all known futures and current producer output.
+          It should return True if we can proceed with current value from producer.
+          If unsafe - we will wait.  WARNING: outside code should make sure about provider and
+          safe_to_consume to play nicely or deadlock can happen.
         reraise_immediately: bool, optional
           If True, it would stop producer yielding values as soon as it detects that some
           exception has occurred (although there might still be values in the queue to be yielded
@@ -66,7 +78,7 @@ class ProducerConsumer:
         self.producer = producer
         self.consumer = consumer
         self.njobs = njobs
-        self.consumer_depchecker = consumer_depchecker
+        self.safe_to_consume = safe_to_consume
         self.reraise_immediately = reraise_immediately
         self.agg = agg
         self.label = label
@@ -75,11 +87,18 @@ class ProducerConsumer:
 
         self.total = None
         self.producer_finished = None
-        self._exc = None
+        self._executor = None
+        self._exc = []
+
+    def __del__(self):
+        # if we are killed while executing, we should ask executor to terminate
+        executor = getattr(self, "_executor")
+        if executor:
+            executor.terminate()
 
     def __iter__(self):
         self.producer_finished = False
-        self._exc = None
+        self._exc = []
 
         producer_queue = Queue()
         consumer_queue = Queue()
@@ -98,7 +117,7 @@ class ProducerConsumer:
                         total += 1
                     self.total = total
             except BaseException as e:
-                self._exc = e
+                self._exc.append(e)
             finally:
                 self.producer_finished = True
 
@@ -120,8 +139,7 @@ class ProducerConsumer:
                     lgr.debug("Got straight result %s, not a generator", res)
                     consumer_queue.put(res)
             except BaseException as e:
-                # TODO: avoid masking exceptions, collect all???
-                self._exc = e
+                self._exc.append(e)
 
         producer_thread = Thread(target=producer_worker)
         producer_thread.start()
@@ -139,17 +157,18 @@ class ProducerConsumer:
         counts = defaultdict(int)
 
         futures = {}
+
         total_announced = False
         njobs = self.njobs or 1
         lgr.debug("Initiating ThreadPoolExecutor with %d jobs", njobs)
-        t0 = time.time()
+        # we will increase sleep_time when doing nothing useful
+        sleeper = Sleeper()
         with concurrent.futures.ThreadPoolExecutor(njobs) as executor:
+            self._executor = executor
             # yield from the producer_queue (.total and .finished could be accessed meanwhile)
             while True:
                 done_useful = False
-                if self.reraise_immediately and self._exc is not None:
-                    # stop all possibly running futures
-                    # executor.shutdown()
+                if self.reraise_immediately and self._exc:
                     break
                 if (self.producer_finished and
                         not futures and
@@ -177,12 +196,12 @@ class ProducerConsumer:
                     done_useful = True
                     try:
                         job_args = producer_queue.get() # timeout=0.001)
-                        if self.consumer_depchecker:
+                        if self.safe_to_consume:
                             # Sleep a little if we are not yet ready
                             # TODO: add some .debug level reporting based on elapsed time
                             # IIRC I did smth like growing exponentially delays somewhere (dandi?)
-                            while not self.consumer_depchecker(futures, job_args):
-                                time.sleep(0.01)
+                            while not self.safe_to_consume(futures, job_args):
+                                _prune_futures(futures, lgr) or sleeper()
                         # Current implementation, to provide depchecking, relies on unique
                         # args for the job
                         assert job_args not in futures
@@ -218,15 +237,7 @@ class ProducerConsumer:
 
                     yield res
 
-                # remove futures which are done
-                for args, future in list(futures.items()):
-                    if future.done():
-                        done_useful = True
-                        future_ = futures.pop(args)
-                        msg = ""
-                        if future_.exception():
-                            msg = " with an exception %s" % future_.exception()
-                        lgr.debug("Future for %r is done%s", args, msg)
+                done_useful |= _prune_futures(futures, lgr)
 
                 if not done_useful:  # you need some rest
                     # TODO: same here -- progressive logging
@@ -236,11 +247,57 @@ class ProducerConsumer:
                         futures,
                         consumer_queue.empty(),
                         producer_queue.empty())
-                    time.sleep(0.2)
+                    sleeper()
+                else:
+                    sleeper.reset()
+
+        self._executor = None
 
         # LOGGING
         log_progress(lgr.info, pid, "%s: done", self.label)
-        assert not futures
         producer_thread.join()
-        if self._exc is not None:
-            raise self._exc
+        if self._exc:
+            if len(self._exc) > 1:
+                lgr.debug("%d exceptions were collected while performing execution in parallel. Only the first one "
+                          "will be reraised", len(self._exc))
+            raise self._exc[0]
+        else:
+            assert not futures, \
+                "There is still %d active futures for following args: %s" \
+                % (len(futures), ', '.join(futures))
+
+
+def _prune_futures(futures, lgr):
+    """Removes .done from provided futures.
+
+    Returns
+    -------
+    bool
+      True if any future was removed
+    """
+    done_useful = False
+    # remove futures which are done
+    for args, future in list(futures.items()):
+        if future.done():
+            done_useful = True
+            future_ = futures.pop(args)
+            msg = ""
+            if future_.exception():
+                msg = " with an exception %s" % future_.exception()
+            lgr.debug("Future for %r is done%s", args, msg)
+    return done_useful
+
+
+class Sleeper():
+    def __init__(self):
+        self.min_sleep_time = 0.001
+        # but no more than to this max
+        self.max_sleep_time = 0.1
+        self.sleep_time = self.min_sleep_time
+
+    def __call__(self):
+        time.sleep(self.sleep_time)
+        self.sleep_time = min(self.max_sleep_time, self.sleep_time * 2)
+
+    def reset(self):
+        self.sleep_time = self.min_sleep_time
