@@ -91,10 +91,10 @@ class ProducerConsumer:
         self._exc = []
 
     def __del__(self):
-        # if we are killed while executing, we should ask executor to terminate
+        # if we are killed while executing, we should ask executor to shutdown
         executor = getattr(self, "_executor")
         if executor:
-            executor.terminate()
+            executor.shutdown()
 
     def __iter__(self):
         self.producer_finished = False
