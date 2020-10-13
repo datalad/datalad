@@ -15,6 +15,8 @@ import re
 
 import os.path as op
 
+from functools import partial
+
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -40,6 +42,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
+from datalad.support.collections import ReadOnlyDict
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import (
@@ -54,6 +57,9 @@ from datalad.support.network import (
     URL,
     RI,
     urlquote,
+)
+from datalad.support.parallel import (
+    ProducerConsumer,
 )
 from datalad.dochelpers import (
     single_or_plural,
@@ -503,39 +509,63 @@ def _install_necessary_subdatasets(
 
 
 def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
-                                        refds_path=None, description=None):
+                                        refds_path=None, description=None, jobs=None):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
     # install using helper that give some flexibility regarding where to
     # get the module from
 
-    for sub in ds.subdatasets(
-            path=start,
-            return_type='generator',
-            result_renderer='disabled'):
-        subds = Dataset(sub['path'])
-        if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
-            lgr.debug(
-                "subdataset %s is configured to be skipped on recursive installation",
-                sub['path'])
-            continue
-        if sub.get('state', None) != 'absent':
-            # dataset was already found to exist
-            yield get_status_dict(
-                'install', ds=subds, status='notneeded', logger=lgr,
-                refds=refds_path)
-            # do not continue, even if an intermediate dataset exists it
-            # does not imply that everything below it does too
-        else:
-            # try to get this dataset
-            for res in _install_subds_from_flexible_source(
-                    ds,
-                    sub,
-                    reckless=reckless,
-                    description=description):
-                # yield everything to let the caller decide how to deal with
-                # errors
-                yield res
+    # Keep only paths, to not drag full instances of Datasets along,
+    # they are cheap to instantiate
+    sub_paths_considered = []
+    subs_notneeded = []
+
+    def gen_subs_to_install():  # producer
+        for sub in ds.subdatasets(
+                path=start,
+                return_type='generator',
+                result_renderer='disabled'):
+            sub_path = sub['path']
+            sub_paths_considered.append(sub_path)
+            subds = Dataset(sub_path)
+            if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
+                lgr.debug(
+                    "subdataset %s is configured to be skipped on recursive installation",
+                    sub_path)
+                continue
+            if sub.get('state', None) != 'absent':
+                # dataset was already found to exist
+                # Producer is supposed to yield only records to operate on.
+                # We could have moved the check into consumer, BUT that would "taint"
+                # progress indication with rapidly skipped entries, obscuring ETA etc.
+                # So we will just collect them all and yield at once after installing
+                # everything needed tobe installed
+                subs_notneeded.append(
+                    get_status_dict(
+                        'install', ds=subds, status='notneeded', logger=lgr,
+                        refds=refds_path))
+                # do not continue, even if an intermediate dataset exists it
+                # does not imply that everything below it does too
+            else:
+                yield ReadOnlyDict(sub)
+
+    yield from ProducerConsumer(
+        gen_subs_to_install(),
+        partial(_install_subds_from_flexible_source, ds, reckless=reckless, description=description),
+        # no safe_to_consume= is needed since we are doing only at a single level ATM
+        label="Installing",
+        unit="datasets",
+        jobs=jobs,
+        lgr=lgr
+    )
+
+    # yield records which producer found "notneeded" for installation
+    for sub in subs_notneeded:
+        yield sub
+
+    # go deeper in hierarchy
+    for sub_path in sub_paths_considered:
+        subds = Dataset(sub_path)
         if not subds.is_installed():
             # an error result was emitted, and the external consumer can decide
             # what to do with it, but there is no point in recursing into
@@ -548,7 +578,9 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 subds,
                 recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
                 reckless=reckless,
-                refds_path=refds_path):
+                refds_path=refds_path,
+                jobs=jobs,
+        ):
             yield res
 
 
@@ -559,7 +591,9 @@ def _install_targetpath(
         recursion_limit,
         reckless,
         refds_path,
-        description):
+        description,
+        jobs=None,
+):
     """Helper to install as many subdatasets as needed to verify existence
     of a target path
 
@@ -644,7 +678,9 @@ def _install_targetpath(
             # TODO keep Path when RF is done
             start=str(target_path),
             refds_path=refds_path,
-            description=description):
+            description=description,
+            jobs=jobs,
+    ):
         # yield immediately so errors could be acted upon
         # outside, before we continue
         res.update(
@@ -854,7 +890,9 @@ class Get(Interface):
                             recursion_limit,
                             reckless,
                             refds_path,
-                            description):
+                            description,
+                            jobs=jobs,
+                    ):
                         # fish out the datasets that 'contains' a targetpath
                         # and store them for later
                         if res.get('status', None) in ('ok', 'notneeded') and \
@@ -890,7 +928,9 @@ class Get(Interface):
                         recursion_limit,
                         reckless,
                         refds_path,
-                        description):
+                        description,
+                        jobs=jobs,
+                ):
                     known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \
                             'contains' in res:
