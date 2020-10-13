@@ -25,6 +25,7 @@ from datalad.interface.results import only_matching_paths
 from datalad.distribution.get import _get_flexible_source_candidates_for_submodule
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import (
+    IncompleteResultsError,
     InsufficientArgumentsError,
     RemoteNotAvailableError,
 )
@@ -231,6 +232,22 @@ def test_get_single_file(path):
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
     eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
+
+
+@with_tree(tree={'file1': 'whatever 1'})
+def test_get_single_file_no_annex(path):
+    # Simulate scenario where we have a clone without git-annex
+    # branch:  https://github.com/datalad/datalad/issues/4510
+    ds = Dataset(path).create(force=True)
+    ds.save()
+
+    # direct clone without involving dataset magic
+    from datalad.support.gitrepo import GitRepo
+    # so no git-annex magically appears
+    repo = GitRepo.clone(url=path, path=path + "2")
+    repo.remove_remote('origin')
+    ds2 = Dataset(repo.path)
+    assert_raises(IncompleteResultsError, ds2.get, 'file1')
 
 
 @with_tempfile(mkdir=True)
