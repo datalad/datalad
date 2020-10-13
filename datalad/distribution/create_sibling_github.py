@@ -110,8 +110,8 @@ class CreateSiblingGithub(Interface):
             re-initialized, and the sibling (re-)configured (thus implies 'reconfigure').
             `replace` could lead to data loss, so use with care.  To minimize
             possibility of data loss, in interactive mode DataLad will ask for
-            confirmation, but it would just issue a warning and proceed in
-            non-interactive mode.""",),
+            confirmation, but it would raise an exception in non-interactive mode.
+            """,),
         github_login=Parameter(
             args=('--github-login',),
             constraints=EnsureStr() | EnsureNone(),
