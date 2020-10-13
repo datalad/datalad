@@ -18,6 +18,9 @@ from os.path import (
     dirname,
     join as opj,
 )
+
+from pkg_resources import EntryPoint
+
 from datalad.api import Dataset
 from datalad.utils import (
     chpwd,
@@ -362,8 +365,6 @@ def test_meta2autofield_dict():
 
 def test_external_indexer():
     """ check that external indexer are called """
-    from pkg_resources import EntryPoint
-
     class MockedIndexer:
         def __init__(self, metadata_format_name: str):
             pass
@@ -384,7 +385,7 @@ def test_external_indexer():
     def _mocked_iter_entry_points(group, metadata):
         yield MockedEntryPoint()
 
-    with patch('datalad.metadata.search.iter_entry_points',
+    with patch('pkg_resources.iter_entry_points',
                MagicMock(side_effect=_mocked_iter_entry_points)):
         index = _meta2autofield_dict({
             'datalad_unique_content_properties': {
@@ -408,8 +409,6 @@ def test_external_indexer():
 
 def test_faulty_external_indexer():
     """ check that generic indexer is called on external indexer faults """
-    from pkg_resources import EntryPoint
-
     class MockedEntryPoint(EntryPoint):
         def __init__(self):
             self.name = 'MockedEntryPoint'
@@ -420,7 +419,7 @@ def test_faulty_external_indexer():
     def _mocked_iter_entry_points(group, metadata):
         yield MockedEntryPoint()
 
-    with patch('datalad.metadata.search.iter_entry_points',
+    with patch('pkg_resources.iter_entry_points',
                MagicMock(side_effect=_mocked_iter_entry_points)):
         index = _meta2autofield_dict({
             'datalad_unique_content_properties': {

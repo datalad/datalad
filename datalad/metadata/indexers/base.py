@@ -38,7 +38,7 @@ class MetadataIndexer(object):
           Metadata created by an extractor.
 
         Returns
-        ----------
+        -------
         dict:
            key-value pairs representing the information in metadata.
            values can be literals or lists of literals
