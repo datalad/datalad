@@ -36,8 +36,13 @@ from ..http import (
     process_www_authenticate,
 )
 from ...support.exceptions import AccessFailedError
-from ...support.network import get_url_straight_filename
-from ...utils import ensure_unicode
+from datalad.support.network import (
+    download_url,
+    get_url_straight_filename,
+)
+from datalad.utils import (
+    ensure_unicode,
+)
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -801,3 +806,22 @@ def test_lorisadapter(d, keyring):
 
     content = read_file(fpath)
     assert_equal(content, "correct body")
+
+
+@known_failure_githubci_win
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+def test_download_url(toppath, topurl):
+    furl = "%sfile.dat" % topurl
+    # fails if URL is disfunctional
+    assert_raises(DownloadError, download_url, furl + 'magic', toppath)
+
+    # working download
+    tfpath = opj(toppath, "file-downloaded.dat")
+    download_url(furl, tfpath)
+    ok_file_has_content(tfpath, 'abc')
+
+    # fails if destfile exists
+    assert_raises(DownloadError, download_url, furl, tfpath)
+    # works when forced
+    download_url(furl, tfpath, overwrite=True)
