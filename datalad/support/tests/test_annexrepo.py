@@ -1532,6 +1532,7 @@ def test_get_urls_none(path):
     eq_(ar.get_urls("afile"), [])
 
 
+@skip_if(cond=not hasattr(AnnexRepo, 'add'))
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
@@ -1546,7 +1547,7 @@ def test_annex_add_no_dotfiles(path):
     # make sure the repo is considered dirty now
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
-    ar._save_add('.', git=True)
+    ar.add('.', git=True)
     # all in index
     assert_true(ar.dirty)
     # TODO: has been more specific:
