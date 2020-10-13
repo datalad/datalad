@@ -38,6 +38,7 @@ from ..utils import (
     setup_exceptionhook,
 )
 from ..dochelpers import exc_str
+from ..version import __full_version__
 
 
 class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
@@ -188,8 +189,8 @@ def setup_parser(
             cmdlineargs[1:], argparse.Namespace())
         if not (completing or unparsed_args):
             fail_handler(parser, msg="too few arguments", exit_code=2)
-        lgr.debug("Command line args 1st pass. Parsed: %s Unparsed: %s",
-                  parsed_args, unparsed_args)
+        lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
+                  __full_version__, parsed_args, unparsed_args)
     except Exception as exc:
         lgr.debug("Early parsing failed with %s", exc_str(exc))
         need_single_subparser = False
