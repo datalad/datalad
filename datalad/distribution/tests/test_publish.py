@@ -567,6 +567,7 @@ def test_publish_depends(
         on_failure='ignore')
     assert_result_count(
         res, 1,
+        path=source.path,
         status='error',
         message=(
             'unknown sibling(s) specified as publication dependency: %s',
