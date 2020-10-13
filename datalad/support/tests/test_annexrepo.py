@@ -1439,6 +1439,7 @@ def test_get_urls_none(path):
     eq_(ar.get_urls("afile"), [])
 
 
+@skip_if(cond=not hasattr(AnnexRepo, 'add'))
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
@@ -1454,13 +1455,13 @@ def test_annex_add_no_dotfiles(path):
     if ar._check_version_kludges("has-include-dotfiles"):
         assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
         # no file is being added, as dotfiles/directories are ignored by default
-        ar._save_add('.', git=False)
+        ar.add('.', git=False)
         # ^ Note: No longer true as of 8.20200226, which does _not_ skip
         # dotfiles.
     # double check, still dirty
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
-    ar._save_add('.', git=True)
+    ar.add('.', git=True)
     # all in index
     assert_true(ar.dirty)
     # TODO: has been more specific:
@@ -1469,11 +1470,8 @@ def test_annex_add_no_dotfiles(path):
     ar.commit(msg="some")
     # all committed
     assert_false(ar.dirty)
-    # fails with v7, but situation has no practical impact as in a real
-    # dataset, .datalad is protected with ,gitattributes
-    if ar._check_version_kludges("has-include-dotfiles"):  # AKA v8
-        # not known to annex
-        assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
+    # not known to annex
+    assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
 
 
 @with_tempfile
