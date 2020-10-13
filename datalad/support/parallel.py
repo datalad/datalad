@@ -50,7 +50,7 @@ class ProducerConsumer:
 
     def __init__(self,
                  producer, consumer,
-                 njobs=None,
+                 jobs=None,
                  safe_to_consume=None,
                  reraise_immediately=False,
                  agg=None,
@@ -77,7 +77,7 @@ class ProducerConsumer:
         """
         self.producer = producer
         self.consumer = consumer
-        self.njobs = njobs
+        self.jobs = jobs
         self.safe_to_consume = safe_to_consume
         self.reraise_immediately = reraise_immediately
         self.agg = agg
@@ -159,11 +159,16 @@ class ProducerConsumer:
         futures = {}
 
         total_announced = False
-        njobs = self.njobs or 1
-        lgr.debug("Initiating ThreadPoolExecutor with %d jobs", njobs)
+        jobs = self.jobs or 1
+        if jobs == "auto":
+            # ATM there is no "auto" for this operation.  We will just make it ...
+            # "auto" could be for some auto-scaling based on a single future time
+            # to complete, scaling up/down.  TODO
+            jobs = 5
+        lgr.debug("Initiating ThreadPoolExecutor with %d jobs", jobs)
         # we will increase sleep_time when doing nothing useful
         sleeper = Sleeper()
-        with concurrent.futures.ThreadPoolExecutor(njobs) as executor:
+        with concurrent.futures.ThreadPoolExecutor(jobs) as executor:
             self._executor = executor
             # yield from the producer_queue (.total and .finished could be accessed meanwhile)
             while True:

@@ -46,12 +46,12 @@ def test_ProducerConsumer():
     assert_equal(list(ProducerConsumer(
         slowprod(10),
         slowcons,
-        njobs=10,
+        jobs=10,
     )), [{"i": i, "status": "ok" if i % 2 else "error"} for i in range(10)])
 
 
 @with_tempfile(mkdir=True)
-def test_creatsubdatasets(topds_path, n=3):
+def test_creatsubdatasets(topds_path, n=10):
     from datalad.distribution.dataset import Dataset
     from datalad.api import create
     ds = Dataset(topds_path).create()
@@ -66,13 +66,13 @@ def test_creatsubdatasets(topds_path, n=3):
     # and we should get the exception (the first one encountered!)
     # Note: reraise_immediately is of "concern" only for producer. since we typically
     # rely on outside code to do the killing!
-    assert_raises(IncompleteResultsError, list, ProducerConsumer(paths[::-1], create_, njobs=5))
+    assert_raises(IncompleteResultsError, list, ProducerConsumer(paths[::-1], create_, jobs=5))
     # we are in a dirty state, let's just remove all those for a clean run
     rmtree(topds_path)
 
     # and this one followed by save should be good IFF we provide our dependency checker
     ds = Dataset(topds_path).create()
-    list(ProducerConsumer(paths, create_, safe_to_consume=no_parentds_in_futures, njobs=10))
+    list(ProducerConsumer(paths, create_, safe_to_consume=no_parentds_in_futures, jobs=10))
     ds.save(paths)
     assert_repo_status(ds.repo)
 
