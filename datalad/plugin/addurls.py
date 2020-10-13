@@ -22,16 +22,24 @@ from functools import partial
 from operator import itemgetter
 from urllib.parse import urlparse
 
+import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import exc_str
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import annexjson2result, get_status_dict
-from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import (
+    jobs_opt,
+    nosave_opt,
+)
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
+from datalad.support.parallel import (
+    ProducerConsumer,
+    no_parentds_in_futures,
+)
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     ensure_list,
@@ -762,6 +770,7 @@ class Addurls(Interface):
             action='append',
             doc="""Pass this [PY: cfg_proc PY][CMD: --cfg_proc CMD] value when
             calling `create` to make datasets."""),
+        jobs=jobs_opt,
     )
 
     @staticmethod
@@ -771,13 +780,14 @@ class Addurls(Interface):
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
-                 cfg_proc=None):
+                 cfg_proc=None, jobs=None):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
 
         from requests.exceptions import RequestException
 
+        from datalad.api import create
         from datalad.distribution.dataset import Dataset, require_dataset
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
@@ -865,17 +875,32 @@ class Addurls(Interface):
 
         annex_options = ["--fast"] if fast else []
 
+        subpaths_to_create = []
         for spath in subpaths:
-            if os.path.exists(os.path.join(ds.path, spath)):
+            spath_full = op.join(ds.path, spath)
+            if os.path.exists(spath_full):
                 lgr.warning(
                     "Not creating subdataset at existing path: %s",
                     spath)
             else:
-                yield from ds.create(
-                    spath,
-                    result_xfm=None,
-                    cfg_proc=cfg_proc,
-                    return_type='generator')
+                subpaths_to_create.append(spath_full)
+
+        if subpaths_to_create:
+            yield from ProducerConsumer(
+                sorted(subpaths_to_create),
+                partial(create,
+                        result_xfm=None,
+                        cfg_proc=cfg_proc,
+                        return_type='generator'),
+                safe_to_consume=no_parentds_in_futures,
+                unit="datasets",
+                jobs=jobs,
+                lgr=lgr,
+            )
+            yield from ds.save(subpaths_to_create,
+                               message=f"Added {len(subpaths_to_create)} subdatasets",
+                               return_type='generator',
+                               )
 
         for row in rows:
             # Add additional information that we'll need for various
