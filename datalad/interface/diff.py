@@ -36,7 +36,10 @@ from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
-from datalad.cmd import GitRunner
+from datalad.cmd import (
+    StdOutErrCapture,
+    GitWitlessRunner,
+)
 
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
@@ -91,14 +94,8 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
            # fully untracked dirs as such, the rest as files
            '--untracked={}'.format(report_untracked)]
     try:
-        stdout, stderr = GitRunner(cwd=dspath).run(
-            cmd,
-            log_stderr=True,
-            log_stdout=True,
-            log_online=False,
-            expect_stderr=False,
-            shell=False,
-            expect_fail=True)
+        stdout = GitWitlessRunner(cwd=dspath).run(
+            cmd, protocol=StdOutErrCapture)['stdout']
     except CommandError as e:
         # TODO should we catch any and handle them in here?
         raise e
@@ -154,14 +151,8 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
         cmd.extend(ap['path'] for ap in paths if ap.get('raw_input', False))
 
     try:
-        stdout, stderr = GitRunner(cwd=dspath).run(
-            cmd,
-            log_stderr=True,
-            log_stdout=True,
-            log_online=False,
-            expect_stderr=False,
-            shell=False,
-            expect_fail=True)
+        stdout = GitWitlessRunner(cwd=dspath).run(
+            cmd, protocol=StdOutErrCapture)['stdout']
     except CommandError as e:
         if 'bad revision' in e.stderr:
             yield dict(

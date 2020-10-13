@@ -90,18 +90,22 @@ def _describe_datalad():
 
 
 def _describe_annex():
-    from datalad.cmd import GitRunner
+    from datalad.cmd import (
+        GitWitlessRunner,
+        StdOutErrCapture,
+    )
 
-    runner = GitRunner()
+    runner = GitWitlessRunner()
     try:
-        out, err = runner.run(['git', 'annex', 'version'])
+        out = runner.run(
+            ['git', 'annex', 'version'], protocol=StdOutErrCapture)
     except CommandError as e:
         return dict(
             version='not available',
             message=exc_str(e),
         )
     info = {}
-    for line in out.split(os.linesep):
+    for line in out['stdout'].split(os.linesep):
         key = line.split(':')[0]
         if not key:
             continue

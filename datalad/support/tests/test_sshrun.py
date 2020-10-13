@@ -14,7 +14,10 @@ from datalad.tests.utils import assert_raises, assert_equal
 from unittest.mock import patch
 
 from datalad.api import sshrun
-from datalad.cmd import Runner
+from datalad.cmd import (
+    StdOutCapture,
+    WitlessRunner,
+)
 from datalad.cmdline.main import main
 
 from datalad.tests.utils import skip_if_on_windows
@@ -47,12 +50,14 @@ def test_no_stdin_swallow(fname):
     # will relay actual exit code on CommandError
     cmd = ['datalad', 'sshrun', 'datalad-test', 'cat']
 
-    out, err = Runner().run(cmd, stdin=open(fname))
-    assert_equal(out.rstrip(), '123magic')
+    out = WitlessRunner().run(
+        cmd, stdin=open(fname), protocol=StdOutCapture)
+    assert_equal(out['stdout'].rstrip(), '123magic')
 
     # test with -n switch now, which we could place even at the end
-    out, err = Runner().run(cmd + ['-n'], stdin=open(fname))
-    assert_equal(out, '')
+    out = WitlessRunner().run(
+        cmd + ['-n'], stdin=open(fname), protocol=StdOutCapture)
+    assert_equal(out['stdout'], '')
 
 
 @skip_if_on_windows
@@ -60,8 +65,8 @@ def test_no_stdin_swallow(fname):
 @with_tempfile(suffix="1 space", content="magic")
 def test_fancy_quotes(f):
     cmd = ['datalad', 'sshrun', 'datalad-test', """'cat '"'"'%s'"'"''""" % f]
-    out, err = Runner().run(cmd)
-    assert_equal(out, 'magic')
+    out = WitlessRunner().run(cmd, protocol=StdOutCapture)
+    assert_equal(out['stdout'], 'magic')
 
 
 @skip_if_on_windows

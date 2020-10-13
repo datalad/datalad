@@ -1319,12 +1319,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cmd.extend(git_options)
         cmd += ["rev-parse", "--show-toplevel"]
         try:
-            toppath, err = GitRunner().run(
-                cmd,
-                cwd=path,
-                log_stdout=True, log_stderr=True,
-                expect_fail=True, expect_stderr=True)
-            toppath = toppath.rstrip('\n\r')
+            out = GitWitlessRunner(cwd=path).run(
+                cmd, protocol=StdOutErrCapture)
+            toppath = out['stdout'].rstrip('\n\r')
         except CommandError:
             return None
         except OSError:

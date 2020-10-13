@@ -30,9 +30,9 @@ from datalad.support.gitrepo import (
 )
 from datalad.cmd import (
     CommandError,
-    GitRunner,
+    GitWitlessRunner,
     StdOutCapture,
-    WitlessRunner,
+    StdOutErrCapture,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -673,7 +673,7 @@ def postclonecfg_ria(ds, props):
             #       to work and would read from stdin. Make sure we know this
             #       works for required git versions and on all platforms.
             with make_tempfile(content=config_content) as cfg_file:
-                runner = WitlessRunner(env=GitRunner.get_git_environ_adjusted())
+                runner = GitWitlessRunner()
                 try:
                     result = runner.run(
                         ['git', 'config', '-f', cfg_file,
@@ -803,7 +803,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # the path
                     # Note, that w/o support for bare repos in GitRepo we also
                     # can't use ConfigManager ATM.
-                    from datalad.cmd import GitWitlessRunner, StdOutErrCapture
                     gc_response = GitWitlessRunner(
                         cwd=origin_git_path,
                     ).run(['git', 'config', '--local', '--get', 'core.bare'],

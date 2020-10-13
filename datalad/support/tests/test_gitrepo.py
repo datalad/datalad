@@ -21,7 +21,11 @@ import sys
 
 
 from datalad import get_encoding_info
-from datalad.cmd import Runner
+from datalad.cmd import (
+    StdOutCapture,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 
 from datalad.utils import (
     chpwd,
@@ -287,9 +291,9 @@ def test_GitRepo_get_indexed_files(src, path):
     gr = GitRepo.clone(src, path)
     idx_list = gr.get_indexed_files()
 
-    runner = Runner()
-    out = runner(['git', 'ls-files'], cwd=path)
-    out_list = list(filter(bool, out[0].split('\n')))
+    runner = WitlessRunner(cwd=path)
+    out = runner.run(['git', 'ls-files'], protocol=StdOutCapture)
+    out_list = list(filter(bool, out['stdout'].split('\n')))
 
     for item in idx_list:
         assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
@@ -1504,7 +1508,7 @@ def test_fake_dates(path):
 @with_tempfile(mkdir=True)
 def test_duecredit(path):
     # Just to check that no obvious side-effects
-    run = Runner(cwd=path).run
+    run = WitlessRunner(cwd=path).run
     cmd = [
         sys.executable, "-c",
         "from datalad.support.gitrepo import GitRepo; GitRepo(%r, create=True)" % path
@@ -1520,16 +1524,16 @@ def test_duecredit(path):
     # cwd is not matching possibly present PWD env variable
     env.pop('PWD', None)
 
-    out, err = run(cmd, env=env, expect_stderr=True)
-    outs = out + err  # Let's not depend on where duecredit decides to spit out
+    out = run(cmd, env=env, protocol=StdOutErrCapture)
+    outs = ''.join(out.values()) # Let's not depend on where duecredit decides to spit out
     # All quiet
     test_string = 'Data management and distribution platform'
     assert_not_in(test_string, outs)
 
     # and now enable DUECREDIT - output could come to stderr
     env['DUECREDIT_ENABLE'] = '1'
-    out, err = run(cmd, env=env, expect_stderr=True)
-    outs = out + err
+    out = run(cmd, env=env, protocol=StdOutErrCapture)
+    outs = ''.join(out.values())
 
     if external_versions['duecredit']:
         assert_in(test_string, outs)

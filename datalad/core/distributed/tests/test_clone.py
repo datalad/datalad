@@ -30,7 +30,10 @@ from datalad.utils import (
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import WitlessRunner as Runner
+from datalad.cmd import (
+    GitWitlessRunner,
+    WitlessRunner as Runner,
+)
 from datalad.tests.utils import (
     assert_false,
     assert_in,
@@ -1081,7 +1084,6 @@ def test_ephemeral(origin_path, bare_path,
     eq_(res, [origin.config.get("annex.uuid")])
 
     # 4. ephemeral clone from a bare repo
-    from datalad.cmd import GitWitlessRunner
     runner = GitWitlessRunner()
     runner.run(['git', 'clone', '--bare', origin_path, bare_path])
     runner.run(['git', 'annex', 'init'], cwd=bare_path)

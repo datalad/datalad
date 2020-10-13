@@ -55,10 +55,7 @@ def decompress_file(archive, dir_):
     if len(suffixes) > 1 and suffixes[-2] == '.tar':
         # we have a compressed tar file that needs to be fed through the
         # decompressor first
-        cmd = [
-            'sh', '-c',
-            '7z x {} -so | 7z x -si -ttar'.format(quote_cmdlinearg(archive)),
-        ]
+        cmd = '7z x {} -so | 7z x -si -ttar'.format(quote_cmdlinearg(archive))
     else:
         # fire and forget
         cmd = ['7z', 'x', archive]
@@ -90,13 +87,10 @@ def compress_files(files, archive, path=None, overwrite=True):
             )
     suffixes = _normalize_fname_suffixes(apath.suffixes)
     if len(suffixes) > 1 and suffixes[-2] == '.tar':
-        cmd = [
-            'sh', '-c',
-            '7z u .tar -so -- {} | 7z u -si -- {}'.format(
-                join_cmdline(files),
-                quote_cmdlinearg(str(apath)),
-            ),
-        ]
+        cmd = '7z u .tar -so -- {} | 7z u -si -- {}'.format(
+            join_cmdline(files),
+            quote_cmdlinearg(str(apath)),
+        )
     else:
         cmd = ['7z', 'u', str(apath), '--'] + files
     runner.run(cmd, protocol=KillOutput)

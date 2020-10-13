@@ -80,7 +80,6 @@ from datalad.utils import (
     ensure_unicode,
 )
 
-from ..cmd import Runner
 from .. import utils
 from ..support.exceptions import (
     CommandError,
@@ -96,6 +95,10 @@ from ..consts import (
     ARCHIVES_TEMP_DIR,
 )
 from . import _TEMP_PATHS_GENERATED
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+)
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -928,12 +931,10 @@ def _get_resolved_flavors(flavors):
 
 
 def clone_url(url):
-    # delay import of our code until needed for certain
-    from ..cmd import Runner
-    runner = Runner()
+    runner = GitWitlessRunner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
         {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
-    _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    runner.run(["git", "clone", url, tdir], protocol=KillOutput)
     if GitRepo(tdir).is_with_annex():
         AnnexRepo(tdir, init=True)
     _TEMP_PATHS_CLONES.add(tdir)

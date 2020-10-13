@@ -15,7 +15,10 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 import sys
 
-from datalad.cmd import Runner
+from datalad.cmd import (
+    WitlessRunner,
+    KillOutput,
+)
 from datalad.utils import (
     chpwd,
     quote_cmdlinearg,
@@ -299,11 +302,14 @@ def test_quoting(path):
         with assert_raises(CommandError):
             ds.run_procedure(spec=["just2args", "still-one arg"])
 
-        runner = Runner(cwd=ds.path)
+        runner = WitlessRunner(cwd=ds.path)
         runner.run(
-            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'")
+            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'",
+            protocol=KillOutput)
         with assert_raises(CommandError):
-            runner.run("datalad run-procedure just2args 'still-one arg'")
+            runner.run(
+                "datalad run-procedure just2args 'still-one arg'",
+                protocol=KillOutput)
 
 
 @skip_if_on_windows

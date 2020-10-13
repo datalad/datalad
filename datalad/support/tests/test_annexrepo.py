@@ -37,8 +37,7 @@ from unittest.mock import patch
 import gc
 
 from datalad.cmd import (
-    Runner,
-    WitlessRunner,
+    WitlessRunner as Runner,
 )
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.external_versions import external_versions
@@ -746,9 +745,8 @@ def test_AnnexRepo_always_commit(path):
 @with_tempfile
 def test_AnnexRepo_on_uninited_annex(origin, path):
     # "Manually" clone to avoid initialization:
-    from datalad.cmd import Runner
     runner = Runner()
-    _ = runner(["git", "clone", origin, path], expect_stderr=True)
+    runner.run(["git", "clone", origin, path])
 
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
@@ -2142,9 +2140,9 @@ def _test_add_under_subdir(path):
     create_tree(subdir, {'empty': ''})
     runner = Runner(cwd=subdir)
     with chpwd(subdir):
-        runner(['git', 'add', 'empty'])  # should add sucesfully
+        runner.run(['git', 'add', 'empty'])  # should add sucesfully
         # gr.commit('important') #
-        runner(['git', 'commit', '-m', 'important'])
+        runner.run(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
 
 
@@ -2172,7 +2170,7 @@ def test_annexjson_protocol(path):
     ar = AnnexRepo(path, create=True)
     ar.save()
     assert_repo_status(path)
-    runner = WitlessRunner(cwd=ar.path)
+    runner = Runner(cwd=ar.path)
     # first an orderly execution
     res = runner.run(
         ['git', 'annex', 'find', '.', '--json'],
@@ -2343,8 +2341,6 @@ def test_ro_operations(path):
     # This test would function only if there is a way to run sudo
     # non-interactively, e.g. on Travis or on your local (watchout!) system
     # after you ran sudo command recently.
-
-    from datalad.cmd import Runner
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
@@ -2406,14 +2402,13 @@ def test_save_noperms(path):
     # after you ran sudo command recently.
     repo = AnnexRepo(path, init=True)
 
-    from datalad.cmd import Runner
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
     try:
         # To assure that git/git-annex really cannot acquire a lock and do
         # any changes (e.g. merge git-annex branch), we make this repo owned by root
-        sudochown(['-R', 'root:root', repo.pathobj / 'file1'])
+        sudochown(['-R', 'root:root', str(repo.pathobj / 'file1')])
     except Exception as exc:
         # Exception could be CommandError or IOError when there is no sudo
         raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
