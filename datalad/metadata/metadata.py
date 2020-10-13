@@ -19,7 +19,6 @@ import os.path as op
 from collections import (
     OrderedDict,
 )
-from collections.abc import Mapping
 
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -28,6 +27,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.metadata.definitions import version as vocabulary_version
+from datalad.support.collections import ReadOnlyDict, _val2hashable
 from datalad.support.constraints import (
     EnsureNone,
     EnsureBool,
@@ -700,62 +700,6 @@ def _unique_value_key(x):
     # we need to force str, because sorted in PY3 refuses to compare
     # any heterogeneous type combinations, such as str/int, tuple(int)/tuple(str)
     return as_unicode(x)
-
-
-def _val2hashable(val):
-    """Small helper to convert incoming mutables to something hashable
-
-    The goal is to be able to put the return value into a set, while
-    avoiding conversions that would result in a change of representation
-    in a subsequent JSON string.
-    """
-    if isinstance(val, dict):
-        return ReadOnlyDict(val)
-    elif isinstance(val, list):
-        return tuple(map(_val2hashable, val))
-    else:
-        return val
-
-
-class ReadOnlyDict(Mapping):
-    # Taken from https://github.com/slezica/python-frozendict
-    # License: MIT
-    """
-    An immutable wrapper around dictionaries that implements the complete
-    :py:class:`collections.Mapping` interface. It can be used as a drop-in
-    replacement for dictionaries where immutability is desired.
-    """
-    dict_cls = dict
-
-    def __init__(self, *args, **kwargs):
-        self._dict = self.dict_cls(*args, **kwargs)
-        self._hash = None
-
-    def __getitem__(self, key):
-        return self._dict[key]
-
-    def __contains__(self, key):
-        return key in self._dict
-
-    def copy(self, **add_or_replace):
-        return self.__class__(self, **add_or_replace)
-
-    def __iter__(self):
-        return iter(self._dict)
-
-    def __len__(self):
-        return len(self._dict)
-
-    def __repr__(self):
-        return '<%s %r>' % (self.__class__.__name__, self._dict)
-
-    def __hash__(self):
-        if self._hash is None:
-            h = 0
-            for key, value in self._dict.items():
-                h ^= hash((key, _val2hashable(value)))
-            self._hash = h
-        return self._hash
 
 
 def get_ds_aggregate_db_locations(ds, version='default', warn_absent=True):
