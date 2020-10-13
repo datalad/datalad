@@ -664,7 +664,7 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
     # needs to be an annex to get content
     if not isinstance(ds_repo, AnnexRepo):
         for r in results_from_paths(
-                content, status='notneeded',
+                content,
                 message="no dataset annex, content already present",
                 action='get',
                 type='file',

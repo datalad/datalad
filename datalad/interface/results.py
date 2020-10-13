@@ -14,20 +14,21 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import isdir
-from os.path import isabs
-from os.path import join as opj
-from os.path import relpath
-from os.path import abspath
-from os.path import normpath
 from datalad.utils import (
     ensure_list,
     with_pathsep as _with_sep,
     path_is_subpath,
     PurePosixPath,
 )
-from datalad.support.path import robust_abspath
-
+from datalad.support.path import (
+    exists,
+    isabs,
+    isdir,
+    join as opj,
+    normpath,
+    relpath,
+    robust_abspath,
+)
 from datalad.distribution.dataset import Dataset
 
 
@@ -91,7 +92,7 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
 
 
 def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
-                       status=None, message=None):
+                       message=None):
     """
     Helper to yield analog result dicts for each path in a sequence.
 
@@ -107,9 +108,12 @@ def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
 
     """
     for p in ensure_list(paths):
+        # TODO: notneeded vs impossible is incomplete solution here --
+        # would not work for unlocked files!
         yield get_status_dict(
             action, path=p, type=type, logger=logger, refds=refds,
-            status=status, message=(message, p) if '%s' in message else message)
+            status='notneeded' if exists(p) else 'impossible',
+            message=(message, p) if '%s' in message else message)
 
 
 def is_ok_dataset(r):
