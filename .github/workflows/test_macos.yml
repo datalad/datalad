@@ -24,7 +24,7 @@ jobs:
     - name: Install git-annex
       run: |
         eval source tools/ci/install-annex.sh ${{ matrix.install_scenario }}
-        echo "::set-env name=PATH::$PATH"
+        echo "PATH=$PATH" >> $GITHUB_ENV
 
     - name: Set up Python 3.6
       uses: actions/setup-python@v1
