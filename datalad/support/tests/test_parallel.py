@@ -6,6 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+import sys
 
 from time import sleep, time
 from functools import partial
@@ -22,6 +23,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_raises,
     rmtree,
+    skip_if,
     with_tempfile,
 )
 
@@ -77,6 +79,43 @@ def test_creatsubdatasets(topds_path, n=10):
     assert_repo_status(ds.repo)
 
 
+# it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
+@skip_if(sys.version_info < (3, 8, 0, 'final'), msg="Known to be buggy/stall")
+def test_stalling(kill=False):
+    import concurrent.futures
+    from datalad.cmd import WitlessRunner
+
+    def worker():
+        WitlessRunner().run(["echo", "1"])
+
+    t0 = time()
+    v1 = worker()
+    dt1 = time() - t0
+
+    t0 = time()
+    with concurrent.futures.ThreadPoolExecutor(1) as executor:
+        # print("submitting")
+        future = executor.submit(worker)
+        dt2_limit = dt1 * 5
+        # print("waiting for up to %.2f sec" % dt2_limit)
+        while not future.done():
+            # print("not yet")
+            sleep(dt1/3)
+            if time() - t0 > dt2_limit:
+                # does not even shutdown
+                # executor.shutdown(wait=False)
+                if kill:
+                    # raising an exception isn't enough!
+                    print("exceeded")
+                    import os
+                    import signal
+                    os.kill(os.getpid(), signal.SIGTERM)
+                raise AssertionError("Future has not finished in 5x time")
+        v2 = future.result()
+    assert_equal(v1, v2)
+
+
 if __name__ == '__main__':
     # test_ProducerConsumer()
-    test_creatsubdatasets()
+    # test_creatsubdatasets()
+    test_stalling(kill=True)
