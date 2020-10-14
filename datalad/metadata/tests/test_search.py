@@ -52,6 +52,8 @@ from ..search import (
     _meta2autofield_dict,
 )
 
+from ..indexers.base import MetadataIndexer
+
 
 @with_testsui(interactive=False)
 @with_tempfile(mkdir=True)
@@ -365,9 +367,9 @@ def test_meta2autofield_dict():
 
 def test_external_indexer():
     """ check that external indexer are called """
-    class MockedIndexer:
+    class MockedIndexer(MetadataIndexer):
         def __init__(self, metadata_format_name: str):
-            pass
+            super().__init__(metadata_format_name)
 
         def create_index(self, metadata):
             yield from {

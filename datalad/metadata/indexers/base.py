@@ -7,11 +7,11 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """ Metadata indexer base class """
-
+import abc
 from typing import Any, Dict, List, Union
 
 
-class MetadataIndexer(object):
+class MetadataIndexer(metaclass=abc.ABCMeta):
     """ Defines the indexer interface """
     def __init__(self, metadata_format_name: str):
         """
@@ -22,6 +22,7 @@ class MetadataIndexer(object):
         """
         self.metadata_format_name = metadata_format_name
 
+    @abc.abstractmethod
     def create_index(self, metadata: Union[Dict, List]) -> Dict[str, Any]:
         """
         Create an index from metadata.

@@ -176,8 +176,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     def get_indexer(metadata_format_name: str) -> callable:
         from pkg_resources import EntryPoint, iter_entry_points
 
-        # Use the first returned entry point, if any, because there should be
-        # at most one indexer for ``metadata_format_name´´.
+        # Use the first returned entry point, if any, because there can at most be
+        # one indexer for ``metadata_format_name´´.
         indexer = (tuple(iter_entry_points('datalad.metadata.indexers', metadata_format_name)) or (None,))[0]
         if isinstance(indexer, EntryPoint):
             try:
@@ -185,6 +185,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                 return indexer_object.create_index
             except Exception as e:
                 lgr.warning('Failed to load indexer %s: %s', indexer.name, exc_str(e))
+        lgr.info('Falling back to standard indexer for metadata format: %s', metadata_format_name)
         return lambda metadata: _deep_kv('', metadata)
 
     if val2str:
@@ -199,7 +200,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     meta = meta or {}
     return {
         # Collect all meta-items which have a non-dict value type and where
-        # the key not absent in a given schema.
+        # the key is not absent in a given schema.
         **{
             key: _val2str_helper(value)
             for key, value in filter(lambda kv: not isinstance(kv[1], dict), meta.items())
@@ -209,7 +210,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
         # Collect all meta-items which have a dict value type and where
         # the key is neither 'datalad_unique_content_properties' nor absent
         # in a given schema.
-        # These values are considered as metadata, the keys are considered to
+        # These values are considered to be metadata, the keys are considered to
         # be the name of the extractor, i.e. the metadata_format_name, that created
         # the metadata.
         **{
