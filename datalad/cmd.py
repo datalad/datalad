@@ -1095,7 +1095,7 @@ class GitRunnerBase(object):
             # we only need to consider bundled git if it's actually different
             # from default. (see issue #5030)
             alongside = op.lexists(bundled_git_path) and \
-                        bundled_git_path != find_executable('git')
+                        bundled_git_path != op.realpath(find_executable('git'))
 
         return annex_path if alongside else ''
 
