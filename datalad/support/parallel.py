@@ -158,7 +158,7 @@ class ProducerConsumer:
 
         futures = {}
 
-        total_announced = False
+        total_announced = self.total
         jobs = self.jobs or 1
         if jobs == "auto":
             # ATM there is no "auto" for this operation.  We will just make it ...
@@ -182,7 +182,8 @@ class ProducerConsumer:
                     break
 
                 # LOGGING
-                if not total_announced and self.producer_finished:
+                if self.total and total_announced != self.total:
+                    # update total with new information
                     log_progress(
                         lgr.info,
                         pid,
@@ -192,7 +193,7 @@ class ProducerConsumer:
                         # unit=("+" if not it.finished else "") + " " + unit,
                         update=0  # not None, so it does not stop
                     )
-                    total_announced = True
+                    total_announced = self.total
 
                 # important!  We are using threads, so worker threads will be sharing CPU time
                 # with this master thread. For it to become efficient, we should consume as much
