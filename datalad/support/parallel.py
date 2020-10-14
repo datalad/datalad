@@ -250,7 +250,7 @@ class ProducerConsumer:
 
                 if not done_useful:  # you need some rest
                     # TODO: same here -- progressive logging
-                    lgr.debug(
+                    lgr.log(5,
                         "Did nothing useful, sleeping. Have "
                         "producer_finished=%s producer_queue.empty=%s futures=%s consumer_queue.empty=%s",
                         self.producer_finished,
