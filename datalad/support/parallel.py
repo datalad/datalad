@@ -85,8 +85,9 @@ class ProducerConsumer:
         self.unit = unit
         self.lgr = lgr
 
-        self.total = None
+        self.total = None if self.agg else 0
         self.producer_finished = None
+        self._producer_queue = None
         self._executor = None
         self._exc = []
 
@@ -96,26 +97,28 @@ class ProducerConsumer:
         if executor:
             executor.shutdown()
 
+    def add_to_producer_queue(self, value):
+        self._producer_queue.put(value)
+        if self.agg:
+            self.total = (
+                self.agg(value, self.total) if self.total is not None else self.agg(value)
+            )
+        else:
+            self.total += 1
+
     def __iter__(self):
         self.producer_finished = False
         self._exc = []
 
-        producer_queue = Queue()
+        # To allow feeding producer queue with more entries, possibly from consumer!
+        self._producer_queue = producer_queue = Queue()
         consumer_queue = Queue()
 
         def producer_worker():
             """That is the one which interrogates producer and updates .total"""
-            total = None if self.agg else 0
             try:
                 for value in self.producer:
-                    producer_queue.put(value)
-                    if self.agg:
-                        total = (
-                            self.agg(value, total) if total is not None else self.agg(value)
-                        )
-                    else:
-                        total += 1
-                    self.total = total
+                    self.add_to_producer_queue(value)
             except BaseException as e:
                 self._exc.append(e)
             finally:
