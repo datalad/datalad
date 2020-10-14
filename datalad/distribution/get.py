@@ -537,10 +537,10 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                     continue
                 # TODO: Yarik is lost among all parentds, ds, start, refds_path so is not brave enough to
                 # assume any from the record, thus will pass "ds.path" around to consumer
-                yield ds.path, ReadOnlyDict(sub)
+                yield ds.path, ReadOnlyDict(sub), recursion_limit
 
-        def consumer(ds_path__sub):
-            ds_path, sub = ds_path__sub
+        def consumer(ds_path__sub__limit):
+            ds_path, sub, recursion_limit = ds_path__sub__limit
             subds = Dataset(sub['path'])
             if sub.get('state', None) != 'absent':
                 rec = get_status_dict('install', ds=subds, status='notneeded', logger=lgr, refds=refds_path)
