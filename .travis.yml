@@ -67,10 +67,12 @@ matrix:
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=not
+    - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
   - python: 3.5
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=""
+    - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
