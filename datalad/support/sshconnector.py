@@ -564,7 +564,66 @@ class MultiplexSSHConnection(BaseSSHConnection):
 
 
 @auto_repr
-class MultiplexSSHManager(object):
+class BaseSSHManager(object):
+    """Interface for an SSHManager
+    """
+    def ensure_initialized(self):
+        """Assures that manager is initialized"""
+        pass
+
+    assure_initialized = ensure_initialized
+
+    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+        """Get an SSH connection handler
+
+        Parameters
+        ----------
+        url: str
+          ssh url
+        force_ip : {False, 4, 6}
+          Force the use of IPv4 or IPv6 addresses.
+
+        Returns
+        -------
+        BaseSSHConnection
+        """
+        raise NotImplementedError
+
+    def _prep_connection_args(self, url):
+        # parse url:
+        from datalad.support.network import RI, is_ssh
+        if isinstance(url, RI):
+            sshri = url
+        else:
+            if ':' not in url and '/' not in url:
+                # it is just a hostname
+                lgr.debug("Assuming %r is just a hostname for ssh connection",
+                          url)
+                url += ':'
+            sshri = RI(url)
+
+        if not is_ssh(sshri):
+            raise ValueError("Unsupported SSH URL: '{0}', use "
+                             "ssh://host/path or host:path syntax".format(url))
+
+        from datalad import cfg
+        identity_file = cfg.get("datalad.ssh.identityfile")
+        return sshri, identity_file
+
+    def close(self, allow_fail=True):
+        """Closes all connections, known to this instance.
+
+        Parameters
+        ----------
+        allow_fail: bool, optional
+          If True, swallow exceptions which might be thrown during
+          connection.close, and just log them at DEBUG level
+        """
+        pass
+
+
+@auto_repr
+class MultiplexSSHManager(BaseSSHManager):
     """Keeps ssh connections to share. Serves singleton representation
     per connection.
 
@@ -574,6 +633,7 @@ class MultiplexSSHManager(object):
     """
 
     def __init__(self):
+        super().__init__()
         self._socket_dir = None
         self._connections = dict()
         # Initialization of prev_connections is happening during initial
@@ -591,7 +651,7 @@ class MultiplexSSHManager(object):
         self.assure_initialized()
         return self._socket_dir
 
-    def assure_initialized(self):
+    def ensure_initialized(self):
         """Assures that manager is initialized - knows socket_dir, previous connections
         """
         if self._socket_dir is not None:
@@ -627,6 +687,7 @@ class MultiplexSSHManager(object):
         lgr.log(5,
                 "Found %d previous connections",
                 len(self._prev_connections))
+    assure_initialized = ensure_initialized
 
     def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
@@ -642,24 +703,7 @@ class MultiplexSSHManager(object):
         -------
         SSHConnection
         """
-        # parse url:
-        from datalad.support.network import RI, is_ssh
-        if isinstance(url, RI):
-            sshri = url
-        else:
-            if ':' not in url and '/' not in url:
-                # it is just a hostname
-                lgr.debug("Assuming %r is just a hostname for ssh connection",
-                          url)
-                url += ':'
-            sshri = RI(url)
-
-        if not is_ssh(sshri):
-            raise ValueError("Unsupported SSH URL: '{0}', use "
-                             "ssh://host/path or host:path syntax".format(url))
-
-        from datalad import cfg
-        identity_file = cfg.get("datalad.ssh.identityfile")
+        sshri, identity_file = self._prep_connection_args(url)
 
         conhash = get_connection_hash(
             sshri.hostname,
