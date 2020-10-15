@@ -314,7 +314,7 @@ class BaseSSHConnection(object):
 
 
 @auto_repr
-class SingleProcessSSHConnection(BaseSSHConnection):
+class NoMultiplexSSHConnection(BaseSSHConnection):
     """Representation of an SSH connection.
 
     The connection is opened for execution of a single process, and closed
@@ -649,7 +649,7 @@ class NoMultiplexSSHManager(BaseSSHManager):
         """
         sshri, identity_file = self._prep_connection_args(url)
 
-        return SingleProcessSSHConnection(
+        return NoMultiplexSSHConnection(
             sshri,
             identity_file=identity_file,
             use_remote_annex_bundle=use_remote_annex_bundle,
@@ -804,7 +804,7 @@ if cfg.obtain('datalad.ssh.multiplex-connections'):
     SSHConnection = MultiplexSSHConnection
 else:
     SSHManager = NoMultiplexSSHManager
-    SSHConnection = SingleProcessSSHConnection
+    SSHConnection = NoMultiplexSSHConnection
 
 
 def _quote_filename_for_scp(name):
