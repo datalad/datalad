@@ -568,7 +568,7 @@ class BaseSSHManager(object):
     """Interface for an SSHManager
     """
     def ensure_initialized(self):
-        """Assures that manager is initialized"""
+        """Ensures that manager is initialized"""
         pass
 
     assure_initialized = ensure_initialized
@@ -624,14 +624,8 @@ class BaseSSHManager(object):
 
 @auto_repr
 class NoMultiplexSSHManager(BaseSSHManager):
+    """Does not "manage" and just returns a new connection
     """
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def ensure_initialized(self):
-        pass
 
     def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
