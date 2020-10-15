@@ -53,8 +53,15 @@ from datalad.utils import get_encoding_info, get_envvars_info, getpwd
 getpwd()
 
 lgr.log(5, "Instantiating ssh manager")
-from .support.sshconnector import SSHManager
-ssh_manager = SSHManager()
+from .support.sshconnector import (
+    MultiplexSSHManager,
+    NoMultiplexSSHManager,
+)
+ssh_manager = (
+    MultiplexSSHManager()
+    if cfg.obtain('datalad.ssh.multiplex-connections')
+    else NoMultiplexSSHManager()
+)
 atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
 

@@ -623,6 +623,41 @@ class BaseSSHManager(object):
 
 
 @auto_repr
+class NoMultiplexSSHManager(BaseSSHManager):
+    """
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def ensure_initialized(self):
+        pass
+
+    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+        """Get a singleton, representing a shared ssh connection to `url`
+
+        Parameters
+        ----------
+        url: str
+          ssh url
+        force_ip : {False, 4, 6}
+          Force the use of IPv4 or IPv6 addresses.
+
+        Returns
+        -------
+        SSHConnection
+        """
+        sshri, identity_file = self._prep_connection_args(url)
+
+        return SingleProcessSSHConnection(
+            sshri,
+            identity_file=identity_file,
+            use_remote_annex_bundle=use_remote_annex_bundle,
+            force_ip=force_ip,
+        )
+
+
+@auto_repr
 class MultiplexSSHManager(BaseSSHManager):
     """Keeps ssh connections to share. Serves singleton representation
     per connection.
@@ -641,14 +676,14 @@ class MultiplexSSHManager(BaseSSHManager):
         # to an empty list to fail if logic is violated
         self._prev_connections = None
         # and no explicit initialization in the constructor
-        # self.assure_initialized()
+        # self.ensure_initialized()
 
     @property
     def socket_dir(self):
         """Return socket_dir, and if was not defined before,
         and also pick up all previous connections (if any)
         """
-        self.assure_initialized()
+        self.ensure_initialized()
         return self._socket_dir
 
     def ensure_initialized(self):
