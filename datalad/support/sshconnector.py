@@ -691,8 +691,7 @@ class MultiplexSSHManager(BaseSSHManager):
         """
         if self._socket_dir is not None:
             return
-        from ..config import ConfigManager
-        cfg = ConfigManager()
+        from datalad import cfg
         self._socket_dir = \
             Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
         self._socket_dir.mkdir(exist_ok=True, parents=True)
