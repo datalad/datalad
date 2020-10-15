@@ -797,8 +797,14 @@ class MultiplexSSHManager(BaseSSHManager):
 
 
 # retain backward compat with 0.13.4 and earlier
-SSHManager = MultiplexSSHManager
-SSHConnection = MultiplexSSHConnection
+# should be ok since cfg already defined by the time this one is imported
+from .. import cfg
+if cfg.obtain('datalad.ssh.multiplex-connections'):
+    SSHManager = MultiplexSSHManager
+    SSHConnection = MultiplexSSHConnection
+else:
+    SSHManager = NoMultiplexSSHManager
+    SSHConnection = SingleProcessSSHConnection
 
 
 def _quote_filename_for_scp(name):
