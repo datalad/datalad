@@ -32,28 +32,43 @@ from datalad.tests.utils import (
     ok_,
     patch_config,
     skip_if_on_windows,
+    skip_nomultiplex_ssh,
     skip_ssh,
     swallow_logs,
     with_tempfile,
     with_tree,
 )
 from datalad import cfg as dl_cfg
-from ..sshconnector import SSHConnection, SSHManager, sh_quote
+from ..sshconnector import (
+    SSHConnection,
+    SSHManager,
+    MultiplexSSHManager,
+    MultiplexSSHConnection,
+    NoMultiplexSSHConnection,
+    sh_quote,
+)
 from ..sshconnector import get_connection_hash
+
+# Some tests test the internals and assumptions of multiplex connections
+_ssh_manager_is_multiplex = SSHManager is MultiplexSSHManager
 
 
 @skip_ssh
 def test_ssh_get_connection():
 
     manager = SSHManager()
-    assert manager._socket_dir is None, \
-        "Should be unset upon initialization. Got %s" % str(manager._socket_dir)
+    if _ssh_manager_is_multiplex:
+        assert manager._socket_dir is None, \
+            "Should be unset upon initialization. Got %s" % str(manager._socket_dir)
     c1 = manager.get_connection('ssh://datalad-test')
-    assert manager._socket_dir, "Should be set after interactions with the manager"
-    assert_is_instance(c1, SSHConnection)
 
-    # subsequent call returns the very same instance:
-    ok_(manager.get_connection('ssh://datalad-test') is c1)
+    if _ssh_manager_is_multiplex:
+        assert manager._socket_dir, "Should be set after interactions with the manager"
+        assert_is_instance(c1, MultiplexSSHConnection)
+        # subsequent call returns the very same instance:
+        ok_(manager.get_connection('ssh://datalad-test') is c1)
+    else:
+        assert_is_instance(c1, NoMultiplexSSHConnection)
 
     # fail on malformed URls (meaning: our fancy URL parser can't correctly
     # deal with them):
@@ -85,15 +100,18 @@ def test_ssh_open_close(tmp_path, tfile1):
 
     manager = SSHManager()
 
-    path = opj(str(manager.socket_dir),
-               get_connection_hash('datalad-test', bundled=True))
-    # TODO: facilitate the test when it didn't exist
-    existed_before = exists(path)
+    socket_path = None
+    if _ssh_manager_is_multiplex:
+        socket_path = opj(str(manager.socket_dir),
+                   get_connection_hash('datalad-test', bundled=True))
+        # TODO: facilitate the test when it didn't exist
+        existed_before = exists(socket_path)
 
     c1 = manager.get_connection('ssh://datalad-test')
     c1.open()
-    # control master exists for sure now
-    ok_(exists(path))
+    if socket_path:
+        # control master exists for sure now
+        ok_(exists(socket_path))
 
     # use connection to execute remote command:
     # we list explicitly local HOME since we override it in module_setup
@@ -105,7 +123,8 @@ def test_ssh_open_close(tmp_path, tfile1):
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
     eq_(set(remote_ls), {"f0", "f1"})
-    ok_(exists(path))
+    if socket_path:
+        ok_(exists(socket_path))
 
     # now test for arguments containing spaces and other pleasant symbols
     out, err = c1('ls -l {}'.format(sh_quote(tfile1)))
@@ -116,12 +135,12 @@ def test_ssh_open_close(tmp_path, tfile1):
     #eq_(err, '')
 
     c1.close()
-    # control master doesn't exist anymore:
-    ok_(exists(path) == existed_before)
+    if socket_path:
+        # control master doesn't exist anymore:
+        ok_(exists(socket_path) == existed_before)
 
 
-@skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 def test_ssh_manager_close():
 
     manager = SSHManager()
@@ -159,7 +178,7 @@ def test_ssh_manager_close():
 
 @with_tempfile
 def test_ssh_manager_close_no_throw(bogus_socket):
-    manager = SSHManager()
+    manager = MultiplexSSHManager()
 
     class bogus:
         def close(self):
@@ -202,8 +221,9 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     # copy tempfile list to remote_url:sourcedir
     sourcefiles = [sourcefile1, sourcefile2, obscure_file]
     ssh.put(sourcefiles, opj(remote_url, sourcedir))
-    # docs promise that connection is auto-opened
-    ok_(ssh.is_open())
+    # docs promise that connection is auto-opened in case of multiplex
+    if _ssh_manager_is_multiplex:
+        ok_(ssh.is_open())
 
     # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.c opy'
@@ -245,7 +265,7 @@ def test_ssh_compound_cmds():
 
 
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 def test_ssh_close_target():
     manager = SSHManager()
     path0 = manager.socket_dir / get_connection_hash(
@@ -278,11 +298,12 @@ def test_ssh_custom_identity_file():
             manager = SSHManager()
             ssh = manager.get_connection('ssh://datalad-test')
             cmd_out, _ = ssh("echo blah")
-            expected_socket = op.join(
-                str(manager.socket_dir),
-                get_connection_hash("datalad-test", identity_file=ifile,
-                                    bundled=True))
-            ok_(exists(expected_socket))
+            if _ssh_manager_is_multiplex:
+                expected_socket = op.join(
+                    str(manager.socket_dir),
+                    get_connection_hash("datalad-test", identity_file=ifile,
+                                        bundled=True))
+                ok_(exists(expected_socket))
             manager.close()
             assert_in("-i", cml.out)
             assert_in(ifile, cml.out)
