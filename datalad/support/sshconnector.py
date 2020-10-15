@@ -116,7 +116,7 @@ class BaseSSHConnection(object):
         if force_ip:
             self._ssh_open_args.append("-{}".format(force_ip))
         if identity_file:
-            self._ssh_open_args.extend(["-i", self._identity_file])
+            self._ssh_open_args.extend(["-i", identity_file])
 
         self._use_remote_annex_bundle = use_remote_annex_bundle
         # essential properties of the remote system
