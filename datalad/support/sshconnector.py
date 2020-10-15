@@ -137,6 +137,43 @@ class BaseSSHConnection(object):
             self.__runner = Runner()
         return self.__runner
 
+    def _adjust_cmd_for_bundle_execution(self, cmd):
+        # locate annex and set the bundled vs. system Git machinery in motion
+        if self._use_remote_annex_bundle:
+            remote_annex_installdir = self.get_annex_installdir()
+            if remote_annex_installdir:
+                # make sure to use the bundled git version if any exists
+                cmd = '{}; {}'.format(
+                    'export "PATH={}:$PATH"'.format(remote_annex_installdir),
+                    cmd)
+        return cmd
+
+    def _exec_ssh(self, ssh_cmd, cmd, options=None, stdin=None, log_output=True):
+        cmd = self._adjust_cmd_for_bundle_execution(cmd)
+
+        for opt in options or []:
+            ssh_cmd.extend(["-o", opt])
+
+        # build SSH call, feed remote command as a single last argument
+        # whatever it contains will go to the remote machine for execution
+        # we cannot perform any sort of escaping, because it will limit
+        # what we can do on the remote, e.g. concatenate commands with '&&'
+        ssh_cmd += [self.sshri.as_str()] + [cmd]
+
+        kwargs = dict(
+            log_stdout=log_output, log_stderr=log_output,
+            log_online=not log_output
+        )
+
+        # TODO: pass expect parameters from above?
+        # Hard to explain to toplevel users ... So for now, just set True
+        return self._runner.run(
+            ssh_cmd,
+            expect_fail=True,
+            expect_stderr=True,
+            stdin=stdin,
+            **kwargs)
+
     def _get_scp_command_spec(self, recursive, preserve_attrs):
         """Internal helper for SCP interface methods"""
         # Convert ssh's port flag (-p) to scp's (-P).
@@ -277,6 +314,77 @@ class BaseSSHConnection(object):
 
 
 @auto_repr
+class SingleProcessSSHConnection(BaseSSHConnection):
+    """Representation of an SSH connection.
+
+    The connection is opened for execution of a single process, and closed
+    as soon as the process end.
+    """
+    def __init__(self, sshri, **kwargs):
+        """Create a connection handler
+
+        The actual opening of the connection is performed on-demand.
+
+        Parameters
+        ----------
+        sshri: SSHRI
+          SSH resource identifier (contains all connection-relevant info),
+          or another resource identifier that can be converted into an SSHRI.
+        **kwargs
+          Pass on to BaseSSHConnection
+        """
+        super().__init__(sshri, **kwargs)
+        self._ssh_open_args += [
+            # we presently do not support any interactive authentication
+            # at the time of process execution
+            '-o', 'PasswordAuthentication=no',
+            '-o', 'KbdInteractiveAuthentication=no',
+        ]
+
+    def __call__(self, cmd, options=None, stdin=None, log_output=True):
+        """Executes a command on the remote.
+
+        It is the callers responsibility to properly quote commands
+        for remote execution (e.g. filename with spaces of other special
+        characters). Use the `sh_quote()` from the module for this purpose.
+
+        Parameters
+        ----------
+        cmd: str
+          command to run on the remote
+        options : list of str, optional
+          Additional options to pass to the `-o` flag of `ssh`. Note: Many
+          (probably most) of the available configuration options should not be
+          set here because they can critically change the properties of the
+          connection. This exists to allow options like SendEnv to be set.
+
+        Returns
+        -------
+        tuple of str
+          stdout, stderr of the command run.
+        """
+        # there is no dedicated "open" step, put all args together
+        ssh_cmd = ["ssh"] + self._ssh_open_args + self._ssh_args
+        return self._exec_ssh(
+            ssh_cmd,
+            cmd,
+            options=options,
+            stdin=stdin,
+            log_output=log_output)
+
+    def is_open(self):
+        return False
+
+    def open(self):
+        return False
+
+    def close(self):
+        # we perform blocking execution, we should not return from __call__ until
+        # the connection is already closed
+        pass
+
+
+@auto_repr
 class MultiplexSSHConnection(BaseSSHConnection):
     """Representation of a (shared) ssh connection.
     """
@@ -345,39 +453,13 @@ class MultiplexSSHConnection(BaseSSHConnection):
         # by itself
         self.open()
 
-        # locate annex and set the bundled vs. system Git machinery in motion
-        if self._use_remote_annex_bundle:
-            remote_annex_installdir = self.get_annex_installdir()
-            if remote_annex_installdir:
-                # make sure to use the bundled git version if any exists
-                cmd = '{}; {}'.format(
-                    'export "PATH={}:$PATH"'.format(remote_annex_installdir),
-                    cmd)
-
-        # build SSH call, feed remote command as a single last argument
-        # whatever it contains will go to the remote machine for execution
-        # we cannot perform any sort of escaping, because it will limit
-        # what we can do on the remote, e.g. concatenate commands with '&&'
         ssh_cmd = ["ssh"] + self._ssh_args
-        for opt in options or []:
-            ssh_cmd.extend(["-o", opt])
-
-        ssh_cmd += [self.sshri.as_str()] \
-            + [cmd]
-
-        kwargs = dict(
-            log_stdout=log_output, log_stderr=log_output,
-            log_online=not log_output
-        )
-
-        # TODO: pass expect parameters from above?
-        # Hard to explain to toplevel users ... So for now, just set True
-        return self._runner.run(
+        return self._exec_ssh(
             ssh_cmd,
-            expect_fail=True,
-            expect_stderr=True,
+            cmd,
+            options=options,
             stdin=stdin,
-            **kwargs)
+            log_output=log_output)
 
     def is_open(self):
         if not self.ctrl_path.exists():
