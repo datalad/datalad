@@ -98,7 +98,7 @@ class BaseSSHConnection(object):
         force_ip : {False, 4, 6}
            Force the use of IPv4 or IPv6 addresses with -4 or -6.
         """
-        self.__runner = None
+        self._runner = None
 
         from datalad.support.network import SSHRI, is_ssh
         if not is_ssh(sshri):
@@ -132,10 +132,10 @@ class BaseSSHConnection(object):
         raise NotImplementedError
 
     @property
-    def _runner(self):
-        if self.__runner is None:
-            self.__runner = Runner()
-        return self.__runner
+    def runner(self):
+        if self._runner is None:
+            self._runner = Runner()
+        return self._runner
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
         # locate annex and set the bundled vs. system Git machinery in motion
@@ -167,7 +167,7 @@ class BaseSSHConnection(object):
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
-        return self._runner.run(
+        return self.runner.run(
             ssh_cmd,
             expect_fail=True,
             expect_stderr=True,
@@ -219,7 +219,7 @@ class BaseSSHConnection(object):
             self.sshri.hostname,
             _quote_filename_for_scp(destination),
         )]
-        return self._runner.run(scp_cmd)
+        return self.runner.run(scp_cmd)
 
     def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
@@ -255,7 +255,7 @@ class BaseSSHConnection(object):
                     for s in assure_list(source)]
         # add destination path
         scp_cmd += [destination]
-        return self._runner.run(scp_cmd)
+        return self.runner.run(scp_cmd)
 
     def get_annex_installdir(self):
         key = 'installdir:annex'
@@ -477,7 +477,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             # "Master is running" and that is normal, not worthy warning about
             # etc -- we are doing the check here for successful operation
             with tempfile.TemporaryFile() as tempf:
-                out, err = self._runner.run(cmd, stdin=tempf, expect_stderr=True)
+                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -551,7 +551,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
-            self._runner.run(cmd, expect_stderr=True, expect_fail=True)
+            self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             lgr.debug("Failed to run close command")
             if self.ctrl_path.exists():
