@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import concurrent.futures
 import inspect
+import sys
 import time
 import uuid
 
@@ -24,6 +25,9 @@ from threading import Thread
 from . import ansi_colors as colors
 from ..log import log_progress
 from ..utils import path_is_subpath
+
+import logging
+lgr = logging.getLogger('datalad.parallel')
 
 
 def _count_str(count, verb, omg=False):
@@ -45,20 +49,30 @@ def no_parentds_in_futures(futures, path):
 
 
 class ProducerConsumer:
+    """Producer/Consumer implementation to (possibly) parallelize execution.
+
+    It is "effective" only for Python >= 3.8.
+
+    TODO
+    `producer` must produce unique entries. AssertionError might be raised if
+    the same entry is to be consumed.
+
+    In parallel execution, results are yielded as soon as available, so order
+    might not match the produced one.
     """
-    """
+
+    # We cannot use threads with asyncio WitlessRunner inside until
+    # 3.8.0 release (v3.8.0b2~37 to be exact)
+    # See https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
+    _can_use_threads = sys.version_info >= (3, 8, 0, 'final')
 
     def __init__(self,
                  producer, consumer,
+                 *,
                  jobs=None,
                  safe_to_consume=None,
                  reraise_immediately=False,
                  agg=None,
-                 # TODO: "absorb" into some more generic "logging" helper
-                 # so could be used not only with consumers which yield our records
-                 # 'agg' from above could also more relate to i
-                 label="Total", unit="items",
-                 lgr=None,
                  ):
         """
 
@@ -81,12 +95,11 @@ class ProducerConsumer:
         self.safe_to_consume = safe_to_consume
         self.reraise_immediately = reraise_immediately
         self.agg = agg
-        self.label = label
-        self.unit = unit
-        self.lgr = lgr
 
         self.total = None if self.agg else 0
-        self.producer_finished = None
+        self._jobs = None  # actual "parallel" jobs used
+        # Relevant only for _iter_threads
+        self._producer_finished = None
         self._producer_queue = None
         self._executor = None
         self._exc = []
@@ -97,8 +110,7 @@ class ProducerConsumer:
         if executor:
             executor.shutdown()
 
-    def add_to_producer_queue(self, value):
-        self._producer_queue.put(value)
+    def _update_total(self, value):
         if self.agg:
             self.total = (
                 self.agg(value, self.total) if self.total is not None else self.agg(value)
@@ -107,7 +119,52 @@ class ProducerConsumer:
             self.total += 1
 
     def __iter__(self):
-        self.producer_finished = False
+        jobs = self.jobs
+        if jobs == "auto" :
+            # ATM there is no "auto" for this operation.  We will just make it ...
+            # "auto" could be for some auto-scaling based on a single future time
+            # to complete, scaling up/down.  TODO
+            jobs = 5 if self._can_use_threads else 0
+        if jobs is None:
+            jobs = 1 if self._can_use_threads else 0
+        if jobs >= 1 and not self._can_use_threads:
+            lgr.debug("Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
+                      "Will run serially", jobs)
+            jobs = 0
+        self._jobs = jobs
+        if jobs == 0:
+            yield from self._iter_serial()
+        else:
+            yield from self._iter_threads(jobs)
+
+    def _iter_serial(self):
+        # depchecker is not consulted, serial execution
+        # reraise_immediately is also "always False by design"
+        # To allow consumer to add to the queue
+        self._producer_queue = producer_queue = Queue()
+
+        def produce():
+            # First consume all coming directly from producer and then go through all which
+            # consumer might have added to the producer queue
+            for args in self.producer:
+                self._update_total(args)
+                yield args
+            # consumer could have added to the queue while we were still
+            # producing
+            while not producer_queue.empty():
+                yield producer_queue.get()
+
+        for args in produce():
+            res = self.consumer(args)
+            if inspect.isgenerator(res):
+                lgr.debug("Got consumer worker which returned a generator %s", res)
+                yield from res
+            else:
+                lgr.debug("Got straight result %s, not a generator", res)
+                yield res
+
+    def _iter_threads(self, jobs):
+        self._producer_finished = False
         self._exc = []
 
         # To allow feeding producer queue with more entries, possibly from consumer!
@@ -122,7 +179,7 @@ class ProducerConsumer:
             except BaseException as e:
                 self._exc.append(e)
             finally:
-                self.producer_finished = True
+                self._producer_finished = True
 
         def consumer_worker(callable, *args, **kwargs):
             """Since jobs could return a generator and we cannot really "inspect" for that
@@ -147,27 +204,8 @@ class ProducerConsumer:
         producer_thread = Thread(target=producer_worker)
         producer_thread.start()
 
-        # LOGGING
-        pid = str(uuid.uuid4())  # could be based on PID and time may be to be informative?
-        lgr = self.lgr
-        label = self.label
-        if lgr is None:
-            from .. import lgr
-        log_progress(lgr.info, pid,
-                     "%s: starting", self.label,
-                     # will become known only later total=len(items),
-                     label=self.label, unit=" " + self.unit)
-        counts = defaultdict(int)
-
         futures = {}
 
-        total_announced = self.total
-        jobs = self.jobs or 1
-        if jobs == "auto":
-            # ATM there is no "auto" for this operation.  We will just make it ...
-            # "auto" could be for some auto-scaling based on a single future time
-            # to complete, scaling up/down.  TODO
-            jobs = 5
         lgr.debug("Initiating ThreadPoolExecutor with %d jobs", jobs)
         # we will increase sleep_time when doing nothing useful
         sleeper = Sleeper()
@@ -178,25 +216,11 @@ class ProducerConsumer:
                 done_useful = False
                 if self.reraise_immediately and self._exc:
                     break
-                if (self.producer_finished and
+                if (self._producer_finished and
                         not futures and
                         consumer_queue.empty() and
                         producer_queue.empty()):
                     break
-
-                # LOGGING
-                if self.total and total_announced != self.total:
-                    # update total with new information
-                    log_progress(
-                        lgr.info,
-                        pid,
-                        None,  # I do not think there is something valuable to announce
-                        total=self.total,
-                        # unfortunately of no effect, so we cannot inform that more items to come
-                        # unit=("+" if not it.finished else "") + " " + unit,
-                        update=0  # not None, so it does not stop
-                    )
-                    total_announced = self.total
 
                 # important!  We are using threads, so worker threads will be sharing CPU time
                 # with this master thread. For it to become efficient, we should consume as much
@@ -222,28 +246,10 @@ class ProducerConsumer:
                 # check active futures
                 if not consumer_queue.empty():
                     done_useful = True
-
                     # ATM we do not bother of some "in order" reporting
                     # Just report as soon as any new record arrives
                     res = consumer_queue.get()
                     lgr.debug("Got %s from consumer_queue", res)
-                    # LOGGING
-                    counts[res["status"]] += 1
-                    count_strs = (_count_str(*args)
-                                  for args in [(counts["notneeded"], "skipped", False),
-                                               (counts["error"], "failed", True)])
-                    if counts["notneeded"] or counts["error"]:
-                        label = "{} ({})".format(
-                            self.label,
-                            ", ".join(filter(None, count_strs)))
-
-                    log_progress(
-                        lgr.error if res["status"] == "error" else lgr.info,
-                        pid,
-                        "%s: processed result%s", self.label,
-                        " for " + res["path"] if "path" in res else "",
-                        label=label, update=1, increment=True)
-
                     yield res
 
                 done_useful |= _prune_futures(futures, lgr)
@@ -253,19 +259,17 @@ class ProducerConsumer:
                     lgr.log(5,
                         "Did nothing useful, sleeping. Have "
                         "producer_finished=%s producer_queue.empty=%s futures=%s consumer_queue.empty=%s",
-                        self.producer_finished,
-                        producer_queue.empty(),
-                        futures,
-                        consumer_queue.empty(),
-                    )
+                            self._producer_finished,
+                            producer_queue.empty(),
+                            futures,
+                            consumer_queue.empty(),
+                            )
                     sleeper()
                 else:
                     sleeper.reset()
 
         self._executor = None
 
-        # LOGGING
-        log_progress(lgr.info, pid, "%s: done", self.label)
         producer_thread.join()
         if self._exc:
             if len(self._exc) > 1:
@@ -276,6 +280,10 @@ class ProducerConsumer:
             assert not futures, \
                 "There is still %d active futures for following args: %s" \
                 % (len(futures), ', '.join(futures))
+
+    def add_to_producer_queue(self, value):
+        self._producer_queue.put(value)
+        self._update_total(value)
 
 
 def _prune_futures(futures, lgr):
@@ -312,3 +320,80 @@ class Sleeper():
 
     def reset(self):
         self.sleep_time = self.min_sleep_time
+
+
+class ProducerConsumerProgressLog(ProducerConsumer):
+    """ProducerConsumer wrapper with log_progress reporting.
+
+    It will update .total of the log_progress each time it changes (i.e. whenever
+    producer produced new values to be consumed).
+    """
+
+    def __init__(self,
+                 producer, consumer,
+                 *,
+                 label="Total", unit="items",
+                 lgr=None,
+                 **kwargs
+                 ):
+        """
+
+        Parameters
+        ----------
+        producer, consumer, **kwargs
+          Passed into ProducerConsumer. Most likely kwargs must not include 'agg' or
+          if provided, it must return an 'int' value.
+        label, unit: str, optional
+          Provided to log_progress
+        lgr: logger, optional
+          Provided to log_progress. Local one is used if not provided
+        """
+        super().__init__(producer, consumer, **kwargs)
+        self.label = label
+        self.unit = unit
+        self.lgr = lgr
+
+    def __iter__(self):
+        pid = str(uuid.uuid4())  # could be based on PID and time may be to be informative?
+        lgr_ = self.lgr
+        label = self.label
+        if lgr_ is None:
+            lgr_ = lgr
+
+        log_progress(lgr_.info, pid,
+                     "%s: starting", self.label,
+                     # will become known only later total=len(items),
+                     label=self.label, unit=" " + self.unit)
+        counts = defaultdict(int)
+        total_announced = self.total
+        for res in super().__iter__():
+            if self.total and total_announced != self.total:
+                # update total with new information
+                log_progress(
+                    lgr_.info,
+                    pid,
+                    None,  # I do not think there is something valuable to announce
+                    total=self.total,
+                    # unfortunately of no effect, so we cannot inform that more items to come
+                    # unit=("+" if not it.finished else "") + " " + unit,
+                    update=0  # not None, so it does not stop
+                )
+                total_announced = self.total
+
+            counts[res["status"]] += 1
+            count_strs = (_count_str(*args)
+                          for args in [(counts["notneeded"], "skipped", False),
+                                       (counts["error"], "failed", True)])
+            if counts["notneeded"] or counts["error"]:
+                label = "{} ({})".format(
+                    self.label,
+                    ", ".join(filter(None, count_strs)))
+
+            log_progress(
+                lgr_.error if res["status"] == "error" else lgr_.info,
+                pid,
+                "%s: processed result%s", self.label,
+                " for " + res["path"] if "path" in res else "",
+                label=label, update=1, increment=True)
+            yield res
+        log_progress(lgr_.info, pid, "%s: done", self.label)

@@ -6,7 +6,6 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-import sys
 
 from time import sleep, time
 from functools import partial
@@ -16,6 +15,7 @@ from datalad.support import path as op
 # absolute import only to be able to run test without `nose` so to see progress bar
 from datalad.support.parallel import (
     ProducerConsumer,
+    ProducerConsumerProgressLog,
     no_parentds_in_futures,
 )
 from datalad.tests.utils import (
@@ -29,8 +29,9 @@ from datalad.tests.utils import (
 
 from datalad.support.exceptions import IncompleteResultsError
 
-def test_ProducerConsumer():
-    def slowprod(n, secs=0.1):
+
+def check_ProducerConsumer(PC, jobs):
+    def slowprod(n, secs=0.001):
         for i in range(n):
             yield i
             sleep(secs)
@@ -38,18 +39,44 @@ def test_ProducerConsumer():
     def slowcons(i):
         # so takes longer to consume than to produce and progress bar will appear
         # after slowprod is done producing
-        #print(f"Consuming {i}")
-        #t0 = time()
-        sleep(0.2)
-        #print(f"Consumed {i} in {time() - t0}")
+        sleep(0.002)
+        yield from fastcons(i)
+
+    def fastcons(i):
+        # we should still work correctly if consumer is fast!
         yield {
             "i": i, "status": "ok" if i % 2 else "error"
         }
-    assert_equal(list(ProducerConsumer(
-        slowprod(10),
-        slowcons,
-        jobs=10,
-    )), [{"i": i, "status": "ok" if i % 2 else "error"} for i in range(10)])
+
+    for cons in fastcons, slowcons:
+        # sorted since order of completion is not guaranteed
+        assert_equal(
+            sorted(PC(
+                slowprod(10),
+                cons,
+                jobs=jobs),
+                key=lambda r: r['i']),
+            [{"i": i, "status": "ok" if i % 2 else "error"} for i in range(10)])
+
+
+def check_producing_consumer(jobs):
+    def producer():
+        yield from range(3)
+    def consumer(i):
+        yield i
+        if isinstance(i, int):
+            pc.add_to_producer_queue(str(i**2))
+
+    pc = ProducerConsumer(producer(), consumer, jobs=jobs)
+    assert_equal(list(pc), [0, 1, 2, "0", "1", "4"])
+
+
+def test_ProducerConsumer():
+        # Largely a smoke test, which only verifies correct results output
+    for jobs in "auto", None, 1, 10:
+        for PC in ProducerConsumer, ProducerConsumerProgressLog:
+            yield check_ProducerConsumer, PC, jobs
+        yield check_producing_consumer, jobs
 
 
 @with_tempfile(mkdir=True)
@@ -80,7 +107,7 @@ def test_creatsubdatasets(topds_path, n=10):
 
 
 # it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
-@skip_if(sys.version_info < (3, 8, 0, 'final'), msg="Known to be buggy/stall")
+@skip_if(not ProducerConsumer._can_use_threads, msg="Known to be buggy/stall")
 def test_stalling(kill=False):
     import concurrent.futures
     from datalad.cmd import WitlessRunner
@@ -116,6 +143,6 @@ def test_stalling(kill=False):
 
 
 if __name__ == '__main__':
-    # test_ProducerConsumer()
+    test_ProducerConsumer()
     # test_creatsubdatasets()
-    test_stalling(kill=True)
+    # test_stalling(kill=True)

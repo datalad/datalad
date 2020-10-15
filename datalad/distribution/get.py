@@ -59,7 +59,7 @@ from datalad.support.network import (
     urlquote,
 )
 from datalad.support.parallel import (
-    ProducerConsumer,
+    ProducerConsumerProgressLog,
 )
 from datalad.dochelpers import (
     single_or_plural,
@@ -576,7 +576,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         if producer_only:
             yield from producer
         else:
-            producer_consumer = ProducerConsumer(
+            producer_consumer = ProducerConsumerProgressLog(
                 producer,
                 consumer,
                 # no safe_to_consume= is needed since we are doing only at a single level ATM

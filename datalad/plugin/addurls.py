@@ -37,7 +37,7 @@ from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
 from datalad.support.parallel import (
-    ProducerConsumer,
+    ProducerConsumerProgressLog,
     no_parentds_in_futures,
 )
 from datalad.support.s3 import get_versioned_url
@@ -886,7 +886,7 @@ class Addurls(Interface):
                 subpaths_to_create.append(spath_full)
 
         if subpaths_to_create:
-            yield from ProducerConsumer(
+            yield from ProducerConsumerProgressLog(
                 sorted(subpaths_to_create),
                 partial(create,
                         result_xfm=None,
