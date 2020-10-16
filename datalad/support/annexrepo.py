@@ -1443,11 +1443,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return list(self.add_(
             files, git=git, backend=backend, options=options, jobs=jobs,
-            git_options=git_options, annex_options=annex_options, update=update
+            git_options=git_options, annex_options=annex_options, update=update,
+            expect_success=True
         ))
 
     def add_(self, files, git=None, backend=None, options=None, jobs=None,
-            git_options=None, annex_options=None, update=False):
+            git_options=None, annex_options=None, update=False, expect_success=False):
         """Like `add`, but returns a generator"""
         if update and not git:
             raise InsufficientArgumentsError("option 'update' requires 'git', too")
@@ -1515,6 +1516,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # explicitly use git-add with --update instead of git-annex-add
             # TODO: This might still need some work, when --update AND files
             # are specified!
+            # ATM if would raise exception if add fails, regardless of expect_success
             for r in super(AnnexRepo, self).add(
                     files,
                     git=True,
@@ -1523,7 +1525,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 yield r
 
         else:
-            for r in self._run_annex_command_json(
+            yield from self._run_annex_command_json(
                     'add',
                     opts=options,
                     files=files,
@@ -1531,8 +1533,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                     expect_fail=True,
                     jobs=jobs,
                     expected_entries=expected_additions,
-                    expect_stderr=True):
-                yield r
+                    expect_stderr=True,
+                    expect_success=expect_success,
+            )
 
     @normalize_paths
     def get_file_key(self, files, batch=None):
@@ -2181,6 +2184,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 files=None,
                                 expected_entries=None,
                                 progress=False,
+                                expect_success=False,
                                 **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
 
@@ -2191,6 +2195,9 @@ class AnnexRepo(GitRepo, RepoInterface):
           ProcessAnnexProgressIndicators to display progress
         progress: bool, optional
           Whether to request/handle --json-progress
+        expect_success: bool, optional
+          If set to True, we would raise IncompleteResultError if any json record
+          has 'success' set to False
         **kwargs
           Passed to ._run_annex_command
         """
@@ -2377,6 +2384,17 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 return_objects.append(obj)
 
+        if expect_success:
+            succeeded, failed = [], []
+            for obj in json_objects:
+                (succeeded if obj.get('success', True) else failed).append(obj)
+            if failed:
+                raise IncompleteResultsError(
+                    results=succeeded,
+                    failed=failed,
+                    msg="Failed to annex %s with %d failed and %d ok"
+                        % (command, len(failed), len(succeeded))
+                )
         return return_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always

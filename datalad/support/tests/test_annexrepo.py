@@ -2196,13 +2196,14 @@ def check_files_split_exc(cls, topdir):
     # absent files -- should not crash with "too long" but some other more
     # meaningful exception
     files = ["f" * 100 + "%04d" % f for f in range(100000)]
+    with assert_raises(Exception) as ecm:
+        r.add(files)
     if isinstance(r, AnnexRepo):
         # Annex'es add first checks for what is being added and does not fail
         # for non existing files either ATM :-/  TODO: make consistent etc
-        r.add(files)
+        # But since we use --json and process output in .add(), we do get an exception
+        assert isinstance(ecm.exception, IncompleteResultsError)
     else:
-        with assert_raises(Exception) as ecm:
-            r.add(files)
         assert_not_in('too long', str(ecm.exception))
         assert_not_in('too many', str(ecm.exception))
 
@@ -2255,7 +2256,9 @@ def test_files_split():
 @with_tree({
     'repo': {
         'file1': 'file1',
-        'file2': 'file2'
+        'file2': 'file2',
+        'file_to_add1': 'file_to_add1',
+        'file_to_add2': 'file_to_add2',
     }
 })
 def test_ro_operations(path):
@@ -2310,6 +2313,26 @@ def test_ro_operations(path):
 
     # just check that all is good again
     repo2.repo_info()
+
+    # Test that .add would not just "complete"
+    file_to_add1 = str(repo.pathobj / "file_to_add1")
+    file_to_add2 = str(repo.pathobj / "file_to_add2")
+    # Make 2nd one non-addable
+    run(['chmod', 'a-w', file_to_add2])
+    sudochown(['root', file_to_add2])
+    try:
+        # Generator form should work out, just report that not succeeded
+        rec = list(repo.add_(file_to_add2))
+        assert_equal(len(rec), 1)
+        assert_equal(rec[0]['success'], False)
+        # Non-generator version must raise
+        with assert_raises(IncompleteResultsError) as ce:
+            repo.add([file_to_add2, file_to_add1])
+        # and we did not exit prematurely
+        assert_equal(ce.exception.results[0]['file'], 'file_to_add1')
+        assert_equal(ce.exception.failed[0]['file'], 'file_to_add2')
+    finally:
+        sudochown(['-R', str(os.geteuid()), file_to_add1])
 
 
 @skip_if_on_windows
