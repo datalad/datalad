@@ -165,6 +165,8 @@ class BaseSSHConnection(object):
             log_online=not log_output
         )
 
+        lgr.debug("%s is used to run %s", self, ssh_cmd)
+
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
         return self.runner.run(
@@ -522,7 +524,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         cmd = ["ssh"] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
 
         # start control master:
-        lgr.debug("Opening %s by calling %s" % (self, cmd))
+        lgr.debug("Opening %s by calling %s", self, cmd)
         proc = Popen(cmd)
         stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
 
