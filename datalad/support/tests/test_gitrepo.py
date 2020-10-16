@@ -49,6 +49,7 @@ from datalad.tests.utils import (
     ok_,
     skip_if_no_network,
     skip_if_on_windows,
+    skip_nomultiplex_ssh,
     skip_ssh,
     SkipTest,
     slow,
@@ -531,7 +532,7 @@ def _path2localsshurl(path):
 # broken,possibly due to a GitPy issue with windows sshurls
 # see https://github.com/datalad/datalad/pull/3638
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
 def test_GitRepo_ssh_fetch(remote_path, repo_path):
@@ -565,7 +566,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 # broken,possibly due to a GitPy issue with windows sshurls
 # see https://github.com/datalad/datalad/pull/3638
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_pull(remote_path, repo_path):
@@ -604,7 +605,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 # broken,possibly due to a GitPy issue with windows sshurls
 # see https://github.com/datalad/datalad/pull/3638
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_push(repo_path, remote_path):

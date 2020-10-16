@@ -21,6 +21,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureListOf
 from datalad.support.constraints import EnsureStr
+from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -267,6 +268,13 @@ definitions = {
                'title': "If set, pass this file as ssh's -i option."}),
         'destination': 'global',
         'default': None,
+    },
+    'datalad.ssh.multiplex-connections': {
+        'ui': ('question', {
+               'title': "Whether to use a single shared connection for multiple SSH processes aiming at the same target."}),
+        'destination': 'global',
+        'default': not on_windows,
+        'type': EnsureBool(),
     },
     'datalad.annex.retry': {
         'ui': ('question',

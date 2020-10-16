@@ -951,7 +951,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # So that we "share" control paths with git/git-annex
         if ssh_manager:
-            ssh_manager.assure_initialized()
+            ssh_manager.ensure_initialized()
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
