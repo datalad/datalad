@@ -418,6 +418,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         remote_name: str
         url: str
         """
+        if not self.config.obtain('datalad.ssh.multiplex-connections'):
+            return
+
         from datalad.support.network import is_ssh
         # Note:
         #

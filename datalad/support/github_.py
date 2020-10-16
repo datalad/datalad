@@ -334,7 +334,11 @@ def _make_github_repos(
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
                 res.append((ds,) + ensure_tuple_or_list(res_))
-            except gh.BadCredentialsException as e:
+            except (gh.BadCredentialsException, gh.GithubException) as e:
+                if not isinstance(e, gh.BadCredentialsException) and e.status != 403:
+                    # e.g. while deleting a repository, just a generic GithubException is
+                    # raised but code is 403.  That one we process, the rest - re-raise
+                    raise
                 if res:
                     # so we have succeeded with at least one repo already -
                     # we should not try any other credential.
@@ -386,8 +390,30 @@ def _make_github_repo(github_login, entity, reponame, existing,
                 lgr.error(msg)
             else:
                 raise ValueError(msg)
+        elif existing == 'replace':
+            _msg = 'repository "%s" already exists on GitHub.' % reponame
+            if dryrun:
+                lgr.info(_msg + " Deleting (dry)")
+            else:
+                # Since we are running in the loop trying different tokens,
+                # this message might appear twice. TODO: avoid
+                if ui.is_interactive:
+                    remove = ui.yesno(
+                        "Do you really want to remove it?",
+                        title=_msg,
+                        default=False
+                    )
+                else:
+                    raise RuntimeError(
+                        _msg +
+                        " Remove it manually first on GitHub or rerun datalad in "
+                        "interactive shell to confirm this action.")
+                if not remove:
+                    raise RuntimeError(_msg)
+                repo.delete()
+                repo = None
         else:
-            RuntimeError('to must not happen')
+            RuntimeError('must not happen')
 
     if repo is None and not dryrun:
         try:

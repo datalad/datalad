@@ -275,6 +275,25 @@ def skip_ssh(func):
     return  _wrap_skip_ssh
 
 
+def skip_nomultiplex_ssh(func):
+    """Skips SSH tests if default connection/manager does not support multiplexing
+
+    e.g. currently on windows or if set via datalad.ssh.multiplex-connections config variable
+    """
+
+    check_not_generatorfunction(func)
+    from ..support.sshconnector import MultiplexSSHManager, SSHManager
+
+    @wraps(func)
+    @attr('skip_nomultiplex_ssh')
+    @skip_ssh
+    def  _wrap_skip_nomultiplex_ssh(*args, **kwargs):
+        if SSHManager is not MultiplexSSHManager:
+            raise SkipTest("SSH without multiplexing is used")
+        return func(*args, **kwargs)
+    return  _wrap_skip_nomultiplex_ssh
+
+
 @optional_args
 def skip_v6_or_later(func, method='raise'):
     """Skip tests if v6 or later will be used as the default repo version.

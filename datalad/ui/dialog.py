@@ -81,7 +81,7 @@ class ConsoleLog(object):
                      noninteractive_level=5)
 
     def error(self, error):
-        self.out.write("ERROR: %s\n" % error)
+        self.message("ERROR: %s" % error)
 
     def get_progressbar(self, *args, **kwargs):
         """Return a progressbar.  See e.g. `tqdmProgressBar` about the interface

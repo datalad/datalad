@@ -87,6 +87,7 @@ from datalad.tests.utils import (
     skip_if,
     skip_if_on_windows,
     skip_if_root,
+    skip_nomultiplex_ssh,
     skip_ssh,
     SkipTest,
     slow,
@@ -1116,7 +1117,7 @@ def test_annex_backends(path):
     eq_(repo.default_backends, ['MD5E'])
 
 
-@skip_ssh
+@skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
 def test_annex_ssh(topdir):
     # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
