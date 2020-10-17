@@ -2257,8 +2257,9 @@ def test_files_split():
     'repo': {
         'file1': 'file1',
         'file2': 'file2',
-        'file_to_add1': 'file_to_add1',
-        'file_to_add2': 'file_to_add2',
+        # use ro subdirectory to make file not renameable
+        'd1': {'file_to_add': 'file_to_add1'},
+        'd2': {'file_to_add': 'file_to_add2'},
     }
 })
 def test_ro_operations(path):
@@ -2315,10 +2316,11 @@ def test_ro_operations(path):
     repo2.repo_info()
 
     # Test that .add would not just "complete"
-    file_to_add1 = str(repo.pathobj / "file_to_add1")
-    file_to_add2 = str(repo.pathobj / "file_to_add2")
+    file_to_add1 = str(repo.pathobj / "d1" / "file_to_add")
+    dir_to_add2 = str(repo.pathobj / "d2")
+    file_to_add2 = str(repo.pathobj / "d2" / "file_to_add")
     # Make 2nd one non-addable
-    run(['chmod', 'a-w', file_to_add2])
+    run(['chmod', '-R', 'a-w', dir_to_add2])
     sudochown(['root', file_to_add2])
     try:
         # Generator form should work out, just report that not succeeded
@@ -2329,10 +2331,10 @@ def test_ro_operations(path):
         with assert_raises(IncompleteResultsError) as ce:
             repo.add([file_to_add2, file_to_add1])
         # and we did not exit prematurely
-        assert_equal(ce.exception.results[0]['file'], 'file_to_add1')
-        assert_equal(ce.exception.failed[0]['file'], 'file_to_add2')
+        assert_equal(ce.exception.results[0]['file'], 'd1/file_to_add')
+        assert_equal(ce.exception.failed[0]['file'], 'd2/file_to_add')
     finally:
-        sudochown(['-R', str(os.geteuid()), file_to_add1])
+        sudochown(['-R', str(os.geteuid()), dir_to_add2])
 
 
 @skip_if_on_windows
