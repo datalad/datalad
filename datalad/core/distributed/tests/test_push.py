@@ -245,9 +245,9 @@ def test_push():
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True, suffix='sub')
+@with_tempfile(mkdir=True, suffix='subnoannex')
+@with_tempfile(mkdir=True, suffix='subsub')
 def test_push_recursive(
         origin_path, src_path, dst_top, dst_sub, dst_subnoannex, dst_subsub):
     # dataset with two submodules and one subsubmodule
@@ -372,6 +372,14 @@ def test_push_recursive(
         assert_in_results(
             res, status='notneeded', type='dataset', path=d.path,
             refspec=DEFAULT_REFSPEC)
+
+    # if noannex target gets some annex, we still should not fail to push
+    target_subnoannex.call_git(['annex', 'init'])
+    # just to ensure that we do need something to push
+    (subnoannex.pathobj / "newfile").write_text("content")
+    subnoannex.save()
+    res = subnoannex.push(to="target")
+    assert_in_results(res, status='ok', type='dataset')
 
 
 @slow  # 12sec on Yarik's laptop

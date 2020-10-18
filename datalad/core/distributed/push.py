@@ -632,7 +632,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 "Sync local annex branch from pushurl after remote "
                 'availability update.')
         repo.call_git(fetch_cmd)
-        repo.localsync(target)
+        # If no CommandError was raised, it means that remote has git-annex
+        # but local repo might not be an annex yet. Since there is nothing to "sync"
+        # from us, we just skip localsync without mutating repo into an AnnexRepo
+        if is_annex_repo:
+            repo.localsync(target)
     except CommandError as e:
         # it is OK if the remote doesn't have a git-annex branch yet
         # (e.g. fresh repo)
