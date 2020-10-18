@@ -378,9 +378,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          done_fetch=None, got_path_arg=False):
-    if not done_fetch:
-        done_fetch = set()
+          got_path_arg=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -546,8 +544,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     # we know what to push and where, now dependency processing first
     for r in publish_depends:
         # simply make a call to this function again, all the same, but
-        # target is different, pass done_fetch to avoid duplicate
-        # and expensive calls to git-fetch
+        # target is different
         yield from _push(
             dspath,
             content,
@@ -558,7 +555,6 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             jobs,
             res_kwargs.copy(),
             pbars,
-            done_fetch=None,
             got_path_arg=got_path_arg,
         )
 
