@@ -338,6 +338,7 @@ class ProducerConsumerProgressLog(ProducerConsumer):
     def __init__(self,
                  producer, consumer,
                  *,
+                 log_filter=None,
                  label="Total", unit="items",
                  lgr=None,
                  **kwargs
@@ -349,12 +350,16 @@ class ProducerConsumerProgressLog(ProducerConsumer):
         producer, consumer, **kwargs
           Passed into ProducerConsumer. Most likely kwargs must not include 'agg' or
           if provided, it must return an 'int' value.
+        log_filter: callable, optional
+          If defined, only result records for which callable evaluates to True will be
+          passed to log_progress
         label, unit: str, optional
           Provided to log_progress
         lgr: logger, optional
           Provided to log_progress. Local one is used if not provided
         """
         super().__init__(producer, consumer, **kwargs)
+        self.log_filter = log_filter
         self.label = label
         self.unit = unit
         self.lgr = lgr
@@ -371,7 +376,7 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                      # will become known only later total=len(items),
                      label=self.label, unit=" " + self.unit)
         counts = defaultdict(int)
-        total_announced = self.total
+        total_announced = None  # self.total
         for res in super().__iter__():
             if self.total and total_announced != self.total:
                 # update total with new information
@@ -386,20 +391,21 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                 )
                 total_announced = self.total
 
-            counts[res["status"]] += 1
-            count_strs = (_count_str(*args)
-                          for args in [(counts["notneeded"], "skipped", False),
-                                       (counts["error"], "failed", True)])
-            if counts["notneeded"] or counts["error"]:
-                label = "{} ({})".format(
-                    self.label,
-                    ", ".join(filter(None, count_strs)))
+            if not (self.log_filter and not self.log_filter(res)):
+                counts[res["status"]] += 1
+                count_strs = (_count_str(*args)
+                              for args in [(counts["notneeded"], "skipped", False),
+                                           (counts["error"], "failed", True)])
+                if counts["notneeded"] or counts["error"]:
+                    label = "{} ({})".format(
+                        self.label,
+                        ", ".join(filter(None, count_strs)))
 
-            log_progress(
-                lgr_.error if res["status"] == "error" else lgr_.info,
-                pid,
-                "%s: processed result%s", self.label,
-                " for " + res["path"] if "path" in res else "",
-                label=label, update=1, increment=True)
+                log_progress(
+                    lgr_.error if res["status"] == "error" else lgr_.info,
+                    pid,
+                    "%s: processed result%s", self.label,
+                    " for " + res["path"] if "path" in res else "",
+                    label=label, update=1, increment=True)
             yield res
         log_progress(lgr_.info, pid, "%s: done", self.label)

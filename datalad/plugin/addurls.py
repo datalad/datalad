@@ -972,14 +972,28 @@ class Addurls(Interface):
             # and now resort them again since we added
             rows_by_ds = sorted(rows_by_ds, key=lambda r: r[0])
 
+        # We want to provide progress overall files not just datasets
+        # so our total will be just a len of rows
+        def agg_files(*args, **kwargs):
+            return len(rows)
+
         yield from ProducerConsumerProgressLog(
             rows_by_ds,
             addurls_to_ds,
+            agg=agg_files,
             safe_to_consume=no_parentds_in_futures,
             # our producer provides not only dataset paths and also rows, take just path
             producer_future_key=lambda row_by_ds: row_by_ds[0],
-            unit="datasets",
             jobs=jobs,
+            # Logging options
+            # we will be yielding all kinds of records, but of interest for progress
+            # reporting only addurls on files
+            # note: annexjson2result overrides 'action' with 'command' content from
+            # annex, so we end up with 'addurl' even if we provide 'action'='addurls'.
+            # TODO: see if it is all ok, since we might be now yielding both
+            # addurls and addurl records.
+            log_filter=lambda res: res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"],
+            unit="files",
             lgr=lgr,
         )
 
