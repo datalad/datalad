@@ -1054,7 +1054,6 @@ def download_url(url, dest=None, overwrite=False):
     """
     from datalad.downloaders.providers import Providers
     providers = Providers.from_config_files()
-    # not returning anything: download() seems to just echo `dest`
     if dest:
         return providers.download(url, path=str(dest), overwrite=overwrite)
     else:
