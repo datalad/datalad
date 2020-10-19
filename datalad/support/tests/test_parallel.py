@@ -72,12 +72,26 @@ def check_producing_consumer(jobs):
     assert_equal(list(pc), [0, 1, 2, "0", "1", "4"])
 
 
+def check_producer_future_key(jobs):
+    def producer():
+        for i in range(3):
+            yield i, {"k": i**2}  # dict is mutable, will need a key
+
+    def consumer(args):
+        i, d = args
+        yield i
+
+    pc = ProducerConsumer(producer(), consumer, producer_future_key=lambda r: r[0], jobs=jobs)
+    assert_equal(list(pc), [0, 1, 2])
+
+
 def test_ProducerConsumer():
         # Largely a smoke test, which only verifies correct results output
     for jobs in "auto", None, 1, 10:
         for PC in ProducerConsumer, ProducerConsumerProgressLog:
             yield check_ProducerConsumer, PC, jobs
         yield check_producing_consumer, jobs
+        yield check_producer_future_key, jobs
 
 
 @slow  # 12sec on Yarik's laptop

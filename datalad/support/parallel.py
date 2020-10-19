@@ -71,6 +71,7 @@ class ProducerConsumer:
                  *,
                  jobs=None,
                  safe_to_consume=None,
+                 producer_future_key=None,
                  reraise_immediately=False,
                  agg=None,
                  ):
@@ -79,11 +80,14 @@ class ProducerConsumer:
         Parameters
         ----------
         ...
-        safe_to_consume: callable
+        safe_to_consume: callable, optional
           A callable which gets a dict of all known futures and current producer output.
           It should return True if we can proceed with current value from producer.
           If unsafe - we will wait.  WARNING: outside code should make sure about provider and
           safe_to_consume to play nicely or deadlock can happen.
+        producer_future_key: callable, optional
+          A key function for a value from producer which will be used as a key in futures
+          dictionary and output of which is passed to safe_to_consume
         reraise_immediately: bool, optional
           If True, it would stop producer yielding values as soon as it detects that some
           exception has occurred (although there might still be values in the queue to be yielded
@@ -93,6 +97,7 @@ class ProducerConsumer:
         self.consumer = consumer
         self.jobs = jobs
         self.safe_to_consume = safe_to_consume
+        self.producer_future_key = producer_future_key
         self.reraise_immediately = reraise_immediately
         self.agg = agg
 
@@ -229,17 +234,18 @@ class ProducerConsumer:
                     done_useful = True
                     try:
                         job_args = producer_queue.get() # timeout=0.001)
+                        job_key = self.producer_future_key(job_args) if self.producer_future_key else job_args
                         if self.safe_to_consume:
                             # Sleep a little if we are not yet ready
                             # TODO: add some .debug level reporting based on elapsed time
                             # IIRC I did smth like growing exponentially delays somewhere (dandi?)
-                            while not self.safe_to_consume(futures, job_args):
+                            while not self.safe_to_consume(futures, job_key):
                                 _prune_futures(futures, lgr) or sleeper()
                         # Current implementation, to provide depchecking, relies on unique
                         # args for the job
-                        assert job_args not in futures
+                        assert job_key not in futures
                         lgr.debug("Submitting worker future for %s", job_args)
-                        futures[job_args] = executor.submit(consumer_worker, self.consumer, job_args)
+                        futures[job_key] = executor.submit(consumer_worker, self.consumer, job_args)
                     except Empty:
                         pass
 
