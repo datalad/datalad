@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     assert_raises,
     rmtree,
     skip_if,
+    slow,
     with_tempfile,
 )
 
@@ -79,8 +80,9 @@ def test_ProducerConsumer():
         yield check_producing_consumer, jobs
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tempfile(mkdir=True)
-def test_creatsubdatasets(topds_path, n=10):
+def test_creatsubdatasets(topds_path, n=2):
     from datalad.distribution.dataset import Dataset
     from datalad.api import create
     ds = Dataset(topds_path).create()
@@ -101,7 +103,7 @@ def test_creatsubdatasets(topds_path, n=10):
 
     # and this one followed by save should be good IFF we provide our dependency checker
     ds = Dataset(topds_path).create()
-    list(ProducerConsumer(paths, create_, safe_to_consume=no_parentds_in_futures, jobs=10))
+    list(ProducerConsumer(paths, create_, safe_to_consume=no_parentds_in_futures, jobs=5))
     ds.save(paths)
     assert_repo_status(ds.repo)
 
