@@ -520,6 +520,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
 def _add_urls(rows, ds, repo, ifexists=None, options=None):
     """Call `git annex addurl` using information in `rows`.
     """
+    add_metadata = {}
     for row in rows:
         filename_abs = row["filename_abs"]
         filename = row["ds_filename"]
@@ -554,21 +555,25 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None):
         # In the case of an error, the json object has file=None.
         if out_json["file"] is None:
             out_json["file"] = filename_abs
-        yield annexjson2result(out_json, ds, action="addurls",
-                               type="file", logger=lgr)
+        res_addurls = annexjson2result(
+            out_json, ds, action="addurls",
+            type="file", logger=lgr)
+        if res_addurls["status"] == "ok" and row.get("meta_args"):
+            add_metadata[filename] = row["meta_args"]
+        yield res_addurls
 
+    if not add_metadata:
+        return
 
-@with_result_progress("Adding metadata")
-def _add_meta(rows, ds, repo):
-    """Call `git annex metadata --set` using information in `rows`.
-    """
+    # For some reason interleaving batched addurl and regular metadata calls
+    # causes multiple commits, so we do need to have it separate.
+    # TODO: figure out with Joey either could be avoided
     from unittest.mock import patch
-
     with patch.object(repo, "always_commit", False):
-        for row in rows:
-            filename = row["ds_filename"]
+        for filename, meta in add_metadata.items():
             lgr.debug("Adding metadata to %s in %s", filename, repo.path)
-            for a in repo.set_metadata_(filename, add=row["meta_args"]):
+            assert not repo.always_commit
+            for a in repo.set_metadata_(filename, add=meta):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
                 # Don't show all added metadata for the file because that
                 # could quickly flood the output.
@@ -941,11 +946,7 @@ class Addurls(Interface):
                     subds_files_to_add.add(r["path"])
                 yield r
 
-            if subds_files_to_add:
-                meta_rows = [r for r in rows if r["filename_abs"] in subds_files_to_add and r["meta_args"]]
-                yield from _add_meta(meta_rows, subds, repo)
-
-                files_to_add.update(subds_files_to_add)
+            files_to_add.update(subds_files_to_add)
             pass  # end of addurls_to_ds
 
 
