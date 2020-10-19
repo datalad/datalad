@@ -353,7 +353,7 @@ def with_result_progress(fn, label="Total", unit=" Files"):
     pid = str(fn)
     base_label = label
 
-    def _wrap_with_result_progress_(items, **kwargs):
+    def _wrap_with_result_progress_(items, *args, **kwargs):
         counts = defaultdict(int)
 
         label = base_label
@@ -361,7 +361,7 @@ def with_result_progress(fn, label="Total", unit=" Files"):
                      "%s: starting", label,
                      total=len(items), label=label, unit=unit)
 
-        for res in fn(items, **kwargs):
+        for res in fn(items, *args, **kwargs):
             counts[res["status"]] += 1
             count_strs = (count_str(*args)
                           for args in [(counts["notneeded"], "skipped", False),
@@ -380,8 +380,8 @@ def with_result_progress(fn, label="Total", unit=" Files"):
             yield res
         log_progress(lgr.info, pid, "%s: done", base_label)
 
-    def _wrap_with_result_progress(items, **kwargs):
-        return list(_wrap_with_result_progress_(items, **kwargs))
+    def _wrap_with_result_progress(items, *args, **kwargs):
+        return list(_wrap_with_result_progress_(items, *args, **kwargs))
 
     return _wrap_with_result_progress_ \
         if inspect.isgeneratorfunction(fn) \
