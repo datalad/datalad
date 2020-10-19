@@ -38,6 +38,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
+    getpwd,
     partition,
 )
 
@@ -215,14 +216,17 @@ class Subdatasets(Interface):
             bottomup=False,
             set_property=None,
             delete_property=None):
-        # no constraints given -> query subdatasets under curdir
-        if not path and dataset is None:
-            path = os.curdir
         paths = [resolve_path(p, dataset) for p in ensure_list(path)] \
             if path else None
 
         ds = require_dataset(
             dataset, check_installed=True, purpose='subdataset reporting/modification')
+
+        # no constraints given -> query subdatasets under curdir
+        if not paths and dataset is None:
+            cwd = getpwd()
+            paths = None if cwd == ds.path else [cwd]
+
         lgr.debug('Query subdatasets of %s', dataset)
         if paths is not None:
             lgr.debug('Query subdatasets underneath paths: %s', paths)
