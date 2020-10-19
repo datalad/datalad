@@ -647,7 +647,8 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
         ds.addurls(
             self.json_file, "{url}",
-            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}")
+            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}",
+            jobs=3)
         eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
             {"foo",
              "bar",
