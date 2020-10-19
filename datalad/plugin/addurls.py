@@ -874,12 +874,9 @@ class Addurls(Interface):
 
         annex_options = ["--fast"] if fast else []
 
-        message_addurls = message or """\
-[DATALAD] add files from URLs
-
-url_file='{}'
-url_format='{}'
-filename_format='{}'""".format(url_file, url_format, filename_format)
+        # to be populated by addurls_to_ds
+        files_to_add = set()
+        created_subds = []
 
         def addurls_to_ds(args):
             """The "consumer" for ProducerConsumer parallel execution"""
@@ -911,6 +908,7 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
                 yield from subds.create(result_xfm=None,
                                         cfg_proc=cfg_proc,
                                         return_type='generator')
+                created_subds.append(subpath)
             repo = subds.repo  # "expensive" so we get it once
 
             if version_urls:
@@ -937,18 +935,17 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
                                  update=1, increment=True)
                 log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
 
-            files_to_add = set()
+            subds_files_to_add = set()
             for r in _add_urls(rows, subds, repo, ifexists=ifexists, options=annex_options):
                 if r["status"] == "ok":
-                    files_to_add.add(r["path"])
+                    subds_files_to_add.add(r["path"])
                 yield r
 
-            if files_to_add:
-                meta_rows = [r for r in rows if r["filename_abs"] in files_to_add and r["meta_args"]]
+            if subds_files_to_add:
+                meta_rows = [r for r in rows if r["filename_abs"] in subds_files_to_add and r["meta_args"]]
                 yield from _add_meta(meta_rows, subds, repo)
 
-                if save:
-                    yield from subds.save(path=files_to_add, message=message_addurls, recursive=True)
+                files_to_add.update(subds_files_to_add)
             pass  # end of addurls_to_ds
 
 
@@ -984,10 +981,24 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
             jobs=jobs,
             lgr=lgr,
         )
+        extra_msgs = []
+        if created_subds:
+            extra_msgs.append(f"{len(created_subds)} subdatasets were created")
+        if extra_msgs:
+            extra_msgs.append('')
+        message_addurls = message or f"""\
+[DATALAD] add {len(files_to_add)} files to {len(rows_by_ds)} (sub)datasets from URLs
+
+{os.linesep.join(extra_msgs)}
+url_file='{url_file}'
+url_format='{url_format}'
+filename_format='{filenameformat}'"""
+
         # save all in bulk
+        files_to_add.update([r[0] for r in rows_by_ds])
         yield from ds.save(
-            [r[0] for r in rows_by_ds],
-            message=message_addurls,  # custom? f"Addurl created and/or updated {len(rows_by_ds)} (sub)datasets",
+            list(files_to_add),
+            message=message_addurls,
             # TODO  jobs=jobs,
             return_type='generator')
 
