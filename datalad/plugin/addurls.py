@@ -516,7 +516,11 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     return infos, list(sort_paths(subpaths))
 
 
-@with_result_progress("Adding URLs")
+def _log_filter_addurls(res):
+    return res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"]
+
+
+@with_result_progress("Adding URLs", log_filter=_log_filter_addurls)
 def _add_urls(rows, ds, repo, ifexists=None, options=None):
     """Call `git annex addurl` using information in `rows`.
     """
@@ -993,7 +997,7 @@ class Addurls(Interface):
             # annex, so we end up with 'addurl' even if we provide 'action'='addurls'.
             # TODO: see if it is all ok, since we might be now yielding both
             # addurls and addurl records.
-            log_filter=lambda res: res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"],
+            log_filter=_log_filter_addurls,
             unit="files",
             lgr=lgr,
         )
