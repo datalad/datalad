@@ -206,9 +206,10 @@ def _describe_metadata_elements(group):
 
     for e in iter_entry_points(group):
         info = {}
-        infos[e.name] = info
+        infos['%s (%s)' % (e.name, str(e.dist))] = info
         try:
             info['module'] = e.module_name
+            info['distribution'] = str(e.dist)
             mod = import_module(e.module_name, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
             e.load()
