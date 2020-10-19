@@ -321,7 +321,7 @@ def log_progress(lgrcall, pid, *args, **kwargs):
 
 
 @optional_args
-def with_result_progress(fn, label="Total", unit=" Files"):
+def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
     """Wrap a progress bar, with status counts, around a function.
 
     Parameters
@@ -331,6 +331,10 @@ def with_result_progress(fn, label="Total", unit=" Files"):
         positional argument and any number of keyword arguments.  After
         processing each item in the collection, it should yield a status
         dict.
+    log_filter : callable, optional
+        If defined, only result records for which callable evaluates to True will be
+        passed to log_progress
+
     label, unit : str
         Passed to log.log_progress.
 
@@ -364,21 +368,22 @@ def with_result_progress(fn, label="Total", unit=" Files"):
                      total=len(items), label=label, unit=unit)
 
         for res in fn(items, *args, **kwargs):
-            counts[res["status"]] += 1
-            count_strs = (count_str(*args)
-                          for args in [(counts["notneeded"], "skipped", False),
-                                       (counts["error"], "failed", True)])
-            if counts["notneeded"] or counts["error"]:
-                label = "{} ({})".format(
-                    base_label,
-                    ", ".join(filter(None, count_strs)))
+            if not (log_filter and not log_filter(res)):
+                counts[res["status"]] += 1
+                count_strs = (count_str(*args)
+                              for args in [(counts["notneeded"], "skipped", False),
+                                           (counts["error"], "failed", True)])
+                if counts["notneeded"] or counts["error"]:
+                    label = "{} ({})".format(
+                        base_label,
+                        ", ".join(filter(None, count_strs)))
 
-            log_progress(
-                lgr.error if res["status"] == "error" else lgr.info,
-                pid,
-                "%s: processed result%s", base_label,
-                " for " + res["path"] if "path" in res else "",
-                label=label, update=1, increment=True)
+                log_progress(
+                    lgr.error if res["status"] == "error" else lgr.info,
+                    pid,
+                    "%s: processed result%s", base_label,
+                    " for " + res["path"] if "path" in res else "",
+                    label=label, update=1, increment=True)
             yield res
         log_progress(lgr.info, pid, "%s: done", base_label)
 
