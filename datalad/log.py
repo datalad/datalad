@@ -350,11 +350,13 @@ def with_result_progress(fn, label="Total", unit=" Files"):
                 msg = colors.color_word(msg, colors.RED)
             return msg
 
-    pid = str(fn)
+
     base_label = label
 
     def _wrap_with_result_progress_(items, *args, **kwargs):
         counts = defaultdict(int)
+
+        pid = "%s:%s" % (fn, random.randint(0, 100000))
 
         label = base_label
         log_progress(lgr.info, pid,
