@@ -176,15 +176,33 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     def get_indexer(metadata_format_name: str) -> callable:
         from pkg_resources import EntryPoint, iter_entry_points
 
-        # Use the first returned entry point, if any, because there can at most be
-        # one indexer for ``metadata_format_name´´.
-        indexer = (tuple(iter_entry_points('datalad.metadata.indexers', metadata_format_name)) or (None,))[0]
-        if isinstance(indexer, EntryPoint):
-            try:
-                indexer_object = indexer.load()(metadata_format_name)
-                return indexer_object.create_index
-            except Exception as e:
-                lgr.warning('Failed to load indexer %s: %s', indexer.name, exc_str(e))
+        all_indexers = tuple(iter_entry_points('datalad.metadata.indexers', metadata_format_name))
+        if all_indexers:
+            if len(all_indexers) > 1:
+                # Check that there is only one indexer of the requested name.
+                # In theory there could be multiple indexers, if different
+                # distributions provided the same entry point. So if there is
+                # more than one indexer, we know that different distributions
+                # have provided elements for the same entry point. Since we
+                # do not know which other changes the distributions have made,
+                # e.g. API changes, we cannot decide here, which entry point
+                # should be used. Issue a warning and use the fall-back indexer.
+                lgr.warning(
+                    "Multiple indexers for metadata format %s provided by the following distributions: "
+                    + ", ".join([str(indexer.dist) for indexer in all_indexers]),
+                    metadata_format_name)
+            else:
+                indexer = all_indexers[0]
+                if isinstance(indexer, EntryPoint):
+                    try:
+                        indexer_object = indexer.load()(metadata_format_name)
+                        return indexer_object.create_index
+                    except Exception as e:
+                        lgr.warning(
+                            'Failed to load indexer %s (%s): %s',
+                            indexer.name,
+                            str(indexer.dist),
+                            exc_str(e))
         lgr.info('Falling back to standard indexer for metadata format: %s', metadata_format_name)
         return lambda metadata: _deep_kv('', metadata)
 

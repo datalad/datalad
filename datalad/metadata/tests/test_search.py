@@ -414,6 +414,7 @@ def test_faulty_external_indexer():
     class MockedEntryPoint(EntryPoint):
         def __init__(self):
             self.name = 'MockedEntryPoint'
+            self.dist = 'Mock Distribution 1.1'
 
         def load(self, *args):
             raise Exception('Mocked indexer error')
@@ -423,6 +424,43 @@ def test_faulty_external_indexer():
 
     with patch('pkg_resources.iter_entry_points',
                MagicMock(side_effect=_mocked_iter_entry_points)):
+
+        index = _meta2autofield_dict({
+            'datalad_unique_content_properties': {
+                'extr1': {
+                    "prop1": "v1"
+                }
+            },
+            'extr1': {
+                'prop1': 'value'
+            }
+        })
+
+    eq_(
+        index,
+        {
+            'extr1.prop1': 'value'
+        }
+    )
+
+
+def test_multiple_entry_points():
+    """ check that generic indexer is called if multiple indexers exist for the same name """
+    class MockedEntryPoint(EntryPoint):
+        def __init__(self):
+            self.name = 'MockedEntryPoint'
+            self.dist = 'Mock Distribution 1.1'
+
+        def load(self, *args):
+            return 'Loaded MockedEntryPoint'
+
+    def _mocked_iter_entry_points(group, metadata):
+        yield MockedEntryPoint()
+        yield MockedEntryPoint()
+
+    with patch('pkg_resources.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+
         index = _meta2autofield_dict({
             'datalad_unique_content_properties': {
                 'extr1': {
