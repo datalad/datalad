@@ -556,7 +556,7 @@ class HTTPRemoteIO(object):
         # to annexremote.dirhash from within IO classes
 
         url = self.base_url + "/annex/objects/" + str(key_path)
-        from datalad.utils import download_url
+        from datalad.support.network import download_url
         download_url(url, filename, overwrite=True)
 
 
