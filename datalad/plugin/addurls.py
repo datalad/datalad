@@ -965,6 +965,7 @@ class Addurls(Interface):
         # There could be "intermediate" subdatasets which have no rows but would need
         # their datasets created and saved, so let's add them
         add_subpaths = set(subpaths).difference(r[0] for r in rows_by_ds)
+        nrows_by_ds_orig = len(rows_by_ds)
         if add_subpaths:
             for subpath in add_subpaths:
                 rows_by_ds.append((subpath, tuple()))
@@ -981,26 +982,28 @@ class Addurls(Interface):
             jobs=jobs,
             lgr=lgr,
         )
-        extra_msgs = []
-        if created_subds:
-            extra_msgs.append(f"{len(created_subds)} subdatasets were created")
-        if extra_msgs:
-            extra_msgs.append('')
-        message_addurls = message or f"""\
-[DATALAD] add {len(files_to_add)} files to {len(rows_by_ds)} (sub)datasets from URLs
+
+        if save:
+            extra_msgs = []
+            if created_subds:
+                extra_msgs.append(f"{len(created_subds)} subdatasets were created")
+            if extra_msgs:
+                extra_msgs.append('')
+            message_addurls = message or f"""\
+[DATALAD] add {len(files_to_add)} files to {nrows_by_ds_orig} (sub)datasets from URLs
 
 {os.linesep.join(extra_msgs)}
 url_file='{url_file}'
 url_format='{url_format}'
 filename_format='{filenameformat}'"""
 
-        # save all in bulk
-        files_to_add.update([r[0] for r in rows_by_ds])
-        yield from ds.save(
-            list(files_to_add),
-            message=message_addurls,
-            # TODO  jobs=jobs,
-            return_type='generator')
+            # save all in bulk
+            files_to_add.update([r[0] for r in rows_by_ds])
+            yield from ds.save(
+                list(files_to_add),
+                message=message_addurls,
+                # TODO  jobs=jobs,
+                return_type='generator')
 
 
 __datalad_plugin__ = Addurls
