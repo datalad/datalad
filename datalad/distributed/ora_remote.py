@@ -559,15 +559,8 @@ class HTTPRemoteIO(object):
         # to annexremote.dirhash from within IO classes
 
         url = self.base_url + "/annex/objects/" + str(key_path)
-        response = requests.get(url, stream=True)
-
-        with open(filename, 'wb') as dst_file:
-            bytes_received = 0
-            for chunk in response.iter_content(chunk_size=self.buffer_size,
-                                               decode_unicode=False):
-                dst_file.write(chunk)
-                bytes_received += len(chunk)
-                progress_cb(bytes_received)
+        from datalad.support.network import download_url
+        download_url(url, filename, overwrite=True)
 
 
 def handle_errors(func):

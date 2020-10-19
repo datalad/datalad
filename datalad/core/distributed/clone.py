@@ -45,9 +45,11 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureKeyChoice,
 )
+from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
 from datalad.support.network import (
     get_local_file_url,
+    download_url,
     URL,
     RI,
     DataLadRI,
@@ -630,15 +632,13 @@ def postclonecfg_ria(ds, props):
         scheme = props['giturl'].split(':', 1)[0]
         if scheme in ['http', 'https']:
             try:
-                response = requests.get("{}{}config".format(
-                    props['giturl'],
-                    '/' if not props['giturl'].endswith('/') else '')
-                )
-                config_content = response.text
-            except requests.RequestException as e:
+                config_content = download_url(
+                    "{}{}config".format(
+                        props['giturl'],
+                        '/' if not props['giturl'].endswith('/') else ''))
+            except DownloadError as e:
                 lgr.debug("Failed to get config file from source:\n%s",
                           exc_str(e))
-
         elif scheme == 'ssh':
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
@@ -662,8 +662,8 @@ def postclonecfg_ria(ds, props):
                 lgr.debug("Failed to get config file from source: %s",
                           exc_str(e))
         else:
-            lgr.debug("Unknown URL-Scheme in %s. Can handle SSH, HTTP or "
-                      "FILE scheme URLs.", props['source'])
+            lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
+                      "FILE scheme URLs.", scheme, props['source'])
 
         # 3. And read it
         org_uuid = None

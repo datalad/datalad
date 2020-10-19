@@ -244,14 +244,22 @@ class Save(Interface):
             for superds, subdss in edges.items():
                 superds_status = paths_by_ds.get(superds, {})
                 for subds in subdss:
-                    # TODO actually start from an entry that may already
-                    # exist in the status record
-                    superds_status[ut.Path(subds)] = dict(
-                        # shot from the hip, some status config
-                        # to trigger this specific super/sub
-                        # relation to be saved
-                        state='untracked',
-                        type='dataset')
+                    subds_path = ut.Path(subds)
+                    sub_status = superds_status.get(subds_path, {})
+                    if not (sub_status.get("state") == "untracked" and
+                            sub_status.get("type") == "directory"):
+                        # ^ If the subdataset is already untracked directory,
+                        # let it go through the normal "add submodules"
+                        # handling of repo.save_().
+
+                        # TODO actually start from an entry that may already
+                        # exist in the status record
+                        superds_status[subds_path] = dict(
+                            # shot from the hip, some status config
+                            # to trigger this specific super/sub
+                            # relation to be saved
+                            state='untracked',
+                            type='dataset')
                 paths_by_ds[superds] = superds_status
 
         # TODO parallelize, whenever we have multiple subdataset of a single

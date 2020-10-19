@@ -834,3 +834,14 @@ def test_save_dotfiles():
     for git in [True, False, None]:
         for save_path in [None, "nodot-subdir"]:
             yield check_save_dotfiles, git, save_path
+
+
+@with_tempfile
+def test_save_nested_subs_explicit_paths(path):
+    ds = Dataset(path).create()
+    spaths = [Path("s1"), Path("s1", "s2"), Path("s1", "s2", "s3")]
+    for spath in spaths:
+        Dataset(ds.pathobj / spath).create()
+    ds.save(path=spaths)
+    eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
+        set(map(str, spaths)))
