@@ -986,7 +986,8 @@ class Addurls(Interface):
             rows_by_ds,
             addurls_to_ds,
             agg=agg_files,
-            safe_to_consume=no_parentds_in_futures,
+            # It is ok to start with subdatasets since top dataset already exists
+            safe_to_consume=partial(no_parentds_in_futures, skip=("", None, ".")),
             # our producer provides not only dataset paths and also rows, take just path
             producer_future_key=lambda row_by_ds: row_by_ds[0],
             jobs=jobs,

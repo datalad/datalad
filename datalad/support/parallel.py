@@ -38,14 +38,21 @@ def _count_str(count, verb, omg=False):
         return msg
 
 
-def no_parentds_in_futures(futures, path):
+def no_parentds_in_futures(futures, path, skip=tuple()):
     """Return True if no path in futures keys is parentds for provided path
 
     Assumes that the future's key is the path.
+
+    Parameters
+    ----------
+    skip: iterable
+      Do not consider futures with paths in skip.  E.g. it could be top level
+      dataset which we know it exists already, and it is ok to start with child
+      process before it
     """
     # TODO: OPT.  Could benefit from smarter than linear time if not one at a time?
     #   or may be we should only go through active futures (still linear!)?
-    return not any(path_is_subpath(path, p) for p in futures)
+    return all(not path_is_subpath(path, p) or p in skip for p in futures)
 
 
 class ProducerConsumer:
