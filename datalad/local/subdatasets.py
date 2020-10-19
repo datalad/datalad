@@ -239,7 +239,7 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must "
                         "start with a letter)" % k)
         if contains:
-            contains = [resolve_path(c, dataset) for c in ensure_list(contains)]
+            contains = [resolve_path(c, dataset, ds) for c in ensure_list(contains)]
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,

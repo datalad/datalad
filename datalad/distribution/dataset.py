@@ -588,7 +588,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 # New helpers, courtesy of datalad-revolution.
 
 
-def resolve_path(path, ds=None):
+def resolve_path(path, ds=None, ds_resolved=None):
     """Resolve a path specification (against a Dataset location)
 
     Any path is returned as an absolute path. If, and only if, a dataset
@@ -609,8 +609,11 @@ def resolve_path(path, ds=None):
     path : str or PathLike or list
       Platform-specific path specific path specification. Multiple path
       specifications can be given as a list
-    ds : Dataset or None
+    ds : Dataset or PathLike or None
       Dataset instance to resolve relative paths against.
+    ds_resolved : Dataset or None
+      A dataset instance that was created from `ds` outside can be provided
+      to avoid multiple instantiation on repeated calls.
 
     Returns
     -------
@@ -620,7 +623,7 @@ def resolve_path(path, ds=None):
     """
     got_ds_instance = isinstance(ds, Dataset)
     if ds is not None and not got_ds_instance:
-        ds = require_dataset(
+        ds = ds_resolved or require_dataset(
             ds, check_installed=False, purpose='path resolution')
     out = []
     for p in ensure_list(path):
