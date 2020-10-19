@@ -231,11 +231,18 @@ class ConfigManager(object):
 
         self._src_mode = source
         run_kwargs = dict()
+        self._runner = None
         if dataset is not None:
-            # make sure we run the git config calls in the dataset
-            # to pick up the right config files
-            run_kwargs['cwd'] = dataset.path
-        self._runner = GitWitlessRunner(**run_kwargs)
+            if hasattr(dataset, '_git_runner'):
+                self._runner = dataset._git_runner
+            elif dataset.repo:
+                self._runner = dataset.repo._git_runner
+            else:
+                # make sure we run the git config calls in the dataset
+                # to pick up the right config files
+                run_kwargs['cwd'] = dataset.path
+        if self._runner is None:
+            self._runner = GitWitlessRunner(**run_kwargs)
 
         self.reload(force=True)
 

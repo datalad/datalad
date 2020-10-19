@@ -44,6 +44,7 @@ from datalad.tests.utils import (
     assert_not_in,
     assert_raises,
     assert_repo_status,
+    assert_true,
     create_tree,
     DEFAULT_BRANCH,
     eq_,
@@ -153,6 +154,57 @@ def test_GitRepo_init_options(path):
     gr = GitRepo(path, create=True, bare=True)
     ok_(gr.config.getbool(section="core", option="bare"))
 
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+@with_tree(tree={'somefile': 'content', 'config': 'not a git config'})
+@with_tree(tree={'afile': 'other',
+                 '.git': {}})
+@with_tempfile
+@with_tempfile
+def test_GitRepo_bare(path, empty_dir, non_empty_dir, empty_dot_git, non_bare,
+                      clone_path):
+
+    import gc
+
+    # create a bare repo:
+    gr = GitRepo(path, create=True, bare=True)
+    assert_equal(gr.dot_git, gr.pathobj)
+    assert_true(gr.bare)
+    assert_true(gr.config.getbool("core", "bare"))
+    assert_false((gr.pathobj / '.git').exists())
+    assert_false(gr.call_git_success(['status'], expect_stderr=True))
+
+    # kill the object and try to get a new instance on an existing bare repo:
+    del gr
+    gc.collect()
+
+    gr = GitRepo(path, create=False)
+    assert_equal(gr.dot_git, gr.pathobj)
+    assert_true(gr.bare)
+    assert_true(gr.config.getbool("core", "bare"))
+    assert_false((gr.pathobj / '.git').exists())
+    assert_false(gr.call_git_success(['status'], expect_stderr=True))
+
+    # an empty dir is not a bare repo:
+    assert_raises(InvalidGitRepositoryError, GitRepo, empty_dir,
+                  create=False)
+
+    # an arbitrary dir is not a bare repo:
+    assert_raises(InvalidGitRepositoryError, GitRepo, non_empty_dir,
+                  create=False)
+
+    # nor is a path with an empty .git:
+    assert_raises(InvalidGitRepositoryError, GitRepo, empty_dot_git,
+                  create=False)
+
+    # a regular repo is not bare
+    non_bare_repo = GitRepo(non_bare, create=True)
+    assert_false(non_bare_repo.bare)
+
+    # we can have a bare clone
+    clone = GitRepo.clone(non_bare, clone_path, clone_options={'bare': True})
+    assert_true(clone.bare)
 
 @with_tree(
     tree={

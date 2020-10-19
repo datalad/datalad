@@ -527,6 +527,8 @@ def test_global_config():
 def test_bare(path):
     # can we handle a bare repo?
     gr = GitRepo(path, create=True, bare=True)
+    # do we read the correct local config?
+    assert_in(gr.pathobj / 'config', gr.config._stores['git']['files'])
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', gr.config)
     # not set something that wasn't there
