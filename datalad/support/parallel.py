@@ -80,6 +80,9 @@ class ProducerConsumer:
     # 3.8.0 release (v3.8.0b2~37 to be exact)
     # See https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
     _can_use_threads = sys.version_info >= (3, 8, 0, 'final')
+    # Users should not specify -J100 and then just come complaining without
+    # being informed that they are out of luck
+    _alerted_already = False
 
     def __init__(self,
                  producer, consumer,
@@ -140,16 +143,18 @@ class ProducerConsumer:
 
     def __iter__(self):
         jobs = self.jobs
-        if jobs == "auto" :
-            # ATM there is no "auto" for this operation.  We will just make it ...
+        if jobs in (None, "auto"):
+            from datalad import cfg
+            # ATM there is no "auto" for this operation, so in both auto and None
+            # just consult max-jobs which can only be an int ATM.
             # "auto" could be for some auto-scaling based on a single future time
-            # to complete, scaling up/down.  TODO
-            jobs = 5 if self._can_use_threads else 0
-        if jobs is None:
-            jobs = 1 if self._can_use_threads else 0
+            # to complete, scaling up/down. Ten config variable could accept "auto" as well
+            jobs = cfg.obtain('datalad.runtime.max-jobs')
         if jobs >= 1 and not self._can_use_threads:
-            lgr.debug("Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
-                      "Will run serially", jobs)
+            (lgr.debug if ProducerConsumer._alerted_already else lgr.warning)(
+                "Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
+                "Will run serially", jobs)
+            ProducerConsumer._alerted_already = True
             jobs = 0
         self._jobs = jobs
         if jobs == 0:
