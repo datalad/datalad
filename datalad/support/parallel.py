@@ -38,6 +38,10 @@ def _count_str(count, verb, omg=False):
         return msg
 
 
+#
+# safe_to_consume  helpers
+#
+
 def no_parentds_in_futures(futures, path, skip=tuple()):
     """Return True if no path in futures keys is parentds for provided path
 
@@ -66,14 +70,46 @@ def no_subds_in_futures(futures, path, skip=tuple()):
 class ProducerConsumer:
     """Producer/Consumer implementation to (possibly) parallelize execution.
 
-    It is "effective" only for Python >= 3.8.
+    It is an iterable providing a multi-threaded producer/consumer implementation,
+    where there could be multiple consumers for items produced by a producer.  Since
+    in DataLad majority of time is done in IO interactions with outside git and git-annex
+    processes, and since we typically operate across multiple datasets, multi-threading
+    across datasets operations already provides a significant performance benefit.
 
-    TODO
-    `producer` must produce unique entries. AssertionError might be raised if
-    the same entry is to be consumed.
+    All results from consumers are all yielded as soon as they are produced by consumers.
+    Because this implementation is based on threads, `producer` and `consumer` could
+    be some "closures" within code, thus having lean interface and accessing
+    data from shared "outter scope".
 
-    In parallel execution, results are yielded as soon as available, so order
-    might not match the produced one.
+    Notes
+    -----
+    - with jobs > 1, results are yielded as soon as available, so order
+      might not match the one provided by "producer".
+    - jobs > 1, is "effective" only for Python >= 3.8.  For older versions it
+      would log a warning (upon initial encounter) if jobs > 1 is specified.
+    - `producer` must produce unique entries. AssertionError might be raised if
+      the same entry is to be consumed.
+    - `consumer` can add to the queue of items produced by producer via
+      `.add_to_producer_queue`. This allows for continuous re-use of the same
+      instance in recursive operations (see `get` use of ProducerConsumer).
+
+
+    Examples
+    --------
+    A simple and somewhat boring example could be to count lines in '*.py'
+    files in parallel
+
+        from glob import glob
+        from pprint import pprint
+        from datalad.support.parallel import ProducerConsumer
+
+        def count_lines(fname):
+            with open(fname) as f:
+                return fname, len(f.readlines())
+        pprint(dict(ProducerConsumer(glob("*.py"), count_lines)))
+
+    More usage exampels could be found in `test_parallel.py` and around the
+    codebase `addurls.py`, `get.py`, `save.py`, etc.
     """
 
     # We cannot use threads with asyncio WitlessRunner inside until
@@ -97,19 +133,34 @@ class ProducerConsumer:
 
         Parameters
         ----------
-        ...
+        producer: iterable
+          Provides items to feed a consumer with
+        consumer: callable
+          Is provided with items produced by producer.  Multiple consumers might
+          operate in parallel threads if jobs > 1
+        jobs: int, optional
+          If None or "auto", 'datalad.runtime.max-jobs' configuration variable is
+          consulted.  With jobs=0 there is no threaded execution whatsoever.  With
+          jobs=1 there is a separate thread for the producer, so in effect with jobs=1
+          some parallelization between producer (if it is a generator) and consumer
+          could be achieved, while there is only a single thread available for consumers.
         safe_to_consume: callable, optional
-          A callable which gets a dict of all known futures and current producer output.
-          It should return True if we can proceed with current value from producer.
-          If unsafe - we will wait.  WARNING: outside code should make sure about provider and
-          safe_to_consume to play nicely or deadlock can happen.
+          A callable which gets a dict of all known futures and current item from producer.
+          It should return `True` if executor can proceed with current value from producer.
+          If not (unsafe to consume) - we will wait.
+          WARNING: outside code should make sure about provider and `safe_to_consume` to
+          play nicely or a very suboptimal behavior or possibly even a deadlock can happen.
         producer_future_key: callable, optional
           A key function for a value from producer which will be used as a key in futures
-          dictionary and output of which is passed to safe_to_consume
+          dictionary and output of which is passed to safe_to_consume.
         reraise_immediately: bool, optional
           If True, it would stop producer yielding values as soon as it detects that some
           exception has occurred (although there might still be values in the queue to be yielded
-          which were collected before the exception was raised)
+          which were collected before the exception was raised).
+        agg: callable, optional
+          Should be a callable with two arguments: (item, prior total) and return a new total
+          which will get assigned to .total of this object.  If not specified, .total is
+          just a number of items produced by the producer.
         """
         self.producer = producer
         self.consumer = consumer
@@ -351,7 +402,10 @@ class Sleeper():
 class ProducerConsumerProgressLog(ProducerConsumer):
     """ProducerConsumer wrapper with log_progress reporting.
 
-    It will update .total of the log_progress each time it changes (i.e. whenever
+    It is to be used around a `consumer` which returns or yields result records.
+    If that is not the case -- use regular `ProducerConsumer`.
+
+    It will update `.total` of the `log_progress` each time it changes (i.e. whenever
     producer produced new values to be consumed).
     """
 
@@ -364,7 +418,6 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                  **kwargs
                  ):
         """
-
         Parameters
         ----------
         producer, consumer, **kwargs
