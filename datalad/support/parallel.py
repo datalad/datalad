@@ -55,6 +55,14 @@ def no_parentds_in_futures(futures, path, skip=tuple()):
     return all(not path_is_subpath(path, p) or p in skip for p in futures)
 
 
+def no_subds_in_futures(futures, path, skip=tuple()):
+    """Return Tre if no path in futures keys is a subdataset for provided path
+
+    See `no_parentds_in_futures` for more info
+    """
+    return all(not path_is_subpath(p, path) or p in skip for p in futures)
+
+
 class ProducerConsumer:
     """Producer/Consumer implementation to (possibly) parallelize execution.
 
