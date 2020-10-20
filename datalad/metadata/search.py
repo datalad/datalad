@@ -173,16 +173,73 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
             else:
                 yield key, v
 
+    def get_indexer(metadata_format_name: str) -> callable:
+        from pkg_resources import EntryPoint, iter_entry_points
+
+        all_indexers = tuple(iter_entry_points('datalad.metadata.indexers', metadata_format_name))
+        if all_indexers:
+            if len(all_indexers) > 1:
+                # Check that there is only one indexer of the requested name.
+                # In theory there could be multiple indexers, if different
+                # distributions provided the same entry point. So if there is
+                # more than one indexer, we know that different distributions
+                # have provided elements for the same entry point. Since we
+                # do not know which other changes the distributions have made,
+                # e.g. API changes, we cannot decide here, which entry point
+                # should be used. Issue a warning and use the fall-back indexer.
+                lgr.warning(
+                    "Multiple indexers for metadata format %s provided by the following distributions: "
+                    + ", ".join([str(indexer.dist) for indexer in all_indexers]),
+                    metadata_format_name)
+            else:
+                indexer = all_indexers[0]
+                if isinstance(indexer, EntryPoint):
+                    try:
+                        indexer_object = indexer.load()(metadata_format_name)
+                        return indexer_object.create_index
+                    except Exception as e:
+                        lgr.warning(
+                            'Failed to load indexer %s (%s): %s',
+                            indexer.name,
+                            str(indexer.dist),
+                            exc_str(e))
+        lgr.info('Falling back to standard indexer for metadata format: %s', metadata_format_name)
+        return lambda metadata: _deep_kv('', metadata)
+
+    if val2str:
+        def _val2str_helper(value):
+            if isinstance(value, (list, tuple)):
+                return u' '.join(_any2unicode(i) for i in value)
+            return _any2unicode(value)
+    else:
+        def _val2str_helper(value):
+            return value
+
+    meta = meta or {}
     return {
-        k:
-        # turn lists into space-separated value strings
-            (u' '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
-            # and the rest into unicode
-            _any2unicode(v)) if val2str else v
-        for k, v in _deep_kv('', meta or {})
-        # auto-exclude any key that is not a defined field in the schema (if there is
-        # a schema
-        if schema is None or k in schema
+        # Collect all meta-items which have a non-dict value type and where
+        # the key is not absent in a given schema.
+        **{
+            key: _val2str_helper(value)
+            for key, value in filter(lambda kv: not isinstance(kv[1], dict), meta.items())
+            if schema is None or key in schema
+        },
+
+        # Collect all meta-items which have a dict value type and where
+        # the key is neither 'datalad_unique_content_properties' nor absent
+        # in a given schema.
+        # These values are considered to be metadata, the keys are considered to
+        # be the name of the extractor, i.e. the metadata_format_name, that created
+        # the metadata.
+        **{
+            metadata_format_name + '.' + sub_key: _val2str_helper(sub_key_value)
+            for metadata_format_name, metadata_content in filter(
+                lambda kv: isinstance(kv[1], dict) and kv[0] != 'datalad_unique_content_properties',
+                meta.items()
+            )
+            for sub_key, sub_key_value in get_indexer(metadata_format_name)(metadata_content)
+            if schema is None or metadata_format_name + '.' + sub_key in schema
+        }
     }
 
 
