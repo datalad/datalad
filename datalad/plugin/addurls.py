@@ -1022,7 +1022,7 @@ filename_format='{filenameformat}'"""
             yield from ds.save(
                 list(files_to_add),
                 message=message_addurls,
-                # TODO  jobs=jobs,
+                jobs=jobs,
                 return_type='generator')
 
 
