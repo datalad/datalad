@@ -210,6 +210,10 @@ try:
             if external_versions['tqdm'] < '4.10.0' \
             else dict(mininterval=0.1)
 
+        # react to changes in the terminal width
+        if external_versions['tqdm'] >= '2.1':
+            _default_pbar_params['dynamic_ncols'] = True
+
         def __init__(self, label='', fill_text=None,
                      total=None, unit='B', out=sys.stdout, leave=False,
                      frontend=None):
