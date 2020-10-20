@@ -1129,6 +1129,12 @@ def test_annex_ssh(topdir):
     if external_versions['cmd:system-ssh'] < '7.4' and \
        '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
         raise SkipTest("Test known to hang")
+    # And, since the switch to the Docker SSH target, our cron build with
+    # 7.20190708 stalls. 7.20190819 is the first known good version, but do a
+    # minimal skip up until the next release because we don't know that
+    # 7.20190730 stalls.
+    if external_versions['cmd:annex'] < '7.20190730':
+        raise SkipTest("Test known to hang")
 
     topdir = Path(topdir)
     rm1 = AnnexRepo(topdir / "remote1", create=True)
