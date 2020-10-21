@@ -534,7 +534,9 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                 log_progress(
                     lgr_.info,
                     pid,
-                    None,  # I do not think there is something valuable to announce
+                    "",  # None flips python 3.6.7 in conda if nose ran without -s
+                         # I do not think there is something
+                    # valuable to announce
                     total=self.total,
                     # unfortunately of no effect, so we cannot inform that more items to come
                     # unit=("+" if not it.finished else "") + " " + unit,
