@@ -172,6 +172,9 @@ class ColorFormatter(logging.Formatter):
                 "%(message)s ")
 
     def format(self, record):
+        # safety guard if None was provided
+        if record.msg is None:
+            record.msg = ""
         if record.msg.startswith('| '):
             # If we already log smth which supposed to go without formatting, like
             # output for running a command, just return the message and be done
