@@ -17,6 +17,7 @@ import logging
 import wrapt
 import sys
 import re
+from time import time
 from os import curdir
 from os import pardir
 from os import listdir
@@ -514,16 +515,24 @@ def default_result_renderer(res):
                 if res.get('message', None) else ''))
 
 
-def _display_suppressed_message(nsimilar, ndisplayed, final=False):
+def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
     # +1 because there was the original result + nsimilar displayed.
     n_suppressed = nsimilar - ndisplayed + 1
     if n_suppressed > 0:
-        ui.message('  [{} similar {} been suppressed]'
-                   .format(n_suppressed,
-                           single_or_plural("message has",
-                                            "messages have",
-                                            n_suppressed, False)),
-                   cr="\n" if final else "\r")
+        ts = time()
+        # rate-limit update of suppression message, with a large number
+        # of fast-paced results updating for each one can result in more
+        # CPU load than the actual processing
+        # arbitrarily go for a 2Hz update frequency -- it "feels" good
+        if last_ts is None or (ts- last_ts > 0.5):
+            ui.message('  [{} similar {} been suppressed]'
+                       .format(n_suppressed,
+                               single_or_plural("message has",
+                                                "messages have",
+                                                n_suppressed, False)),
+                       cr="\n" if final else "\r")
+            return ts
+    return last_ts
 
 
 def _process_results(
@@ -541,6 +550,7 @@ def _process_results(
 
     # used to track repeated messages in the default renderer
     last_result = None
+    last_result_ts = None
     # which result dict keys to inspect for changes to discover repetions
     # of similar messages
     repetition_keys = set(('action', 'status', 'type', 'refds'))
@@ -553,6 +563,8 @@ def _process_results(
         if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
             # record to figure out WTF, so he just skips it
+            # but MIH thinks leaving a trace of that would be good
+            lgr.debug('Drop result record without "action": %s', res)
             continue
 
         actsum = action_summary.get(res['action'], {})
@@ -610,13 +622,13 @@ def _process_results(
                 if result_repetitions < render_n_repetitions:
                     default_result_renderer(res)
                 else:
-                    _display_suppressed_message(
-                        result_repetitions, render_n_repetitions)
+                    last_result_ts = _display_suppressed_message(
+                        result_repetitions, render_n_repetitions, last_result_ts)
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
-                _display_suppressed_message(
-                    result_repetitions, render_n_repetitions,
+                last_result_ts = _display_suppressed_message(
+                    result_repetitions, render_n_repetitions, last_result_ts,
                     final=True)
                 default_result_renderer(res)
                 result_repetitions = 0
@@ -653,7 +665,7 @@ def _process_results(
         yield res
     # make sure to report on any issues that we had suppressed
     _display_suppressed_message(
-        result_repetitions, render_n_repetitions, final=True)
+        result_repetitions, render_n_repetitions, last_result_ts, final=True)
 
 
 def keep_result(res, rfilter, **kwargs):
