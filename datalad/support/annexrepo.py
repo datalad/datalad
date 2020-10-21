@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import re
+import warnings
 
 from itertools import chain
 from os import linesep
@@ -1807,24 +1808,45 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return self._check_files(check, files, batch)
 
-    def init_remote(self, name, options):
+    def init_remote(self, name, options, type=None, config=None, external=False, encryption=None):
         """Creates a new special remote
 
         Parameters
         ----------
         name: str
             name of the special remote
+        options: list(str)
+        type: str, optional
+        config: dict
+        external: bool
+        encryption: str, optional
         """
         # TODO: figure out consistent way for passing options + document
 
+        if options:
+            warnings.warn(
+                "Passing options list is deprecated and will be removed in"
+                " 0.15; pass config dict instead",
+                DeprecationWarning,
+            )
+            if type or encryption or external:
+                raise ValueError("Specify options as dict")
+        cfg = dict(config) if config else {}
+        if external:
+            cfg["type"] = "external"
+            cfg["externaltype"] = type
+        elif type is not None:
+            cfg["type"] = type
+        cfg["encryption"] = encryption or "none"
+        args = ["{}={}".format(k, v) for k, v in cfg.items()]
         self._run_annex_command(
             'initremote',
-            annex_options=[name] + options,
+            annex_options=[name] + options + args,
             runner="gitwitless",
         )
         self.config.reload()
 
-    def enable_remote(self, name, options=None, env=None):
+    def enable_remote(self, name, options=None, env=None, config=None):
         """Enables use of an existing special remote
 
         Parameters
@@ -1832,14 +1854,23 @@ class AnnexRepo(GitRepo, RepoInterface):
         name: str
             name, the special remote was created with
         options: list, optional
+        config: dict
         """
 
+        if options:
+            warnings.warn(
+                "Passing options list is deprecated and will be removed in"
+                " 0.15; pass config dict instead",
+                DeprecationWarning,
+            )
+        cfg = dict(config) if config else {}
+        args = ['{}={}'.format(k, v) for k, v in cfg.items()]
         try:
             # TODO: outputs are nohow used/displayed. Eventually convert to
             # to a generator style yielding our "dict records"
             self._run_annex_command(
                 'enableremote',
-                annex_options=[name] + ensure_list(options),
+                annex_options=[name] + ensure_list(options) + args,
                 runner="gitwitless",
                 env=env)
         except CommandError as e:

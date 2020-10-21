@@ -40,22 +40,6 @@ def get_all_files(path):
     ])
 
 
-def initremote(repo, name, encryption=None, config=None):
-    cfg = dict(config) if config else {}
-    cfg['encryption'] = encryption if encryption else 'none'
-    args = ['{}={}'.format(k, v) for k, v in cfg.items()]
-    repo.init_remote(name, args)
-
-
-def initexternalremote(repo, name, type, encryption=None, config=None):
-    config = dict(
-        config if config else {},
-        type='external',
-        externaltype=type,
-    )
-    return initremote(repo, name, encryption=encryption, config=config)
-
-
 def setup_archive_remote(repo, archive_path):
 
     # for integration in a URL, we need POSIX version of the path
@@ -66,7 +50,7 @@ def setup_archive_remote(repo, archive_path):
                       ''.format(archive_path.as_posix())}
     else:
         cfg = {'url': 'ria+{}'.format(archive_path.as_uri())}
-    initexternalremote(repo, 'archive', 'ora', config=cfg)
+    repo.init_remote('archive', [], type='ora', config=cfg, external=True)
 
 
 def populate_dataset(ds):
