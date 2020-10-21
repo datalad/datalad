@@ -299,7 +299,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 continue
         # the following used to be done by _parse_git_submodules()
         # but is expensive and does not need to be done for submodules
-        # no matching `contains`
+        # not matching `contains`
         if not sm_path.exists() or not GitRepo.is_valid_repo(sm_path):
             sm['state'] = 'absent'
         # do we just need this to recurse into subdatasets, or is this a
