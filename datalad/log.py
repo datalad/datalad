@@ -10,8 +10,9 @@
 from functools import partial
 import logging
 import os
-import sys
 import platform
+import sys
+import types
 import logging.handlers
 
 from os.path import basename, dirname
@@ -412,7 +413,30 @@ class LoggerHelper(object):
             # or a string which corresponds to a constant;)
             log_level = getattr(logging, level.upper())
 
-        self.lgr.setLevel(log_level)
+        lgr = self.lgr
+        if not getattr(lgr, '_orig_debug', None):
+            # overload .debug and .log (should be used only for < DEBUG levels)
+            # with "no-op" operation so we do not need to even do log level checking
+            # for every instance of those.
+            # TODOs:
+            # - make it configurable so could be disabled?
+            lgr._orig_debug = lgr.debug
+            lgr._orig_log = lgr.log
+            lgr._orig_setLevel = lgr.setLevel
+
+            def _overload_setLevel(lgr, level):
+                def noop(*args, **kwargs):
+                    pass
+
+                lgr._orig_setLevel(level)
+                if lgr.getEffectiveLevel() >= logging.INFO:
+                    lgr.log = lgr.debug = noop
+                else:
+                    lgr.log = lgr._orig_log
+                    lgr.debug = lgr._orig_debug
+            lgr.setLevel = types.MethodType(_overload_setLevel, lgr)
+
+        lgr.setLevel(log_level)
         # and set other related/used loggers to the same level to prevent their
         # talkativity, if they are not yet known to this python session, so we
         # have little chance to "override" possibly set outside levels
