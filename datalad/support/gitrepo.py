@@ -3436,13 +3436,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # --exclude-standard will make sure to honor and standard way
             # git can be instructed to ignore content, and will prevent
             # crap from contaminating untracked file reports
-            cmd = ['ls-files',
-                   '--stage', '-z', '-d', '-m', '--exclude-standard']
+            cmd = ['ls-files', '--stage', '-z']
             # untracked report mode, using labels from `git diff` option style
             if untracked == 'all':
-                cmd.append('-o')
+                cmd += ['--exclude-standard', '-o']
             elif untracked == 'normal':
-                cmd += ['-o', '--directory', '--no-empty-directory']
+                cmd += ['--exclude-standard', '-o', '--directory', '--no-empty-directory']
             elif untracked == 'no':
                 pass
             else:
