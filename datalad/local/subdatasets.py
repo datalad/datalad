@@ -213,10 +213,10 @@ class Subdatasets(Interface):
             bottomup=False,
             set_property=None,
             delete_property=None):
-        paths = resolve_path(ensure_list(path), dataset) if path else None
-
         ds = require_dataset(
             dataset, check_installed=True, purpose='subdataset reporting/modification')
+
+        paths = resolve_path(ensure_list(path), dataset, ds) if path else None
 
         # no constraints given -> query subdatasets under curdir
         if not paths and dataset is None:
@@ -239,7 +239,7 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must "
                         "start with a letter)" % k)
         if contains:
-            contains = [resolve_path(c, dataset, ds) for c in ensure_list(contains)]
+            contains = resolve_path(ensure_list(contains), dataset, ds)
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
