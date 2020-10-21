@@ -81,8 +81,8 @@ def _parse_git_submodules(ds_pathobj, repo, paths):
         yield from repo.get_submodules_(paths=paths)
     else:
         for props in repo.get_submodules_(paths=paths):
-            props['path'] = ds_pathobj / paths['path'].relative_to(repo.pathobj)
-        yield props
+            props['path'] = ds_pathobj / props['path'].relative_to(repo.pathobj)
+            yield props
 
 
 @build_doc
