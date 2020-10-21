@@ -284,8 +284,6 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
     # expand all test cases for the contains test in the loop below
     # leads to ~20% speedup per loop iteration of a non-match
     expanded_contains = [
-        # convert to strings, as sm_path below will be a string and
-        # we do not want repeated type-conversion
         [c] + list(c.parents)
         for c in (contains if contains is not None else [])
     ]
