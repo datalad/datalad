@@ -40,6 +40,7 @@ from datalad.utils import (
     ensure_list,
     getpwd,
     partition,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -224,8 +225,8 @@ class Subdatasets(Interface):
 
         # no constraints given -> query subdatasets under curdir
         if not paths and dataset is None:
-            cwd = getpwd()
-            paths = None if cwd == ds.path else [cwd]
+            cwd = Path(getpwd())
+            paths = None if cwd == ds.pathobj else [cwd]
 
         lgr.debug('Query subdatasets of %s', dataset)
         if paths is not None:
