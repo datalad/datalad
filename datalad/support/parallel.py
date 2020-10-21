@@ -23,6 +23,7 @@ from queue import Queue, Empty
 from threading import Thread
 
 from . import ansi_colors as colors
+from ..dochelpers import exc_str
 from ..log import log_progress
 from ..utils import path_is_subpath
 
@@ -92,7 +93,9 @@ class ProducerConsumer:
     - `consumer` can add to the queue of items produced by producer via
       `.add_to_producer_queue`. This allows for continuous re-use of the same
       instance in recursive operations (see `get` use of ProducerConsumer).
-
+    - if producer or consumer raise an exception, we will try to "fail gracefully",
+      unless subsequent Ctrl-C is pressed, we will let already running jobs to
+      finish first.
 
     Examples
     --------
@@ -175,14 +178,57 @@ class ProducerConsumer:
         # Relevant only for _iter_threads
         self._producer_finished = None
         self._producer_queue = None
+        self._producer_exception = None
+        self._producer_interrupt = None
+        # so we could interrupt more or less gracefully
+        self._producer_thread = None
         self._executor = None
-        self._exc = []
+        self._futures = {}
 
     def __del__(self):
         # if we are killed while executing, we should ask executor to shutdown
-        executor = getattr(self, "_executor")
-        if executor:
-            executor.shutdown()
+        shutdown = getattr(self, "shutdown", None)
+        if shutdown:
+            shutdown(force=True)
+
+    def shutdown(self, force=False, exception=None):
+        if self._producer_thread and self._producer_thread.is_alive():
+            # we will try to let the worker to finish "gracefully"
+            self._producer_interrupt = f"shutdown due to {exception}"
+
+        # purge producer queue
+        if self._producer_queue:
+            while not self._producer_queue.empty():
+                self._producer_queue.get()
+
+        lgr.debug("Shutting down %s with %d futures. Reason: %s",
+                  self._executor, len(self._futures), exception)
+
+        if not force:
+            # pop not yet running or done futures.
+            # Those would still have a chance to yield results and finish gracefully
+            # or their exceptions to be bubbled up FWIW.
+            ntotal = len(self._futures)
+            ncanceled = 0
+            nrunning = 0
+            for k, future in list(self._futures.items()):
+                running = future.running()
+                nrunning += int(running)
+                if not (running or future.done()):
+                    if self._futures.pop(k).cancel():
+                        ncanceled += 1
+            lgr.info("Canceled %d out of %d jobs. %d left running.",
+                     ncanceled, ntotal, nrunning)
+        else:
+            # just pop all entirely
+            for k in list(self._futures):
+                self._futures.pop(k).cancel()
+            if self._executor:
+                self._executor.shutdown()
+                self._executor = None
+            if exception:
+                raise exception
+        lgr.debug("Finished shutdown with force=%s due to exception=%r", force, exception)
 
     def _update_total(self, value):
         if self.agg:
@@ -222,7 +268,7 @@ class ProducerConsumer:
         def produce():
             # First consume all coming directly from producer and then go through all which
             # consumer might have added to the producer queue
-            for args in self.producer:
+            for args in self._producer_iter:
                 self._update_total(args)
                 yield args
             # consumer could have added to the queue while we were still
@@ -239,9 +285,15 @@ class ProducerConsumer:
                 lgr.debug("Got straight result %s, not a generator", res)
                 yield res
 
+    @property
+    def _producer_iter(self):
+        """A little helper to also support generator functions"""
+        return self.producer() if inspect.isgeneratorfunction(self.producer) else self.producer
+
     def _iter_threads(self, jobs):
         self._producer_finished = False
-        self._exc = []
+        self._producer_exception = None
+        self._producer_interrupt = None
 
         # To allow feeding producer queue with more entries, possibly from consumer!
         self._producer_queue = producer_queue = Queue()
@@ -250,138 +302,155 @@ class ProducerConsumer:
         def producer_worker():
             """That is the one which interrogates producer and updates .total"""
             try:
-                for value in self.producer:
+                for value in self._producer_iter:
+                    if self._producer_interrupt:
+                        raise InterruptedError("Producer thread was interrupted due to %s" % self._producer_interrupt)
                     self.add_to_producer_queue(value)
+            except InterruptedError:
+                pass  # There is some outside exception which will be raised
             except BaseException as e:
-                self._exc.append(e)
+                self._producer_exception = e
             finally:
                 self._producer_finished = True
 
         def consumer_worker(callable, *args, **kwargs):
             """Since jobs could return a generator and we cannot really "inspect" for that
             """
-            try:
-                res = callable(*args, **kwargs)
-                if inspect.isgenerator(res):
-                    lgr.debug("Got consumer worker which returned a generator %s", res)
-                    didgood = False
-                    for r in res:
-                        didgood = True
-                        lgr.debug("Adding %s to queue", r)
-                        consumer_queue.put(r)
-                    if not didgood:
-                        lgr.error("Nothing was obtained from %s :-(", res)
-                else:
-                    lgr.debug("Got straight result %s, not a generator", res)
-                    consumer_queue.put(res)
-            except BaseException as e:
-                self._exc.append(e)
+            res = callable(*args, **kwargs)
+            if inspect.isgenerator(res):
+                lgr.debug("Got consumer worker which returned a generator %s", res)
+                didgood = False
+                for r in res:
+                    didgood = True
+                    lgr.debug("Adding %s to queue", r)
+                    consumer_queue.put(r)
+                if not didgood:
+                    lgr.error("Nothing was obtained from %s :-(", res)
+            else:
+                lgr.debug("Got straight result %s, not a generator", res)
+                consumer_queue.put(res)
 
-        producer_thread = Thread(target=producer_worker)
-        producer_thread.start()
-
-        futures = {}
+        self._producer_thread = Thread(target=producer_worker)
+        self._producer_thread.start()
+        self._futures = futures = {}
 
         lgr.debug("Initiating ThreadPoolExecutor with %d jobs", jobs)
         # we will increase sleep_time when doing nothing useful
         sleeper = Sleeper()
+        interrupted_by_exception = None
         with concurrent.futures.ThreadPoolExecutor(jobs) as executor:
             self._executor = executor
             # yield from the producer_queue (.total and .finished could be accessed meanwhile)
             while True:
-                done_useful = False
-                if self.reraise_immediately and self._exc:
-                    break
-                if (self._producer_finished and
-                        not futures and
-                        consumer_queue.empty() and
-                        producer_queue.empty()):
-                    break
+                try:
+                    done_useful = False
+                    if self.reraise_immediately and self._producer_exception and not interrupted_by_exception:
+                        # so we have a chance to exit gracefully
+                        # No point to reraise if there is already an exception which was raised
+                        # which might have even been this one
+                        lgr.debug("Reraising an exception from producer as soon as we found it")
+                        raise self._producer_exception
+                    if (self._producer_finished and
+                            not futures and
+                            consumer_queue.empty() and
+                            producer_queue.empty()):
+                        # This will let us not "escape" the while loop and reraise any possible exception
+                        # within the loop if we have any.
+                        # Otherwise we might see "RuntimeError: generator ignored GeneratorExit"
+                        # when e.g. we did continue upon interrupted_by_exception, and then
+                        # no other subsequent exception was raised and we left the loop
+                        raise _FinalShutdown()
 
-                # important!  We are using threads, so worker threads will be sharing CPU time
-                # with this master thread. For it to become efficient, we should consume as much
-                # as possible from producer asap and push it to executor.  So drain the queue
-                while not producer_queue.empty():
-                    done_useful = True
-                    try:
-                        job_args = producer_queue.get() # timeout=0.001)
-                        job_key = self.producer_future_key(job_args) if self.producer_future_key else job_args
-                        if self.safe_to_consume:
-                            # Sleep a little if we are not yet ready
-                            # TODO: add some .debug level reporting based on elapsed time
-                            # IIRC I did smth like growing exponentially delays somewhere (dandi?)
-                            while not self.safe_to_consume(futures, job_key):
-                                _prune_futures(futures, lgr) or sleeper()
-                        # Current implementation, to provide depchecking, relies on unique
-                        # args for the job
-                        assert job_key not in futures
-                        lgr.debug("Submitting worker future for %s", job_args)
-                        futures[job_key] = executor.submit(consumer_worker, self.consumer, job_args)
-                    except Empty:
-                        pass
+                    # important!  We are using threads, so worker threads will be sharing CPU time
+                    # with this master thread. For it to become efficient, we should consume as much
+                    # as possible from producer asap and push it to executor.  So drain the queue
+                    while not (producer_queue.empty() or interrupted_by_exception):
+                        done_useful = True
+                        try:
+                            job_args = producer_queue.get() # timeout=0.001)
+                            job_key = self.producer_future_key(job_args) if self.producer_future_key else job_args
+                            if self.safe_to_consume:
+                                # Sleep a little if we are not yet ready
+                                # TODO: add some .debug level reporting based on elapsed time
+                                # IIRC I did smth like growing exponentially delays somewhere (dandi?)
+                                while not self.safe_to_consume(futures, job_key):
+                                    self._pop_done_futures(lgr) or sleeper()
+                            # Current implementation, to provide depchecking, relies on unique
+                            # args for the job
+                            assert job_key not in futures
+                            lgr.debug("Submitting worker future for %s", job_args)
+                            futures[job_key] = executor.submit(consumer_worker, self.consumer, job_args)
+                        except Empty:
+                            pass
 
-                # check active futures
-                if not consumer_queue.empty():
-                    done_useful = True
-                    # ATM we do not bother of some "in order" reporting
-                    # Just report as soon as any new record arrives
-                    res = consumer_queue.get()
-                    lgr.debug("Got %s from consumer_queue", res)
-                    yield res
+                    # check active futures
+                    if not consumer_queue.empty():
+                        done_useful = True
+                        # ATM we do not bother of some "in order" reporting
+                        # Just report as soon as any new record arrives
+                        res = consumer_queue.get()
+                        lgr.debug("Got %s from consumer_queue", res)
+                        yield res
 
-                done_useful |= _prune_futures(futures, lgr)
+                    done_useful |= self._pop_done_futures(lgr)
 
-                if not done_useful:  # you need some rest
-                    # TODO: same here -- progressive logging
-                    lgr.log(5,
-                        "Did nothing useful, sleeping. Have "
-                        "producer_finished=%s producer_queue.empty=%s futures=%s consumer_queue.empty=%s",
-                            self._producer_finished,
-                            producer_queue.empty(),
-                            futures,
-                            consumer_queue.empty(),
-                            )
-                    sleeper()
-                else:
-                    sleeper.reset()
-
-        self._executor = None
-
-        producer_thread.join()
-        if self._exc:
-            if len(self._exc) > 1:
-                lgr.debug("%d exceptions were collected while performing execution in parallel. Only the first one "
-                          "will be reraised", len(self._exc))
-            raise self._exc[0]
-        else:
-            assert not futures, \
-                "There is still %d active futures for following args: %s" \
-                % (len(futures), ', '.join(futures))
+                    if not done_useful:  # you need some rest
+                        # TODO: same here -- progressive logging
+                        lgr.log(5,
+                                "Did nothing useful, sleeping. Have "
+                                "producer_finished=%s producer_queue.empty=%s futures=%s consumer_queue.empty=%s",
+                                self._producer_finished,
+                                producer_queue.empty(),
+                                futures,
+                                consumer_queue.empty(),
+                                )
+                        sleeper()
+                    else:
+                        sleeper.reset()
+                except _FinalShutdown:
+                    self.shutdown(force=True, exception=self._producer_exception or interrupted_by_exception)
+                    break  # if there were no exception to raise
+                except BaseException as exc:
+                    if interrupted_by_exception:
+                        # so we are here again but now it depends why we are here
+                        if isinstance(exc, KeyboardInterrupt):
+                            lgr.warning("Interrupted via Ctrl-C.  Forcing the exit")
+                            self.shutdown(force=True, exception=exc)
+                        else:
+                            lgr.warning("One more exception was received while trying to finish gracefully: %s", exc_str())
+                            # and we go back into the loop until we finish or there is Ctrl-C
+                    else:
+                        interrupted_by_exception = exc
+                        lgr.warning("""Received an exception %s.
+Canceling not-yet running jobs and waiting for completion of running.
+You can force earlier forceful exit by Ctrl-C.""",
+                                    exc_str(exc))
+                        self.shutdown(force=False, exception=exc)
 
     def add_to_producer_queue(self, value):
         self._producer_queue.put(value)
         self._update_total(value)
 
+    def _pop_done_futures(self, lgr):
+        """Removes .done from provided futures.
 
-def _prune_futures(futures, lgr):
-    """Removes .done from provided futures.
-
-    Returns
-    -------
-    bool
-      True if any future was removed
-    """
-    done_useful = False
-    # remove futures which are done
-    for args, future in list(futures.items()):
-        if future.done():
-            done_useful = True
-            future_ = futures.pop(args)
-            msg = ""
-            if future_.exception():
-                msg = " with an exception %s" % future_.exception()
-            lgr.debug("Future for %r is done%s", args, msg)
-    return done_useful
+        Returns
+        -------
+        bool
+          True if any future was removed
+        """
+        done_useful = False
+        # remove futures which are done
+        for args, future in list(self._futures.items()):
+            if future.done():
+                done_useful = True
+                future_ = self._futures.pop(args)
+                exception = future_.exception()
+                if exception:
+                    lgr.debug("Future for %r raised %s.  Re-raising to trigger graceful shutdown etc", args, exception)
+                    raise exception
+                lgr.debug("Future for %r is done", args)
+        return done_useful
 
 
 class Sleeper():
@@ -482,3 +551,8 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                     label=label, update=1, increment=True)
             yield res
         log_progress(lgr_.info, pid, "%s: done", self.label)
+
+
+class _FinalShutdown(Exception):
+    """Used internally for the final forceful shutdown if any exception did happen"""
+    pass

@@ -20,6 +20,7 @@ from datalad.support.parallel import (
 )
 from datalad.tests.utils import (
     assert_equal,
+    assert_greater,
     assert_repo_status,
     assert_raises,
     rmtree,
@@ -68,7 +69,8 @@ def check_producing_consumer(jobs):
         if isinstance(i, int):
             pc.add_to_producer_queue(str(i**2))
 
-    pc = ProducerConsumer(producer(), consumer, jobs=jobs)
+    # we auto-detect generator function producer
+    pc = ProducerConsumer(producer, consumer, jobs=jobs)
     assert_equal(list(pc), [0, 1, 2, "0", "1", "4"])
 
 
@@ -120,6 +122,66 @@ def test_creatsubdatasets(topds_path, n=2):
     list(ProducerConsumer(paths, create_, safe_to_consume=no_parentds_in_futures, jobs=5))
     ds.save(paths)
     assert_repo_status(ds.repo)
+
+
+def test_gracefull_death():
+
+    def assert_provides_and_raises(pc, exception, target=None):
+        """Helper to get all results before exception is raised"""
+        results = []
+        with assert_raises(exception):
+            for r in pc:
+                results.append(r)
+        # results should be sorted since we do not guarantee order
+        results = sorted(results)
+        if target is not None:
+            assert_equal(results, target)
+        return results
+
+    def interrupted_producer():
+        yield 1
+        raise ValueError()
+
+    def consumer(i):
+        sleep(0.001)
+        yield i
+
+    assert_provides_and_raises(
+        ProducerConsumer(interrupted_producer(), consumer, jobs=3), ValueError, [1])
+
+    def faulty_consumer(i):
+        sleep(0.001)
+        if i == 1:
+            raise ValueError()
+        return i
+
+    # so we do not get failed, but other parallel ones finish their job
+    results = assert_provides_and_raises(
+        ProducerConsumer(range(1000), faulty_consumer, jobs=5), ValueError)
+    # and analysis of futures to raise an exception can take some time etc, so
+    # we could get more, but for sure we should not get all 999 and not even a 100
+    assert_greater(100, len(results))
+    assert_equal(results[:4], [0, 2, 3, 4])
+
+    def producer():
+        for i in range(10):
+            sleep(0.0001)
+            yield i
+        raise ValueError()
+    # by default we do not stop upon producer failing
+    assert_provides_and_raises(
+        ProducerConsumer(producer(), consumer, jobs=2), ValueError, list(range(10)))
+    # if producer produces more than we can as quickly consume but then fails
+    # ATM we do not proceed to consume other items, but fail when we finish
+    # consuming until the time point when producer has failed
+    # by default we do not stop upon producer failing
+    results = assert_provides_and_raises(
+        ProducerConsumer(producer(), consumer, reraise_immediately=True, jobs=2),
+        ValueError)
+    # we will get some results, seems around 4 and they should be "sequential"
+    assert_equal(results, list(range(len(results))))
+    assert_greater(len(results), 2)
+    assert_greater(6, len(results))
 
 
 # it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
