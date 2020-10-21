@@ -184,6 +184,11 @@ class ProducerConsumer:
         self._producer_thread = None
         self._executor = None
         self._futures = {}
+        self._interrupted = False
+
+    @property
+    def interrupted(self):
+        return self._interrupted
 
     def __del__(self):
         # if we are killed while executing, we should ask executor to shutdown
@@ -291,6 +296,7 @@ class ProducerConsumer:
         return self.producer() if inspect.isgeneratorfunction(self.producer) else self.producer
 
     def _iter_threads(self, jobs):
+        self._interrupted = False
         self._producer_finished = False
         self._producer_exception = None
         self._producer_interrupt = None
@@ -411,6 +417,7 @@ class ProducerConsumer:
                     self.shutdown(force=True, exception=self._producer_exception or interrupted_by_exception)
                     break  # if there were no exception to raise
                 except BaseException as exc:
+                    self._interrupted = True
                     if interrupted_by_exception:
                         # so we are here again but now it depends why we are here
                         if isinstance(exc, KeyboardInterrupt):
@@ -535,10 +542,13 @@ class ProducerConsumerProgressLog(ProducerConsumer):
 
             if not (self.log_filter and not self.log_filter(res)):
                 counts[res["status"]] += 1
-                count_strs = (_count_str(*args)
+                count_strs = [_count_str(*args)
                               for args in [(counts["notneeded"], "skipped", False),
-                                           (counts["error"], "failed", True)])
-                if counts["notneeded"] or counts["error"]:
+                                           (counts["error"], "failed", True)]]
+                if counts["notneeded"] or counts["error"] or self.interrupted:
+                    strs = count_strs
+                    if self.interrupted:
+                        strs.append("exiting!")
                     label = "{} ({})".format(
                         self.label,
                         ", ".join(filter(None, count_strs)))
