@@ -407,7 +407,7 @@ class ProducerConsumer:
                         sleeper()
                     else:
                         sleeper.reset()
-                except _FinalShutdown:
+                except (_FinalShutdown, GeneratorExit):
                     self.shutdown(force=True, exception=self._producer_exception or interrupted_by_exception)
                     break  # if there were no exception to raise
                 except BaseException as exc:

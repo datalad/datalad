@@ -21,6 +21,7 @@ from datalad.support.parallel import (
 from datalad.tests.utils import (
     assert_equal,
     assert_greater,
+    assert_greater_equal,
     assert_repo_status,
     assert_raises,
     rmtree,
@@ -124,6 +125,7 @@ def test_creatsubdatasets(topds_path, n=2):
     assert_repo_status(ds.repo)
 
 
+@skip_if(not ProducerConsumer._can_use_threads, msg="Test relies on having parallel execution")
 def test_gracefull_death():
 
     def assert_provides_and_raises(pc, exception, target=None):
@@ -180,8 +182,27 @@ def test_gracefull_death():
         ValueError)
     # we will get some results, seems around 4 and they should be "sequential"
     assert_equal(results, list(range(len(results))))
-    assert_greater(len(results), 2)
-    assert_greater(6, len(results))
+    assert_greater_equal(len(results), 2)
+    assert_greater_equal(6, len(results))
+
+    # Simulate situation close to what we have when outside code consumes
+    # some yielded results and then "looses interest" (on_failure="error").
+    # In this case we should still exit gracefully (no GeneratorExit warnings),
+    # not over-produce, and also do not kill already running consumers
+    consumed = []
+    def inner():
+        def consumer(i):
+            sleep(0.01)
+            consumed.append(i)
+            return i
+        pc = iter(ProducerConsumer(range(1000), consumer, jobs=2))
+        yield next(pc)
+        yield next(pc)
+    assert_equal(sorted(inner()), [0, 1])
+    consumed = sorted(consumed)
+    assert_equal(consumed, list(range(len(consumed))))
+    assert_greater_equal(len(consumed), 4)  # we should wait for that 2nd batch to finish
+    assert_greater_equal(20, len(consumed))
 
 
 # it will stall! https://github.com/datalad/datalad/pull/5022#issuecomment-708716290
