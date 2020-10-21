@@ -77,15 +77,11 @@ def _parse_git_submodules(ds_pathobj, repo, paths):
                 return
     # can we use the reported as such, or do we need to recode wrt to the
     # query context dataset?
-    recode_paths = ds_pathobj != repo.pathobj
-    for props in repo.get_submodules_(paths=paths):
-        path = props["path"]
-        if props.get('type', None) != 'dataset':
-            continue
-        if recode_paths:
-            props['path'] = ds_pathobj / path.relative_to(repo.pathobj)
-        else:
-            props['path'] = path
+    if ds_pathobj == repo.pathobj:
+        yield from repo.get_submodules_(paths=paths)
+    else:
+        for props in repo.get_submodules_(paths=paths):
+            props['path'] = ds_pathobj / paths['path'].relative_to(repo.pathobj)
         yield props
 
 
