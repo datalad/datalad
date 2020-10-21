@@ -216,7 +216,9 @@ class ProducerConsumer:
             ntotal = len(self._futures)
             ncanceled = 0
             nrunning = 0
-            for k, future in list(self._futures.items()):
+            # Do in reverse order so if any job still manages
+            # to sneak in, it would be the earlier submitted one.
+            for k, future in list(self._futures.items())[::-1]:
                 running = future.running()
                 nrunning += int(running)
                 if not (running or future.done()):
@@ -226,7 +228,7 @@ class ProducerConsumer:
                      ncanceled, ntotal, nrunning)
         else:
             # just pop all entirely
-            for k in list(self._futures):
+            for k in list(self._futures)[::-1]:
                 self._futures.pop(k).cancel()
             if self._executor:
                 self._executor.shutdown()
