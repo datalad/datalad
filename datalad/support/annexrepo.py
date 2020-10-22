@@ -859,7 +859,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         srs = {}
         try:
             for line in self.call_git_items_(
-                    ['cat-file', 'blob', 'git-annex:remote.log']):
+                    ['cat-file', 'blob', 'git-annex:remote.log'],
+                    check_fake_dates=False):
                 # be precise and split by spaces
                 fields = line.split(' ')
                 # special remote UUID
@@ -1620,7 +1621,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # reports a type change as modified.
         modified = [
             f for f in self.call_git_items_(
-                ['diff', '--name-only', '-z'], sep='\0')
+                ['diff', '--name-only', '-z'], sep='\0',
+                check_fake_dates=False)
             if f] if pointers else []
         annex_res = fn(files, normalize_paths=False, batch=batch)
         return [bool(annex_res.get(f) and
