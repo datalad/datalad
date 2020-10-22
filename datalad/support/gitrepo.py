@@ -3964,7 +3964,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           - git : bool (passed to Repo.add()
           - eval_submodule_state : {'full', 'commit', 'no'}
             passed to Repo.status()
-          - untracked : {'no', 'normal', 'all'} - passed to Repo.satus()
+          - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
         """
         return list(
             self.save_(
