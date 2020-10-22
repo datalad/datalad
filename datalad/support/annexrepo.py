@@ -2732,10 +2732,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             For each file in input list indicates the used backend by a str
             like "SHA256E" or "MD5".
         """
-
         return [
-            self.get_key_backend(self.get_file_key(f))
-            for f in files
+            r.get('backend')
+            for r in self.get_content_annexinfo(
+                # we provide records for files to inspect. this bypasses
+                # any internal git-calls to acquire status info
+                init={self.pathobj / fn: {} for fn in files},
+                eval_availability=False).values()
         ]
 
     @property
