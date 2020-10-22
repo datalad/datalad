@@ -1430,59 +1430,39 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Raises
         ------
-        FileInGitError
-             If running in non-batch mode and a file is under git, not annex
         FileNotInAnnexError
              If running in non-batch mode and a file is not under git at all
         """
+        if len(files) > 1:
+            # in order to maintain compat with pre 0.14, behave differently
+            # in batch mode, although that was an implementation detail
+            # that is no longer valid
+            batch = True
+        # prep filenames for query
+        files = [self.pathobj / fn for fn in files]
+        keys = self.get_content_annexinfo(
+            # we provide records for files to inspect. this bypasses
+            # any internal git-calls to acquire status info
+            init={k: {} for k in files},
+            eval_availability=False)
 
-        if batch or (batch is None and len(files) > 1):
-            return self._batched.get('lookupkey', path=self.path)(files)
-        else:
-            files = files[0]
-            # single file
-            # keep current implementation
-            # TODO: This should change, but involves more RF'ing and an
-            # alternative regarding FileNotInAnnexError
-            cmd_str = 'git annex lookupkey %s' % files  # have a string for messages
+        results = []
+        not_in_annex = []
+        for f in files:
+            # we know that we provided a template record. at minimum this one
+            # will come out again
+            props = keys[f]
+            key = props.get('key')
+            if batch:
+                # batch mode used to report empty strings
+                results.append(key if key else '')
+            else:
+                (results if key else not_in_annex).append(key)
 
-            try:
-                out, err = self._run_annex_command(
-                    'lookupkey',
-                    files=[files],
-                    expect_fail=True,
-                    runner="gitwitless",
-                )
-            except CommandError as e:
-                if e.code == 1:
-                    if not exists(opj(self.path, files)):
-                        raise IOError(e.code, "File not found.", files)
-                    # XXX you don't like me because I can be real slow!
-                    elif files in self.get_indexed_files():
-                        # if we got here, the file is present and in git,
-                        # but not in the annex
-                        raise FileInGitError(cmd=cmd_str,
-                                             msg="File not in annex, but git: %s"
-                                                 % files,
-                                             filename=files)
-                    else:
-                        raise FileNotInAnnexError(cmd=cmd_str,
-                                                  msg="File not in annex: %s"
-                                                      % files,
-                                                  filename=files)
-                else:
-                    # Not sure, whether or not this can actually happen
-                    raise e
+        if not_in_annex:
+            raise FileNotInAnnexError(filename=not_in_annex)
 
-            entries = out.rstrip(linesep).splitlines()
-            # filter out the ones which start with (: http://git-annex.branchable.com/bugs/lookupkey_started_to_spit_out___34__debug__34___messages_to_stdout/?updated
-            entries = list(filter(lambda x: not x.startswith('('), entries))
-            if len(entries) > 1:
-                lgr.warning("Got multiple entries in reply asking for a key of a file: %s"
-                            % (str(entries)))
-            elif not entries:
-                raise FileNotInAnnexError("Could not get a key for a file(s) %s -- empty output" % files)
-            return entries[0]
+        return results
 
     @normalize_paths
     def unlock(self, files):

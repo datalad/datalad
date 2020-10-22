@@ -210,8 +210,6 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
     assert_false(dm)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:473
-@known_failure_windows
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
@@ -236,7 +234,8 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     # should raise Exception; also test for polymorphism
     assert_raises(IOError, ar.get_file_key, "test.dat")
     assert_raises(FileNotInAnnexError, ar.get_file_key, "test.dat")
-    assert_raises(FileInGitError, ar.get_file_key, "test.dat")
+    # exception no longer raised, would be expensive to query in addition
+    #assert_raises(FileInGitError, ar.get_file_key, "test.dat")
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
