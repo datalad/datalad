@@ -2875,6 +2875,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 untracked='no',
                 eval_file_type=False).items():
             if props.get('type', None) != 'dataset':
+                # make sure this method never talks about non-dataset
+                # content
                 continue
             props["path"] = path
             props.update(modinfo.get(path, {}))

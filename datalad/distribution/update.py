@@ -49,11 +49,11 @@ lgr = logging.getLogger('datalad.distribution.update')
 
 
 class YieldDatasetAndRevision(YieldDatasets):
-    """Like YieldDatasets, but also provide "revision" value, if any.
+    """Like YieldDatasets, but also provide "gitshasum" value, if any.
     """
     def __call__(self, res):
         ds = super(YieldDatasetAndRevision, self).__call__(res)
-        return ds, res.get("revision")
+        return ds, res.get("gitshasum")
 
 
 @build_doc
