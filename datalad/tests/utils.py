@@ -353,19 +353,17 @@ def ok_file_under_git(path, filename=None, annexed=False):
     If relative path provided, then test from current directory
     """
     annex, file_repo_path, filename, path, repo = _prep_file_under_git(path, filename)
-    assert_in(file_repo_path, repo.get_indexed_files())  # file is known to Git
-
-    if annex:
-        try:
-            # operates on relative to curdir path
-            repo.get_file_key(file_repo_path)
-            in_annex = True
-        except FileNotInAnnexError as e:
-            in_annex = False
-    else:
-        in_annex = False
-
-    assert(annexed == in_annex)
+    query_path = repo.pathobj / file_repo_path
+    query = (
+        repo.get_content_annexinfo
+        if annex else repo.get_content_info)(paths=[query_path])
+    # file exists
+    assert(query_path in query)
+    query_result = query[query_path]
+    # file is known to Git
+    assert(query_result.get('gitshasum'))
+    # file in annex
+    assert(annexed == ('key' in query_result))
 
 
 def put_file_under_git(path, filename=None, content=None, annexed=False):
