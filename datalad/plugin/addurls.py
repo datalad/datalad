@@ -521,10 +521,11 @@ def _log_filter_addurls(res):
 
 
 @with_result_progress("Adding URLs", log_filter=_log_filter_addurls)
-def _add_urls(rows, ds, repo, ifexists=None, options=None):
+def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
     """Call `git annex addurl` using information in `rows`.
     """
     add_metadata = {}
+    drop = []
     for row in rows:
         filename_abs = row["filename_abs"]
         filename = row["ds_filename"]
@@ -562,9 +563,23 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None):
         res_addurls = annexjson2result(
             out_json, ds, action="addurls",
             type="file", logger=lgr)
-        if res_addurls["status"] == "ok" and row.get("meta_args"):
-            add_metadata[filename] = row["meta_args"]
+        if res_addurls["status"] == "ok":
+            if drop_after and 'annexkey' in res_addurls:
+                drop.append(filename)
+            if row.get("meta_args"):
+                add_metadata[filename] = row["meta_args"]
         yield res_addurls
+
+    # TODO: ideally we should drop right after yielding res_addurls
+    # above.  But ATM we have no --batch for drop interfaced (there is one
+    # based on key though), so let's do in one sweep after.  In current usecases
+    # it would still be tollerable but might not be generally (e.g. a dataset
+    # which does not fit on harddrive)
+    # TODO: alternative enhancement (since common functionality) could be to add
+    # drop_after to add_url_to_file but it is not a generator, so we cannot
+    # yield multiple records ATM
+    if drop:
+       yield from ds.drop(drop, result_xfm=None, return_type='generator')
 
     if not add_metadata:
         return
@@ -779,6 +794,11 @@ class Addurls(Interface):
             doc="""Pass this [PY: cfg_proc PY][CMD: --cfg_proc CMD] value when
             calling `create` to make datasets."""),
         jobs=jobs_opt,
+        drop_after=Parameter(
+            args=("--drop-after",),
+            action="store_true",
+            doc="""drop files after adding to annex""",
+        ),
     )
 
     @staticmethod
@@ -788,7 +808,7 @@ class Addurls(Interface):
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
-                 cfg_proc=None, jobs=None):
+                 cfg_proc=None, jobs=None, drop_after=False):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
@@ -945,7 +965,8 @@ class Addurls(Interface):
                 log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
 
             subds_files_to_add = set()
-            for r in _add_urls(rows, subds, repo, ifexists=ifexists, options=annex_options):
+            for r in _add_urls(rows, subds, repo,
+                               ifexists=ifexists, options=annex_options, drop_after=drop_after):
                 if r["status"] == "ok":
                     subds_files_to_add.add(r["path"])
                 yield r

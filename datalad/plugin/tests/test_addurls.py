@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_re_in,
     assert_repo_status,
+    assert_result_count,
     assert_true,
     chpwd,
     create_tree,
@@ -722,3 +723,14 @@ class TestAddurls(object):
                        stdin=jfh)
         for fname in ["a", "b", "c"]:
             ok_exists(op.join(path, fname))
+
+    @with_tempfile(mkdir=True)
+    def test_drop_after(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.repo.set_gitattributes([('a*', {'annex.largefiles': 'nothing'})])
+        # make some files go to git, so we could test that we do not blow
+        # while trying to drop what is in git not annex
+        res = ds.addurls(self.json_file, '{url}', '{name}', drop_after=True)
+
+        assert_result_count(res, 3, action='addurl', status='ok')  # a, b, c  even if a goes to git
+        assert_result_count(res, 2, action='drop', status='ok')  # b, c
