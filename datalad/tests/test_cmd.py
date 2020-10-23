@@ -23,6 +23,7 @@ from datalad.tests.utils import (
     assert_is,
     assert_raises,
     eq_,
+    known_failure_appveyor,
     known_failure_githubci_win,
     lgr,
     OBSCURE_FILENAME,
@@ -77,6 +78,9 @@ def test_runner_dry(tempfile):
     assert_equal("args=('foo', 'bar')", dry[1]['command'][1])
 
 
+# UnicodeDecodeError: 'charmap' codec can't decode byte 0x81 in position 10:
+# character maps to <undefined>
+@known_failure_appveyor
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
@@ -282,6 +286,9 @@ def test_runner_failure(dir_):
     assert_equal(1, cme.exception.code)
 
 
+# UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe1 in position 1:
+# invalid continuation byte
+@known_failure_appveyor
 @with_tempfile(mkdir=True)
 def test_runner_failure_unicode(path):
     # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
