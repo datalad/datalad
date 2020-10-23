@@ -525,7 +525,6 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
     """Call `git annex addurl` using information in `rows`.
     """
     add_metadata = {}
-    drop = []
     for row in rows:
         filename_abs = row["filename_abs"]
         filename = row["ds_filename"]
@@ -563,23 +562,29 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
         res_addurls = annexjson2result(
             out_json, ds, action="addurls",
             type="file", logger=lgr)
-        if res_addurls["status"] == "ok":
-            if drop_after and 'annexkey' in res_addurls:
-                drop.append(filename)
-            if row.get("meta_args"):
-                add_metadata[filename] = row["meta_args"]
         yield res_addurls
 
-    # TODO: ideally we should drop right after yielding res_addurls
-    # above.  But ATM we have no --batch for drop interfaced (there is one
-    # based on key though), so let's do in one sweep after.  In current usecases
-    # it would still be tollerable but might not be generally (e.g. a dataset
-    # which does not fit on harddrive)
-    # TODO: alternative enhancement (since common functionality) could be to add
-    # drop_after to add_url_to_file but it is not a generator, so we cannot
-    # yield multiple records ATM
-    if drop:
-       yield from ds.drop(drop, result_xfm=None, return_type='generator')
+        if not res_addurls["status"] == "ok":
+            continue
+
+        if drop_after and 'annexkey' in res_addurls:
+            # unfortunately .drop has no batched mode, and drop_key ATM would
+            # raise AssertionError if not success, and otherwise return nothing
+            try:
+                repo.drop_key(res_addurls['annexkey'], batch=True)
+                st_kwargs = dict(status="ok")
+            except (AssertionError, AnnexBatchCommandError) as exc:
+                st_kwargs = dict(message=exc_str(exc),
+                                  status="error")
+            yield get_status_dict(action="drop",
+                                  ds=ds,
+                                  annexkey=res_addurls['annexkey'],
+                                  type="file",
+                                  path=filename_abs,
+                                  **st_kwargs)
+
+        if row.get("meta_args"):
+            add_metadata[filename] = row["meta_args"]
 
     if not add_metadata:
         return
