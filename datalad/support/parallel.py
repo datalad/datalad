@@ -61,7 +61,7 @@ def no_parentds_in_futures(futures, path, skip=tuple()):
 
 
 def no_subds_in_futures(futures, path, skip=tuple()):
-    """Return Tre if no path in futures keys is a subdataset for provided path
+    """Return True if no path in futures keys is a subdataset for provided path
 
     See `no_parentds_in_futures` for more info
     """
@@ -80,7 +80,7 @@ class ProducerConsumer:
     All results from consumers are all yielded as soon as they are produced by consumers.
     Because this implementation is based on threads, `producer` and `consumer` could
     be some "closures" within code, thus having lean interface and accessing
-    data from shared "outter scope".
+    data from shared "outer scope".
 
     Notes
     -----
@@ -111,7 +111,7 @@ class ProducerConsumer:
                 return fname, len(f.readlines())
         pprint(dict(ProducerConsumer(glob("*.py"), count_lines)))
 
-    More usage exampels could be found in `test_parallel.py` and around the
+    More usage examples could be found in `test_parallel.py` and around the
     codebase `addurls.py`, `get.py`, `save.py`, etc.
     """
 
