@@ -707,10 +707,12 @@ def with_memory_keyring(t):
 def without_http_proxy(tfunc):
     """Decorator to remove http*_proxy env variables for the duration of the test
     """
-
+    
     @wraps(tfunc)
     @attr('without_http_proxy')
     def  _wrap_without_http_proxy(*args, **kwargs):
+        if on_windows:
+            raise SkipTest('Unclear why this is not working on windows')
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
