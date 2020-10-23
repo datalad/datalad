@@ -382,7 +382,7 @@ def test_download_ftp():
                   None,
                   "This is ftp.gnu.org"
         )
-    except AccessFailedError as exc:
+    except AccessFailedError as exc:  # pragma: no cover
         if 'status code 503' in str(exc):
             raise SkipTest("ftp.gnu.org throws 503 when on travis (only?)")
         raise
