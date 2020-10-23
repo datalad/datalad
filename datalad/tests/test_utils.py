@@ -15,6 +15,7 @@ import os
 import os.path as op
 import shutil
 import sys
+import time
 import logging
 from unittest.mock import patch
 import builtins
@@ -712,8 +713,12 @@ def test_path_():
 def test_get_timestamp_suffix():
     # we need to patch temporarily TZ
     with patch.dict('os.environ', {'TZ': 'GMT'}):
+        # figure out how GMT time zone suffix is represented
+        # could be +0 or -0, depending on platform
+        # just use whatever it is, not the subject of this test
+        tz_suffix = time.strftime('%z', time.gmtime(0))
         # skynet DOB
-        target_ts = '1970-01-01T00:00:00+0000'
+        target_ts = '1970-01-01T00:00:00' + tz_suffix
         assert_equal(get_timestamp_suffix(0), '-' + target_ts)
         assert_equal(get_timestamp_suffix(0, prefix="+"),
                      '+' + target_ts)
