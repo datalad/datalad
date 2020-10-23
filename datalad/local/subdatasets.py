@@ -55,8 +55,9 @@ lgr = logging.getLogger('datalad.local.subdatasets')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 
-def _parse_git_submodules(ds_pathobj, repo, paths):
+def _parse_git_submodules(ds, paths, cache):
     """All known ones with some properties"""
+    ds_pathobj = ds.pathobj
     if not (ds_pathobj / ".gitmodules").exists():
         # easy way out. if there is no .gitmodules file
         # we cannot have (functional) subdatasets
@@ -77,6 +78,7 @@ def _parse_git_submodules(ds_pathobj, repo, paths):
                 return
     # can we use the reported as such, or do we need to recode wrt to the
     # query context dataset?
+    cache['repo'] = repo = ds.repo
     if ds_pathobj == repo.pathobj:
         yield from repo.get_submodules_(paths=paths)
     else:
@@ -240,10 +242,15 @@ class Subdatasets(Interface):
                         "start with a letter)" % k)
         if contains:
             contains = resolve_path(ensure_list(contains), dataset, ds)
+            # expand all test cases for the contains test in the loop below
+            # leads to ~20% speedup per loop iteration of a non-match
+            expanded_contains = [[c] + list(c.parents) for c in contains]
+        else:
+            expanded_contains = []
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
-                contains, bottomup, set_property, delete_property,
+                expanded_contains, bottomup, set_property, delete_property,
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
             # Path objects
@@ -277,22 +284,19 @@ class Subdatasets(Interface):
 def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     contains, bottomup, set_property, delete_property,
                     refds_path):
-    dspath = ds.path
-    repo = ds.repo
-    if not GitRepo.is_valid_repo(dspath):
-        return
-    # expand all test cases for the contains test in the loop below
-    # leads to ~20% speedup per loop iteration of a non-match
-    expanded_contains = [
-        [c] + list(c.parents)
-        for c in (contains if contains is not None else [])
-    ]
+    lookup_cache = {}
+    # it should be OK to skip the extra check, because _parse_git_submodules()
+    # we specifically look for .gitmodules and the rest of the function
+    # is on its results
+    #if not GitRepo.is_valid_repo(dspath):
+    #    return
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(ds.pathobj, repo, paths):
+    for sm in _parse_git_submodules(ds, paths, lookup_cache):
+        repo = lookup_cache['repo']
         sm_path = sm['path']
         contains_hits = None
         if contains:
-            contains_hits = [c[0] for c in expanded_contains if sm_path in c]
+            contains_hits = [c[0] for c in contains if sm_path in c]
             if not contains_hits:
                 # we are not looking for this subds, because it doesn't
                 # match the target path
@@ -382,7 +386,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             type='dataset',
             logger=lgr)
         subdsres.update(sm)
-        subdsres['parentds'] = dspath
+        subdsres['parentds'] = ds.path
         if to_report:
             if contains_hits:
                 subdsres['contains'] = contains_hits
