@@ -15,6 +15,7 @@ import os
 import os.path as op
 import shutil
 import sys
+import time
 import logging
 from unittest.mock import patch
 import builtins
@@ -607,7 +608,10 @@ def test_expandpath():
     eq_(expandpath("some", False), expandvars('some'))
     assert_true(isabs(expandpath('some')))
     # this may have to go because of platform issues
-    eq_(expandpath("$HOME"), expanduser('~'))
+    if not on_windows:
+        # expanduser is not influenced by our HOME setting adjustments
+        # for the tests on windows
+        eq_(expandpath("$HOME"), expanduser('~'))
 
 
 def test_is_explicit_path():
@@ -709,9 +713,12 @@ def test_path_():
 def test_get_timestamp_suffix():
     # we need to patch temporarily TZ
     with patch.dict('os.environ', {'TZ': 'GMT'}):
+        # figure out how GMT time zone suffix is represented
+        # could be +0 or -0, depending on platform
+        # just use whatever it is, not the subject of this test
+        tz_suffix = time.strftime('%z', time.gmtime(0))
         # skynet DOB
-        target_ts = '1970-01-01T00:00:00-0000' \
-            if on_windows else '1970-01-01T00:00:00+0000'
+        target_ts = '1970-01-01T00:00:00' + tz_suffix
         assert_equal(get_timestamp_suffix(0), '-' + target_ts)
         assert_equal(get_timestamp_suffix(0, prefix="+"),
                      '+' + target_ts)
@@ -794,7 +801,7 @@ def test_as_unicode():
     assert_in("1 is not of any of known or provided", str(cme.exception))
 
 
-@known_failure_windows
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 def test_path_prefix(path):
     eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
@@ -862,7 +869,7 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(fname), os.curdir)
 
 
-@known_failure_windows
+@skip_if_on_windows
 def test_path_startswith():
     ok_(path_startswith('/a/b', '/a'))
     ok_(path_startswith('/a/b', '/a/b'))
@@ -878,7 +885,7 @@ def test_path_startswith():
     assert_raises(ValueError, path_startswith, '/a/b', 'a')
 
 
-@known_failure_windows
+@skip_if_on_windows
 def test_path_is_subpath():
     ok_(path_is_subpath('/a/b', '/a'))
     ok_(path_is_subpath('/a/b/c', '/a'))
