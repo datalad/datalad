@@ -234,8 +234,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     # should raise Exception; also test for polymorphism
     assert_raises(IOError, ar.get_file_key, "test.dat")
     assert_raises(FileNotInAnnexError, ar.get_file_key, "test.dat")
-    # exception no longer raised, would be expensive to query in addition
-    #assert_raises(FileInGitError, ar.get_file_key, "test.dat")
+    assert_raises(FileInGitError, ar.get_file_key, "test.dat")
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")

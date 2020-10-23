@@ -1410,16 +1410,23 @@ class AnnexRepo(GitRepo, RepoInterface):
     def get_file_key(self, files, batch=None):
         """Get key of an annexed file.
 
+        This method is inefficient when called repeatedly for single files,
+        rather than once for a list of files.
+
+        When more annex file properties need to be queried in addition to the
+        file key, it is more efficient to use get_content_annexinfo(). This
+        method is a frontend for it, and selectively returns file keys only.
+
         Parameters
         ----------
         files: str or list
             file(s) to look up
         batch: None or bool, optional
-            If True, `lookupkey --batch` process will be used, which would
-            not crash even if provided file is not under annex (but directly
-            under git), but rather just return an empty string. If False,
-            invokes without --batch. If None, use batch mode if more than a
-            single file is provided.
+            Only alters the reporting behavior to retain compatibility with
+            pre 0.14 DataLad versions. If True, return an empty string
+            rather than raise an exception for a file that is in Git, but not
+            annexed. If None, behave as if batch-True if more than a single
+            file is provided.
 
         Returns
         -------
@@ -1430,22 +1437,28 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Raises
         ------
+        FileInGitError
+            If running in non-batch mode and a file is under git, not annex
         FileNotInAnnexError
-             If running in non-batch mode and a file is not under git at all
+            If running in non-batch mode and a file is not under git at all
         """
         if len(files) > 1:
             # in order to maintain compat with pre 0.14, behave differently
             # in batch mode, although that was an implementation detail
             # that is no longer valid
             batch = True
+
         # prep filenames for query
         files = [self.pathobj / fn for fn in files]
+        # the actual query
         keys = self.get_content_annexinfo(
             # we provide records for files to inspect. this bypasses
             # any internal git-calls to acquire status info
             init={k: {} for k in files},
             eval_availability=False)
 
+        # the rest of the method is only about replicating previous result
+        # and error behavior
         results = []
         not_in_annex = []
         for f in files:
@@ -1457,11 +1470,24 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # batch mode used to report empty strings
                 results.append(key if key else '')
             else:
-                (results if key else not_in_annex).append(key)
+                if key:
+                    results.append(key)
+                else:
+                    not_in_annex.append(f)
 
         if not_in_annex:
-            raise FileNotInAnnexError(filename=not_in_annex)
-
+            # test if files are in Git at all
+            in_git = [
+                f for f, k in self.get_content_info(
+                    paths=[f.relative_to(self.pathobj) for f in not_in_annex],
+                    untracked='no',
+                    eval_file_type=False).items()
+                if k.get('gitshasum')
+            ]
+            if in_git:
+                raise FileInGitError(filename=in_git)
+            else:
+                raise FileNotInAnnexError(filename=not_in_annex)
         return results
 
     @normalize_paths
