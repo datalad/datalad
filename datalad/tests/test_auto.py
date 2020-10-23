@@ -112,6 +112,7 @@ def test_proxying_open_testrepobased(repo):
 
 
 # TODO: RF to allow for quick testing of various scenarios/backends without duplication
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def _test_proxying_open(generate_load, verify_load, repo):
     annex = AnnexRepo(repo, create=True)
@@ -181,6 +182,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
             assert_true(annex2.file_has_content(fpath2_2))
 
 
+@known_failure_windows
 def test_proxying_open_h5py():
     def generate_hdf5(f):
         with h5py.File(f, "w") as f:
@@ -197,7 +199,7 @@ def test_proxying_open_h5py():
     yield _test_proxying_open, generate_hdf5, verify_hdf5
 
 
-@known_failure_githubci_win
+@known_failure_windows
 def test_proxying_open_regular():
     def generate_dat(f):
         with open(f, "w") as f:
@@ -210,7 +212,7 @@ def test_proxying_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
-@known_failure_githubci_win
+@known_failure_windows
 def test_proxying_io_open_regular():
 
     def generate_dat(f):
@@ -224,7 +226,7 @@ def test_proxying_io_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
-@known_failure_githubci_win
+@known_failure_windows
 def test_proxying_lzma_LZMAFile():
     def generate_dat(f):
         with LZMAFile(f, "w") as f:
@@ -237,6 +239,7 @@ def test_proxying_lzma_LZMAFile():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
+@known_failure_windows
 def test_proxying_open_nibabel():
     if not nib:
         raise SkipTest("No nibabel found")
@@ -258,7 +261,7 @@ def test_proxying_open_nibabel():
     yield _test_proxying_open, generate_nii, verify_nii
 
 
-@known_failure_githubci_win
+@known_failure_windows
 def test_proxying_os_stat():
     from os.path import exists
     def generate_dat(f):

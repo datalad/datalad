@@ -26,7 +26,7 @@ from datalad.tests.utils import (
     assert_false,
     with_tempfile,
     swallow_logs,
-    known_failure_githubci_win,
+    known_failure_windows,
 )
 
 from ..support.protocol import (
@@ -40,7 +40,7 @@ from ..support.protocol import (
 from ..cmd import Runner
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tempfile
 def test_protocol_commons(protocol_file):
 
@@ -76,6 +76,7 @@ def test_protocol_commons(protocol_file):
         assert_equal(str_, read_str)
 
 
+@known_failure_windows
 @with_tempfile
 @with_tempfile
 def test_ExecutionTimeProtocol(path1, path2):
@@ -125,6 +126,7 @@ def test_ExecutionTimeProtocol(path1, path2):
     ok_(timer_protocol[2]['duration'] >= 0)
 
 
+@known_failure_windows
 @with_tempfile
 @with_tempfile
 def test_ExecutionTimeExternalsProtocol(path1, path2):
@@ -162,6 +164,7 @@ def test_ExecutionTimeExternalsProtocol(path1, path2):
     assert_equal(len(timer_protocol), 2)
 
 
+@known_failure_windows
 @with_tempfile
 def test_DryRunProtocol(path):
 
@@ -182,6 +185,7 @@ def test_DryRunProtocol(path):
     assert_equal(len(protocol), 2)
 
 
+@known_failure_windows
 @with_tempfile
 def test_DryRunExternalsProtocol(path):
 
