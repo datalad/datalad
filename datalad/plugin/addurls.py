@@ -11,7 +11,6 @@
 
 from collections.abc import Mapping
 
-import itertools
 import logging
 import os
 import re
@@ -19,7 +18,6 @@ import string
 import sys
 
 from functools import partial
-from operator import itemgetter
 from urllib.parse import urlparse
 
 import datalad.support.path as op
@@ -45,7 +43,6 @@ from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     ensure_list,
     get_suggestions_msg,
-    path_is_subpath,
     unlink,
 )
 
