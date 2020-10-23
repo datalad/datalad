@@ -960,10 +960,7 @@ def clone_url(url):
     return tdir
 
 
-if not on_windows:
-    local_testrepo_flavors = ['local'] # 'local-url'
-else:
-    local_testrepo_flavors = ['network-clone']
+local_testrepo_flavors = ['local'] # 'local-url'
 
 _TESTREPOS = None
 
