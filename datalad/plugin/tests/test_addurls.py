@@ -41,6 +41,7 @@ from datalad.tests.utils import (
     HTTPPath,
     known_failure_githubci_win,
     ok_exists,
+    ok_startswith,
     swallow_logs,
     with_tempfile,
     with_tree,
@@ -438,8 +439,13 @@ class TestAddurls(object):
 
         n_annex_commits = get_annex_commit_counts()
 
-        ds.addurls(self.json_file, "{url}", "{name}")
-
+        # Meanwhile also test that we can specify path relative
+        # to the top of the dataset, as we generally treat paths in
+        # Python API, and it will be the one saved in commit
+        # message record
+        json_file = op.relpath(self.json_file, ds.path)
+        ds.addurls(json_file, "{url}", "{name}")
+        ok_startswith(ds.repo.format_commit('%b'), f"url_file='{json_file}'")
         filenames = ["a", "b", "c"]
         for fname in filenames:
             ok_exists(op.join(ds.path, fname))
