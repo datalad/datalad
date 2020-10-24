@@ -803,9 +803,9 @@ def known_failure(func):
     skipping precedence over the probing.
     """
 
+    @wraps(func)
     @skip_known_failure
     @probe_known_failure
-    @wraps(func)
     @attr('known_failure')
     def  _wrap_known_failure(*args, **kwargs):
         return func(*args, **kwargs)
@@ -829,8 +829,8 @@ def known_failure_v6_or_later(func):
 
     if (version and version >= 6) or 5 not in info["supported"]:
 
-        @known_failure
         @wraps(func)
+        @known_failure
         @attr('known_failure_v6_or_later')
         @attr('v6_or_later')
         def v6_func(*args, **kwargs):
@@ -872,9 +872,8 @@ def known_failure_windows(func):
     Otherwise the original (undecorated) function is returned.
     """
     if on_windows:
-
-        @known_failure
         @wraps(func)
+        @known_failure
         @attr('known_failure_windows')
         @attr('windows')
         def dm_func(*args, **kwargs):
@@ -888,8 +887,8 @@ def known_failure_appveyor(func):
     """Test decorator marking a test as known to fail on AppVeyor.
     """
     if 'APPVEYOR' in os.environ:
-        @known_failure
         @wraps(func)
+        @known_failure
         @attr('known_failure_appveyor')
         @attr('appveyor')
         def dm_func(*args, **kwargs):
@@ -902,8 +901,8 @@ def known_failure_githubci_win(func):
     """Test decorator for a known test failure on Github's Windows CI
     """
     if 'GITHUB_WORKFLOW' in os.environ and on_windows:
-        @known_failure
         @wraps(func)
+        @known_failure
         @attr('known_failure_githubci_win')
         @attr('githubci_win')
         def dm_func(*args, **kwargs):
@@ -916,8 +915,8 @@ def known_failure_githubci_osx(func):
     """Test decorator for a known test failure on Github's macOS CI
     """
     if 'GITHUB_WORKFLOW' in os.environ and on_osx:
-        @known_failure
         @wraps(func)
+        @known_failure
         @attr('known_failure_githubci_osx')
         @attr('githubci_osx')
         def dm_func(*args, **kwargs):
