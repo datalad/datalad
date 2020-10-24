@@ -267,6 +267,17 @@ class CreateSiblingRia(Interface):
             logger=lgr,
         )
 
+        # parse target URL
+        try:
+            ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
+        except ValueError as e:
+            yield get_status_dict(
+                status='error',
+                message=str(e),
+                **res_kwargs
+            )
+            return
+
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
                 "Repository at {} is not a DataLad dataset, "
@@ -359,16 +370,6 @@ class CreateSiblingRia(Interface):
         # reduced to single instance, since rewriting url based on config could
         # be different for subdatasets.
 
-        # parse target URL
-        try:
-            ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
-        except ValueError as e:
-            yield get_status_dict(
-                status='error',
-                message=str(e),
-                **res_kwargs
-            )
-            return
         create_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                      Path(base_path),
                      '1')
