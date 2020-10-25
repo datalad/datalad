@@ -974,7 +974,7 @@ def test_AnnexRepo_get_contentlocation():
         yield _test_AnnexRepo_get_contentlocation, batch
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('about2_.txt', 'more abouts_'),
