@@ -130,6 +130,7 @@ def test_clone_crcns(tdir, ds_path):
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
+@known_failure_appveyor
 @integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -926,6 +927,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
+@known_failure_appveyor
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
