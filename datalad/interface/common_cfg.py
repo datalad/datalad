@@ -355,7 +355,7 @@ definitions = {
     },
     'datalad.runtime.max-jobs': {
         'ui': ('question', {
-            'title': 'Maximum number of parallel jobs DataLad can run in "parallel"',
+            'title': 'Maximum number of jobs DataLad can run in "parallel"',
             'text': 'Set this value to enable parallel multi-threaded DataLad jobs that may speed up certain '
                     'operations, in particular operation across multiple datasets (e.g., install multiple '
                     'subdatasets, etc).'}),
