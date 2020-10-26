@@ -228,6 +228,9 @@ then to later deactivate the virtualenv just simply enter
 deactivate
 ```
 
+**Note**: on Windows, please add `--traverse-namespace` option to the `nose`
+call, or otherwise `nose` would not discover tests.
+
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
