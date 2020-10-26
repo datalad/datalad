@@ -255,10 +255,15 @@ class ProducerConsumer:
             # to complete, scaling up/down. Ten config variable could accept "auto" as well
             jobs = cfg.obtain('datalad.runtime.max-jobs')
         if jobs >= 1 and not self._can_use_threads:
-            (lgr.debug if ProducerConsumer._alerted_already else lgr.warning)(
-                "Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
-                "Will run serially", jobs)
-            ProducerConsumer._alerted_already = True
+            # if we have arrived with jobs=1 and older python, we will not
+            # even alert that we are running serially.  The fact is that
+            # ProducerConsumer with jobs=1 does parallel run of the producer
+            # so in principle already partially parallelized.
+            if jobs > 1:
+                (lgr.debug if ProducerConsumer._alerted_already else lgr.warning)(
+                    "Got jobs=%d but we cannot use threads with Pythons versions prior 3.8.0. "
+                    "Will run serially", jobs)
+                ProducerConsumer._alerted_already = True
             jobs = 0
         self._jobs = jobs
         if jobs == 0:
