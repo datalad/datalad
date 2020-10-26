@@ -12,6 +12,7 @@
 
 from contextlib import contextmanager
 import logging
+from time import sleep
 from os.path import (
     exists,
     join as opj,
@@ -403,11 +404,16 @@ def test_utils_suppress_similar():
     # Check suppression boundary for straight chain of similar
     # messages.
 
+    # yield test results immediately to make test run fast
+    sleep_dur = 0.0
+
     def n_foo(number):
         for i in range(number):
             yield dict(action="foo",
                        status="ok",
                        path="path{}".format(i))
+            sleep(sleep_dur)
+
 
     with _swallow_outputs() as cmo:
         cmo.isatty = lambda: True
@@ -426,12 +432,19 @@ def test_utils_suppress_similar():
         assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
 
     with _swallow_outputs() as cmo:
+        # for this one test yield results slightly slower than 2Hz
+        # such that we can see each individual supression message
+        # and no get caught by the rate limiter
+        sleep_dur = 0.51
         list(tu(13, result_fn=n_foo, result_renderer="default"))
         assert_not_in("path10", cmo.out)
         # We see an update for each result.
         assert_re_in(r"1 .* suppressed", cmo.out, match=False)
         assert_re_in(r"2 .* suppressed", cmo.out, match=False)
         assert_re_in(r"3 .* suppressed", cmo.out, match=False)
+
+    # make tests run fast again
+    sleep_dur = 0.0
 
     with _swallow_outputs(isatty=False) as cmo:
         list(tu(11, result_fn=n_foo, result_renderer="default"))

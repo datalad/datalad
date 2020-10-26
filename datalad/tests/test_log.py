@@ -40,7 +40,10 @@ from datalad.tests.utils import (
     ok_generator,
     swallow_logs,
     with_tempfile,
+    SkipTest,
 )
+from datalad.utils import on_windows
+
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -162,6 +165,8 @@ def test_color_formatter():
                  name='some name'))
 
         cf = ColorFormatter(use_color=use_color)
+        if on_windows:
+            raise SkipTest('Unclear under which conditions coloring should work')
         (assert_in if use_color else assert_not_in)(colors.RESET_SEQ, cf.format(rec))
 
 

@@ -1010,7 +1010,7 @@ class Addurls(Interface):
 [DATALAD] add {len(files_to_add)} files to {nrows_by_ds_orig} (sub)datasets from URLs
 
 {os.linesep.join(extra_msgs)}
-url_file='{url_file}'
+url_file='{urlfile}'
 url_format='{url_format}'
 filename_format='{filenameformat}'"""
 

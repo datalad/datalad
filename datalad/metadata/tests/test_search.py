@@ -11,13 +11,16 @@
 
 import logging
 from shutil import copy
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import os
 from os import makedirs
 from os.path import (
     dirname,
     join as opj,
 )
+
+from pkg_resources import EntryPoint
+
 from datalad.api import Dataset
 from datalad.utils import (
     chpwd,
@@ -48,6 +51,8 @@ from ..search import (
     _listdict2dictlist,
     _meta2autofield_dict,
 )
+
+from ..indexers.base import MetadataIndexer
 
 
 @with_testsui(interactive=False)
@@ -357,4 +362,119 @@ def test_meta2autofield_dict():
                 {'extr1': {"prop1": "v1"}},
             'extr1': {'prop1': 'value'}}),
         {'extr1.prop1': 'value'}
+    )
+
+
+def test_external_indexer():
+    """ check that external indexer are called """
+    class MockedIndexer(MetadataIndexer):
+        def __init__(self, metadata_format_name: str):
+            super().__init__(metadata_format_name)
+
+        def create_index(self, metadata):
+            yield from {
+                "jubel": 1,
+                "trubel": 2
+            }.items()
+
+    class MockedEntryPoint(EntryPoint):
+        def __init__(self):
+            pass
+
+        def load(self, *args):
+            return MockedIndexer
+
+    def _mocked_iter_entry_points(group, metadata):
+        yield MockedEntryPoint()
+
+    with patch('pkg_resources.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+        index = _meta2autofield_dict({
+            'datalad_unique_content_properties': {
+                'extr1': {
+                    "prop1": "v1"
+                }
+            },
+            'extr1': {
+                'prop1': 'value'
+            }
+        })
+
+    eq_(
+        index,
+        {
+            'extr1.jubel': '1',
+            'extr1.trubel': '2'
+        }
+    )
+
+
+def test_faulty_external_indexer():
+    """ check that generic indexer is called on external indexer faults """
+    class MockedEntryPoint(EntryPoint):
+        def __init__(self):
+            self.name = 'MockedEntryPoint'
+            self.dist = 'Mock Distribution 1.1'
+
+        def load(self, *args):
+            raise Exception('Mocked indexer error')
+
+    def _mocked_iter_entry_points(group, metadata):
+        yield MockedEntryPoint()
+
+    with patch('pkg_resources.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+
+        index = _meta2autofield_dict({
+            'datalad_unique_content_properties': {
+                'extr1': {
+                    "prop1": "v1"
+                }
+            },
+            'extr1': {
+                'prop1': 'value'
+            }
+        })
+
+    eq_(
+        index,
+        {
+            'extr1.prop1': 'value'
+        }
+    )
+
+
+def test_multiple_entry_points():
+    """ check that generic indexer is called if multiple indexers exist for the same name """
+    class MockedEntryPoint(EntryPoint):
+        def __init__(self):
+            self.name = 'MockedEntryPoint'
+            self.dist = 'Mock Distribution 1.1'
+
+        def load(self, *args):
+            return 'Loaded MockedEntryPoint'
+
+    def _mocked_iter_entry_points(group, metadata):
+        yield MockedEntryPoint()
+        yield MockedEntryPoint()
+
+    with patch('pkg_resources.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+
+        index = _meta2autofield_dict({
+            'datalad_unique_content_properties': {
+                'extr1': {
+                    "prop1": "v1"
+                }
+            },
+            'extr1': {
+                'prop1': 'value'
+            }
+        })
+
+    eq_(
+        index,
+        {
+            'extr1.prop1': 'value'
+        }
     )
