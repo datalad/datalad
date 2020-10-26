@@ -924,7 +924,7 @@ class Addurls(Interface):
 
 url_file='{}'
 url_format='{}'
-filename_format='{}'""".format(url_file, url_format, filename_format)
+filename_format='{}'""".format(urlfile, url_format, filename_format)
 
         if files_to_add:
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add and r["meta_args"]]
