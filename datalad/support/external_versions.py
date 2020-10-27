@@ -38,6 +38,18 @@ class UnknownVersion:
             return 0
         raise TypeError("UNKNOWN version is not comparable")
 
+    def __eq__(self, other):
+        return other is self
+
+    def __ne__(self, other):
+        return other is not self
+
+    def __lt__(self, other):
+        return False
+
+    __gt__ = __lt__
+    # True only if the same, the rest -- False
+    __le__ = __ge__ = __eq__
 
 #
 # Custom handlers
@@ -238,7 +250,7 @@ class ExternalVersions(object):
                 except Exception as exc:
                     lgr.debug("Failed to deduce version of %s due to %s"
                               % (modname, exc_str(exc)))
-                    return None
+                    return UnknownVersion()
             else:
                 if module is None:
                     if modname not in sys.modules:

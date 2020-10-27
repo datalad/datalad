@@ -36,8 +36,10 @@ from datalad.tests.utils import (
     assert_greater_equal,
     assert_in,
     assert_not_in,
+    assert_not_equal,
     assert_raises,
     assert_true,
+    assert_false,
 )
 from datalad.tests.utils import SkipTest
 
@@ -76,8 +78,10 @@ def test_external_versions_basic():
     # And that thing is "True", i.e. present
     assert(ev['os'])
     # but not comparable with anything besides itself (was above)
-    assert_raises(TypeError, cmp, ev['os'], '0')
-    assert_raises(TypeError, assert_greater, ev['os'], '0')
+    assert_not_equal(ev['os'], '0')
+    assert_false(ev['os'] > '0')
+    assert_false(ev['os'] < '0')
+    assert_false(ev['os'] <= '0')
 
     return
     ## Code below is from original duecredit, and we don't care about
