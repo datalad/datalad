@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 __python_requires__ = "~= 3.6"
 import argparse
 from contextlib import contextmanager
