@@ -3,6 +3,7 @@ __python_requires__ = "~= 3.6"
 import argparse
 from contextlib import contextmanager
 from glob import glob
+import logging
 import os
 import os.path
 from pathlib import Path
@@ -16,6 +17,8 @@ import tempfile
 DOWNLOAD_LATEST_ARTIFACT = (
     Path(__file__).parent / "tools" / "ci" / "download-latest-artifact"
 )
+
+log = logging.getLogger("datalad.install")
 
 
 def main():
@@ -170,9 +173,10 @@ class GitAnnexInstaller:
                 check=True,
             )
         else:
-            print(
-                f"I: devel version {devel_annex_version} is not newer than installed {current_annex_version}",
-                file=sys.stderr,
+            log.info(
+                "devel version %s is not newer than installed %s",
+                devel_annex_version,
+                current_annex_version,
             )
         self.post_install()
 
@@ -206,7 +210,7 @@ class GitAnnexInstaller:
     def _install_via_autobuild_or_snapshot_linux(self, subpath):
         tmpdir = tempfile.mkdtemp(prefix="ga-")
         self.annex_bin = os.path.join(tmpdir, "git-annex.linux")
-        print("I: downloading and extracting under {self.annex_bin}", file=sys.stderr)
+        log.info("downloading and extracting under %s", self.annex_bin)
         wget = subprocess.Popen(
             [
                 "wget",
@@ -253,9 +257,8 @@ class GitAnnexInstaller:
         tmpdir = tempfile.mkdtemp(prefix="ga-")
         self.annex_bin = os.path.join(tmpdir, "annex-bin")
         if shutil.which("git-annex") is not None:
-            print(
-                "W: git annex already installed.  In this case this setup has no sense",
-                file=sys.stderr,
+            log.warning(
+                "git annex already installed.  In this case this setup has no sense"
             )
             sys.exit(1)
         # We are interested only to get git-annex into our environment
@@ -270,7 +273,7 @@ class GitAnnexInstaller:
         # We will symlink git-annex only under a dedicated directory, so it could be
         # used with default Python etc. If names changed here, possibly adjust
         # hardcoded duplicates below where we establish relative symlinks.
-        print("I: downloading and running miniconda installer", file=sys.stderr)
+        log.info("downloading and running miniconda installer")
         subprocess.run(
             [
                 "wget",
@@ -367,13 +370,13 @@ class GitAnnexInstaller:
             bashrc = Path.home() / ".bashrc"
             contents = bashrc.read_text()
             bashrc.write_text(pathline + "\n" + contents)
-            print("I: Adjusted first line of ~/.bashrc:", file=sys.stderr)
-            print(pathline, file=sys.stderr)
+            log.info("Adjusted first line of ~/.bashrc:")
+            log.info("%s", pathline)
         # Rudimentary test of installation and inform user about location
         for binname in ["git-annex", "git-annex-shell"]:
             if not os.access(os.path.join(self.annex_bin, binname), os.X_OK):
                 raise RuntimeError(f"Cannot execute {binname}")
-        print("I: git-annex is available under '{self.annex_bin}'", file=sys.stderr)
+        log.info("git-annex is available under %r", self.annex_bin)
 
 
 @contextmanager
