@@ -396,7 +396,10 @@ class HTTPDownloaderSession(DownloaderSession):
         # which has no .stream, so let's do ducktyping and provide our custom stream
         # via BufferedReader for such cases, while maintaining the rest of code
         # intact.  TODO: figure it all out, since doesn't scale for any sizeable download
-        if not hasattr(response.raw, 'stream'):
+        # This code is tested by tests/test_http.py:test_download_ftp BUT
+        # it causes 503 on travis,  but not always so we allow to skip that test
+        # in such cases. That causes fluctuating coverage
+        if not hasattr(response.raw, 'stream'):  # pragma: no cover
             def _stream():
                 buf = io.BufferedReader(response.raw)
                 v = True
@@ -431,7 +434,7 @@ class HTTPDownloaderSession(DownloaderSession):
                 # TEMP
                 # see https://github.com/niltonvolpato/python-progressbar/pull/44
                 ui.out.flush()
-                if size is not None and total >= size:
+                if size is not None and total >= size:  # pragma: no cover
                     break  # we have done as much as we were asked
 
         if return_content:

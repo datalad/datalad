@@ -46,6 +46,7 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
+    known_failure_appveyor,
     known_failure_windows,
     neq_,
     ok_,
@@ -97,6 +98,7 @@ def test_invalid_call(origin, tdir):
         type='dataset')
 
 
+@known_failure_appveyor
 @with_tempfile
 @with_tempfile
 def test_since_empty_and_unsupported(p1, p2):
@@ -757,6 +759,7 @@ def test_publish_no_fetch_refspec_configured(path):
     ds.publish(to="origin")
 
 
+@known_failure_appveyor
 @slow  # 14sec on Yarik's laptop
 @skip_ssh
 @with_tempfile(mkdir=True)

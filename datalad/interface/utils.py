@@ -578,7 +578,8 @@ def _process_results(
                 msgargs = msg[1:]
                 msg = msg[0]
             if 'path' in res:
-                path = res['path']
+                # result path could be a path instance
+                path = str(res['path'])
                 if msgargs:
                     # we will pass the msg for %-polation, so % should be doubled
                     path = path.replace('%', '%%')
