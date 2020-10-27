@@ -84,16 +84,22 @@ def main():
 
 class GitAnnexInstaller:
     def __init__(self, adjust_bashrc=False, env_write_file=None):
-        self._path = None
+        self.pathline = None
         self.annex_bin = "/usr/bin"
         self.adjust_bashrc = adjust_bashrc
         self.env_write_file = Path(env_write_file)
 
-    def setpath(self, newpath):
-        self._path = newpath
+    def addpath(self, p, last=False):
+        if self.pathline is not None:
+            raise RuntimeError("addpath() called more than once")
+        if not last:
+            newpath = f'{quote(p)}:"$PATH"'
+        else:
+            newpath = f'"$PATH":{quote(p)}'
+        self.pathline = f"export PATH={newpath}"
         if self.env_write_file is not None:
             with self.env_write_file.open("a") as fp:
-                print(f"export PATH={quote(newpath)}", file=fp)
+                print(self.pathline, file=fp)
 
     def install_via_neurodebian(self):
         # TODO: use nd_freeze_install for an arbitrary version specified
@@ -228,7 +234,7 @@ class GitAnnexInstaller:
             sys.exit(f"wget failed with exit code {wget.returncode}")
         if tar.returncode != 0:
             sys.exit(f"tar failed with exit code {tar.returncode}")
-        self.setpath(f"{self.annex_bin}:{os.environ['PATH']}")
+        self.addpath(self.annex_bin)
         self.post_install()
 
     def _install_via_autobuild_or_snapshot_macos(self, subpath):
@@ -250,7 +256,7 @@ class GitAnnexInstaller:
     def install_via_conda_forge(self, version=None):
         tmpdir = tempfile.mkdtemp(prefix="ga-")
         self.annex_bin = os.path.join(tmpdir, "annex-bin")
-        self.setpath(f"{self.annex_bin}:{os.environ['PATH']}")
+        self.addpath(self.annex_bin)
         self._install_via_conda(version, tmpdir)
 
     def install_via_conda_forge_last(self, version=None):
@@ -264,7 +270,7 @@ class GitAnnexInstaller:
         # We are interested only to get git-annex into our environment
         # So as to not interfere with "system wide" Python etc, we will add
         # miniconda at the end of the path
-        self.setpath(f"{os.environ['PATH']}:{self.annex_bin}")
+        self.addpath(self.annex_bin, last=True)
         self._install_via_conda(version, tmpdir)
 
     def _install_via_conda(self, version, tmpdir):
@@ -358,20 +364,19 @@ class GitAnnexInstaller:
         )
         subprocess.run(["hdiutil", "detach", "/Volumes/git-annex/"], check=True)
         self.annex_bin = "/Applications/git-annex.app/Contents/MacOS"
-        self.setpath(f"{self.annex_bin}:{os.environ['PATH']}")
+        self.addpath(self.annex_bin)
 
     def post_install(self):
-        if self.adjust_bashrc and self._path is not None:
+        if self.adjust_bashrc and self.pathline is not None:
             # If PATH was changed, we need to make it available to SSH commands.
             # Note: Prepending is necessary. SSH commands load .bashrc, but many
             # distributions (including Debian and Ubuntu) come with a snippet
             # to exit early in that case.
-            pathline = f"export PATH={quote(self._path)}"
             bashrc = Path.home() / ".bashrc"
             contents = bashrc.read_text()
-            bashrc.write_text(pathline + "\n" + contents)
+            bashrc.write_text(self.pathline + "\n" + contents)
             log.info("Adjusted first line of ~/.bashrc:")
-            log.info("%s", pathline)
+            log.info("%s", self.pathline)
         # Rudimentary test of installation and inform user about location
         for binname in ["git-annex", "git-annex-shell"]:
             if not os.access(os.path.join(self.annex_bin, binname), os.X_OK):
