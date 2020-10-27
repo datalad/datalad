@@ -93,7 +93,7 @@ class GitAnnexInstaller:
         self._path = newpath
         if self.env_write_file is not None:
             with self.env_write_file.open("a") as fp:
-                print(f"PATH={quote(newpath)}", file=fp)
+                print(f"export PATH={quote(newpath)}", file=fp)
 
     def install_via_neurodebian(self):
         # TODO: use nd_freeze_install for an arbitrary version specified
@@ -366,7 +366,7 @@ class GitAnnexInstaller:
             # Note: Prepending is necessary. SSH commands load .bashrc, but many
             # distributions (including Debian and Ubuntu) come with a snippet
             # to exit early in that case.
-            pathline = f"PATH={quote(self._path)}"
+            pathline = f"export PATH={quote(self._path)}"
             bashrc = Path.home() / ".bashrc"
             contents = bashrc.read_text()
             bashrc.write_text(pathline + "\n" + contents)
