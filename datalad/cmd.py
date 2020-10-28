@@ -1338,27 +1338,34 @@ class BatchedCommand(SafeDelCloseMixin):
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
-            # try waiting for the annex process to finish 3 times for 3 sec
-            # with 1s pause in between
-            try:
-                try_multiple(
-                    # ntrials
-                    3,
-                    # exception to catch
-                    subprocess.TimeoutExpired,
-                    # base waiting period
-                    1.0,
-                    # function to run
-                    process.wait,
-                    timeout=3.0,
-                )
-            except subprocess.TimeoutExpired:
-                lgr.warning(
-                    "Batched process %s did not finish, abandoning it without killing it",
-                    process)
-            if process.returncode is not None:
-                lgr.debug("Process %s has finished", process)
+            from . import cfg
+            cfg_var = 'datalad.runtime.stalled-external'
+            cfg_val = cfg.obtain(cfg_var)
+            if cfg_val == 'wait':
+                process.wait()
+            elif cfg_val == 'abandon':
+                # try waiting for the annex process to finish 3 times for 3 sec
+                # with 1s pause in between
+                try:
+                    try_multiple(
+                        # ntrials
+                        3,
+                        # exception to catch
+                        subprocess.TimeoutExpired,
+                        # base waiting period
+                        1.0,
+                        # function to run
+                        process.wait,
+                        timeout=3.0,
+                    )
+                except subprocess.TimeoutExpired:
+                    lgr.warning(
+                        "Batched process %s did not finish, abandoning it without killing it",
+                        process)
+            else:
+                raise ValueError(f"Unexpected {cfg_var}={cfg_val!r}")
             self._process = None
+            lgr.debug("Process %s has finished", process)
 
         # It is hard to debug when something is going wrong. Hopefully logging stderr
         # if generally asked might be of help

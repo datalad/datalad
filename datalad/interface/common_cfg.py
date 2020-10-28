@@ -359,6 +359,15 @@ definitions = {
         'type': EnsureChoice('all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
         'default': None,
     },
+    'datalad.runtime.stalled-external': {
+        'ui': ('question', {
+            'title': 'Behavior for handing external processes',
+            'text': 'What to do with external processes if they do not finish in some minimal reasonable time. '
+                    'If "abandon", datalad would proceed without waiting for external process to exit. '
+                    'ATM applies only to batched git-annex processes. Should be changed with caution.'}),
+        'type': EnsureChoice('wait', 'abandon'),
+        'default': 'wait',
+    },
     'datalad.search.indexercachesize': {
         'ui': ('question', {
                'title': 'Maximum cache size for search index (per process)',
