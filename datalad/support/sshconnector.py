@@ -13,12 +13,16 @@ Allows for connecting via ssh and keeping the connection open
 git calls to a ssh remote without the need to reauthenticate.
 """
 
+import fasteners
 import os
 import logging
 from socket import gethostname
 from hashlib import md5
 from subprocess import Popen
 import tempfile
+import threading
+
+
 # importing the quote function here so it can always be imported from this
 # module
 # this used to be shlex.quote(), but is now a cross-platform helper
@@ -419,6 +423,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ]
         self.ctrl_path = Path(ctrl_path)
         self._opened_by_us = False
+        self._lock = threading.Lock()
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
@@ -498,6 +503,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             {True: 'succeeded', False: 'failed'}[res])
         return res
 
+    @fasteners.locked
     def open(self):
         """Opens the connection.
 
