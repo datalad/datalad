@@ -183,6 +183,7 @@ def test_create_simple():
     yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
 
 
+@skip_if_on_windows  # ORA remote is incompatible with windows clients
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})
 def test_storage_only(base_path, ds_path):
