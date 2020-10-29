@@ -195,9 +195,9 @@ class CreateSiblingRia(Interface):
             sibling are created ([CMD: on CMD][PY: True|'on' PY]).
             Alternatively, creation of the storage sibling can be disabled
             ([CMD: off CMD][PY: False|'off' PY]), or a storage sibling
-            is created only and no Git sibling
+            created only and no Git sibling
             ([CMD: only CMD][PY: 'only' PY]). In the latter mode, no Git
-            installation is required that the target host."""),
+            installation is required on the target host."""),
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice(
