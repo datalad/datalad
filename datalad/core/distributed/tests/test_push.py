@@ -261,8 +261,9 @@ def test_push_recursive(
     # running on a clone should make the test scenario more different than
     # test_push(), even for the pieces that should be identical
     top = Clone.__call__(source=origin.path, path=src_path)
-    sub, subsub, subnoannex = top.get(
-        '.', recursive=True, get_data=False, result_xfm='datasets')
+    subs = top.get('.', recursive=True, get_data=False, result_xfm='datasets')
+    # order for '.' should not be relied upon, so sort by path
+    sub, subsub, subnoannex = sorted(subs, key=lambda ds: ds.path)
 
     target_top = mk_push_target(top, 'target', dst_top, annex=True)
     # subdatasets have no remote yet, so recursive publishing should fail:

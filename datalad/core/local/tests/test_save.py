@@ -570,7 +570,7 @@ def test_add_recursive(path):
 
     # recursive add should not even touch sub1, because
     # it knows that it is clean
-    res = parent.save(recursive=True)
+    res = parent.save(recursive=True, jobs=5)
     # the key action is done
     assert_result_count(
         res, 1, path=op.join(subsub.path, 'new'), action='add', status='ok')

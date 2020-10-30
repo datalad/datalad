@@ -546,8 +546,8 @@ class TestAddurls(object):
             if save:
                 assert_repo_status(path)
             else:
-                # The datasets are create and saved ...
-                assert_repo_status(path, modified=subdirs)
+                # The datasets are create but not saved (since asked not to)
+                assert_repo_status(path, untracked=subdirs)
                 # but the downloaded files aren't.
                 for subds, fnames in subdir_files.items():
                     assert_repo_status(subds, added=fnames)
@@ -653,7 +653,8 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
         ds.addurls(
             self.json_file, "{url}",
-            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}")
+            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}",
+            jobs=3)
         eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
             {"foo",
              "bar",

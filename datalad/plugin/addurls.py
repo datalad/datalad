@@ -11,7 +11,6 @@
 
 from collections.abc import Mapping
 
-import itertools
 import logging
 import os
 import re
@@ -19,19 +18,27 @@ import string
 import sys
 
 from functools import partial
-from operator import itemgetter
 from urllib.parse import urlparse
 
+import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import exc_str
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import annexjson2result, get_status_dict
-from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import (
+    jobs_opt,
+    nosave_opt,
+)
 from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.itertools import groupby_sorted
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
+from datalad.support.parallel import (
+    ProducerConsumerProgressLog,
+    no_parentds_in_futures,
+)
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     ensure_list,
@@ -506,13 +513,18 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     return infos, list(sort_paths(subpaths))
 
 
-@with_result_progress("Adding URLs")
-def add_urls(rows, ifexists=None, options=None):
+def _log_filter_addurls(res):
+    return res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"]
+
+
+@with_result_progress("Adding URLs", log_filter=_log_filter_addurls)
+def _add_urls(rows, ds, repo, ifexists=None, options=None):
     """Call `git annex addurl` using information in `rows`.
     """
+    add_metadata = {}
     for row in rows:
         filename_abs = row["filename_abs"]
-        ds, filename = row["ds"], row["ds_filename"]
+        filename = row["ds_filename"]
         lgr.debug("Adding URLs to %s in %s", filename, ds.path)
 
         if os.path.exists(filename_abs) or os.path.islink(filename_abs):
@@ -530,8 +542,8 @@ def add_urls(rows, ifexists=None, options=None):
                 lgr.debug("File %s already exists", filename_abs)
 
         try:
-            out_json = ds.repo.add_url_to_file(filename, row["url"],
-                                               batch=True, options=options)
+            out_json = repo.add_url_to_file(filename, row["url"],
+                                            batch=True, options=options)
         except AnnexBatchCommandError as exc:
             yield get_status_dict(action="addurls",
                                   ds=ds,
@@ -544,29 +556,30 @@ def add_urls(rows, ifexists=None, options=None):
         # In the case of an error, the json object has file=None.
         if out_json["file"] is None:
             out_json["file"] = filename_abs
-        yield annexjson2result(out_json, ds, action="addurls",
-                               type="file", logger=lgr)
+        res_addurls = annexjson2result(
+            out_json, ds, action="addurls",
+            type="file", logger=lgr)
+        if res_addurls["status"] == "ok" and row.get("meta_args"):
+            add_metadata[filename] = row["meta_args"]
+        yield res_addurls
 
+    if not add_metadata:
+        return
 
-@with_result_progress("Adding metadata")
-def add_meta(rows):
-    """Call `git annex metadata --set` using information in `rows`.
-    """
+    # For some reason interleaving batched addurl and regular metadata calls
+    # causes multiple commits, so we do need to have it separate.
+    # TODO: figure out with Joey either could be avoided
     from unittest.mock import patch
-
-    # OPT: group by dataset first so to not patch/unpatch always_commit
-    # per each file of which we could have thousands
-    for ds, ds_rows in itertools.groupby(rows, itemgetter("ds")):
-        with patch.object(ds.repo, "always_commit", False):
-            for row in ds_rows:
-                filename = row["ds_filename"]
-                lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-                for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
-                    res = annexjson2result(a, ds, type="file", logger=lgr)
-                    # Don't show all added metadata for the file because that
-                    # could quickly flood the output.
-                    del res["message"]
-                    yield res
+    with patch.object(repo, "always_commit", False):
+        for filename, meta in add_metadata.items():
+            lgr.debug("Adding metadata to %s in %s", filename, repo.path)
+            assert not repo.always_commit
+            for a in repo.set_metadata_(filename, add=meta):
+                res = annexjson2result(a, ds, type="file", logger=lgr)
+                # Don't show all added metadata for the file because that
+                # could quickly flood the output.
+                del res["message"]
+                yield res
 
 
 @build_doc
@@ -762,6 +775,7 @@ class Addurls(Interface):
             action='append',
             doc="""Pass this [PY: cfg_proc PY][CMD: --cfg_proc CMD] value when
             calling `create` to make datasets."""),
+        jobs=jobs_opt,
     )
 
     @staticmethod
@@ -771,13 +785,14 @@ class Addurls(Interface):
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
-                 cfg_proc=None):
+                 cfg_proc=None, jobs=None):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
 
         from requests.exceptions import RequestException
 
+        from datalad.api import create
         from datalad.distribution.dataset import Dataset, require_dataset
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
@@ -865,73 +880,147 @@ class Addurls(Interface):
 
         annex_options = ["--fast"] if fast else []
 
-        for spath in subpaths:
-            if os.path.exists(os.path.join(ds.path, spath)):
-                lgr.warning(
-                    "Not creating subdataset at existing path: %s",
-                    spath)
-            else:
-                yield from ds.create(
-                    spath,
-                    result_xfm=None,
-                    cfg_proc=cfg_proc,
-                    return_type='generator')
-
-        for row in rows:
-            # Add additional information that we'll need for various
-            # operations.
-            filename_abs = os.path.join(ds.path, row["filename"])
-            if row["subpath"]:
-                ds_current = Dataset(os.path.join(ds.path,
-                                                  row["subpath"]))
-            else:
-                ds_current = ds
-            ds_filename = os.path.relpath(filename_abs, ds_current.path)
-            row.update({"filename_abs": filename_abs,
-                        "ds": ds_current,
-                        "ds_filename": ds_filename})
-
-        if version_urls:
-            num_urls = len(rows)
-            log_progress(lgr.info, "addurls_versionurls",
-                         "Versioning %d URLs", num_urls,
-                         label="Versioning URLs",
-                         total=num_urls, unit=" URLs")
-            for row in rows:
-                url = row["url"]
-                try:
-                    row["url"] = get_versioned_url(url)
-                except (ValueError, NotImplementedError) as exc:
-                    # We don't expect this to happen because get_versioned_url
-                    # should return the original URL if it isn't an S3 bucket.
-                    # It only raises exceptions if it doesn't know how to
-                    # handle the scheme for what looks like an S3 bucket.
-                    lgr.warning("error getting version of %s: %s",
-                                row["url"], exc_str(exc))
-                log_progress(lgr.info, "addurls_versionurls",
-                             "Versioned result for %s: %s", url, row["url"],
-                             update=1, increment=True)
-            log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
-
+        # to be populated by addurls_to_ds
         files_to_add = set()
-        for r in add_urls(rows, ifexists=ifexists, options=annex_options):
-            if r["status"] == "ok":
-                files_to_add.add(r["path"])
-            yield r
+        created_subds = []
 
-            msg = message or """\
-[DATALAD] add files from URLs
+        def addurls_to_ds(args):
+            """The "consumer" for ProducerConsumer parallel execution"""
+            subpath, rows = args
 
-url_file='{}'
-url_format='{}'
-filename_format='{}'""".format(urlfile, url_format, filename_format)
+            ds_path = ds.path  # shortcut on closure from outside
 
-        if files_to_add:
-            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add and r["meta_args"]]
-            yield from add_meta(meta_rows)
+            # technically speaking, subds might be the ds
+            if subpath:
+                subds_path = os.path.join(ds_path, subpath)
+            else:
+                subds_path = ds_path
 
-            if save:
-                yield from ds.save(path=files_to_add, message=msg, recursive=True)
+            for row in rows:
+                # Add additional information that we'll need for various
+                # operations.
+                filename_abs = op.join(ds_path, row["filename"])
+                ds_filename = op.relpath(filename_abs, subds_path)
+                row.update({"filename_abs": filename_abs,
+                            "ds_filename": ds_filename})
+
+            subds = Dataset(subds_path)
+
+            if subds.is_installed():
+                lgr.debug(
+                    "Not creating subdataset at existing path: %s",
+                    subds_path)
+            else:
+                yield from subds.create(result_xfm=None,
+                                        cfg_proc=cfg_proc,
+                                        return_type='generator')
+                created_subds.append(subpath)
+            repo = subds.repo  # "expensive" so we get it once
+
+            if version_urls:
+                num_urls = len(rows)
+                log_progress(lgr.info, "addurls_versionurls",
+                             "Versioning %d URLs", num_urls,
+                             label="Versioning URLs",
+                             total=num_urls, unit=" URLs")
+                for row in rows:
+                    url = row["url"]
+                    try:
+                        # TODO: make get_versioned_url more efficient while going
+                        # through the same bucket(s)
+                        row["url"] = get_versioned_url(url)
+                    except (ValueError, NotImplementedError) as exc:
+                        # We don't expect this to happen because get_versioned_url
+                        # should return the original URL if it isn't an S3 bucket.
+                        # It only raises exceptions if it doesn't know how to
+                        # handle the scheme for what looks like an S3 bucket.
+                        lgr.warning("error getting version of %s: %s",
+                                    row["url"], exc_str(exc))
+                    log_progress(lgr.info, "addurls_versionurls",
+                                 "Versioned result for %s: %s", url, row["url"],
+                                 update=1, increment=True)
+                log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
+
+            subds_files_to_add = set()
+            for r in _add_urls(rows, subds, repo, ifexists=ifexists, options=annex_options):
+                if r["status"] == "ok":
+                    subds_files_to_add.add(r["path"])
+                yield r
+
+            files_to_add.update(subds_files_to_add)
+            pass  # end of addurls_to_ds
+
+
+        # We need to group by dataset since otherwise we will initiate
+        # batched annex process per each subdataset, which might be infeasible
+        # in any use-case with a considerable number of subdatasets.
+        # Also groupping allows us for parallelization across datasets, and avoids
+        # proliferation of commit messages upon creation of each individual subdataset.
+
+        def keyfn(d):
+            # The top-level dataset has a subpath of None.
+            return d.get("subpath") or ""
+
+        # We need to serialize itertools.groupby .
+        rows_by_ds = [(k, tuple(v)) for k, v in groupby_sorted(rows, key=keyfn)]
+
+        # There could be "intermediate" subdatasets which have no rows but would need
+        # their datasets created and saved, so let's add them
+        add_subpaths = set(subpaths).difference(r[0] for r in rows_by_ds)
+        nrows_by_ds_orig = len(rows_by_ds)
+        if add_subpaths:
+            for subpath in add_subpaths:
+                rows_by_ds.append((subpath, tuple()))
+            # and now resort them again since we added
+            rows_by_ds = sorted(rows_by_ds, key=lambda r: r[0])
+
+        # We want to provide progress overall files not just datasets
+        # so our total will be just a len of rows
+        def agg_files(*args, **kwargs):
+            return len(rows)
+
+        yield from ProducerConsumerProgressLog(
+            rows_by_ds,
+            addurls_to_ds,
+            agg=agg_files,
+            # It is ok to start with subdatasets since top dataset already exists
+            safe_to_consume=partial(no_parentds_in_futures, skip=("", None, ".")),
+            # our producer provides not only dataset paths and also rows, take just path
+            producer_future_key=lambda row_by_ds: row_by_ds[0],
+            jobs=jobs,
+            # Logging options
+            # we will be yielding all kinds of records, but of interest for progress
+            # reporting only addurls on files
+            # note: annexjson2result overrides 'action' with 'command' content from
+            # annex, so we end up with 'addurl' even if we provide 'action'='addurls'.
+            # TODO: see if it is all ok, since we might be now yielding both
+            # addurls and addurl records.
+            log_filter=_log_filter_addurls,
+            unit="files",
+            lgr=lgr,
+        )
+
+        if save:
+            extra_msgs = []
+            if created_subds:
+                extra_msgs.append(f"{len(created_subds)} subdatasets were created")
+            if extra_msgs:
+                extra_msgs.append('')
+            message_addurls = message or f"""\
+[DATALAD] add {len(files_to_add)} files to {nrows_by_ds_orig} (sub)datasets from URLs
+
+{os.linesep.join(extra_msgs)}
+url_file='{urlfile}'
+url_format='{url_format}'
+filename_format='{filenameformat}'"""
+
+            # save all in bulk
+            files_to_add.update([r[0] for r in rows_by_ds])
+            yield from ds.save(
+                list(files_to_add),
+                message=message_addurls,
+                jobs=jobs,
+                return_type='generator')
 
 
 __datalad_plugin__ = Addurls
