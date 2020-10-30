@@ -258,7 +258,7 @@ def _create_dataset_sibling(
                 # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
-                shell("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
+                shell("chmod -R +r+w {}".format(sh_quote(remoteds_path)))
                 # remove target at path
                 shell("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
@@ -1036,7 +1036,7 @@ done
             mode = shared
 
         if mode:
-            ssh('chmod {} -R {} {}'.format(
+            ssh('chmod -R {} {} {}'.format(
                 mode,
                 sh_quote(dirname(webresources_remote)),
                 sh_quote(opj(path, 'index.html'))))
