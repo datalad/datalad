@@ -313,7 +313,7 @@ class GitAnnexInstaller:
                 "-c",
                 "conda-forge",
                 "-y",
-                f"git-annex{version or ''}",
+                f"git-annex={version}" if version is not None else "git-annex",
             ],
             check=True,
         )
