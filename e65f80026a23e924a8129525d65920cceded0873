@@ -1,0 +1,58 @@
+Update 0.13.4-1-ga13c6ce439:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    a13c6ce439e9f08e2346bcc491f30bd530f3f234..06cb3d8547f8ea9f4701fc89d9d892fb9a014d83
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #4957 from yarikoptic/bf-obscure%
+   d071bcd3fe^-1
++  Merge pull request #5001 from adswa/win-gitannex
+   f74a4c30ba^-1
++  Merge pull request #5017 from bpoldrack/fix-run-sidecar
+   a55baf68cb^-1
+-  Merge pull request #5019 from yarikoptic/enh-include-version
+   084829beb4^-1
+-  Merge pull request #4959 from yarikoptic/bf-coverage
+   c5e9edb686^-1
+-  Merge pull request #5037 from jwodder/use-env-files
+   7e5dca1719^-1
++  Merge pull request #5035 from bpoldrack/fix-gh-5030
+   c8dd7282e7^-1
++  Merge pull request #5008 from yarikoptic/bf-gh
+   c4cd70c32b^-1
++  Merge pull request #5045 from loj/bf-indis3-credentials
+   605a995dc4^-1
+-  Merge pull request #5040 from yarikoptic/bf-minor-error-msg
+   b229e24f3f^-1
++  Merge pull request #5042 from mih/enh-sshnomultiplex
+   c728888112^-1
++  Merge pull request #5051 from yarikoptic/bf-push-noannex
+   b79bf5b3e7^-1
++  Merge pull request #5049 from kyleam/save-nested-ds
+   cf97236ec7^-1
++  Merge pull request #5025 from mih/bf-5023-1
+   ff2fcf3f27^-1
++  Merge pull request #5026 from mih/bf-5024
+   9d7ee3de69^-1
++  Merge pull request #5057 from yarikoptic/en-pbar
+   39939f11a4^-1
++  Merge pull request #5060 from mih/opt-resultsuppression
+   99754424f0^-1
+-  Merge pull request #5058 from kyleam/old-annex-skip-ssh-test
+   e871a993e8^-1
+-  Merge pull request #5052 from yarikoptic/fix-coverage
+   9c90f708ff^-1
+-  Merge pull request #5089 from mih/bf-5086
+   e35ccc2bc3^-1
+-  Merge pull request #5080 from kyleam/appveyor-restore-testing
+   2d16ac03e3^-1
+-  Merge pull request #5096 from yarikoptic/enh-nose-windows
+   35ee77cf1f^-1
+-  Merge pull request #5072 from yarikoptic/enh-downgrade-annex
+   06cb3d8547^-1
