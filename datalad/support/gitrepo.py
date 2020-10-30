@@ -951,7 +951,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # So that we "share" control paths with git/git-annex
         if ssh_manager:
-            ssh_manager.assure_initialized()
+            ssh_manager.ensure_initialized()
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
@@ -3884,7 +3884,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           - git : bool (passed to Repo.add()
           - eval_submodule_state : {'full', 'commit', 'no'}
             passed to Repo.status()
-          - untracked : {'no', 'normal', 'all'} - passed to Repo.satus()
+          - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
         """
         return list(
             self.save_(

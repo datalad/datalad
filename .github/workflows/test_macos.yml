@@ -1,0 +1,53 @@
+name: Test on macOS
+
+on:
+    - pull_request
+    - push
+
+jobs:
+  test:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        install_scenario:
+          - brew
+          - snapshot
+    steps:
+    - name: Set up environment
+      run: |
+        git config --global user.email "test@github.land"
+        git config --global user.name "GitHub Almighty"
+
+    - uses: actions/checkout@v1
+
+    - name: Install git-annex
+      run: |
+        eval source tools/ci/install-annex.sh ${{ matrix.install_scenario }}
+        echo "PATH=$PATH" >> "$GITHUB_ENV"
+
+    - name: Set up Python 3.6
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.6
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install coverage
+
+    - name: WTF!?
+      run: |
+        datalad wtf
+
+    - name: Run tests
+      run: |
+        mkdir -p __testhome__
+        cd __testhome__
+        python -m nose -s -v --with-cov --cover-package datalad --cover-xml datalad.core datalad.support
+
+    - name: Upload coverage report to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        file: __testhome__/coverage.xml

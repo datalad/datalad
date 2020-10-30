@@ -272,6 +272,25 @@ def skip_ssh(func):
     return  _wrap_skip_ssh
 
 
+def skip_nomultiplex_ssh(func):
+    """Skips SSH tests if default connection/manager does not support multiplexing
+
+    e.g. currently on windows or if set via datalad.ssh.multiplex-connections config variable
+    """
+
+    check_not_generatorfunction(func)
+    from ..support.sshconnector import MultiplexSSHManager, SSHManager
+
+    @wraps(func)
+    @attr('skip_nomultiplex_ssh')
+    @skip_ssh
+    def  _wrap_skip_nomultiplex_ssh(*args, **kwargs):
+        if SSHManager is not MultiplexSSHManager:
+            raise SkipTest("SSH without multiplexing is used")
+        return func(*args, **kwargs)
+    return  _wrap_skip_nomultiplex_ssh
+
+
 @optional_args
 def skip_v6_or_later(func, method='raise'):
     """Skip tests if v6 or later will be used as the default repo version.
@@ -893,6 +912,20 @@ def known_failure_githubci_win(func):
     return func
 
 
+def known_failure_githubci_osx(func):
+    """Test decorator for a known test failure on Github's macOS CI
+    """
+    if 'GITHUB_WORKFLOW' in os.environ and on_osx:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_githubci_osx')
+        @attr('githubci_osx')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
 # ### ###
 # END known failure decorators
 # ### ###
@@ -992,9 +1025,6 @@ def _get_testrepos_uris(regex, flavors):
     return uris
 
 
-# addurls with our generated file:// URLs doesn't work on appveyor
-# https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
-@known_failure_appveyor
 @optional_args
 def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     """Decorator to provide a local/remote test repository
@@ -1031,6 +1061,10 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     @wraps(t)
     @attr('with_testrepos')
     def  _wrap_with_testrepos(*arg, **kw):
+        # addurls with our generated file:// URLs doesn't work on appveyor
+        # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
+        if 'APPVEYOR' in os.environ:
+            raise SkipTest("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1424,21 +1458,10 @@ def with_parametric_batch(t):
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
-OBSCURE_FILENAMES = (
-    u" \"';a&b/&c `| ",  # shouldn't be supported anywhere I guess due to /
-    u" \"';a&b&c `| ",
-    u" \"';abc `| ",
-    u" \"';abc | ",
-    u" \"';abc ",
-    u" ;abc ",
-    u" ;abc",
-    u" ab c ",
-    u" ab c",
-    u"ac",
-    u" ab .datc ",
-    u"ab .datc ",  # they all should at least support spaces and dots
-)
+# Those will be tried to be added to the base name if filesystem allows
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
+
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
@@ -1449,35 +1472,61 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_windows:
         # TODO: really figure out unicode handling on windows
         UNICODE_FILENAME = ''
-    # Prepend the list with unicode names first
-    OBSCURE_FILENAMES = tuple(
-        f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
-    ) + OBSCURE_FILENAMES
+    if UNICODE_FILENAME:
+        OBSCURE_FILENAME_PARTS.append(UNICODE_FILENAME)
+# space before extension, simple extension and trailing space to finish it up
+OBSCURE_FILENAME_PARTS += [' ', '.datc', ' ']
 
 
 @with_tempfile(mkdir=True)
-def get_most_obscure_supported_name(tdir):
+def get_most_obscure_supported_name(tdir, return_candidates=False):
     """Return the most obscure filename that the filesystem would support under TEMPDIR
 
+    Parameters
+    ----------
+    return_candidates: bool, optional
+      if True, return a tuple of (good, candidates) where candidates are "partially"
+      sorted from trickiest considered
     TODO: we might want to use it as a function where we would provide tdir
     """
-    for filename in OBSCURE_FILENAMES:
-        filename = OBSCURE_PREFIX + filename
-        if on_windows and filename.rstrip() != filename:
-            continue
+    # we need separate good_base so we do not breed leading/trailing spaces
+    initial = good = OBSCURE_PREFIX
+    system = platform.system()
+
+    OBSCURE_FILENAMES = []
+    def good_filename(filename):
+        OBSCURE_FILENAMES.append(candidate)
         try:
-            with open(opj(tdir, filename), 'w') as f:
+            # Windows seems to not tollerate trailing spaces and
+            # ATM we do not distinguish obscure filename and dirname.
+            # So here we will test for both - being able to create dir
+            # with obscure name and obscure filename under
+            os.mkdir(opj(tdir, filename))
+            with open(opj(tdir, filename, filename), 'w') as f:
                 f.write("TEST LOAD")
-            return filename  # it will get removed as a part of wiping up the directory
+            return True
         except:
             lgr.debug("Filename %r is not supported on %s under %s",
-                      filename, platform.system(), tdir)
-            pass
-    raise RuntimeError("Could not create any of the files under %s among %s"
+                      filename, system, tdir)
+            return False
+
+    # incrementally build up the most obscure filename from parts
+    for part in OBSCURE_FILENAME_PARTS:
+        candidate = good + part
+        if good_filename(candidate):
+            good = candidate
+
+    if good == initial:
+        raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+    lgr.debug("Tested %d obscure filename candidates. The winner: %r", len(OBSCURE_FILENAMES), good)
+    if return_candidates:
+        return good, OBSCURE_FILENAMES[::-1]
+    else:
+        return good
 
 
-OBSCURE_FILENAME = get_most_obscure_supported_name()
+OBSCURE_FILENAME, OBSCURE_FILENAMES = get_most_obscure_supported_name(return_candidates=True)
 
 
 @optional_args

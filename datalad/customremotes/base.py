@@ -322,6 +322,8 @@ class AnnexCustomRemote(object):
            arguments to be joined by a space and passed to git-annex
         """
         msg = " ".join(map(str, args))
+        # Sanitize since there must be no new lines
+        msg = msg.replace(os.linesep, r'\n')
         if not self._in_the_loop:
             lgr.debug("We are not yet in the loop, thus should not send to annex"
                       " anything.  Got: %s" % msg.encode())
@@ -650,7 +652,7 @@ class AnnexCustomRemote(object):
         # TODO: should actually be implemented by AnnexRepo
         #       Command is available in annex >= 20140410
         (out, err) = \
-            self.runner(['git-annex', 'contentlocation', key], cwd=self.path)
+            self.runner(['git', 'annex', 'contentlocation', key], cwd=self.path)
         # TODO: it would exit with non-0 if key is not present locally.
         # we need to catch and throw our exception
         return opj(self.path, out.rstrip(os.linesep))

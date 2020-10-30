@@ -28,6 +28,7 @@ from datalad.tests.utils import (
     assert_status,
     DEFAULT_BRANCH,
     eq_,
+    known_failure_githubci_osx,
     neq_,
     ok_,
     ok_file_has_content,
@@ -244,9 +245,9 @@ def test_push():
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True, suffix='sub')
+@with_tempfile(mkdir=True, suffix='subnoannex')
+@with_tempfile(mkdir=True, suffix='subsub')
 def test_push_recursive(
         origin_path, src_path, dst_top, dst_sub, dst_subnoannex, dst_subsub):
     # dataset with two submodules and one subsubmodule
@@ -371,6 +372,14 @@ def test_push_recursive(
         assert_in_results(
             res, status='notneeded', type='dataset', path=d.path,
             refspec=DEFAULT_REFSPEC)
+
+    # if noannex target gets some annex, we still should not fail to push
+    target_subnoannex.call_git(['annex', 'init'])
+    # just to ensure that we do need something to push
+    (subnoannex.pathobj / "newfile").write_text("content")
+    subnoannex.save()
+    res = subnoannex.push(to="target")
+    assert_in_results(res, status='ok', type='dataset')
 
 
 @slow  # 12sec on Yarik's laptop
@@ -796,6 +805,7 @@ def test_push_git_annex_branch_when_no_data(path):
                for d in target.for_each_ref_(fields="refname:strip=2")})
 
 
+@known_failure_githubci_osx
 @with_tree(tree={"ds": {"f0": "0", "f1": "0", "f2": "0",
                         "f3": "1",
                         "f4": "2", "f5": "2"}})
@@ -815,3 +825,20 @@ def test_push_git_annex_branch_many_paths_same_data(path):
     # 3 files point to content already covered by another file.
     assert_result_count(res, 3,
                         action="copy", type="file", status="notneeded")
+
+
+@known_failure_githubci_osx
+@with_tree(tree={"ds": {"f0": "0"}})
+def test_push_matching(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create(force=True)
+    ds.config.set('push.default', 'matching', where='local')
+    ds.save()
+    remote_ds = mk_push_target(ds, 'local', str(path / 'dssibling'),
+                               annex=True, bare=False)
+    # that fact that the next one even runs makes sure that we are in a better
+    # place than https://github.com/datalad/datalad/issues/4888
+    ds.push(to='local')
+    # and we pushed the commit in the current branch
+    eq_(remote_ds.get_hexsha(DEFAULT_BRANCH),
+        ds.repo.get_hexsha(DEFAULT_BRANCH))

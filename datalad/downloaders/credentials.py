@@ -21,7 +21,6 @@ https://github.com/omab/python-social-auth
 """
 
 import time
-import calendar
 
 from collections import OrderedDict
 
@@ -210,9 +209,12 @@ class AWS_S3(Credential):
     def is_expired(self):
         exp = self.get('expiration', None)
         if not exp:
-            return True
+            return False
         exp_epoch = iso8601_to_epoch(exp)
-        expire_in = (exp_epoch - calendar.timegm(time.localtime())) / 3600.
+        # -2 to artificially shorten duration of the allotment to avoid
+        # possible race conditions between us checking either it has
+        # already expired before submitting a request.
+        expire_in = (exp_epoch - time.time() - 2) / 3600.
 
         lgr.debug(
             ("Credential %s has expired %.2fh ago"
@@ -259,8 +261,23 @@ class CompositeCredential(Credential):
     def enter_new(self):
         # should invalidate/remove all tail credentials to avoid failing attempts to login
         self._credentials[0].enter_new()
+        self.refresh()
+
+    def refresh(self):
+        """Re-establish "dependent" credentials
+
+        E.g. if code outside was reported that it expired somehow before known expiration datetime
+        """
         for c in self._credentials[1:]:
             c.delete()
+        # trigger re-establishing the chain
+        _ = self()
+        if self.is_expired:
+            raise RuntimeError("Credential %s expired right upon refresh: should have not happened")
+
+    @property
+    def is_expired(self):
+        return any(c.is_expired for c in self._credentials)
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""

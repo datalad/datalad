@@ -541,8 +541,8 @@ def test_is_ssh():
 def test_iso8601_to_epoch():
     epoch = 1467901515
     eq_(iso8601_to_epoch('2016-07-07T14:25:15+00:00'), epoch)
-    # zone information is actually not used
-    eq_(iso8601_to_epoch('2016-07-07T14:25:15+11:00'), epoch)
+    eq_(iso8601_to_epoch('2016-07-07T14:25:15+11:00'),
+        epoch - 11 * 60 * 60)
     eq_(iso8601_to_epoch('2016-07-07T14:25:15Z'), epoch)
     eq_(iso8601_to_epoch('2016-07-07T14:25:15'), epoch)
 

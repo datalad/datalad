@@ -24,8 +24,6 @@ env:
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow or network"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
-    # Special settings/helper for combined coverage from special remotes execution
-    - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
@@ -69,10 +67,12 @@ matrix:
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=not
+    - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
   - python: 3.5
     env:
     - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=""
+    - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
@@ -289,7 +289,7 @@ script:
 after_success:
   # submit only what we have covered in the PRs
   - if [ -z "${_DL_CRON:-}" ]; then
-      cp __testhome__/.coverage .;
+      cd __testhome__;
       coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi
