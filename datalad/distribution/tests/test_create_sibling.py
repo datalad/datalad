@@ -25,6 +25,7 @@ from datalad.cmd import (
     WitlessRunner as Runner,
     StdOutErrCapture,
 )
+from datalad.distribution.create_sibling import _RunnerAdapter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
@@ -835,3 +836,15 @@ def test_non_master_branch(src_path, target_path):
         "other-sub")
     eq_(get_branch(Dataset(target_path / "b" / "sub-b").repo),
         DEFAULT_BRANCH)
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_preserve_attrs(src, dest):
+    create_tree(src, {"src": {"foo": {"bar": "This is test text."}}})
+    os.utime(opj(src, "src", "foo", "bar"), (1234567890, 1234567890))
+    _RunnerAdapter().put(opj(src, "src"), dest, recursive=True, preserve_attrs=True)
+    s = os.stat(opj(dest, "src", "foo", "bar"))
+    assert s.st_atime == 1234567890
+    assert s.st_mtime == 1234567890
+    with open(opj(dest, "src", "foo", "bar")) as fp:
+        assert fp.read() == "This is test text."
