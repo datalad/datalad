@@ -176,7 +176,7 @@ def test_invalid_args(path):
 #    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 
-@known_failure_appveyor
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
@@ -288,6 +288,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @with_tree(tree={
     'ds': {'test.txt': 'some'},
     })
@@ -436,7 +437,7 @@ def test_install_into_dataset(source, top_path):
 
 
 @slow   # 15sec on Yarik's laptop
-@known_failure_windows  #FIXME
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @usecase  # 39.3074s
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -879,6 +880,7 @@ def test_install_subds_from_another_remote(topdir):
 
 # Takes > 2 sec
 # Do not use cassette
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @skip_if_no_network
 @with_tempfile
 def check_datasets_datalad_org(suffix, tdir):

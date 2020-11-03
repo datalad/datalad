@@ -473,6 +473,7 @@ def test_remove_nowhining(path):
 
 
 @usecase
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 @use_cassette('test_remove_recursive_2')

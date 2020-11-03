@@ -111,6 +111,7 @@ def test_invalid_args(path, otherpath, alienpath):
     assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
 
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -130,7 +131,7 @@ def test_clone_crcns(tdir, ds_path):
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
-@known_failure_appveyor
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -217,6 +218,7 @@ def test_clone_dataset_from_just_source(url, path):
 # test fails randomly, likely a bug in one of the employed test helpers
 # https://github.com/datalad/datalad/pull/3966#issuecomment-571267932
 @known_failure
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @with_tree(tree={
     'ds': {'test.txt': 'some'},
     })
@@ -405,6 +407,7 @@ def test_clone_isnt_a_smartass(origin_path, path):
     eq_(cloned.subdatasets(), [])
 
 
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
     pdir = Path(tdir) / 'protected'
@@ -431,8 +434,7 @@ def test_clone_report_permission_issue(tdir):
         )
 
 
-# Started to hang on appveyor.
-@known_failure_appveyor  #FIXME - hangs
+@skip_if_on_windows # https://github.com/datalad/datalad/issues/5097
 @skip_if_no_network
 @with_tempfile
 def test_autoenabled_remote_msg(path):
