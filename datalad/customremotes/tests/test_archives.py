@@ -81,7 +81,7 @@ from datalad import cfg as dl_cfg
 @with_tempfile()
 def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
-    annex = AnnexRepo(d, runner=_get_custom_runner(d))
+    annex = AnnexRepo(d, backend='MD5E', runner=_get_custom_runner(d))
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
