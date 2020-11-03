@@ -165,7 +165,7 @@ def test_basic_scenario(d, d2):
 )
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
-    annex = AnnexRepo(topdir, init=True)
+    annex = AnnexRepo(topdir, backend='MD5E', init=True)
     annex.add('a.tar.gz')
     annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
