@@ -189,7 +189,15 @@ class PathBasedFlyweight(Flyweight):
         # physical repository at a time
         # do absolute() in addition to always get an absolute path
         # even with non-existing paths on windows
-        return str(ut.Path(path).resolve().absolute())
+        resolved = str(ut.Path(path).resolve().absolute())
+        if ut.on_windows and resolved.startswith('\\\\'):
+            # resolve() ended up converting a mounted network drive into a UNC path.
+            # such paths are not supoprted (e.g. as cmd.exe CWD), hence redo and take
+            # absolute path at face value. This has the consequence we cannot determine
+            # repo duplicates mounted on different drives, but this is no worse than
+            # on UNIX
+            return str(ut.Path(path).absolute())
+        return resolved
 
     def _flyweight_id_from_args(cls, *args, **kwargs):
 
