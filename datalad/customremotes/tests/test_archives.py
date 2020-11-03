@@ -33,6 +33,7 @@ from ...tests.utils import (
     assert_equal,
     assert_false,
     assert_is_instance,
+    assert_not_equal,
     assert_not_in,
     assert_true,
     chpwd,
@@ -80,7 +81,7 @@ from datalad import cfg as dl_cfg
 @with_tempfile()
 def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
-    annex = AnnexRepo(d, runner=_get_custom_runner(d))
+    annex = AnnexRepo(d, backend='MD5E', runner=_get_custom_runner(d))
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
@@ -165,7 +166,7 @@ def test_basic_scenario(d, d2):
 )
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
-    annex = AnnexRepo(topdir, init=True)
+    annex = AnnexRepo(topdir, backend='MD5E', init=True)
     annex.add('a.tar.gz')
     annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
@@ -322,7 +323,11 @@ def test_link_file_load(tempfile):
             # despite copystat mtime is not copied. TODO
             #        st.st_mtime)
 
-    if on_linux or on_osx:
+    # TODO: fix up the test to not rely on OS assumptions but rather
+    # first sense filesystem about linking support.
+    # For Yarik's Windows 10 VM test was failing under assumption that
+    # linking is not supported at all, but I guess it does.
+    if True:  # on_linux or on_osx:
         # above call should result in the hardlink
         assert_equal(inode(tempfile), inode(tempfile2))
         assert_equal(stats(tempfile), stats(tempfile2))
@@ -336,8 +341,8 @@ def test_link_file_load(tempfile):
                 link_file_load(tempfile, tempfile2)  # should still work
                 ok_("failed (TEST), copying file" in cm.out)
 
-    # should be a copy (either originally for windows, or after mocked call)
-    ok_(inode(tempfile) != inode(tempfile2))
+        # should be a copy (after mocked call)
+        assert_not_equal(inode(tempfile), inode(tempfile2))
     with open(tempfile2, 'r') as f:
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
