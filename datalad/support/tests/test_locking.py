@@ -32,6 +32,18 @@ from datalad.tests.utils import (
 )
 
 
+class Subproc:
+    # By implementing this closure as a class instead of as a nested function,
+    # it becomes possible to pickle it.
+
+    def __init__(self, tempfile):
+        self.tempfile = tempfile
+
+    def __call__(self, q):
+        with lock_if_check_fails(False, self.tempfile, blocking=False) as (_, lock2):
+            q.put(lock2.acquired)
+
+
 @known_failure_windows
 @with_tempfile
 def test_lock_if_check_fails(tempfile):
@@ -60,13 +72,9 @@ def test_lock_if_check_fails(tempfile):
         ok_exists(tempfile + '.get-lck')
     assert not op.exists(tempfile + '.get-lck')  # and it gets removed after
 
-    def subproc(q):
-        with lock_if_check_fails(False, tempfile, blocking=False) as (_, lock2):
-            q.put(lock2.acquired)
-
     from multiprocessing import Queue, Process
     q = Queue()
-    p = Process(target=subproc, args=(q,))
+    p = Process(target=Subproc(tempfile), args=(q,))
 
     # now we need somehow to actually check the bloody lock functioning
     with lock_if_check_fails((op.exists, (tempfile,)), tempfile) as (check, lock):
@@ -83,7 +91,7 @@ def test_lock_if_check_fails(tempfile):
     ok_exists(tempfile)
 
     # and we redo -- it will acquire it
-    p = Process(target=subproc, args=(q,))
+    p = Process(target=Subproc(tempfile), args=(q,))
     p.start()
     ok_(q.get())
     p.join()
