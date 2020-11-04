@@ -57,7 +57,7 @@ novalue
 empty =
 myint = 3
 
-[onemore "complicated の beast with.dot"]
+[onemore "complicated nounicode beast with.dot"]
 findme = 5.0
 """
 
@@ -83,16 +83,16 @@ def test_something(path, new_home):
     assert_true(cfg.has_section('something'))
     assert_false(cfg.has_section('somethingelse'))
     assert_equal(sorted(cfg.sections()),
-                 [u'onemore.complicated の beast with.dot', 'something'])
+                 [u'onemore.complicated nounicode beast with.dot', 'something'])
     assert_true(cfg.has_option('something', 'user'))
     assert_false(cfg.has_option('something', 'us?er'))
     assert_false(cfg.has_option('some?thing', 'user'))
     assert_equal(sorted(cfg.options('something')), ['empty', 'myint', 'novalue', 'user'])
-    assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
+    assert_equal(cfg.options(u'onemore.complicated nounicode beast with.dot'), ['findme'])
 
     assert_equal(
         sorted(cfg.items()),
-        [(u'onemore.complicated の beast with.dot.findme', '5.0'),
+        [(u'onemore.complicated nounicode beast with.dot.findme', '5.0'),
          ('something.empty', ''),
          ('something.myint', '3'),
          ('something.novalue', None),
@@ -109,7 +109,7 @@ def test_something(path, new_home):
         cfg.get('something.user'),
         ('name=Jane Doe', 'email=jd@example.com'))
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
-    assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
+    assert_equal(cfg.getfloat(u'onemore.complicated nounicode beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
     assert_equal(cfg.getbool('something', 'myint'), True)
     # git demands a key without value at all to be used as a flag, thus True
@@ -128,8 +128,8 @@ def test_something(path, new_home):
     assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
 
     # modification follows
-    cfg.add('something.new', 'の')
-    assert_equal(cfg.get('something.new'), u'の')
+    cfg.add('something.new', 'nounicode')
+    assert_equal(cfg.get('something.new'), u'nounicode')
     # sections are added on demand
     cfg.add('unheard.of', 'fame')
     assert_true(cfg.has_section('unheard.of'))

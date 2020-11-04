@@ -40,8 +40,9 @@ requires = {
     ],
     'downloaders': [
         'boto',
-        'keyring>=8.0', 'keyrings.alt',
-        'msgpack',
+        # disabled for Debian - dependencies are specified in debian/control
+        # 'keyring>=8.0', 'keyrings.alt',
+        # 'msgpack',
         'requests>=1.2',
     ],
     'downloaders-extra': [
@@ -178,8 +179,7 @@ datalad_setup(
     'datalad',
     description="data distribution geared toward scientific datasets",
     install_requires=
-        requires['core'] + requires['downloaders'] +
-        requires['publish'] + requires['metadata'],
+        requires['core'],
     python_requires='>=3.5',
     extras_require=requires,
     cmdclass=cmdclass,

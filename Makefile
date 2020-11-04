@@ -1,7 +1,7 @@
 # simple makefile to simplify repetetive build env management tasks under posix
 # Ideas borrowed from scikit-learn's and PyMVPA Makefiles  -- thanks!
 
-PYTHON ?= python
+PYTHON ?= python3
 NOSETESTS ?= $(PYTHON) -m nose
 
 MODULE ?= datalad

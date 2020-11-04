@@ -56,7 +56,7 @@ def test_runner_dry(tempfile):
     runner = Runner(protocol=dry)
 
     # test dry command call
-    cmd = 'echo Testing äöü東 dry run > %s' % tempfile
+    cmd = 'echo Testing nounicode dry run > %s' % tempfile
     with swallow_logs(new_level=5) as cml:
         ret = runner.run(cmd)
         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
@@ -80,7 +80,7 @@ def test_runner(tempfile):
 
     # test non-dry command call
     runner = Runner()
-    content = 'Testing äöü東 real run'
+    content = 'Testing nounicode real run'
     cmd = 'echo %s > %r' % (content, tempfile)
     ret = runner.run(cmd)
     assert_equal(ret, ('', ''))  # no out or err
@@ -184,7 +184,7 @@ def test_runner_log_stdout():
     # assertion yet.
 
     runner = Runner(log_outputs=True)
-    cmd_ = ['echo', 'stdout-Message äöü東 should be logged']
+    cmd_ = ['echo', 'stdout-Message nounicode should be logged']
     for cmd in [cmd_, ' '.join(cmd_)]:
         # should be identical runs, either as a string or as a list
         kw = {}
@@ -197,16 +197,16 @@ def test_runner_log_stdout():
             if not on_windows:
                 # we can just count on sanity
                 cm.assert_logged("stdout| stdout-"
-                                 "Message äöü東 should be logged", regex=False)
+                                 "Message nounicode should be logged", regex=False)
             else:
                 # echo outputs quoted lines for some reason, so relax check
-                ok_("stdout-Message äöü東 should be logged" in cm.lines[1])
+                ok_("stdout-Message nounicode should be logged" in cm.lines[1])
 
-    cmd = 'echo stdout-Message äöü東 should not be logged'
+    cmd = 'echo stdout-Message nounicode should not be logged'
     with swallow_outputs() as cmo:
         with swallow_logs(new_level=11) as cml:
             ret = runner.run(cmd, log_stdout=False)
-            eq_(cmo.out, "stdout-Message äöü東 should not be logged\n")
+            eq_(cmo.out, "stdout-Message nounicode should not be logged\n")
             eq_(cml.out, "")
 
 
@@ -281,7 +281,7 @@ def test_runner_failure_unicode(path):
     # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
     runner = Runner()
     with assert_raises(CommandError), swallow_logs():
-        runner.run(u"β-command-doesnt-exist", cwd=path)
+        runner.run(u"B-command-doesnt-exist", cwd=path)
 
 
 @skip_if_on_windows  # likely would fail
