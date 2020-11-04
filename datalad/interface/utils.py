@@ -487,19 +487,27 @@ def eval_results(func):
 def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res.get('path', None)
-        path = ' {}'.format(path) if path else ''
+        if path and res.get('refds'):
+            try:
+                path = relpath(path, res['refds'])
+            except ValueError:
+                # can happen, e.g., on windows with paths from different
+                # drives. just go with the original path in this case
+                pass
         ui.message('{action}({status}):{path}{type}{msg}'.format(
-                action=ac.color_word(res['action'], ac.BOLD),
-                status=ac.color_status(res['status']),
-                path=relpath(path, res['refds']) if path and res.get('refds') else path,
-                type=' ({})'.format(
-                        ac.color_word(res['type'], ac.MAGENTA)
-                ) if 'type' in res else '',
-                msg=' [{}]'.format(
-                        res['message'][0] % res['message'][1:]
-                        if isinstance(res['message'], tuple) else res[
-                            'message'])
-                if res.get('message', None) else ''))
+            action=ac.color_word(
+                res.get('action', '<action-unspecified>'),
+                ac.BOLD),
+            status=ac.color_status(res.get('status', '<status-unspecified>')),
+            path=' {}'.format(path) if path else '',
+            type=' ({})'.format(
+                ac.color_word(res['type'], ac.MAGENTA)
+            ) if 'type' in res else '',
+            msg=' [{}]'.format(
+                res['message'][0] % res['message'][1:]
+                if isinstance(res['message'], tuple) else res[
+                    'message'])
+            if res.get('message', None) else ''))
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
