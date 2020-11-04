@@ -341,7 +341,7 @@ class ExtractedArchive(object):
 
         It does not actually extract any archive
         """
-        return opj(self.path, urlunquote(afile))
+        return opj(self.path, afile)
 
     def get_extracted_files(self):
         """Generator to provide filenames which are available under extracted archive

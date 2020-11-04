@@ -35,3 +35,7 @@ jobs:
         TRAVIS_PULL_REQUEST: true
       run: |
         tools/ci/benchmark-travis-pr.sh
+    - name: Compare
+      run: |
+        # Invocation from tools/ci/benchmark-travis-pr.sh for convenience
+        asv compare refs/bm/merge-target refs/bm/pr

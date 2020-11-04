@@ -45,9 +45,11 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureKeyChoice,
 )
+from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
 from datalad.support.network import (
     get_local_file_url,
+    download_url,
     URL,
     RI,
     DataLadRI,
@@ -628,18 +630,15 @@ def postclonecfg_ria(ds, props):
         # get that config file the same way:
         config_content = None
         scheme = props['giturl'].split(':', 1)[0]
-        if scheme == 'http':
-
+        if scheme in ['http', 'https']:
             try:
-                response = requests.get("{}{}config".format(
-                    props['giturl'],
-                    '/' if not props['giturl'].endswith('/') else '')
-                )
-                config_content = response.text
-            except requests.RequestException as e:
+                config_content = download_url(
+                    "{}{}config".format(
+                        props['giturl'],
+                        '/' if not props['giturl'].endswith('/') else ''))
+            except DownloadError as e:
                 lgr.debug("Failed to get config file from source:\n%s",
                           exc_str(e))
-
         elif scheme == 'ssh':
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
@@ -663,8 +662,8 @@ def postclonecfg_ria(ds, props):
                 lgr.debug("Failed to get config file from source: %s",
                           exc_str(e))
         else:
-            lgr.debug("Unknown URL-Scheme in %s. Can handle SSH, HTTP or "
-                      "FILE scheme URLs.", props['source'])
+            lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
+                      "FILE scheme URLs.", scheme, props['source'])
 
         # 3. And read it
         org_uuid = None
@@ -799,7 +798,20 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # Deal with file:// scheme URLs as well as plain paths.
                     # If origin isn't local, we have nothing to do.
                     origin_git_path = Path(RI(origin_annex_url).localpath)
-                    if origin_git_path.name != '.git':
+
+                    # we are local; check for a bare repo first to not mess w/
+                    # the path
+                    # Note, that w/o support for bare repos in GitRepo we also
+                    # can't use ConfigManager ATM.
+                    from datalad.cmd import GitWitlessRunner, StdOutErrCapture
+                    gc_response = GitWitlessRunner(
+                        cwd=origin_git_path,
+                    ).run(['git', 'config', '--local', '--get', 'core.bare'],
+                          protocol=StdOutErrCapture)
+                    if gc_response['stdout'].lower().strip() == 'true':
+                        # origin is a bare repo -> use path as is
+                        pass
+                    elif origin_git_path.name != '.git':
                         origin_git_path /= '.git'
                 except ValueError:
                     # Note, that accessing localpath on a non-local RI throws

@@ -202,7 +202,7 @@ def iso8601_to_epoch(datestr):
     iso8601 is used to parse properly the time zone information, which
     can't be parsed with standard datetime strptime
     """
-    return calendar.timegm(iso8601.parse_date(datestr).timetuple())
+    return calendar.timegm(iso8601.parse_date(datestr).utctimetuple())
 
 
 def __urlopen_requests(url):
@@ -1022,5 +1022,42 @@ def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
         pickle.dump(doc, open(doc_fname, 'wb'))
         lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))
     return doc
+
+
+def download_url(url, dest=None, overwrite=False):
+    """Download a file from a URL
+
+    Supports and honors any DataLad "downloader/provider" configuration.
+
+    Parameters
+    ----------
+    url: str
+      Source URL to download from.
+    dest: Path-like or None
+      Destination file name (file must not exist), or name of a target
+      directory (must exists, and filename must be derivable from `url`).
+      If None, the downloaded content will be returned as a string.
+    overwrite: bool
+      Force overwriting an existing destination file.
+
+    Returns
+    -------
+    str
+      Path of the downloaded file, or URL content if `dest` is None.
+
+    Raises
+    ------
+    DownloadError
+      If `dest` already exists and is a file, or if `dest` is a directory
+      and no filename could be determined from `url`, or if no file was
+      found at the given `url`.
+    """
+    from datalad.downloaders.providers import Providers
+    providers = Providers.from_config_files()
+    if dest:
+        return providers.download(url, path=str(dest), overwrite=overwrite)
+    else:
+        return providers.fetch(url)
+
 
 lgr.log(5, "Done importing support.network")

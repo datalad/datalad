@@ -795,6 +795,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     _unique_instances = WeakValueDictionary()
 
+    GIT_MIN_VERSION = "2.19.1"
+    git_version = None
+
     def _flyweight_invalid(self):
         return not self.is_valid_git()
 
@@ -819,6 +822,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # the flyweight key is already determining unique instances
         # add the class name to distinguish from strings of a path
         return hash((self.__class__.__name__, self.__weakref__.key))
+
+    @classmethod
+    def _check_git_version(cls):
+        git_version = external_versions["cmd:git"]
+        if git_version < "2.13.0":
+            lgr.warning("Detected Git version %s. "
+                        "DataLad has known incompatibilities "
+                        "with versions below 2.13.0",
+                        git_version)
+        cls.git_version = git_version
 
     # This is the least common denominator to claim that a user
     # used DataLad.
@@ -876,6 +889,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           C='/my/path'   => -C /my/path
 
         """
+        if self.git_version is None:
+            self._check_git_version()
 
         # BEGIN Repo validity test
         # We want to fail early for tests, that would be performed a lot. In particular this is about
@@ -936,7 +951,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # So that we "share" control paths with git/git-annex
         if ssh_manager:
-            ssh_manager.assure_initialized()
+            ssh_manager.ensure_initialized()
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
@@ -970,13 +985,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
             os.makedirs(path)
-        elif sanity_checks and external_versions['cmd:git'] < '2.14.0':
-            warnings.warn(
-                "Your git version (%s) is too old, we will not safe-guard "
-                "against creating a new repository under already known to git "
-                "subdirectory" % external_versions['cmd:git'],
-                OutdatedExternalDependencyWarning
-            )
         elif sanity_checks:
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
@@ -2618,8 +2626,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             options = []
         if msg:
             options = options + ["-m", msg]
-        if allow_unrelated and external_versions['cmd:git'] >= '2.9':
-            options += ['--allow-unrelated-histories']
+        options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
             check_fake_dates=True,
@@ -3877,7 +3884,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           - git : bool (passed to Repo.add()
           - eval_submodule_state : {'full', 'commit', 'no'}
             passed to Repo.status()
-          - untracked : {'no', 'normal', 'all'} - passed to Repo.satus()
+          - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
         """
         return list(
             self.save_(

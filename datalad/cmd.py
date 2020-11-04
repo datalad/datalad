@@ -43,6 +43,7 @@ from .utils import (
     assure_bytes,
     assure_unicode,
     auto_repr,
+    ensure_unicode,
     generate_file_chunks,
     get_tempfile_kwargs,
     split_cmdline,
@@ -1090,7 +1091,12 @@ class GitRunnerBase(object):
             alongside = False
         else:
             annex_path = op.dirname(op.realpath(annex_fpath))
-            alongside = op.lexists(op.join(annex_path, 'git'))
+            bundled_git_path = op.join(annex_path, 'git')
+            # we only need to consider bundled git if it's actually different
+            # from default. (see issue #5030)
+            alongside = op.lexists(bundled_git_path) and \
+                        bundled_git_path != op.realpath(find_executable('git'))
+
         return annex_path if alongside else ''
 
     @staticmethod
@@ -1317,12 +1323,14 @@ class BatchedCommand(SafeDelCloseMixin):
           None otherwise
         """
         ret = None
+        process = self._process
         if self._stderr_out:
             # close possibly still open fd
+            lgr.debug(
+                "Closing stderr of %s", process)
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
-        if self._process:
-            process = self._process
+        if process:
             lgr.debug(
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
@@ -1330,10 +1338,28 @@ class BatchedCommand(SafeDelCloseMixin):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+
+        # It is hard to debug when something is going wrong. Hopefully logging stderr
+        # if generally asked might be of help
+        if lgr.isEnabledFor(5):
+            from . import cfg
+            log_stderr = cfg.getbool('datalad.log', 'outputs', default=False)
+        else:
+            log_stderr = False
+
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
-            if return_stderr:
+            if return_stderr or log_stderr:
                 with open(self._stderr_out_fname, 'r') as f:
-                    ret = f.read()
+                    stderr = f.read()
+            if return_stderr:
+                ret = stderr
+            if log_stderr:
+                stderr = ensure_unicode(stderr)
+                stderr = stderr.splitlines()
+                lgr.log(5, "stderr of %s had %d lines:", process.pid, len(stderr))
+                for l in stderr:
+                    lgr.log(5, "| " + l)
+
             # remove the file where we kept dumping stderr
             unlink(self._stderr_out_fname)
             self._stderr_out_fname = None

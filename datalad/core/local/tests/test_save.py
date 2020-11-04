@@ -45,7 +45,6 @@ import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
-from datalad.support.external_versions import external_versions
 from datalad.api import (
     create,
     install,
@@ -713,7 +712,7 @@ def test_surprise_subds(path):
     # this test irrelevant because it is about the unborn branch edge case.
     adjusted = somerepo.is_managed_branch()
     # This edge case goes away with Git v2.22.0.
-    fixed_git = external_versions['cmd:git'] >= '2.22.0'
+    fixed_git = somerepo.git_version >= '2.22.0'
 
     # save non-recursive
     res = ds.save(recursive=False, on_failure='ignore')
@@ -835,3 +834,14 @@ def test_save_dotfiles():
     for git in [True, False, None]:
         for save_path in [None, "nodot-subdir"]:
             yield check_save_dotfiles, git, save_path
+
+
+@with_tempfile
+def test_save_nested_subs_explicit_paths(path):
+    ds = Dataset(path).create()
+    spaths = [Path("s1"), Path("s1", "s2"), Path("s1", "s2", "s3")]
+    for spath in spaths:
+        Dataset(ds.pathobj / spath).create()
+    ds.save(path=spaths)
+    eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
+        set(map(str, spaths)))

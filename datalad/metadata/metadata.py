@@ -19,11 +19,7 @@ import os.path as op
 from collections import (
     OrderedDict,
 )
-
-try:
-    from collections.abc import Mapping
-except ImportError:  # Python <= 3.3
-    from collections import Mapping
+from collections.abc import Mapping
 
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -801,7 +797,7 @@ def get_ds_aggregate_db_locations(ds, version='default', warn_absent=True):
             # caller had no specific idea what metadata version is needed/available
             # This dataset does not have aggregated metadata.  Does it have any
             # other version?
-            info_glob = op.join(ds.path, agginfo_relpath_template).format('*')
+            info_glob = op.join(ds.path, agginfo_relpath_template.format('*'))
             info_files = glob.glob(info_glob)
             msg = "Found no aggregated metadata info file %s." \
                   % info_fpath

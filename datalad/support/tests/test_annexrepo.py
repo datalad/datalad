@@ -88,6 +88,7 @@ from datalad.tests.utils import (
     skip_if,
     skip_if_on_windows,
     skip_if_root,
+    skip_nomultiplex_ssh,
     skip_ssh,
     SkipTest,
     slow,
@@ -975,7 +976,7 @@ def test_AnnexRepo_get_contentlocation():
         yield _test_AnnexRepo_get_contentlocation, batch
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('about2_.txt', 'more abouts_'),
@@ -1118,7 +1119,7 @@ def test_annex_backends(path):
     eq_(repo.default_backends, ['MD5E'])
 
 
-@skip_ssh
+@skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
 def test_annex_ssh(topdir):
     # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
@@ -1127,6 +1128,12 @@ def test_annex_ssh(topdir):
     # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
     if external_versions['cmd:system-ssh'] < '7.4' and \
        '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
+        raise SkipTest("Test known to hang")
+    # And, since the switch to the Docker SSH target, our cron build with
+    # 7.20190708 stalls. 7.20190819 is the first known good version, but do a
+    # minimal skip up until the next release because we don't know that
+    # 7.20190730 stalls.
+    if external_versions['cmd:annex'] < '7.20190730':
         raise SkipTest("Test known to hang")
 
     topdir = Path(topdir)

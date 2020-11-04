@@ -12,6 +12,7 @@
 
 from contextlib import contextmanager
 import logging
+from time import sleep
 from os.path import (
     exists,
     join as opj,
@@ -50,6 +51,7 @@ from ..utils import (
     eval_results,
     handle_dirty_dataset,
 )
+from ..results import get_status_dict
 from datalad.interface.base import build_doc
 
 
@@ -402,11 +404,16 @@ def test_utils_suppress_similar():
     # Check suppression boundary for straight chain of similar
     # messages.
 
+    # yield test results immediately to make test run fast
+    sleep_dur = 0.0
+
     def n_foo(number):
         for i in range(number):
             yield dict(action="foo",
                        status="ok",
                        path="path{}".format(i))
+            sleep(sleep_dur)
+
 
     with _swallow_outputs() as cmo:
         cmo.isatty = lambda: True
@@ -425,12 +432,19 @@ def test_utils_suppress_similar():
         assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
 
     with _swallow_outputs() as cmo:
+        # for this one test yield results slightly slower than 2Hz
+        # such that we can see each individual supression message
+        # and no get caught by the rate limiter
+        sleep_dur = 0.51
         list(tu(13, result_fn=n_foo, result_renderer="default"))
         assert_not_in("path10", cmo.out)
         # We see an update for each result.
         assert_re_in(r"1 .* suppressed", cmo.out, match=False)
         assert_re_in(r"2 .* suppressed", cmo.out, match=False)
         assert_re_in(r"3 .* suppressed", cmo.out, match=False)
+
+    # make tests run fast again
+    sleep_dur = 0.0
 
     with _swallow_outputs(isatty=False) as cmo:
         list(tu(11, result_fn=n_foo, result_renderer="default"))
@@ -460,3 +474,39 @@ def test_utils_suppress_similar():
         assert_in("path10", cmo.out)
         assert_not_in("path20", cmo.out)
         assert_re_in("[^-0-9]1 .* suppressed", cmo.out, match=False)
+
+
+class TestUtils2(Interface):
+    # result_renderer = custom_renderer
+    _params_ = dict(
+        number=Parameter(
+            args=("--path",),
+            constraints=EnsureStr() | EnsureNone()),
+    )
+    @staticmethod
+    @eval_results
+    def __call__(path=None):
+        def logger(msg, *args):
+            return msg % args
+        if path:
+            # we will be testing for path %s
+            message = ("all good %s", "my friend")
+        else:
+            message = ("kaboom %s %s", "greedy")
+        yield get_status_dict(
+            action="test",
+            status="ok",
+            message=message,
+            logger=logger,
+            path=path or ''
+        )
+
+
+def test_incorrect_msg_interpolation():
+    with assert_raises(TypeError) as cme:
+        TestUtils2().__call__()
+    # this must be our custom exception
+    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.exception))
+
+    # there should be no exception if reported in the record path contains %
+    TestUtils2().__call__("%eatthis")

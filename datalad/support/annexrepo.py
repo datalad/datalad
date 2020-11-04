@@ -413,6 +413,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         remote_name: str
         url: str
         """
+        if not self.config.obtain('datalad.ssh.multiplex-connections'):
+            return
+
         from datalad.support.network import is_ssh
         # Note:
         #
@@ -740,12 +743,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd = ['git']
             if git_options:
                 cmd.extend(git_options)
-
-            cmd.append("rev-parse")
-            if external_versions['cmd:git'] >= '2.13.0':
-                cmd.append("--absolute-git-dir")
-            else:
-                cmd.append("--git-dir")
+            cmd.extend(["rev-parse", "--absolute-git-dir"])
 
             try:
                 toppath, err = GitRunner().run(
@@ -760,10 +758,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 toppath = AnnexRepo.get_toppath(dirname(path),
                                                 follow_up=follow_up,
                                                 git_options=git_options)
-
-            if external_versions['cmd:git'] < '2.13.0':
-                # we got a path relative to `path` instead of an absolute one
-                toppath = opj(path, toppath)
 
             # we got the git-dir. Assuming the root dir we are looking for is
             # one level up:
@@ -1045,7 +1039,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             cmd_list = ['git'] + git_options + ['annex']
         else:
-            cmd_list = ['git-annex']
+            # Note: On Windows machines, for a yet unclear reason, git-annex may
+            # not be found as an executable. This is mitigated (again, for an
+            # unclear reason) by seperating the invocation into "git annex". See
+            # https://github.com/datalad/datalad/issues/4892 for original issue.
+            cmd_list = ['git', 'annex']
         if jobs:
             annex_options += ['-J%d' % jobs]
 
@@ -1313,7 +1311,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(
                     remote=remote,
-                    cmd="get",
+                    cmd="annex get",
                     msg="Remote is not known. Known are: %s"
                     % (self.get_remotes(),)
                 )
@@ -1744,6 +1742,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         pointers = self.supports_unlocked_pointers
         # We're only concerned about modified files in V6+ mode. In V5
         # `find` returns an empty string for unlocked files.
+        #
+        # ATTN: test_AnnexRepo_file_has_content has a failure before Git
+        # v2.13 (tested back to v2.9) because this diff call unexpectedly
+        # reports a type change as modified.
         modified = [
             f for f in self.call_git_items_(
                 ['diff', '--name-only', '-z'], sep='\0')
@@ -1991,7 +1993,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise AnnexBatchCommandError(
                     cmd="addurl",
                     msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
-            assert(out_json['command'] == 'addurl')
+            assert \
+                (out_json['command'] == 'addurl'), \
+                "no exception was raised and no 'command' in result out_json=%s" % str(out_json)
         if not out_json.get('success', False):
             raise (AnnexBatchCommandError if batch else CommandError)(
                     cmd="addurl",
@@ -3777,7 +3781,8 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch']  # , '--debug']
+            ['--batch'] + \
+            (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None
         super(BatchedAnnex, self).__init__(

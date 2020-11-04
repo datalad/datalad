@@ -74,6 +74,7 @@ from datalad.tests.utils import (
     usecase,
     get_datasets_topdir,
     SkipTest,
+    known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
 )
@@ -175,6 +176,7 @@ def test_invalid_args(path):
 #    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 
+@known_failure_appveyor
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})

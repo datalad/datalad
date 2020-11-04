@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
+    known_failure_appveyor,
     known_failure_windows,
     neq_,
     ok_,
@@ -96,17 +97,16 @@ def test_invalid_call(origin, tdir):
         type='dataset')
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
-@skip_ssh
+@known_failure_appveyor
 @with_tempfile
 @with_tempfile
-def test_smth_about_not_supported(p1, p2):
+def test_since_empty_and_unsupported(p1, p2):
     source = Dataset(p1).create()
     from datalad.support.network import PathRI
-    source.create_sibling(
-        'ssh://datalad-test' + PathRI(p2).posixpath,
-        name='target1')
-    # source.publish(to='target1')
+    source.create_sibling(p2, name='target1')
+    # see https://github.com/datalad/datalad/pull/4448#issuecomment-620847327
+    # Test that it doesn't fail without a prior push
+    source.publish(to='target1', since='')
     with chpwd(p1):
         # since we have only two commits (set backend, init dataset)
         # -- there is no HEAD^^
@@ -114,7 +114,7 @@ def test_smth_about_not_supported(p1, p2):
             publish(to='target1', since='HEAD^^', on_failure='ignore'),
             1,
             status='impossible',
-            message="fatal: bad revision 'HEAD^^'")
+            message="fatal: bad revision 'HEAD^^..HEAD'")
         # but now let's add one more commit, we should be able to pusblish
         source.repo.commit("msg", options=['--allow-empty'])
         publish(to='target1', since='HEAD^')  # must not fail now
@@ -428,7 +428,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     source.config.set('branch.{}.remote'.format(DEFAULT_BRANCH),
                       'target', where='local')
     with chpwd(source.path):
-        res_ = publish(since='', recursive=True)
+        res_ = publish(since='^', recursive=True)
     # TODO: somehow test that there were no even attempt to diff within "subm 1"
     # since if `--since=''` worked correctly, nothing has changed there and it
     # should have not been even touched
@@ -436,7 +436,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_result_count(res_, 1, status='ok', path=source.path, type='dataset')
 
     # Don't fail when a string is passed as `dataset` and since="".
-    assert_status("notneeded", publish(since='', dataset=source.path))
+    assert_status("notneeded", publish(since='^', dataset=source.path))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
@@ -757,6 +757,7 @@ def test_publish_no_fetch_refspec_configured(path):
     ds.publish(to="origin")
 
 
+@known_failure_appveyor
 @slow  # 14sec on Yarik's laptop
 @skip_ssh
 @with_tempfile(mkdir=True)
