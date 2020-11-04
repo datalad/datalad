@@ -61,7 +61,9 @@ install:
   # latest version
   #- appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
   # specific version mih uses to debug on real win10 box
-  - appveyor DownloadFile http://store.datalad.org/git-annex/windows/git-annex_8.20200309.exe -FileName resources\git-annex-installer.exe
+  #- appveyor DownloadFile http://store.datalad.org/git-annex/windows/git-annex_8.20200309.exe -FileName resources\git-annex-installer.exe
+  # datalad-extensions built version with fixed up special remotes handling
+  - appveyor DownloadFile http://datasets.datalad.org/datalad/packages/windows/git-annex-installer_8.20201007+git171-g7e24b2587_x64.exe -FileName resources\git-annex-installer.exe
   # extract git annex into the system Git installation path
   - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
   # info on how python is ticking
