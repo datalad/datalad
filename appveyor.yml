@@ -7,16 +7,22 @@ environment:
   MINICONDA: C:\Miniconda35
   DATALAD_TESTS_SSH: 1
 
+  # each matrix run comes with about 150s of setup overhead
   matrix:
-    # each matrix run comes with about 150s of setup overhead
-    - KNOWN_FAILURES: true
-      TEST_SELECTION: datalad.plugin
-    - TEST_SELECTION: datalad.core
-    - TEST_SELECTION: datalad.local datalad.distributed
-
+    # more modern functionality
+    - TEST_SELECTION: datalad.core datalad.local datalad.distributed datalad.tests.test_witless_runner datalad.tests.test_config
+    # older, but essential functionality
+    - TEST_SELECTION: datalad.cmdline datalad.distribution datalad.interface datalad.support datalad.ui datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3 datalad.tests.test_api datalad.tests.test_constraints datalad.tests.test_dochelpers 
+    # assorted other tests
+    - TEST_SELECTION: datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822 datalad.tests.test_utils datalad.tests.test_base datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives
+    # also execute tests that probably still not run, but it will be
+    # easier to pick the working one from the log
+    - KNOWN2FAIL: 1
+      TEST_SELECTION: datalad.plugin datalad.customremotes datalad.downloaders.tests.test_http datalad.metadata.extractors.tests.test_base datalad.metadata.test_aggregation datalad.metadata.test_base datalad.metadata.extractors.tests.test_datacite_xml datalad.tests.test__main__ datalad.tests.test_cmd datalad.tests.test_log datalad.tests.test_protocols datalad.tests.test_auto datalad.tests.test_tests_utils
+ 
 matrix:
   allow_failures:
-    - KNOWN_FAILURES: true
+    - KNOWN2FAIL: 1
 
 cache:
   # cache the pip cache
@@ -94,21 +100,6 @@ test_script:
   - datalad wtf
   # perform selected tests for this matrix run
   - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad %TEST_SELECTION%
-  # and now this... [keep appending tests that should work!!]
-  # - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.core datalad.local datalad.distributed datalad.cmdline datalad.distribution datalad.interface datalad.support datalad.ui
-  # # one call per datalad component for now -- to better see what is being tested
-  # # remaining fails: test_archives.test_basic_scenario test_datalad.test_basic_scenario_local_url
-  # #- python -m nose -s -v -A "not (turtle)" datalad.customremotes
-  # # remaining fails: test_http
-  # - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3
-  # # remaining fails: extractors.tests.test_base test_aggregation test_base  datalad.metadata.extractors.tests.test_datacite_xml
-  # - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822
-  # # remaining fails: test_addurls test_export_archive test_plugins"
-  # # additional tests need module `dateutil`!!
-  # - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.plugin.tests.test_check_dates
-  # # remaining fails: test__main__ test_cmd test_log  test_protocols test_test_utils test_auto
-  # - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad datalad.tests.test_utils datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives datalad.tests.test_witless_runner
- 
   # prepare coverage.xml in a separate invocation.  If invoked directly with nose - do not include test_ files themselves
   - python -m coverage xml
 
