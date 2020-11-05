@@ -1255,3 +1255,19 @@ def test_fetch_git_special_remote(url_path, url, path):
     ds_b = clone(ds_a.path, path / "other")
     ds_b.get("f1")
     ok_(ds_b.repo.file_has_content("f1"))
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_nonuniform_adjusted_subdataset(path):
+    # https://github.com/datalad/datalad/issues/5107
+    topds = Dataset(Path(path) / "top").create()
+    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    if not topds.repo.is_managed_branch():
+        raise SkipTest(
+            "Test logic assumes default dataset state is adjusted")
+    topds.clone(
+        source='git://github.com/datalad/testrepo--basic--r1',
+        path='subds')
+    eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
+        subds_url)
