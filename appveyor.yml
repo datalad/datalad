@@ -1,8 +1,11 @@
+image:
+  - Visual Studio 2019
+
 build: false
 
 environment:
   PYTHON: "C:\\Python35"
-  PYTHON_VERSION: "3.5.1"
+  PYTHON_VERSION: "3.5.2"
   PYTHON_ARCH: "32"
   MINICONDA: C:\Miniconda35
   DATALAD_TESTS_SSH: 1
