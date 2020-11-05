@@ -4,13 +4,11 @@ image:
 build: false
 
 environment:
-  PYTHON: "C:\\Python35"
-  PYTHON_VERSION: "3.5.2"
-  PYTHON_ARCH: "32"
   MINICONDA: C:\Miniconda35
   DATALAD_TESTS_SSH: 1
 
   matrix:
+    # each matrix run comes with about 150s of setup overhead
     - KNOWN_FAILURES: true
       TEST_SELECTION: datalad.plugin
     - TEST_SELECTION: datalad.core
@@ -28,7 +26,6 @@ init:
   # alter machine PATH setting to have git-core tools and SSH installation
   # accessible even when SSHing into localhost (see gh-3683)
   - ps: '[System.Environment]::SetEnvironmentVariable("PATH", "$env:Path;C:\Program Files\Git\mingw64\libexec\git-core;C:\projects\datalad\resources\OpenSSH-Win32", [System.EnvironmentVariableTarget]::Machine)'
-  - "ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH% %MINICONDA%"
   # this will display login RDP info for the build VM, but if the build VM should block
   # see on_finish below instead
   #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
@@ -37,8 +34,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
-  #- "conda create -q -n test-environment python=%PYTHON_VERSION% numpy scipy matplotlib pytest pandas"
-  - "conda create -q -n test-environment python=%PYTHON_VERSION%"
+  - "conda create -q -n test-environment"
   - activate test-environment
   - mkdir resources
   # define test host alias
