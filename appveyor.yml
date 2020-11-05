@@ -4,7 +4,7 @@ image:
 build: false
 
 environment:
-  MINICONDA: C:\Miniconda35
+  MINICONDA: C:\Miniconda37
   DATALAD_TESTS_SSH: 1
 
   # each matrix run comes with about 150s of setup overhead
