@@ -100,6 +100,7 @@ from .repo import (
     RepoInterface,
     path_based_str_repr,
 )
+from datalad.core.local.repo import repo_from_path
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -2837,7 +2838,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cmd += ['-b', branch]
         if url is None:
             # repo must already exist locally
-            subm = GitRepo(op.join(self.path, path), create=False, init=False)
+            subm = repo_from_path(op.join(self.path, path))
             # check that it has a commit, and refuse
             # to operate on it otherwise, or we would get a bastard
             # submodule that cripples git operations
@@ -3115,7 +3116,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            branch = self.get_active_branch()
+            branch = self.get_corresponding_branch() or self.get_active_branch()
             if branch is None:
                 return None, None
 
