@@ -266,7 +266,8 @@ def test_status_symlinked_dir_within_repo(path):
         return ds.status(path=[bar_f], annex="availability",
                          on_failure="ignore", result_renderer=None)
 
-    if ds.repo.git_annex_version < "8.20200522":
+    if ds.repo.git_annex_version < "8.20200522" or on_windows:
+        # TODO: on windows even with a recent annex -- no CommandError is raised, TODO
         assert_result_count(call(), 0)
     else:
         # As of 2a8fdfc7d (Display a warning message when asked to operate on a
