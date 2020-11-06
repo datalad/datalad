@@ -97,6 +97,7 @@ from .repo import (
     RepoInterface,
     path_based_str_repr,
 )
+from datalad.core.local.repo import repo_from_path
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -4164,7 +4165,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         info = []
         for path in paths:
             rpath = str(path.relative_to(self.pathobj).as_posix())
-            subm = GitRepo(path, create=False, init=False)
+            subm = repo_from_path(path)
             subm_commit = subm.get_hexsha()
             if not subm_commit:
                 yield get_status_dict(
