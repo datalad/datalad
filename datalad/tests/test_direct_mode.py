@@ -125,7 +125,7 @@ def test_direct_cfg(path1, path2):
     ar2sub1 = AnnexRepo(op.join(path2, 'sub1'))
     # but now let's convert that sub1 to direct mode
     assert not ar2sub1.is_direct_mode()
-    _set_direct_mode(arsub1, True)
+    _set_direct_mode(ar2sub1, True)
     assert ar2sub1.is_direct_mode()
     del ar2; del ar2sub1; AnnexRepo._unique_instances.clear()  # fight flyweight
 
@@ -134,6 +134,6 @@ def test_direct_cfg(path1, path2):
 
     # And what if we are trying to add pre-cloned repo in direct mode?
     ar2sub2 = AnnexRepo.clone(path1, op.join(path2, 'sub2'))
-    _set_direct_mode(arsub2, True)
+    _set_direct_mode(ar2sub2, True)
     del ar2sub2; AnnexRepo._unique_instances.clear()  # fight flyweight
     ar2.add('sub2')
