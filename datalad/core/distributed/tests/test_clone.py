@@ -48,6 +48,7 @@ from datalad.tests.utils import (
     integration,
     known_failure,
     known_failure_appveyor,
+    known_failure_windows,
     neq_,
     nok_,
     ok_,
@@ -928,7 +929,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
-@known_failure_appveyor
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
