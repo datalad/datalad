@@ -254,6 +254,7 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @slow   # 25sec on Yarik's laptop
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -365,6 +366,7 @@ def test_install_recursive(src, path_nr, path_r):
     eq_(subds, ds.install('recursive-in-ds'))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_recursive_with_data(src, path):
@@ -568,6 +570,7 @@ def test_failed_install(dspath):
                   source="http://nonexistingreallyanything.datalad.org/bla")
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_list(path, top_path):
@@ -651,6 +654,7 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.repo.file_has_content('subsubfile.txt'))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
@@ -690,6 +694,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
         ds.get(path=['subm 1', 'not_existing'])
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_skip_failed_recursive(src, path):

@@ -51,6 +51,7 @@ from datalad.tests.utils import (
     get_most_obscure_supported_name,
     integration,
     known_failure_windows,
+    known_failure_appveyor,
     local_testrepo_flavors,
     neq_,
     ok_,
@@ -337,6 +338,7 @@ def test_GitRepo_commit(path):
     assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_indexed_files(src, path):
@@ -471,6 +473,7 @@ def test_GitRepo_files_decorator():
     assert_raises(ValueError, test_instance.decorated_one, 1)
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @skip_if_no_network
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
@@ -488,6 +491,7 @@ def test_GitRepo_remote_add(orig_path, path):
     eq_('git://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_remove(orig_path, path):
@@ -513,6 +517,7 @@ def test_GitRepo_get_remote_url(orig_path, path):
                  'git://github.com/datalad/testrepo--basic--r1')
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
@@ -544,6 +549,7 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     )
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
@@ -787,6 +793,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
 
 
 # TODO: Why was it "flavors=local_testrepo_flavors" ? What's the windows issue here?
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('.*git.*', flavors=['clone'])
 @with_tempfile
 def test_GitRepo_get_files(url, path):
@@ -964,6 +971,7 @@ def test_GitRepo_git_get_branch_commits_(src):
     eq_(len(commits), 1)
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_get_tracking_branch(o_path, c_path):
@@ -992,6 +1000,7 @@ def test_get_tracking_branch(o_path, c_path):
         clone.get_tracking_branch(remote_only=True))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_submodule_deinit(path):
     from datalad.support.annexrepo import AnnexRepo
@@ -1024,6 +1033,7 @@ def test_submodule_deinit(path):
     ok_(not GitRepo.is_valid_repo(str(top_repo.pathobj / 'subm 1')))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(".*basic_git.*", flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_GitRepo_add_submodule(source, path):

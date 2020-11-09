@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     eq_,
     assert_cwd_unchanged,
     with_testrepos,
+    known_failure_appveyor,
 )
 from ...support.annexrepo import AnnexRepo
 from ...support.gitrepo import GitRepo
@@ -59,6 +60,7 @@ def test_get_repo_instance_git(path):
     chpwd(old_pwd)
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_get_repo_instance_annex(path):

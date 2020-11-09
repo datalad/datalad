@@ -109,6 +109,7 @@ def test_nested_with_tempfile_basic(f1, f2):
 # used as well to verify that every one of those functions adds new argument
 # to the end of incoming arguments.
 @with_tempfile(prefix="TEST", suffix='big')
+@known_failure_appveyor  # passes on adina's win10 box
 @with_tree((('f1.txt', 'load'),))
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')

@@ -327,6 +327,7 @@ def test_AnnexRepo_file_has_content(batch, src, annex_path):
 
 # 1 is enough to test
 @with_parametric_batch
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
 def test_AnnexRepo_is_under_annex(batch, src, annex_path):
@@ -566,6 +567,7 @@ def test_repo_info(path):
         eq_(info['available local disk space'], 19193986496)
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
@@ -673,6 +675,7 @@ def test_AnnexRepo_backend_option(path, url):
         for f in ar.get_indexed_files() if 'faraway' in f)
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
@@ -788,6 +791,7 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_annex(path):
 
@@ -936,6 +940,7 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
 def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
@@ -1215,6 +1220,7 @@ def test_annex_ssh(topdir):
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_annex_remove(path):
     repo = AnnexRepo(path, create=False)
@@ -1436,6 +1442,7 @@ def test_annex_get_annexed_files(path):
         set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
 def test_is_available(batch, p):
@@ -1802,6 +1809,7 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos(".*basic.*", flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_add_submodule(source, path):

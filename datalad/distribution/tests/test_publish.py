@@ -212,6 +212,7 @@ def test_publish_simple(origin, src_path, dst_path):
         filter_fsck_error_msg(source.repo.fsck(remote='target')))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('basic_git', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)

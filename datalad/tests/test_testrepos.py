@@ -16,6 +16,7 @@ from datalad.tests.utils import (
     ok_,
     with_testrepos,
     with_tempfile,
+    known_failure_appveyor,
 )
 from datalad.cmd import (
     StdOutErrCapture,
@@ -41,6 +42,8 @@ def test_point_to_github(url):
     ok_('github.com' in url)
     ok_(url.startswith('git://github.com/datalad/testrepo--'))
 
+
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos
 @with_tempfile
 def test_clone(src, tempdir):

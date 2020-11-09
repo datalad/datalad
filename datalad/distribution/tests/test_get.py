@@ -50,6 +50,7 @@ from datalad.tests.utils import (
     SkipTest,
     slow,
     known_failure_windows,
+    known_failure_appveyor,
 )
 from datalad.utils import (
     with_pathsep,
@@ -219,6 +220,7 @@ def test_get_invalid_call(path, file_outside):
         message=('path not associated with dataset %s', ds))
 
 
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('basic_annex', flavors='clone')
 def test_get_single_file(path):
 
@@ -438,7 +440,7 @@ def test_get_recurse_subdatasets(src, path):
     ok_(subds1.repo.file_has_content('test-annex.dat') is False)
     ok_(subds2.repo.file_has_content('test-annex.dat') is False)
 
-
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
 def test_get_greedy_recurse_subdatasets(src, path):
@@ -456,7 +458,7 @@ def test_get_greedy_recurse_subdatasets(src, path):
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
     ok_(subds2.repo.file_has_content('test-annex.dat') is True)
 
-
+@known_failure_appveyor  # passes on adina's win10 box
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
 def test_get_install_missing_subdataset(src, path):

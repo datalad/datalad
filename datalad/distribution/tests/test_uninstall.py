@@ -46,6 +46,7 @@ from datalad.tests.utils import (
     use_cassette,
     usecase,
     known_failure_windows,
+    known_failure_appveyor,
 )
 from datalad.utils import (
     chpwd,
