@@ -73,6 +73,7 @@ from datalad.tests.utils import (
     eq_,
     find_files,
     get_most_obscure_supported_name,
+    known_failure_appveyor,
     known_failure_githubci_win,
     known_failure_windows,
     local_testrepo_flavors,
@@ -295,6 +296,7 @@ def test_annex_repo_sameas_special(repo):
 
 
 # 1 is enough to test file_has_content
+@known_failure_appveyor  # passes on mih's win10 box
 @with_parametric_batch
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
@@ -869,6 +871,7 @@ def test_AnnexRepo_add_to_git(path):
     assert_repo_status(repo, annex=True)
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('.*annex.*', flavors=['local'])
 # TODO: flavor 'network' has wrong content for test-annex.dat!
 @with_tempfile
@@ -1363,7 +1366,7 @@ def test_annex_copy_to(origin, clone):
     eq_(cme.exception.failed, ['nonex1', 'nonex2'])
 
 
-
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('.*annex.*', flavors=['local'])
 # TODO: flavor 'network' has wrong content for test-annex.dat!
 @with_tempfile

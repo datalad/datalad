@@ -276,9 +276,7 @@ def test_run_from_subds_gh3551(path):
         ok_(subds.repo.file_has_content("f"))
 
 
-# unexpected content of state "modified", likely a more fundamental issue with the
-# testrepo setup
-@known_failure_githubci_win
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)

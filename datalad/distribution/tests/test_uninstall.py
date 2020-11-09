@@ -161,6 +161,7 @@ def test_uninstall_annex_file(path):
     ok_(not exists(opj(path, 'test-annex.dat')))
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('.*basic.*', flavors=['clone'])
 def test_uninstall_git_file(path):
     ds = Dataset(path)
