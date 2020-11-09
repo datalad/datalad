@@ -270,6 +270,7 @@ def test_install_dataset_from_instance(src, dst):
     assert_in('INFO.txt', clone.repo.get_indexed_files())
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos(flavors=['network'])
 @with_tempfile
 def test_install_dataset_from_just_source_via_path(url, path):
@@ -600,6 +601,7 @@ def test_install_list(path, top_path):
     assert_status('notneeded', get_result)
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_reckless(path, top_path):

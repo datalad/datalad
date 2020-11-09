@@ -30,6 +30,7 @@ from ...utils import chpwd, getpwd
 from ...utils import Path
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @assert_cwd_unchanged
 @with_testrepos('^basic_git$', flavors=['clone'])
 def test_get_repo_instance_git(path):

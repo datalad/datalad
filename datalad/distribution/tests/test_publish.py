@@ -69,6 +69,7 @@ def filter_fsck_error_msg(dicts):
             for d in dicts]
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_invalid_call(origin, tdir):

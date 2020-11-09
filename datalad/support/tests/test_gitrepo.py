@@ -95,6 +95,7 @@ def test_GitRepo_invalid_path(path):
         ok_(not op.exists(op.join(path, "file:")))
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile

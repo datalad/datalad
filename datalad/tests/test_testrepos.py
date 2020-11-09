@@ -25,6 +25,7 @@ from datalad.cmd import (
 from .utils_testdatasets import make_studyforrest_mockup
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_having_annex(path):
     ok_(os.path.exists(os.path.join(path, '.git')))
@@ -37,6 +38,8 @@ def test_having_annex(path):
     ok_('origin/git-annex' in refs, msg="Didn't find git-annex among refs %s"
                                         % refs)
 
+
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):
     ok_('github.com' in url)

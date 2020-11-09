@@ -38,6 +38,7 @@ from datalad.tests.utils import (
     assert_result_count,
     with_sameas_remote,
     eq_,
+    known_failure_appveyor,
     ok_,
 )
 
@@ -45,6 +46,7 @@ from datalad.utils import Path
 
 
 # work on cloned repos to be safer
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile

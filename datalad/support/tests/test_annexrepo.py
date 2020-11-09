@@ -838,6 +838,7 @@ def test_AnnexRepo_add_to_annex(path):
     assert_repo_status(repo, annex=True)
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_AnnexRepo_add_to_git(path):
 
@@ -2050,6 +2051,7 @@ def test_change_description(path):
     eq_(ar.get_description(), 'someother')
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_get_corresponding_branch(path):
 
@@ -2069,6 +2071,7 @@ def test_AnnexRepo_get_corresponding_branch(path):
         eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_get_tracking_branch(path):
 
@@ -2078,6 +2081,7 @@ def test_AnnexRepo_get_tracking_branch(path):
     eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
+@known_failure_appveyor  # passes on mih's win10 box
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 
