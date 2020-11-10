@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 __python_requires__ = "~= 3.6"
 import argparse
-from contextlib import contextmanager
-from glob import glob
 import logging
 import os
 import os.path
@@ -41,8 +39,12 @@ def main():
     schemata.add_parser("autobuild", help="Linux, macOS only")
     schemata.add_parser("brew", help="macOS only")
     scm_conda_forge = schemata.add_parser("conda-forge", help="Linux only")
+    scm_conda_forge.add_argument("-b", "--batch", action="store_true")
+    scm_conda_forge.add_argument("--path-miniconda")
     scm_conda_forge.add_argument("version", nargs="?")
     scm_conda_forge_last = schemata.add_parser("conda-forge-last", help="Linux only")
+    scm_conda_forge_last.add_argument("-b", "--batch", action="store_true")
+    scm_conda_forge_last.add_argument("--path-miniconda")
     scm_conda_forge_last.add_argument("version", nargs="?")
     schemata.add_parser("datalad-extensions-build", help="Linux, macOS only")
     scm_deb_url = schemata.add_parser("deb-url", help="Linux only")
@@ -50,6 +52,11 @@ def main():
     schemata.add_parser("neurodebian", help="Linux only")
     schemata.add_parser("neurodebian-devel", help="Linux only")
     schemata.add_parser("snapshot", help="Linux, macOS only")
+    scm_miniconda = schemata.add_parser(
+        "miniconda", help="Install just Miniconda; Linux only"
+    )
+    scm_miniconda.add_argument("-b", "--batch", action="store_true")
+    scm_miniconda.add_argument("--path-miniconda")
     args = parser.parse_args()
     if args.schema is None:
         args.schema = "conda-forge"
@@ -65,9 +72,13 @@ def main():
     elif args.schema == "brew":
         installer.install_via_brew()
     elif args.schema == "conda-forge":
-        installer.install_via_conda_forge(args.version)
+        installer.install_via_conda_forge(
+            args.version, miniconda_path=args.path_miniconda, batch=args.batch
+        )
     elif args.schema == "conda-forge-last":
-        installer.install_via_conda_forge_last(args.version)
+        installer.install_via_conda_forge_last(
+            args.version, miniconda_path=args.path_miniconda, batch=args.batch
+        )
     elif args.schema == "datalad-extensions-build":
         installer.install_via_datalad_extensions_build()
     elif args.schema == "deb-url":
@@ -78,6 +89,11 @@ def main():
         installer.install_via_neurodebian_devel()
     elif args.schema == "snapshot":
         installer.install_via_snapshot()
+    elif args.schema == "miniconda":
+        miniconda_path = args.path_miniconda
+        if miniconda_path is None:
+            miniconda_path = tempfile.mkdtemp(prefix="ga-")
+        installer.install_miniconda(miniconda_path, batch=args.batch)
     else:
         raise RuntimeError(f"Invalid schema: {args.schema}")
 
@@ -253,13 +269,15 @@ class GitAnnexInstaller:
             self._install_from_dmg(dmgpath)
         self.post_install()
 
-    def install_via_conda_forge(self, version=None):
+    def install_via_conda_forge(self, version=None, miniconda_path=None, batch=False):
         tmpdir = tempfile.mkdtemp(prefix="ga-")
         self.annex_bin = os.path.join(tmpdir, "annex-bin")
         self.addpath(self.annex_bin)
-        self._install_via_conda(version, tmpdir)
+        self._install_via_conda(version, tmpdir, miniconda_path, batch)
 
-    def install_via_conda_forge_last(self, version=None):
+    def install_via_conda_forge_last(
+        self, version=None, miniconda_path=None, batch=False
+    ):
         tmpdir = tempfile.mkdtemp(prefix="ga-")
         self.annex_bin = os.path.join(tmpdir, "annex-bin")
         if shutil.which("git-annex") is not None:
@@ -271,40 +289,16 @@ class GitAnnexInstaller:
         # So as to not interfere with "system wide" Python etc, we will add
         # miniconda at the end of the path
         self.addpath(self.annex_bin, last=True)
-        self._install_via_conda(version, tmpdir)
+        self._install_via_conda(version, tmpdir, miniconda_path, batch)
 
-    def _install_via_conda(self, version, tmpdir):
-        miniconda_script = "Miniconda3-latest-Linux-x86_64.sh"
-        conda_bin = os.path.join(tmpdir, "miniconda", "bin")
+    def _install_via_conda(self, version, tmpdir, miniconda_path=None, batch=False):
+        if miniconda_path is None:
+            miniconda_path = os.path.join(tmpdir, "miniconda")
+        conda_bin = os.path.join(miniconda_path, "bin")
         # We will symlink git-annex only under a dedicated directory, so it could be
         # used with default Python etc. If names changed here, possibly adjust
         # hardcoded duplicates below where we establish relative symlinks.
-        log.info("downloading and running miniconda installer")
-        subprocess.run(
-            [
-                "wget",
-                "-q",
-                "-O",
-                os.path.join(tmpdir, miniconda_script),
-                (
-                    os.environ.get("ANACONDA_URL")
-                    or "https://repo.anaconda.com/miniconda/"
-                )
-                + miniconda_script,
-            ],
-            check=True,
-        )
-        subprocess.run(
-            [
-                "bash",
-                os.path.join(tmpdir, miniconda_script),
-                "-b",
-                "-p",
-                os.path.join(tmpdir, "miniconda"),
-            ],
-            env=dict(os.environ, HOME=tmpdir),
-            check=True,
-        )
+        self.install_miniconda(miniconda_path, batch=batch)
         subprocess.run(
             [
                 os.path.join(conda_bin, "conda"),
@@ -318,11 +312,36 @@ class GitAnnexInstaller:
             check=True,
         )
         if self.annex_bin != conda_bin:
-            os.makedirs(self.annex_bin, exist_ok=True)
-            with dirchanged(self.annex_bin):
-                for fname in glob("../miniconda/bin/git-annex*"):
-                    os.symlink(fname, os.path.basename(fname))
+            annex_bin = Path(self.annex_bin)
+            annex_bin.mkdir(parents=True, exist_ok=True)
+            for p in Path(conda_bin).glob("git-annex*"):
+                (annex_bin / p.name).symlink_to(p.resolve())
         self.post_install()
+
+    def install_miniconda(self, miniconda_path, batch=False):
+        miniconda_script = "Miniconda3-latest-Linux-x86_64.sh"
+        log.info("Downloading and running miniconda installer")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_path = os.path.join(tmpdir, miniconda_script)
+            subprocess.run(
+                [
+                    "wget",
+                    "-q",
+                    "-O",
+                    script_path,
+                    (
+                        os.environ.get("ANACONDA_URL")
+                        or "https://repo.anaconda.com/miniconda/"
+                    )
+                    + miniconda_script,
+                ],
+                check=True,
+            )
+            args = ["-p", str(miniconda_path), "-s"]
+            if batch:
+                args.append("-b")
+            log.info("Installing miniconda in %s", miniconda_path)
+            subprocess.run(["bash", script_path] + args, check=True)
 
     def install_via_datalad_extensions_build(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -382,22 +401,6 @@ class GitAnnexInstaller:
             if not os.access(os.path.join(self.annex_bin, binname), os.X_OK):
                 raise RuntimeError(f"Cannot execute {binname}")
         log.info("git-annex is available under %r", self.annex_bin)
-
-
-@contextmanager
-def dirchanged(dirpath):
-    """
-    ``dirchanged(dirpath)`` returns a context manager.  On entry, it stores the
-    current working directory path and then changes the current directory to
-    ``dirpath``.  On exit, it changes the current directory back to the stored
-    path.
-    """
-    olddir = os.getcwd()
-    os.chdir(dirpath)
-    try:
-        yield
-    finally:
-        os.chdir(olddir)
 
 
 if __name__ == "__main__":
