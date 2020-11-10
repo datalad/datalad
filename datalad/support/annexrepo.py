@@ -2030,6 +2030,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'dropkey',
                 annex_options=options, json=True, path=self.path
             )(keys)
+        # TODO: RF to be consistent with the rest (IncompleteResultError or alike)
+        # and/or completely refactor since drop above also has key option
         for j in json_objects:
             assert j.get('success', True)
 
