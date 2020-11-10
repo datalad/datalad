@@ -51,6 +51,7 @@ from datalad.tests.utils import (
     integration,
     known_failure,
     known_failure_appveyor,
+    known_failure_windows,
     neq_,
     nok_,
     ok_,
@@ -72,6 +73,7 @@ from datalad.tests.utils import (
     with_tree,
     SkipTest,
 )
+from datalad.support.network import get_local_file_url
 from datalad.core.distributed.clone import (
     _get_installationpath_from_url,
     decode_source_spec,
@@ -898,7 +900,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     # URL to use for upload. Point is, that this should be invalid for the clone
     # so that autoenable would fail. Therefore let it be based on a to be
     # deleted symlink
-    upl_url = "ria+{}".format(link.as_uri())
+    upl_url = "ria+{}".format(get_local_file_url(str(link)))
 
     for d in (ds, subds, subgit):
 
@@ -930,7 +932,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
-@known_failure_appveyor
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
@@ -946,7 +948,7 @@ def test_ria_postclonecfg():
         id = _postclonetest_prepare(lcl, store)
 
         # test cloning via ria+file://
-        yield _test_ria_postclonecfg, Path(store).as_uri(), id
+        yield _test_ria_postclonecfg, get_local_file_url(store, compatibility='git'), id
 
         # Note: HTTP disabled for now. Requires proper implementation in ORA
         #       remote. See
