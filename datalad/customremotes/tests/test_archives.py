@@ -38,22 +38,23 @@ from ...tests.utils import (
     assert_true,
     chpwd,
     eq_,
-    get_most_obscure_supported_name,
     in_,
     known_failure_githubci_win,
     ok_,
     ok_file_has_content,
     serve_path_via_http,
     swallow_logs,
-    swallow_outputs,
     with_tempfile,
     with_tree,
 )
-from ...cmd import Runner, GitRunner
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 from ...utils import (
     _path_,
-    on_linux,
-    on_osx,
     unlink,
 )
 from . import _get_custom_runner
@@ -173,16 +174,20 @@ def test_annex_get_from_subdir(topdir):
     fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
     with chpwd(op.join(topdir, 'a', 'd')):
-        runner = Runner()
-        runner(['git', 'annex', 'drop', '--', fn_in_archive_obscure])  # run git annex drop
+        runner = WitlessRunner()
+        runner.run(
+            ['git', 'annex', 'drop', '--', fn_in_archive_obscure],
+            protocol=KillOutput)  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
-        runner(['git', 'annex', 'get', '--', fn_in_archive_obscure])   # run git annex get
+        runner.run(
+            ['git', 'annex', 'get', '--', fn_in_archive_obscure],
+            protocol=KillOutput)   # run git annex get
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
 @known_failure_githubci_win
 def test_get_git_environ_adjusted():
-    gitrunner = GitRunner()
+    gitrunner = GitWitlessRunner()
     env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
 
     # test conversion of relevant env vars from relative_path to correct absolute_path
@@ -201,19 +206,16 @@ def test_get_git_environ_adjusted():
 def test_no_rdflib_loaded():
     # rely on rdflib polluting stdout to see that it is not loaded whenever we load this remote
     # since that adds 300ms delay for no immediate use
-    from ...cmd import Runner
-    runner = Runner()
-    with swallow_outputs() as cmo:
-        runner.run(
-            [sys.executable,
-             '-c',
-             'import datalad.customremotes.archives, sys; '
-             'print([k for k in sys.modules if k.startswith("rdflib")])'],
-            log_stdout=False,
-            log_stderr=False)
-        # print cmo.out
-        assert_not_in("rdflib", cmo.out)
-        assert_not_in("rdflib", cmo.err)
+    runner = WitlessRunner()
+    out = runner.run(
+        [sys.executable,
+         '-c',
+         'import datalad.customremotes.archives, sys; '
+         'print([k for k in sys.modules if k.startswith("rdflib")])'],
+        protocol=StdOutErrCapture)
+    # print cmo.out
+    assert_not_in("rdflib", out['stdout'])
+    assert_not_in("rdflib", out['stderr'])
 
 
 @with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
