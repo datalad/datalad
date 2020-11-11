@@ -588,6 +588,21 @@ def handle_errors(func):
                              "{dsid}.{uuid}.log".format(dsid=self.archive_id,
                                                         uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
+
+            try:
+                # We're done using io, so let it perform any needed cleanup. At
+                # the moment, this is only relevant for SSHRemoteIO, in which
+                # case it cleans up the SSH socket and prevents a hang with
+                # git-annex 8.20201103 and later.
+                self.io.close()
+            except AttributeError:
+                pass
+            else:
+                # Note: It is documented as safe to unregister a function even
+                # if it hasn't been registered.
+                from atexit import unregister
+                unregister(self.io.close)
+
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
             else:
