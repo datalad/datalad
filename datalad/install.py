@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.request import urlopen
 
 DOWNLOAD_LATEST_ARTIFACT = (
     Path(__file__).parent / "tools" / "ci" / "download-latest-artifact"
@@ -42,7 +43,9 @@ def main():
     scm_conda_forge.add_argument("-b", "--batch", action="store_true")
     scm_conda_forge.add_argument("--path-miniconda")
     scm_conda_forge.add_argument("version", nargs="?")
-    scm_conda_forge_last = schemata.add_parser("conda-forge-last", help="Linux, macOS only")
+    scm_conda_forge_last = schemata.add_parser(
+        "conda-forge-last", help="Linux, macOS only"
+    )
     scm_conda_forge_last.add_argument("-b", "--batch", action="store_true")
     scm_conda_forge_last.add_argument("--path-miniconda")
     scm_conda_forge_last.add_argument("version", nargs="?")
@@ -208,7 +211,7 @@ class GitAnnexInstaller:
     def install_via_deb_url(self, url):
         with tempfile.TemporaryDirectory() as tmpdir:
             debpath = os.path.join(tmpdir, "git-annex.deb")
-            subprocess.run(["wget", "-O", debpath, url], check=True)
+            download_file(url, debpath)
             subprocess.run(["sudo", "dpkg", "-i", debpath], check=True)
         self.post_install()
 
@@ -236,38 +239,21 @@ class GitAnnexInstaller:
         tmpdir = tempfile.mkdtemp(prefix="ga-")
         self.annex_bin = os.path.join(tmpdir, "git-annex.linux")
         log.info("downloading and extracting under %s", self.annex_bin)
-        wget = subprocess.Popen(
-            [
-                "wget",
-                "-q",
-                "-O-",
-                f"https://downloads.kitenet.net/git-annex/{subpath}/git-annex-standalone-amd64.tar.gz",
-            ],
-            stdout=subprocess.PIPE,
+        gzfile = os.path.join(tmpdir, "git-annex-standalone-amd64.tar.gz")
+        download_file(
+            f"https://downloads.kitenet.net/git-annex/{subpath}/git-annex-standalone-amd64.tar.gz",
+            gzfile,
         )
-        tar = subprocess.Popen(["tar", "-C", tmpdir, "-xzf"], stdin=wget.stdout)
-        wget.stdout.close()
-        tar.communicate()
-        wget.wait()
-        if wget.returncode != 0:
-            sys.exit(f"wget failed with exit code {wget.returncode}")
-        if tar.returncode != 0:
-            sys.exit(f"tar failed with exit code {tar.returncode}")
+        subprocess.run(["tar", "-C", tmpdir, "-xzf", gzfile], check=True)
         self.addpath(self.annex_bin)
         self.post_install()
 
     def _install_via_autobuild_or_snapshot_macos(self, subpath):
         with tempfile.TemporaryDirectory() as tmpdir:
             dmgpath = os.path.join(tmpdir, "git-annex.dmg")
-            subprocess.run(
-                [
-                    "wget",
-                    "-q",
-                    "-O",
-                    dmgpath,
-                    f"https://downloads.kitenet.net/git-annex/{subpath}/git-annex.dmg",
-                ],
-                check=True,
+            download_file(
+                f"https://downloads.kitenet.net/git-annex/{subpath}/git-annex.dmg",
+                dmgpath,
             )
             self._install_from_dmg(dmgpath)
         self.post_install()
@@ -332,24 +318,18 @@ class GitAnnexInstaller:
         log.info("Downloading and running miniconda installer")
         with tempfile.TemporaryDirectory() as tmpdir:
             script_path = os.path.join(tmpdir, miniconda_script)
-            subprocess.run(
-                [
-                    "wget",
-                    "-q",
-                    "-O",
-                    script_path,
-                    (
-                        os.environ.get("ANACONDA_URL")
-                        or "https://repo.anaconda.com/miniconda/"
-                    )
-                    + miniconda_script,
-                ],
-                check=True,
+            download_file(
+                (
+                    os.environ.get("ANACONDA_URL")
+                    or "https://repo.anaconda.com/miniconda/"
+                )
+                + miniconda_script,
+                script_path,
             )
+            log.info("Installing miniconda in %s", miniconda_path)
             args = ["-p", str(miniconda_path), "-s"]
             if batch:
                 args.append("-b")
-            log.info("Installing miniconda in %s", miniconda_path)
             subprocess.run(["bash", script_path] + args, check=True)
 
     def install_via_datalad_extensions_build(self):
@@ -410,6 +390,12 @@ class GitAnnexInstaller:
             if not os.access(os.path.join(self.annex_bin, binname), os.X_OK):
                 raise RuntimeError(f"Cannot execute {binname}")
         log.info("git-annex is available under %r", self.annex_bin)
+
+
+def download_file(url, path):
+    with urlopen(url) as r:
+        with open(path, "wb") as fp:
+            shutil.copyfileobj(r, fp)
 
 
 if __name__ == "__main__":
