@@ -220,12 +220,7 @@ class AnnexCustomRemote(object):
         fout:
             input/output streams.  If not specified, stdin, stdout used
         """
-        # TODO: probably we shouldn't have runner here but rather delegate
-        # to AnnexRepo's functionality
         from ..support.annexrepo import AnnexRepo
-        from ..cmd import GitRunner
-
-        self.runner = GitRunner()
 
         # Custom remotes correspond to annex via stdin/stdout
         self.fin = fin or sys.stdin
@@ -672,8 +667,7 @@ class AnnexCustomRemote(object):
         """
         # TODO: should actually be implemented by AnnexRepo
         #       Command is available in annex >= 20140410
-        (out, err) = \
-            self.runner(['git', 'annex', 'contentlocation', key], cwd=self.path)
+        out = self.repo.call_git(['git', 'annex', 'contentlocation', key])
         # TODO: it would exit with non-0 if key is not present locally.
         # we need to catch and throw our exception
         return opj(self.path, out.rstrip(os.linesep))

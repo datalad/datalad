@@ -424,18 +424,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             % (naturalsize(akey_size) if akey_size else "unknown")
         )
 
-        def progress_indicators(l):
-            self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
-
-        self.runner(["git", "annex", "get",
-                     "--json", "--json-progress",
-                     "--key", akey
-                     ],
-                    log_stdout=progress_indicators,
-                    log_stderr='offline',
-                    # False, # to avoid lock down
-                    log_online=True,
-                    cwd=self.path, expect_stderr=True)
+        # call git annex get without capturing any output
+        self.repo._git_runner.run(
+            ["git", "annex", "get", "--json", "--json-progress", "--key", akey],
+            protocol=None,
+            cwd=self.path,
+        )
 
 
 def main():
