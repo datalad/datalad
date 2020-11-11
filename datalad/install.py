@@ -103,7 +103,10 @@ class GitAnnexInstaller:
         self.pathline = None
         self.annex_bin = "/usr/bin"
         self.adjust_bashrc = adjust_bashrc
-        self.env_write_file = Path(env_write_file)
+        if env_write_file is None:
+            self.env_write_file = None
+        else:
+            self.env_write_file = Path(env_write_file)
 
     def addpath(self, p, last=False):
         if self.pathline is not None:
