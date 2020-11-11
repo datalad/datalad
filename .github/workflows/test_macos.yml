@@ -16,6 +16,7 @@ jobs:
     steps:
     - name: Set up environment
       run: |
+        brew install exempi
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
