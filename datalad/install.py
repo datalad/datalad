@@ -38,11 +38,11 @@ def main():
     )
     schemata.add_parser("autobuild", help="Linux, macOS only")
     schemata.add_parser("brew", help="macOS only")
-    scm_conda_forge = schemata.add_parser("conda-forge", help="Linux only")
+    scm_conda_forge = schemata.add_parser("conda-forge", help="Linux, macOS only")
     scm_conda_forge.add_argument("-b", "--batch", action="store_true")
     scm_conda_forge.add_argument("--path-miniconda")
     scm_conda_forge.add_argument("version", nargs="?")
-    scm_conda_forge_last = schemata.add_parser("conda-forge-last", help="Linux only")
+    scm_conda_forge_last = schemata.add_parser("conda-forge-last", help="Linux, macOS only")
     scm_conda_forge_last.add_argument("-b", "--batch", action="store_true")
     scm_conda_forge_last.add_argument("--path-miniconda")
     scm_conda_forge_last.add_argument("version", nargs="?")
@@ -53,7 +53,7 @@ def main():
     schemata.add_parser("neurodebian-devel", help="Linux only")
     schemata.add_parser("snapshot", help="Linux, macOS only")
     scm_miniconda = schemata.add_parser(
-        "miniconda", help="Install just Miniconda; Linux only"
+        "miniconda", help="Install just Miniconda; Linux, macOS only"
     )
     scm_miniconda.add_argument("-b", "--batch", action="store_true")
     scm_miniconda.add_argument("--path-miniconda")
@@ -319,7 +319,13 @@ class GitAnnexInstaller:
         self.post_install()
 
     def install_miniconda(self, miniconda_path, batch=False):
-        miniconda_script = "Miniconda3-latest-Linux-x86_64.sh"
+        systype = platform.system()
+        if systype == "Linux":
+            miniconda_script = "Miniconda3-latest-Linux-x86_64.sh"
+        elif systype == "Darwin":
+            miniconda_script = "Miniconda3-latest-MacOSX-x86_64.sh"
+        else:
+            raise RuntimeError(f"E: Unsupported OS: {systype}")
         log.info("Downloading and running miniconda installer")
         with tempfile.TemporaryDirectory() as tmpdir:
             script_path = os.path.join(tmpdir, miniconda_script)
