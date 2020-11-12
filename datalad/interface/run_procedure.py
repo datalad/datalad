@@ -98,7 +98,7 @@ def _get_proc_config(name, ds=None):
 def _get_procedure_implementation(name='*', ds=None):
     """get potential procedure path and configuration
 
-    Order of consideration is user-level, system-level, dataset,
+    Order of consideration is user-level, system-level, extra locations, dataset,
     datalad extensions, datalad. First one found according to this order is the
     one to be returned. Therefore local definitions/configurations take
     precedence over ones, that come from outside (via a datalad-extension or a
@@ -119,7 +119,8 @@ def _get_procedure_implementation(name='*', ds=None):
 
     # 1. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
-                cfg.obtain('datalad.locations.system-procedures')):
+                cfg.obtain('datalad.locations.system-procedures'),
+                cfg.get('datalad.locations.extra-procedures', get_all=True)):
         for dir in ensure_list(loc):
             for m, n in _get_file_match(dir, name):
                 yield (m, n,) + _get_proc_config(n)

@@ -86,6 +86,12 @@ definitions = {
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'procedures'),
     },
+    'datalad.locations.extra-procedures': {
+        'ui': ('question', {
+            'title': 'Extra procedure directory',
+            'text': 'Where should datalad search for some additional procedures?'}),
+        'destination': 'global',
+    },
     'datalad.locations.dataset-procedures': {
         'ui': ('question', {
                'title': 'Dataset procedure directory',
