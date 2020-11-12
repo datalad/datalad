@@ -18,7 +18,6 @@ import os.path as op
 import logging
 from collections import (
     OrderedDict,
-    namedtuple
 )
 from os import linesep
 from os.path import (
@@ -48,7 +47,6 @@ from datalad import ssh_manager
 from datalad.cmd import (
     GitWitlessRunner,
     WitlessProtocol,
-    GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
     NoCapture,
@@ -947,7 +945,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if kwargs:
             git_opts.update(kwargs)
 
-        self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._cfg = None
         self._git_runner = GitWitlessRunner(cwd=self.path)
 
@@ -2112,78 +2109,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             for p in self.get_content_info(
                 paths=None, ref=branch, untracked='no', eval_file_type=False)
             ]
-
-    @normalize_paths(match_return_type=False)
-    def _git_custom_command(self, files, cmd_str,
-                            log_stdout=True, log_stderr=True, log_online=False,
-                            expect_stderr=True, cwd=None, env=None,
-                            shell=None, expect_fail=False,
-                            check_fake_dates=False,
-                            index_file=None,
-                            updates_tree=False):
-        """Allows for calling arbitrary commands.
-
-        The method should be avoided and the call_git*() should be used instead.
-
-        Parameters
-        ----------
-        files: list of files
-        cmd_str: str or list
-          arbitrary command str. `files` is appended to that string.
-        updates_tree: bool
-          whether or not command updates the working tree. If True, triggers
-          necessary reevaluations like self.config.reload()
-
-        Returns
-        -------
-        stdout, stderr
-        """
-
-        # ensure cmd_str becomes a well-formed list:
-        if isinstance(cmd_str, str):
-            cmd = split_cmdline(cmd_str)
-        else:
-            cmd = cmd_str[:]  # we will modify in-place
-
-        assert(cmd[0] == 'git')
-        cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-
-        if check_fake_dates and self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
-
-        if index_file:
-            env = (env if env is not None else os.environ).copy()
-            env['GIT_INDEX_FILE'] = index_file
-
-        # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
-        #  handling????
-        try:
-            out, err = run_gitcommand_on_file_list_chunks(
-                self.cmd_call_wrapper.run,
-                cmd,
-                files,
-                log_stderr=log_stderr,
-                log_stdout=log_stdout,
-                log_online=log_online,
-                expect_stderr=expect_stderr,
-                cwd=cwd,
-                env=env,
-                shell=shell,
-                expect_fail=expect_fail)
-        except CommandError as e:
-            ignored = re.search(GitIgnoreError.pattern, e.stderr)
-            if ignored:
-                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
-                                     code=e.code, stdout=e.stdout,
-                                     stderr=e.stderr,
-                                     paths=ignored.groups()[0].splitlines())
-            raise
-
-        if updates_tree:
-            lgr.debug("Reloading config due to supposed working tree update")
-            self.config.reload()
-
-        return out, err
 
     # Convenience wrappers for one-off git calls that don't require further
     # processing or error handling.

@@ -13,7 +13,6 @@ from ...consts import DATALAD_SPECIAL_REMOTE
 from ...tests.utils import *
 from ...support.external_versions import external_versions
 
-from . import _get_custom_runner
 from ...support.exceptions import CommandError
 from ...downloaders.tests.utils import get_test_providers
 from ..datalad import DataladAnnexCustomRemote
@@ -22,7 +21,7 @@ from ..datalad import DataladAnnexCustomRemote
 @with_tempfile()
 @skip_if_no_network
 def check_basic_scenario(url, d):
-    annex = AnnexRepo(d, runner=_get_custom_runner(d))
+    annex = AnnexRepo(d)
     annex.init_remote(
         DATALAD_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,

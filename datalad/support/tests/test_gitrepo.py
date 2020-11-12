@@ -82,7 +82,6 @@ from datalad.support.exceptions import (
     NoSuchPathError,
 )
 from datalad.support.external_versions import external_versions
-from datalad.support.protocol import ExecutionTimeProtocol
 
 
 @with_tempfile(mkdir=True)
