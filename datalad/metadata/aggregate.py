@@ -71,6 +71,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 from datalad.support.path import split_ext
 from datalad.utils import (
+    copy_file,
     path_is_subpath,
     all_same,
     ensure_list,
@@ -421,7 +422,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
             # XXX TODO once we have a command that can copy/move files
             # from one dataset to another including file availability
             # info, this should be used here
-            shutil.copyfile(
+            copy_file(
                 op.join(aggfrom_ds.path, objrelpath),
                 objpath)
             # mark for saving

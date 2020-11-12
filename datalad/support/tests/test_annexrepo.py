@@ -26,7 +26,6 @@ from os.path import (
     pardir,
     exists,
 )
-from shutil import copyfile
 from datalad.tests.utils import assert_not_is_instance
 
 
@@ -47,6 +46,7 @@ from datalad.support.sshconnector import get_connection_hash
 
 from datalad.utils import (
     chpwd,
+    copy_file,
     get_linux_distribution,
     on_windows,
     rmtree,
@@ -1001,7 +1001,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
     # add to an existing but not committed file
     # TODO: __call__ of the BatchedAnnex must be checked to be called
-    copyfile(opj(sitepath, 'about.txt'), opj(dst, testfile))
+    copy_file(opj(sitepath, 'about.txt'), opj(dst, testfile))
     # must crash sensibly since file exists, we shouldn't addurl to non-annexed files
     with assert_raises(AnnexBatchCommandError):
         ar.add_url_to_file(testfile, testurl, batch=True)
@@ -1019,7 +1019,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # TODO: none of the below should re-initiate the batch process
 
     # add to an existing and staged annex file
-    copyfile(opj(sitepath, 'about2.txt'), opj(dst, testfile2))
+    copy_file(opj(sitepath, 'about2.txt'), opj(dst, testfile2))
     ar.add(testfile2)
     ar.add_url_to_file(testfile2, testurl2, batch=True)
     assert(ar.info(testfile2))
@@ -1027,7 +1027,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile2))
 
     # add to an existing and committed annex file
-    copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
+    copy_file(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
     ar.add(testfile2_)
     if ar.is_direct_mode():
         assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(testfile))

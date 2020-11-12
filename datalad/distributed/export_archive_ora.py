@@ -14,11 +14,11 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
-import shutil
 import subprocess
 from argparse import REMAINDER
 
 from datalad.utils import (
+    copy_file,
     rmtree,
 )
 from datalad.interface.base import (
@@ -169,7 +169,7 @@ class ExportArchiveORA(Interface):
                     str(keydir))
                 # no hard links supported
                 # switch function after first error
-                link_fx = shutil.copyfile
+                link_fx = copy_file
                 link_fx(str(keypath), str(keydir / key))
 
         log_progress(

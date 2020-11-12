@@ -25,6 +25,7 @@ import glob
 import gzip
 import stat
 import string
+import subprocess
 import warnings
 import wrapt
 
@@ -2590,3 +2591,41 @@ def check_symlink_capability(path, target):
             path.unlink()
         if target.exists():
             target.unlink()
+
+
+_cp_supports_reflink = None
+
+
+def copy_file(src, dst, follow_symlinks=True):
+    """
+    Copy file (including metadata) from src to dst.  Use `cp --reflink=auto` if
+    the local `cp` supports it.
+
+    Parameters
+    ----------
+    src: str or os.PathLike
+      path to the file to copy
+    dst: str or os.PathLike
+      path that `src` should be copied to
+    """
+    global _cp_supports_reflink
+    if _cp_supports_reflink is None:
+        r = subprocess.run(
+            ["cp", "--help"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+        )
+        # Ignore command failures (e.g., if cp doesn't support --help), as the
+        # command will still likely output its usage info.
+        _cp_supports_reflink = "--reflink" in r.stdout
+    if _cp_supports_reflink:
+        symopts = ["-R", "-L"] if follow_symlinks else ["-R", "-P"]
+        subprocess.run(
+            ["cp", "-f", "-p", "--reflink=auto"]
+            + symopts
+            + ["--", str(src), str(dst)],
+            check=True,
+        )
+    else:
+        return shutil.copy2(src, dst, follow_symlinks=follow_symlinks)

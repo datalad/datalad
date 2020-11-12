@@ -15,7 +15,6 @@ from os.path import join as opj
 import os.path as op
 from collections import OrderedDict
 from operator import itemgetter
-import shutil
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -26,6 +25,7 @@ from ..support.archives import ArchivesCache
 from ..support.network import URL
 from ..support.locking import lock_if_check_fails
 from ..support.path import exists
+from ..utils import copy_file
 from ..utils import getpwd
 from ..utils import unique
 from ..utils import ensure_bytes
@@ -56,8 +56,7 @@ def link_file_load(src, dst, dry_run=False):
         os.link(src_realpath, dst)
     except AttributeError as e:
         lgr.warning("Linking of %s failed (%s), copying file" % (src, e))
-        shutil.copyfile(src_realpath, dst)
-        shutil.copystat(src_realpath, dst)
+        copy_file(src_realpath, dst)
     else:
         lgr.log(2, "Hardlinking finished")
 

@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from shutil import copyfile
 import sys
 
 from datalad.dochelpers import exc_str
@@ -32,6 +31,7 @@ from datalad.distribution.dataset import (
 )
 from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import (
+    copy_file,
     ensure_list,
     get_dataset_root,
     Path,
@@ -593,7 +593,7 @@ def _replace_file(str_src, dest, str_dest, follow_symlinks):
         dest.unlink()
     else:
         dest.parent.mkdir(exist_ok=True, parents=True)
-    copyfile(str_src, str_dest, follow_symlinks=follow_symlinks)
+    copy_file(str_src, str_dest, follow_symlinks=follow_symlinks)
 
 
 def _extract_special_remote_info(repo):
