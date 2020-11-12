@@ -55,12 +55,15 @@ import patoolib.util
 # And I don't want to mock for every invocation
 from ..support.exceptions import CommandError
 from ..utils import swallow_outputs
-from ..cmd import Runner
+from datalad.cmd import (
+    WitlessRunner,
+    StdOutErrCapture,
+)
 from ..utils import ensure_unicode
 
 from ..utils import on_windows
 
-_runner = Runner()
+_runner = WitlessRunner()
 
 
 def _patool_run(cmd, verbosity=0, **kwargs):
@@ -71,16 +74,15 @@ def _patool_run(cmd, verbosity=0, **kwargs):
         # Any debug/progress output could be spit out to stderr so let's
         # "expect" it.
         #
-        if isinstance(cmd, (list, tuple)) and kwargs.get('shell'):
+        if isinstance(cmd, (list, tuple)) and kwargs.pop('shell', None):
             # patool (as far as I see it) takes care about quoting args
             cmd = ' '.join(cmd)
-        out, err = _runner.run(cmd,
-                    #log_stdout='offline',
-                    #log_stderr='offline',
-                    #expect_stderr=True,
-                    #stdin=open('/dev/null'),
-                    **kwargs)
-        lgr.debug("Finished running for patool. stdout=%s, stderr=%s", out, err)
+        out = _runner.run(
+            cmd,
+            protocol=StdOutErrCapture,
+            **kwargs)
+        lgr.debug("Finished running for patool. stdout=%s, stderr=%s",
+                  out['stdout'], out['stderr'])
         return 0
     except CommandError as e:
         return e.code
