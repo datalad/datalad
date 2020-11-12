@@ -417,6 +417,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # TODO: we need to report user somehow about this happening and
         # progress on the download
         from humanize import naturalsize
+        from datalad.support.annexrepo import AnnexJsonProtocol
+
         akey_size = self.repo.get_size_from_key(akey)
         self.info(
             "To obtain some keys we need to fetch an archive "
@@ -424,18 +426,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             % (naturalsize(akey_size) if akey_size else "unknown")
         )
 
-        def progress_indicators(l):
-            self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
-
-        self.runner(["git", "annex", "get",
-                     "--json", "--json-progress",
-                     "--key", akey
-                     ],
-                    log_stdout=progress_indicators,
-                    log_stderr='offline',
-                    # False, # to avoid lock down
-                    log_online=True,
-                    cwd=self.path, expect_stderr=True)
+        self.repo._git_runner.run(
+            ["git", "annex", "get", "--json", "--json-progress", "--key", akey],
+            protocol=AnnexJsonProtocol,
+            cwd=self.path,
+        )
 
 
 def main():
