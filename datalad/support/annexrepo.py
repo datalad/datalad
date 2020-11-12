@@ -965,7 +965,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
-        if runner == "gitwitless":
+        if runner in ("gitwitless", None):
             if protocol:
                 _protocol = protocol
             else:
@@ -1000,8 +1000,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             kwargs.pop('expect_stderr', False)
             run_func = self._git_runner.run
             kwargs['protocol'] = _protocol
-        elif runner is None:
-            run_func = self.cmd_call_wrapper.run
         else:
             raise ValueError("Unknown runner %r" % runner)
 
