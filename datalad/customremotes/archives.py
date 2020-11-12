@@ -426,7 +426,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             % (naturalsize(akey_size) if akey_size else "unknown")
         )
 
-        # call git annex get without capturing any output
         self.repo._git_runner.run(
             ["git", "annex", "get", "--json", "--json-progress", "--key", akey],
             protocol=AnnexJsonProtocol,
