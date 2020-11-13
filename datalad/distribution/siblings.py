@@ -421,7 +421,7 @@ def _configure_remote(
     if name != 'here':
         # do all configure steps that are not meaningful for the 'here' sibling
         # AKA the local repo
-        if name not in known_remotes:
+        if name not in known_remotes and url:
             # this remote is fresh: make it known
             # just minimalistic name and URL, the rest is coming from `configure`
             ds.repo.add_remote(name, url)
