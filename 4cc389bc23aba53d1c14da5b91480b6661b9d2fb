@@ -1,0 +1,106 @@
+Update 0.13.5-312-g3a99d98ce:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    104133d3f1d29a643ebf3d0d2ac66d330d8745e7..09e88baf841d6be918d0728d534accc515d2a09c
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge branch 'maint'
+   4eec34409^-1
++  Merge pull request #4955 from yarikoptic/opt-specialremote
+   25c03f99c^-1
+-  CLN: customremotes: Fix a comment typo
+   bcffccba6^-1
++  Merge pull request #4977 from bpoldrack/bf-ria-https
+   7c1219d17^-1
+-  Merge branch 'maint'
+   13619fe60^-1
++  Merge pull request #4982 from mih/enh-wtfcred
+   c224b144d^-1
+-  Merge branch 'maint'
+   fe090ff2b^-1
+-  Merge branch 'maint'
+   64a2ebfb3^-1
+-  Merge pull request #4964 from kyleam/get-check-target
+   a6e0e0560^-1
++  Merge pull request #4991 from adswa/doc-readme
+   d9f3c174a^-1
+-  Merge pull request #5009 from yarikoptic/rf-nodirect
+   e01d3bea1^-1
+-  Merge branch 'maint'
+   d3f011485^-1
+-  Merge pull request #5020 from yarikoptic/rm-license-info
+   1db837e3b^-1
+-  Merge pull request #5011 from mih/rf-createsibling
+   961c42660^-1
+-  Merge pull request #5012 from mih/rf-dropannotate
+   9139c244b^-1
+-  Merge branch 'maint'
+   035299db1^-1
+-  Merge pull request #4996 from mih/rf-runnerdeath
+   f60bc6a62^-1
+-  Merge branch 'maint'
+   44a471935^-1
+-  Merge branch 'maint'
+   4b6606cb4^-1
+-  Merge branch 'maint'
+   87e7bdcea^-1
++  Merge pull request #4911 from bpoldrack/towards-bare-repos
+   af85ad107^-1
++* Merge pull request #4963 from christian-monch/nf-individual-indexer
+   f66dce7e5^-1
++  Merge pull request #5067 from kyleam/ls-files-simplify
+   c12224dc5^-1
++  Merge pull request #4868 from mih/opt-subdatasets
+   239bf8eda^-1
+-  Merge branch 'maint'
+   7d31c354e^-1
+-  Merge pull request #5073 from mih/tst-morewintest
+   7c0ba42c6^-1
++  Merge pull request #5076 from mih/opt-subdataset-2
+   9aba26331^-1
++  Merge pull request #5091 from yarikoptic/enh-addurls-relpath
+   635b6af3a^-1
+-  Merge pull request #5092 from mih/master
+   fbb938a0b^-1
++  Merge pull request #5090 from mih/bf-5077
+   2aa78de71^-1
+-  Merge branch 'maint'
+   3a99d98ce^-1
++  Merge pull request #5022 from yarikoptic/enh-iter-progress
+   6053a58c0^-1
+-  Merge pull request #5013 from yarikoptic/rf-do-not-hide
+   cf2862a93^-1
++  Merge pull request #5098 from jwodder/gh-5078
+   1fb777f7a^-1
+-  Merge branch 'maint'
+   a0b3f3bae^-1
++  Merge pull request #5128 from mih/bf-5107
+   cec5f0c3a^-1
+-  Merge branch 'maint'
+   8081fcf6f^-1
+-  Merge pull request #5133 from kyleam/test_direct_cfg_cron_failure
+   d596de136^-1
++  Merge pull request #5081 from yarikoptic/enh-addurls-drop
+   64174d7a5^-1
+-  Merge branch 'maint'
+   7665c39f0^-1
++  Merge pull request #5108 from jwodder/gh-4941
+   157d4d024^-1
++  Merge pull request #5002 from mih/rf-runrunner
+   f18036928^-1
++  Merge pull request #5141 from mih/rf-archiverunner
+   0dbab7137^-1
++  Merge pull request #5142 from mih/rf-norunnercustomremote
+   e4756f6f6^-1
+-  Merge branch 'maint'
+   6854e3dc2^-1
++  Merge pull request #5139 from jwodder/gh-5078b
+   66c3a1df6^-1
++  Merge pull request #5164 from kyleam/custom-remote-keypath
+   09e88baf8^-1
