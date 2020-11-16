@@ -662,16 +662,6 @@ class AnnexCustomRemote(object):
         """
         return list(self.gen_URLS(key))
 
-    def _get_key_path(self, key):
-        """Return path to the KEY file
-        """
-        # TODO: should actually be implemented by AnnexRepo
-        #       Command is available in annex >= 20140410
-        out = self.repo.call_git(['git', 'annex', 'contentlocation', key])
-        # TODO: it would exit with non-0 if key is not present locally.
-        # we need to catch and throw our exception
-        return opj(self.path, out.rstrip(os.linesep))
-
     # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
     #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING
