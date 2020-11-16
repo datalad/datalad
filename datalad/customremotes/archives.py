@@ -258,7 +258,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             # Extract via cache only if size is not yet known
             if size is None:
                 # if for testing we want to force getting the archive extracted
-                # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
                 efile = self.cache[akey_path].get_extracted_filename(afile)
                 efile = ensure_bytes(efile)
 
