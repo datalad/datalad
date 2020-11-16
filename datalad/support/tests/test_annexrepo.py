@@ -2487,3 +2487,16 @@ def test_run_annex_gitwitless_invalid_callable(path):
                 log_stdout=log_stdout,
                 log_stderr=log_stderr,
                 runner="gitwitless")
+
+
+@with_tempfile(mkdir=True)
+def test_call_annex(path):
+    ar = AnnexRepo(path, create=True)
+    # we raise on mistakes
+    with assert_raises(CommandError):
+        ar._call_annex(['not-an-annex-command'])
+    # and we get to know why
+    try:
+        ar._call_annex(['not-an-annex-command'])
+    except CommandError as e:
+        assert_in('Invalid argument', e.stderr)
