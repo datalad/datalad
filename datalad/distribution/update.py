@@ -396,7 +396,7 @@ def _annex_plain_merge(repo, _, target, merge_opts=None):
     yield from _plain_merge(repo, _, target, merge_opts=merge_opts)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
-    repo.call_git(["annex", "merge"])
+    repo.call_annex(["merge"])
 
 
 def _annex_sync(repo, remote, _target, merge_opts=None):

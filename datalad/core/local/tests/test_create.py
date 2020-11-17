@@ -180,10 +180,8 @@ def test_create(probe, path):
     eq_(ds.config.get("annex.backends"), 'MD5E')
     if not ar.is_managed_branch():
         eq_(ds.config.get("core.sharedrepository"), '2')
-    runner = Runner()
     # check description in `info`
-    cmd = ['git', 'annex', 'info']
-    cmlout = runner.run(cmd, cwd=path, protocol=StdOutErrCapture)['stdout']
+    cmlout = ds.repo.call_annex(['info'])
     assert_in('funny [here]', cmlout)
     # check datset ID
     eq_(ds.config.get_value('datalad.dataset', 'id'),

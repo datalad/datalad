@@ -95,6 +95,7 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
     if annex:
         if bare:
             target = GitRepo(path=path, bare=True, create=True)
+            # cannot use call_annex()
             target.call_git(['annex', 'init'])
         else:
             target = AnnexRepo(path, init=True, create=True)
@@ -113,8 +114,8 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
         # commit for the managed branch.
         # the only sane approach is to let git-annex establish a shared
         # history
-        ds.repo.call_git(['annex', 'sync'])
-        ds.repo.call_git(['annex', 'sync', '--cleanup'])
+        ds.repo.call_annex(['sync'])
+        ds.repo.call_annex(['sync', '--cleanup'])
     return target
 
 
