@@ -988,6 +988,52 @@ class AnnexRepo(GitRepo, RepoInterface):
         out, _ = self._call_annex(args, files=files, protocol=StdOutErrCapture)
         yield from (out.split(sep) if sep else out.splitlines())
 
+    def call_annex_oneline(self, args, files=None):
+        """Call annex for a single line of output.
+
+        This method filters prior output line selection to exclude git-annex
+        status output that is triggered by command execution, but is not
+        related to the particular command. This includes lines like:
+
+          (merging ... into git-annex)
+          (recording state ...)
+
+        Parameters
+        ----------
+        args : list of str
+          Arguments to pass to `annex`.
+        files : list of str, optional
+          File arguments to pass to `annex`. The advantage of passing these here
+          rather than as part of `args` is that the call will be split into
+          multiple calls to avoid exceeding the maximum command line length.
+
+        Returns
+        -------
+        str
+          Either a single output line, or an empty string if there was no
+          output.
+        Raises
+        ------
+        CommandError if the call exits with a non-zero status.
+        AssertionError if there is more than one line of output.
+        """
+        # ignore some lines
+        # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
+        # that links claims it is fixed, but '(recording state in git...)'
+        # still appear as of 8.20201103-1
+        lines = [
+            l for l in self.call_annex_items_(args, files=files)
+            if l and not re.search(
+                r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+            )
+        ]
+
+        if len(lines) > 1:
+            raise AssertionError(
+                "Expected {} to return single line, but it returned {}"
+                .format(["git", 'annex'] + args, lines))
+        return lines[0] if lines else ''
+
     def _run_annex_command(self, annex_cmd,
                            git_options=None, annex_options=None,
                            backend=None, jobs=None,
@@ -1124,33 +1170,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                                                " 'git-annex %s'" % annex_cmd,
                                                e.code, e.stdout, e.stderr)
             raise
-
-    def _run_simple_annex_command(self, *args, **kwargs):
-        """Run an annex command and return its output, of which expect 1 line
-
-        Just a little helper to interact with basic annex commands and process
-        their output while ignoring some messages
-
-        Parameters
-        ----------
-        **kwargs: all passed into _run
-        """
-        out, err = self._run_annex_command(
-            *args, **kwargs
-        )
-        lines = out.rstrip('\n').splitlines()
-        # ignore some lines which might appear on a fresh clone
-        # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
-        lines_ = [
-            l for l in lines
-            if l and not re.search(
-                r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
-            )
-        ]
-
-        if len(lines_) > 1:
-            raise AssertionError("Expected one line but got {}".format(lines_))
-        return lines_[0] if lines_ else None
 
     def _is_direct_mode_from_config(self):
         """Figure out if in direct mode from the git config.
@@ -2564,8 +2583,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         str
-          Whether the setting is returned, or an empty string if there
-          is none.
+          Whether the setting is returned, or `None` if there is none.
 
         Raises
         ------
@@ -2578,9 +2596,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if property not in ('wanted', 'required', 'group'):
             raise ValueError(
                 'unknown preferred content property: {}'.format(property))
-        return self._run_simple_annex_command(
-            property,
-            annex_options=[remote or '.'])
+        return self.call_annex_oneline([property, remote or '.']) or None
 
     def set_preferred_content(self, property, expr, remote=None):
         """Set preferred content configuration of a repository or remote
@@ -2612,9 +2628,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if property not in ('wanted', 'required', 'group'):
             raise ValueError(
                 'unknown preferred content property: {}'.format(property))
-        return self._run_simple_annex_command(
-            property,
-            annex_options=[remote or '.', expr])
+        return self.call_annex_oneline([property, remote or '.', expr])
 
     def get_groupwanted(self, name):
         """Get `groupwanted` expression for a group `name`
@@ -2624,15 +2638,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         name : str
            Name of the groupwanted group
         """
-        return self._run_simple_annex_command(
-            'groupwanted', annex_options=[name]
-        )
+        return self.call_annex_oneline(['groupwanted', name])
 
     def set_groupwanted(self, name, expr):
         """Set `expr` for the `name` groupwanted"""
-        return self._run_simple_annex_command(
-            'groupwanted', annex_options=[name, expr]
-        )
+        return self.call_annex_oneline(['groupwanted', name, expr])
 
     def precommit(self):
         """Perform pre-commit maintenance tasks, such as closing all batched annexes
