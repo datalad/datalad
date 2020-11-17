@@ -1188,6 +1188,72 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
             copy=False,
         )
 
+    def run_on_filelist_chunks(self, cmd, files, protocol=None,
+                               cwd=None, env=None, **kwargs):
+        """Run a git-style command multiple times if `files` is too long
+
+        Parameters
+        ----------
+        cmd : list
+          Sequence of program arguments.
+        files : list
+          List of files.
+        protocol : WitlessProtocol, optional
+          Protocol class handling interaction with the running process
+          (e.g. output capture). A number of pre-crafted classes are
+          provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
+        cwd : path-like, optional
+          If given, commands are executed with this path as PWD,
+          the PWD of the parent process is used otherwise. Overrides
+          any `cwd` given to the constructor.
+        env : dict, optional
+          Environment to be used for command execution. If `cwd`
+          was given, 'PWD' in the environment is set to its value.
+          This must be a complete environment definition, no values
+          from the current environment will be inherited. Overrides
+          any `env` given to the constructor.
+        kwargs :
+          Passed to the Protocol class constructor.
+
+        Returns
+        -------
+        dict
+          At minimum there will be keys 'stdout', 'stderr' with
+          unicode strings of the cumulative standard output and error
+          of the process as values.
+
+        Raises
+        ------
+        CommandError
+          On execution failure (non-zero exit code) this exception is
+          raised which provides the command (cmd), stdout, stderr,
+          exit code (status), and a message identifying the failed
+          command, as properties.
+        FileNotFoundError
+          When a given executable does not exist.
+        """
+        assert isinstance(cmd, list)
+        file_chunks = generate_file_chunks(files, cmd)
+
+        results = None
+        for i, file_chunk in enumerate(file_chunks):
+            # do not pollute with message when there only ever is a single chunk
+            if len(file_chunk) < len(files):
+                lgr.debug('Process file list chunk %i (length %i)',
+                          i, len(file_chunk))
+            res = self.run(
+                cmd + ['--'] + file_chunk,
+                protocol=protocol,
+                cwd=cwd,
+                env=env,
+                **kwargs)
+            if results is None:
+                results = res
+            else:
+                for k, v in res.items():
+                    results[k] += v
+        return results
+
 
 def readline_rstripped(stdout):
     #return iter(stdout.readline, b'').next().rstrip()

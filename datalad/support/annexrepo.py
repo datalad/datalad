@@ -954,12 +954,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(runner.env)
 
-        return run_gitcommand_on_file_list_chunks(
-            runner.run,
-            cmd,
-            files,
-            protocol=protocol,
-            env=env)
+        if files:
+            return runner.run_on_filelist_chunks(
+                cmd,
+                files,
+                protocol=protocol,
+                env=env)
+        else:
+            return runner.run(
+                cmd,
+                protocol=protocol,
+                env=env)
 
     def call_annex(self, args, files=None):
         """Call annex and return standard output.
@@ -981,11 +986,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._call_annex(args, files=files, protocol=StdOutErrCapture)
-        return out
+        return self._call_annex(
+            args,
+            files=files,
+            protocol=StdOutErrCapture)['stdout']
 
     def call_annex_items_(self, args, files=None, sep=None):
-        out, _ = self._call_annex(args, files=files, protocol=StdOutErrCapture)
+        out = self._call_annex(
+            args,
+            files=files,
+            protocol=StdOutErrCapture)['stdout']
         yield from (out.split(sep) if sep else out.splitlines())
 
     def call_annex_oneline(self, args, files=None):
