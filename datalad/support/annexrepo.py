@@ -2563,12 +2563,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
 
         options = ensure_list(options, copy=True)
+        cmd = ['whereis'] + options
+        files_arg = None
         if key:
-            kwargs = {'opts': options + ["--key"] + files}
+            cmd = cmd + ["--key"] + files
         else:
-            kwargs = {'files': files}
+            files_arg = files
 
-        json_objects = self._run_annex_command_json('whereis', **kwargs)
+        json_objects = self._call_annex_records(cmd, files=files_arg)
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
