@@ -551,13 +551,13 @@ def test_repo_info(path):
         return [custom_json]
 
     with patch.object(
-            repo, '_run_annex_command_json',
+            repo, '_call_annex_records',
             return_value=get_custom()):
         info = repo.repo_info()
         eq_(info['available local disk space'], None)
 
     with patch.object(
-        repo, '_run_annex_command_json',
+        repo, '_call_annex_records',
         return_value=get_custom({
             "available local disk space": "19193986496 (+100000 reserved)"})):
         info = repo.repo_info()
