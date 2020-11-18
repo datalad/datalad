@@ -431,10 +431,17 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
-    res = ar.drop(testfile)
-    eq_(res['command'], 'drop')
-    eq_(res['success'], False)
-    assert_in('adjust numcopies', res['note'])
+    try:
+        res = ar.drop(testfile)
+    except CommandError as e:
+        # there should be at least one result that was captured
+        # TODO think about a more standard way of accessing such
+        # records in a CommandError, maybe having a more specialized
+        # exception derived from CommandError
+        res = e.kwargs['stdout_json'][0]
+        eq_(res['command'], 'drop')
+        eq_(res['success'], False)
+        assert_in('adjust numcopies', res['note'])
 
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)

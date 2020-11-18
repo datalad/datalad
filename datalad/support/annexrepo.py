@@ -2244,9 +2244,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             files = ensure_list(files)
             options = options + ['--key']
             res = [
-                self._run_annex_command_json(
-                    'drop',
-                    opts=options + [k],
+                self._call_annex_records(
+                    ['drop'] + options + [k],
                     jobs=jobs)
                 for k in files
             ]
@@ -2256,9 +2255,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 return res
         else:
-            return self._run_annex_command_json(
-                'drop',
-                opts=options,
+            return self._call_annex_records(
+                ['drop'] + options,
                 files=files,
                 jobs=jobs)
 
