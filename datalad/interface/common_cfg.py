@@ -411,7 +411,9 @@ definitions = {
             'title': 'Commit message handling',
             'text': 'When no commit message was provided: '
                     'attempt to obtain one interactively (interactive); '
-                    'or use a generic commit message (generic)'}),
+                    'or use a generic commit message (generic). '
+                    'NOTE: The interactive option is experimental. The '
+                    'behavior may change in backwards-incompatible ways.'}),
         'default': 'generic',
         'type': EnsureChoice('interactive', 'generic'),
     },
