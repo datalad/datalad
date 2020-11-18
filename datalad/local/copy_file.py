@@ -625,13 +625,10 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
         # failing next on 'fromkey', due to a key mismatch.
         # this is more compatible with the nature of 'cp'
         dest.unlink()
-    res = dest_repo._run_annex_command_json(
-        'fromkey',
+    res = dest_repo._call_annex_records(
         # we use force, because in all likelihood there is no content for this key
         # yet
-        opts=[dest_key, str_dest, '--force'],
-        # doesn't work in adjusted-unlock mode
-        expect_fail=True,
+        ['fromkey', dest_key, str_dest, '--force'],
     )
     if any(not r['success'] for r in res):
         return dict(

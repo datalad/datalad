@@ -155,8 +155,8 @@ class Unlock(Interface):
         # Do the actual unlocking.
         for ds_path, files in to_unlock.items():
             ds = Dataset(ds_path)
-            for r in ds.repo._run_annex_command_json(
-                    "unlock",
+            for r in ds.repo._call_annex_records(
+                    ["unlock"],
                     files=files):
                 yield get_status_dict(
                     path=op.join(ds.path, r['file']),

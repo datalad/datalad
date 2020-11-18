@@ -1015,7 +1015,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "not enough free space, need (.*) more", e.stderr
             )
             if out_of_space_re:
-                raise OutOfSpaceError(cmd=args,
+                raise OutOfSpaceError(cmd=['annex'] + args,
                                       sizemore_msg=out_of_space_re.groups()[0])
 
             # RemoteNotAvailableError:
@@ -1023,7 +1023,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "there is no available git remote named \"(.*)\"", e.stderr
             )
             if remote_na_re:
-                raise RemoteNotAvailableError(cmd=args,
+                raise RemoteNotAvailableError(cmd=['annex'] + args,
                                               remote=remote_na_re.groups()[0])
 
             # TEMP: Workaround for git-annex bug, where it reports success=True
@@ -1052,19 +1052,16 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # we create the error reporting herein. If all files were
                     # not found, there is nothing on stdout and we don't need
                     # anything
-                    out = ""
-                if not out.endswith(linesep):
-                    out += linesep
-                out += linesep.join(
-                    ['{{"command": "{cmd}", "file": "{path}", '
-                     '"note": "{note}",'
-                     '"success": false}}'.format(
-                         cmd=args,
-                         # gotta quote backslashes that have taken over...
-                         # ... or the outcome is not valid JSON
-                         path=f.replace('\\', '\\\\'),
-                         note="not found")
-                     for f in not_existing])
+                    out = {'stdout_json': []}
+                out['stdout_json'].extend(
+                    {
+                        "command": args[0],
+                        "file": f,
+                        "note": "not found",
+                        "success": False,
+                    }
+                    for f in not_existing
+                )
 
             # Note: insert additional code here to analyse failure and possibly
             # raise a custom exception
@@ -1078,6 +1075,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Or if we had empty stdout but there was stderr
             if out is None or (not out and e.stderr):
                 raise e
+
+            records = e.kwargs.get('stdout_json', [])
+            if records:
+                have = out.get('stdout_json', [])
+                have.extend(records)
+                out['stdout_json'] = have
+
             #if e.stderr:
             #    # else just warn about present errors
             #    shorten = lambda x: x[:1000] + '...' if len(x) > 1000 else x
@@ -1496,16 +1500,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         #  --batch mode (I don't think we have --progress support in long
         #  alive batch processes ATM),
         if key:
-            kwargs = {'opts': options + ['--key'] + files}
+            cmd = ['get'] + options + ['--key'] + files
+            files_arg = None
         else:
-            kwargs = {'opts': options, 'files': files}
-        results = self._run_annex_command_json(
-            'get',
+            cmd = ['get'] + options
+            files_arg = files
+        results = self._call_annex_records(
+            cmd,
             # TODO: eventually make use of --batch mode
+            files=files_arg,
             jobs=jobs,
-            expected_entries=expected_downloads,
             progress=True,
-            **kwargs
+            protocol=AnnexJsonProtocol,
+            total_nbytes=sum(expected_downloads.values()),
         )
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
@@ -1676,15 +1683,13 @@ class AnnexRepo(GitRepo, RepoInterface):
                 yield r
 
         else:
-            for r in self._run_annex_command_json(
-                    'add',
-                    opts=options,
+            if backend:
+                options.extend(('--backend', backend))
+            for r in self._call_annex_records(
+                    ['add'] + options,
                     files=files,
-                    backend=backend,
-                    expect_fail=True,
                     jobs=jobs,
-                    expected_entries=expected_additions,
-                    expect_stderr=True):
+                    total_nbytes=sum(expected_additions.values())):
                 yield r
 
     @normalize_paths
@@ -2087,8 +2092,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
+        if backend:
+            options.extend(('--backend', backend))
         git_options = []
-        kwargs = dict(backend=backend)
         if lexists(opj(self.path, file_)) and \
                 unlink_existing and \
                 not self.is_under_annex(file_):
@@ -2103,12 +2109,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 lgr.debug("Not batching addurl call "
                           "because fake dates are enabled")
             files_opt = '--file=%s' % file_
-            out_json = self._run_annex_command_json(
-                'addurl',
-                opts=options + [files_opt] + [url],
+            out_json = self._call_annex_records(
+                ['addurl'] + options + [files_opt] + [url],
                 progress=True,
-                expected_entries={file_: None},
-                **kwargs
             )
             if len(out_json) != 1:
                 raise AssertionError(
@@ -3137,17 +3140,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         if options:
             annex_options.extend(split_cmdline(options))
 
+        # filter out keys with missing size info
+        total_nbytes = sum(i for i in expected_copys.values() if i) or None
+
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
-        results = self._run_annex_command_json(
-            'copy',
-            opts=annex_options,
+        results = self._call_annex_records(
+            ['copy'] + annex_options,
             files=files,  # copy_files,
             jobs=jobs,
-            expected_entries=expected_copys,
-            progress=True
-            #log_stdout=True, log_stderr=not log_online,
-            #log_online=log_online, expect_stderr=True
+            progress=True,
+            protocol=AnnexJsonProtocol,
+            total_nbytes=total_nbytes,
         )
         results_list = list(results)
         # XXX this is the only logic different ATM from get
@@ -3268,8 +3272,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files = [files]
             # anything else is assumed to be an iterable (e.g. a generator)
         if batch is False:
-            for res in self._call_annex_records(
-                    ['metadata', '--json'], files=files):
+            for res in self._call_annex_records(['metadata'], files=files):
                 yield _format_response(res)
         else:
             # batch mode is different: we need to compose a JSON request object
@@ -3563,16 +3566,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git is True:
             yield from GitRepo._save_add(self, files, git_opts=git_opts)
         else:
-            for r in self._run_annex_command_json(
-                    'add',
-                    opts=options,
+            for r in self._call_annex_records(
+                    ['add'] + options,
                     files=list(files.keys()),
-                    backend=None,
-                    expect_fail=True,
                     # TODO
                     jobs=None,
-                    expected_entries=expected_additions,
-                    expect_stderr=True):
+                    total_nbytes=sum(expected_additions.values())
+                    if expected_additions else None):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,

@@ -37,6 +37,7 @@ from unittest.mock import patch
 import gc
 
 from datalad.cmd import (
+    GitWitlessRunner,
     WitlessRunner as Runner,
 )
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
@@ -258,7 +259,7 @@ def test_AnnexRepo_get_outofspace(annex_path):
             stderr="junk around not enough free space, need 905.6 MB more and after"
         )
 
-    with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
+    with patch.object(AnnexRepo, '_call_annex', raise_cmderror) as cma, \
             assert_raises(OutOfSpaceError) as cme:
         ar.get("file")
     exc = cme.exception
@@ -893,23 +894,23 @@ def test_AnnexRepo_get(src, dst):
 
     called = []
     # for some reason yoh failed mock to properly just call original func
-    orig_run = annex._run_annex_command
+    orig_run = annex._git_runner.run_on_filelist_chunks
 
-    def check_run(cmd, annex_options, **kwargs):
-        called.append(cmd)
-        if cmd == 'find':
-            assert_not_in('-J5', annex_options)
-        elif cmd == 'get':
-            assert_in('-J5', annex_options)
+    def check_run(cmd, files, **kwargs):
+        cmd_name = cmd[cmd.index('annex') + 1]
+        called.append(cmd_name)
+        if cmd_name == 'find':
+            assert_not_in('-J5', cmd)
+        elif cmd_name == 'get':
+            assert_in('-J5', cmd)
         else:
             raise AssertionError(
-                "no other commands so far should be ran. Got %s, %s" %
-                (cmd, annex_options)
+                "no other commands so far should be ran. Got %s" % cmd
             )
-        return orig_run(cmd, annex_options=annex_options, **kwargs)
+        return orig_run(cmd, files, **kwargs)
 
     annex.drop(testfile)
-    with patch.object(AnnexRepo, '_run_annex_command',
+    with patch.object(GitWitlessRunner, 'run_on_filelist_chunks',
                       side_effect=check_run, auto_spec=True), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
@@ -1323,34 +1324,40 @@ def test_annex_copy_to(origin, clone):
         assert_in('copied1', kwargs['files'])
         assert_in('copied2', kwargs['files'])
         assert_in('existed', kwargs['files'])
-        return """
-{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
-{"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
-{"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
-""", ""
+        return [
+                {"command":"copy","note":"to target ...", "success":True,
+                 "key":"akey1", "file":"copied1"},
+                {"command":"copy","note":"to target ...", "success":True,
+                 "key":"akey2", "file":"copied2"},
+                {"command":"copy","note":"checking target ...", "success":True,
+                 "key":"akey3", "file":"existed"},
+        ]
     # Note that we patch _run_annex_command, which is also invoked by _run_annex_command_json
     # which is in turn invoked first by copy_to for "find" operation.
     # TODO: provide a dedicated handling within above ok_copy for 'find' command
-    with patch.object(repo, '_run_annex_command', ok_copy):
+    with patch.object(repo, '_call_annex_records', ok_copy):
         eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
             ["copied1", "copied2"])
 
     # now let's test that we are correctly raising the exception in case if
     # git-annex execution fails
-    orig_run = repo._run_annex_command
+    orig_run = repo._call_annex
 
     # Kinda a bit off the reality since no nonex* would not be returned/handled
     # by _get_expected_files, so in real life -- wouldn't get report about Incomplete!?
     def fail_to_copy(command, **kwargs):
-        if command == 'copy':
+        if command[0] == 'copy':
             # That is not how annex behaves
             # http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             # for non-existing files output goes into stderr
             raise CommandError(
                 "Failed to run ...",
-                stdout=
-                    '{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied"}\n'
-                    '{"command":"copy","note":"checking target ...", "success":true, "key":"akey2", "file":"existed"}\n',
+                stdout_json=[
+                    {"command":"copy","note":"to target ...", "success":True,
+                     "key":"akey1", "file":"copied"},
+                    {"command":"copy","note":"checking target ...",
+                     "success":True, "key":"akey2", "file":"existed"},
+                ],
                 stderr=
                     'git-annex: nonex1 not found\n'
                     'git-annex: nonex2 not found\n'
@@ -1362,7 +1369,7 @@ def test_annex_copy_to(origin, clone):
         assert files == ["copied", "existed", "nonex1", "nonex2"]
         return {'akey1': 10}, ["copied"]
 
-    with patch.object(repo, '_run_annex_command', fail_to_copy), \
+    with patch.object(repo, '_call_annex', fail_to_copy), \
             patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
@@ -2165,7 +2172,7 @@ def _test_add_under_subdir(path):
 @with_tempfile(mkdir=True)
 def test_error_reporting(path):
     ar = AnnexRepo(path, create=True)
-    res = ar._run_annex_command_json('add', files='gl\\orious BS')
+    res = ar._call_annex_records(['add'], files='gl\\orious BS')
     eq_(
         res,
         [{
@@ -2450,11 +2457,11 @@ def test_annex_cmd_expect_fail(path):
     repo = AnnexRepo(path)
 
     with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=True)
+        repo._call_annex_records(['add', 'non-existing'])
         # message shows up at DEBUG level:
         assert_re_in(r".*\[DEBUG\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
     with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
+        repo._call_annex_records(['add', 'non-existing'])
         # message shows up at WARNING level
         assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
 
