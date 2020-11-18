@@ -2176,7 +2176,7 @@ def test_error_reporting(path):
     eq_(
         res,
         [{
-            'command': 'add',
+            'command': ['annex', 'add', '--json', '--json-error-messages'],
             # whole thing, despite space, properly quotes backslash
             'file': 'gl\\orious BS',
             'note': 'not found',
@@ -2447,25 +2447,6 @@ def test_save_noperms(path):
         sudochown(['-R', str(os.geteuid()), repo.path])
 
 
-@with_tempfile
-def test_annex_cmd_expect_fail(path):
-    # test, that log message about stderr on non-zero exit is logged on debug level if expect_fail was set to True,
-    # warning level else
-
-    from re import DOTALL
-
-    repo = AnnexRepo(path)
-
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._call_annex_records(['add', 'non-existing'])
-        # message shows up at DEBUG level:
-        assert_re_in(r".*\[DEBUG\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._call_annex_records(['add', 'non-existing'])
-        # message shows up at WARNING level
-        assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
-
-
 def test_get_size_from_key():
 
     # see https://git-annex.branchable.com/internals/key_format/
@@ -2487,20 +2468,6 @@ def test_get_size_from_key():
 
     for key, value in test_keys.items():
         eq_(AnnexRepo.get_size_from_key(key), value)
-
-
-@with_tempfile(mkdir=True)
-def test_run_annex_gitwitless_invalid_callable(path):
-    ar = AnnexRepo(path, create=True)
-    for log_stdout, log_stderr in [(str, False),
-                                   (False, str),
-                                   (str, str)]:
-        with assert_raises(ValueError):
-            ar._run_annex_command_json(
-                "info",
-                log_stdout=log_stdout,
-                log_stderr=log_stderr,
-                runner="gitwitless")
 
 
 @with_tempfile(mkdir=True)
