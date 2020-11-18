@@ -887,7 +887,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         return srs
 
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,
-                    git_options=None, merge_annex_branches=True):
+                    git_options=None, stdin=None, merge_annex_branches=True,
+                    **kwargs):
         """Run git-annex commands
 
         Parameters
@@ -907,6 +908,10 @@ class AnnexRepo(GitRepo, RepoInterface):
           StdOutErrCapture, which will provide default logging behavior and
           guarantee that stdout/stderr are included in potential CommandError
           exception.
+        git_options:
+        stdin: File-like, optional
+          stdin to connect to the git-annex process. Only used when `files`
+          is None.
         merge_annex_branches: bool, optional
           If False, annex.merge-annex-branches=false config will be set for
           git-annex call.  Useful for operations which are not intended to
@@ -959,18 +964,23 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cmd,
                 files,
                 protocol=protocol,
-                env=env)
+                env=env,
+                **kwargs)
         else:
             return runner.run(
                 cmd,
+                stdin=stdin,
                 protocol=protocol,
-                env=env)
+                env=env,
+                **kwargs)
 
     def _call_annex_records(self, args, files=None, jobs=None,
                             protocol=None,
                             git_options=None,
+                            stdin=None,
                             merge_annex_branches=True,
-                            progress=False):
+                            progress=False,
+                            **kwargs):
         if protocol is None:
             protocol = AnnexJsonProtocol
 
@@ -988,7 +998,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 jobs=jobs,
                 protocol=protocol,
                 git_options=git_options,
+                stdin=stdin,
                 merge_annex_branches=merge_annex_branches,
+                **kwargs,
             )
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
@@ -3649,13 +3661,13 @@ class AnnexJsonProtocol(WitlessProtocol):
     # capture both streams and handle messaging completely
     proc_out = True
     proc_err = True
-    total_nbytes = None
 
-    def __init__(self, done_future):
+    def __init__(self, done_future, total_nbytes=None):
         # to collect parsed JSON command output
         self.json_out = []
         super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
+        self.total_nbytes = total_nbytes
 
     def connection_made(self, transport):
         super().connection_made(transport)
