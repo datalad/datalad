@@ -3262,14 +3262,14 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         synced_branch = 'synced/{}'.format(branch)
         had_synced_branch = synced_branch in self.get_branches()
-        cmd = ['annex', 'sync']
+        cmd = ['sync']
         if remote:
             cmd.extend(ensure_list(remote))
         cmd.extend([
             # disable any external interaction and other magic
             '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge',
             '--no-content'])
-        self.call_git(cmd)
+        self.call_annex(cmd)
         # a sync can establish new config (e.g. annex-uuid for a remote)
         self.config.reload()
         # cleanup sync'ed branch if we caused it

@@ -133,7 +133,7 @@ def test_unlock(path):
     if ds.repo.supports_unlocked_pointers:
         # TODO: RF: make 'lock' a command as well
         # re-lock to further on have a consistent situation with V5:
-        ds.repo.call_git(['annex', 'lock'], files=['test-annex.dat'])
+        ds.repo.call_annex(['lock'], files=['test-annex.dat'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
     # after commit, file is locked again:
@@ -157,7 +157,7 @@ def test_unlock(path):
     if ds.repo.supports_unlocked_pointers:
         # TODO: RF: make 'lock' a command as well
         # re-lock to further on have a consistent situation with V5:
-        ds.repo.call_git(['annex', 'lock'], files=['test-annex.dat'])
+        ds.repo.call_annex(['lock'], files=['test-annex.dat'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
     # TODO:

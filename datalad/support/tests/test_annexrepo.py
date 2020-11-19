@@ -716,8 +716,7 @@ def test_AnnexRepo_always_commit(path):
     repo.add(file1)
 
     # Now git-annex log should show the addition:
-    out = repo.call_annex('log')
-    out_list = out.rstrip(os.linesep).splitlines()
+    out_list = list(repo.call_annex_items_(['log']))
     eq_(len(out_list), 1)
     assert_in(file1, out_list[0])
     # check git log of git-annex branch:
@@ -731,7 +730,7 @@ def test_AnnexRepo_always_commit(path):
         # No additional git commit:
         eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
-        out = repo.call_annex('log')
+        out = repo.call_annex(['log'])
 
         # And we see only the file before always_commit was set to false:
         assert_in(file1, out)
@@ -741,7 +740,7 @@ def test_AnnexRepo_always_commit(path):
     # on the annex branches.
     repo.sync()
 
-    out = repo.call_annex('log')
+    out = repo.call_annex(['log'])
     assert_in(file1, out)
     assert_in(file2, out)
 
@@ -2192,10 +2191,9 @@ def test_annexjson_protocol(path):
     ar = AnnexRepo(path, create=True)
     ar.save()
     assert_repo_status(path)
-    runner = Runner(cwd=ar.path)
     # first an orderly execution
-    res = runner.run(
-        ['git', 'annex', 'find', '.', '--json'],
+    res = ar._call_annex(
+        ['find', '.', '--json'],
         protocol=AnnexJsonProtocol)
     for k in ('stdout', 'stdout_json', 'stderr'):
         assert_in(k, res)
@@ -2209,8 +2207,8 @@ def test_annexjson_protocol(path):
 
     # now the same, but with a forced error
     with assert_raises(CommandError) as e:
-        res = runner.run(
-            ['git', 'annex', 'find', '.', 'error', '--json'],
+        res = ar._call_annex(
+            ['find', '.', 'error', '--json'],
             protocol=AnnexJsonProtocol)
         # normal operation is not impaired
         eq_(e.stdout_json, orig_j)

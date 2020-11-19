@@ -425,10 +425,9 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             % (naturalsize(akey_size) if akey_size else "unknown")
         )
 
-        self.repo._git_runner.run(
-            ["git", "annex", "get", "--json", "--json-progress", "--key", akey],
+        self.repo._call_annex(
+            ["get", "--json", "--json-progress", "--key", akey],
             protocol=AnnexJsonProtocol,
-            cwd=self.path,
         )
 
 

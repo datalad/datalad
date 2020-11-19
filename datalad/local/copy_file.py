@@ -610,7 +610,7 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
     # https://github.com/datalad/datalad/issues/3357 that could prevent
     # information leakage across datasets
     if finfo.get('has_content', True):
-        dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
+        dest_key = dest_repo.call_annex_oneline(['calckey', str_src])
     else:
         lgr.debug(
             'File content not available, forced to reuse previous annex key: %s',
