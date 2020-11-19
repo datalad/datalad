@@ -279,7 +279,7 @@ def test_here(path):
     res.pop('annex-description', None)
     # volatile prop
     res.pop('available_local_disk_space', None)
-    ds.repo._run_annex_command('dead', annex_options=['here'])
+    ds.repo.call_annex(['dead', 'here'])
     newres = ds.siblings('query', name='here', return_type='item-or-list')
     newres.pop('available_local_disk_space', None)
     eq_(res, newres)

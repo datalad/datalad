@@ -716,7 +716,7 @@ def test_AnnexRepo_always_commit(path):
     repo.add(file1)
 
     # Now git-annex log should show the addition:
-    out, err = repo._run_annex_command('log')
+    out = repo.call_annex('log')
     out_list = out.rstrip(os.linesep).splitlines()
     eq_(len(out_list), 1)
     assert_in(file1, out_list[0])
@@ -731,7 +731,7 @@ def test_AnnexRepo_always_commit(path):
         # No additional git commit:
         eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
-        out, err = repo._run_annex_command('log')
+        out = repo.call_annex('log')
 
         # And we see only the file before always_commit was set to false:
         assert_in(file1, out)
@@ -741,7 +741,7 @@ def test_AnnexRepo_always_commit(path):
     # on the annex branches.
     repo.sync()
 
-    out, err = repo._run_annex_command('log')
+    out = repo.call_annex('log')
     assert_in(file1, out)
     assert_in(file2, out)
 
@@ -931,7 +931,7 @@ def test_v7_detached_get(opath, path):
     repo = AnnexRepo(path)
     # test getting in a detached HEAD
     repo.checkout('HEAD^{}')
-    repo._run_annex_command('upgrade')  # TODO: .upgrade ?
+    repo.call_annex(['upgrade'])  # TODO: .upgrade ?
 
     repo.get('file.dat')
     ok_file_has_content(op.join(repo.path, 'file.dat'), "content")
@@ -1332,7 +1332,7 @@ def test_annex_copy_to(origin, clone):
                 {"command":"copy","note":"checking target ...", "success":True,
                  "key":"akey3", "file":"existed"},
         ]
-    # Note that we patch _run_annex_command, which is also invoked by _run_annex_command_json
+    # Note that we patch _call_annex_records,
     # which is in turn invoked first by copy_to for "find" operation.
     # TODO: provide a dedicated handling within above ok_copy for 'find' command
     with patch.object(repo, '_call_annex_records', ok_copy):
@@ -2176,7 +2176,7 @@ def test_error_reporting(path):
     eq_(
         res,
         [{
-            'command': ['annex', 'add', '--json', '--json-error-messages'],
+            'command': 'add',
             # whole thing, despite space, properly quotes backslash
             'file': 'gl\\orious BS',
             'note': 'not found',

@@ -767,7 +767,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     if not repo.is_initialized() or description:
         repo._init(description=description)
     if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
-        repo._run_annex_command('untrust', annex_options=['here'])
+        repo.call_annex(['untrust', 'here'])
 
     elif reckless == 'ephemeral':
         # with ephemeral we declare 'here' as 'dead' right away, whenever

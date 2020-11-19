@@ -63,11 +63,7 @@ def _set_direct_mode(self, enable_direct_mode=True):
             cmd="git-annex indirect",
             msg="Can't switch to indirect mode on that filesystem.")
 
-    self._run_annex_command(
-        'direct' if enable_direct_mode else 'indirect',
-        expect_stderr=True,
-        runner="gitwitless"
-    )
+    self.call_annex(['direct' if enable_direct_mode else 'indirect']),
     self.config.reload()
 
     # For paranoid we will just re-request

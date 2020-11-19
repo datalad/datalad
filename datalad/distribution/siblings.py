@@ -564,13 +564,12 @@ def _configure_remote(
                     # XXX except it is not enough
 
                     # make special remote of type=git (see #335)
-                    ds.repo._run_annex_command(
+                    ds.repo.call_annex([
                         'initremote',
-                        annex_options=[
-                            as_common_datasrc,
-                            'type=git',
-                            'location={}'.format(url),
-                            'autoenable=true'])
+                        as_common_datasrc,
+                        'type=git',
+                        'location={}'.format(url),
+                        'autoenable=true'])
                 else:
                     yield dict(
                         status='impossible',
@@ -596,7 +595,7 @@ def _configure_remote(
             result_props['message'] = 'cannot set description of a plain Git repository'
             yield result_props
             return
-        ds.repo._run_annex_command('describe', annex_options=[name, description])
+        ds.repo.call_annex(['describe', name, description])
 
     # report all we know at once
     info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]

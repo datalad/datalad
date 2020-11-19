@@ -65,6 +65,7 @@ from datalad.cmd import (
     # KillOutput,
     run_gitcommand_on_file_list_chunks,
     SafeDelCloseMixin,
+    StdOutCapture,
     StdOutErrCapture,
     WitlessProtocol,
 )
@@ -1878,14 +1879,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             for f in files:
                 try:
-                    obj, _ = self._run_annex_command(
-                        'find', files=[f],
-                        annex_options=["--print0"],
-                        expect_fail=True,
+                    res = self._call_annex(
+                        ['find', "--print0"],
+                        files=[f],
                         merge_annex_branches=False,
-                        runner="gitwitless",
                     )
-                    items = obj.rstrip("\0").split("\0")
+                    items = res['stdout'].rstrip("\0").split("\0")
                     objects[f] = items[0] if len(items) == 1 else items
                 except CommandError:
                     objects[f] = ''
@@ -1986,14 +1985,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         options: list, optional
         """
 
+        # MIH thinks there should be no `env` argument at all
+        # https://github.com/datalad/datalad/issues/5162
+        env = env or self._git_runner.env
         try:
-            # TODO: outputs are nohow used/displayed. Eventually convert to
-            # to a generator style yielding our "dict records"
-            self._run_annex_command(
-                'enableremote',
-                annex_options=[name] + ensure_list(options),
-                runner="gitwitless",
-                env=env)
+            from unittest.mock import patch
+            with patch.object(self._git_runner, 'env', env):
+                # TODO: outputs are nohow used/displayed. Eventually convert to
+                # to a generator style yielding our "dict records"
+                self.call_annex(['enableremote', name] + ensure_list(options))
         except CommandError as e:
             if re.match(r'.*StatusCodeException.*statusCode = 401', e.stderr):
                 raise AccessDeniedError(e.stderr)
@@ -2172,16 +2172,25 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             lgr.warning("add_urls: git_options not yet implemented. Ignored.")
 
+        git_options = []
+        if cwd:
+            git_options.extend(('-C', cwd))
+
         if annex_options:
             lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
 
-        self._run_annex_command('addurl', annex_options=options + urls,
-                                backend=backend, log_online=True,
-                                log_stderr=False, cwd=cwd)
-        # Don't capture stderr, since download progress provided by wget uses
-        # stderr.
+        if backend:
+            options.extend(('--backend', backend))
+
+        self._call_annex(
+            ['addurl'] + options + urls,
+            git_options=git_options,
+            # Don't capture stderr, since download progress provided by wget uses
+            # stderr.
+            protocol=StdOutCapture,
+        )
 
         # currently simulating similar return value, assuming success
         # for all files:
@@ -2785,10 +2794,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise CommandNotAvailableError(
                 'git-annex migrate',
                 "Command 'migrate' is not available in direct mode.")
-        self._run_annex_command('migrate',
-                                annex_options=files,
-                                backend=backend,
-                                runner="gitwitless")
+        self._call_annex(
+            ['migrate'] + (['--backend', backend] if backend else []),
+            files=files,
+        )
 
     @classmethod
     def get_key_backend(cls, key):

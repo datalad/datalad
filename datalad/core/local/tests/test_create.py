@@ -344,7 +344,7 @@ def test_nested_create(path):
     #              on_failure='ignore', result_xfm=None, result_filter=None),
     #    status='error', action='add')
     # only way to make it work is to unannex the content upfront
-    ds.repo._run_annex_command('unannex', annex_options=[op.join(lvl2relpath, 'file')])
+    ds.repo.call_annex(['unannex', op.join(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself, but only on v5
     ds.repo.commit()
     # still nothing without force

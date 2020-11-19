@@ -1256,10 +1256,9 @@ def test_fetch_git_special_remote(url_path, url, path):
 
     clone_url = url + "special/.git"
     ds_a = clone(clone_url, path / "a")
-    ds_a.repo._run_annex_command(
-        "initremote",
-        annex_options=["special", "type=git", "autoenable=true",
-                       "location=" + clone_url])
+    ds_a.repo.call_annex(
+        ["initremote", "special", "type=git", "autoenable=true",
+         "location=" + clone_url])
 
     # Set up a situation where a file is present only on the special remote,
     # and its existence is known only to the special remote's git-annex branch.
