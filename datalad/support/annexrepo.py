@@ -48,7 +48,6 @@ from datalad.utils import (
     auto_repr,
     ensure_list,
     get_linux_distribution,
-    join_cmdline,
     on_windows,
     Path,
     PurePosixPath,
@@ -2597,40 +2596,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise ValueError(
                     "Received output %r from annex, whenever expect 0 or 1" % out
                 )
-
-    @normalize_paths(match_return_type=False)
-    def _annex_custom_command(
-            self, files, cmd_str, log_stdout=True, log_stderr=True,
-            log_online=False, expect_stderr=False, cwd=None, env=None,
-            shell=None, expect_fail=False):
-        """Allows for calling arbitrary commands.
-
-        Helper for developing purposes, i.e. to quickly implement git-annex
-        commands for proof of concept.
-
-        Parameters
-        ----------
-        files: list of files
-        cmd_str: str
-            arbitrary command str. `files` is appended to that string.
-
-        Returns
-        -------
-        stdout, stderr
-        """
-        cmd = split_cmdline(
-            cmd_str + " " + join_cmdline(files)) \
-            if isinstance(cmd_str, str) \
-            else cmd_str + files
-
-        if self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
-
-        return self.cmd_call_wrapper.run(
-            cmd,
-            log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
-            expect_stderr=expect_stderr,
-            cwd=cwd, env=env, shell=shell, expect_fail=expect_fail)
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):
