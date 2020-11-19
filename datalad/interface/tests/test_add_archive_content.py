@@ -304,7 +304,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo.get(opj('1', '1 f.txt'))  # and should be able to get it again
 
     # bug was that dropping didn't work since archive was dropped first
-    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.call_annex(["drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
     repo.get(key_1tar, key=True)

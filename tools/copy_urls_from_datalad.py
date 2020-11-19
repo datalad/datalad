@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # enable datalad special remote
     urls_to_register = defaultdict(list)  # key: urls
     try:
-        annex._annex_custom_command([], ["git", "annex", "enableremote", "datalad"])
+        annex.call_annex(["enableremote", "datalad"])
         # go through each and see where urls aren't yet under web
         # seems might have also --in=datalad to restrict
         w = annex.whereis([], options=['--all'], output='full')
@@ -54,10 +54,8 @@ if __name__ == '__main__':
     )
     for k, urls in tqdm(urls_to_register.items()):
         for url in urls:
-            annex._annex_custom_command(
-                [],
-                ["git", "annex", "registerurl", '-c', 'annex.alwayscommit=false', k, url]
-            )
+            annex.call_annex([
+                "registerurl", '-c', 'annex.alwayscommit=false', k, url])
     # to cause annex to commit all the changes
-    annex._annex_custom_command([], ["git", "annex", "merge"])
+    annex.call_annex(["merge"])
     annex.gc(allow_background=False)

@@ -774,7 +774,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def set_remote_dead(self, name):
         """Announce to annex that remote is "dead"
         """
-        return self._annex_custom_command([], ["git", "annex", "dead", name])
+        return self.call_annex(["dead", name])
 
     def is_remote_annex_ignored(self, remote):
         """Return True if remote is explicitly ignored"""
