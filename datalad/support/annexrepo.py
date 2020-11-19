@@ -50,7 +50,6 @@ from datalad.utils import (
     get_linux_distribution,
     join_cmdline,
     on_windows,
-    partition,
     Path,
     PurePosixPath,
     split_cmdline,
@@ -63,7 +62,6 @@ from datalad.cmd import (
     BatchedCommand,
     GitWitlessRunner,
     # KillOutput,
-    run_gitcommand_on_file_list_chunks,
     SafeDelCloseMixin,
     StdOutCapture,
     StdOutErrCapture,
@@ -89,7 +87,6 @@ from .exceptions import (
     InsufficientArgumentsError,
     OutOfSpaceError,
     RemoteNotAvailableError,
-    BrokenExternalDependency,
     OutdatedExternalDependency,
     MissingExternalDependency,
     NoSuchPathError,
@@ -1203,143 +1200,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "Expected {} to return single line, but it returned {}"
                 .format(["git", 'annex'] + args, lines))
         return lines[0] if lines else ''
-
-    def _run_annex_command(self, annex_cmd,
-                           git_options=None, annex_options=None,
-                           backend=None, jobs=None,
-                           files=None,
-                           merge_annex_branches=True,
-                           runner=None,
-                           protocol=None,
-                           **kwargs):
-        """Helper to run actual git-annex calls
-
-        Unifies annex command calls.
-
-        Parameters
-        ----------
-        annex_cmd: str
-            the actual git-annex command, like 'init' or 'add'
-        git_options: list of str
-            options to be passed to git
-        annex_options: list of str
-            options to be passed to the git-annex command
-        backend: str
-            backend to be used by this command; Currently this can also be
-            achieved by having an item '--backend=XXX' in annex_options.
-            This may change.
-        jobs : int
-        files: list, optional
-            If command passes list of files. If list is too long
-            (by number of files or overall size) it will be split, and multiple
-            command invocations will follow
-        merge_annex_branches: bool, optional
-            If False, annex.merge-annex-branches=false config will be set for
-            git-annex call.  Useful for operations which are not intended to
-            benefit from updating information about remote git-annexes
-        runner: {None, "gitwitless"}, optional
-            Use specified runner class instead of the bound Runner instance.
-        protocol : WitlessProtocol, optional
-            Protocol class to pass to GitWitlessRunner.run(). This is ignored
-            if `runner` is not "gitwitless".
-        **kwargs
-            these are passed as additional kwargs to .run() of the runner
-
-        Raises
-        ------
-        CommandNotAvailableError
-            if an annex command call returns "unknown command"
-        """
-        if self.git_annex_version is None:
-            self._check_git_annex_version()
-
-        debug = ['--debug'] if lgr.getEffectiveLevel() <= 8 else []
-        backend = ['--backend=%s' % backend] if backend else []
-
-        git_options = (git_options[:] if git_options else []) + self._ANNEX_GIT_COMMON_OPTIONS
-        annex_options = annex_options[:] if annex_options else []
-        if self._annex_common_options:
-            annex_options = self._annex_common_options + annex_options
-
-        if not self.always_commit:
-            git_options += ['-c', 'annex.alwayscommit=false']
-
-        if not merge_annex_branches:
-            git_options += ['-c', 'annex.merge-annex-branches=false']
-
-        if git_options:
-            cmd_list = ['git'] + git_options + ['annex']
-        else:
-            # Note: On Windows machines, for a yet unclear reason, git-annex may
-            # not be found as an executable. This is mitigated (again, for an
-            # unclear reason) by seperating the invocation into "git annex". See
-            # https://github.com/datalad/datalad/issues/4892 for original issue.
-            cmd_list = ['git', 'annex']
-        if jobs:
-            annex_options += ['-J%d' % jobs]
-
-        cmd_list += [annex_cmd] + backend + annex_options + debug
-
-        env = kwargs.pop("env", None)
-        if self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
-
-        if runner == "gitwitless":
-            if protocol:
-                _protocol = protocol
-            else:
-                log_streams = (kwargs.pop('log_stdout', True),
-                               kwargs.pop('log_stderr', True))
-                if any(map(callable, log_streams)):
-                    raise ValueError(
-                        "gitwitless is incompatible with callable"
-                        "for log_std{out,err}: log_stdout=%r, log_stderr=%r",
-                        log_streams[0], log_streams[1])
-
-                class _protocol(WitlessProtocol):
-                    proc_out = bool(log_streams[0])
-                    proc_err = bool(log_streams[1])
-            # expect_fail and expect_stderr were all about deciding level
-            # at which to log if error or stderr output.  With WitlessRunner
-            # and all the handling "from upstairs" we simply would do nothing
-            # special about it. But that ATM poses a risk of non-disclosing
-            # underlying problems to the user if caller of this is not handling
-            # out, err returned values anyhow.
-            # But decision making on either report stderr is "difficult" outside
-            # since annex --debug output also goes to stderr, thus occluding
-            # errors messages.  This is the point when we know that --debug
-            # is enabled, and probably need
-            # TODOs:
-            #  - convert all functions to generators/functions returning the
-            #    records (pass them up)
-            #  - upon debug, sanitize stderr output to exclude debug lines
-            #    (they start with [ISODATETIME]), and include those into
-            #    record
-            kwargs.pop('expect_fail', False)
-            kwargs.pop('expect_stderr', False)
-            run_func = self._git_runner.run
-            kwargs['protocol'] = _protocol
-        elif runner is None:
-            run_func = self.cmd_call_wrapper.run
-        else:
-            raise ValueError("Unknown runner %r" % runner)
-
-        try:
-            # TODO: RF to use --batch where possible instead of splitting
-            # into multiple invocations
-            return run_gitcommand_on_file_list_chunks(
-                run_func,
-                cmd_list,
-                files,
-                env=env,
-                **kwargs)
-        except CommandError as e:
-            if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
-                raise CommandNotAvailableError(str(cmd_list),
-                                               "Unknown command:"
-                                               " 'git-annex %s'" % annex_cmd,
-                                               e.code, e.stdout, e.stderr)
-            raise
 
     def _is_direct_mode_from_config(self):
         """Figure out if in direct mode from the git config.
