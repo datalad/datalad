@@ -62,10 +62,11 @@ def check_basic_scenario(url, d):
     with swallow_outputs() as cmo, swallow_logs() as cml:
         with assert_raises(CommandError) as cme:
             annex.add_urls([url + '_bogus'])
+            assert_in('addurl: 1 failed', cme.stderr)
         # assert_equal(cml.out, '')
         err, out = cmo.err, cmo.out
     assert_equal(out, '')
-    assert_in('addurl: 1 failed', err)
+    assert_equal(err, '')
     # and there should be nothing more
 
 
