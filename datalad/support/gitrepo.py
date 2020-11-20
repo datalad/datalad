@@ -2114,7 +2114,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
-                            read_only=True,
+                            read_only=False,
                             index_file=None,
                             updates_tree=False):
         """Allows for calling arbitrary commands.
