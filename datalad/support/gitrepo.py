@@ -999,7 +999,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 stdout, _ = self._call_git(
                     ['-C', path, 'ls-files'],
                     expect_fail=True,
-                    check_fake_dates=False,
+                    read_only=True,
                 )
                 if stdout:
                     raise PathKnownToRepositoryError(
@@ -1025,7 +1025,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # we don't want it to scream on stdout
                 expect_fail=True,
                 # there is no commit, and none will be made
-                check_fake_dates=False)
+                read_only=True)
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
@@ -1436,7 +1436,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 ensure_list(git_options) +
                 to_options(update=update) + ['--verbose'],
                 files=files,
-                check_fake_dates=True,
+                read_only=False,
             )
             # get all the entries
             for o in self._process_git_get_output(*add_out):
@@ -1583,7 +1583,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if count:
             cmd.append('--count={:d}'.format(count))
 
-        for line in self.call_git_items_(cmd, check_fake_dates=False):
+        for line in self.call_git_items_(cmd, read_only=True):
             props = line.split('\0')
             if len(fields) != len(props):
                 raise RuntimeError(
@@ -1807,7 +1807,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         try:
             stdout = self.call_git(
                 cmd, expect_stderr=True, expect_fail=True,
-                check_fake_dates=False)
+                read_only=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
                 raise ValueError("Unknown commit identifier: %s" % commitish)
@@ -1850,7 +1850,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if short:
             cmd.append('--short')
         try:
-            return self.call_git_oneline(cmd, check_fake_dates=False)
+            return self.call_git_oneline(cmd, read_only=True)
         except CommandError as e:
             if commitish is None:
                 return None
@@ -1865,7 +1865,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 ['rev-list', '-n1', 'HEAD'],
                 files=files,
                 expect_fail=True,
-                check_fake_dates=False,
+                read_only=True,
             )
             commit = commit.strip()
             return commit if commit else None
@@ -1902,7 +1902,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd = ["log", "--format={}".format(fmt)]
         cmd.extend((options or []) + revrange + ["--"])
         try:
-            stdout = self.call_git(cmd, expect_fail=True, check_fake_dates=False)
+            stdout = self.call_git(cmd, expect_fail=True, read_only=True)
         except CommandError as e:
             if "does not have any commits" in e.stderr:
                 return []
@@ -1926,7 +1926,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # exist.
         return self.call_git_success(
             ["rev-parse", "--verify", commitish + "^{commit}"],
-            check_fake_dates=False,
+            read_only=True,
         )
 
     def get_merge_base(self, commitishes):
@@ -1954,7 +1954,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         try:
             base = self.call_git_oneline(['merge-base'] + commitishes,
-                                         check_fake_dates=False)
+                                         read_only=True)
         except CommandError as exc:
             if exc.code == 1 and not (exc.stdout or exc.stderr):
                 # No merge base was found (unrelated commits).
@@ -1979,7 +1979,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         return self.call_git_success(
             ["merge-base", "--is-ancestor", reva, revb],
-            check_fake_dates=False)
+            read_only=True)
 
     def get_commit_date(self, branch=None, date='authored'):
         """Get the date stamp of the last commit (in a branch or head otherwise)
@@ -2015,7 +2015,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         try:
             out = self.call_git(["symbolic-ref", "HEAD"], expect_fail=True,
-                                check_fake_dates=False)
+                                read_only=True)
         except CommandError as e:
             if 'HEAD is not a symbolic ref' in e.stderr:
                 lgr.debug("detached HEAD in {0}".format(self))
@@ -2114,7 +2114,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
-                            check_fake_dates=False,
+                            read_only=True,
                             index_file=None,
                             updates_tree=False):
         """Allows for calling arbitrary commands.
@@ -2144,7 +2144,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
 
-        if check_fake_dates and self.fake_dates_enabled:
+        if not read_only and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
         if index_file:
@@ -2185,7 +2185,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     # processing or error handling.
 
     def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
-                  env=None, check_fake_dates=True):
+                  env=None, read_only=False):
         """Allows for calling arbitrary commands.
 
         Internal helper to the call_git*() methods.
@@ -2204,8 +2204,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool, optional
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
-        check_fake_dates : bool, optional
-          If enabled (default), inspect if dates should be faked for dataset
+        read_only : bool, optional
+          If False (default), do not assume that command does not introduce changes and
+          is merely out read/output information.
+          E.g., if not read_only, we would inspect if dates should be faked for dataset
           commits and set up the Git environment to ensure that. Must be
           disabled for repository initialization.
 
@@ -2223,7 +2225,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
 
         env = None
-        if check_fake_dates and self.fake_dates_enabled:
+        if not read_only and self.fake_dates_enabled:
             env = self.add_fake_dates(runner.env)
 
         out = err = None
@@ -2252,7 +2254,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         return out, err
 
     def call_git(self, args, files=None,
-                 expect_stderr=False, expect_fail=False, check_fake_dates=True):
+                 expect_stderr=False, expect_fail=False, read_only=False):
         """Call git and return standard output.
 
         Parameters
@@ -2281,11 +2283,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         out, _ = self._call_git(args, files,
                                 expect_stderr=expect_stderr,
                                 expect_fail=expect_fail,
-                                check_fake_dates=check_fake_dates)
+                                read_only=read_only)
         return out
 
     def call_git_items_(self, args, files=None, expect_stderr=False, sep=None,
-                        check_fake_dates=True):
+                        read_only=False):
         """Call git, splitting output on `sep`.
 
         Parameters
@@ -2311,10 +2313,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         CommandError if the call exits with a non-zero status.
         """
         out, _ = self._call_git(args, files, expect_stderr=expect_stderr,
-                                check_fake_dates=check_fake_dates)
+                                read_only=read_only)
         yield from (out.split(sep) if sep else out.splitlines())
 
-    def call_git_oneline(self, args, files=None, expect_stderr=False, check_fake_dates=True):
+    def call_git_oneline(self, args, files=None, expect_stderr=False, read_only=False):
         """Call git for a single line of output.
 
         Parameters
@@ -2338,14 +2340,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         lines = list(self.call_git_items_(args, files=files,
                                           expect_stderr=expect_stderr,
-                                          check_fake_dates=check_fake_dates))
+                                          read_only=read_only))
         if len(lines) > 1:
             raise AssertionError(
                 "Expected {} to return single line, but it returned {}"
                 .format(["git"] + args, lines))
         return lines[0]
 
-    def call_git_success(self, args, files=None, expect_stderr=False, check_fake_dates=True):
+    def call_git_success(self, args, files=None, expect_stderr=False, read_only=False):
         """Call git and return true if the call exit code of 0.
 
         Parameters
@@ -2367,7 +2369,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         try:
             self._call_git(
                 args, files, expect_fail=True, expect_stderr=expect_stderr,
-                check_fake_dates=check_fake_dates)
+                read_only=read_only)
 
         except CommandError:
             return False
