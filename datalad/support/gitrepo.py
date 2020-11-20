@@ -34,6 +34,7 @@ from os.path import (
 )
 
 import posixpath
+import threading
 from functools import wraps
 from weakref import (
     finalize,
@@ -880,6 +881,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           C='/my/path'   => -C /my/path
 
         """
+        # A lock to prevent multiple threads performing write operations in parallel
+        self._write_lock = threading.Lock()
+
         if self.git_version is None:
             self._check_git_version()
 
@@ -2230,6 +2234,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         out = err = None
         try:
+            if not read_only:
+                self._write_lock.acquire()
             out, err = run_gitcommand_on_file_list_chunks(
                 self._git_runner.run,
                 cmd,
@@ -2246,6 +2252,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                      paths=ignored.groups()[0].splitlines())
             lgr.log(5 if expect_fail else 11, str(e))
             raise
+        finally:
+            if not read_only:
+                self._write_lock.release()
 
         if err:
             for line in err.splitlines():
