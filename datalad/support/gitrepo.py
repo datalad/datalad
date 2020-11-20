@@ -2322,8 +2322,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_stderr : bool, optional
           Standard error is expected and should not be elevated above the DEBUG
           level.
-        sep : str, optional
-          Split the output by `str.split(sep)` rather than `str.splitlines`.
 
         Raises
         ------
