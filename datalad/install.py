@@ -21,6 +21,11 @@ log = logging.getLogger("datalad.install")
 
 
 def main():
+    logging.basicConfig(
+        format="%(asctime)s [%(levelname)-8s] %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+        level=logging.INFO,
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--adjust-bashrc",
