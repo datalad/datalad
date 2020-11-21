@@ -60,6 +60,11 @@ def main():
     )
     scm_miniconda.add_argument("-b", "--batch", action="store_true")
     scm_miniconda.add_argument("--path-miniconda")
+    scm_datalad = schemata.add_parser(
+        "datalad", help="Install Datalad via Miniconda; Linux, macOS only"
+    )
+    scm_datalad.add_argument("-b", "--batch", action="store_true")
+    scm_datalad.add_argument("--path-miniconda")
     args = parser.parse_args()
     if args.schema is None:
         args.schema = "conda-forge"
@@ -95,8 +100,13 @@ def main():
     elif args.schema == "miniconda":
         miniconda_path = args.path_miniconda
         if miniconda_path is None:
-            miniconda_path = tempfile.mkdtemp(prefix="ga-")
+            miniconda_path = os.path.join(tempfile.mkdtemp(prefix="ga-"), "miniconda")
         installer.install_miniconda(miniconda_path, batch=args.batch)
+    elif args.schema == "datalad":
+        miniconda_path = args.path_miniconda
+        if miniconda_path is None:
+            miniconda_path = os.path.join(tempfile.mkdtemp(prefix="ga-"), "miniconda")
+        installer.install_datalad(miniconda_path, batch=args.batch)
     else:
         raise RuntimeError(f"Invalid schema: {args.schema}")
 
@@ -331,6 +341,21 @@ class GitAnnexInstaller:
             if batch:
                 args.append("-b")
             subprocess.run(["bash", script_path] + args, check=True)
+
+    def install_datalad(self, miniconda_path, batch=False):
+        self.install_miniconda(miniconda_path, batch)
+        subprocess.run(
+            [
+                os.path.join(miniconda_path, "bin", "conda"),
+                "install",
+                "-q",
+                "-c",
+                "conda-forge",
+                "-y",
+                "datalad",
+            ],
+            check=True,
+        )
 
     def install_via_datalad_extensions_build(self):
         with tempfile.TemporaryDirectory() as tmpdir:
