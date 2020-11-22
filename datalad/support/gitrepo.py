@@ -2209,11 +2209,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
         read_only : bool, optional
-          If False (default), do not assume that command does not introduce changes and
-          is merely out read/output information.
-          E.g., if not read_only, we would inspect if dates should be faked for dataset
-          commits and set up the Git environment to ensure that. Must be
-          disabled for repository initialization.
+          If set to True, we assume that command does not introduce changes to recorded
+          in git information (commits, heads, tags) and merely reads/outputs information
+          (note: git might still adjust caches and index).
+          If set to False, we would inspect if dates should be faked for dataset
+          commits and set up the Git environment to ensure that.
 
         Returns
         -------
