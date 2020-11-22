@@ -2118,7 +2118,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
-                            read_only=False,
+                            check_fake_dates=False,
                             index_file=None,
                             updates_tree=False):
         """Allows for calling arbitrary commands.
@@ -2148,7 +2148,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
 
-        if not read_only and self.fake_dates_enabled:
+        if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
         if index_file:
