@@ -9,11 +9,9 @@ In hope that it could potentially work on IPv6 only setups
  datalad/tests/utils.py | 11 +++--------
  1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/datalad/tests/utils.py b/datalad/tests/utils.py
-index f2d1c5ef6..c1f3acd79 100644
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -610,14 +610,9 @@ class HTTPPath(object):
+@@ -629,14 +629,9 @@ class HTTPPath(object):
      def start(self):
          """Start serving `path` via HTTP.
          """
@@ -31,6 +29,3 @@ index f2d1c5ef6..c1f3acd79 100644
  
          queue = multiprocessing.Queue()
          self._mproc = multiprocessing.Process(
--- 
-2.27.0
-

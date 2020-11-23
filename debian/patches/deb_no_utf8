@@ -71,7 +71,7 @@ Last-Update: 2018-06-05
  @skip_if_on_windows  # likely would fail
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -58,7 +58,7 @@ novalue
+@@ -57,7 +57,7 @@ novalue
  empty =
  myint = 3
  
@@ -80,7 +80,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -84,16 +84,16 @@ def test_something(path, new_home):
+@@ -83,16 +83,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -100,7 +100,7 @@ Last-Update: 2018-06-05
           ('something.empty', ''),
           ('something.myint', '3'),
           ('something.novalue', None),
-@@ -110,7 +110,7 @@ def test_something(path, new_home):
+@@ -109,7 +109,7 @@ def test_something(path, new_home):
          cfg.get('something.user'),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -109,7 +109,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      # git demands a key without value at all to be used as a flag, thus True
-@@ -129,8 +129,8 @@ def test_something(path, new_home):
+@@ -128,8 +128,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -209,7 +209,7 @@ Last-Update: 2018-06-05
          eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1438,7 +1438,9 @@ OBSCURE_FILENAMES = (
+@@ -1460,7 +1460,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -217,12 +217,12 @@ Last-Update: 2018-06-05
 +# Debian: unfortunately unicode without locales setup causes git-annex to puke
 +# https://git-annex.branchable.com/bugs/fails_to_init_under_a_directory_with_a___34__tricky__34___name/
 +UNICODE_FILENAME = u""
-
+ 
  # OSX is exciting -- some I guess FS might be encoding differently from decoding
  # so Й might get recoded
 --- a/datalad/core/local/tests/test_diff.py
 +++ b/datalad/core/local/tests/test_diff.py
-@@ -501,9 +501,12 @@ def test_diff_rsync_syntax(path):
+@@ -500,9 +500,12 @@ def test_diff_rsync_syntax(path):
  
  @with_tempfile(mkdir=True)
  def test_diff_nonexistent_ref_unicode(path):
