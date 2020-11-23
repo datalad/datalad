@@ -1621,7 +1621,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # reports a type change as modified.
         modified = [
             f for f in self.call_git_items_(
-                ['diff', '--name-only', '-z'], sep='\0',
+                ['diff-files', '--name-only', '-z'], sep='\0',
                 read_only=True)
             if f] if pointers else []
         annex_res = fn(files, normalize_paths=False, batch=batch)
