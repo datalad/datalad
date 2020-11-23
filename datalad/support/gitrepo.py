@@ -2209,11 +2209,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
         read_only : bool, optional
-          If set to True, we assume that command does not introduce changes to recorded
-          in git information (commits, heads, tags) and merely reads/outputs information
-          (note: git might still adjust caches and index).
-          If set to False, we would inspect if dates should be faked for dataset
-          commits and set up the Git environment to ensure that.
+          By setting this to True, the caller indicates that the command does
+          not write to the repository, which lets this function skip some
+          operations that are necessary only for commands the modify the
+          repository. Beware that even commands that are conceptually
+          read-only, such as `git-status` and `git-diff`, may refresh and write
+          the index.
 
         Returns
         -------
