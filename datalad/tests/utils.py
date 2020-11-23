@@ -629,9 +629,14 @@ class HTTPPath(object):
     def start(self):
         """Start serving `path` via HTTP.
         """
-        # Generally avoid IPv4 addresses, use names, so testing could be done
-        # also on IPv6 only setups (see https://bugs.debian.org/963856)
-        hostname = 'localhost'
+        # There is a problem with Haskell on wheezy trying to
+        # fetch via IPv6 whenever there is a ::1 localhost entry in
+        # /etc/hosts.  Apparently fixing that docker image reliably
+        # is not that straightforward, although see
+        # http://jasonincode.com/customizing-hosts-file-in-docker/
+        # so we just force to use 127.0.0.1 while on wheezy
+        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
         self._mproc = multiprocessing.Process(
@@ -1455,9 +1460,7 @@ def with_parametric_batch(t):
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 # Those will be tried to be added to the base name if filesystem allows
 OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
-# Debian: unfortunately unicode without locales setup causes git-annex to puke
-# https://git-annex.branchable.com/bugs/fails_to_init_under_a_directory_with_a___34__tricky__34___name/
-UNICODE_FILENAME = u""
+UNICODE_FILENAME = u"ΔЙקم๗あ"
 
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded

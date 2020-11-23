@@ -154,29 +154,29 @@ def test_py2_unicode_command(path):
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
     cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                         touch_cmd,
-                                        u"bB0.dat")
+                                        u"bβ0.dat")
     ds.run(cmd_str)
     assert_repo_status(ds.path)
-    ok_exists(op.join(path, u"bB0.dat"))
+    ok_exists(op.join(path, u"bβ0.dat"))
 
     # somewhat desperate attempt to detect our own Github CI tests on a
     # crippled filesystem (VFAT) that is so crippled that it doesn't handle
     # what is needed here. It just goes mad with encoded bytestrings:
     # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
     if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
-        ds.run([sys.executable, "-c", touch_cmd, u"bB1.dat"])
+        ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
         assert_repo_status(ds.path)
-        ok_exists(op.join(path, u"bB1.dat"))
+        ok_exists(op.join(path, u"bβ1.dat"))
 
         # Send in a list of byte-strings to mimic a py2 command-line
         # invocation.
         ds.run([s.encode("utf-8")
-                for s in [sys.executable, "-c", touch_cmd, u" B1 "]])
+                for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
         assert_repo_status(ds.path)
-        ok_exists(op.join(path, u" B1 "))
+        ok_exists(op.join(path, u" β1 "))
 
     with assert_raises(CommandError), swallow_outputs():
-        ds.run(u"bB2.dat")
+        ds.run(u"bβ2.dat")
 
 
 @with_tempfile(mkdir=True)
