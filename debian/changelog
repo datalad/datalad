@@ -3,7 +3,11 @@ datalad (0.13.5-1) unstable; urgency=medium
   [ Michael Hanke ]
   * New upstream release (skipped 0.13.4)
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 23 Nov 2020 18:16:27 -0500
+  [ Yaroslav Halchenko ]
+  * Skip test_basics as a quick workaround fro
+  https://github.com/datalad/datalad/issues/4753
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 23 Nov 2020 22:32:49 -0500
 
 datalad (0.13.3-1) unstable; urgency=medium
 
