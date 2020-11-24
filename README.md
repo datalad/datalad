@@ -102,11 +102,6 @@ are available, so you could provide enhanced installation via
 - `full`
      to install all dependencies.
 
-There is also a [Singularity container](http://singularity.lbl.gov) available.
-The latest release version can be obtained by running:
-
-    singularity pull shub://datalad/datalad
-
 More details on installation and initial configuration could be found in the
 [DataLad Handbook: Installation].
 
