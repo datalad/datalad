@@ -16,7 +16,7 @@ from ..consts import (
 from ..dochelpers import exc_str
 from ..downloaders.credentials import UserPassword
 from ..ui import ui
-from ..utils import unique, assure_list, assure_tuple_or_list
+from ..utils import unique, ensure_list, ensure_tuple_or_list
 
 from .exceptions import (
     AccessDeniedError,
@@ -99,7 +99,9 @@ def _gen_github_ses(github_login, github_passwd):
 
     # see if we have tokens - might be many. Doesn't cost us much so get at once
     all_tokens = tokens = unique(
-        assure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None)),
+        # use get_all=True to support specification of multiple tokens
+        # using identical config keys
+        ensure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None, get_all=True)),
         reverse=True
     )
 
@@ -331,8 +333,12 @@ def _make_github_repos(
                     dryrun)
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
-                res.append((ds,) + assure_tuple_or_list(res_))
-            except gh.BadCredentialsException as e:
+                res.append((ds,) + ensure_tuple_or_list(res_))
+            except (gh.BadCredentialsException, gh.GithubException) as e:
+                if not isinstance(e, gh.BadCredentialsException) and e.status != 403:
+                    # e.g. while deleting a repository, just a generic GithubException is
+                    # raised but code is 403.  That one we process, the rest - re-raise
+                    raise
                 if res:
                     # so we have succeeded with at least one repo already -
                     # we should not try any other credential.
@@ -384,8 +390,30 @@ def _make_github_repo(github_login, entity, reponame, existing,
                 lgr.error(msg)
             else:
                 raise ValueError(msg)
+        elif existing == 'replace':
+            _msg = 'repository "%s" already exists on GitHub.' % reponame
+            if dryrun:
+                lgr.info(_msg + " Deleting (dry)")
+            else:
+                # Since we are running in the loop trying different tokens,
+                # this message might appear twice. TODO: avoid
+                if ui.is_interactive:
+                    remove = ui.yesno(
+                        "Do you really want to remove it?",
+                        title=_msg,
+                        default=False
+                    )
+                else:
+                    raise RuntimeError(
+                        _msg +
+                        " Remove it manually first on GitHub or rerun datalad in "
+                        "interactive shell to confirm this action.")
+                if not remove:
+                    raise RuntimeError(_msg)
+                repo.delete()
+                repo = None
         else:
-            RuntimeError('to must not happen')
+            RuntimeError('must not happen')
 
     if repo is None and not dryrun:
         try:

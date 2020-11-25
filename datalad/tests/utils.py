@@ -80,7 +80,6 @@ from datalad.utils import (
     ensure_unicode,
 )
 
-from ..cmd import Runner
 from .. import utils
 from ..support.exceptions import (
     CommandError,
@@ -96,6 +95,10 @@ from ..consts import (
     ARCHIVES_TEMP_DIR,
 )
 from . import _TEMP_PATHS_GENERATED
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+)
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -172,10 +175,10 @@ def skip_if_no_network(func=None):
         @wraps(func)
         @attr('network')
         @attr('skip_if_no_network')
-        def newfunc(*args, **kwargs):
+        def  _wrap_skip_if_no_network(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        return newfunc
+        return  _wrap_skip_if_no_network
     else:
         check_and_raise()
 
@@ -192,10 +195,10 @@ def skip_if_on_windows(func=None):
     if func:
         @wraps(func)
         @attr('skip_if_on_windows')
-        def newfunc(*args, **kwargs):
+        def  _wrap_skip_if_on_windows(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        return newfunc
+        return  _wrap_skip_if_on_windows
     else:
         check_and_raise()
 
@@ -215,10 +218,10 @@ def skip_if_root(func=None):
     if func:
         @wraps(func)
         @attr('skip_if_root')
-        def newfunc(*args, **kwargs):
+        def  _wrap_skip_if_root(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        return newfunc
+        return  _wrap_skip_if_root
     else:
         check_and_raise()
 
@@ -244,7 +247,7 @@ def skip_if(func, cond=True, msg=None, method='raise'):
     check_not_generatorfunction(func)
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_if(*args, **kwargs):
         if cond:
             if method == 'raise':
                 raise SkipTest(msg if msg else "condition was True")
@@ -252,7 +255,7 @@ def skip_if(func, cond=True, msg=None, method='raise'):
                 print(msg if msg else "condition was True")
                 return
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_if
 
 
 def skip_ssh(func):
@@ -264,12 +267,31 @@ def skip_ssh(func):
 
     @wraps(func)
     @attr('skip_ssh')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_ssh(*args, **kwargs):
         test_ssh = dl_cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_ssh
+
+
+def skip_nomultiplex_ssh(func):
+    """Skips SSH tests if default connection/manager does not support multiplexing
+
+    e.g. currently on windows or if set via datalad.ssh.multiplex-connections config variable
+    """
+
+    check_not_generatorfunction(func)
+    from ..support.sshconnector import MultiplexSSHManager, SSHManager
+
+    @wraps(func)
+    @attr('skip_nomultiplex_ssh')
+    @skip_ssh
+    def  _wrap_skip_nomultiplex_ssh(*args, **kwargs):
+        if SSHManager is not MultiplexSSHManager:
+            raise SkipTest("SSH without multiplexing is used")
+        return func(*args, **kwargs)
+    return  _wrap_skip_nomultiplex_ssh
 
 
 @optional_args
@@ -291,9 +313,9 @@ def skip_v6_or_later(func, method='raise'):
     @wraps(func)
     @attr('skip_v6_or_later')
     @attr('v6_or_later')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_v6_or_later(*args, **kwargs):
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_v6_or_later
 
 
 #
@@ -542,7 +564,7 @@ def ok_file_has_content(path, content, strip=False, re_=False,
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
     @wraps(t)
-    def newfunc(*arg, **kw):
+    def  _wrap_with_tree(*arg, **kw):
         if 'dir' not in tkwargs.keys():
             # if not specified otherwise, respect datalad.tests.temp.dir config
             # as this is a test helper
@@ -555,7 +577,7 @@ def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
         finally:
             if delete:
                 rmtemp(d)
-    return newfunc
+    return  _wrap_with_tree
 
 
 lgr = logging.getLogger('datalad.tests')
@@ -650,7 +672,7 @@ def serve_path_via_http(tfunc, *targs):
 
     @wraps(tfunc)
     @attr('serve_path_via_http')
-    def newfunc(*args, **kwargs):
+    def  _wrap_serve_path_via_http(*args, **kwargs):
 
         if targs:
             # if a path is passed into serve_path_via_http, then it's in targs
@@ -664,7 +686,7 @@ def serve_path_via_http(tfunc, *targs):
 
         with HTTPPath(path) as url:
             return tfunc(*(args + (path, url)), **kwargs)
-    return newfunc
+    return  _wrap_serve_path_via_http
 
 
 @optional_args
@@ -673,22 +695,24 @@ def with_memory_keyring(t):
     """
     @wraps(t)
     @attr('with_memory_keyring')
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_memory_keyring(*args, **kwargs):
         keyring = MemoryKeyring()
         with patch("datalad.downloaders.credentials.keyring_", keyring):
             return t(*(args + (keyring,)), **kwargs)
 
-    return newfunc
+    return  _wrap_with_memory_keyring
 
 
 @optional_args
 def without_http_proxy(tfunc):
     """Decorator to remove http*_proxy env variables for the duration of the test
     """
-
+    
     @wraps(tfunc)
     @attr('without_http_proxy')
-    def newfunc(*args, **kwargs):
+    def  _wrap_without_http_proxy(*args, **kwargs):
+        if on_windows:
+            raise SkipTest('Unclear why this is not working on windows')
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
@@ -697,7 +721,7 @@ def without_http_proxy(tfunc):
         with patch.dict('os.environ', env, clear=True):
             return tfunc(*args, **kwargs)
 
-    return newfunc
+    return  _wrap_without_http_proxy
 
 
 @borrowkwargs(methodname=make_tempfile)
@@ -722,7 +746,7 @@ def with_tempfile(t, **tkwargs):
     """
 
     @wraps(t)
-    def newfunc(*arg, **kw):
+    def  _wrap_with_tempfile(*arg, **kw):
         if 'dir' not in tkwargs.keys():
             # if not specified otherwise, respect datalad.tests.temp.dir config
             # as this is a test helper
@@ -730,7 +754,7 @@ def with_tempfile(t, **tkwargs):
         with make_tempfile(wrapped=t, **tkwargs) as filename:
             return t(*(arg + (filename,)), **kw)
 
-    return newfunc
+    return  _wrap_with_tempfile
 
 
 # ### ###
@@ -747,7 +771,7 @@ def probe_known_failure(func):
 
     @wraps(func)
     @attr('probe_known_failure')
-    def newfunc(*args, **kwargs):
+    def  _wrap_probe_known_failure(*args, **kwargs):
         if dl_cfg.obtain("datalad.tests.knownfailures.probe"):
             assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
             # Note: Since assert_raises lacks a `msg` argument, a comment
@@ -756,7 +780,7 @@ def probe_known_failure(func):
             # wouldn't be very telling.
         else:
             return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_probe_known_failure
 
 
 @optional_args
@@ -772,9 +796,9 @@ def skip_known_failure(func, method='raise'):
              method=method)
     @wraps(func)
     @attr('skip_known_failure')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_known_failure(*args, **kwargs):
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_known_failure
 
 
 def known_failure(func):
@@ -788,9 +812,9 @@ def known_failure(func):
     @probe_known_failure
     @wraps(func)
     @attr('known_failure')
-    def newfunc(*args, **kwargs):
+    def  _wrap_known_failure(*args, **kwargs):
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_known_failure
 
 
 def known_failure_v6_or_later(func):
@@ -893,6 +917,20 @@ def known_failure_githubci_win(func):
     return func
 
 
+def known_failure_githubci_osx(func):
+    """Test decorator for a known test failure on Github's macOS CI
+    """
+    if 'GITHUB_WORKFLOW' in os.environ and on_osx:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_githubci_osx')
+        @attr('githubci_osx')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
 # ### ###
 # END known failure decorators
 # ### ###
@@ -914,22 +952,17 @@ def _get_resolved_flavors(flavors):
 
 
 def clone_url(url):
-    # delay import of our code until needed for certain
-    from ..cmd import Runner
-    runner = Runner()
+    runner = GitWitlessRunner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
         {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
-    _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    runner.run(["git", "clone", url, tdir], protocol=KillOutput)
     if GitRepo(tdir).is_with_annex():
         AnnexRepo(tdir, init=True)
     _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
 
-if not on_windows:
-    local_testrepo_flavors = ['local'] # 'local-url'
-else:
-    local_testrepo_flavors = ['network-clone']
+local_testrepo_flavors = ['local'] # 'local-url'
 
 _TESTREPOS = None
 
@@ -992,9 +1025,6 @@ def _get_testrepos_uris(regex, flavors):
     return uris
 
 
-# addurls with our generated file:// URLs doesn't work on appveyor
-# https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
-@known_failure_appveyor
 @optional_args
 def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     """Decorator to provide a local/remote test repository
@@ -1030,7 +1060,11 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     """
     @wraps(t)
     @attr('with_testrepos')
-    def newfunc(*arg, **kw):
+    def  _wrap_with_testrepos(*arg, **kw):
+        # addurls with our generated file:// URLs doesn't work on appveyor
+        # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
+        if 'APPVEYOR' in os.environ:
+            raise SkipTest("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1065,7 +1099,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
-    return newfunc
+    return  _wrap_with_testrepos
 with_testrepos.__test__ = False
 
 
@@ -1086,7 +1120,7 @@ def with_sameas_remote(func, autoenabled=False):
     @skip_ssh
     @with_tempfile(mkdir=True)
     @with_tempfile(mkdir=True)
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_sameas_remote(*args, **kwargs):
         # With git-annex's 8.20200522-77-g1f2e2d15e, transferring from an rsync
         # special remote hangs on Xenial. This is likely due to an interaction
         # with an older rsync or openssh version. Use openssh as a rough
@@ -1117,7 +1151,7 @@ def with_sameas_remote(func, autoenabled=False):
             # This should have --sameas support.
             raise
         return func(*(fn_args + (repo,)), **kwargs)
-    return newfunc
+    return  _wrap_with_sameas_remote
 
 
 @optional_args
@@ -1128,14 +1162,14 @@ def with_fake_cookies_db(func, cookies={}):
 
     @wraps(func)
     @attr('with_fake_cookies_db')
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_fake_cookies_db(*args, **kwargs):
         try:
             orig_cookies_db = cookies_db._cookies_db
             cookies_db._cookies_db = cookies.copy()
             return func(*args, **kwargs)
         finally:
             cookies_db._cookies_db = orig_cookies_db
-    return newfunc
+    return  _wrap_with_fake_cookies_db
 
 
 @optional_args
@@ -1150,7 +1184,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
     """
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_assert_cwd_unchanged(*args, **kwargs):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
         exc_info = None
@@ -1189,7 +1223,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         return ret
 
-    return newfunc
+    return  _wrap_assert_cwd_unchanged
 
 
 @optional_args
@@ -1207,7 +1241,7 @@ def run_under_dir(func, newdir='.'):
     """
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_run_under_dir(*args, **kwargs):
         pwd_before = getpwd()
         try:
             chpwd(newdir)
@@ -1216,7 +1250,7 @@ def run_under_dir(func, newdir='.'):
             chpwd(pwd_before)
 
 
-    return newfunc
+    return  _wrap_run_under_dir
 
 
 def assert_re_in(regex, c, flags=0, match=True, msg=None):
@@ -1278,8 +1312,8 @@ def assert_status(label, results):
     `label` can be a sequence, in which case status must be one of the items
     in this sequence.
     """
-    label = assure_list(label)
-    results = assure_list(results)
+    label = ensure_list(label)
+    results = ensure_list(results)
     for i, r in enumerate(results):
         try:
             assert_in('status', r)
@@ -1298,7 +1332,7 @@ def assert_message(message, results):
     This only tests the message template string, and not a formatted message
     with args expanded.
     """
-    for r in assure_list(results):
+    for r in ensure_list(results):
         assert_in('message', r)
         m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
         assert_equal(m, message)
@@ -1313,7 +1347,7 @@ def _format_res(x):
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
-    results = assure_list(results)
+    results = ensure_list(results)
     for r in results:
         if not len(kwargs):
             count += 1
@@ -1333,7 +1367,7 @@ def assert_in_results(results, **kwargs):
     """Verify that the particular combination of keys and values is found in
     one of the results"""
     found = False
-    for r in assure_list(results):
+    for r in ensure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
     if not found:
@@ -1345,7 +1379,7 @@ def assert_in_results(results, **kwargs):
 def assert_not_in_results(results, **kwargs):
     """Verify that the particular combination of keys and values is not in any
     of the results"""
-    for r in assure_list(results):
+    for r in ensure_list(results):
         assert any(k not in r or r[k] != v for k, v in kwargs.items())
 
 
@@ -1367,7 +1401,7 @@ def assert_result_values_cond(results, prop, cond):
     prop: str
     cond: callable
     """
-    for r in assure_list(results):
+    for r in ensure_list(results):
         ok_(cond(r[prop]),
             msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
 
@@ -1402,11 +1436,11 @@ def skip_httpretty_on_problematic_pythons(func):
     """
 
     @make_decorator(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_httpretty_on_problematic_pythons(*args, **kwargs):
         if sys.version_info[:3] == (3, 4, 2):
             raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_httpretty_on_problematic_pythons
 
 
 @optional_args
@@ -1414,31 +1448,20 @@ def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
     """
     @wraps(t)
-    def newfunc():
+    def  _wrap_with_parametric_batch():
         for batch in (False, True):
                 yield t, batch
 
-    return newfunc
+    return  _wrap_with_parametric_batch
 
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
-OBSCURE_FILENAMES = (
-    u" \"';a&b/&c `| ",  # shouldn't be supported anywhere I guess due to /
-    u" \"';a&b&c `| ",
-    u" \"';abc `| ",
-    u" \"';abc | ",
-    u" \"';abc ",
-    u" ;abc ",
-    u" ;abc",
-    u" ab c ",
-    u" ab c",
-    u"ac",
-    u" ab .datc ",
-    u"ab .datc ",  # they all should at least support spaces and dots
-)
+# Those will be tried to be added to the base name if filesystem allows
+OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
 UNICODE_FILENAME = u"ΔЙקم๗あ"
+
 # OSX is exciting -- some I guess FS might be encoding differently from decoding
 # so Й might get recoded
 # (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
@@ -1449,35 +1472,61 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_windows:
         # TODO: really figure out unicode handling on windows
         UNICODE_FILENAME = ''
-    # Prepend the list with unicode names first
-    OBSCURE_FILENAMES = tuple(
-        f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
-    ) + OBSCURE_FILENAMES
+    if UNICODE_FILENAME:
+        OBSCURE_FILENAME_PARTS.append(UNICODE_FILENAME)
+# space before extension, simple extension and trailing space to finish it up
+OBSCURE_FILENAME_PARTS += [' ', '.datc', ' ']
 
 
 @with_tempfile(mkdir=True)
-def get_most_obscure_supported_name(tdir):
+def get_most_obscure_supported_name(tdir, return_candidates=False):
     """Return the most obscure filename that the filesystem would support under TEMPDIR
 
+    Parameters
+    ----------
+    return_candidates: bool, optional
+      if True, return a tuple of (good, candidates) where candidates are "partially"
+      sorted from trickiest considered
     TODO: we might want to use it as a function where we would provide tdir
     """
-    for filename in OBSCURE_FILENAMES:
-        filename = OBSCURE_PREFIX + filename
-        if on_windows and filename.rstrip() != filename:
-            continue
+    # we need separate good_base so we do not breed leading/trailing spaces
+    initial = good = OBSCURE_PREFIX
+    system = platform.system()
+
+    OBSCURE_FILENAMES = []
+    def good_filename(filename):
+        OBSCURE_FILENAMES.append(candidate)
         try:
-            with open(opj(tdir, filename), 'w') as f:
+            # Windows seems to not tollerate trailing spaces and
+            # ATM we do not distinguish obscure filename and dirname.
+            # So here we will test for both - being able to create dir
+            # with obscure name and obscure filename under
+            os.mkdir(opj(tdir, filename))
+            with open(opj(tdir, filename, filename), 'w') as f:
                 f.write("TEST LOAD")
-            return filename  # it will get removed as a part of wiping up the directory
+            return True
         except:
             lgr.debug("Filename %r is not supported on %s under %s",
-                      filename, platform.system(), tdir)
-            pass
-    raise RuntimeError("Could not create any of the files under %s among %s"
+                      filename, system, tdir)
+            return False
+
+    # incrementally build up the most obscure filename from parts
+    for part in OBSCURE_FILENAME_PARTS:
+        candidate = good + part
+        if good_filename(candidate):
+            good = candidate
+
+    if good == initial:
+        raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+    lgr.debug("Tested %d obscure filename candidates. The winner: %r", len(OBSCURE_FILENAMES), good)
+    if return_candidates:
+        return good, OBSCURE_FILENAMES[::-1]
+    else:
+        return good
 
 
-OBSCURE_FILENAME = get_most_obscure_supported_name()
+OBSCURE_FILENAME, OBSCURE_FILENAMES = get_most_obscure_supported_name(return_candidates=True)
 
 
 @optional_args
@@ -1485,7 +1534,7 @@ def with_testsui(t, responses=None, interactive=True):
     """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
 
     @wraps(t)
-    def newfunc(*args, **kwargs):
+    def  _wrap_with_testsui(*args, **kwargs):
         from datalad.ui import ui
         old_backend = ui.backend
         try:
@@ -1503,7 +1552,7 @@ def with_testsui(t, responses=None, interactive=True):
     if not interactive and responses is not None:
         raise ValueError("Non-interactive UI cannot provide responses")
 
-    return newfunc
+    return  _wrap_with_testsui
 
 with_testsui.__test__ = False
 
@@ -1511,7 +1560,7 @@ with_testsui.__test__ = False
 def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
-    def new_func(*args, **kwargs):
+    def  _wrap_assert_no_errors_logged(*args, **kwargs):
         with swallow_logs(new_level=logging.ERROR) as cml:
             out = func(*args, **kwargs)
             if cml.out:
@@ -1522,7 +1571,7 @@ def assert_no_errors_logged(func, skip_re=None):
                     )
         return out
 
-    return new_func
+    return  _wrap_assert_no_errors_logged
 
 
 def get_mtimes_and_digests(target_path):
@@ -1860,11 +1909,11 @@ def skip_wo_symlink_capability(func):
     """
     @wraps(func)
     @attr('skip_wo_symlink_capability')
-    def newfunc(*args, **kwargs):
+    def  _wrap_skip_wo_symlink_capability(*args, **kwargs):
         if not has_symlink_capability():
             raise SkipTest("no symlink capabilities")
         return func(*args, **kwargs)
-    return newfunc
+    return  _wrap_skip_wo_symlink_capability
 
 
 def get_ssh_port(host):
@@ -1917,8 +1966,12 @@ def get_ssh_port(host):
 
 def patch_config(vars):
     """Patch our config with custom settings. Returns mock.patch cm
+
+    Only the merged configuration from all sources (global, local, dataset)
+    will be patched. Source-constrained patches (e.g. only committed dataset
+    configuration) are not supported.
     """
-    return patch.dict(dl_cfg._store, vars)
+    return patch.dict(dl_cfg._merged_store, vars)
 
 
 @contextmanager
@@ -1969,25 +2022,33 @@ from nose.plugins.attrib import attr
 def integration(f):
     """Mark test as an "integration" test which generally is not needed to be run
     
-    Generally tend to be slower
+    Generally tend to be slower.
+    Should be used in combination with @slow and @turtle if that is the case.
     """
     return attr('integration')(f)
 
 
 def slow(f):
     """Mark test as a slow, although not necessarily integration or usecase test
+
+    Rule of thumb cut-off to mark as slow is 10 sec
     """
     return attr('slow')(f)
 
 
 def turtle(f):
     """Mark test as very slow, meaning to not run it on Travis due to its
-    time limit"""
+    time limit
+
+    Rule of thumb cut-off to mark as turtle is 2 minutes
+    """
     return attr('turtle')(f)
 
 
 def usecase(f):
     """Mark test as a usecase user ran into and which (typically) caused bug report
     to be filed/troubleshooted
+
+    Should be used in combination with @slow and @turtle if slow.
     """
     return attr('usecase')(f)

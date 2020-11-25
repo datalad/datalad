@@ -12,7 +12,7 @@ import os
 import os.path as op
 
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     Path,
     on_windows,
     rmtree,
@@ -398,10 +398,10 @@ def test_add_files(path):
             status = ds.repo.annexstatus(['dir'])
         else:
             result = ds.save(arg[0], to_git=arg[1])
-            for a in assure_list(arg[0]):
+            for a in ensure_list(arg[0]):
                 assert_result_count(result, 1, path=str(ds.pathobj / a))
             status = ds.repo.get_content_annexinfo(
-                ut.Path(p) for p in assure_list(arg[0]))
+                ut.Path(p) for p in ensure_list(arg[0]))
         for f, p in status.items():
             if arg[1]:
                 assert p.get('key', None) is None, f
@@ -570,7 +570,7 @@ def test_add_recursive(path):
 
     # recursive add should not even touch sub1, because
     # it knows that it is clean
-    res = parent.save(recursive=True)
+    res = parent.save(recursive=True, jobs=5)
     # the key action is done
     assert_result_count(
         res, 1, path=op.join(subsub.path, 'new'), action='add', status='ok')
@@ -834,3 +834,14 @@ def test_save_dotfiles():
     for git in [True, False, None]:
         for save_path in [None, "nodot-subdir"]:
             yield check_save_dotfiles, git, save_path
+
+
+@with_tempfile
+def test_save_nested_subs_explicit_paths(path):
+    ds = Dataset(path).create()
+    spaths = [Path("s1"), Path("s1", "s2"), Path("s1", "s2", "s3")]
+    for spath in spaths:
+        Dataset(ds.pathobj / spath).create()
+    ds.save(path=spaths)
+    eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
+        set(map(str, spaths)))

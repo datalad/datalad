@@ -17,6 +17,7 @@ import logging
 import wrapt
 import sys
 import re
+from time import time
 from os import curdir
 from os import pardir
 from os import listdir
@@ -35,7 +36,7 @@ from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge c
 from datalad.utils import (
     path_startswith,
     path_is_subpath,
-    assure_unicode,
+    ensure_unicode,
     getargspec,
     get_wrapped_class,
 )
@@ -55,7 +56,6 @@ from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
-from datalad.config import ConfigManager
 from datalad.core.local.resulthooks import (
     get_jsonhooks_from_config,
     match_jsonhook2result,
@@ -231,7 +231,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     filematch = False
     if isdir(basepath):
         for p in listdir(basepath):
-            p = assure_unicode(opj(basepath, p))
+            p = ensure_unicode(opj(basepath, p))
             if not isdir(p):
                 if p in targetpaths:
                     filematch = True
@@ -367,20 +367,8 @@ def eval_results(func):
         from datalad.distribution.dataset import Dataset
         ds = dataset_arg if isinstance(dataset_arg, Dataset) \
             else Dataset(dataset_arg) if dataset_arg else None
-        # do not reuse a dataset's existing config manager here
-        # they are configured to read the committed dataset configuration
-        # too. That means a datalad update can silently bring in new
-        # procedure definitions from the outside, and in some sense enable
-        # remote code execution by a 3rd-party
-        # To avoid that, create a new config manager that only reads local
-        # config (system and .git/config), plus any overrides given to this
-        # datalad session
-        proc_cfg = ConfigManager(
-            ds, source='local', overrides=dlcfg.overrides
-        ) if ds and ds.is_installed() else dlcfg
-
         # look for hooks
-        hooks = get_jsonhooks_from_config(proc_cfg)
+        hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -499,31 +487,47 @@ def eval_results(func):
 def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res.get('path', None)
-        path = ' {}'.format(path) if path else ''
+        if path and res.get('refds'):
+            try:
+                path = relpath(path, res['refds'])
+            except ValueError:
+                # can happen, e.g., on windows with paths from different
+                # drives. just go with the original path in this case
+                pass
         ui.message('{action}({status}):{path}{type}{msg}'.format(
-                action=ac.color_word(res['action'], ac.BOLD),
-                status=ac.color_status(res['status']),
-                path=relpath(path, res['refds']) if path and res.get('refds') else path,
-                type=' ({})'.format(
-                        ac.color_word(res['type'], ac.MAGENTA)
-                ) if 'type' in res else '',
-                msg=' [{}]'.format(
-                        res['message'][0] % res['message'][1:]
-                        if isinstance(res['message'], tuple) else res[
-                            'message'])
-                if res.get('message', None) else ''))
+            action=ac.color_word(
+                res.get('action', '<action-unspecified>'),
+                ac.BOLD),
+            status=ac.color_status(res.get('status', '<status-unspecified>')),
+            path=' {}'.format(path) if path else '',
+            type=' ({})'.format(
+                ac.color_word(res['type'], ac.MAGENTA)
+            ) if 'type' in res else '',
+            msg=' [{}]'.format(
+                res['message'][0] % res['message'][1:]
+                if isinstance(res['message'], tuple) else res[
+                    'message'])
+            if res.get('message', None) else ''))
 
 
-def _display_suppressed_message(nsimilar, ndisplayed, final=False):
+def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
     # +1 because there was the original result + nsimilar displayed.
     n_suppressed = nsimilar - ndisplayed + 1
     if n_suppressed > 0:
-        ui.message('  [{} similar {} been suppressed]'
-                   .format(n_suppressed,
-                           single_or_plural("message has",
-                                            "messages have",
-                                            n_suppressed, False)),
-                   cr="\n" if final else "\r")
+        ts = time()
+        # rate-limit update of suppression message, with a large number
+        # of fast-paced results updating for each one can result in more
+        # CPU load than the actual processing
+        # arbitrarily go for a 2Hz update frequency -- it "feels" good
+        if last_ts is None or final or (ts - last_ts > 0.5):
+            ui.message('  [{} similar {} been suppressed]'
+                       .format(n_suppressed,
+                               single_or_plural("message has",
+                                                "messages have",
+                                                n_suppressed, False)),
+                       cr="\n" if final else "\r")
+            return ts
+    return last_ts
 
 
 def _process_results(
@@ -541,6 +545,7 @@ def _process_results(
 
     # used to track repeated messages in the default renderer
     last_result = None
+    last_result_ts = None
     # which result dict keys to inspect for changes to discover repetions
     # of similar messages
     repetition_keys = set(('action', 'status', 'type', 'refds'))
@@ -553,6 +558,8 @@ def _process_results(
         if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
             # record to figure out WTF, so he just skips it
+            # but MIH thinks leaving a trace of that would be good
+            lgr.debug('Drop result record without "action": %s', res)
             continue
 
         actsum = action_summary.get(res['action'], {})
@@ -579,11 +586,22 @@ def _process_results(
                 msgargs = msg[1:]
                 msg = msg[0]
             if 'path' in res:
+                # result path could be a path instance
+                path = str(res['path'])
+                if msgargs:
+                    # we will pass the msg for %-polation, so % should be doubled
+                    path = path.replace('%', '%%')
                 msg = '{} [{}({})]'.format(
-                    msg, res['action'], res['path'])
+                    msg, res['action'], path)
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
-                res_lgr(msg, *msgargs)
+                try:
+                    res_lgr(msg, *msgargs)
+                except TypeError as exc:
+                    raise TypeError(
+                        "Failed to render %r with %r from %r: %s"
+                        % (msg, msgargs, res, exc_str(exc))
+                    )
             else:
                 res_lgr(msg)
 
@@ -600,13 +618,13 @@ def _process_results(
                 if result_repetitions < render_n_repetitions:
                     default_result_renderer(res)
                 else:
-                    _display_suppressed_message(
-                        result_repetitions, render_n_repetitions)
+                    last_result_ts = _display_suppressed_message(
+                        result_repetitions, render_n_repetitions, last_result_ts)
             else:
                 # this one is new, first report on any prev. suppressed results
                 # by number, and then render this fresh one
-                _display_suppressed_message(
-                    result_repetitions, render_n_repetitions,
+                last_result_ts = _display_suppressed_message(
+                    result_repetitions, render_n_repetitions, last_result_ts,
                     final=True)
                 default_result_renderer(res)
                 result_repetitions = 0
@@ -643,7 +661,7 @@ def _process_results(
         yield res
     # make sure to report on any issues that we had suppressed
     _display_suppressed_message(
-        result_repetitions, render_n_repetitions, final=True)
+        result_repetitions, render_n_repetitions, last_result_ts, final=True)
 
 
 def keep_result(res, rfilter, **kwargs):

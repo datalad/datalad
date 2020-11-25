@@ -20,8 +20,8 @@ import io
 from time import sleep
 
 from ..utils import (
-    assure_list_from_str,
-    assure_dict_from_str,
+    ensure_list_from_str,
+    ensure_dict_from_str,
     ensure_bytes,
 )
 from ..dochelpers import borrowkwargs
@@ -50,10 +50,11 @@ lgr = getLogger('datalad.http')
 
 try:
     import requests_ftp
+    _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
     lgr.debug("Failed to import requests_ftp, thus no ftp support: %s" % exc_str(e))
-    pass
+    _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:
     # Let's also enable requests etc debugging
@@ -141,9 +142,9 @@ class HTTPBaseAuthenticator(Authenticator):
         """
         super(HTTPBaseAuthenticator, self).__init__(**kwargs)
         self.url = url
-        self.failure_re = assure_list_from_str(failure_re)
-        self.success_re = assure_list_from_str(success_re)
-        self.session_cookies = assure_list_from_str(session_cookies)
+        self.failure_re = ensure_list_from_str(failure_re)
+        self.success_re = ensure_list_from_str(success_re)
+        self.session_cookies = ensure_list_from_str(session_cookies)
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
@@ -216,6 +217,11 @@ class HTTPBaseAuthenticator(Authenticator):
             # verify that we actually logged in
             for failure_re in self.failure_re:
                 if content_is_bytes:
+                    # content could be not in utf-8. But I do not think that
+                    # it is worth ATM messing around with guessing encoding
+                    # of the content to figure out what to encode it into
+                    # since typically returned "auth failed" should be in
+                    # utf-8 or plain ascii
                     failure_re = ensure_bytes(failure_re)
                 if re.search(failure_re, content):
                     raise AccessDeniedError(
@@ -261,7 +267,7 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
           Passed to super class HTTPBaseAuthenticator
         """
         super(HTMLFormAuthenticator, self).__init__(**kwargs)
-        self.fields = assure_dict_from_str(fields)
+        self.fields = ensure_dict_from_str(fields)
         self.tagid = tagid
 
     def _post_credential(self, credentials, post_url, session):
@@ -390,7 +396,10 @@ class HTTPDownloaderSession(DownloaderSession):
         # which has no .stream, so let's do ducktyping and provide our custom stream
         # via BufferedReader for such cases, while maintaining the rest of code
         # intact.  TODO: figure it all out, since doesn't scale for any sizeable download
-        if not hasattr(response.raw, 'stream'):
+        # This code is tested by tests/test_http.py:test_download_ftp BUT
+        # it causes 503 on travis,  but not always so we allow to skip that test
+        # in such cases. That causes fluctuating coverage
+        if not hasattr(response.raw, 'stream'):  # pragma: no cover
             def _stream():
                 buf = io.BufferedReader(response.raw)
                 v = True
@@ -425,7 +434,7 @@ class HTTPDownloaderSession(DownloaderSession):
                 # TEMP
                 # see https://github.com/niltonvolpato/python-progressbar/pull/44
                 ui.out.flush()
-                if size is not None and total >= size:
+                if size is not None and total >= size:  # pragma: no cover
                     break  # we have done as much as we were asked
 
         if return_content:
@@ -507,10 +516,15 @@ class HTTPDownloader(BaseDownloader):
                 # so let's rest and try again
                 if retry >= nretries:
                     #import epdb; epdb.serve()
+                    if not _FTP_SUPPORT and url.startswith("ftp://"):
+                        msg_ftp = "For ftp:// support, install requests_ftp. "
+                    else:
+                        msg_ftp = ""
+
                     raise AccessFailedError(
-                        "Failed to establish a new session %d times. "
+                        "Failed to establish a new session %d times. %s"
                         "Last exception was: %s"
-                        % (nretries, exc_str(exc)))
+                        % (nretries, msg_ftp, exc_str(exc)))
                 lgr.warning(
                     "Caught exception %s. Will retry %d out of %d times",
                     exc_str(exc), retry+1, nretries)

@@ -40,6 +40,7 @@ from datalad.api import create
 from datalad.config import (
     ConfigManager,
     rewrite_url,
+    write_config_section,
 )
 from datalad.cmd import CommandError
 
@@ -73,7 +74,7 @@ def test_something(path, new_home):
     # will refuse to work on dataset without a dataset
     assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
     assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
@@ -104,9 +105,12 @@ def test_something(path, new_home):
          ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
 
-    # always get all values
+    # by default get last value only
     assert_equal(
-        cfg.get('something.user'),
+        cfg.get('something.user'), 'email=jd@example.com')
+    # but can get all values
+    assert_equal(
+        cfg.get('something.user', get_all=True),
         ('name=Jane Doe', 'email=jd@example.com'))
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
     assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
@@ -226,7 +230,7 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
@@ -387,10 +391,8 @@ def test_overrides():
     from datalad.utils import Path
     assert_not_in(
         'ups.name', cfg,
-        (cfg._store,
+        (cfg._stores,
          cfg.overrides,
-         cfg._cfgfiles,
-         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
     ))
 
 
@@ -456,11 +458,15 @@ def test_no_leaks(path1, path2):
         assert_not_in('i.was.here', ds2.config.keys())
 
         # and that we do not track the wrong files
-        assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_not_in(ds1.pathobj / '.git' / 'config',
+                      ds2.config._stores['git']['files'])
+        assert_not_in(ds1.pathobj / '.datalad' / 'config',
+                      ds2.config._stores['dataset']['files'])
         # these are the right ones
-        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_in(ds2.pathobj / '.git' / 'config',
+                  ds2.config._stores['git']['files'])
+        assert_in(ds2.pathobj / '.datalad' / 'config',
+                  ds2.config._stores['dataset']['files'])
 
 
 @with_tempfile()
@@ -512,7 +518,7 @@ def test_global_config():
     # from within tests, global config should be read from faked $HOME (see
     # setup_package)
     glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
-    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._cfgfiles)
+    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._stores['git']['files'])
     assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
 
@@ -521,6 +527,8 @@ def test_global_config():
 def test_bare(path):
     # can we handle a bare repo?
     gr = GitRepo(path, create=True, bare=True)
+    # do we read the correct local config?
+    assert_in(gr.pathobj / 'config', gr.config._stores['git']['files'])
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', gr.config)
     # not set something that wasn't there
@@ -531,3 +539,37 @@ def test_bare(path):
     assert_equal(gr.config.get(obscure_key), 'myvalue')
     # now make sure the config is where we think it is
     assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
+
+
+@with_tempfile()
+def test_write_config_section(path):
+    # can we handle a bare repo?
+    gr = GitRepo(path, create=True, bare=True)
+
+    # test cases
+    # first 3 args are write_config_section() parameters
+    # 4th arg is a list with key/value pairs that should end up in a
+    # ConfigManager after a reload
+    testcfg = [
+        ('submodule', 'sub', dict(active='true', url='http://example.com'), [
+            ('submodule.sub.active', 'true'),
+            ('submodule.sub.url', 'http://example.com'),
+        ]),
+        ('submodule', 'sub"quote', {"a-b": '"quoted"', 'c': 'with"quote'}, [
+            ('submodule.sub"quote.a-b', '"quoted"'),
+            ('submodule.sub"quote.c', 'with"quote'),
+        ]),
+        ('short', ' s p a c e ', {"a123": ' space all over '}, [
+            ('short. s p a c e .a123', ' space all over '),
+        ]),
+    ]
+
+    for tc in testcfg:
+        # using append mode to provoke potential interference by
+        # successive calls
+        with (gr.pathobj / 'config').open('a') as fobj:
+            write_config_section(fobj, tc[0], tc[1], tc[2])
+        gr.config.reload()
+        for testcase in tc[3]:
+            assert_in(testcase[0], gr.config)
+            assert_equal(testcase[1], gr.config[testcase[0]])

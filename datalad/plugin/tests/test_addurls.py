@@ -21,7 +21,7 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_re_in,
     assert_repo_status,
+    assert_result_count,
     assert_true,
     chpwd,
     create_tree,
@@ -41,7 +42,7 @@ from datalad.tests.utils import (
     HTTPPath,
     known_failure_githubci_win,
     ok_exists,
-    slow,
+    ok_startswith,
     swallow_logs,
     with_tempfile,
     with_tree,
@@ -307,10 +308,12 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-def test_extract_csv_json_equal():
+def check_extract_csv_json_equal(input_type):
+    delim = "\t" if input_type == "tsv" else ","
+
     keys = ST_DATA["header"]
-    csv_rows = [",".join(keys)]
-    csv_rows.extend(",".join(str(row[k]) for k in keys)
+    csv_rows = [delim.join(keys)]
+    csv_rows.extend(delim.join(str(row[k]) for k in keys)
                     for row in ST_DATA["rows"])
 
     kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -318,14 +321,19 @@ def test_extract_csv_json_equal():
                 meta=["group={age_group}"])
 
     json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
-    csv_output = au.extract(csv_rows, "csv", **kwds)
+    csv_output = au.extract(csv_rows, input_type, **kwds)
 
     eq_(json_output, csv_output)
 
 
+def test_extract_csv_tsv_json_equal():
+    yield check_extract_csv_json_equal, "csv"
+    yield check_extract_csv_json_equal, "tsv"
+
+
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  au.extract, None, "not_csv_or_json")
+                  au.extract, None, "invalid_input_type")
 
 
 @with_tempfile(mkdir=True)
@@ -395,7 +403,6 @@ def test_addurls_dry_run(path):
                   cml.out)
 
 
-@slow  # ~9s
 class TestAddurls(object):
 
     @classmethod
@@ -433,8 +440,13 @@ class TestAddurls(object):
 
         n_annex_commits = get_annex_commit_counts()
 
-        ds.addurls(self.json_file, "{url}", "{name}")
-
+        # Meanwhile also test that we can specify path relative
+        # to the top of the dataset, as we generally treat paths in
+        # Python API, and it will be the one saved in commit
+        # message record
+        json_file = op.relpath(self.json_file, ds.path)
+        ds.addurls(json_file, "{url}", "{name}")
+        ok_startswith(ds.repo.format_commit('%b'), f"url_file='{json_file}'")
         filenames = ["a", "b", "c"]
         for fname in filenames:
             ok_exists(op.join(ds.path, fname))
@@ -535,8 +547,8 @@ class TestAddurls(object):
             if save:
                 assert_repo_status(path)
             else:
-                # The datasets are create and saved ...
-                assert_repo_status(path, modified=subdirs)
+                # The datasets are create but not saved (since asked not to)
+                assert_repo_status(path, untracked=subdirs)
                 # but the downloaded files aren't.
                 for subds, fnames in subdir_files.items():
                     assert_repo_status(subds, added=fnames)
@@ -642,7 +654,8 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
         ds.addurls(
             self.json_file, "{url}",
-            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}")
+            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}",
+            jobs=3)
         eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
             {"foo",
              "bar",
@@ -657,16 +670,17 @@ class TestAddurls(object):
     def test_addurls_invalid_input(self, path):
         ds = Dataset(path).create(force=True)
         in_file = op.join(path, "in")
-        for in_type in ["csv", "json"]:
+        for in_type in au.INPUT_TYPES:
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
             assert_in("Failed to read", str(exc.exception))
 
     @with_tree({"in.csv": "url,name,subdir",
+                "in.tsv": "url\tname\tsubdir",
                 "in.json": "[]"})
     def test_addurls_no_rows(self, path):
         ds = Dataset(path).create(force=True)
-        for fname in ["in.csv", "in.json"]:
+        for fname in ["in.csv", "in.tsv", "in.json"]:
             with swallow_logs(new_level=logging.WARNING) as cml:
                 assert_in_results(
                     ds.addurls(fname, "{url}", "{name}"),
@@ -695,20 +709,34 @@ class TestAddurls(object):
         yield make_test(json_text, "ext", "json,default input type")
         yield make_test(json_text, "json", "json,json input type")
 
-        csv_text = "\n".join(
-            ["name,url"] +
-            ["{name},{url}".format(**rec) for rec in json.loads(json_text)])
-        yield make_test(csv_text, "csv", "csv,csv input type")
+        def make_delim_text(delim):
+            row = "{name}" + delim + "{url}"
+            return "\n".join(
+                [row.format(name="name", url="url")] +
+                [row.format(**rec) for rec in json.loads(json_text)])
 
+        yield make_test(make_delim_text(","), "csv", "csv,csv input type")
+        yield make_test(make_delim_text("\t"), "tsv", "tsv,tsv input type")
 
     @with_tempfile(mkdir=True)
     def test_addurls_stdin_input_command_line(self, path):
         # The previous test checks all the cases, but it overrides sys.stdin.
         # Do a simple check that's closer to a command line call.
         Dataset(path).create(force=True)
-        runner = Runner(cwd=path)
+        runner = WitlessRunner(cwd=path)
         with open(self.json_file) as jfh:
             runner.run(["datalad", "addurls", '-', '{url}', '{name}'],
                        stdin=jfh)
         for fname in ["a", "b", "c"]:
             ok_exists(op.join(path, fname))
+
+    @with_tempfile(mkdir=True)
+    def test_drop_after(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.repo.set_gitattributes([('a*', {'annex.largefiles': 'nothing'})])
+        # make some files go to git, so we could test that we do not blow
+        # while trying to drop what is in git not annex
+        res = ds.addurls(self.json_file, '{url}', '{name}', drop_after=True)
+
+        assert_result_count(res, 3, action='addurl', status='ok')  # a, b, c  even if a goes to git
+        assert_result_count(res, 2, action='drop', status='ok')  # b, c

@@ -31,7 +31,7 @@ requires = {
         'distro; python_version >= "3.8"',
         'iso8601',
         'humanize',
-        'fasteners',
+        'fasteners>=0.14',
         'patool>=1.7',
         'tqdm',
         'wrapt',
@@ -176,7 +176,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={

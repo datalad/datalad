@@ -148,7 +148,7 @@ class Ls(Interface):
                 ds = Dataset(loc)
                 if ds.is_installed():
                     return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
-                    loc_type = False
+                    #loc_type = False
                 else:
                     loc_type = "dir"  # we know that so far for sure
                     # it might have been an uninstalled dataset within super-dataset

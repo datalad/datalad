@@ -314,7 +314,7 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
 
 
 # TODO: make limit respect config/environment parameter
-def exc_str(exc=None, limit=None):
+def exc_str(exc=None, limit=None, include_str=True):
     """Enhanced str for exceptions.  Should include original location
 
     Parameters
@@ -326,6 +326,10 @@ def exc_str(exc=None, limit=None):
       Number of levels in the traceback stack from the point where exception
       was raised to include. If `None`, environment variable
       DATALAD_EXC_STR_TBLIMIT is consulted.
+    include_str: bool, optional
+      Either include str (or `repr` if empty `str`) into representation.
+      If False, just ends up reporting traceback without string representation
+      of exception pre-pended.
 
     Returns
     -------
@@ -333,7 +337,7 @@ def exc_str(exc=None, limit=None):
       String representation of the exception with traceback information
       appended.
     """
-    out = str(exc)
+    out = str(exc) if include_str else ""
     if limit is None:
         # TODO: config logging.exceptions.traceback_levels = 1
         limit = int(os.environ.get('DATALAD_EXC_STR_TBLIMIT', '1'))
@@ -341,8 +345,9 @@ def exc_str(exc=None, limit=None):
         exctype, value, tb = sys.exc_info()
         if not exc:
             exc = value
-            out = str(exc)
-        if not out:
+            if include_str:
+                out = str(exc)
+        if include_str and not out:
             out = repr(exc)
         # verify that it seems to be the exception we were passed
         #assert(isinstance(exc, exctype))
@@ -350,12 +355,16 @@ def exc_str(exc=None, limit=None):
             assert(exc is value)
         entries = traceback.extract_tb(tb)
         if entries:
-            out += " [%s]" % (
+            tb_str = "[%s]" % (
                 ','.join(
                     '%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1])
                     for x in entries[-limit:]
                 )
             )
+            if out:
+                out = "%s %s" % (out, tb_str)
+            else:
+                out = tb_str
     except:  # MIH: TypeError?
         return out  # To the best of our abilities
     finally:

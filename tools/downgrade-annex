@@ -1,0 +1,77 @@
+#!/bin/bash
+
+set -eu
+
+export PS4='> '
+# set -x
+
+function info () {
+  echo "INFO: $*"
+}
+
+function error() {
+  echo "ERROR: $1" >&2
+  exit "${2:-1}"
+}
+
+function fsck() {
+  info "FSCKing"
+  git annex fsck --fast -q
+}
+
+function check_clean() {
+  info "Checking if all clean"
+  git diff --quiet --exit-code --ignore-submodules && git diff --exit-code --ignore-submodules --cached --quiet
+}
+
+
+if $(git config --global annex.autoupgraderepository) != false; then
+  error "Please disable auto upgrades first"
+fi
+
+cd "${1:-.}"
+
+annex_version=$(git annex version | awk -e '/^git-annex version:/{print $3}')
+case "$annex_version" in
+  5.*|6.*|7.*) info "git-annex $annex_version . Good, proceeding";;
+  *) error "git-annex $annex_version . Please downgrade to proceed";;
+esac
+
+repo_annex_version=$(git config annex.version)
+case "$repo_annex_version" in
+  5) echo "you are good - already version $repo_annex_version"; exit 0;;
+  8) ;;
+  *) error "do not know how to downgrade $repo_annex_version, fix me"
+esac
+
+# needs recent annex
+# unlocked=( $(git annex find --unlocked) )
+unlocked=( $(git grep -l -a --no-textconv --cached '^/annex/objects/' || :) )
+if [ "${#unlocked[*]}" -ge 1 ]; then
+    error "Found ${#unlocked[*]} unlocked files. Cannot do: ${unlocked[*]}" 2
+fi
+
+# Cannot do - needs more recent annex
+# fsck
+check_clean
+
+git config --remove-section filter.annex || echo "Failed to remove filter.annex, may be gone already"
+sed -i -n -e '/filter=annex/d' .git/info/attributes
+rm -f .git/hooks/post-checkout .git/hooks/post-merge
+rm -rf .git/annex/keysdb .git/annex/fsck .git/annex/export
+
+git config annex.version 5
+
+fsck
+check_clean
+
+## Let's do a dummy basic operation test
+#echo data > data
+#git annex add data
+#git commit -m 'sample data' data
+#
+#fsck
+#check_clean
+
+info "DONE, all good"
+

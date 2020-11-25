@@ -14,7 +14,10 @@ __docformat__ = 'restructuredtext'
 
 
 from os.path import join as opj
-from datalad.cmd import GitRunner
+from datalad.cmd import (
+    GitWitlessRunner,
+    StdOutCapture,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.api import diff
 from datalad.interface.diff import _parse_git_diff
@@ -46,8 +49,10 @@ def test_magic_number():
     # commit
     # given the level of dark magic, we better test whether this stays
     # constant across Git versions (it should!)
-    out, err = GitRunner().run('git hash-object -t tree /dev/null')
-    eq_(out.strip(), PRE_INIT_COMMIT_SHA)
+    out = GitWitlessRunner().run(
+        ['git', 'hash-object', '-t', 'tree', '/dev/null'],
+        protocol=StdOutCapture)
+    eq_(out['stdout'].strip(), PRE_INIT_COMMIT_SHA)
 
 
 @known_failure_githubci_win

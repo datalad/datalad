@@ -12,10 +12,11 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import OrderedDict
 import logging
+import re
 from tempfile import TemporaryFile
 
-from datalad.cmd import GitWitlessRunner
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -44,7 +45,7 @@ from datalad.support.constraints import (
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
     Path,
-    assure_list,
+    ensure_list,
 )
 
 from datalad.distribution.dataset import (
@@ -196,7 +197,7 @@ class Push(Interface):
             raise ValueError("'since' should point to commitish or use '^'.")
         # we resolve here, because we need to perform inspection on what was given
         # as an input argument further down
-        paths = [resolve_path(p, dataset) for p in assure_list(path)]
+        paths = [resolve_path(p, dataset) for p in ensure_list(path)]
 
         ds = require_dataset(
             dataset, check_installed=True, purpose='pushing')
@@ -376,9 +377,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
 
 
 def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
-          done_fetch=None, got_path_arg=False):
-    if not done_fetch:
-        done_fetch = set()
+          got_path_arg=False):
     force_git_push = force in ('all', 'gitpush')
 
     # nothing recursive in here, we only need a repo to work with
@@ -422,7 +421,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 res_kwargs,
                 status='impossible',
                 message='No push target given, and none could be '
-                        'auto-detected, please specific via --to',
+                        'auto-detected, please specify via --to',
             )
             return
         elif len(target) > 1:
@@ -460,7 +459,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
     depvar = 'remote.{}.datalad-publish-depends'.format(target)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = assure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, []))
     if publish_depends:
         lgr.debug("Discovered publication dependencies for '%s': %s'",
                   target, publish_depends)
@@ -507,12 +506,21 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             # managed branch directly, instead of the corresponding branch
             'refs/heads/adjusted' not in p['from_ref'])
     ]
-    if not refspecs2push:
-        lgr.debug(
-            'No refspecs configured for push, attempting to use active branch')
-        # nothing was set up for push, push the current branch at minimum
-        # TODO this is not right with managed branches
-        active_branch = repo.get_active_branch()
+    # TODO this is not right with managed branches
+    active_branch = repo.get_active_branch()
+    if active_branch and is_annex_repo:
+        # we could face a managed branch, in which case we need to
+        # determine the actual one and make sure it is sync'ed with the
+        # managed one, and push that one instead. following methods can
+        # be called unconditionally
+        repo.localsync(managed_only=True)
+        active_branch = repo.get_corresponding_branch(
+            active_branch) or active_branch
+
+    if not refspecs2push and not active_branch:
+        # nothing was set up for push, and we have no active branch
+        # this is a weird one, let's confess and stop here
+        # I don't think we need to support such a scenario
         if not active_branch:
             yield dict(
                 res_kwargs,
@@ -522,26 +530,20 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 'branch'
             )
             return
-        if is_annex_repo:
-            # we could face a managed branch, in which case we need to
-            # determine the actual one and make sure it is sync'ed with the
-            # managed one, and push that one instead. following methods can
-            # be called unconditionally
-            repo.localsync(managed_only=True)
-            active_branch = repo.get_corresponding_branch(
-                active_branch) or active_branch
-        refspecs2push.append(
-            # same dance as above
-            active_branch
-            if ds.config.get('branch.{}.merge'.format(active_branch), None)
-            else '{ab}:{ab}'.format(ab=active_branch)
-        )
+
+    # make sure that we always push the active branch (the context for the
+    # potential path arguments) and the annex branch -- because we claim
+    # to know better than any git config
+    must_have_branches = [active_branch] if active_branch else []
+    if is_annex_repo:
+        must_have_branches.append('git-annex')
+    for branch in must_have_branches:
+        _append_branch_to_refspec_if_needed(ds, refspecs2push, branch)
 
     # we know what to push and where, now dependency processing first
     for r in publish_depends:
         # simply make a call to this function again, all the same, but
-        # target is different, pass done_fetch to avoid duplicate
-        # and expensive calls to git-fetch
+        # target is different
         yield from _push(
             dspath,
             content,
@@ -552,7 +554,6 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             jobs,
             res_kwargs.copy(),
             pbars,
-            done_fetch=None,
             got_path_arg=got_path_arg,
         )
 
@@ -626,7 +627,11 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
                 "Sync local annex branch from pushurl after remote "
                 'availability update.')
         repo.call_git(fetch_cmd)
-        repo.localsync(target)
+        # If no CommandError was raised, it means that remote has git-annex
+        # but local repo might not be an annex yet. Since there is nothing to "sync"
+        # from us, we just skip localsync without mutating repo into an AnnexRepo
+        if is_annex_repo:
+            repo.localsync(target)
     except CommandError as e:
         # it is OK if the remote doesn't have a git-annex branch yet
         # (e.g. fresh repo)
@@ -636,11 +641,10 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
             raise
         lgr.debug('Remote does not have a git-annex branch: %s', e)
 
-    if is_annex_repo:
-        refspecs2push += [
-            'git-annex'
-            if ds.config.get('branch.git-annex.merge', None)
-            else 'git-annex:git-annex']
+    if not refspecs2push:
+        lgr.debug('No refspecs found that need to be pushed')
+        return
+
     # and push all relevant branches, plus the git-annex branch to announce
     # local availability info too
     yield from _push_refspecs(
@@ -650,6 +654,18 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
         force_git_push,
         res_kwargs.copy(),
     )
+
+
+def _append_branch_to_refspec_if_needed(ds, refspecs, branch):
+    # try to anticipate any flavor of an idea of a branch ending up in a refspec
+    looks_like_that_branch = re.compile(
+        r'((^|.*:)refs/heads/|.*:|^){}$'.format(branch))
+    if all(not looks_like_that_branch.match(r) for r in refspecs):
+        refspecs.append(
+            branch
+            if ds.config.get('branch.{}.merge'.format(branch), None)
+            else '{branch}:{branch}'.format(branch=branch)
+        )
 
 
 def _push_refspecs(repo, target, refspecs, force_git_push, res_kwargs):
@@ -705,27 +721,35 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
             target,
         )
         return
+
+    ds_repo = ds.repo
+
     res_kwargs['target'] = target
     if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
         # this remote either isn't an annex,
         # or hasn't been properly initialized
-        # rather than barfing tons of messages for each file, do one
-        # for the entire dataset
-        yield dict(
-            res_kwargs,
-            action='copy',
-            status='impossible'
-            if force in ('all', 'checkdatapresent')
-            else 'notneeded',
-            message=(
-                "Target '%s' does not appear to be an annex remote",
-                target)
-        )
-        return
+        # given that there was no annex-ignore, let's try to init it
+        # see https://github.com/datalad/datalad/issues/5143 for the story
+        ds_repo.localsync(target)
+
+        if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
+            # still nothing
+            # rather than barfing tons of messages for each file, do one
+            # for the entire dataset
+            yield dict(
+                res_kwargs,
+                action='copy',
+                status='impossible'
+                if force in ('all', 'checkdatapresent')
+                else 'notneeded',
+                message=(
+                    "Target '%s' does not appear to be an annex remote",
+                    target)
+            )
+            return
 
     # it really looks like we will transfer files, get info on what annex
     # has in store
-    ds_repo = ds.repo
     # paths must be recoded to a dataset REPO root (in case of a symlinked
     # location
     annex_info_init = \
@@ -791,6 +815,14 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # input has type=dataset, but now it is about files
     res_kwargs.pop('type', None)
 
+    # A set and an OrderedDict is used to track files pointing to the
+    # same key.  The set could be dropped, using a single dictionary
+    # that has an entry for every seen key and a (likely empty) list
+    # of redundant files, but that would mean looping over potentially
+    # many keys to yield likely few if any notneeded results.
+    seen_keys = set()
+    repkey_paths = OrderedDict()
+
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative
     # to this location
@@ -799,10 +831,17 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     with TemporaryFile() as file_list:
         nbytes = 0
         for c in to_transfer:
-            file_list.write(
-                bytes(Path(c['path']).relative_to(ds.pathobj)))
-            file_list.write(b'\0')
-            nbytes += c['bytesize']
+            key = c['key']
+            if key in seen_keys:
+                repkey_paths.setdefault(key, []).append(c['path'])
+            else:
+                file_list.write(
+                    bytes(Path(c['path']).relative_to(ds.pathobj)))
+                file_list.write(b'\0')
+                nbytes += c['bytesize']
+                seen_keys.add(key)
+        lgr.debug('Counted %d bytes of annex data to transfer',
+                  nbytes)
 
         # rewind stdin buffer
         file_list.seek(0)
@@ -815,9 +854,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         # and go
         # TODO try-except and yield what was captured before the crash
         #res = GitWitlessRunner(
-        res = GitWitlessRunner(
-            cwd=ds.path,
-        ).run(
+        res = ds_repo._git_runner.run(
             cmd,
             # TODO report how many in total, and give global progress too
             protocol=TailoredPushAnnexJsonProtocol,
@@ -828,6 +865,13 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
                           c, res[c])
         for j in res['stdout_json']:
             yield annexjson2result(j, ds, type='file', **res_kwargs)
+
+    for annex_key, paths in repkey_paths.items():
+        for path in paths:
+            yield dict(
+                res_kwargs, action='copy', type='file', status='notneeded',
+                path=path, annexkey=annex_key,
+                message='Another file points to the same key')
     return
 
 

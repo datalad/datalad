@@ -21,7 +21,11 @@ import sys
 
 
 from datalad import get_encoding_info
-from datalad.cmd import Runner
+from datalad.cmd import (
+    StdOutCapture,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 
 from datalad.utils import (
     chpwd,
@@ -32,12 +36,15 @@ from datalad.utils import (
 )
 from datalad.tests.utils import (
     assert_cwd_unchanged,
+    assert_equal,
     assert_false,
     assert_in,
     assert_in_results,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_repo_status,
+    assert_true,
     create_tree,
     DEFAULT_BRANCH,
     eq_,
@@ -49,8 +56,10 @@ from datalad.tests.utils import (
     ok_,
     skip_if_no_network,
     skip_if_on_windows,
+    skip_nomultiplex_ssh,
     skip_ssh,
     SkipTest,
+    slow,
     swallow_logs,
     with_tempfile,
     with_testrepos,
@@ -145,6 +154,57 @@ def test_GitRepo_init_options(path):
     gr = GitRepo(path, create=True, bare=True)
     ok_(gr.config.getbool(section="core", option="bare"))
 
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+@with_tree(tree={'somefile': 'content', 'config': 'not a git config'})
+@with_tree(tree={'afile': 'other',
+                 '.git': {}})
+@with_tempfile
+@with_tempfile
+def test_GitRepo_bare(path, empty_dir, non_empty_dir, empty_dot_git, non_bare,
+                      clone_path):
+
+    import gc
+
+    # create a bare repo:
+    gr = GitRepo(path, create=True, bare=True)
+    assert_equal(gr.dot_git, gr.pathobj)
+    assert_true(gr.bare)
+    assert_true(gr.config.getbool("core", "bare"))
+    assert_false((gr.pathobj / '.git').exists())
+    assert_false(gr.call_git_success(['status'], expect_stderr=True))
+
+    # kill the object and try to get a new instance on an existing bare repo:
+    del gr
+    gc.collect()
+
+    gr = GitRepo(path, create=False)
+    assert_equal(gr.dot_git, gr.pathobj)
+    assert_true(gr.bare)
+    assert_true(gr.config.getbool("core", "bare"))
+    assert_false((gr.pathobj / '.git').exists())
+    assert_false(gr.call_git_success(['status'], expect_stderr=True))
+
+    # an empty dir is not a bare repo:
+    assert_raises(InvalidGitRepositoryError, GitRepo, empty_dir,
+                  create=False)
+
+    # an arbitrary dir is not a bare repo:
+    assert_raises(InvalidGitRepositoryError, GitRepo, non_empty_dir,
+                  create=False)
+
+    # nor is a path with an empty .git:
+    assert_raises(InvalidGitRepositoryError, GitRepo, empty_dot_git,
+                  create=False)
+
+    # a regular repo is not bare
+    non_bare_repo = GitRepo(non_bare, create=True)
+    assert_false(non_bare_repo.bare)
+
+    # we can have a bare clone
+    clone = GitRepo.clone(non_bare, clone_path, clone_options={'bare': True})
+    assert_true(clone.bare)
 
 @with_tree(
     tree={
@@ -284,9 +344,9 @@ def test_GitRepo_get_indexed_files(src, path):
     gr = GitRepo.clone(src, path)
     idx_list = gr.get_indexed_files()
 
-    runner = Runner()
-    out = runner(['git', 'ls-files'], cwd=path)
-    out_list = list(filter(bool, out[0].split('\n')))
+    runner = WitlessRunner(cwd=path)
+    out = runner.run(['git', 'ls-files'], protocol=StdOutCapture)
+    out_list = list(filter(bool, out['stdout'].split('\n')))
 
     for item in idx_list:
         assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
@@ -530,7 +590,7 @@ def _path2localsshurl(path):
 # broken,possibly due to a GitPy issue with windows sshurls
 # see https://github.com/datalad/datalad/pull/3638
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
 def test_GitRepo_ssh_fetch(remote_path, repo_path):
@@ -564,7 +624,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 # broken,possibly due to a GitPy issue with windows sshurls
 # see https://github.com/datalad/datalad/pull/3638
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_pull(remote_path, repo_path):
@@ -603,7 +663,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 # broken,possibly due to a GitPy issue with windows sshurls
 # see https://github.com/datalad/datalad/pull/3638
 @skip_if_on_windows
-@skip_ssh
+@skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_push(repo_path, remote_path):
@@ -1039,8 +1099,21 @@ def test_update_submodules_sub_on_unborn_branch(path):
     assert_in("unborn branch", str(cme.exception))
 
 
-def test_GitRepo_get_submodules():
-    raise SkipTest("TODO")
+@with_tempfile
+def test_GitRepo_get_submodules(path):
+    repo = GitRepo(path, create=True)
+
+    s_abc = GitRepo(op.join(path, "s_abc"), create=True)
+    s_abc.commit(msg="c s_abc", options=["--allow-empty"])
+    repo.add_submodule(path="s_abc")
+
+    s_xyz = GitRepo(op.join(path, "s_xyz"), create=True)
+    s_xyz.commit(msg="c s_xyz", options=["--allow-empty"])
+    repo.add_submodule(path="s_xyz")
+
+    eq_([s["gitmodule_name"]
+         for s in repo.get_submodules(sorted_=True)],
+        ["s_abc", "s_xyz"])
 
 
 @with_tempfile
@@ -1164,22 +1237,87 @@ def test_optimized_cloning(path):
 @with_tempfile(mkdir=True)
 def test_GitRepo_flyweight(path1, path2):
 
+    import gc
+
     repo1 = GitRepo(path1, create=True)
     assert_is_instance(repo1, GitRepo)
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instantiation that isn't picked up immediately, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = GitRepo(path1, create=False)
     assert_is_instance(repo2, GitRepo)
+
     # the very same object:
     ok_(repo1 is repo2)
 
     # reference the same in a different way:
     with chpwd(path1):
         repo3 = GitRepo(op.relpath(path1, start=path2), create=False)
+
     # it's the same object:
     ok_(repo1 is repo3)
 
     # and realpath attribute is the same, so they are still equal:
     ok_(repo1 == repo3)
+
+    orig_id = id(repo1)
+
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # deleting one reference doesn't change anything - we still get the same
+    # thing:
+    gc.collect()  #  TODO: see first comment above
+    del repo1
+    ok_(repo2 is not None)
+    ok_(repo2 is repo3)
+    ok_(repo2 == repo3)
+
+    # re-requesting still delivers the same thing:
+    repo1 = GitRepo(path1)
+    assert_equal(orig_id, id(repo1))
+
+    # killing all references should result in the instance being gc'd and
+    # re-request yields a new object:
+    del repo1
+    del repo2
+
+    # Killing last reference will lead to garbage collection which will call
+    # GitRepo's finalizer:
+    with swallow_logs(new_level=1) as cml:
+        del repo3
+        gc.collect()  # TODO: see first comment above
+        cml.assert_logged(msg="Finalizer called on: GitRepo(%s)" % path1,
+                          level="Level 1",
+                          regex=False)
+
+    # Flyweight is gone:
+    assert_not_in(path1, GitRepo._unique_instances.keys())
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, GitRepo) and o.path == path1])
+
+    # new object is created on re-request:
+    repo1 = GitRepo(path1)
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
 
 
 @with_tree(tree={'ignore-sub.me': {'a_file.txt': 'some content'},
@@ -1419,38 +1557,11 @@ def test_fake_dates(path):
     eq_(seconds_initial + 3, gr.get_commit_date())
 
 
-@with_tree(tree={"foo": "foo content"})
-def test_custom_runner_protocol(path):
-    # Check that a runner with a non-default protocol gets wired up correctly.
-    prot = ExecutionTimeProtocol()
-    gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
-
-    ok_(len(prot) > 0)
-    ok_(prot[0]['duration'] >= 0)
-
-    def check(prev_len, prot, command):
-        # Check that the list grew and has the expected command without
-        # assuming that it gained _only_ a one command.
-        ok_(len(prot) > prev_len)
-        assert_in(command,
-                  sum([p["command"] for p in prot[prev_len:]], []))
-
-    prev_len = len(prot)
-    gr.add("foo")
-    check(prev_len, prot, "add")
-
-    # commit no longer uses a Runner with protocol capabilities
-    #prev_len = len(prot)
-    #gr.commit("commit foo")
-    #check(prev_len, prot, "commit")
-
-    ok_(all(p['duration'] >= 0 for p in prot))
-
-
+@slow   # 15sec on Yarik's laptop and tripped Travis CI
 @with_tempfile(mkdir=True)
 def test_duecredit(path):
     # Just to check that no obvious side-effects
-    run = Runner(cwd=path).run
+    run = WitlessRunner(cwd=path).run
     cmd = [
         sys.executable, "-c",
         "from datalad.support.gitrepo import GitRepo; GitRepo(%r, create=True)" % path
@@ -1466,16 +1577,16 @@ def test_duecredit(path):
     # cwd is not matching possibly present PWD env variable
     env.pop('PWD', None)
 
-    out, err = run(cmd, env=env, expect_stderr=True)
-    outs = out + err  # Let's not depend on where duecredit decides to spit out
+    out = run(cmd, env=env, protocol=StdOutErrCapture)
+    outs = ''.join(out.values()) # Let's not depend on where duecredit decides to spit out
     # All quiet
     test_string = 'Data management and distribution platform'
     assert_not_in(test_string, outs)
 
     # and now enable DUECREDIT - output could come to stderr
     env['DUECREDIT_ENABLE'] = '1'
-    out, err = run(cmd, env=env, expect_stderr=True)
-    outs = out + err
+    out = run(cmd, env=env, protocol=StdOutErrCapture)
+    outs = ''.join(out.values())
 
     if external_versions['duecredit']:
         assert_in(test_string, outs)
@@ -1550,7 +1661,7 @@ def test_gitrepo_call_git_methods(path):
             with assert_raises(CommandError):
                 gr.call_git(["mv"], files=["notthere", "dest"],
                             expect_fail=expect_fail)
-            check("notthere", cml.out)
+            check("fatal: bad source", cml.out)
 
     eq_(list(gr.call_git_items_(["ls-files"])),
         ["bar", "foo.txt"])
@@ -1568,7 +1679,7 @@ def test_gitrepo_call_git_methods(path):
     ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
     with swallow_logs(new_level=logging.DEBUG) as cml:
         assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
-        assert_not_in("blob", cml.out)
+        assert_not_in("expected blob type", cml.out)
 
 
 @skip_if_no_network

@@ -21,7 +21,10 @@ from datalad.api import (
     install,
     publish,
 )
-from datalad.cmd import Runner
+from datalad.cmd import (
+    WitlessRunner as Runner,
+    StdOutErrCapture,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
@@ -165,6 +168,7 @@ def test_invalid_call(path):
                 'bogus'))
 
 
+@slow  # 26sec on travis
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
@@ -415,6 +419,7 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
         publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
 
 
+@slow  # 28 + 19sec on travis
 def test_target_ssh_recursive():
     skip_if_on_windows()
     yield skip_ssh(check_target_ssh_recursive), True
@@ -470,6 +475,7 @@ def check_target_ssh_since(use_ssh, origin, src_path, target_path):
     assert_postupdate_hooks(_path_(target_path, 'brandnew'), installed=False)
 
 
+@slow  # 10sec + ? on travis
 def test_target_ssh_since():
     skip_if_on_windows()
     yield skip_ssh(check_target_ssh_since), True
@@ -533,9 +539,10 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr
     # since it exits with 0 exit even if there was a problem
-    out, err = Runner(cwd=opj(dst_path, '.git'))(_path_('hooks/post-update'))
-    assert_false(out)
-    assert_false(err)
+    out = Runner(cwd=opj(dst_path, '.git')).run([_path_('hooks/post-update')],
+                                                protocol=StdOutErrCapture)
+    assert_false(out['stdout'])
+    assert_false(out['stderr'])
 
     # Verify that we could replace and publish no problem
     # https://github.com/datalad/datalad/issues/1656
@@ -578,6 +585,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     assert_postupdate_hooks(dst_path)
 
 
+@slow  # 14 + 10sec on travis
 def test_replace_and_relative_sshpath():
     skip_if_on_windows()
     yield skip_ssh(check_replace_and_relative_sshpath), True
@@ -627,7 +635,7 @@ def _test_target_ssh_inherit(standardgroup, ui, use_ssh, src_path, target_path):
         ds.publish(on_failure='ignore'),
         1,
         status='impossible',
-        message='No target sibling configured for default publication, please specific via --to')
+        message='No target sibling configured for default publication, please specify via --to')
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     assert_postupdate_hooks(target_path, installed=ui)
@@ -789,6 +797,7 @@ def test_local_path_target_dir(path):
     ok_((path / "e" / "d-subds").exists())
 
 
+@slow  # 12sec on Yarik's laptop
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)

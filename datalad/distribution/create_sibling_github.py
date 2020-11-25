@@ -33,7 +33,7 @@ from ..support.constraints import (
     EnsureStr,
 )
 from ..utils import (
-    assure_list,
+    ensure_list,
 )
 from .dataset import (
     datasetmethod,
@@ -100,12 +100,18 @@ class CreateSiblingGithub(Interface):
             constraints=EnsureStr()),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'error', 'reconfigure'),
+            constraints=EnsureChoice('skip', 'error', 'reconfigure', 'replace'),
             metavar='MODE',
             doc="""desired behavior when already existing or configured
-            siblings are discovered. 'skip': ignore; 'error': fail immediately;
-            'reconfigure': use the existing repository and reconfigure the
-            local dataset to use it as a sibling""",),
+            siblings are discovered. In this case, a dataset can be skipped
+            ('skip'), the sibling configuration be updated ('reconfigure'),
+            or process interrupts with error ('error'). DANGER ZONE: If 'replace'
+            is used, an existing github repository will be irreversibly removed,
+            re-initialized, and the sibling (re-)configured (thus implies 'reconfigure').
+            `replace` could lead to data loss, so use with care.  To minimize
+            possibility of data loss, in interactive mode DataLad will ask for
+            confirmation, but it would raise an exception in non-interactive mode.
+            """,),
         github_login=Parameter(
             args=('--github-login',),
             constraints=EnsureStr() | EnsureNone(),
@@ -233,7 +239,7 @@ class CreateSiblingGithub(Interface):
     @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
-        res = assure_list(res)
+        res = ensure_list(res)
         if args.dryrun:
             ui.message('DRYRUN -- Anticipated results:')
         if not len(res):

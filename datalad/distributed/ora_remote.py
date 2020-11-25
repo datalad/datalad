@@ -207,16 +207,19 @@ class LocalIO(IOBase):
             # no archive, not file
             return False
         loc = str(file_path)
-        from datalad.cmd import Runner
-        runner = Runner()
+        from datalad.cmd import (
+            StdOutErrCapture,
+            WitlessRunner,
+        )
+        runner = WitlessRunner()
         # query 7z for the specific object location, keeps the output
         # lean, even for big archives
-        out, err = runner(
+        out = runner.run(
             ['7z', 'l', str(archive_path),
              loc],
-            log_stdout=True,
+            protocol=StdOutErrCapture,
         )
-        return loc in out
+        return loc in out['stdout']
 
     def read_file(self, file_path):
 
@@ -556,15 +559,8 @@ class HTTPRemoteIO(object):
         # to annexremote.dirhash from within IO classes
 
         url = self.base_url + "/annex/objects/" + str(key_path)
-        response = requests.get(url, stream=True)
-
-        with open(filename, 'wb') as dst_file:
-            bytes_received = 0
-            for chunk in response.iter_content(chunk_size=self.buffer_size,
-                                               decode_unicode=False):
-                dst_file.write(chunk)
-                bytes_received += len(chunk)
-                progress_cb(bytes_received)
+        from datalad.support.network import download_url
+        download_url(url, filename, overwrite=True)
 
 
 def handle_errors(func):
@@ -579,7 +575,7 @@ def handle_errors(func):
     # TODO: configurable on remote end (flag within layout_version!)
 
     @wraps(func)
-    def new_func(self, *args, **kwargs):
+    def  _wrap_handle_errors(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
@@ -590,16 +586,32 @@ def handle_errors(func):
                 entry = "{time}: Error:\n{exc_str}\n" \
                         "".format(time=datetime.now(),
                                   exc_str=exc_str)
-                log_target = self.store_base_path / 'error_logs' / \
+                # ensure base path is platform path
+                log_target = Path(self.store_base_path) / 'error_logs' / \
                              "{dsid}.{uuid}.log".format(dsid=self.archive_id,
                                                         uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
+
+            try:
+                # We're done using io, so let it perform any needed cleanup. At
+                # the moment, this is only relevant for SSHRemoteIO, in which
+                # case it cleans up the SSH socket and prevents a hang with
+                # git-annex 8.20201103 and later.
+                self.io.close()
+            except AttributeError:
+                pass
+            else:
+                # Note: It is documented as safe to unregister a function even
+                # if it hasn't been registered.
+                from atexit import unregister
+                unregister(self.io.close)
+
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
             else:
                 raise e
 
-    return new_func
+    return  _wrap_handle_errors
 
 
 class NoLayoutVersion(Exception):
@@ -625,7 +637,7 @@ class RIARemote(SpecialRemote):
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
-        # must be absolute, and POSIX
+        # must be absolute, and POSIX (will be instance of PurePosixPath)
         # subclass must set this
         self.store_base_path = None
         # by default we can read and write
@@ -656,8 +668,9 @@ class RIARemote(SpecialRemote):
         isn't configured, sets the remote to read-only operation.
         """
 
+        # ensure base path is platform path
         dataset_tree_version_file = \
-            self.store_base_path / 'ria-layout-version'
+            Path(self.store_base_path) / 'ria-layout-version'
 
         # check dataset tree version
         try:
@@ -794,7 +807,8 @@ class RIARemote(SpecialRemote):
                     "No remote base path configured. "
                     "Specify `base-path` setting.")
 
-        self.store_base_path = Path(self.store_base_path)
+        # the base path is ultimately derived from a URL, always treat as POSIX
+        self.store_base_path = PurePosixPath(self.store_base_path)
         if not self.store_base_path.is_absolute():
             raise RIARemoteError(
                 'Non-absolute object tree base path configuration: %s'
@@ -846,10 +860,14 @@ class RIARemote(SpecialRemote):
         locations, etc.
         If this doesn't raise, the remote end should be fine to work with.
         """
+        # make sure the base path is a platform path when doing local IO
+        # the incoming Path object is a PurePosixPath
+        store_base_path = Path(self.store_base_path) \
+            if self._local_io else self.store_base_path
 
         # cache remote layout directories
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.store_base_path, self.archive_id)
+            self.get_layout_locations(store_base_path, self.archive_id)
 
         read_only_msg = "Treating remote as read-only in order to" \
                         "prevent damage by putting things into an unknown " \
@@ -865,7 +883,7 @@ class RIARemote(SpecialRemote):
                                      self.known_versions_dst)
             self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            reason = "Remote doesn't report any dataset tree version." \
+            reason = "Remote doesn't report any dataset tree version. " \
                      "Consider upgrading datalad or add a fitting " \
                      "'ria-layout-version' file at the RIA store's " \
                      "root."
@@ -882,7 +900,7 @@ class RIARemote(SpecialRemote):
                                self.known_versions_objt)
             self._set_read_only(reason + read_only_msg)
         except NoLayoutVersion:
-            reason = "Remote doesn't report any object tree version." \
+            reason = "Remote doesn't report any object tree version. " \
                      "Consider upgrading datalad or add a fitting " \
                      "'ria-layout-version' file at the remote " \
                      "dataset root. "

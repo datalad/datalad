@@ -14,15 +14,17 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import isdir
-from os.path import isabs
-from os.path import join as opj
-from os.path import relpath
-from os.path import abspath
-from os.path import normpath
+from os.path import (
+    isabs,
+    isdir,
+    join as opj,
+    normpath,
+    relpath,
+)
+
+from datalad.dochelpers import exc_str
 from datalad.utils import (
-    assure_list,
-    with_pathsep as _with_sep,
+    ensure_list,
     path_is_subpath,
     PurePosixPath,
 )
@@ -44,7 +46,8 @@ success_status_map = {
 
 
 def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
-                    refds=None, status=None, message=None, **kwargs):
+                    refds=None, status=None, message=None, exception=None,
+                    **kwargs):
     # `type` is intentionally not `type_` or something else, as a mismatch
     # with the dict key 'type' causes too much pain all over the place
     # just for not shadowing the builtin `type` in this function
@@ -85,13 +88,15 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
         d['status'] = status
     if message is not None:
         d['message'] = message
+    if exception is not None:
+        d['exception_traceback'] = exc_str(exception, limit=1000, include_str=False)
     if kwargs:
         d.update(kwargs)
     return d
 
 
 def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
-                       status=None, message=None):
+                       status=None, message=None, exception=None):
     """
     Helper to yield analog result dicts for each path in a sequence.
 
@@ -106,10 +111,12 @@ def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
     generator
 
     """
-    for p in assure_list(paths):
+    for p in ensure_list(paths):
         yield get_status_dict(
             action, path=p, type=type, logger=logger, refds=refds,
-            status=status, message=(message, p) if '%s' in message else message)
+            status=status, message=(message, p) if '%s' in message else message,
+            exception=exception
+        )
 
 
 def is_ok_dataset(r):
@@ -251,7 +258,7 @@ def count_results(res, **kwargs):
 
 def only_matching_paths(res, **kwargs):
     # TODO handle relative paths by using a contained 'refds' value
-    paths = assure_list(kwargs.get('path', []))
+    paths = ensure_list(kwargs.get('path', []))
     respath = res.get('path', None)
     return respath in paths
 
@@ -276,7 +283,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         # otherwise this is not what we are looking for
         return source == res.get('source_url', None)
     # the only thing left is a potentially heterogeneous list of paths/URLs
-    paths = assure_list(kwargs.get('path', []))
+    paths = ensure_list(kwargs.get('path', []))
     # three cases left:
     # 1. input arg was an absolute path -> must match 'path' property
     # 2. input arg was relative to a dataset -> must match refds/relpath

@@ -30,7 +30,8 @@ from datalad.ui import ui
 
 from datalad.cmd import (
     CommandError,
-    Runner,
+    StdOutErrCapture,
+    WitlessRunner,
 )
 from datalad.consts import (
     TIMESTAMP_FMT,
@@ -49,7 +50,6 @@ from datalad.distribution.dataset import (
     resolve_path,
     require_dataset,
 )
-from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import (
     build_doc,
     Interface,
@@ -89,15 +89,20 @@ from datalad.utils import (
     make_tempfile,
     _path_,
     slash_join,
-    assure_list,
+    ensure_list,
     quote_cmdlinearg,
 )
+from datalad.core.local.diff import diff_dataset
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
 
-class _RunnerAdapter(Runner):
+class _RunnerAdapter(WitlessRunner):
     """An adapter to use interchanegably with SSH connection"""
+
+    def __call__(self, cmd):
+        out = self.run(cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get_git_version(self):
         return external_versions['cmd:git']
@@ -119,9 +124,9 @@ class _RunnerAdapter(Runner):
                 # destination directory already exists. With Python 3.8, we can
                 # make copytree() do the same with dirs_exist_ok=True. But for
                 # now, just rely on `cp`.
-                cmd = ["cp", "--recursive"]
+                cmd = ["cp", "-R"]
                 if preserve_attrs:
-                    cmd.append("--preserve")
+                    cmd.append("-p")
                 self(cmd + [quote_cmdlinearg(a) for a in args])
         else:
             copy_fn(source, destination)
@@ -253,7 +258,7 @@ def _create_dataset_sibling(
                 # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
-                shell("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
+                shell("chmod -R +r+w {}".format(sh_quote(remoteds_path)))
                 # remove target at path
                 shell("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
@@ -512,8 +517,7 @@ class CreateSibling(Interface):
             sibling (re-)configured (thus implies 'reconfigure').
             `replace` could lead to data loss, so use with care.  To minimize
             possibility of data loss, in interactive mode DataLad will ask for
-            confirmation, but it would just issue a warning and proceed in
-            non-interactive mode.
+            confirmation, but it would raise an exception in non-interactive mode.
             """,),
         inherit=inherit_opt,
         shared=Parameter(
@@ -645,51 +649,69 @@ class CreateSibling(Interface):
         # parse the base dataset to find all subdatasets that need processing
         #
         to_process = []
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                # only a single path!
-                path=refds_path,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
+        cand_ds = [
+            Dataset(r['path'])
+            for r in diff_dataset(
+                ds,
+                fr=since,
+                to=None,
+                # make explicit, but doesn't matter, no recursion in diff()
+                constant_refs=True,
+                # contrain to the paths of all locally existing subdatasets
+                path=[
+                    sds['path']
+                    for sds in ds.subdatasets(
+                        recursive=recursive,
+                        recursion_limit=recursion_limit,
+                        fulfilled=True,
+                        result_renderer=None)
+                ],
+                # save cycles, we are only looking for datasets
+                annex=None,
+                untracked='no',
+                # recursion was done faster by subdatasets()
+                recursive=False,
+                # save cycles, we are only looking for datasets
+                eval_file_type=False,
+            )
+            if r.get('type') == 'dataset' and r.get('state', None) != 'clean'
+        ]
+        # check remotes setup
+        for d in cand_ds if since else ([ds] + cand_ds):
+            d_repo = d.repo
+            if d_repo is None:
+                continue
+            checkds_remotes = d.repo.get_remotes()
+            res = dict(
                 action='create_sibling',
-                # both next should not happen anyways
-                unavailable_path_status='impossible',
-                nondataset_path_status='error',
-                modified=since,
-                return_type='generator',
-                on_failure='ignore'):
-            if ap.get('status', None):
-                # this is done
-                yield ap
-                continue
-            if ap.get('type', None) != 'dataset' or ap.get('state', None) == 'absent':
-                # this can happen when there is `since`, but we have no
-                # use for anything but datasets here
-                continue
-            checkds_remotes = Dataset(ap['path']).repo.get_remotes() \
-                if ap.get('state', None) != 'absent' \
-                else []
+                path=d.path,
+                type='dataset',
+            )
+
             if publish_depends:
                 # make sure dependencies are valid
                 # TODO: inherit -- we might want to automagically create
                 # those dependents as well???
-                unknown_deps = set(assure_list(publish_depends)).difference(checkds_remotes)
+                unknown_deps = set(ensure_list(publish_depends)).difference(
+                    checkds_remotes)
                 if unknown_deps:
-                    ap['status'] = 'error'
-                    ap['message'] = (
-                        'unknown sibling(s) specified as publication dependency: %s',
-                        unknown_deps)
-                    yield ap
+                    yield dict(
+                        res,
+                        status='error',
+                        message=('unknown sibling(s) specified as publication '
+                                 'dependency: %s', unknown_deps),
+                    )
                     continue
             if name in checkds_remotes and existing in ('error', 'skip'):
-                ap['status'] = 'error' if existing == 'error' else 'notneeded'
-                ap['message'] = (
-                    "sibling '%s' already configured (specify alternative name, or force "
-                    "reconfiguration via --existing",
-                    name)
-                yield ap
+                yield dict(
+                    res,
+                    status='error' if existing == 'error' else 'notneeded',
+                    message=(
+                        "sibling '%s' already configured (specify alternative "
+                        "name, or force reconfiguration via --existing", name),
+                )
                 continue
-            to_process.append(ap)
+            to_process.append(res)
 
         if not to_process:
             # we ruled out all possibilities
@@ -1014,7 +1036,7 @@ done
             mode = shared
 
         if mode:
-            ssh('chmod {} -R {} {}'.format(
+            ssh('chmod -R {} {} {}'.format(
                 mode,
                 sh_quote(dirname(webresources_remote)),
                 sh_quote(opj(path, 'index.html'))))

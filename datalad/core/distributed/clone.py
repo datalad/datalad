@@ -30,9 +30,9 @@ from datalad.support.gitrepo import (
 )
 from datalad.cmd import (
     CommandError,
-    GitRunner,
+    GitWitlessRunner,
     StdOutCapture,
-    WitlessRunner,
+    StdOutErrCapture,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -45,9 +45,12 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureKeyChoice,
 )
+from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
 from datalad.support.network import (
     get_local_file_url,
+    download_url,
+    is_url,
     URL,
     RI,
     DataLadRI,
@@ -58,7 +61,7 @@ from datalad.dochelpers import (
     single_or_plural,
 )
 from datalad.utils import (
-    assure_bool,
+    ensure_bool,
     knows_annex,
     make_tempfile,
     Path,
@@ -156,7 +159,7 @@ class Clone(Interface):
              code_py="clone(source='ria+http://store.datalad.org#~hcp-openaccess')",
              code_cmd="datalad clone ria+http://store.datalad.org#~hcp-openaccess"),
         dict(
-            text="Install a dataset in a specific version as identified by a"
+            text="Install a dataset in a specific version as identified by a "
                  "branch or tag name from store.datalad.org",
             code_py="clone(source='ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier')",
             code_cmd="datalad clone ria+http://store.datalad.org#76b6ca66-36b1-11ea-a2e6-f0d5bf7b5561@myidentifier"),
@@ -393,7 +396,8 @@ def clone_dataset(
             for cand in candidate_sources:
                 src = cand['giturl']
                 if track_url == src \
-                        or get_local_file_url(track_url, compatibility='git') == src \
+                        or (not is_url(track_url)
+                            and get_local_file_url(track_url, compatibility='git') == src) \
                         or track_path == expanduser(src):
                     yield get_status_dict(
                         status='notneeded',
@@ -566,6 +570,11 @@ def postclone_check_head(ds):
         for rbranch in remote_branches:
             if rbranch in ["origin/git-annex", "HEAD"]:
                 continue
+            if rbranch.startswith("origin/adjusted/"):
+                # If necessary for this file system, a downstream
+                # git-annex-init call will handle moving into an
+                # adjusted state.
+                continue
             repo.call_git(["checkout", "-b", rbranch[7:],  # drop "origin/"
                            "--track", rbranch])
             lgr.debug("Checked out local branch from %s", rbranch)
@@ -623,18 +632,15 @@ def postclonecfg_ria(ds, props):
         # get that config file the same way:
         config_content = None
         scheme = props['giturl'].split(':', 1)[0]
-        if scheme == 'http':
-
+        if scheme in ['http', 'https']:
             try:
-                response = requests.get("{}{}config".format(
-                    props['giturl'],
-                    '/' if not props['giturl'].endswith('/') else '')
-                )
-                config_content = response.text
-            except requests.RequestException as e:
+                config_content = download_url(
+                    "{}{}config".format(
+                        props['giturl'],
+                        '/' if not props['giturl'].endswith('/') else ''))
+            except DownloadError as e:
                 lgr.debug("Failed to get config file from source:\n%s",
                           exc_str(e))
-
         elif scheme == 'ssh':
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
@@ -658,8 +664,8 @@ def postclonecfg_ria(ds, props):
                 lgr.debug("Failed to get config file from source: %s",
                           exc_str(e))
         else:
-            lgr.debug("Unknown URL-Scheme in %s. Can handle SSH, HTTP or "
-                      "FILE scheme URLs.", props['source'])
+            lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
+                      "FILE scheme URLs.", scheme, props['source'])
 
         # 3. And read it
         org_uuid = None
@@ -669,7 +675,7 @@ def postclonecfg_ria(ds, props):
             #       to work and would read from stdin. Make sure we know this
             #       works for required git versions and on all platforms.
             with make_tempfile(content=config_content) as cfg_file:
-                runner = WitlessRunner(env=GitRunner.get_git_environ_adjusted())
+                runner = GitWitlessRunner()
                 try:
                     result = runner.run(
                         ['git', 'config', '-f', cfg_file,
@@ -785,7 +791,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
         if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
                                     ds.repo.dot_git / 'dl_target_test'):
-            # symlink the annex to avoid needless copies in an emphemeral clone
+            # symlink the annex to avoid needless copies in an ephemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
             origin_annex_url = ds.config.get("remote.origin.url", None)
             origin_git_path = None
@@ -794,7 +800,13 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # Deal with file:// scheme URLs as well as plain paths.
                     # If origin isn't local, we have nothing to do.
                     origin_git_path = Path(RI(origin_annex_url).localpath)
-                    if origin_git_path.name != '.git':
+
+                    # we are local; check for a bare repo first to not mess w/
+                    # the path
+                    if GitRepo(origin_git_path, create=False).bare:
+                        # origin is a bare repo -> use path as is
+                        pass
+                    elif origin_git_path.name != '.git':
                         origin_git_path /= '.git'
                 except ValueError:
                     # Note, that accessing localpath on a non-local RI throws
@@ -821,6 +833,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
 
+    repo_config = repo.config
     # Note: The purpose of this function is to inform the user. So if something
     # looks misconfigured, we'll warn and move on to the next item.
     for uuid, config in repo.get_special_remotes().items():
@@ -833,7 +846,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             continue
         sr_autoenable = config.get('autoenable', False)
         try:
-            sr_autoenable = assure_bool(sr_autoenable)
+            sr_autoenable = ensure_bool(sr_autoenable)
         except ValueError:
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
@@ -843,6 +856,15 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 sr_autoenable, sr_name, ds.path)
             continue
 
+        # If it looks like a type=git special remote, make sure we have up to
+        # date information. See gh-2897.
+        if sr_autoenable and repo_config.get("remote.{}.fetch".format(sr_name)):
+            try:
+                repo.fetch(remote=sr_name)
+            except CommandError as exc:
+                lgr.warning("Failed to fetch type=git special remote %s: %s",
+                            sr_name, exc_str(exc))
+
         # determine whether there is a registered remote with matching UUID
         if uuid:
             if remote_uuids is None:
@@ -851,8 +873,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # this will point to the UUID for the configuration (i.e.
                     # the key returned by get_special_remotes) rather than the
                     # shared UUID.
-                    (repo.config.get('remote.%s.annex-config-uuid' % r) or
-                     repo.config.get('remote.%s.annex-uuid' % r))
+                    (repo_config.get('remote.%s.annex-config-uuid' % r) or
+                     repo_config.get('remote.%s.annex-uuid' % r))
                     for r in repo.get_remotes()
                 }
             if uuid not in remote_uuids:

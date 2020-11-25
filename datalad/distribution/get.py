@@ -15,6 +15,8 @@ import re
 
 import os.path as op
 
+from functools import partial
+
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -40,6 +42,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
+from datalad.support.collections import ReadOnlyDict
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import (
@@ -47,12 +50,16 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CommandError,
     InsufficientArgumentsError,
 )
 from datalad.support.network import (
     URL,
     RI,
     urlquote,
+)
+from datalad.support.parallel import (
+    ProducerConsumerProgressLog,
 )
 from datalad.dochelpers import (
     single_or_plural,
@@ -309,9 +316,100 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 res.get('path', None) == dest_path:
             _fixup_submodule_dotgit_setup(ds, sm_path)
 
-            # do fancy update
+            target_commit = sm['gitshasum']
             lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
-            ds.repo.update_submodule(sm_path, init=True)
+            section_name = 'submodule.{}'.format(sm['gitmodule_name'])
+            # do not use `git-submodule update --init`, it would make calls
+            # to git-config which will not obey datalad inter-process locks for
+            # modifying .git/config
+            sub = GitRepo(res['path'])
+            # record what branch we were on right after the clone
+            # TODO instead of the active branch, this should first consider
+            # a configured branch in the submodule record of the superdataset
+            sub_orig_branch = sub.get_active_branch()
+            # if we are on a branch this hexsha will be the tip of that branch
+            sub_orig_hexsha = sub.get_hexsha()
+            if sub_orig_hexsha != target_commit:
+                # make sure we have the desired commit locally
+                # expensive and possibly error-prone fetch conditional on cheap
+                # local check
+                if not sub.commit_exists(target_commit):
+                    try:
+                        sub.fetch(remote='origin', refspec=target_commit)
+                    except CommandError:
+                        pass
+                    # instead of inspecting the fetch results for possible ways
+                    # with which it could failed to produced the desired result
+                    # let's verify the presence of the commit directly, we are in
+                    # expensive-land already anyways
+                    if not sub.commit_exists(target_commit):
+                        res.update(
+                            status='error',
+                            message=(
+                                'Target commit %s does not exist in the clone, and '
+                                'a fetch that commit from origin failed',
+                                target_commit[:8]),
+                        )
+                        yield res
+                        # there is nothing we can do about this
+                        # MIH thinks that removing the clone is not needed, as a likely
+                        # next step will have to be a manual recovery intervention
+                        # and not another blind attempt
+                        continue
+                # checkout the desired commit
+                sub.call_git(['checkout', target_commit])
+                # did we detach?
+                # XXX: This is a less generic variant of a part of
+                # GitRepo.update_submodule(). It makes use of already available
+                # information and trusts the existence of the just cloned repo
+                # and avoids (redoing) some safety checks
+                if sub_orig_branch and not sub.get_active_branch():
+                    # trace if current state is a predecessor of the branch_hexsha
+                    lgr.debug(
+                        "Detached HEAD after updating submodule %s "
+                        "(original branch: %s)", sub, sub_orig_branch)
+                    if sub.get_merge_base(
+                            [sub_orig_hexsha, target_commit]) == target_commit:
+                        # TODO: config option?
+                        # MIH: There is no real need here. IMHO this should all not
+                        # happen, unless the submodule record has a branch
+                        # configured. And Datalad should leave such a record, when
+                        # a submodule is registered.
+
+                        # we assume the target_commit to be from the same branch,
+                        # because it is an ancestor -- update that original branch
+                        # to point to the target_commit, and update HEAD to point to
+                        # that location -- this readies the subdataset for
+                        # further modification
+                        lgr.info(
+                            "Reset subdataset branch '%s' to %s (from %s) to "
+                            "avoid a detached HEAD",
+                            sub_orig_branch, target_commit[:8], sub_orig_hexsha[:8])
+                        branch_ref = 'refs/heads/%s' % sub_orig_branch
+                        sub.update_ref(branch_ref, target_commit)
+                        sub.update_ref('HEAD', branch_ref, symbolic=True)
+                    else:
+                        lgr.warning(
+                            "%s has a detached HEAD, because the recorded "
+                            "subdataset state %s has no unique ancestor with "
+                            "branch '%s'",
+                            sub, target_commit[:8], sub_orig_branch)
+
+            # register the submodule as "active" in the superdataset
+            ds.config.set(
+                '{}.active'.format(section_name),
+                'true',
+                reload=False, force=True, where='local',
+            )
+            ds.config.set(
+                '{}.url'.format(section_name),
+                # record the actual source URL of the successful clone
+                # and not a funky prediction based on the parent ds
+                # like ds.repo.update_submodule() would do (does not
+                # accept a URL)
+                res['source']['giturl'],
+                reload=True, force=True, where='local',
+            )
         yield res
 
     subds = Dataset(dest_path)
@@ -411,53 +509,83 @@ def _install_necessary_subdatasets(
 
 
 def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
-                                        refds_path=None, description=None):
+                 refds_path=None, description=None, jobs=None, producer_only=False):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
+    if jobs == "auto":
+        # be safe -- there might be ssh logins etc. So no parallel
+        jobs = 0
     # install using helper that give some flexibility regarding where to
     # get the module from
 
-    for sub in ds.subdatasets(
-            path=start,
-            return_type='generator',
-            result_renderer='disabled'):
+    # Keep only paths, to not drag full instances of Datasets along,
+    # they are cheap to instantiate
+    sub_paths_considered = []
+    subs_notneeded = []
+
+    def gen_subs_to_install():  # producer
+        for sub in ds.subdatasets(
+                path=start,
+                return_type='generator',
+                result_renderer='disabled'):
+            sub_path = sub['path']
+            sub_paths_considered.append(sub_path)
+            if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
+                lgr.debug(
+                    "subdataset %s is configured to be skipped on recursive installation",
+                    sub_path)
+                continue
+            # TODO: Yarik is lost among all parentds, ds, start, refds_path so is not brave enough to
+            # assume any from the record, thus will pass "ds.path" around to consumer
+            yield ds.path, ReadOnlyDict(sub), recursion_limit
+
+    def consumer(ds_path__sub__limit):
+        ds_path, sub, recursion_limit = ds_path__sub__limit
         subds = Dataset(sub['path'])
-        if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
-            lgr.debug(
-                "subdataset %s is configured to be skipped on recursive installation",
-                sub['path'])
-            continue
         if sub.get('state', None) != 'absent':
-            # dataset was already found to exist
-            yield get_status_dict(
-                'install', ds=subds, status='notneeded', logger=lgr,
-                refds=refds_path)
+            rec = get_status_dict('install', ds=subds, status='notneeded', logger=lgr, refds=refds_path)
+            subs_notneeded.append(rec)
+            yield rec
             # do not continue, even if an intermediate dataset exists it
             # does not imply that everything below it does too
         else:
-            # try to get this dataset
-            for res in _install_subds_from_flexible_source(
-                    ds,
-                    sub,
-                    reckless=reckless,
-                    description=description):
-                # yield everything to let the caller decide how to deal with
-                # errors
-                yield res
+            # TODO: here we need another "ds"!  is it within "sub"?
+            yield from _install_subds_from_flexible_source(
+                Dataset(ds_path), sub, reckless=reckless, description=description)
+
         if not subds.is_installed():
             # an error result was emitted, and the external consumer can decide
             # what to do with it, but there is no point in recursing into
             # something that should be there, but isn't
             lgr.debug('Subdataset %s could not be installed, skipped', subds)
-            continue
+            return
+
         # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
                 subds,
                 recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
                 reckless=reckless,
-                refds_path=refds_path):
-            yield res
+                refds_path=refds_path,
+                jobs=jobs,
+                producer_only=True  # we will be adding to producer queue
+        ):
+            producer_consumer.add_to_producer_queue(res)
+
+    producer = gen_subs_to_install()
+    if producer_only:
+        yield from producer
+    else:
+        producer_consumer = ProducerConsumerProgressLog(
+            producer,
+            consumer,
+            # no safe_to_consume= is needed since we are doing only at a single level ATM
+            label="Installing",
+            unit="datasets",
+            jobs=jobs,
+            lgr=lgr
+        )
+        yield from producer_consumer
 
 
 def _install_targetpath(
@@ -467,7 +595,9 @@ def _install_targetpath(
         recursion_limit,
         reckless,
         refds_path,
-        description):
+        description,
+        jobs=None,
+):
     """Helper to install as many subdatasets as needed to verify existence
     of a target path
 
@@ -552,7 +682,9 @@ def _install_targetpath(
             # TODO keep Path when RF is done
             start=str(target_path),
             refds_path=refds_path,
-            description=description):
+            description=description,
+            jobs=jobs,
+    ):
         # yield immediately so errors could be acted upon
         # outside, before we continue
         res.update(
@@ -762,7 +894,9 @@ class Get(Interface):
                             recursion_limit,
                             reckless,
                             refds_path,
-                            description):
+                            description,
+                            jobs=jobs,
+                    ):
                         # fish out the datasets that 'contains' a targetpath
                         # and store them for later
                         if res.get('status', None) in ('ok', 'notneeded') and \
@@ -798,7 +932,9 @@ class Get(Interface):
                         recursion_limit,
                         reckless,
                         refds_path,
-                        description):
+                        description,
+                        jobs=jobs,
+                ):
                     known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \
                             'contains' in res:

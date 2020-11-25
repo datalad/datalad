@@ -36,7 +36,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
@@ -295,7 +295,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     depvar = 'remote.{}.datalad-publish-depends'.format(remote)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = assure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, []))
 
     # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # make sure we are up-to-date on this topic on all affected remotes, before
@@ -446,11 +446,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # TODO: this should become it own helper
             if is_annex_repo:
                 # annex could manage this branch
-                if current_branch.startswith('annex/direct') \
-                        and ds.config.getbool('annex', 'direct', default=False):
-                    # this is a "fake" annex direct mode branch
-                    # we want to publish the underlying branch
-                    current_branch = current_branch[12:]
                 match_adjusted = re.match(
                     r'adjusted/(.*)\([a-z]*\)',
                     current_branch)
@@ -497,13 +492,13 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             cand_remotes = [r for r in ds.repo.get_remotes()
                             if 'remote.{}.push'.format(r) in ds.config]
             if len(cand_remotes) > 1:
-                lgr.warning('Target sibling ambiguous, please specific via --to')
+                lgr.warning('Target sibling ambiguous, please specify via --to')
             elif len(cand_remotes) == 1:
                 track_remote = cand_remotes[0]
             else:
                 return ('impossible',
                         'No target sibling configured for default publication, '
-                        'please specific via --to')
+                        'please specify via --to')
         if track_remote:
             ds_remote_info[ds_path] = dict(zip(
                 ('remote', 'refspec'),
@@ -623,11 +618,11 @@ class Publish(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
-            from which to look for changes
-            to decide whether updated publishing is necessary for this and which children.
-            If empty argument is provided, then we would take from the previously 
-            published to that remote/sibling state (for the current branch)"""),
+            doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
+            changes to decide whether pushing is necessary.
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point. An empty string ('') for the same effect is
+            still supported)."""),
         # since: commit => .gitmodules diff to head => submodules to publish
         missing=missing_sibling_opt,
         path=Parameter(
@@ -689,18 +684,22 @@ class Publish(Interface):
             dataset = require_dataset(
                 dataset, check_installed=True, purpose='publishing')
 
-        if since and not dataset:
+        if (since and since != '^') and not dataset:
             raise InsufficientArgumentsError(
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
-        if dataset and since == '':
+        if dataset and since in ('', '^'):
             # only update since last update so we figure out what was the last update
             active_branch = dataset.repo.get_active_branch()
             if to:
                 # XXX here we assume one to one mapping of names from local branches
                 # to the remote
                 since = '%s/%s' % (to, active_branch)
+                # test if such branch already exists,
+                if since not in dataset.repo.get_remote_branches():
+                    lgr.debug("No remote branch %s yet, so since will not be used", since)
+                    since = None
             else:
                 # take tracking remote for the active branch
                 tracked_remote, tracked_refspec = dataset.repo.get_tracking_branch()
@@ -737,7 +736,7 @@ class Publish(Interface):
                 action='publish',
                 unavailable_path_status='impossible',
                 nondataset_path_status='error',
-                modified=since,
+                modified="%s..HEAD" % since if since else since,
                 return_type='generator',
                 on_failure='ignore',
                 force_no_revision_change_discovery=False, # we cannot publish what was not committed

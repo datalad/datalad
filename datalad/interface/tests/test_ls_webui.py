@@ -13,13 +13,14 @@ import logging
 from genericpath import exists
 from datalad.tests.utils import (
     assert_equal,
-    assert_raises,
-    assert_in,
     assert_false,
+    assert_in,
     assert_not_in,
+    assert_raises,
+    known_failure_windows,
     ok_startswith,
     serve_path_via_http,
-    known_failure_windows,
+    slow,
     with_tree,
 )
 from os.path import join as opj
@@ -39,7 +40,7 @@ from datalad.utils import (
     swallow_outputs,
     _path_,
 )
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner
 
 
 def test_machinesize():
@@ -148,6 +149,7 @@ def test_fs_traverse(topdir):
 
 # underlying code cannot deal with adjusted branches
 # https://github.com/datalad/datalad/pull/3817
+@slow  # 9sec on Yarik's laptop
 @known_failure_windows
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
@@ -190,7 +192,8 @@ def test_ls_json(topdir, topurl):
     # register "external" submodule  by installing and uninstalling it
     ext_url = topurl + '/dir/subgit/.git'
     # need to make it installable via http
-    Runner()('git update-server-info', cwd=opj(topdir, 'dir', 'subgit'))
+    WitlessRunner(cwd=opj(topdir, 'dir', 'subgit')).run(
+        ['git', 'update-server-info'])
     ds.install(opj('dir', 'subgit_ext'), source=ext_url)
     ds.uninstall(opj('dir', 'subgit_ext'))
     meta_dir = opj('.git', 'datalad', 'metadata')

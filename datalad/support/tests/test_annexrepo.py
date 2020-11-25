@@ -37,8 +37,7 @@ from unittest.mock import patch
 import gc
 
 from datalad.cmd import (
-    Runner,
-    WitlessRunner,
+    WitlessRunner as Runner,
 )
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.external_versions import external_versions
@@ -88,6 +87,7 @@ from datalad.tests.utils import (
     skip_if,
     skip_if_on_windows,
     skip_if_root,
+    skip_nomultiplex_ssh,
     skip_ssh,
     SkipTest,
     slow,
@@ -686,6 +686,7 @@ def test_AnnexRepo_get_file_backend(src, dst):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
+@known_failure_windows
 @with_tempfile
 def test_AnnexRepo_always_commit(path):
 
@@ -746,9 +747,8 @@ def test_AnnexRepo_always_commit(path):
 @with_tempfile
 def test_AnnexRepo_on_uninited_annex(origin, path):
     # "Manually" clone to avoid initialization:
-    from datalad.cmd import Runner
     runner = Runner()
-    _ = runner(["git", "clone", origin, path], expect_stderr=True)
+    runner.run(["git", "clone", origin, path])
 
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
@@ -975,7 +975,7 @@ def test_AnnexRepo_get_contentlocation():
         yield _test_AnnexRepo_get_contentlocation, batch
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('about2_.txt', 'more abouts_'),
@@ -1118,7 +1118,7 @@ def test_annex_backends(path):
     eq_(repo.default_backends, ['MD5E'])
 
 
-@skip_ssh
+@skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
 def test_annex_ssh(topdir):
     # On Xenial, this hangs with a recent git-annex. It bisects to git-annex's
@@ -1127,6 +1127,12 @@ def test_annex_ssh(topdir):
     # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
     if external_versions['cmd:system-ssh'] < '7.4' and \
        '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
+        raise SkipTest("Test known to hang")
+    # And, since the switch to the Docker SSH target, our cron build with
+    # 7.20190708 stalls. 7.20190819 is the first known good version, but do a
+    # minimal skip up until the next release because we don't know that
+    # 7.20190730 stalls.
+    if external_versions['cmd:annex'] < '7.20190730':
         raise SkipTest("Test known to hang")
 
     topdir = Path(topdir)
@@ -1199,7 +1205,10 @@ def test_annex_ssh(topdir):
     # copy to the new remote:
     ar.copy_to(["foo"], remote="ssh-remote-2")
 
-    ok_(exists(socket_2))
+    if not exists(socket_2):  # pragma: no cover
+        # @known_failure (marked for grep)
+        raise SkipTest("test_annex_ssh hit known failure (gh-4781)")
+
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 
@@ -1662,8 +1671,28 @@ def test_get_description(path1, path2):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_flyweight(path1, path2):
 
+    import sys
+
     repo1 = AnnexRepo(path1, create=True)
     assert_is_instance(repo1, AnnexRepo)
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instantiation that isn't picked up immediately, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = AnnexRepo(path1, create=False)
     assert_is_instance(repo2, AnnexRepo)
@@ -1685,6 +1714,68 @@ def test_AnnexRepo_flyweight(path1, path2):
     repo4 = GitRepo(path1)
     assert_is_instance(repo4, GitRepo)
     assert_not_is_instance(repo4, AnnexRepo)
+
+    orig_id = id(repo1)
+
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
+
+
+    # But we have two GitRepos in memory (the AnnexRepo and repo4):
+    assert_equal(2, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # deleting one reference doesn't change anything - we still get the same
+    # thing:
+    del repo1
+    gc.collect()  # TODO: see first comment above
+    ok_(repo2 is not None)
+    ok_(repo2 is repo3)
+    ok_(repo2 == repo3)
+
+    repo1 = AnnexRepo(path1)
+    eq_(orig_id, id(repo1))
+
+    del repo1
+    del repo2
+
+    # for testing that destroying the object calls close() on BatchedAnnex:
+    class Dummy:
+        def __init__(self, *args, **kwargs):
+            self.close_called = False
+
+        def close(self):
+            self.close_called = True
+
+    fake_batch = Dummy()
+
+    # Killing last reference will lead to garbage collection which will call
+    # AnnexRepo's finalizer:
+    with patch.object(repo3._batched, 'close', fake_batch.close):
+        with swallow_logs(new_level=1) as cml:
+            del repo3
+            gc.collect()  # TODO: see first comment above
+            cml.assert_logged(msg="Finalizer called on: AnnexRepo(%s)" % path1,
+                              level="Level 1",
+                              regex=False)
+            # finalizer called close() on BatchedAnnex:
+            assert_true(fake_batch.close_called)
+
+    # Flyweight is gone:
+    assert_not_in(path1, AnnexRepo._unique_instances.keys())
+
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, AnnexRepo) and o.path == path1])
+    # GitRepo is unaffected:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # new object is created on re-request:
+    repo1 = AnnexRepo(path1)
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
@@ -2057,9 +2148,9 @@ def _test_add_under_subdir(path):
     create_tree(subdir, {'empty': ''})
     runner = Runner(cwd=subdir)
     with chpwd(subdir):
-        runner(['git', 'add', 'empty'])  # should add sucesfully
+        runner.run(['git', 'add', 'empty'])  # should add sucesfully
         # gr.commit('important') #
-        runner(['git', 'commit', '-m', 'important'])
+        runner.run(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
 
 
@@ -2087,7 +2178,7 @@ def test_annexjson_protocol(path):
     ar = AnnexRepo(path, create=True)
     ar.save()
     assert_repo_status(path)
-    runner = WitlessRunner(cwd=ar.path)
+    runner = Runner(cwd=ar.path)
     # first an orderly execution
     res = runner.run(
         ['git', 'annex', 'find', '.', '--json'],
@@ -2203,6 +2294,7 @@ def check_files_split_exc(cls, topdir):
         assert_not_in('too many', str(ecm.exception))
 
 
+@slow  # 15 + 17sec on travis
 def test_files_split_exc():
     for cls in GitRepo, AnnexRepo:
         yield check_files_split_exc, cls
@@ -2257,8 +2349,6 @@ def test_ro_operations(path):
     # This test would function only if there is a way to run sudo
     # non-interactively, e.g. on Travis or on your local (watchout!) system
     # after you ran sudo command recently.
-
-    from datalad.cmd import Runner
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
@@ -2320,14 +2410,13 @@ def test_save_noperms(path):
     # after you ran sudo command recently.
     repo = AnnexRepo(path, init=True)
 
-    from datalad.cmd import Runner
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
     try:
         # To assure that git/git-annex really cannot acquire a lock and do
         # any changes (e.g. merge git-annex branch), we make this repo owned by root
-        sudochown(['-R', 'root:root', repo.pathobj / 'file1'])
+        sudochown(['-R', 'root:root', str(repo.pathobj / 'file1')])
     except Exception as exc:
         # Exception could be CommandError or IOError when there is no sudo
         raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)

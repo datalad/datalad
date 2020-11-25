@@ -35,12 +35,13 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetFound
 from datalad.utils import (
+    guard_for_format,
     join_cmdline,
     quote_cmdlinearg,
     split_cmdline,
 )
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 import datalad.support.ansi_colors as ac
 
 from datalad.core.local.run import Run
@@ -77,24 +78,21 @@ def _get_proc_config(name, ds=None):
     """
     # figure what ConfigManager to ask
     cm = cfg if ds is None else ds.config
+    # ConfigManager might return a tuple for different reasons.
+    # The config might have been defined multiple times in the same location
+    # (within .datalad/config for example) or there are multiple values for
+    # it on different levels of git-config (system, user, repo). git-config
+    # in turn does report such things ordered from most general to most
+    # specific configuration. We do want the most specific one here, so
+    # config.get(), which returns the last entry, works here.
+    # TODO: At this point we cannot determine whether it was actually
+    # configured to yield several values by the very same config, in which
+    # case we should actually issue a warning, since we then have no idea
+    # of a priority. But ConfigManager isn't able yet to tell us or to
+    # restrict the possibility to define multiple values to particular items
     v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
     h = cm.get('datalad.procedures.{}.help'.format(name), None)
-    if isinstance(v, tuple):
-        # ConfigManager might return a tuple for different reasons.
-        # The config might have been defined multiple times in the same location
-        # (within .datalad/config for example) or there are multiple values for
-        # it on different levels of git-config (system, user, repo). git-config
-        # in turn does report such things ordered from most general to most
-        # specific configuration. We do want the most specific one here, so we
-        # go with the last entry of that tuple.
-        # TODO: At this point we cannot determine whether it was actually
-        # configured to yield several values by the very same config, in which
-        # case we should actually issue a warning, since we then have no idea
-        # of a priority. But ConfigManager isn't able yet to tell us or to
-        # restrict the possibility to define multiple values to particular items
-        return v[-1], h
-    else:
-        return v, h
+    return v, h
 
 
 def _get_procedure_implementation(name='*', ds=None):
@@ -122,13 +120,13 @@ def _get_procedure_implementation(name='*', ds=None):
     # 1. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
-        for dir in assure_list(loc):
+        for dir in ensure_list(loc):
             for m, n in _get_file_match(dir, name):
                 yield (m, n,) + _get_proc_config(n)
     # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
-        dirs = assure_list(
+        dirs = ensure_list(
                 ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
             # TODO `get` dirs if necessary
@@ -437,8 +435,8 @@ class RunProcedure(Interface):
                              "Missing 'execute' permissions?" % procedure_file)
 
         cmd = ex['template'].format(
-            script=quote_cmdlinearg(procedure_file),
-            ds=quote_cmdlinearg(ds.path) if ds else '',
+            script=guard_for_format(quote_cmdlinearg(procedure_file)),
+            ds=guard_for_format(quote_cmdlinearg(ds.path)) if ds else '',
             args=join_cmdline(args) if args else '')
         lgr.info(u"Running procedure %s", name)
         lgr.debug(u'Full procedure command: %r', cmd)
@@ -453,6 +451,16 @@ class RunProcedure(Interface):
                 return_type='generator'
         ):
             yield r
+
+        if ds:
+            # the procedure ran and we have to anticipate that it might have
+            # changed the dataset config, so we need to trigger an unforced
+            # reload.
+            # we have to do this despite "being done here", because
+            # run_procedure() runs in the same process and reuses dataset (config
+            # manager) instances, and the next interaction with a dataset should
+            # be able to count on an up-to-date config
+            ds.config.reload()
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):

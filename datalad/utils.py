@@ -8,15 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+from collections.abc import Callable
 import hashlib
 import re
 import builtins
 import time
-
-try:
-    from collections.abc import Callable
-except ImportError:  # Python <= 3.3
-    from collections import Callable
 
 import logging
 import shutil
@@ -281,6 +277,7 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
+# unused in -core
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
@@ -373,31 +370,6 @@ from pathlib import (
     PurePath,
     PurePosixPath,
 )
-
-if sys.version_info.major == 3 and sys.version_info.minor < 6:
-    # Path.resolve() doesn't have strict=False until 3.6
-    # monkey patch it -- all code imports this class from this
-    # module
-    Path._datalad_moved_resolve = Path.resolve
-
-    def _resolve_without_strict(self, strict=False):
-        if strict or self.exists():
-            # this is pre 3.6 behavior
-            return self._datalad_moved_resolve()
-
-        # if strict==False, find the closest component
-        # that actually exists and resolve that one
-        for p in self.parents:
-            if not p.exists():
-                continue
-            resolved = p._datalad_moved_resolve()
-            # append the rest that did not exist
-            return resolved / self.relative_to(p)
-        # pathlib return the unresolved if nothing resolved
-        return self
-
-    Path.resolve = _resolve_without_strict
-
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -571,6 +543,7 @@ def file_basename(name, return_ext=False):
         return fbname
 
 
+# unused in -core
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
@@ -579,6 +552,7 @@ def escape_filename(filename):
     return filename
 
 
+# unused in -core
 def encode_filename(filename):
     """Encode unicode filename
     """
@@ -588,6 +562,7 @@ def encode_filename(filename):
         return filename
 
 
+# unused in -core
 def decode_input(s):
     """Given input string/bytes, decode according to stdin codepage (or UTF-8)
     if not defined
@@ -608,6 +583,7 @@ def decode_input(s):
             return s.decode(encoding, errors='replace')
 
 
+# unused in -core
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -784,6 +760,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
                     "confidence. Highest confidence was %s for %s"
                     % (denc_confidence, denc)
                 )
+            lgr.log(5, "Auto-detected encoding to be %s", denc)
             return s.decode(denc)
         else:
             raise ValueError(
@@ -1083,15 +1060,16 @@ def line_profile(func):
     prof = line_profiler.LineProfiler()
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_line_profile(*args, **kwargs):
         try:
             pfunc = prof(func)
             return pfunc(*args, **kwargs)
         finally:
             prof.print_stats()
-    return newfunc
+    return  _wrap_line_profile
 
 
+# unused in -core
 @optional_args
 def collect_method_callstats(func):
     """Figure out methods which call the method repeatedly on the same instance
@@ -1119,7 +1097,7 @@ def collect_method_callstats(func):
     toppath = op.dirname(__file__) + op.sep
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_collect_method_callstats(*args, **kwargs):
         try:
             self = args[0]
             stack = traceback.extract_stack()
@@ -1156,7 +1134,7 @@ def collect_method_callstats(func):
     import atexit
     atexit.register(print_stats)
 
-    return newfunc
+    return  _wrap_collect_method_callstats
 
 
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
@@ -1187,6 +1165,7 @@ def never_fail(f):
 #
 
 
+# unused in -core
 @contextmanager
 def nothing_cm():
     """Just a dummy cm to programmically switch context managers"""
@@ -1241,6 +1220,16 @@ def swallow_outputs():
             self._err.close()
             out_name = self._out.name
             err_name = self._err.name
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False) \
+                    and lgr.getEffectiveLevel() <= logging.DEBUG:
+                for s, sname in ((self.out, 'stdout'),
+                                 (self.err, 'stderr')):
+                    if s:
+                        pref = os.linesep + "| "
+                        lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
+                    else:
+                        lgr.debug("Nothing was swallowed for %s", sname)
             del self._out
             del self._err
             gc.collect()
@@ -1606,8 +1595,6 @@ class chpwd(object):
     def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
-            # PY35 has no auto-conversion of Path to str
-            path = str(path)
             pwd = getpwd()
             self._prev_pwd = pwd
         else:
@@ -1623,7 +1610,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = path
+        os.environ['PWD'] = str(path)
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1834,6 +1821,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
+# unused in -core
 def get_logfilename(dspath, cmd='datalad'):
     """Return a filename to use for logging under a dataset/repository
 
@@ -1963,7 +1951,11 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
 
 
 @optional_args
-def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+def try_multiple_dec(
+        f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
+        exceptions_filter=None,
+        logger=None,
+):
     """Decorator to try function multiple times.
 
     Main purpose is to decorate functions dealing with removal of files/directories
@@ -1978,7 +1970,15 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     increment_type: {None, 'exponential'}
       Note that if it is exponential, duration should typically be > 1.0
       so it grows with higher power
-
+    exceptions: Exception or tuple of Exceptions, optional
+      Exception or a tuple of multiple exceptions, on which to retry
+    exceptions_filter: callable, optional
+      If provided, this function will be called with a caught exception
+      instance.  If function returns True - we will re-try, if False - exception
+      will be re-raised without retrying.
+    logger: callable, optional
+      Logger to log upon failure.  If not provided, will use stock logger
+      at the level of 5 (heavy debug).
     """
     from .dochelpers import exc_str
     if not exceptions:
@@ -1987,28 +1987,31 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
         ntrials = 100 if on_windows else 10
-
+    if logger is None:
+        def logger(*args, **kwargs):
+            return lgr.log(5, *args, **kwargs)
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
-    def wrapped(*args, **kwargs):
+    def _wrap_try_multiple_dec(*args, **kwargs):
         t = duration
         for trial in range(ntrials):
             try:
                 return f(*args, **kwargs)
             except exceptions as exc:
-                if increment_type == 'exponential':
-                    t = duration ** (trial + 1)
-                lgr.log(
-                    5,
-                    "Caught %s on trial #%d. Sleeping %f and retrying",
-                    exc_str(exc), trial, t)
+                if exceptions_filter and not exceptions_filter(exc):
+                    raise
                 if trial < ntrials - 1:
+                    if increment_type == 'exponential':
+                        t = duration ** (trial + 1)
+                    logger(
+                        "Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
                     sleep(t)
                 else:
                     raise
 
-    return wrapped
+    return _wrap_try_multiple_dec
 
 
 @try_multiple_dec
@@ -2070,6 +2073,7 @@ def safe_print(s):
 # IO Helpers
 #
 
+# unused in -core
 def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
 
@@ -2093,6 +2097,19 @@ def open_r_encdetect(fname, readahead=1000):
               fname,
               enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_file(fname, decode=True):
+    """A helper to read file passing content via ensure_unicode
+
+    Parameters
+    ----------
+    decode: bool, optional
+      if False, no ensure_unicode and file content returned as bytes
+    """
+    with open(fname, 'rb') as f:
+        content = f.read()
+    return ensure_unicode(content) if decode else content
 
 
 def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
@@ -2442,6 +2459,16 @@ def quote_cmdlinearg(arg):
     ) if on_windows else shlex_quote(arg)
 
 
+def guard_for_format(arg):
+    """Replace { and } with {{ and }}
+
+    To be used in cases if arg is not expected to have provided
+    by user .format() placeholders, but 'arg' might become a part
+    of a composite passed to .format(), e.g. via 'Run'
+    """
+    return arg.replace('{', '{{').replace('}', '}}')
+
+
 def join_cmdline(args):
     """Join command line args into a string using quote_cmdlinearg
     """
@@ -2501,16 +2528,32 @@ def get_wrapped_class(wrapped):
     return _func_class
 
 
-# TODO whenever we feel ready for English kill the compat block below
-assure_tuple_or_list = ensure_tuple_or_list
-assure_iter = ensure_iter
-assure_list = ensure_list
-assure_list_from_str = ensure_list_from_str
-assure_dict_from_str = ensure_dict_from_str
-assure_bytes = ensure_bytes
-assure_unicode = ensure_unicode
-assure_bool = ensure_bool
-assure_dir = ensure_dir
+def _make_assure_kludge(fn):
+    old_name = fn.__name__.replace("ensure", "assure")
+
+    @wraps(fn)
+    def compat_fn(*args, **kwargs):
+        warnings.warn(
+            "{} is deprecated and will be removed in a future release. "
+            "Use {} instead."
+            .format(old_name, fn.__name__),
+            DeprecationWarning)
+        return fn(*args, **kwargs)
+
+    compat_fn.__doc__ = ("Note: This function is deprecated. Use {} instead."
+                         .format(fn.__name__))
+    return compat_fn
+
+
+assure_tuple_or_list = _make_assure_kludge(ensure_tuple_or_list)
+assure_iter = _make_assure_kludge(ensure_iter)
+assure_list = _make_assure_kludge(ensure_list)
+assure_list_from_str = _make_assure_kludge(ensure_list_from_str)
+assure_dict_from_str = _make_assure_kludge(ensure_dict_from_str)
+assure_bytes = _make_assure_kludge(ensure_bytes)
+assure_unicode = _make_assure_kludge(ensure_unicode)
+assure_bool = _make_assure_kludge(ensure_bool)
+assure_dir = _make_assure_kludge(ensure_dir)
 
 
 lgr.log(5, "Done importing datalad.utils")

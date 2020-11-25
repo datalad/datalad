@@ -31,37 +31,14 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
 from ..utils import (
-    assure_unicode,
     chpwd,
+    ensure_unicode,
     get_suggestions_msg,
     on_msys_tainted_paths,
     setup_exceptionhook,
 )
 from ..dochelpers import exc_str
-
-
-def _license_info():
-    return """\
-Copyright (c) 2013-2019 DataLad developers
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-"""
+from ..version import __full_version__
 
 
 class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
@@ -145,7 +122,7 @@ def setup_parser(
     parser.add_argument(
         '-f', '--output-format', dest='common_output_format',
         default='default',
-        type=assure_unicode,
+        type=ensure_unicode,
         metavar="{default,json,json_pp,tailored,'<template>'}",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
@@ -212,8 +189,8 @@ def setup_parser(
             cmdlineargs[1:], argparse.Namespace())
         if not (completing or unparsed_args):
             fail_handler(parser, msg="too few arguments", exit_code=2)
-        lgr.debug("Command line args 1st pass. Parsed: %s Unparsed: %s",
-                  parsed_args, unparsed_args)
+        lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
+                  __full_version__, parsed_args, unparsed_args)
     except Exception as exc:
         lgr.debug("Early parsing failed with %s", exc_str(exc))
         need_single_subparser = False

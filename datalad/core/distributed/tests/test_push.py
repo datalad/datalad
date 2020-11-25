@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
@@ -10,6 +9,8 @@
 """Test push
 
 """
+
+import logging
 
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
@@ -27,12 +28,15 @@ from datalad.tests.utils import (
     assert_status,
     DEFAULT_BRANCH,
     eq_,
+    known_failure_githubci_osx,
     neq_,
     ok_,
     ok_file_has_content,
     serve_path_via_http,
     skip_if_on_windows,
     skip_ssh,
+    slow,
+    swallow_logs,
     with_tempfile,
     with_tree,
     SkipTest,
@@ -129,7 +133,7 @@ def check_push(annex, src_path, dst_path):
     assert_in_results(
         res, status='impossible',
         message='No push target given, and none could be auto-detected, '
-        'please specific via --to')
+        'please specify via --to')
     eq_(orig_branches, src_repo.get_branches())
     # target sibling
     target = mk_push_target(src, 'target', dst_path, annex=annex)
@@ -237,12 +241,13 @@ def test_push():
     yield check_push, True
 
 
+@slow  # 33sec on Yarik's laptop
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True, suffix='sub')
+@with_tempfile(mkdir=True, suffix='subnoannex')
+@with_tempfile(mkdir=True, suffix='subsub')
 def test_push_recursive(
         origin_path, src_path, dst_top, dst_sub, dst_subnoannex, dst_subsub):
     # dataset with two submodules and one subsubmodule
@@ -256,8 +261,9 @@ def test_push_recursive(
     # running on a clone should make the test scenario more different than
     # test_push(), even for the pieces that should be identical
     top = Clone.__call__(source=origin.path, path=src_path)
-    sub, subsub, subnoannex = top.get(
-        '.', recursive=True, get_data=False, result_xfm='datasets')
+    subs = top.get('.', recursive=True, get_data=False, result_xfm='datasets')
+    # order for '.' should not be relied upon, so sort by path
+    sub, subsub, subnoannex = sorted(subs, key=lambda ds: ds.path)
 
     target_top = mk_push_target(top, 'target', dst_top, annex=True)
     # subdatasets have no remote yet, so recursive publishing should fail:
@@ -368,7 +374,16 @@ def test_push_recursive(
             res, status='notneeded', type='dataset', path=d.path,
             refspec=DEFAULT_REFSPEC)
 
+    # if noannex target gets some annex, we still should not fail to push
+    target_subnoannex.call_git(['annex', 'init'])
+    # just to ensure that we do need something to push
+    (subnoannex.pathobj / "newfile").write_text("content")
+    subnoannex.save()
+    res = subnoannex.push(to="target")
+    assert_in_results(res, status='ok', type='dataset')
 
+
+@slow  # 12sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -644,6 +659,7 @@ def test_push_wanted(srcpath, dstpath):
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
 
 
+@slow  # 10sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_data_transfer(path):
     path = Path(path)
@@ -704,6 +720,7 @@ def test_auto_data_transfer(path):
         path=str(ds_a.pathobj / "bar.dat"))
 
 
+@slow  # 16sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_if_wanted_data_transfer_path_restriction(path):
     path = Path(path)
@@ -773,3 +790,56 @@ def test_auto_if_wanted_data_transfer_path_restriction(path):
         res,
         action="copy", target="b", status="ok",
         path=str(ds_a.pathobj / "sec.dat"))
+
+
+@with_tempfile(mkdir=True)
+def test_push_git_annex_branch_when_no_data(path):
+    path = Path(path)
+    ds = Dataset(path / "a").create()
+    target = mk_push_target(ds, "target", str(path / "target"),
+                            annex=False, bare=True)
+    (ds.pathobj / "f0").write_text("0")
+    ds.save()
+    ds.push(to="target", data="nothing")
+    assert_in("git-annex",
+              {d["refname:strip=2"]
+               for d in target.for_each_ref_(fields="refname:strip=2")})
+
+
+@known_failure_githubci_osx
+@with_tree(tree={"ds": {"f0": "0", "f1": "0", "f2": "0",
+                        "f3": "1",
+                        "f4": "2", "f5": "2"}})
+def test_push_git_annex_branch_many_paths_same_data(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create(force=True)
+    ds.save()
+    mk_push_target(ds, "target", str(path / "target"),
+                   annex=True, bare=False)
+    nbytes = sum(ds.repo.get_content_annexinfo(paths=[f])[f]["bytesize"]
+                 for f in [ds.repo.pathobj / "f0",
+                           ds.repo.pathobj / "f3",
+                           ds.repo.pathobj / "f4"])
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res = ds.push(to="target")
+    assert_in("{} bytes of annex data".format(nbytes), cml.out)
+    # 3 files point to content already covered by another file.
+    assert_result_count(res, 3,
+                        action="copy", type="file", status="notneeded")
+
+
+@known_failure_githubci_osx
+@with_tree(tree={"ds": {"f0": "0"}})
+def test_push_matching(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create(force=True)
+    ds.config.set('push.default', 'matching', where='local')
+    ds.save()
+    remote_ds = mk_push_target(ds, 'local', str(path / 'dssibling'),
+                               annex=True, bare=False)
+    # that fact that the next one even runs makes sure that we are in a better
+    # place than https://github.com/datalad/datalad/issues/4888
+    ds.push(to='local')
+    # and we pushed the commit in the current branch
+    eq_(remote_ds.get_hexsha(DEFAULT_BRANCH),
+        ds.repo.get_hexsha(DEFAULT_BRANCH))

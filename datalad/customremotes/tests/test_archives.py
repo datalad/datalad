@@ -33,26 +33,28 @@ from ...tests.utils import (
     assert_equal,
     assert_false,
     assert_is_instance,
+    assert_not_equal,
     assert_not_in,
     assert_true,
     chpwd,
     eq_,
-    get_most_obscure_supported_name,
     in_,
     known_failure_githubci_win,
     ok_,
     ok_file_has_content,
     serve_path_via_http,
     swallow_logs,
-    swallow_outputs,
     with_tempfile,
     with_tree,
 )
-from ...cmd import Runner, GitRunner
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 from ...utils import (
     _path_,
-    on_linux,
-    on_osx,
     unlink,
 )
 from . import _get_custom_runner
@@ -80,7 +82,7 @@ from datalad import cfg as dl_cfg
 @with_tempfile()
 def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
-    annex = AnnexRepo(d, runner=_get_custom_runner(d))
+    annex = AnnexRepo(d, backend='MD5E', runner=_get_custom_runner(d))
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
@@ -165,23 +167,27 @@ def test_basic_scenario(d, d2):
 )
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
-    annex = AnnexRepo(topdir, init=True)
+    annex = AnnexRepo(topdir, backend='MD5E', init=True)
     annex.add('a.tar.gz')
     annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
     fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
     with chpwd(op.join(topdir, 'a', 'd')):
-        runner = Runner()
-        runner(['git', 'annex', 'drop', '--', fn_in_archive_obscure])  # run git annex drop
+        runner = WitlessRunner()
+        runner.run(
+            ['git', 'annex', 'drop', '--', fn_in_archive_obscure],
+            protocol=KillOutput)  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
-        runner(['git', 'annex', 'get', '--', fn_in_archive_obscure])   # run git annex get
+        runner.run(
+            ['git', 'annex', 'get', '--', fn_in_archive_obscure],
+            protocol=KillOutput)   # run git annex get
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
 @known_failure_githubci_win
 def test_get_git_environ_adjusted():
-    gitrunner = GitRunner()
+    gitrunner = GitWitlessRunner()
     env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
 
     # test conversion of relevant env vars from relative_path to correct absolute_path
@@ -200,19 +206,16 @@ def test_get_git_environ_adjusted():
 def test_no_rdflib_loaded():
     # rely on rdflib polluting stdout to see that it is not loaded whenever we load this remote
     # since that adds 300ms delay for no immediate use
-    from ...cmd import Runner
-    runner = Runner()
-    with swallow_outputs() as cmo:
-        runner.run(
-            [sys.executable,
-             '-c',
-             'import datalad.customremotes.archives, sys; '
-             'print([k for k in sys.modules if k.startswith("rdflib")])'],
-            log_stdout=False,
-            log_stderr=False)
-        # print cmo.out
-        assert_not_in("rdflib", cmo.out)
-        assert_not_in("rdflib", cmo.err)
+    runner = WitlessRunner()
+    out = runner.run(
+        [sys.executable,
+         '-c',
+         'import datalad.customremotes.archives, sys; '
+         'print([k for k in sys.modules if k.startswith("rdflib")])'],
+        protocol=StdOutErrCapture)
+    # print cmo.out
+    assert_not_in("rdflib", out['stdout'])
+    assert_not_in("rdflib", out['stderr'])
 
 
 @with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
@@ -322,7 +325,11 @@ def test_link_file_load(tempfile):
             # despite copystat mtime is not copied. TODO
             #        st.st_mtime)
 
-    if on_linux or on_osx:
+    # TODO: fix up the test to not rely on OS assumptions but rather
+    # first sense filesystem about linking support.
+    # For Yarik's Windows 10 VM test was failing under assumption that
+    # linking is not supported at all, but I guess it does.
+    if True:  # on_linux or on_osx:
         # above call should result in the hardlink
         assert_equal(inode(tempfile), inode(tempfile2))
         assert_equal(stats(tempfile), stats(tempfile2))
@@ -336,8 +343,8 @@ def test_link_file_load(tempfile):
                 link_file_load(tempfile, tempfile2)  # should still work
                 ok_("failed (TEST), copying file" in cm.out)
 
-    # should be a copy (either originally for windows, or after mocked call)
-    ok_(inode(tempfile) != inode(tempfile2))
+        # should be a copy (after mocked call)
+        assert_not_equal(inode(tempfile), inode(tempfile2))
     with open(tempfile2, 'r') as f:
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))

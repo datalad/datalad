@@ -1,0 +1,25 @@
+name: Shellcheck on scripts
+
+on: [push, pull_request]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up system
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install shellcheck
+    - uses: actions/checkout@v1
+    - name: Run shellcheck
+      run: |
+        # I: running only on a subset of scripts which are shellcheck clean ATM
+        shellcheck \
+          tools/bisect-git-annex.scripts/bisect-git-annex-lock.sh \
+          tools/ci/install-annex.sh \
+          tools/ci/install-minimum-git.sh \
+          tools/ci/prep-travis-devel-annex.sh \
+          tools/ci/prep-travis-forssh.sh

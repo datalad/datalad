@@ -837,6 +837,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     argspec = getargspec(call)
     defaults = argspec.defaults
     nargs = len(argspec.args)
+    defaults = defaults or []  # ensure it is a list and not None
     assert (nargs >= len(defaults))
     # map any args to their name
     argmap = list(zip(argspec.args[:len(args)], args))

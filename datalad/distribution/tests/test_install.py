@@ -34,7 +34,6 @@ from datalad.utils import (
     Path,
 )
 from datalad.support import path as op
-from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
@@ -42,7 +41,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner as Runner
 from datalad.tests.utils import (
     skip_ssh,
     create_tree,
@@ -73,7 +72,7 @@ from datalad.tests.utils import (
     slow,
     usecase,
     get_datasets_topdir,
-    SkipTest,
+    known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
 )
@@ -97,7 +96,7 @@ def _test_guess_dot_git(annex, path, url, tdir):
         assert_raises(IncompleteResultsError, install, path=tdir, source=url)
     ok_(not exists(tdir))
 
-    Runner(cwd=path)(['git', 'update-server-info'])
+    Runner(cwd=path).run(['git', 'update-server-info'])
 
     with swallow_logs() as cml:
         installed = install(tdir, source=url)
@@ -175,6 +174,7 @@ def test_invalid_args(path):
 #    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 
+@known_failure_appveyor
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
@@ -254,6 +254,7 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@slow   # 25sec on Yarik's laptop
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_dataset_from_instance(src, dst):
@@ -296,7 +297,7 @@ def test_install_dataladri(src, topurl, path):
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
-    Runner(cwd=gr.path)(['git', 'update-server-info'])
+    Runner(cwd=gr.path).run(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.consts.DATASETS_TOPURL', topurl), \
             swallow_logs():
@@ -307,6 +308,7 @@ def test_install_dataladri(src, topurl, path):
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@slow   # 46sec on Yarik's laptop and tripped Travis CI
 @known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
@@ -431,6 +433,7 @@ def test_install_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
+@slow   # 15sec on Yarik's laptop
 @known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network

@@ -23,6 +23,7 @@ from datalad.tests.utils import (
     assert_is,
     assert_raises,
     eq_,
+    known_failure_appveyor,
     known_failure_githubci_win,
     lgr,
     OBSCURE_FILENAME,
@@ -44,10 +45,14 @@ from ..cmd import (
 )
 from datalad.support.exceptions import CommandError
 from datalad.support.protocol import DryRunProtocol
-from datalad.utils import split_cmdline
+from datalad.utils import (
+    split_cmdline,
+    quote_cmdlinearg,
+)
 
 
-@known_failure_githubci_win
+# runner protocol implementation is not compatible with windows
+@skip_if_on_windows
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner_dry(tempfile):
@@ -73,7 +78,9 @@ def test_runner_dry(tempfile):
     assert_equal("args=('foo', 'bar')", dry[1]['command'][1])
 
 
-@known_failure_githubci_win
+# UnicodeDecodeError: 'charmap' codec can't decode byte 0x81 in position 10:
+# character maps to <undefined>
+@known_failure_appveyor
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
@@ -81,7 +88,7 @@ def test_runner(tempfile):
     # test non-dry command call
     runner = Runner()
     content = 'Testing äöü東 real run'
-    cmd = 'echo %s > %r' % (content, tempfile)
+    cmd = 'echo %s > %s' % (content, quote_cmdlinearg(tempfile))
     ret = runner.run(cmd)
     assert_equal(ret, ('', ''))  # no out or err
     ok_file_has_content(tempfile, content, strip=True)
@@ -152,7 +159,8 @@ def test_runner_instance_callable_wet():
     eq_(ret, os.path.join('foo', 'bar'))
 
 
-@known_failure_githubci_win
+# runner logging implementation is not compatible with windows
+@skip_if_on_windows
 def test_runner_log_stderr():
 
     runner = Runner(log_outputs=True)
@@ -178,6 +186,8 @@ def test_runner_log_stderr():
                           "stderr| stderr-Message should not be logged")
 
 
+# runner logging implementation is not compatible with windows
+@skip_if_on_windows
 @known_failure_githubci_win
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of
@@ -267,7 +277,7 @@ def test_runner_failure(dir_):
     from ..support.annexrepo import AnnexRepo
     repo = AnnexRepo(dir_, create=True)
     runner = Runner()
-    failing_cmd = ['git-annex', 'add', 'notexistent.dat']
+    failing_cmd = ['git', 'annex', 'add', 'notexistent.dat']
 
     with assert_raises(CommandError) as cme, \
          swallow_logs() as cml:
@@ -276,6 +286,9 @@ def test_runner_failure(dir_):
     assert_equal(1, cme.exception.code)
 
 
+# UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe1 in position 1:
+# invalid continuation byte
+@known_failure_appveyor
 @with_tempfile(mkdir=True)
 def test_runner_failure_unicode(path):
     # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
@@ -331,7 +344,10 @@ def test_runner_stdin(path):
         assert_in("whatever", cmo.out)
 
 
-@known_failure_githubci_win
+# this test assumes that this source file is using the same
+# lineendings as are standard on the platform. While this is
+# common on *nix, it is a choice on windows
+@skip_if_on_windows
 def test_process_remaining_output():
     runner = Runner()
     out = u"""\

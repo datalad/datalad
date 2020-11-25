@@ -25,14 +25,15 @@ from os.path import (
     curdir,
     join as opj,
     exists,
-    islink,
     lexists,
     isdir,
-    isabs,
     normpath
 )
 from multiprocessing import cpu_count
-from weakref import WeakValueDictionary
+from weakref import (
+    finalize,
+    WeakValueDictionary
+)
 
 from datalad import ssh_manager
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
@@ -44,7 +45,6 @@ from datalad.dochelpers import (
 from datalad.ui import ui
 import datalad.utils as ut
 from datalad.utils import (
-    assure_list,
     auto_repr,
     ensure_list,
     get_linux_distribution,
@@ -61,11 +61,11 @@ from datalad.log import log_progress
 from datalad.support.json_py import json_loads
 from datalad.cmd import (
     BatchedCommand,
-    GitRunner,
     GitWitlessRunner,
     # KillOutput,
     run_gitcommand_on_file_list_chunks,
     SafeDelCloseMixin,
+    StdOutErrCapture,
     WitlessProtocol,
 )
 
@@ -73,7 +73,6 @@ from datalad.cmd import (
 from .repo import RepoInterface
 from .gitrepo import (
     GitRepo,
-    _normalize_path,
     normalize_path,
     normalize_paths,
     to_options
@@ -102,10 +101,6 @@ from .exceptions import (
 )
 
 lgr = logging.getLogger('datalad.annex')
-
-# TODO Constant is no longer used, but left defined to avoid breakage in
-# dependent code. Remove in 0.14 release.
-N_AUTO_JOBS = 1
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -276,7 +271,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             self._init(version=version, description=description)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
-        # and _set_direct_mode
         self._direct_mode = None
 
         # Handle cases of detecting repositories with no longer supported
@@ -315,6 +309,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # will be evaluated lazily
         self._n_auto_jobs = None
+
+        # Finally, register a finalizer (instead of having a __del__ method).
+        # This will be called by garbage collection as well as "atexit". By
+        # keeping the reference here, we can also call it explicitly.
+        # Note, that we can pass required attributes to the finalizer, but not
+        # `self` itself. This would create an additional reference to the object
+        # and thereby preventing it from being collected at all.
+        self._finalizer = finalize(self, AnnexRepo._cleanup, self.path,
+                                   self._batched)
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
@@ -367,7 +370,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
             self.config.set('annex.backends', backend, where='local')
 
-    def __del__(self):
+    @classmethod
+    def _cleanup(cls, path, batched):
+
+        lgr.log(1, "Finalizer called on: AnnexRepo(%s)", path)
+
+        # Ben: With switching to finalize rather than del, I think the
+        #      safe_del_debug isn't needed anymore. However, time will tell and
+        #      it doesn't hurt.
 
         def safe__del__debug(e):
             """We might be too late in the game and either .debug or exc_str
@@ -378,8 +388,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return
 
         try:
-            if hasattr(self, '_batched') and self._batched is not None:
-                self._batched.close()
+            if batched is not None:
+                batched.close()
         except TypeError as e:
             # Workaround:
             # most likely something wasn't accessible anymore; doesn't really
@@ -389,11 +399,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
-            safe__del__debug(e)
-        try:
-            super(AnnexRepo, self).__del__()
-        except TypeError as e:
-            # see above
             safe__del__debug(e)
 
     def _set_shared_connection(self, remote_name, url):
@@ -413,6 +418,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         remote_name: str
         url: str
         """
+        if not self.config.obtain('datalad.ssh.multiplex-connections'):
+            return
+
         from datalad.support.network import is_ssh
         # Note:
         #
@@ -447,8 +455,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def is_managed_branch(self, branch=None):
         """Whether `branch` is managed by git-annex.
 
-        ATM this returns true in direct mode (branch 'annex/direct/my_branch')
-        and if on an adjusted branch (annex v6+ repository:
+        ATM this returns True if on an adjusted branch of annex v6+ repository:
         either 'adjusted/my_branch(unlocked)' or 'adjusted/my_branch(fixed)'
 
         Note: The term 'managed branch' is used to make clear it's meant to be
@@ -469,11 +476,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
         # Note: `branch` might still be None, due to detached HEAD
         # (or no checkout at all)
-        if branch and \
-            (branch.startswith('annex/direct/') or
-             branch.startswith('adjusted/')):
-            return True
-        return False
+        return (branch and branch.startswith('adjusted/'))
 
     def get_corresponding_branch(self, branch=None):
         """Get the name of a potential corresponding branch.
@@ -495,9 +498,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             branch = self.get_active_branch()
 
         if self.is_managed_branch(branch):
-            if branch.startswith('annex/direct/'):
-                cor_branch = branch[13:]
-            elif branch.startswith('adjusted/'):
+            if branch.startswith('adjusted/'):
                 if branch.endswith('(unlocked)'):
                     cor_branch = branch[9:-10]
                 elif branch.endswith('(fixed)'):
@@ -602,12 +603,13 @@ class AnnexRepo(GitRepo, RepoInterface):
           upgradable -> list of upgradable versions (int)
         """
         if cls.repository_versions is None:
-            from datalad.cmd import Runner
             key_remap = {
                 "supported repository versions": "supported",
                 "upgrade supported from repository versions": "upgradable"}
-            out, _ = Runner().run(["git", "annex", "version"])
-            kvs = (ln.split(":", 1) for ln in out.splitlines())
+            out = GitWitlessRunner().run(
+                ["git", "annex", "version"],
+                protocol=StdOutErrCapture)
+            kvs = (ln.split(":", 1) for ln in out['stdout'].splitlines())
             cls.repository_versions = {
                 key_remap[k]: list(map(int, v.strip().split()))
                 for k, v in kvs if k in key_remap}
@@ -686,91 +688,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     def get_file_size(self, path):
         fpath = opj(self.path, path)
         return 0 if not exists(fpath) else os.stat(fpath).st_size
-
-    # TODO: Once the PR containing super class 'Repo' was merged, move there and
-    # melt with GitRepo.get_toppath including tests for both
-    @classmethod
-    def get_toppath(cls, path, follow_up=True, git_options=None):
-        """Return top-level of a repository given the path.
-
-        Parameters
-        -----------
-        follow_up : bool
-          If path has symlinks -- they get resolved by git.  If follow_up is
-          True, we will follow original path up until we hit the same resolved
-          path.  If no such path found, resolved one would be returned.
-        git_options: list of str
-          options to be passed to the git rev-parse call
-
-        Return None if no parent directory contains a git repository.
-        """
-
-        # first try plain git result:
-        toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-                                      git_options=git_options)
-        if toppath == '':
-            # didn't fail, so git itself didn't come to the conclusion
-            # there is no repo, but we have no actual result;
-            # might be an annex in direct mode
-            if git_options is None:
-                git_options = []
-            # TODO: Apparently doesn't work with git 2.11.0
-            # Note: Since we are in a classmethod, GitRepo.get_toppath uses
-            # Runner directly instead of _git_custom_command, which is why the
-            # common mechanics for direct mode are not applied.
-            # This is why there is no solution for git 2.11 yet
-
-            # Note 2: Actually, the above issue is irrelevant. The git
-            # executable has no repository it is bound to, since it's the
-            # purpose of the call to find this repository. Therefore
-            # core.bare=False has no effect at all.
-
-            # Disabled. See notes.
-            # git_options.extend(['-c', 'core.bare=False'])
-            # toppath = GitRepo.get_toppath(path=path, follow_up=follow_up,
-            #                               git_options=git_options)
-
-            # basically a copy of code in GitRepo.get_toppath
-            # except it uses 'git rev-parse --git-dir' as a workaround for
-            # direct mode:
-
-            from os.path import dirname
-            from os import pardir
-
-            cmd = ['git']
-            if git_options:
-                cmd.extend(git_options)
-            cmd.extend(["rev-parse", "--absolute-git-dir"])
-
-            try:
-                toppath, err = GitRunner().run(
-                    cmd,
-                    cwd=path,
-                    log_stdout=True, log_stderr=True,
-                    expect_fail=True, expect_stderr=True)
-                toppath = toppath.rstrip('\n\r')
-            except CommandError:
-                return None
-            except OSError:
-                toppath = AnnexRepo.get_toppath(dirname(path),
-                                                follow_up=follow_up,
-                                                git_options=git_options)
-
-            # we got the git-dir. Assuming the root dir we are looking for is
-            # one level up:
-            toppath = Path(toppath, pardir).resolve()
-
-            if follow_up:
-                path_ = path
-                path_prev = ""
-                while path_ and path_ != path_prev:  # on top /.. = /
-                    if Path(path_).resolve() == toppath:
-                        toppath = path_
-                        break
-                    path_prev = path_
-                    path_ = dirname(path_)
-
-        return str(toppath) if toppath else toppath
 
     def is_initialized(self):
         """quick check whether this appears to be an annex-init'ed repo
@@ -938,10 +855,27 @@ class AnnexRepo(GitRepo, RepoInterface):
           working with a sameas remote, the presence of either "sameas-name" or
           "sameas-uuid" is a reliable indicator.
         """
+        argspec = re.compile(r'^([^=]*)=(.*)$')
+        srs = {}
         try:
-            stdout, stderr = self._git_custom_command(
-                None, ['git', 'cat-file', 'blob', 'git-annex:remote.log'],
-                expect_fail=True)
+            for line in self.call_git_items_(
+                    ['cat-file', 'blob', 'git-annex:remote.log']):
+                # be precise and split by spaces
+                fields = line.split(' ')
+                # special remote UUID
+                sr_id = fields[0]
+                # the rest are config args for enableremote
+                sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+                if "name" not in sr_info:
+                    name = sr_info.get("sameas-name")
+                    if name is None:
+                        lgr.warning(
+                            "Encountered git-annex remote without a name or "
+                            "sameas-name value: %s",
+                            sr_info)
+                    else:
+                        sr_info["name"] = name
+                srs[sr_id] = sr_info
         except CommandError as e:
             if 'Not a valid object name git-annex:remote.log' in e.stderr:
                 # no special remotes configures
@@ -949,25 +883,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 # some unforseen error
                 raise e
-        argspec = re.compile(r'^([^=]*)=(.*)$')
-        srs = {}
-        for line in stdout.splitlines():
-            # be precise and split by spaces
-            fields = line.split(' ')
-            # special remote UUID
-            sr_id = fields[0]
-            # the rest are config args for enableremote
-            sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
-            if "name" not in sr_info:
-                name = sr_info.get("sameas-name")
-                if name is None:
-                    lgr.warning(
-                        "Encountered git-annex remote without a name or "
-                        "sameas-name value: %s",
-                        sr_info)
-                else:
-                    sr_info["name"] = name
-            srs[sr_id] = sr_info
         return srs
 
     def _run_annex_command(self, annex_cmd,
@@ -1036,7 +951,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git_options:
             cmd_list = ['git'] + git_options + ['annex']
         else:
-            cmd_list = ['git-annex']
+            # Note: On Windows machines, for a yet unclear reason, git-annex may
+            # not be found as an executable. This is mitigated (again, for an
+            # unclear reason) by seperating the invocation into "git annex". See
+            # https://github.com/datalad/datalad/issues/4892 for original issue.
+            cmd_list = ['git', 'annex']
         if jobs:
             annex_options += ['-J%d' % jobs]
 
@@ -1079,11 +998,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             #    record
             kwargs.pop('expect_fail', False)
             kwargs.pop('expect_stderr', False)
-            run_func = GitWitlessRunner(cwd=self.path, env=env).run
+            run_func = self._git_runner.run
             kwargs['protocol'] = _protocol
         elif runner is None:
             run_func = self.cmd_call_wrapper.run
-            kwargs['env'] = env
         else:
             raise ValueError("Unknown runner %r" % runner)
 
@@ -1094,6 +1012,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 run_func,
                 cmd_list,
                 files,
+                env=env,
                 **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
@@ -1180,46 +1099,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # that unlocked pointers aren't supported.
             return False
 
-    # TODO: RM DIRECT  might be gone but pieces might be useful for establishing
-    #       migration to v6+ mode and testing. For now is made protected to
-    #       avoid use by users
-    def _set_direct_mode(self, enable_direct_mode=True):
-        """Switch to direct or indirect mode
-
-        WARNING!  To be used only for internal development purposes.
-                  We no longer support direct mode and thus setting it in a
-                  repository would render it unusable for DataLad
-
-        Parameters
-        ----------
-        enable_direct_mode: bool
-            True means switch to direct mode,
-            False switches to indirect mode
-
-        Raises
-        ------
-        CommandNotAvailableError
-            in case you try to switch to indirect mode on a crippled filesystem
-        """
-        if self.is_crippled_fs() and not enable_direct_mode:
-            # TODO: ?? DIRECT - should we call git annex upgrade?
-            raise CommandNotAvailableError(
-                cmd="git-annex indirect",
-                msg="Can't switch to indirect mode on that filesystem.")
-
-        self._run_annex_command(
-            'direct' if enable_direct_mode else 'indirect',
-            expect_stderr=True,
-            runner="gitwitless"
-        )
-        self.config.reload()
-
-        # For paranoid we will just re-request
-        self._direct_mode = None
-        assert(self.is_direct_mode() == enable_direct_mode)
-
-        # All further workarounds were stripped - no direct mode is supported
-
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
 
@@ -1304,7 +1183,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(
                     remote=remote,
-                    cmd="get",
+                    cmd="annex get",
                     msg="Remote is not known. Known are: %s"
                     % (self.get_remotes(),)
                 )
@@ -1887,7 +1766,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                content=content, no_content=not content,
                                all=all,
                                fast=fast))
-        args.extend(assure_list(remotes))
+        args.extend(ensure_list(remotes))
         self._run_annex_command('sync', annex_options=args, runner="gitwitless")
 
     @normalize_path
@@ -1986,7 +1865,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise AnnexBatchCommandError(
                     cmd="addurl",
                     msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
-            assert(out_json['command'] == 'addurl')
+            assert \
+                (out_json.get('command') == 'addurl'), \
+                "no exception was raised and no 'command' in result out_json=%s" % str(out_json)
         if not out_json.get('success', False):
             raise (AnnexBatchCommandError if batch else CommandError)(
                     cmd="addurl",
@@ -2093,12 +1974,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise InsufficientArgumentsError("drop() requires at least to "
                                              "specify 'files' or 'options'")
 
-        options = assure_list(options)
+        options = ensure_list(options)
 
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
-            files = assure_list(files)
+            files = ensure_list(files)
             options = options + ['--key']
             res = [
                 self._run_annex_command_json(
@@ -2149,6 +2030,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'dropkey',
                 annex_options=options, json=True, path=self.path
             )(keys)
+        # TODO: RF to be consistent with the rest (IncompleteResultError or alike)
+        # and/or completely refactor since drop above also has key option
         for j in json_objects:
             assert j.get('success', True)
 
@@ -2419,7 +2302,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 % (output, ', '.join(map(repr, OUTPUTS)))
             )
 
-        options = assure_list(options, copy=True)
+        options = ensure_list(options, copy=True)
         if key:
             kwargs = {'opts': options + ["--key"] + files}
         else:
@@ -3129,7 +3012,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return
         if batch is False:
             # we can be lazy
-            files = assure_list(files)
+            files = ensure_list(files)
         else:
             if isinstance(files, str):
                 files = [files]
@@ -3194,7 +3077,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """Like set_metadata() but returns a generator"""
 
         def _genspec(expr, d):
-            return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]
+            return [expr.format(k, v) for k, vs in d.items() for v in ensure_list(vs)]
 
         args = []
         spec = []
@@ -3502,12 +3385,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         had_synced_branch = synced_branch in self.get_branches()
         cmd = ['annex', 'sync']
         if remote:
-            cmd.extend(assure_list(remote))
+            cmd.extend(ensure_list(remote))
         cmd.extend([
             # disable any external interaction and other magic
             '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge',
             '--no-content'])
         self.call_git(cmd)
+        # a sync can establish new config (e.g. annex-uuid for a remote)
+        self.config.reload()
         # cleanup sync'ed branch if we caused it
         if not had_synced_branch and synced_branch in self.get_branches():
             lgr.debug('Remove previously non-existent %s branch after sync',
@@ -3772,7 +3657,8 @@ class BatchedAnnex(BatchedCommand):
             annex_cmd + \
             (annex_options if annex_options else []) + \
             (['--json', '--json-error-messages'] if json else []) + \
-            ['--batch']  # , '--debug']
+            ['--batch'] + \
+            (['--debug'] if lgr.getEffectiveLevel() <= 8 else [])
         output_proc = \
             output_proc if output_proc else readline_json if json else None
         super(BatchedAnnex, self).__init__(

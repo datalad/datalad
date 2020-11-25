@@ -47,6 +47,7 @@ from datalad.tests.utils import (
     assert_is_not,
     assert_is_not_none,
     assert_not_equal,
+    assert_not_in,
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -56,6 +57,7 @@ from datalad.tests.utils import (
     OBSCURE_FILENAME,
     ok_,
     SkipTest,
+    swallow_logs,
     with_tempfile,
     with_testrepos,
 )
@@ -296,6 +298,7 @@ def test_require_dataset():
 
 @with_tempfile(mkdir=True)
 def test_dataset_id(path):
+
     ds = Dataset(path)
     assert_equal(ds.id, None)
     ds.create()
@@ -303,50 +306,38 @@ def test_dataset_id(path):
     # ID is always a UUID
     assert_equal(ds.id.count('-'), 4)
     assert_equal(len(ds.id), 36)
+
+    # Ben: The following part of the test is concerned with creating new objects
+    #      and therefore used to reset the flyweight dict while keeping a ref to
+    #      the old object for comparison etc. This is ugly and in parts
+    #      retesting what is already tested in `test_Dataset_flyweight`. No need
+    #      for that. If we del the last ref to an instance and gc.collect(),
+    #      then we get a new instance on next request. This test should trust
+    #      the result of `test_Dataset_flyweight`.
+
     # creating a new object for the same path
     # yields the same ID
-
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
+    del ds
     newds = Dataset(path)
-    assert_false(ds is newds)
-    assert_equal(ds.id, newds.id)
+    assert_equal(dsorigid, newds.id)
+
     # recreating the dataset does NOT change the id
-    #
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
+    del newds
+
+    ds = Dataset(path)
     ds.create(annex=False, force=True)
     assert_equal(ds.id, dsorigid)
+
     # even adding an annex doesn't
-    #
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
-    AnnexRepo._unique_instances.clear()
+    del ds
+    ds = Dataset(path)
     ds.create(force=True)
     assert_equal(ds.id, dsorigid)
+
     # dataset ID and annex UUID have nothing to do with each other
     # if an ID was already generated
     assert_true(ds.repo.uuid != ds.id)
-    # creating a new object for the same dataset with an ID on record
-    # yields the same ID
-    #
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
-    newds = Dataset(path)
-    assert_false(ds is newds)
-    assert_equal(ds.id, newds.id)
+
     # even if we generate a dataset from scratch with an annex UUID right away,
     # this is also not the ID
     annexds = Dataset(opj(path, 'scratch')).create()
@@ -357,8 +348,30 @@ def test_dataset_id(path):
 @with_tempfile(mkdir=True)
 def test_Dataset_flyweight(path1, path2):
 
+    import gc
+    import sys
+
     ds1 = Dataset(path1)
     assert_is_instance(ds1, Dataset)
+    # Don't create circular references or anything similar
+    assert_equal(1, sys.getrefcount(ds1) - 1)
+
+    ds1.create()
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # refcount still fine after repo creation:
+    assert_equal(1, sys.getrefcount(ds1) - 1)
+
+
     # instantiate again:
     ds2 = Dataset(path1)
     assert_is_instance(ds2, Dataset)
@@ -371,14 +384,56 @@ def test_Dataset_flyweight(path1, path2):
         ok_(ds1 == ds3)
         ok_(ds1 is ds3)
 
-    # on windows as symlink is not what you think it is
+    # gc knows one such object only:
+    eq_(1, len([o for o in gc.get_objects()
+                if isinstance(o, Dataset) and o.path == path1]))
+
+
+    # on windows a symlink is not what you think it is
     if not on_windows:
         # reference the same via symlink:
         with chpwd(path2):
             os.symlink(path1, 'linked')
-            ds3 = Dataset('linked')
-            ok_(ds3 == ds1)
-            ok_(ds3 is not ds1)
+            ds4 = Dataset('linked')
+            ds4_id = id(ds4)
+            ok_(ds4 == ds1)
+            ok_(ds4 is not ds1)
+
+        # underlying repo, however, IS the same:
+        ok_(ds4.repo is ds1.repo)
+
+    # deleting one reference has no effect on the other:
+    del ds1
+    gc.collect()  # TODO: see first comment above
+    ok_(ds2 is not None)
+    ok_(ds2.repo is ds3.repo)
+    if not on_windows:
+        ok_(ds2.repo is ds4.repo)
+
+    # deleting remaining references should lead to garbage collection
+    del ds2
+
+    with swallow_logs(new_level=1) as cml:
+        del ds3
+        gc.collect()  # TODO: see first comment above
+        # flyweight vanished:
+        assert_not_in(path1, Dataset._unique_instances.keys())
+        # no such instance known to gc anymore:
+        eq_([], [o for o in gc.get_objects()
+                 if isinstance(o, Dataset) and o.path == path1])
+        # underlying repo should only be cleaned up, if ds3 was the last
+        # reference to it. Otherwise the repo instance should live on
+        # (via symlinked ds4):
+        finalizer_log = "Finalizer called on: AnnexRepo(%s)" % path1
+        if on_windows:
+            cml.assert_logged(msg=finalizer_log,
+                              level="Level 1",
+                              regex=False)
+        else:
+            assert_not_in(finalizer_log, cml.out)
+            # symlinked is still there:
+            ok_(ds4 is not None)
+            eq_(ds4_id, id(ds4))
 
 
 @with_tempfile

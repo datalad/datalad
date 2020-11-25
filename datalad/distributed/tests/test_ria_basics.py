@@ -49,6 +49,9 @@ from datalad.customremotes.ria_utils import (
     create_ds_in_store,
     get_layout_locations
 )
+from datalad.cmd import (
+    GitWitlessRunner,
+)
 
 
 # Note, that exceptions to test for are generally CommandError since we are
@@ -282,6 +285,7 @@ def _test_remote_layout(host, dspath, store, archiv_store):
         assert_equal(len(ds.repo.whereis('one.txt')), len(whereis) + 1)
 
 
+@slow  # 12sec + ? on travis
 def test_remote_layout():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_remote_layout)), 'datalad-test'
@@ -373,6 +377,7 @@ def _test_version_check(host, dspath, store):
     ds.repo.copy_to('new_file', 'store')
 
 
+@slow  # 17sec + ? on travis
 def test_version_check():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_version_check)), 'datalad-test'
@@ -383,11 +388,6 @@ def test_version_check():
 @with_tempfile
 @with_tempfile
 def _test_gitannex(host, store, dspath):
-
-    from datalad.cmd import (
-        GitRunner,
-        WitlessRunner
-    )
     store = Path(store)
 
     dspath = Path(dspath)
@@ -433,7 +433,7 @@ def _test_gitannex(host, store, dspath):
     # run git-annex-testremote
     # note, that we don't want to capture output. If something goes wrong we
     # want to see it in test build's output log.
-    WitlessRunner(cwd=dspath, env=GitRunner.get_git_environ_adjusted()).run(
+    GitWitlessRunner(cwd=dspath).run(
         ['git', 'annex', 'testremote', 'store']
     )
 
@@ -445,6 +445,7 @@ def test_gitannex_ssh():
     _test_gitannex('datalad-test')
 
 
+@slow  # 41sec on travis
 def test_gitannex_local():
     _test_gitannex(None)
 

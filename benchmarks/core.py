@@ -17,7 +17,12 @@ import timeit
 from time import time
 from subprocess import call
 
-from datalad.cmd import Runner
+from datalad.cmd import (
+    Runner,
+    WitlessRunner,
+    GitWitlessRunner,
+    StdOutErrCapture,
+)
 
 from datalad.api import save
 from datalad.api import create
@@ -108,24 +113,24 @@ class runner(SuprocBenchmarks):
         #overhead = round(min(overheads), 2)
         return overhead
 
-    def track_overhead_echo(self):
+    #def track_overhead_echo(self):
         return self._get_overhead("echo")
 
     # 100ms chosen below as providing some sensible stability for me.
     # at 10ms -- too much variability
-    def track_overhead_100ms(self):
+    #def track_overhead_100ms(self):
         return self._get_overhead("sleep 0.1")
 
-    def track_overhead_heavyout(self):
+    #def track_overhead_heavyout(self):
         # run busyloop for 100ms outputing as much as it could
         return self._get_overhead(heavyout_cmd)
 
-    def track_overhead_heavyout_online_through(self):
+    #def track_overhead_heavyout_online_through(self):
         return self._get_overhead(heavyout_cmd,
                                   log_stderr='offline',  # needed to would get stuck
                                   log_online=True)
 
-    def track_overhead_heavyout_online_process(self):
+    #def track_overhead_heavyout_online_process(self):
         return self._get_overhead(heavyout_cmd,
                                   log_stdout=lambda s: '',
                                   log_stderr='offline',  # needed to would get stuck
@@ -138,3 +143,21 @@ class runner(SuprocBenchmarks):
     #                               log_stderr='offline')
 
     # TODO: track the one with in/out, i.e. for those BatchedProcesses
+
+
+class witlessrunner(SuprocBenchmarks):
+    """Some rudimentary tests to see if there is no major slowdowns of WitlessRunner
+    """
+
+    def setup(self):
+        self.runner = WitlessRunner()
+        self.git_runner = GitWitlessRunner()
+
+    def time_echo(self):
+        self.runner.run(["echo"])
+
+    def time_echo_gitrunner(self):
+        self.git_runner.run(["echo"])
+
+    def time_echo_gitrunner_fullcapture(self):
+        self.git_runner.run(["echo"], protocol=StdOutErrCapture)

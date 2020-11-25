@@ -25,7 +25,18 @@ from datalad.utils import (
 import logging
 lgr = logging.getLogger('datalad.support.archive_utils_7z')
 
-from datalad.cmd import Runner
+from datalad.cmd import (
+    WitlessRunner as Runner,
+    KillOutput,
+)
+
+
+def _normalize_fname_suffixes(suffixes):
+    if suffixes == ['.tgz']:
+        suffixes = ['.tar', '.gz']
+    elif suffixes == ['.tbz2']:
+        suffixes = ['.tar', '.bzip2']
+    return suffixes
 
 
 def decompress_file(archive, dir_):
@@ -40,16 +51,15 @@ def decompress_file(archive, dir_):
     """
     apath = Path(archive)
     runner = Runner(cwd=dir_)
-    if len(apath.suffixes) > 1 and apath.suffixes[-2] == '.tar':
+    suffixes = _normalize_fname_suffixes(apath.suffixes)
+    if len(suffixes) > 1 and suffixes[-2] == '.tar':
         # we have a compressed tar file that needs to be fed through the
         # decompressor first
-        # hangs somehow, do via single string arg
-        #cmd = ['7z', 'x', archive, '-so', '|', '7z', 'x', '-si', '-ttar']
         cmd = '7z x {} -so | 7z x -si -ttar'.format(quote_cmdlinearg(archive))
     else:
         # fire and forget
         cmd = ['7z', 'x', archive]
-    runner.run(cmd)
+    runner.run(cmd, protocol=KillOutput)
 
 
 def compress_files(files, archive, path=None, overwrite=True):
@@ -75,11 +85,12 @@ def compress_files(files, archive, path=None, overwrite=True):
                 'Target archive {} already exists and overwrite is forbidden'.format(
                     apath)
             )
-    if len(apath.suffixes) > 1 and apath.suffixes[-2] == '.tar':
+    suffixes = _normalize_fname_suffixes(apath.suffixes)
+    if len(suffixes) > 1 and suffixes[-2] == '.tar':
         cmd = '7z u .tar -so -- {} | 7z u -si -- {}'.format(
             join_cmdline(files),
             quote_cmdlinearg(str(apath)),
         )
     else:
         cmd = ['7z', 'u', str(apath), '--'] + files
-    runner.run(cmd)
+    runner.run(cmd, protocol=KillOutput)

@@ -14,9 +14,6 @@ import re
 import time
 import os
 import os.path as op
-import warnings
-from locale import getpreferredencoding
-
 
 import logging
 from collections import (
@@ -27,12 +24,10 @@ from os import linesep
 from os.path import (
     join as opj,
     exists,
-    normpath,
     isabs,
     commonprefix,
     relpath,
     dirname,
-    basename,
     curdir,
     pardir,
     sep
@@ -40,7 +35,10 @@ from os.path import (
 
 import posixpath
 from functools import wraps
-from weakref import WeakValueDictionary
+from weakref import (
+    finalize,
+    WeakValueDictionary
+)
 
 from datalad.log import log_progress
 from datalad.support.due import due, Doi
@@ -52,11 +50,13 @@ from datalad.cmd import (
     GitRunner,
     BatchedCommand,
     run_gitcommand_on_file_list_chunks,
+    NoCapture,
     StdOutErrCapture,
 )
 from datalad.config import (
     ConfigManager,
-    _parse_gitconfig_dump
+    _parse_gitconfig_dump,
+    write_config_section,
 )
 
 from datalad.dochelpers import exc_str
@@ -72,7 +72,7 @@ from datalad.utils import (
     ensure_dir,
     generate_file_chunks,
     ensure_unicode,
-    quote_cmdlinearg,
+    is_interactive,
     split_cmdline,
 )
 
@@ -86,7 +86,6 @@ from .exceptions import (
     InvalidGitReferenceError,
     InvalidGitRepositoryError,
     NoSuchPathError,
-    OutdatedExternalDependencyWarning,
     PathKnownToRepositoryError,
 )
 from .network import (
@@ -100,6 +99,7 @@ from .repo import (
     RepoInterface,
     path_based_str_repr,
 )
+from datalad.core.local.repo import repo_from_path
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -238,11 +238,11 @@ def normalize_path(func):
     """
 
     @wraps(func)
-    def newfunc(self, file_, *args, **kwargs):
+    def  _wrap_normalize_path(self, file_, *args, **kwargs):
         file_new = _normalize_path(self.path, file_)
         return func(self, file_new, *args, **kwargs)
 
-    return newfunc
+    return  _wrap_normalize_path
 
 
 @optional_args
@@ -285,7 +285,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
     """
 
     @wraps(func)
-    def newfunc(self, files, *args, **kwargs):
+    def  _wrap_normalize_paths(self, files, *args, **kwargs):
 
         normalize = _normalize_path if kwargs.pop('normalize_paths', True) \
             else lambda rpath, filepath: filepath
@@ -349,7 +349,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
         else:
             return RuntimeError("should have not got here... check logic")
 
-    return newfunc
+    return  _wrap_normalize_paths
 
 
 if "2.24.0" <= external_versions["cmd:git"] < "2.25.0":
@@ -778,10 +778,6 @@ class PushInfo(dict):
         )
 
 
-# Compatibility kludge.  See GitRepo.get_submodules().
-Submodule = namedtuple("Submodule", ["name", "path", "url"])
-
-
 @path_based_str_repr
 class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
@@ -888,15 +884,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             self._check_git_version()
 
         # BEGIN Repo validity test
-        # We want to fail early for tests, that would be performed a lot. In particular this is about
-        # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
-        # __init__ to then test the same things again. If we fail early we can save the additional test from outer
-        # scope.
+        # We want to fail early for tests, that would be performed a lot. In
+        # particular this is about GitRepo.is_valid_repo. We would use the
+        # latter to decide whether or not to call GitRepo() only for __init__ to
+        # then test the same things again. If we fail early we can save the
+        # additional test from outer scope.
         self.path = path
 
-        # Note, that the following three path objects are used often and therefore
-        # are stored for performance. Path object creation comes with a cost. Most noteably,
-        # this is used for validity checking of the repository.
+        # Note, that the following three path objects are used often and
+        # therefore are stored for performance. Path object creation comes with
+        # a cost. Most notably, this is used for validity checking of the
+        # repository.
         self.pathobj = ut.Path(self.path)
         self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
         self._valid_git_test_path = self.dot_git / 'HEAD'
@@ -931,7 +929,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # So that we "share" control paths with git/git-annex
         if ssh_manager:
-            ssh_manager.assure_initialized()
+            ssh_manager.ensure_initialized()
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
@@ -947,9 +945,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._cfg = None
+        self._git_runner = GitWitlessRunner(cwd=self.path)
 
         if do_create:  # we figured it out earlier
+            # we briefly need a runner to create the repo, and cannot
+            # use the config manager runner yet, as it would try to
+            # access the repo config which didn't materialize yet
             self._create_empty_repo(path, create_sanity_checks, **git_opts)
+            # after creation we need to reconsider .git path
+            self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
 
         # with DryRunProtocol path might still not exist
         if exists(self.path):
@@ -962,6 +966,28 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
 
+        # Finally, register a finalizer (instead of having a __del__ method).
+        # This will be called by garbage collection as well as "atexit". By
+        # keeping the reference here, we can also call it explicitly.
+        # Note, that we can pass required attributes to the finalizer, but not
+        # `self` itself. This would create an additional reference to the object
+        # and thereby preventing it from being collected at all.
+        self._finalizer = finalize(self, GitRepo._cleanup, self.path)
+
+
+    @property
+    def bare(self):
+        if self.config.getbool("core", "bare") and \
+                self.pathobj == self.dot_git:
+            return True
+        elif not self.config.getbool("core", "bare") and \
+                not self.pathobj == self.dot_git:
+            return False
+        else:
+            raise InvalidGitRepositoryError("GitRepo contains inconsistent hints"
+                                            " on whether or not it is a bare "
+                                            "repository.")
+
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
             os.makedirs(path)
@@ -970,8 +996,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
             try:
-                stdout, _ = self._git_custom_command(
-                    None, ['git', 'ls-files'], cwd=path, expect_fail=True
+                stdout, _ = self._call_git(
+                    ['-C', path, 'ls-files'],
+                    expect_fail=True,
+                    check_fake_dates=False,
                 )
                 if stdout:
                     raise PathKnownToRepositoryError(
@@ -983,26 +1011,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # assume that all is good -- we are not under any repo
                 pass
 
-        cmd = ['git', 'init']
+        cmd = ['-C', path, 'init']
         cmd.extend(kwargs.pop('_from_cmdline_', []))
         cmd.extend(to_options(**kwargs))
         lgr.debug(
             "Initialize empty Git repository at '%s'%s",
             path,
-            ' %s' % cmd[2:] if cmd[2:] else '')
+            ' %s' % cmd[3:] if cmd[3:] else '')
 
         try:
-            stdout, stderr = self._git_custom_command(
-                None,
+            stdout, stderr = self._call_git(
                 cmd,
-                cwd=path,
-                log_stderr=True,
-                log_stdout=True,
-                log_online=False,
-                expect_stderr=False,
-                shell=False,
                 # we don't want it to scream on stdout
-                expect_fail=True)
+                expect_fail=True,
+                # there is no commit, and none will be made
+                check_fake_dates=False)
         except CommandError as exc:
             lgr.error(exc_str(exc))
             raise
@@ -1106,7 +1129,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         "retrying",
                         trial)
                     continue
-                    (lgr.debug if expect_fail else lgr.error)(e_str)
+                    #(lgr.debug if expect_fail else lgr.error)(e_str)
 
                 if "Clone succeeded, but checkout failed." in str(e):
                     fix_annex = e
@@ -1129,10 +1152,25 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
         return gr
 
-    def __del__(self):
-        # unbind possibly bound ConfigManager, to prevent all kinds of weird
-        # stalls etc
-        self._cfg = None
+    # Note: __del__ shouldn't be needed anymore as we switched to
+    #       `weakref.finalize`.
+    #       https://docs.python.org/3/library/weakref.html#comparing-finalizers-with-del-methods
+    #
+    #       Keeping both methods and this comment around as a reminder to not
+    #       use __del__, if we figure there's a need for cleanup in the future.
+    #
+    # def __del__(self):
+    #     # unbind possibly bound ConfigManager, to prevent all kinds of weird
+    #     # stalls etc
+    #     self._cfg = None
+
+    @classmethod
+    def _cleanup(cls, path):
+        # Ben: I think in case of GitRepo there's nothing to do ATM. Statements
+        #      like the one in the out commented __del__ above, don't make sense
+        #      with python's GC, IMO, except for manually resolving cyclic
+        #      references (not the case w/ ConfigManager ATM).
+        lgr.log(1, "Finalizer called on: GitRepo(%s)", path)
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
@@ -1144,15 +1182,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def is_valid_git(self):
         """Returns whether the underlying repository appears to be still valid
 
-        Note, that this almost identical to the classmethod is_valid_repo(). However,
-        if we are testing an existing instance, we can save Path object creations. Since this testing
-        is done a lot, this is relevant. Creation of the Path objects in is_valid_repo() takes nearly half the time of
-        the entire function.
+        Note, that this almost identical to the classmethod is_valid_repo().
+        However, if we are testing an existing instance, we can save Path object
+        creations. Since this testing is done a lot, this is relevant. Creation
+        of the Path objects in is_valid_repo() takes nearly half the time of the
+        entire function.
 
-        Also note, that this method is bound to an instance but still class-dependent, meaning that a subclass
-        cannot simply overwrite it. This is particularly important for the call from within __init__(),
-        which in turn is called by the subclasses' __init__. Using an overwrite would lead to the wrong thing being
-        called.
+        Also note, that this method is bound to an instance but still
+        class-dependent, meaning that a subclass cannot simply overwrite it.
+        This is particularly important for the call from within __init__(),
+        which in turn is called by the subclasses' __init__. Using an overwrite
+        would lead to the wrong thing being called.
         """
 
         return self.dot_git.exists() and (
@@ -1170,19 +1210,26 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # it is performed a lot
         # recognize two things as good-enough indicators of a present
         # repo: 1) a non-empty .git directory (#3473)
-        #          NOTE: It's actually faster (and more accurate) to test for existence of a particular subpath.
-        #                This should be something that's there right after git-init. Going for .git/HEAD ATM.
+        #          NOTE: It's actually faster (and more accurate) to test for
+        #                existence of a particular subpath.
+        #                This should be something that's there right after
+        #                git-init. Going for .git/HEAD ATM.
         #
-        #                In [11]: %timeit path.exists() and (not path.is_dir() or head_path.exists())
-        #                4.93 µs ± 34.8 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
-        #                In [12]: %timeit path.exists() and (not path.is_dir() or any(path.iterdir()))
-        #                12.8 µs ± 150 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+        #                In [11]: %timeit path.exists() and (not path.is_dir()
+        #                          or head_path.exists())
+        #                4.93 µs ± 34.8 ns per loop
+        #                (mean ± std. dev. of 7 runs, 100000 loops each)
+        #                In [12]: %timeit path.exists() and (not path.is_dir()
+        #                          or any(path.iterdir()))
+        #                12.8 µs ± 150 ns per loop
+        #                (mean ± std. dev. of 7 runs, 100000 loops each)
         #
-        #   and 2) a pointer file or symlink
+        #       2) a pointer file or symlink
+        #       3) path itself looks like a .git -> bare repo
 
-        return dot_git_path.exists() and (
+        return (dot_git_path.exists() and (
             not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
-        )
+        )) or (path / 'HEAD').exists()
 
     @staticmethod
     def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
@@ -1192,7 +1239,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ----------
         pathobj: Path
         ok_missing: bool, optional
-          Allow for .git to be missing (useful while sensing before repo is initialized)
+          Allow for .git to be missing (useful while sensing before repo is
+          initialized)
         maybe_relative: bool, optional
           Return path relative to pathobj
 
@@ -1216,6 +1264,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     raise InvalidGitRepositoryError("Invalid .git file")
         elif dot_git.is_symlink():
             dot_git = dot_git.resolve()
+        elif not dot_git.exists() and \
+                (pathobj / 'HEAD').exists() and \
+                (pathobj / 'config').exists():
+                # looks like a bare repo
+                dot_git = pathobj
         elif not (ok_missing or dot_git.exists()):
             raise RuntimeError("Missing .git in %s." % pathobj)
         # Primarily a compat kludge for get_git_dir, remove when it is deprecated
@@ -1300,12 +1353,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cmd.extend(git_options)
         cmd += ["rev-parse", "--show-toplevel"]
         try:
-            toppath, err = GitRunner().run(
-                cmd,
-                cwd=path,
-                log_stdout=True, log_stderr=True,
-                expect_fail=True, expect_stderr=True)
-            toppath = toppath.rstrip('\n\r')
+            out = GitWitlessRunner(cwd=path).run(
+                cmd, protocol=StdOutErrCapture)
+            toppath = out['stdout'].rstrip('\n\r')
         except CommandError:
             return None
         except OSError:
@@ -1379,13 +1429,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         try:
             # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                files,
+            add_out = self._call_git(
                 # Set annex.largefiles to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
+                ['-c', 'annex.largefiles=nothing', 'add'] +
                 ensure_list(git_options) +
-                to_options(update=update) + ['--verbose']
+                to_options(update=update) + ['--verbose'],
+                files=files,
+                check_fake_dates=True,
             )
             # get all the entries
             for o in self._process_git_get_output(*add_out):
@@ -1450,11 +1501,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if recursive:
             kwargs['r'] = True
-        stdout, stderr = self._git_custom_command(
-            files, ['git', 'rm'] + to_options(**kwargs))
 
         # output per removed file is expected to be "rm 'PATH'":
-        return [line.strip()[4:-1] for line in stdout.splitlines()]
+        return [
+            line.strip()[4:-1]
+            for line in self.call_git_items_(
+                ['rm'] + to_options(**kwargs), files=files)
+        ]
 
     def precommit(self):
         """Perform pre-commit maintenance tasks
@@ -1513,7 +1566,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             raise ValueError('no `fields` provided, refuse to proceed')
         fields = ensure_list(fields)
         cmd = [
-            "git",
             "for-each-ref",
             "--format={}".format(
                 '%00'.join(
@@ -1531,7 +1583,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if count:
             cmd.append('--count={:d}'.format(count))
 
-        out, _ = self._git_custom_command(None, cmd)
+        # cannot use call_git_items_() which would perform fake_dates
+        # processing. Going one level deeper to avoid it, no date
+        # modification possible here
+        out, _ = self._call_git(cmd, check_fake_dates=False)
         for line in out.splitlines():
             props = line.split('\0')
             if len(fields) != len(props):
@@ -1631,6 +1686,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if date:
             options += ["--date", date]
 
+        orig_msg = msg
         if not msg:
             msg = 'Recorded changes'
             _datalad_msg = True
@@ -1642,9 +1698,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         cmd.extend(options)
 
         # set up env for commit
-        env = GitRunner.get_git_environ_adjusted()
-        if self.fake_dates_enabled:
-            env = self.add_fake_dates(env)
+        env = self.add_fake_dates(None) \
+            if self.fake_dates_enabled else os.environ.copy()
         if index_file:
             env['GIT_INDEX_FILE'] = index_file
 
@@ -1652,7 +1707,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
 
-        runner = GitWitlessRunner(cwd=self.path, env=env)
+        # store pre-commit state to be able to check if anything was committed
+        prev_sha = self.get_hexsha()
 
         try:
             for i, chunk in enumerate(file_chunks):
@@ -1665,10 +1721,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if i > 0 and '--dry-run' not in cmd
                     else []
                 ) + ['--'] + chunk
-                runner.run(
+                self._git_runner.run(
                     cur_cmd,
                     protocol=StdOutErrCapture,
                     stdin=None,
+                    env=env,
                 )
         except CommandError as e:
             # real errors first
@@ -1693,6 +1750,24 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("no changes added to commit in %s. Ignored.", self)
             else:
                 raise
+
+        if orig_msg \
+                or '--dry-run' in cmd \
+                or prev_sha == self.get_hexsha() \
+                or (not is_interactive()) \
+                or self.config.obtain('datalad.save.no-message') != 'interactive':
+            # we had a message given, or nothing was committed, or we are not
+            # connected to a terminal, or no interactive message input is desired:
+            # we can go home
+            return
+
+        # handle interactive message entry by running another `git-commit`
+        self._git_runner.run(
+            cmd + ['--amend', '--edit'],
+            protocol=NoCapture,
+            stdin=None,
+            env=env,
+        )
 
     # TODO usage is primarily in the tests, consider making a test helper and
     # remove from GitRepo API
@@ -1725,14 +1800,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         -------
         str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        # use git-log and not git-show due to faster performance with
+        # complex commits (e.g. octopus merges)
+        # https://github.com/datalad/datalad/issues/4801
+        cmd = ['log', '-1', '-z', '--format=' + fmt]
         if commitish is not None:
             cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
-            stdout, stderr = self._git_custom_command(
-                '', cmd, expect_stderr=True, expect_fail=True)
+            stdout = self.call_git(
+                cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
                 raise ValueError("Unknown commit identifier: %s" % commitish)
@@ -1758,14 +1836,28 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Returns
         -------
-        str or, if there are not commits yet, None.
+        str or, if no commitish was given and there are no commits yet, None.
+
+        Raises
+        ------
+        ValueError
+          If a commitish was given, but no corresponding commit could be
+          determined.
         """
-        stdout = self.format_commit("%{}".format('h' if short else 'H'),
-                                    commitish)
-        if stdout is not None:
-            stdout = stdout.splitlines()
-            assert(len(stdout) == 1)
-            return stdout[0]
+        # use --quiet because the 'Needed a single revision' error message
+        # that is the result of running this in a repo with no commits
+        # isn't useful to report
+        cmd = ['rev-parse', '--quiet', '--verify', '{}^{{commit}}'.format(
+            commitish if commitish else 'HEAD')
+        ]
+        if short:
+            cmd.append('--short')
+        try:
+            return self.call_git_oneline(cmd)
+        except CommandError as e:
+            if commitish is None:
+                return None
+            raise ValueError("Unknown commit identifier: %s" % commitish)
 
     @normalize_paths(match_return_type=False)
     def get_last_commit_hexsha(self, files):
@@ -1809,10 +1901,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         elif isinstance(revrange, str):
             revrange = [revrange]
 
-        cmd = ["git", "log", "--format={}".format(fmt)]
+        cmd = ["log", "--format={}".format(fmt)]
         cmd.extend((options or []) + revrange + ["--"])
         try:
-            stdout, _ = self._git_custom_command(None, cmd, expect_fail=True)
+            stdout = self.call_git(cmd, expect_fail=True)
         except CommandError as e:
             if "does not have any commits" in e.stderr:
                 return []
@@ -1920,9 +2012,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           and the branch name otherwise.
         """
         try:
-            out, _ = self._git_custom_command(
-                "", ["git", "symbolic-ref", "HEAD"],
-                expect_fail=True)
+            out = self.call_git(["symbolic-ref", "HEAD"], expect_fail=True)
         except CommandError as e:
             if 'HEAD is not a symbolic ref' in e.stderr:
                 lgr.debug("detached HEAD in {0}".format(self))
@@ -2091,6 +2181,73 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     # Convenience wrappers for one-off git calls that don't require further
     # processing or error handling.
 
+    def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
+                  env=None, check_fake_dates=True):
+        """Allows for calling arbitrary commands.
+
+        Internal helper to the call_git*() methods.
+
+        Parameters
+        ----------
+        args : list of str
+          Arguments to pass to `git`.
+        files : list of str, optional
+          File arguments to pass to `git`. The advantage of passing these here
+          rather than as part of `args` is that the call will be split into
+          multiple calls to avoid exceeding the maximum command line length.
+        expect_stderr : bool, optional
+          Standard error is expected and should not be elevated above the DEBUG
+          level.
+        expect_fail : bool, optional
+          A non-zero exit is expected and should not be elevated above the
+          DEBUG level.
+        check_fake_dates : bool, optional
+          If enabled (default), inspect if dates should be faked for dataset
+          commits and set up the Git environment to ensure that. Must be
+          disabled for repository initialization.
+
+        Returns
+        -------
+        stdout, stderr
+
+        Raises
+        ------
+        CommandError if the call exits with a non-zero status.
+        """
+        runner = self._git_runner
+        stderr_log_level = {True: 5, False: 11}[expect_stderr]
+
+        cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
+
+        env = None
+        if check_fake_dates and self.fake_dates_enabled:
+            env = self.add_fake_dates(runner.env)
+
+        out = err = None
+        try:
+            out, err = run_gitcommand_on_file_list_chunks(
+                self._git_runner.run,
+                cmd,
+                files,
+                protocol=StdOutErrCapture,
+                env=env,
+            )
+        except CommandError as e:
+            ignored = re.search(GitIgnoreError.pattern, e.stderr)
+            if ignored:
+                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
+                                     code=e.code, stdout=e.stdout,
+                                     stderr=e.stderr,
+                                     paths=ignored.groups()[0].splitlines())
+            lgr.log(5 if expect_fail else 11, str(e))
+            raise
+
+        if err:
+            for line in err.splitlines():
+                lgr.log(stderr_log_level,
+                        "stderr| " + line.rstrip('\n'))
+        return out, err
+
     def call_git(self, args, files=None,
                  expect_stderr=False, expect_fail=False):
         """Call git and return standard output.
@@ -2118,10 +2275,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._git_custom_command(files, ["git"] + args,
-                                          expect_stderr=expect_stderr,
-                                          expect_fail=expect_fail,
-                                          check_fake_dates=True)
+        out, _ = self._call_git(args, files,
+                                expect_stderr=expect_stderr,
+                                expect_fail=expect_fail)
         return out
 
     def call_git_items_(self, args, files=None, expect_stderr=False, sep=None):
@@ -2149,9 +2305,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         ------
         CommandError if the call exits with a non-zero status.
         """
-        out, _ = self._git_custom_command(files, ["git"] + args,
-                                          expect_stderr=expect_stderr,
-                                          check_fake_dates=True)
+        out, _ = self._call_git(args, files, expect_stderr=expect_stderr)
         yield from (out.split(sep) if sep else out.splitlines())
 
     def call_git_oneline(self, args, files=None, expect_stderr=False):
@@ -2168,8 +2322,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_stderr : bool, optional
           Standard error is expected and should not be elevated above the DEBUG
           level.
-        sep : str, optional
-          Split the output by `str.split(sep)` rather than `str.splitlines`.
 
         Raises
         ------
@@ -2204,10 +2356,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         bool
         """
         try:
-            self._git_custom_command(files, ["git"] + args,
-                                     expect_fail=True,
-                                     expect_stderr=expect_stderr,
-                                     check_fake_dates=True)
+            self._call_git(
+                args, files, expect_fail=True, expect_stderr=expect_stderr)
+
         except CommandError:
             return False
         return True
@@ -2215,12 +2366,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
         """
-        cmd = ['git', 'remote', 'add']
+        cmd = ['remote', 'add']
         if options:
             cmd += options
         cmd += [name, url]
 
-        result = self._git_custom_command('', cmd)
+        # for historical reasons this method returns stdout and
+        # stderr, keeping that for now
+        result = self._call_git(cmd)
         self.config.reload()
         return result
 
@@ -2231,8 +2384,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # TODO: testing and error handling!
         from .exceptions import RemoteNotAvailableError
         try:
-            out, err = self._git_custom_command(
-                '', ['git', 'remote', 'remove', name])
+            self.call_git(['remote', 'remove', name])
         except CommandError as e:
             if 'fatal: No such remote' in e.stderr:
                 raise RemoteNotAvailableError(name,
@@ -2243,7 +2395,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             else:
                 raise e
 
-        # TODO: config.reload necessary?
+        # config.reload necessary, because the associated remote config
+        # will vanish
         self.config.reload()
         return
 
@@ -2252,8 +2405,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         options = ["-v"] if verbose else []
         name = [name] if name else []
-        self._git_custom_command(
-            '', ['git', 'remote'] + name + ['update'] + options,
+        self.call_git(
+            ['remote'] + name + ['update'] + options,
             expect_stderr=True
         )
 
@@ -2354,7 +2507,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         url = self.config.get('remote.{}.url'.format(remote), None)
         if url and is_ssh(url):
             ssh_manager.get_connection(url).open()
-        GitWitlessRunner(cwd=self.path).run(
+        self._git_runner.run(
             cmd,
             protocol=StdOutCaptureWithGitProgress,
         )
@@ -2493,7 +2646,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 if url and is_ssh(url):
                     ssh_manager.get_connection(url).open()
                 try:
-                    out = GitWitlessRunner(cwd=self.path).run(
+                    out = self._git_runner.run(
                         r_cmd,
                         protocol=protocol,
                     )
@@ -2604,12 +2757,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         """
         # TODO: May be check for the need of -b options herein?
-        cmd = ['git', 'checkout']
+        cmd = ['checkout']
         if options:
             cmd += options
         cmd += [str(name)]
 
-        self._git_custom_command('', cmd, expect_stderr=True, updates_tree=True)
+        self.call_git(cmd, expect_stderr=True)
+        # checkout can change committed config, or create branch config
+        self.config.reload()
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
@@ -2619,16 +2774,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if msg:
             options = options + ["-m", msg]
         options += ['--allow-unrelated-histories']
-        self._git_custom_command(
-            '', ['git', 'merge'] + options + [name],
-            check_fake_dates=True,
+        self.call_git(
+            ['merge'] + options + [name],
             **kwargs
         )
 
     def remove_branch(self, branch):
-        self._git_custom_command(
-            '', ['git', 'branch', '-D', branch]
-        )
+        self.call_git(['branch', '-D', branch])
 
     def cherry_pick(self, commit):
         """Cherry pick `commit` to the current branch.
@@ -2638,8 +2790,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         commit : str
             A single commit.
         """
-        self._git_custom_command("", ["git", "cherry-pick", commit],
-                                 check_fake_dates=True)
+        self.call_git(["cherry-pick", commit])
 
     @property
     def dirty(self):
@@ -2650,9 +2801,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         its submodules. For finer-grained control and more detailed reporting,
         use status() instead.
         """
-        stdout, _ = self._git_custom_command(
-            [],
-            ["git", "status", "--porcelain",
+        stdout = self.call_git(
+            ["status", "--porcelain",
              # Ensure the result isn't influenced by status.showUntrackedFiles.
              "--untracked-files=normal",
              # Ensure the result isn't influenced by diff.ignoreSubmodules.
@@ -2678,13 +2828,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
-        cmd_options = ['git']
+        cmd_options = []
         if not allow_background:
             cmd_options += ['-c', 'gc.autodetach=0']
         cmd_options += ['gc', '--aggressive']
         if auto:
             cmd_options += ['--auto']
-        self._git_custom_command('', cmd_options)
+        self.call_git(cmd_options)
 
     def _parse_gitmodules(self):
         # TODO read .gitconfig from Git blob?
@@ -2692,11 +2842,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if not gitmodules.exists():
             return {}
         # pull out file content
-        out, err = self._git_custom_command(
-            '',
-            ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
+        out = self.call_git(
+            ['config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
-        db, _ = _parse_gitconfig_dump(out, {}, None, True, cwd=self.path)
+        db, _ = _parse_gitconfig_dump(out, cwd=self.path)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
@@ -2749,12 +2898,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 untracked='no',
                 eval_file_type=False).items():
             if props.get('type', None) != 'dataset':
+                # make sure this method never talks about non-dataset
+                # content
                 continue
             props["path"] = path
             props.update(modinfo.get(path, {}))
             yield props
 
-    def get_submodules(self, sorted_=True, paths=None, compat=True):
+    def get_submodules(self, sorted_=True, paths=None):
         """Return list of submodules.
 
         Parameters
@@ -2763,12 +2914,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             Sort submodules by path name.
         paths : list(pathlib.PurePath), optional
             Restrict submodules to those under `paths`.
-        compat : bool, optional
-            If true, return a namedtuple that incompletely mimics the
-            attributes of GitPython's Submodule object in hope of backwards
-            compatibility with previous callers. Note that this form should be
-            considered temporary and callers should be updated; this flag will
-            be removed in a future release.
 
         Returns
         -------
@@ -2776,24 +2921,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         of dictionaries as returned by `get_submodules_`.
         """
         xs = self.get_submodules_(paths=paths)
-        if compat:
-            warnings.warn("The attribute-based return value of get_submodules() "
-                          "exists for compatibility purposes and will be removed "
-                          "in an upcoming release",
-                          DeprecationWarning)
-            xs = (Submodule(name=p["gitmodule_name"],
-                            path=str(p["path"].relative_to(self.pathobj)),
-                            url=p["gitmodule_url"])
-                  for p in xs)
 
         if sorted_:
-            if compat:
-                def key(x):
-                    return x.path
-            else:
-                def key(x):
-                    return x["path"]
-            xs = sorted(xs, key=key)
+            xs = sorted(xs, key=lambda x: x["path"])
         return list(xs)
 
     def add_submodule(self, path, name=None, url=None, branch=None):
@@ -2829,7 +2959,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             cmd += ['-b', branch]
         if url is None:
             # repo must already exist locally
-            subm = GitRepo(op.join(self.path, path), create=False, init=False)
+            subm = repo_from_path(op.join(self.path, path))
             # check that it has a commit, and refuse
             # to operate on it otherwise, or we would get a bastard
             # submodule that cripples git operations
@@ -2874,9 +3004,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             see `__init__`
         """
 
-        self._git_custom_command(path,
-                                 ['git', 'submodule', 'deinit'] +
-                                 to_options(**kwargs))
+        self.call_git(['submodule', 'deinit'] + to_options(**kwargs),
+                      files=[path])
         # TODO: return value
 
     def update_submodule(self, path, mode='checkout', init=False):
@@ -2927,7 +3056,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             subbranch = None
             subbranch_hexsha = None
 
-        cmd = ['git', 'submodule', 'update', '--%s' % mode]
+        cmd = ['submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
             subgitpath = opj(self.path, path, '.git')
@@ -2941,7 +3070,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             #  yoh: I thought I saw one recently but thought it was some kind of
             #  an artifact from running submodule update --init manually at
             #  some point, but looking at this code now I worry that it was not
-        self._git_custom_command(path, cmd)
+        self.call_git(cmd, files=[path])
 
         if not init:
             return
@@ -2996,9 +3125,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           To instruct if ref is symbolic, e.g. should be used in case of
           ref=HEAD
         """
-        self._git_custom_command(
-            '',
-            ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
+        self.call_git(
+            ['symbolic-ref' if symbolic else 'update-ref', ref, value]
         )
 
     def tag(self, tag, message=None, commit=None, options=None):
@@ -3077,14 +3205,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
-        cmd = ['git', 'describe'] + to_options(**kwargs)
+        cmd = ['describe'] + to_options(**kwargs)
         if commitish is not None:
             cmd.append(commitish)
         try:
-            describe, outerr = self._git_custom_command(
-                [],
-                cmd,
-                expect_fail=True)
+            describe = self.call_git(cmd, expect_fail=True)
             return describe.strip()
         # TODO: WTF "catch everything"?
         except:
@@ -3107,7 +3232,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             (remote or None, refspec or None) of the tracking branch
         """
         if branch is None:
-            branch = self.get_active_branch()
+            branch = self.get_corresponding_branch() or self.get_active_branch()
             if branch is None:
                 return None, None
 
@@ -3122,8 +3247,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """return dictionary with count, size(in KiB) information of git objects
         """
 
-        count_cmd = ['git', 'count-objects', '-v']
-        count_str, err = self._git_custom_command('', count_cmd)
+        count_cmd = ['count-objects', '-v']
+        count_str = self.call_git(count_cmd)
         count = {key: int(value)
                  for key, value in [item.split(': ')
                                     for item in count_str.split('\n')
@@ -3167,15 +3292,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           for set and unset attributes, or are the literal attribute value.
         """
         path = ensure_list(path)
-        cmd = ["git", "check-attr", "-z", "--all"]
+        cmd = ["check-attr", "-z", "--all"]
         if index_only:
             cmd.append('--cached')
-        stdout, stderr = self._git_custom_command(path, cmd)
         # make sure we have one entry for each query path to
         # simplify work with the result
-        attributes = {_normalize_path(self.path, p): {} for p in path}
+        attributes = {p: {} for p in path}
         attr = []
-        for item in stdout.split('\0'):
+        for item in self.call_git_items_(cmd, files=path, sep='\0'):
             attr.append(item)
             if len(attr) < 3:
                 continue
@@ -3186,7 +3310,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 True if value == 'set' else False if value == 'unset' else value
             # done, reset item
             attr = []
-        return attributes
+        return {relpath(k, self.path) if isabs(k) else k: v
+                for k, v in attributes.items()}
 
     def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
         """Set gitattributes
@@ -3315,6 +3440,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             paths = [ut.PurePosixPath(p) for p in paths]
 
         path_strs = list(map(str, paths)) if paths else None
+        if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):
+            # If a path points within a submodule, we need to map it to the
+            # containing submodule before feeding it to ls-files or ls-tree.
+            #
+            # Before Git 2.29.0, ls-tree and ls-files differed in how they
+            # reported paths within submodules: ls-files provided no output,
+            # and ls-tree listed the submodule. Now they both return no output.
+            submodules = [str(s["path"].relative_to(self.pathobj))
+                          for s in self.get_submodules_()]
+            path_strs = get_parent_paths(path_strs, submodules)
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -3326,13 +3461,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # --exclude-standard will make sure to honor and standard way
             # git can be instructed to ignore content, and will prevent
             # crap from contaminating untracked file reports
-            cmd = ['git', 'ls-files',
-                   '--stage', '-z', '-d', '-m', '--exclude-standard']
+            cmd = ['ls-files', '--stage', '-z']
             # untracked report mode, using labels from `git diff` option style
             if untracked == 'all':
-                cmd.append('-o')
+                cmd += ['--exclude-standard', '-o']
             elif untracked == 'normal':
-                cmd += ['-o', '--directory', '--no-empty-directory']
+                cmd += ['--exclude-standard', '-o', '--directory', '--no-empty-directory']
             elif untracked == 'no':
                 pass
             else:
@@ -3340,31 +3474,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
-
-            if path_strs:
-                # we need to get their within repo elements since ls-tree
-                # for paths within submodules returns nothing!
-                # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
-                submodules = [str(s["path"].relative_to(self.pathobj))
-                              for s in self.get_submodules_()]
-                path_strs = get_parent_paths(path_strs, submodules)
         else:
-            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
+            cmd = ['ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(
                 r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
         lgr.debug('Query repo: %s', cmd)
         try:
-            stdout, stderr = self._git_custom_command(
-                path_strs,
+            stdout = self.call_git(
                 cmd,
-                log_stderr=True,
-                log_stdout=True,
-                # not sure why exactly, but log_online has to be false!
-                log_online=False,
-                expect_stderr=False,
-                shell=False,
-                # we don't want it to scream on stdout
+                files=path_strs,
                 expect_fail=True)
         except CommandError as exc:
             if "fatal: Not a valid object name" in exc.stderr:
@@ -3611,10 +3730,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             else:
                 modified = set(
                     self.pathobj.joinpath(ut.PurePosixPath(p))
-                    for p in self._git_custom_command(
+                    for p in self.call_git_items_(
+                        ['ls-files', '-z', '-m'],
                         # low-level code cannot handle pathobjs
-                        [str(p) for p in paths] if paths else None,
-                        ['git', 'ls-files', '-z', '-m'])[0].split('\0')
+                        files=[str(p) for p in paths] if paths else None,
+                        sep='\0')
                     if p)
                 _cache[key] = modified
         else:
@@ -3810,19 +3930,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         in the worktree.
         """
         try:
-            stdout, stderr = self._git_custom_command(
-                None,
-                ['git', 'diff', '--name-only', '--staged'],
-                cwd=self.path,
-                log_stderr=True,
-                log_stdout=True,
-                log_online=False,
-                expect_stderr=False,
-                expect_fail=True)
+            return list(self.call_git_items_(
+                ['diff', '--name-only', '--staged'],
+                expect_stderr=True))
         except CommandError as e:
             lgr.debug(exc_str(e))
-            stdout = ''
-        return [f for f in stdout.split('\n') if f]
+            return []
 
     def _save_post(self, message, status, partial_commit):
         # helper to commit changes reported in status
@@ -3874,7 +3987,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           - git : bool (passed to Repo.add()
           - eval_submodule_state : {'full', 'commit', 'no'}
             passed to Repo.status()
-          - untracked : {'no', 'normal', 'all'} - passed to Repo.satus()
+          - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
         """
         return list(
             self.save_(
@@ -3949,7 +4062,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                           props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
-            to_add_submodules = [sm for sm, sm_props in
+            to_add_submodules = [
+                sm for sm, sm_props in
                 self.get_content_info(
                     untracked_dirs,
                     ref=None,
@@ -3958,34 +4072,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
-            for cand_sm in to_add_submodules:
-                try:
-                    self.add_submodule(
-                        str(cand_sm.relative_to(self.pathobj)),
-                        url=None,
-                        name=None,
-                    )
-                except (CommandError, InvalidGitRepositoryError) as e:
-                    yield get_status_dict(
-                        action='add_submodule',
-                        ds=self,
-                        path=self.pathobj / ut.PurePosixPath(cand_sm),
-                        status='error',
-                        message=e.stderr if hasattr(e, 'stderr')
-                        else ('not a Git repository: %s', exc_str(e)),
-                        logger=lgr)
-                    continue
-                # This mirrors the result structure yielded for
-                # to_stage_submodules below.
-                yield get_status_dict(
-                    action='add',
-                    refds=self.pathobj,
-                    type='file',
-                    key=None,
-                    path=self.pathobj / ut.PurePosixPath(cand_sm),
-                    status='ok',
-                    logger=lgr)
-                added_submodule = True
+            if to_add_submodules:
+                for r in self._save_add_submodules(to_add_submodules):
+                    if r.get('status', None) == 'ok':
+                        added_submodule = True
+                    yield r
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
@@ -4007,6 +4098,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     yield r
 
         if added_submodule or vanished_subds:
+            # the config has changed too
+            self.config.reload()
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
@@ -4049,12 +4142,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         from datalad.interface.results import get_status_dict
         try:
             # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                list(files.keys()),
+            add_out = self._call_git(
                 # Set annex.largefiles to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
-                ensure_list(git_opts) + ['--verbose']
+                ['-c', 'annex.largefiles=nothing', 'add'] +
+                ensure_list(git_opts) + ['--verbose'],
+                files=list(files.keys()),
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
@@ -4076,6 +4169,75 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.error("add: %s" % e)
             raise
 
+    def _save_add_submodules(self, paths):
+        """Add new submodules
+
+        This method does not use `git submodule add`, but aims to be more
+        efficient by limiting the scope to mere in-place registration of
+        multiple already present respositories.
+
+        Parameters
+        ----------
+        paths : list(Path)
+        """
+        from datalad.interface.results import get_status_dict
+
+        # first gather info from all datasets in read-only fashion, and then
+        # update index, .gitmodules and .git/config at once
+        info = []
+        for path in paths:
+            rpath = str(path.relative_to(self.pathobj).as_posix())
+            subm = repo_from_path(path)
+            subm_commit = subm.get_hexsha()
+            if not subm_commit:
+                yield get_status_dict(
+                    action='add_submodule',
+                    ds=self,
+                    path=path,
+                    status='error',
+                    message=('cannot add subdataset %s with no commits', subm),
+                    logger=lgr)
+                continue
+            # make an attempt to configure a submodule source URL based on the
+            # discovered remote configuration
+            remote, branch = subm.get_tracking_branch()
+            url = subm.get_remote_url(remote) if remote else None
+            if url is None:
+                url = './{}'.format(rpath)
+            subm_id = subm.config.get('datalad.dataset.id', None)
+            info.append(
+                dict(path=path, rpath=rpath, commit=subm_commit, id=subm_id,
+                     url=url))
+
+        # bypass any convenience or safe-manipulator for speed reasons
+        # use case: saving many new subdatasets in a single run
+        with (self.pathobj / '.gitmodules').open('a') as gmf, \
+             (self.pathobj / '.git' / 'config').open('a') as gcf:
+            for i in info:
+                self.call_git([
+                    'update-index', '--add', '--replace', '--cacheinfo', '160000',
+                    i['commit'], i['rpath']
+                ])
+                gmprops = dict(path=i['rpath'], url=i['url'])
+                if i['id']:
+                    gmprops['datalad-id'] = i['id']
+                write_config_section(
+                    gmf, 'submodule', i['rpath'], gmprops)
+                write_config_section(
+                    gcf, 'submodule', i['rpath'], dict(active='true', url=i['url']))
+
+                # This mirrors the result structure yielded for
+                # to_stage_submodules below.
+                yield get_status_dict(
+                    action='add',
+                    refds=self.pathobj,
+                    # should become type='dataset'
+                    # https://github.com/datalad/datalad/pull/4793#discussion_r464515331
+                    type='file',
+                    key=None,
+                    path=i['path'],
+                    status='ok',
+                    logger=lgr)
 
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove

@@ -1,10 +1,8 @@
-Contributing to DataLad
-=======================
+# Contributing to DataLad
 
 [gh-datalad]: http://github.com/datalad/datalad
 
-Files organization
-------------------
+## Files organization
 
 - [datalad/](./datalad) is the main Python module where major development is happening,
   with major submodules being:
@@ -37,8 +35,13 @@ Files organization
   benchmarking of DataLad.  Implemented in any most appropriate language
   (Python, bash, etc.)
 
-How to contribute
------------------
+Whenever a new top-level file or folder is added to the repository, it should
+be listed in `MANIFEST.in` so that it will be either included in or excluded
+from source distributions as appropriate.  [See
+here](https://packaging.python.org/guides/using-manifest-in/) for information
+about writing a `MANIFEST.in`.
+
+## How to contribute
 
 The preferred way to contribute to the DataLad code base is
 to fork the [main repository][gh-datalad] on GitHub.  Here
@@ -120,10 +123,9 @@ we outline the workflow used by the developers:
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
 
-Development environment
------------------------
+## Development environment
 
-We support Python 3 only (>= 3.5).
+We support Python 3 only (>= 3.6).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -218,8 +220,7 @@ And then we can rely on the [GitHub action](.github/workflows/update-contributor
 look for new orcids as we did above.
 
 
-Documentation
--------------
+## Documentation
 
 ### Docstrings
 
@@ -234,8 +235,7 @@ provided by [Sphinx].
 [Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
 [Sphinx]: http://www.sphinx-doc.org/en/stable/
 
-Additional Hints
-----------------
+## Additional Hints
 
 ### Merge commits
 
@@ -250,8 +250,7 @@ in "Conflicts" listing within the merge commit
 (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
 
 
-Quality Assurance
------------------
+## Quality Assurance
 
 It is recommended to check that your contribution complies with the following
 rules before submitting a pull request:
@@ -297,6 +296,9 @@ then to later deactivate the virtualenv just simply enter
 ```sh
 deactivate
 ```
+
+**Note**: on Windows, please add `--traverse-namespace` option to the `nose`
+call, or otherwise `nose` would not discover tests.
 
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
@@ -421,7 +423,7 @@ below passes ref names instead of commit IDs, which requires asv v0.3
 or later.)
 
 ```shell
-> asv compare -m hopa 0.9.x master
+> asv compare -m hopa maint master
 
 All benchmarks:
 
@@ -447,9 +449,9 @@ All benchmarks:
 [asv continuous] could be used to first run benchmarks for the to-be-tested
 commits and then provide stats:
 
-- `asv continuous 0.9.x master` - would run and compare 0.9.x and master branches
-- `asv continuous HEAD` - would compare HEAD against HEAD^
-- `asv continuous master HEAD` - would compare HEAD against state of master
+- `asv continuous maint master` - would run and compare `maint` and `master` branches
+- `asv continuous HEAD` - would compare `HEAD` against `HEAD^`
+- `asv continuous master HEAD` - would compare `HEAD` against state of master
 - [TODO: contineous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
 
 Notes:
@@ -485,8 +487,7 @@ Example (replace with the benchmark of interest)
 [asv]: http://asv.readthedocs.io
 
 
-Easy Issues
------------
+## Easy Issues
 
 A great way to start contributing to DataLad is to pick an item from the list of
 [Easy issues](https://github.com/datalad/datalad/labels/easy) in the issue
@@ -495,8 +496,7 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
-Recognizing contributions
--------------------------
+## Recognizing contributions
 
 We welcome and recognize all contributions from documentation to testing to code development.
 
@@ -507,17 +507,15 @@ merged, if you helped in a non standard way (e.g., a contribution other than cod
 you can open a pull request to add any [All Contributors Emoji][contrib_emoji] that
 match your contribution types.
 
-Thank you!
-----------
+## Thank you!
 
 You're awesome. :wave::smiley:
 
 
 
-Various hints for developers
-----------------------------
+# Various hints for developers
 
-### Useful tools
+## Useful tools
 
 - While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
   for quick logging of various health stats in a separate terminal window:
@@ -534,26 +532,29 @@ Various hints for developers
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
 
-### Useful Environment Variables
+## Useful Environment Variables
+
 Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
 
 - *DATALAD_DATASETS_TOPURL*:
   Used to point to an alternative location for `///` dataset. If running
   tests preferred to be set to http://datasets-tests.datalad.org
-- *DATALAD_LOG_LEVEL*:
-  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
-- *DATALAD_LOG_CMD_OUTPUTS*:
-  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
-- *DATALAD_LOG_CMD_ENV*:
+- *DATALAD_LOG_CWD*:
+  Whether to log cwd where command to be executed
+- *DATALAD_LOG_ENV*:
   If contains a digit (e.g. 1), would log entire environment passed into
   the Runner.run's popen call.  Otherwise could be a comma separated list
   of environment variables to log
-- *DATALAD_LOG_CMD_STDIN*:
-  Whether to log stdin for the command
-- *DATALAD_LOG_CMD_CWD*:
-  Whether to log cwd where command to be executed
+- *DATALAD_LOG_LEVEL*:
+  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
+- *DATALAD_LOG_NAME*:
+  Whether to include logger name (e.g. `datalad.support.sshconnector`) in the log
+- *DATALAD_LOG_OUTPUTS*:
+  Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
+- *DATALAD_LOG_STDIN*:
+  Whether to log stdin for the command
 - *DATALAD_LOG_TARGET*
   Where to log: `stderr` (default), `stdout`, or another filename
 - *DATALAD_LOG_TIMESTAMP*:
@@ -621,10 +622,37 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_ALLOW_FAIL*:
   Instructs `@never_fail` decorator to allow to fail, e.g. to ease debugging.
 
-# Changelog section
+# Release(s) workflow
+
+## Branches
+
+- `master`: changes toward the next `MAJOR.MINOR.0` release.
+  Release candidates (tagged with an `rcX` suffix) are cut from this branch
+- `maint`: bug fixes for the latest released `MAJOR.MINOR.PATCH`
+- `maint-MAJOR.MINOR`: generally not used, unless some bug fix release with a critical bug fix is needed.
+
+## Workflow
+
+- upon release of `MAJOR.MINOR.0`, `maint` branch needs to be fast-forwarded to that release
+- bug fixes to functionality released within the `maint` branch should be
+  submitted against `maint` branch
+- cherry-picking fixes from `master` into `maint` is allowed where needed
+- `master` branch accepts PRs with new functionality
+- `master` branch merges `maint` as frequently as needed
+
+## Helpers
+
+[Makefile](./Makefile) provides a number of useful `make` targets:
+
+- `linkissues-changelog`: converts `(#ISSUE)` placeholders into proper markdown within [CHANGELOG.md]()
+- `update-changelog`: uses above `linkissues-changelog` and updates .rst changelog
+- `release-pypi`: ensures no `dist/` exists yet, creates a wheel and a source distribution and uploads to pypi.
+
+## Changelog section
 
 For the upcoming release use this template
 
+```markdown
 ## 0.15.0 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
@@ -640,7 +668,7 @@ bet we will fix some bugs and make a world even a better place.
 ### Enhancements and new features
 
 ?
-
+```
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
 [contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

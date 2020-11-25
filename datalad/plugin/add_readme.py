@@ -64,7 +64,7 @@ class AddReadme(Interface):
         lgr = logging.getLogger('datalad.plugin.add_readme')
 
         from datalad.distribution.dataset import require_dataset
-        from datalad.utils import assure_list
+        from datalad.utils import ensure_list
 
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='add README')
@@ -103,11 +103,11 @@ class AddReadme(Interface):
         for label, content in (
                 ('', meta.get('description', meta.get('shortdescription', ''))),
                 ('Author{}'.format('s' if isinstance(meta.get('author', None), list) else ''),
-                    u'\n'.join([u'- {}'.format(a) for a in assure_list(meta.get('author', []))])),
+                    u'\n'.join([u'- {}'.format(a) for a in ensure_list(meta.get('author', []))])),
                 ('Homepage', meta.get('homepage', '')),
                 ('Reference', meta.get('citation', '')),
                 ('License', meta.get('license', '')),
-                ('Keywords', u', '.join([u'`{}`'.format(k) for k in assure_list(meta.get('tag', []))])),
+                ('Keywords', u', '.join([u'`{}`'.format(k) for k in ensure_list(meta.get('tag', []))])),
                 ('Funding', meta.get('fundedby', '')),
                 ):
             if label and content:
@@ -129,7 +129,7 @@ class AddReadme(Interface):
 This is a DataLad dataset{id}.
 
 For more information on DataLad and on how to work with its datasets,
-see the DataLad documentation at: http://docs.datalad.org
+see the DataLad documentation at: http://handbook.datalad.org
 """.format(
             title='Dataset "{}"'.format(meta['title']) if 'title' in meta else 'About this dataset',
             metainfo=metainfo,

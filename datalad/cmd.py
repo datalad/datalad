@@ -40,12 +40,13 @@ from .support.protocol import (
     ExecutionTimeExternalsProtocol,
 )
 from .utils import (
-    assure_bytes,
-    assure_unicode,
     auto_repr,
+    ensure_bytes,
+    ensure_unicode,
     generate_file_chunks,
     get_tempfile_kwargs,
     split_cmdline,
+    try_multiple,
     unlink,
 )
 
@@ -178,8 +179,9 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
     loop : asyncio.AbstractEventLoop
       asyncio event loop instance. Must support subprocesses on the
       target platform.
-    cmd : list
-      Command to be executed, passed to `subprocess_exec`.
+    cmd : list or str
+      Command to be executed, passed to `subprocess_exec` (list), or
+      `subprocess_shell` (str).
     protocol : WitlessProtocol
       Protocol class to be instantiated for managing communication
       with the subprocess.
@@ -202,27 +204,33 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         protocol_kwargs = {}
     cmd_done = asyncio.Future(loop=loop)
     factory = functools.partial(protocol, cmd_done, **protocol_kwargs)
-    proc = loop.subprocess_exec(
-        factory,
-        *cmd,
+    kwargs.update(
         stdin=stdin,
         # ask the protocol which streams to capture
         stdout=asyncio.subprocess.PIPE if protocol.proc_out else None,
         stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
-        **kwargs
     )
+    if isinstance(cmd, str):
+        proc = loop.subprocess_shell(factory, cmd, **kwargs)
+    else:
+        proc = loop.subprocess_exec(factory, *cmd, **kwargs)
     transport = None
+    result = None
     try:
         lgr.debug('Launching process %s', cmd)
         transport, protocol = await proc
         lgr.debug('Waiting for process %i to complete', transport.get_pid())
+        # The next wait is a workaround that avoids losing the output of
+        # quickly exiting commands (https://bugs.python.org/issue41594).
+        await asyncio.ensure_future(transport._wait())
         await cmd_done
+        result = protocol._prepare_result()
     finally:
         # protect against a crash whe launching the process
         if transport:
             transport.close()
 
-    return cmd_done.result()
+    return result
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
@@ -244,8 +252,16 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
     proc_out = None
     proc_err = None
 
-    def __init__(self, done_future):
-        # future promise to be fulfilled when process exits
+    def __init__(self, done_future, encoding=None):
+        """
+        Parameters
+        ----------
+        done_future : asyncio.Future
+          Future promise to be fulfilled when process exits.
+        encoding : str
+          Encoding to be used for process output bytes decoding. By default,
+          the preferred system encoding is guessed.
+        """
         self.done = done_future
         # capture output in bytearrays while the process is running
         Streams = namedtuple('Streams', ['out', 'err'])
@@ -255,7 +271,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         )
         self.pid = None
         super().__init__()
-        self.encoding = getpreferredencoding(do_setlocale=False)
+        self.encoding = encoding or getpreferredencoding(do_setlocale=False)
 
         self._log_outputs = False
         if lgr.isEnabledFor(5):
@@ -276,7 +292,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
                 len(data), self.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
-            log_data = assure_unicode(data)
+            log_data = ensure_unicode(data)
             # The way we log is to stay consistent with Runner.
             # TODO: later we might just log in a single entry, without
             # fd_name prefix
@@ -298,11 +314,10 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
         Note for derived classes overwriting this method:
 
-        The result set for the `done` future must be a dict with keys
-        that do not unintentionally conflict with the API of
-        CommandError, as the result dict is passed to this exception
-        class as kwargs on error. The Runner will overwrite 'cmd' and
-        'cwd' on error, if they are present in the result.
+        The result must be a dict with keys that do not unintentionally
+        conflict with the API of CommandError, as the result dict is passed to
+        this exception class as kwargs on error. The Runner will overwrite
+        'cmd' and 'cwd' on error, if they are present in the result.
         """
         return_code = self.transport.get_returncode()
         lgr.debug(
@@ -320,7 +335,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     def process_exited(self):
         # actually fulfill the future promise and let the execution finish
-        self.done.set_result(self._prepare_result())
+        self.done.set_result(True)
 
 
 class NoCapture(WitlessProtocol):
@@ -407,10 +422,9 @@ class WitlessRunner(object):
 
         Parameters
         ----------
-        cmd : list
-          Sequence of program arguments. Passing a single string means
-          that it is simply the name of the program, no complex shell
-          commands are supported.
+        cmd : list or str
+          Sequence of program arguments. Passing a single string causes
+          execution via the platform shell.
         protocol : WitlessProtocol, optional
           Protocol class handling interaction with the running process
           (e.g. output capture). A number of pre-crafted classes are
@@ -766,13 +780,13 @@ class Runner(object):
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
             # Let it be processed
-            line = log_(assure_unicode(line))
+            line = log_(ensure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = assure_bytes(line)
+                line = ensure_bytes(line)
         if line:
             if out_type == 'stdout':
-                self._log_out(assure_unicode(line))
+                self._log_out(ensure_unicode(line))
             elif out_type == 'stderr':
                 self._log_err(line.decode('utf-8'),
                               expected)
@@ -1086,7 +1100,12 @@ class GitRunnerBase(object):
             alongside = False
         else:
             annex_path = op.dirname(op.realpath(annex_fpath))
-            alongside = op.lexists(op.join(annex_path, 'git'))
+            bundled_git_path = op.join(annex_path, 'git')
+            # we only need to consider bundled git if it's actually different
+            # from default. (see issue #5030)
+            alongside = op.lexists(bundled_git_path) and \
+                        bundled_git_path != op.realpath(find_executable('git'))
+
         return annex_path if alongside else ''
 
     @staticmethod
@@ -1141,7 +1160,7 @@ class GitRunner(Runner, GitRunnerBase):
             *args, **kwargs)
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
-        return assure_unicode(out), assure_unicode(err)
+        return ensure_unicode(out), ensure_unicode(err)
 
 
 class GitWitlessRunner(WitlessRunner, GitRunnerBase):
@@ -1296,7 +1315,7 @@ class BatchedCommand(SafeDelCloseMixin):
         #       it is just a "get"er - we could resend it few times
         # The default output_proc expects a single line output.
         # TODO: timeouts etc
-        stdout = assure_unicode(self.output_proc(process.stdout)) \
+        stdout = ensure_unicode(self.output_proc(process.stdout)) \
             if not process.stdout.closed else None
         if stderr:
             lgr.warning("Received output in stderr: %r", stderr)
@@ -1313,23 +1332,68 @@ class BatchedCommand(SafeDelCloseMixin):
           None otherwise
         """
         ret = None
+        process = self._process
         if self._stderr_out:
             # close possibly still open fd
+            lgr.debug(
+                "Closing stderr of %s", process)
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
-        if self._process:
-            process = self._process
+        if process:
             lgr.debug(
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
-            process.wait()
+            from . import cfg
+            cfg_var = 'datalad.runtime.stalled-external'
+            cfg_val = cfg.obtain(cfg_var)
+            if cfg_val == 'wait':
+                process.wait()
+            elif cfg_val == 'abandon':
+                # try waiting for the annex process to finish 3 times for 3 sec
+                # with 1s pause in between
+                try:
+                    try_multiple(
+                        # ntrials
+                        3,
+                        # exception to catch
+                        subprocess.TimeoutExpired,
+                        # base waiting period
+                        1.0,
+                        # function to run
+                        process.wait,
+                        timeout=3.0,
+                    )
+                except subprocess.TimeoutExpired:
+                    lgr.warning(
+                        "Batched process %s did not finish, abandoning it without killing it",
+                        process)
+            else:
+                raise ValueError(f"Unexpected {cfg_var}={cfg_val!r}")
             self._process = None
             lgr.debug("Process %s has finished", process)
+
+        # It is hard to debug when something is going wrong. Hopefully logging stderr
+        # if generally asked might be of help
+        if lgr.isEnabledFor(5):
+            from . import cfg
+            log_stderr = cfg.getbool('datalad.log', 'outputs', default=False)
+        else:
+            log_stderr = False
+
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
-            if return_stderr:
+            if return_stderr or log_stderr:
                 with open(self._stderr_out_fname, 'r') as f:
-                    ret = f.read()
+                    stderr = f.read()
+            if return_stderr:
+                ret = stderr
+            if log_stderr:
+                stderr = ensure_unicode(stderr)
+                stderr = stderr.splitlines()
+                lgr.log(5, "stderr of %s had %d lines:", process.pid, len(stderr))
+                for l in stderr:
+                    lgr.log(5, "| " + l)
+
             # remove the file where we kept dumping stderr
             unlink(self._stderr_out_fname)
             self._stderr_out_fname = None

@@ -50,9 +50,9 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import (
-    assure_bytes,
-    assure_unicode,
     chpwd,
+    ensure_bytes,
+    ensure_unicode,
     get_dataset_root,
     getpwd,
     join_cmdline,
@@ -399,7 +399,7 @@ def normalize_command(command):
     """Convert `command` to the string representation.
     """
     if isinstance(command, list):
-        command = list(map(assure_unicode, command))
+        command = list(map(ensure_unicode, command))
         if len(command) == 1 and command[0] != "--":
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
@@ -418,7 +418,7 @@ def normalize_command(command):
                 command = command[1:]
             command = join_cmdline(command)
     else:
-        command = assure_unicode(command)
+        command = ensure_unicode(command)
     return command
 
 
@@ -454,24 +454,16 @@ def format_command(dset, command, **kwds):
 
 
 def _execute_command(command, pwd, expected_exit=None):
-    from datalad.cmd import Runner
+    from datalad.cmd import WitlessRunner
 
     exc = None
     cmd_exitcode = None
-    runner = Runner(cwd=pwd)
+    runner = WitlessRunner(cwd=pwd)
     try:
         lgr.info("== Command start (output follows) =====")
         runner.run(
-            command,
-            # immediate output
-            log_online=True,
-            # not yet sure what we should do with the command output
-            # IMHO `run` itself should be very silent and let the command talk
-            log_stdout=False,
-            log_stderr=False,
-            expect_stderr=True,
-            expect_fail=True,
-            # TODO stdin
+            # command is always a string
+            command
         )
     except CommandError as e:
         # strip our own info from the exception. The original command output
@@ -648,11 +640,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     if sidecar is None:
         use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
-        # If ConfigManager gets the ability to say "return single value",
-        # update this code to use that.
-        if isinstance(use_sidecar, tuple):
-            # Use same precedence as 'git config'.
-            use_sidecar = use_sidecar[-1]
         use_sidecar = anything2bool(use_sidecar)
     else:
         use_sidecar = sidecar
@@ -682,13 +669,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record_id) if use_sidecar else record)
 
     outputs_to_save = outputs.expand() if explicit else None
+    if outputs_to_save is not None and use_sidecar:
+        outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
             msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
-                ofh.write(assure_bytes(msg))
+                ofh.write(ensure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -d . -r -F %s'",

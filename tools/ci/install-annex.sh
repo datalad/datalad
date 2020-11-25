@@ -12,14 +12,15 @@
 
 function _show_schemes() {
   _schemes_doc=(
-    "autobuild"
-    "conda-forge [version]"
-    "conda-forge-last [version]"
-    "datalad-extensions-build"
-    "deb-url URL"
-    "neurodebian"
-    "neurodebian-devel"
-    "snapshot"
+    "autobuild  # Linux, macOS"
+    "brew  # macOS"
+    "conda-forge [version]  # Linux"
+    "conda-forge-last [version]  # Linux"
+    "datalad-extensions-build  # Linux, macOS"
+    "deb-url URL  # Linux"
+    "neurodebian  # Linux"
+    "neurodebian-devel  # Linux"
+    "snapshot  # Linux, macOS"
   )
   for s in "${_schemes_doc[@]}"; do
     echo "    $s"
@@ -51,6 +52,14 @@ function setup_neurodebian_devel() {
   sudo apt-get update
 }
 
+function install_from_dmg() {
+  hdiutil attach "$1"
+  rsync -a /Volumes/git-annex/git-annex.app /Applications/
+  hdiutil detach /Volumes/git-annex/
+  _annex_bin=/Applications/git-annex.app/Contents/MacOS
+  export PATH="$_annex_bin:$PATH"
+}
+
 _conda_annex_version=
 scenario="conda-forge"
 adjust_bashrc=
@@ -73,7 +82,7 @@ while [ $# != 0 ]; do
             scenario="$1"
             shift
             case "$scenario" in
-                neurodebian|neurodebian-devel|autobuild|snapshot|datalad-extensions-build)
+                neurodebian|neurodebian-devel|autobuild|snapshot|datalad-extensions-build|brew)
                     ;;
                 conda-forge|conda-forge-last)
                     if [ -n "$1" ]; then
@@ -140,24 +149,48 @@ case "$scenario" in
     )
     ;;
   autobuild|snapshot)
-    _annex_bin="$_TMPDIR/git-annex.linux"
-    echo "I: downloading and extracting under $_annex_bin"
-    case "$scenario" in
-        autobuild)
-            _subpath=autobuild/amd64
+    case "$(uname)" in
+        Linux)
+            _annex_bin="$_TMPDIR/git-annex.linux"
+            echo "I: downloading and extracting under $_annex_bin"
+            case "$scenario" in
+                autobuild)
+                    _subpath=autobuild/amd64
+                    ;;
+                snapshot)
+                    _subpath=linux/current
+                    ;;
+                *)
+                    echo "E: internal error: scenario '$scenario' should not reach here" >&2
+                    exit 1
+                    ;;
+            esac
+            tar -C "$_TMPDIR" -xzf <(
+              wget -q -O- https://downloads.kitenet.net/git-annex/$_subpath/git-annex-standalone-amd64.tar.gz
+            )
+            export PATH="${_annex_bin}:$PATH"
             ;;
-        snapshot)
-            _subpath=linux/current
+        Darwin)
+            case "$scenario" in
+                autobuild)
+                    _subpath=autobuild/x86_64-apple-yosemite
+                    ;;
+                snapshot)
+                    _subpath=OSX/current/10.10_Yosemite
+                    ;;
+                *)
+                    echo "E: internal error: scenario '$scenario' should not reach here" >&2
+                    exit 1
+                    ;;
+            esac
+            wget -q -O "$_TMPDIR/git-annex.dmg" https://downloads.kitenet.net/git-annex/$_subpath/git-annex.dmg
+            install_from_dmg "$_TMPDIR"/*.dmg
             ;;
         *)
-            echo "E: internal error: scenario '$scenario' should not reach here" >&2
+            echo "E: Unsupported OS: $(uname)"
             exit 1
             ;;
     esac
-    tar -C "$_TMPDIR" -xzf <(
-      wget -q -O- https://downloads.kitenet.net/git-annex/$_subpath/git-annex-standalone-amd64.tar.gz
-    )
-    export PATH="${_annex_bin}:$PATH"
     ;;
   conda-forge|conda-forge-last)
     _miniconda_script=Miniconda3-latest-Linux-x86_64.sh
@@ -201,8 +234,24 @@ case "$scenario" in
     unset _conda_annex_version
     ;;
   datalad-extensions-build)
-    TARGET_PATH="$_TMPDIR" "$_this_dir/download-latest-artifact"
-    sudo dpkg -i "$_TMPDIR"/*.deb
+    case "$(uname)" in
+      Linux)
+        TARGET_PATH="$_TMPDIR" "$_this_dir/download-latest-artifact"
+        sudo dpkg -i "$_TMPDIR"/*.deb
+        ;;
+      Darwin)
+        TARGET_PATH="$_TMPDIR" TARGET_ARTIFACT=git-annex-macos-dmg "$_this_dir/download-latest-artifact"
+        install_from_dmg "$_TMPDIR"/*.dmg
+        ;;
+      *)
+        echo "E: Unsupported OS: $(uname)"
+        exit 1
+        ;;
+    esac
+    ;;
+  brew)
+    brew install git-annex
+    _annex_bin=/usr/local/bin
     ;;
   *)
     echo "E: internal error: '$scenario' should be handled above" >&2
@@ -215,7 +264,7 @@ if [ -n "$adjust_bashrc" ]; then
     # distributions (including Debian and Ubuntu) come with a snippet to exit
     # early in that case.
     if [ "$PATH" != "$_PATH_OLD" ]; then
-        sed -i -e "1iexport PATH=\"$PATH\"" ~/.bashrc
+        perl -pli -e 'print "PATH=\"$ENV{PATH}\"" if $. == 1' ~/.bashrc
         echo "I: Adjusted first line of ~/.bashrc:"
         head -n1 ~/.bashrc
     fi

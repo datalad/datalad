@@ -128,15 +128,6 @@ def setup_package():
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
-    # If there is a bundled git, make sure GitPython uses it too
-    # (some parts of the test utilities still rely on GitPython)
-    from datalad.cmd import GitRunner
-    GitRunner._check_git_path()
-    if GitRunner._GIT_PATH:
-        import os
-        os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
-            os.path.join(GitRunner._GIT_PATH, 'git')
-
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
@@ -190,6 +181,11 @@ def setup_package():
     capture.StringIO = StringIO
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
+
+    if cfg.obtain('datalad.tests.setup.testrepos'):
+        lgr.debug("Pre-populating testrepos")
+        from datalad.tests.utils import with_testrepos
+        with_testrepos()(lambda repo: 1)()
 
 
 def teardown_package():
