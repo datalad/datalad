@@ -168,14 +168,9 @@ tributors --version
 0.0.18
 ```
 
-If you want to have Orcid identifiers, you need to export the following environment
-variables. It also helps to have a GitHub token to increase API limits:
+It helps to have a GitHub token to increase API limits:
 
 ```bash
-export ORCID_ID=xxxxxxxxxx
-export ORCID_SECRET=xxxxxxxxxxxxxxxxxx
-export ORCID_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-export ORCID_REFRESH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxx
 export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
