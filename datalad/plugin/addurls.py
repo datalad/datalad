@@ -245,6 +245,33 @@ class AnnexKeyParser(object):
         self.empty = "".join(i[0]
                              for i in string.Formatter().parse(format_string))
 
+    @staticmethod
+    def _validate_common(backend, key):
+        if backend.endswith("E"):
+            ext = True
+            backend = backend[:-1]
+        else:
+            ext = False
+
+        expected_lengths = {"MD5": 32,
+                            "SHA1": 40,
+                            "SHA256": 64}
+
+        expected_len = expected_lengths.get(backend)
+        if not expected_len:
+            return
+
+        if ext and "." in key:
+            key = key.split(".", maxsplit=1)[0]
+
+        if len(key) != expected_len:
+            raise ValueError("{} key does not have expected length of {}: {}"
+                             .format(backend, expected_len, key))
+
+        if not re.match(r"[a-f0-9]+\Z", key):
+            raise ValueError("{} key has non-hexadecimal character: {}"
+                             .format(backend, key))
+
     def parse(self, row):
         """Format the key with the fields in `row` and parse it.
 
@@ -285,6 +312,7 @@ class AnnexKeyParser(object):
                     info["target_backend"] = backend + "E"
             else:
                 info["key"] = key
+            self._validate_common(info["backend"], info["keyname"])
             return info
         else:
             raise ValueError(

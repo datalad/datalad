@@ -763,10 +763,14 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def test_addurls_from_key_invalid_format(self, path):
         ds = Dataset(path).create(force=True)
-        with assert_raises(IncompleteResultsError):
-            ds.addurls(self.json_file, "{url}", "{name}",
-                       key="{name}-which-has-no-double-dash",
-                       exclude_autometa="*")
+        for fmt in ["{name}-which-has-no-double-dash",
+                    # Invalid hash length.
+                    "MD5-s{size}--{md5sum}a",
+                    # Invalid hash content.
+                    "MD5-s{size}--" + 32 * "q"]:
+            with assert_raises(IncompleteResultsError):
+                ds.addurls(self.json_file, "{url}", "{name}",
+                           key=fmt, exclude_autometa="*")
 
     @with_tempfile(mkdir=True)
     def check_addurls_from_key(self, key_arg, expected_backend, path):
