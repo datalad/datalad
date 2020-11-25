@@ -817,7 +817,6 @@ class Addurls(Interface):
 
         from requests.exceptions import RequestException
 
-        from datalad.api import create
         from datalad.distribution.dataset import Dataset, require_dataset
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
