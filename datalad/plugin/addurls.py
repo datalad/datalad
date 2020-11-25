@@ -20,6 +20,7 @@ import sys
 from functools import partial
 from urllib.parse import urlparse
 
+from datalad.support.external_versions import external_versions
 import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import exc_str
@@ -221,6 +222,9 @@ def filter_legal_metafield(fields):
 class AnnexKeyParser(object):
     """Parse a full annex key into subparts.
 
+    The key may have an "et:" prefix appended, which signals that the backend's
+    extension state should be toggled.
+
     See <https://git-annex.branchable.com/internals/key_format/>.
 
     Parameters
@@ -234,7 +238,8 @@ class AnnexKeyParser(object):
     def __init__(self, format_fn, format_string):
         self.format_fn = format_fn
         self.format_string = format_string
-        self.regexp = re.compile(r"(?P<backend>[A-Z0-9]+)"
+        self.regexp = re.compile(r"(?P<et>et:)?"
+                                 r"(?P<backend>[A-Z0-9]+)"
                                  r"(?:-[^-]+)?"
                                  r"--(?P<keyname>[^/\n]+)\Z")
         self.empty = "".join(i[0]
@@ -247,7 +252,8 @@ class AnnexKeyParser(object):
         -------
         A dictionary with the following keys that match their counterparts in
         the output of `git annex examinekey --json`: "key" (the full annex
-        key), "backend", and "keyname".
+        key), "backend", and "keyname". If the key had an "et:" prefix, there
+        is also a "target_backend" key.
 
         Raises
         ------
@@ -269,12 +275,21 @@ class AnnexKeyParser(object):
         match = self.regexp.match(key)
         if match:
             info = match.groupdict()
-            info["key"] = key
+            et = info.pop("et", None)
+            if et:
+                info["key"] = key[3:]  # Drop "et:" from full key.
+                backend = info["backend"]
+                if backend.endswith("E"):
+                    info["target_backend"] = backend[:-1]
+                else:
+                    info["target_backend"] = backend + "E"
+            else:
+                info["key"] = key
             return info
         else:
             raise ValueError(
                 "Key does not match expected "
-                "<backend>[-[CmsS]NNN]--<key> format: {}"
+                "[et:]<backend>[-[CmsS]NNN]--<key> format: {}"
                 .format(key))
 
 
@@ -642,6 +657,11 @@ class RegisterUrl(object):
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
 
+    def examinekey(self, parsed_key, filename):
+        opts = ["--migrate-to-backend=" + parsed_key["target_backend"],
+                "--filename=" + filename, parsed_key["key"]]
+        return self.repo._run_annex_command_json("examinekey", opts=opts)[0]
+
     def fromkey(self, key, filename):
         return self.repo._run_annex_command_json(
             "fromkey", opts=["--force", key, filename])[0]
@@ -652,7 +672,19 @@ class RegisterUrl(object):
     def __call__(self, row):
         filename = row["ds_filename"]
         try:
-            key = row["key"]["key"]
+            parsed_key = row["key"]
+            if "target_backend" in parsed_key:
+                ek_info = self.examinekey(parsed_key, filename)
+                if ek_info:
+                    key = ek_info["key"]
+                else:
+                    yield dict(self._err_res,
+                               path=row["filename_abs"],
+                               message=("Failed to get information for %s",
+                                        parsed_key))
+                    return
+            else:
+                key = parsed_key["key"]
             self.registerurl(key, row["url"])
             res = self.fromkey(key, filename)
         except CommandError as exc:
@@ -688,6 +720,11 @@ class BatchedRegisterUrl(RegisterUrl):
                 annex_options=batch_options)
             self._batch_commands[command] = bcmd
         return bcmd(batch_input)
+
+    def examinekey(self, parsed_key, filename):
+        opts = ["--migrate-to-backend=" + parsed_key["target_backend"]]
+        return self._batch("examinekey", (parsed_key["key"], filename),
+                           json=True, batch_options=opts)
 
     def fromkey(self, key, filename):
         return self._batch("fromkey", (key, filename), json=True,
@@ -933,11 +970,20 @@ class Addurls(Interface):
             doc="""A format string that specifies an annex key for the file
             content. In this case, the file is not downloaded; instead the key
             is used to create the file without content. The value should be
-            structured as "<backend>[-s<bytes>]--<hash>". As an example,
-            "MD5-s{size}--{md5sum}" would use the 'md5sum' and 'size' columns
-            to construct the key. Note: If the backend is an annex extension
-            backend (i.e., a backend with a trailing "E"), the key must have an
-            appropriate extension for the corresponding file name."""),
+            structured as "[et:]<input backend>[-s<bytes>]--<hash>". The
+            optional "et:" prefix, which requires git-annex 8.20201116 or
+            later, signals to toggle extension state of the input backend
+            (i.e., MD5 vs MD5E). As an example, "et:MD5-s{size}--{md5sum}"
+            would use the 'md5sum' and 'size' columns to construct the key,
+            migrating the key from MD5 to MD5E, with an extension based on the
+            file name. Note: If the *input* backend itself is an annex
+            extension backend (i.e., a backend with a trailing "E"), the key's
+            extension will not be updated to match the extension of the
+            corresponding file name. Thus, unless the input keys and file names
+            are generated from git-annex, it is recommended to avoid using
+            extension backends as input. If an extension is desired, use the
+            plain variant as input and prepend "et:" so that git-annex will
+            migrate from the plain backend to the extension variant."""),
         message=Parameter(
             args=("--message",),
             metavar="MESSAGE",
@@ -1017,6 +1063,12 @@ class Addurls(Interface):
                                   status="error",
                                   message="not an annex repo")
             return
+
+        if key and key.startswith("et:") and \
+           external_versions["cmd:annex"] < "8.20201116":
+            lgr.warning("et: prefix of `key` option requires "
+                        "git-annex 8.20201116 or later. Ignoring.")
+            key = None
 
         if url_file != "-":
             url_file = str(resolve_path(url_file, dataset))

@@ -405,6 +405,11 @@ def test_addurls_dry_run(path):
                   cml.out)
 
 
+skip_key_tests = skip_if(
+    external_versions["cmd:annex"] < "8.20201116",
+    "git-annex version does not support `examinekey --migrate-to-backend`")
+
+
 class TestAddurls(object):
 
     @classmethod
@@ -764,10 +769,10 @@ class TestAddurls(object):
                        exclude_autometa="*")
 
     @with_tempfile(mkdir=True)
-    def test_addurls_from_key(self, path):
+    def check_addurls_from_key(self, key_arg, expected_backend, path):
         ds = Dataset(path).create(force=True)
         ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
-                   key="MD5-s{size}--{md5sum}")
+                   key=key_arg)
         repo = ds.repo
         repo_path = ds.repo.pathobj
         paths = [repo_path / x for x in "ac"]
@@ -775,11 +780,18 @@ class TestAddurls(object):
         annexinfo = repo.get_content_annexinfo(eval_availability=True)
         for path in paths:
             pstat = annexinfo[path]
-            eq_(pstat["backend"], "MD5")
+            eq_(pstat["backend"], expected_backend)
             assert_false(pstat["has_content"])
 
         get_res = ds.get(paths, result_renderer=None, on_failure="ignore")
         assert_result_count(get_res, 2, action="get", status="ok")
+
+    def test_addurls_from_key(self):
+        fn = self.check_addurls_from_key
+        yield fn, "MD5-s{size}--{md5sum}", "MD5"
+        yield fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"
+        yield skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"
+        yield skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5"
 
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self, path):
