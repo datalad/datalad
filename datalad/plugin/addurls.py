@@ -237,6 +237,8 @@ class AnnexKeyParser(object):
         self.regexp = re.compile(r"(?P<backend>[A-Z0-9]+)"
                                  r"(?:-[^-]+)?"
                                  r"--(?P<keyname>[^/\n]+)\Z")
+        self.empty = "".join(i[0]
+                             for i in string.Formatter().parse(format_string))
 
     def parse(self, row):
         """Format the key with the fields in `row` and parse it.
@@ -256,6 +258,12 @@ class AnnexKeyParser(object):
         except KeyError as exc:
             lgr.debug("Row missing fields for --key: %s",
                       exc_str(exc))
+            return {}
+
+        if key == self.empty:
+            lgr.debug("All fields in --key's value are empty in row: %s", row)
+            # We got the same string that'd we get if all the fields were
+            # empty, so this doesn't have a key.
             return {}
 
         match = self.regexp.match(key)

@@ -428,8 +428,8 @@ class TestAddurls(object):
                     {"url": cls.url + "udir/b.dat",
                      "name": "b",
                      "subdir": "bar",
-                     "md5sum": "71dd3e865d708f8f8e971309096cd676",
-                     "size": "9"},
+                     "md5sum": "",
+                     "size": ""},
                     {"url": cls.url + "udir/c.dat",
                      "name": "c",
                      "subdir": "foo",
@@ -770,7 +770,7 @@ class TestAddurls(object):
                    key="MD5-s{size}--{md5sum}")
         repo = ds.repo
         repo_path = ds.repo.pathobj
-        paths = [repo_path / x for x in "abc"]
+        paths = [repo_path / x for x in "ac"]
 
         annexinfo = repo.get_content_annexinfo(eval_availability=True)
         for path in paths:
@@ -779,7 +779,7 @@ class TestAddurls(object):
             assert_false(pstat["has_content"])
 
         get_res = ds.get(paths, result_renderer=None, on_failure="ignore")
-        assert_result_count(get_res, 3, action="get", status="ok")
+        assert_result_count(get_res, 2, action="get", status="ok")
 
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self, path):
