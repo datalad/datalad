@@ -481,6 +481,13 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     # because meta may be given multiple times on the command line.
     formats_meta = [partial(fmt.format, m) for m in meta + auto_meta_args]
 
+    info_fns = []
+    if formats_meta:
+        def set_meta_args(info, row):
+            info["meta_args"] = clean_meta_args(fmt(row)
+                                                for fmt in formats_meta)
+        info_fns.append(set_meta_args)
+
     rows_with_url = []
     infos = []
     for row in rows:
@@ -492,8 +499,10 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
-        meta_args = clean_meta_args(fmt(row) for fmt in formats_meta)
-        infos.append({"url": url, "meta_args": meta_args})
+        info = {"url": url}
+        for fn in info_fns:
+            fn(info, row)
+        infos.append(info)
 
     n_dropped = len(rows) - len(rows_with_url)
     if n_dropped:
@@ -901,9 +910,10 @@ class Addurls(Interface):
                 lgr.info("Would download %s to %s",
                          row["url"],
                          os.path.join(ds.path, row["filename"]))
-                lgr.info("Metadata: %s",
-                         sorted(u"{}={}".format(k, v)
-                                for k, v in row["meta_args"].items()))
+                if "meta_args" in row:
+                    lgr.info("Metadata: %s",
+                             sorted(u"{}={}".format(k, v)
+                                    for k, v in row["meta_args"].items()))
             yield get_status_dict(action="addurls",
                                   ds=ds,
                                   status="ok",
