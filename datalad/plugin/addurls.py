@@ -1062,7 +1062,8 @@ class Addurls(Interface):
             for subpath in subpaths:
                 lgr.info("Would create a subdataset at %s", subpath)
             for row in rows:
-                lgr.info("Would download %s to %s",
+                lgr.info("Would %s %s to %s",
+                         "register" if row.get("key") else "download",
                          row["url"],
                          os.path.join(ds.path, row["filename"]))
                 if "meta_args" in row:
