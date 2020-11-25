@@ -31,7 +31,7 @@ from datalad.interface.common_opts import (
     jobs_opt,
     nosave_opt,
 )
-from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.exceptions import CommandError
 from datalad.support.itertools import groupby_sorted
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
@@ -544,7 +544,7 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
         try:
             out_json = repo.add_url_to_file(filename, row["url"],
                                             batch=True, options=options)
-        except AnnexBatchCommandError as exc:
+        except CommandError as exc:
             yield get_status_dict(action="addurls",
                                   ds=ds,
                                   type="file",
@@ -570,7 +570,7 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
             try:
                 repo.drop_key(res_addurls['annexkey'], batch=True)
                 st_kwargs = dict(status="ok")
-            except (AssertionError, AnnexBatchCommandError) as exc:
+            except (AssertionError, CommandError) as exc:
                 st_kwargs = dict(message=exc_str(exc),
                                   status="error")
             yield get_status_dict(action="drop",
