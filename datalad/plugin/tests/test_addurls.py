@@ -25,6 +25,7 @@ from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     assert_dict_equal,
     assert_false,
@@ -43,6 +44,7 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     ok_exists,
     ok_startswith,
+    skip_if,
     swallow_logs,
     with_tempfile,
     with_tree,
@@ -420,13 +422,19 @@ class TestAddurls(object):
 
         cls.data = [{"url": cls.url + "udir/a.dat",
                      "name": "a",
-                     "subdir": "foo"},
+                     "subdir": "foo",
+                     "md5sum": "3fb7c40c70b0ed19da713bd69ee12014",
+                     "size": "9"},
                     {"url": cls.url + "udir/b.dat",
                      "name": "b",
-                     "subdir": "bar"},
+                     "subdir": "bar",
+                     "md5sum": "71dd3e865d708f8f8e971309096cd676",
+                     "size": "9"},
                     {"url": cls.url + "udir/c.dat",
                      "name": "c",
-                     "subdir": "foo"}]
+                     "subdir": "foo",
+                     "md5sum": "9b72648021b70b8c522642e4490d7ac3",
+                     "size": "9"}]
         cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
         with open(cls.json_file, "w") as jfh:
             json.dump(cls.data, jfh)
@@ -450,7 +458,8 @@ class TestAddurls(object):
         # Python API, and it will be the one saved in commit
         # message record
         json_file = op.relpath(self.json_file, ds.path)
-        ds.addurls(json_file, "{url}", "{name}")
+        ds.addurls(json_file, "{url}", "{name}",
+                   exclude_autometa="(md5sum|size)")
         ok_startswith(ds.repo.format_commit('%b'), f"url_file='{json_file}'")
         filenames = ["a", "b", "c"]
         for fname in filenames:
@@ -745,3 +754,51 @@ class TestAddurls(object):
 
         assert_result_count(res, 3, action='addurl', status='ok')  # a, b, c  even if a goes to git
         assert_result_count(res, 2, action='drop', status='ok')  # b, c
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_from_key_invalid_format(self, path):
+        ds = Dataset(path).create(force=True)
+        with assert_raises(IncompleteResultsError):
+            ds.addurls(self.json_file, "{url}", "{name}",
+                       key="{name}-which-has-no-double-dash",
+                       exclude_autometa="*")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_from_key(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
+                   key="MD5-s{size}--{md5sum}")
+        repo = ds.repo
+        repo_path = ds.repo.pathobj
+        paths = [repo_path / x for x in "abc"]
+
+        annexinfo = repo.get_content_annexinfo(eval_availability=True)
+        for path in paths:
+            pstat = annexinfo[path]
+            eq_(pstat["backend"], "MD5")
+            assert_false(pstat["has_content"])
+
+        get_res = ds.get(paths, result_renderer=None, on_failure="ignore")
+        assert_result_count(get_res, 3, action="get", status="ok")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_row_missing_key_fields(self, path):
+        ds = Dataset(path).create(force=True)
+        data = self.data.copy()
+        for row in data:
+            if row["name"] == "b":
+                del row["md5sum"]
+                break
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}", exclude_autometa="*",
+                       key="MD5-s{size}--{md5sum}")
+
+        repo = ds.repo
+        repo_path = ds.repo.pathobj
+        paths = [repo_path / x for x in "ac"]
+
+        annexinfo = repo.get_content_annexinfo(eval_availability=True)
+        for path in paths:
+            pstat = annexinfo[path]
+            eq_(pstat["backend"], "MD5")
+            assert_false(pstat["has_content"])

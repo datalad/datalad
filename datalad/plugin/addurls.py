@@ -218,6 +218,58 @@ def filter_legal_metafield(fields):
     return legal
 
 
+class AnnexKeyParser(object):
+    """Parse a full annex key into subparts.
+
+    See <https://git-annex.branchable.com/internals/key_format/>.
+
+    Parameters
+    ----------
+    format_fn : callable
+        Function that takes a format string and a row and returns the full key.
+    format_string : str
+        Format string for the full key.
+    """
+
+    def __init__(self, format_fn, format_string):
+        self.format_fn = format_fn
+        self.format_string = format_string
+        self.regexp = re.compile(r"(?P<backend>[A-Z0-9]+)"
+                                 r"(?:-[^-]+)?"
+                                 r"--(?P<keyname>[^/\n]+)\Z")
+
+    def parse(self, row):
+        """Format the key with the fields in `row` and parse it.
+
+        Returns
+        -------
+        A dictionary with the following keys that match their counterparts in
+        the output of `git annex examinekey --json`: "key" (the full annex
+        key), "backend", and "keyname".
+
+        Raises
+        ------
+        ValueError if the formatted value doesn't look like a valid key
+        """
+        try:
+            key = self.format_fn(self.format_string, row)
+        except KeyError as exc:
+            lgr.debug("Row missing fields for --key: %s",
+                      exc_str(exc))
+            return {}
+
+        match = self.regexp.match(key)
+        if match:
+            info = match.groupdict()
+            info["key"] = key
+            return info
+        else:
+            raise ValueError(
+                "Key does not match expected "
+                "<backend>[-[CmsS]NNN]--<key> format: {}"
+                .format(key))
+
+
 def get_fmt_names(format_string):
     """Yield field names in `format_string`.
     """
@@ -437,7 +489,7 @@ def sort_paths(paths):
 
 
 def extract(stream, input_type, url_format="{0}", filename_format="{1}",
-            exclude_autometa=None, meta=None,
+            exclude_autometa=None, meta=None, key=None,
             dry_run=False, missing_value=None):
     """Extract and format information from `url_file`.
 
@@ -462,7 +514,8 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
         lgr.warning("No rows found in %s", stream)
         return [], []
 
-    fmt = Formatter(colidx_to_name, missing_value)  # For URL and meta
+    # Formatter for everything but file names
+    fmt = Formatter(colidx_to_name, missing_value)
     format_url = partial(fmt.format, url_format)
 
     auto_meta_args = []
@@ -487,6 +540,12 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
             info["meta_args"] = clean_meta_args(fmt(row)
                                                 for fmt in formats_meta)
         info_fns.append(set_meta_args)
+    if key:
+        key_parser = AnnexKeyParser(fmt.format, key)
+
+        def set_key(info, row):
+            info["key"] = key_parser.parse(row)
+        info_fns.append(set_key)
 
     rows_with_url = []
     infos = []
@@ -565,16 +624,100 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
                               **st_kwargs)
 
 
+class RegisterUrl(object):
+    """Create files (without content) from user-supplied keys and register URLs.
+    """
+
+    def __init__(self, ds, repo=None):
+        self.ds = ds
+        self.repo = repo or ds.repo
+        self._err_res = get_status_dict(action="addurls", ds=self.ds,
+                                        type="file", status="error")
+
+    def fromkey(self, key, filename):
+        return self.repo._run_annex_command_json(
+            "fromkey", opts=["--force", key, filename])[0]
+
+    def registerurl(self, key, url):
+        self.repo._run_annex_command("registerurl", annex_options=[key, url])
+
+    def __call__(self, row):
+        filename = row["ds_filename"]
+        try:
+            key = row["key"]["key"]
+            self.registerurl(key, row["url"])
+            res = self.fromkey(key, filename)
+        except CommandError as exc:
+                yield dict(self._err_res,
+                           path=row["filename_abs"],
+                           message=exc_str(exc))
+        else:
+            yield dict(
+                annexjson2result(res, self.ds, type="file", logger=lgr),
+                message="registered URL",
+                action="addurls")
+
+
+# Note: If any other modules end up needing these batch operations, this should
+# find a new home.
+
+
+class BatchedRegisterUrl(RegisterUrl):
+    """Like `RegisterUrl`, but use batched commands underneath.
+    """
+
+    def __init__(self, ds, repo=None):
+        super().__init__(ds, repo)
+        self._batch_commands = {}
+
+    def _batch(self, command, batch_input,
+               output_proc=None, json=False, batch_options=None):
+        bcmd = self._batch_commands.get(command)
+        if not bcmd:
+            repo = self.repo
+            bcmd = repo._batched.get(
+                command, path=repo.path, json=json, output_proc=output_proc,
+                annex_options=batch_options)
+            self._batch_commands[command] = bcmd
+        return bcmd(batch_input)
+
+    def fromkey(self, key, filename):
+        return self._batch("fromkey", (key, filename), json=True,
+                           # --force is needed because the key (usually) does
+                           # not exist in the local repository.
+                           batch_options=["--force"])
+
+    @staticmethod
+    def _ignore(_stdout):
+        return
+
+    def registerurl(self, key, url):
+        self._batch("registerurl", (key, url),
+                    output_proc=self._ignore, json=False)
+
+
 def _log_filter_addurls(res):
     return res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"]
 
 
 @with_result_progress("Adding URLs", log_filter=_log_filter_addurls)
-def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
+def _add_urls(rows, ds, repo, ifexists=None, options=None,
+              drop_after=False, by_key=False):
     """Call `git annex addurl` using information in `rows`.
     """
     add_url = partial(_add_url, ds=ds, repo=repo,
                       drop_after=drop_after, options=options)
+    if by_key:
+        # The by_key parameter isn't strictly needed, but it lets us avoid some
+        # setup if --key wasn't specified.
+        if repo.fake_dates_enabled:
+            register_url = RegisterUrl(ds, repo)
+        else:
+            register_url = BatchedRegisterUrl(ds, repo)
+    else:
+        def register_url(*args, **kwargs):
+            raise RuntimeError("bug: this should be impossible")
+
     add_metadata = {}
     for row in rows:
         filename_abs = row["filename_abs"]
@@ -595,8 +738,9 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
             else:
                 lgr.debug("File %s already exists", filename_abs)
 
+        fn = register_url if row.get("key") else add_url
         all_ok = True
-        for res in add_url(row):
+        for res in fn(row):
             if res["status"] != "ok":
                 all_ok = False
             yield res
@@ -775,6 +919,17 @@ class Addurls(Interface):
             would mean that the value for the "location" metadata field should
             be set the value of the fourth column.  This option can be given
             multiple times."""),
+        key=Parameter(
+            args=("--key",),
+            metavar="FORMAT",
+            doc="""A format string that specifies an annex key for the file
+            content. In this case, the file is not downloaded; instead the key
+            is used to create the file without content. The value should be
+            structured as "<backend>[-s<bytes>]--<hash>". As an example,
+            "MD5-s{size}--{md5sum}" would use the 'md5sum' and 'size' columns
+            to construct the key. Note: If the backend is an annex extension
+            backend (i.e., a backend with a trailing "E"), the key must have an
+            appropriate extension for the corresponding file name."""),
         message=Parameter(
             args=("--message",),
             metavar="MESSAGE",
@@ -830,7 +985,7 @@ class Addurls(Interface):
     @datasetmethod(name='addurls')
     @eval_results
     def __call__(dataset, urlfile, urlformat, filenameformat,
-                 input_type="ext", exclude_autometa=None, meta=None,
+                 input_type="ext", exclude_autometa=None, meta=None, key=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
                  cfg_proc=None, jobs=None, drop_after=False):
@@ -875,7 +1030,7 @@ class Addurls(Interface):
             try:
                 rows, subpaths = extract(fd, input_type,
                                          url_format, filename_format,
-                                         exclude_autometa, meta,
+                                         exclude_autometa, meta, key,
                                          dry_run,
                                          missing_value)
             except (ValueError, RequestException) as exc:
@@ -992,7 +1147,8 @@ class Addurls(Interface):
 
             subds_files_to_add = set()
             for r in _add_urls(rows, subds, repo,
-                               ifexists=ifexists, options=annex_options, drop_after=drop_after):
+                               ifexists=ifexists, options=annex_options,
+                               drop_after=drop_after, by_key=key):
                 if r["status"] == "ok":
                     subds_files_to_add.add(r["path"])
                 yield r
