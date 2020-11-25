@@ -1,3 +1,10 @@
+datalad (0.13.5-2) UNRELEASED; urgency=medium
+
+  * debian/patches/deb_no_utf8
+    - more skips and de-utf8-ing to please nd90 with elderly python 3.5
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 25 Nov 2020 18:31:59 -0500
+
 datalad (0.13.5-1) unstable; urgency=medium
 
   [ Michael Hanke ]
