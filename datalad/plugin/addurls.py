@@ -513,6 +513,49 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     return infos, list(sort_paths(subpaths))
 
 
+def _add_url(row, ds, repo, options=None, drop_after=False):
+    filename_abs = row["filename_abs"]
+    filename = row["ds_filename"]
+    try:
+        out_json = repo.add_url_to_file(filename, row["url"],
+                                        batch=True, options=options)
+    except CommandError as exc:
+        yield get_status_dict(action="addurls",
+                              ds=ds,
+                              type="file",
+                              path=filename_abs,
+                              message=exc_str(exc),
+                              status="error")
+        return
+
+    # In the case of an error, the json object has file=None.
+    if out_json["file"] is None:
+        out_json["file"] = filename_abs
+    res_addurls = annexjson2result(
+        out_json, ds, action="addurls",
+        type="file", logger=lgr)
+    yield res_addurls
+
+    if not res_addurls["status"] == "ok":
+        return
+
+    if drop_after and 'annexkey' in res_addurls:
+        # unfortunately .drop has no batched mode, and drop_key ATM would
+        # raise AssertionError if not success, and otherwise return nothing
+        try:
+            repo.drop_key(res_addurls['annexkey'], batch=True)
+            st_kwargs = dict(status="ok")
+        except (AssertionError, CommandError) as exc:
+            st_kwargs = dict(message=exc_str(exc),
+                             status="error")
+        yield get_status_dict(action="drop",
+                              ds=ds,
+                              annexkey=res_addurls['annexkey'],
+                              type="file",
+                              path=filename_abs,
+                              **st_kwargs)
+
+
 def _log_filter_addurls(res):
     return res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"]
 
@@ -521,6 +564,8 @@ def _log_filter_addurls(res):
 def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
     """Call `git annex addurl` using information in `rows`.
     """
+    add_url = partial(_add_url, ds=ds, repo=repo,
+                      drop_after=drop_after, options=options)
     add_metadata = {}
     for row in rows:
         filename_abs = row["filename_abs"]
@@ -541,44 +586,13 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None, drop_after=False):
             else:
                 lgr.debug("File %s already exists", filename_abs)
 
-        try:
-            out_json = repo.add_url_to_file(filename, row["url"],
-                                            batch=True, options=options)
-        except CommandError as exc:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  type="file",
-                                  path=filename_abs,
-                                  message=exc_str(exc),
-                                  status="error")
+        all_ok = True
+        for res in add_url(row):
+            if res["status"] != "ok":
+                all_ok = False
+            yield res
+        if not all_ok:
             continue
-
-        # In the case of an error, the json object has file=None.
-        if out_json["file"] is None:
-            out_json["file"] = filename_abs
-        res_addurls = annexjson2result(
-            out_json, ds, action="addurls",
-            type="file", logger=lgr)
-        yield res_addurls
-
-        if not res_addurls["status"] == "ok":
-            continue
-
-        if drop_after and 'annexkey' in res_addurls:
-            # unfortunately .drop has no batched mode, and drop_key ATM would
-            # raise AssertionError if not success, and otherwise return nothing
-            try:
-                repo.drop_key(res_addurls['annexkey'], batch=True)
-                st_kwargs = dict(status="ok")
-            except (AssertionError, CommandError) as exc:
-                st_kwargs = dict(message=exc_str(exc),
-                                  status="error")
-            yield get_status_dict(action="drop",
-                                  ds=ds,
-                                  annexkey=res_addurls['annexkey'],
-                                  type="file",
-                                  path=filename_abs,
-                                  **st_kwargs)
 
         if row.get("meta_args"):
             add_metadata[filename] = row["meta_args"]
