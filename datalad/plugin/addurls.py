@@ -824,7 +824,8 @@ class Addurls(Interface):
         lgr = logging.getLogger("datalad.plugin.addurls")
 
         ds = require_dataset(dataset, check_installed=False)
-        if ds.repo and not isinstance(ds.repo, AnnexRepo):
+        repo = ds.repo
+        if repo and not isinstance(repo, AnnexRepo):
             yield get_status_dict(action="addurls",
                                   ds=ds,
                                   status="error",
@@ -895,7 +896,7 @@ class Addurls(Interface):
                                   message="dry-run finished")
             return
 
-        if not ds.repo:
+        if not repo:
             # Populate a new dataset with the URLs.
             yield from ds.create(
                 result_xfm=None,
