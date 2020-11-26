@@ -270,7 +270,7 @@ Last-Update: 2018-06-05
      slow,
      swallow_logs,
      with_tempfile,
-@@ -368,13 +370,17 @@ def check_target_ssh_recursive(use_ssh,
+@@ -368,13 +370,19 @@ def check_target_ssh_recursive(use_ssh,
  
          remote_name = 'remote-' + str(flat)
          with chpwd(source.path):
@@ -289,13 +289,15 @@ Last-Update: 2018-06-05
 +                    recursive=True,
 +                    ui=True)
 +            except UnicodeDecodeError:
-+                if sys.version_info < (3, 6):
++                # 3.5 on nd90
++                # 3.6 on nd18.04
++                if sys.version_info < (3, 7):
 +                    raise SkipTest("unicode fiasco")
 +                raise
          # raise if git repos were not created
          for suffix in [sep + 'subm 1', sep + '2', '']:
              target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
-@@ -531,7 +537,12 @@ def check_replace_and_relative_sshpath(u
+@@ -531,7 +539,12 @@ def check_replace_and_relative_sshpath(u
      ds = Dataset(src_path).create()
      create_tree(ds.path, {'sub.dat': 'lots of data'})
      ds.save('sub.dat')
