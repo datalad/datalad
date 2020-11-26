@@ -418,13 +418,18 @@ class TestAddurls(object):
         cls._hpath.start()
         cls.url = cls._hpath.url
 
+        cls.data = [{"url": cls.url + "udir/a.dat",
+                     "name": "a",
+                     "subdir": "foo"},
+                    {"url": cls.url + "udir/b.dat",
+                     "name": "b",
+                     "subdir": "bar"},
+                    {"url": cls.url + "udir/c.dat",
+                     "name": "c",
+                     "subdir": "foo"}]
         cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
         with open(cls.json_file, "w") as jfh:
-            json.dump(
-                [{"url": cls.url + "udir/a.dat", "name": "a", "subdir": "foo"},
-                 {"url": cls.url + "udir/b.dat", "name": "b", "subdir": "bar"},
-                 {"url": cls.url + "udir/c.dat", "name": "c", "subdir": "foo"}],
-                jfh)
+            json.dump(cls.data, jfh)
 
     @classmethod
     def teardown_class(cls):
