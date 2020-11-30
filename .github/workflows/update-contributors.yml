@@ -70,10 +70,10 @@ jobs:
              git commit -a -m "Automated deployment to update contributors $(date '+%Y-%m-%d')"
              git push origin "${BRANCH_FROM}"
           fi
-          echo "::set-env name=OPEN_PULL_REQUEST::${OPEN_PULL_REQUEST}"
-          echo "::set-env name=PULL_REQUEST_FROM_BRANCH::${BRANCH_FROM}"
-          echo "::set-env name=PULL_REQUEST_TITLE::[tributors] ${BRANCH_FROM}"
-          echo "::set-env name=PULL_REQUEST_BODY::Tributors update automated pull request."
+          echo "OPEN_PULL_REQUEST=${OPEN_PULL_REQUEST}" >> $GITHUB_ENV
+          echo "PULL_REQUEST_FROM_BRANCH=${BRANCH_FROM}" >> $GITHUB_ENV
+          echo "PULL_REQUEST_TITLE=[tributors] ${BRANCH_FROM}" >> $GITHUB_ENV
+          echo "PULL_REQUEST_BODY=Tributors update automated pull request." >> $GITHUB_ENV
 
       - name: Open Pull Request
         uses: vsoch/pull-request-action@1.0.6
