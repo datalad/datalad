@@ -165,10 +165,6 @@ matrix:
     - https_proxy=
     - _DL_CRON=1
   - python: 3.5
-    env:
-    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
-    - _DL_CRON=1
-  - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
