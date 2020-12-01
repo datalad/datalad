@@ -244,6 +244,7 @@ before_install:
   - eval source tools/ci/install-annex.sh --adjust-bashrc ${_DL_ANNEX_INSTALL_SCENARIO}
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
+  - pip install --upgrade pip
 
 install:
   - git config --global user.email "test@travis.land"
