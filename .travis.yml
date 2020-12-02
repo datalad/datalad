@@ -164,10 +164,6 @@ matrix:
     - https_proxy=
     - _DL_CRON=1
   - python: 3.6
-    env:
-    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
-    - _DL_CRON=1
-  - python: 3.6
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
@@ -248,6 +244,7 @@ before_install:
   - source new.env
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
+  - pip install --upgrade pip
 
 install:
   - git config --global user.email "test@travis.land"
