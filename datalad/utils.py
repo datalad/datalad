@@ -2454,7 +2454,7 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
 def quote_cmdlinearg(arg):
     """Perform platform-appropriate argument quoting"""
     # https://stackoverflow.com/a/15262019
-    return '"{}"'.format(
+    return '{}'.format(
         arg.replace('"', '""')
     ) if on_windows else shlex_quote(arg)
 
