@@ -527,8 +527,9 @@ def test_installationpath_from_url():
 def test_expanduser(srcpath, destpath):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
-
-    with chpwd(destpath), patch.dict('os.environ', {'HOME': srcpath}):
+   
+    with chpwd(destpath), patch.dict('os.environ', {'USERPROFILE' if on_windows else 
+                                                    'HOME': srcpath}):
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
         assert_result_count(res, 1)
