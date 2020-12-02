@@ -512,7 +512,6 @@ def test_expanduser(srcpath, destpath):
    
     with chpwd(destpath), patch.dict('os.environ', {'USERPROFILE' if on_windows else 
                                                     'HOME': srcpath}):
-        
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
         assert_result_count(res, 1)
