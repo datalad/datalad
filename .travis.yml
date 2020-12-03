@@ -54,14 +54,14 @@ matrix:
     env:
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
-  - python: 3.6
+  - if: type = cron
+    python: 3.6
     # Single run for Python 3.6
     env:
     # Run all tests in a single whoop here
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
-    - _DL_CRON=1
   - python: 3.5
     # Split runs for v6 since a single one is too long now
     env:
@@ -132,65 +132,65 @@ matrix:
   # run with minimal supported git-annex version as defined in AnnexRepo.GIT_ANNEX_MIN_VERSION
   # TODO: ATM we do not have that minimal version as a Debian package in
   # snapshots!
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     env:
     - _DL_ANNEX_INSTALL_SCENARIO="deb-url http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb"
-    - _DL_CRON=1
   # Run with git's master branch rather the default one on the system.
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
-    - _DL_CRON=1
   # Run with our reported minimum Git version.
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_MIN_GIT=1
     - PATH="$PWD/git-src/bin-wrappers/:$PATH"
-    - _DL_CRON=1
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
-    - _DL_CRON=1
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
-    - _DL_CRON=1
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
-    - _DL_CRON=1
-#  - python: 3.5
+#  - if: type = cron
+#    python: 3.5
 #    # test whether known v6 failures still fail
 #    env:
 #    - DATALAD_REPO_VERSION=6
 #    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
-#    - _DL_CRON=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
-  - python: 3.5
+  - if: type = cron
+    python: 3.5
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
-    - _DL_CRON=1
 #  # test whether known v6 failures still fail
-#  - env:
+#  - if: type = cron
+#    env:
 #    - DATALAD_REPO_VERSION=6
 #    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
-#    - _DL_CRON=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -201,12 +201,6 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - if [ ! -z "${_DL_CRON:-}" ]; then
-      if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
-        echo "Exiting since should only be ran on a weekly basis by cron!";
-        exit 0;
-      fi
-    fi
   - NOSE_OPTS=( )
   # If we requested to run only not slow (typically <10sec) tests, fail if a test
   # takes 3x more than that - it needs to get @slow or @turtle annotation
@@ -285,7 +279,7 @@ script:
 
 after_success:
   # submit only what we have covered in the PRs
-  - if [ -z "${_DL_CRON:-}" ]; then
+  - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
       cd __testhome__;
       coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
