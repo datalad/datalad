@@ -444,16 +444,13 @@ class TestAddurls(object):
 
         # Ignore this check if we're faking dates because that disables
         # batch mode.
-        if not dl_cfg.get('datalad.fake-dates'):
-            if not on_windows:
-                # We should have two new commits on the git-annex: one for the
-                # added urls and one for the added metadata.
-                eq_(n_annex_commits + 2, get_annex_commit_counts())
-            else:
-                # For unknown reasons (TODO/FIXME) the git-annex branch has
-                # two extra commits (the commit with three metadata changes 
-                # is represented as three individual commits)
-                eq_(n_annex_commits + 2 + 2, get_annex_commit_counts())
+        # Also ignore if on Windows as it seems as if a git-annex bug 
+        # leads to separate meta data commits: 
+        # https://github.com/datalad/datalad/pull/5202#discussion_r535429704
+        if not (dl_cfg.get('datalad.fake-dates') or on_windows):
+            # We should have two new commits on the git-annex: one for the
+            # added urls and one for the added metadata.
+            eq_(n_annex_commits + 2, get_annex_commit_counts())
 
         # Add to already existing links, overwriting.
         with swallow_logs(new_level=logging.DEBUG) as cml:
