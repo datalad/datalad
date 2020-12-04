@@ -253,14 +253,14 @@ def test_extract():
         filename_format="{age_group}//{now_dead}//{name}.csv")
 
     eq_(subpaths,
-        ["adult", "kid", "adult/no", "adult/yes", "kid/no"])
+        ["adult", "kid", op.join("adult", "no"), op.join("adult", "yes"), op.join("kid", "no")])
 
     eq_([d["url"] for d in info],
         ["will_1.com", "bob_2.com", "scott_1.com", "max_2.com"])
 
     eq_([d["filename"] for d in info],
-        ["kid/no/will.csv", "adult/yes/bob.csv",
-         "adult/no/scott.csv", "kid/no/max.csv"])
+        [op.join("kid", "no", "will.csv"), op.join("adult", "yes", "bob.csv"),
+         op.join("adult", "no", "scott.csv"), op.join("kid", "no", "max.csv")])
 
     expects = [{"name": "will", "age_group": "kid", "debut_season": "1",
                 "now_dead": "no"},
@@ -274,7 +274,7 @@ def test_extract():
         assert_dict_equal(d["meta_args"], expect)
 
     eq_([d["subpath"] for d in info],
-        ["kid/no", "adult/yes", "adult/no", "kid/no"])
+        [op.join("kid", "no"), op.join("adult", "yes"), op.join("adult", "no"), op.join("kid", "no")])
 
 
 def test_extract_disable_autometa():
