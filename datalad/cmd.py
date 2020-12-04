@@ -463,13 +463,6 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        # rescue any event-loop to be able to reassign after we are done
-        # with our own event loop management
-        # this is how ipython does it
-        try:
-            old_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            old_loop = None
         # start a new event loop, which we will close again further down
         # if this is not done events like this will occur
         #   BlockingIOError: [Errno 11] Resource temporarily unavailable
@@ -496,12 +489,12 @@ class WitlessRunner(object):
                     env=env,
                 )
             )
+        finally:
+            # be kind to callers and leave asyncio as we found it
+            asyncio.set_event_loop(None)
             # terminate the event loop, cannot be undone, hence we start a fresh
             # one each time (see BlockingIOError notes above)
             event_loop.close()
-        finally:
-            # be kind to callers and leave asyncio as we found it
-            asyncio.set_event_loop(old_loop)
 
         # log before any exception is raised
         lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
