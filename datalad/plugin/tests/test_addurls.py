@@ -48,6 +48,7 @@ from datalad.tests.utils import (
     swallow_logs,
     with_tempfile,
     with_tree,
+    DEFAULT_BRANCH,
 )
 from datalad.utils import get_tempfile_kwargs, rmtemp
 from datalad import cfg as dl_cfg
@@ -463,9 +464,11 @@ class TestAddurls(object):
         # Python API, and it will be the one saved in commit
         # message record
         json_file = op.relpath(self.json_file, ds.path)
+
         ds.addurls(json_file, "{url}", "{name}",
                    exclude_autometa="(md5sum|size)")
-        ok_startswith(ds.repo.format_commit('%b'), f"url_file='{json_file}'")
+        ok_startswith(ds.repo.format_commit('%b', DEFAULT_BRANCH), f"url_file='{json_file}'")
+
         filenames = ["a", "b", "c"]
         for fname in filenames:
             ok_exists(op.join(ds.path, fname))
