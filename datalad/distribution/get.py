@@ -512,9 +512,6 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                  refds_path=None, description=None, jobs=None, producer_only=False):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
-    if jobs == "auto":
-        # be safe -- there might be ssh logins etc. So no parallel
-        jobs = 0
     # install using helper that give some flexibility regarding where to
     # get the module from
 

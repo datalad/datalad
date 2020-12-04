@@ -859,7 +859,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         srs = {}
         try:
             for line in self.call_git_items_(
-                    ['cat-file', 'blob', 'git-annex:remote.log']):
+                    ['cat-file', 'blob', 'git-annex:remote.log'],
+                    read_only=True):
                 # be precise and split by spaces
                 fields = line.split(' ')
                 # special remote UUID

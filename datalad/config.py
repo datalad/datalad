@@ -9,6 +9,7 @@
 """
 """
 
+import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
 import datalad
@@ -176,10 +177,17 @@ class ConfigManager(object):
 
     _checked_git_identity = False
 
+    # Lock for running changing operation across multiple threads.
+    # Since config itself to the same path could
+    # potentially be created independently in multiple threads, and we might be
+    # modifying global config as well, making lock static should not allow more than
+    # one thread to  write at a time, even if to different repositories.
+    _run_lock = threading.Lock()
+
     def __init__(self, dataset=None, overrides=None, source='any'):
         if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
-                'Unkown ConfigManager(source=) setting: {}'.format(source))
+                'Unknown ConfigManager(source=) setting: {}'.format(source))
         store = dict(
             # store in a simple dict
             # no subclassing, because we want to be largely read-only, and implement
@@ -698,7 +706,7 @@ class ConfigManager(object):
             lockfile = Path(self.obtain('datalad.locations.cache')) \
                 / 'locks' / 'gitconfig.lck'
 
-        with InterProcessLock(lockfile, logger=lgr):
+        with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)
 
         if reload:
