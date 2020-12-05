@@ -24,6 +24,7 @@ from datalad.plugin.wtf import _HIDDEN
 from datalad.version import __version__
 
 from ..wtf import SECTION_CALLABLES
+from ...utils import Path
 
 from datalad.utils import assure_unicode
 from datalad.tests.utils import (
@@ -184,7 +185,7 @@ def test_no_annex(path):
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed
     eq_([opj('code', 'inannex')],
-        ds.repo.get_annexed_files())
+        [str(Path(p)) for p in ds.repo.get_annexed_files()])
 
 
 _ds_template = {
