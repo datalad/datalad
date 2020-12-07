@@ -2233,17 +2233,25 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if not read_only and self.fake_dates_enabled:
             env = self.add_fake_dates(runner.env)
 
+        protocol = StdOutErrCapture
         out = err = None
         try:
             if not read_only:
                 self._write_lock.acquire()
-            out, err = run_gitcommand_on_file_list_chunks(
-                self._git_runner.run,
-                cmd,
-                files,
-                protocol=StdOutErrCapture,
-                env=env,
-            )
+            if files:
+                # only call the wrapper if needed (adds distraction logs
+                # otherwise, and also maintains the possibility to connect
+                # stdin in the future)
+                res = runner.run_on_filelist_chunks(
+                    cmd,
+                    files,
+                    protocol=protocol,
+                    env=env)
+            else:
+                res = runner.run(
+                    cmd,
+                    protocol=protocol,
+                    env=env)
         except CommandError as e:
             ignored = re.search(GitIgnoreError.pattern, e.stderr)
             if ignored:
@@ -2257,6 +2265,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if not read_only:
                 self._write_lock.release()
 
+        out = res['stdout']
+        err = res['stderr']
         if err:
             for line in err.splitlines():
                 lgr.log(stderr_log_level,
