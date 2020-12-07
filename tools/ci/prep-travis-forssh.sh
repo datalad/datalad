@@ -23,6 +23,11 @@ StrictHostKeyChecking no
 IdentityFile /tmp/dl-test-ssh-id
 EOF
 
+ls -l "$HOME/.ssh"
+chmod go-rwx -R "$HOME/.ssh"
+ls -ld "$HOME/.ssh"
+ls -l "$HOME/.ssh"
+
 ssh-keygen -f /tmp/dl-test-ssh-id -N ""
 
 curl -fSsL \
