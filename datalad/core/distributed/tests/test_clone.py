@@ -362,9 +362,23 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
     if annex:
-        # the standard setup keeps the annex locks accessible to the user only
-        nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-             & stat.S_IWGRP)
+        if ds.repo.git_annex_version < "8.20200908":
+            # TODO: Drop when GIT_ANNEX_MIN_VERSION is at least 8.20200908.
+
+            # the standard setup keeps the annex locks accessible to the user only
+            nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP)
+        else:
+            # umask might be such (e.g. 002) that group write permissions are inherited, so
+            # for the next test we should check if that is the case on some sample file
+            dltmp_path = ds.pathobj / '.git' / "dltmp"
+            dltmp_path.write_text('')
+            default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
+            dltmp_path.unlink()
+            # the standard setup keeps the annex locks following umask inheritance
+            eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP, default_grp_write_perms)
+
         # but we can set it up for group-shared access too
         sharedds = clone(
             src, sharedpath,
