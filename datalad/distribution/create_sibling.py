@@ -795,7 +795,7 @@ class CreateSibling(Interface):
             lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
                 shell("cd {} "
-                      "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                      "&& ( [ -x hooks/post-update ] && hooks/post-update || true )"
                       "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
