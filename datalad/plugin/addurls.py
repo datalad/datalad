@@ -836,9 +836,10 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None,
             assert not repo.always_commit
             for a in repo.set_metadata_(filename, add=meta):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
-                # Don't show all added metadata for the file because that
-                # could quickly flood the output.
-                del res["message"]
+                if res["status"] == "ok":
+                    # Don't show all added metadata for the file because that
+                    # could quickly flood the output.
+                    del res["message"]
                 yield res
 
 
