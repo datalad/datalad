@@ -1090,19 +1090,17 @@ class Addurls(Interface):
 
         ds = require_dataset(dataset, check_installed=False)
         repo = ds.repo
+        st_dict = get_status_dict(action="addurls", ds=ds)
         if repo and not isinstance(repo, AnnexRepo):
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="error",
-                                  message="not an annex repo")
+            yield dict(st_dict, status="error", message="not an annex repo")
             return
 
         if key and key.startswith("et:") and \
            external_versions["cmd:annex"] < "8.20201116":
-            yield get_status_dict(
-                action="addurls", ds=ds, status="error",
-                message=("et: prefix of `key` option requires "
-                         "git-annex 8.20201116 or later"))
+            yield dict(st_dict,
+                       status="error",
+                       message=("et: prefix of `key` option requires "
+                                "git-annex 8.20201116 or later"))
             return
 
         if url_file != "-":
@@ -1129,28 +1127,21 @@ class Addurls(Interface):
                                          dry_run,
                                          missing_value)
             except (ValueError, RequestException) as exc:
-                yield get_status_dict(action="addurls",
-                                      ds=ds,
-                                      status="error",
-                                      message=exc_str(exc))
+                yield dict(st_dict, status="error", message=exc_str(exc))
                 return
         finally:
             if fd is not sys.stdin:
                 fd.close()
 
         if not rows:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="notneeded",
-                                  message="No rows to process")
+            yield dict(st_dict, status="notneeded",
+                       message="No rows to process")
             return
 
         if len(rows) != len(set(row["filename"] for row in rows)):
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="error",
-                                  message=("There are file name collisions; "
-                                           "consider using {_repindex}"))
+            yield dict(st_dict, status="error",
+                       message=("There are file name collisions; "
+                                "consider using {_repindex}"))
             return
 
         if dry_run:
@@ -1165,10 +1156,7 @@ class Addurls(Interface):
                     lgr.info("Metadata: %s",
                              sorted(u"{}={}".format(k, v)
                                     for k, v in row["meta_args"].items()))
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="ok",
-                                  message="dry-run finished")
+            yield dict(st_dict, status="ok", message="dry-run finished")
             return
 
         if not repo:
