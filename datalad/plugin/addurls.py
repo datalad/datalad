@@ -716,9 +716,9 @@ class RegisterUrl(object):
             self.registerurl(key, row["url"])
             res = self.fromkey(key, filename)
         except CommandError as exc:
-                yield dict(self._err_res,
-                           path=row["filename_abs"],
-                           message=exc_str(exc))
+            yield dict(self._err_res,
+                       path=row["filename_abs"],
+                       message=exc_str(exc))
         else:
             yield dict(
                 annexjson2result(res, self.ds, type="file", logger=lgr),
