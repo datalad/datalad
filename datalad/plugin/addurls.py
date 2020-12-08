@@ -720,10 +720,10 @@ class RegisterUrl(object):
                        path=row["filename_abs"],
                        message=exc_str(exc))
         else:
-            yield dict(
-                annexjson2result(res, self.ds, type="file", logger=lgr),
-                message="registered URL",
-                action="addurls")
+            res = annexjson2result(res, self.ds, type="file", logger=lgr)
+            if not res.get("message"):
+                res["message"] = "registered URL"
+            yield res
 
 
 # Note: If any other modules end up needing these batch operations, this should
