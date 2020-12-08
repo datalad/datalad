@@ -44,6 +44,7 @@ from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     ensure_list,
     get_suggestions_msg,
+    Path,
     unlink,
 )
 
@@ -684,6 +685,7 @@ class RegisterUrl(object):
         self.repo = repo or ds.repo
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
+        self.use_pointer = repo.is_managed_branch()
 
     def examinekey(self, parsed_key, filename, migrate=False):
         opts = []
@@ -699,32 +701,53 @@ class RegisterUrl(object):
     def registerurl(self, key, url):
         self.repo._run_annex_command("registerurl", annex_options=[key, url])
 
+    def _write_pointer(self, row, ek_info):
+        try:
+            fname = Path(row["filename_abs"])
+            fname.parent.mkdir(exist_ok=True, parents=True)
+            fname.write_text(ek_info["objectpointer"])
+        except Exception as exc:
+            message = exc_str(exc)
+            status = "error"
+        else:
+            message = "registered URL"
+            status = "ok"
+        return get_status_dict(action="addurls", ds=self.ds, type="file",
+                               status=status, message=message)
+
     def __call__(self, row):
         filename = row["ds_filename"]
         try:
             parsed_key = row["key"]
-            if "target_backend" in parsed_key:
-                ek_info = self.examinekey(parsed_key, filename, migrate=True)
-                if ek_info:
-                    key = ek_info["key"]
-                else:
+            migrate = "target_backend" in parsed_key
+            use_pointer = self.use_pointer
+            ek_info = None
+            if use_pointer or migrate:
+                ek_info = self.examinekey(parsed_key, filename,
+                                          migrate=migrate)
+                if not ek_info:
                     yield dict(self._err_res,
                                path=row["filename_abs"],
                                message=("Failed to get information for %s",
                                         parsed_key))
                     return
+                key = ek_info["key"]
             else:
                 key = parsed_key["key"]
+
             self.registerurl(key, row["url"])
-            res = self.fromkey(key, filename)
+            if use_pointer:
+                res = self._write_pointer(row, ek_info)
+            else:
+                res = annexjson2result(self.fromkey(key, filename),
+                                       self.ds, type="file", logger=lgr)
+                if not res.get("message"):
+                    res["message"] = "registered URL"
         except CommandError as exc:
             yield dict(self._err_res,
                        path=row["filename_abs"],
                        message=exc_str(exc))
         else:
-            res = annexjson2result(res, self.ds, type="file", logger=lgr)
-            if not res.get("message"):
-                res["message"] = "registered URL"
             yield res
 
 
@@ -1095,13 +1118,19 @@ class Addurls(Interface):
             yield dict(st_dict, status="error", message="not an annex repo")
             return
 
-        if key and key.startswith("et:") and \
-           external_versions["cmd:annex"] < "8.20201116":
-            yield dict(st_dict,
-                       status="error",
-                       message=("et: prefix of `key` option requires "
-                                "git-annex 8.20201116 or later"))
-            return
+        if key:
+            old_examinekey = external_versions["cmd:annex"] < "8.20201116"
+            if old_examinekey:
+                old_msg = None
+                if key.startswith("et:"):
+                    old_msg = ("et: prefix of `key` option requires "
+                               "git-annex 8.20201116 or later")
+                elif repo.is_managed_branch():
+                    old_msg = ("Using `key` option on adjusted branch "
+                               "requires git-annex 8.20201116 or later")
+                if old_msg:
+                    yield dict(st_dict, status="error", message=old_msg)
+                    return
 
         if url_file != "-":
             url_file = str(resolve_path(url_file, dataset))
