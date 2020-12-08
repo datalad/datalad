@@ -685,9 +685,11 @@ class RegisterUrl(object):
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
 
-    def examinekey(self, parsed_key, filename):
-        opts = ["--migrate-to-backend=" + parsed_key["target_backend"],
-                "--filename=" + filename, parsed_key["key"]]
+    def examinekey(self, parsed_key, filename, migrate=False):
+        opts = []
+        if migrate:
+            opts.append("--migrate-to-backend=" + parsed_key["target_backend"])
+        opts.extend(["--filename=" + filename, parsed_key["key"]])
         return self.repo._run_annex_command_json("examinekey", opts=opts)[0]
 
     def fromkey(self, key, filename):
@@ -702,7 +704,7 @@ class RegisterUrl(object):
         try:
             parsed_key = row["key"]
             if "target_backend" in parsed_key:
-                ek_info = self.examinekey(parsed_key, filename)
+                ek_info = self.examinekey(parsed_key, filename, migrate=True)
                 if ek_info:
                     key = ek_info["key"]
                 else:
@@ -749,8 +751,11 @@ class BatchedRegisterUrl(RegisterUrl):
             self._batch_commands[command] = bcmd
         return bcmd(batch_input)
 
-    def examinekey(self, parsed_key, filename):
-        opts = ["--migrate-to-backend=" + parsed_key["target_backend"]]
+    def examinekey(self, parsed_key, filename, migrate=False):
+        if migrate:
+            opts = ["--migrate-to-backend=" + parsed_key["target_backend"]]
+        else:
+            opts = None
         return self._batch("examinekey", (parsed_key["key"], filename),
                            json=True, batch_options=opts)
 
