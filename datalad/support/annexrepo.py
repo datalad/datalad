@@ -2249,7 +2249,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             files_arg = files
 
-        json_objects = self._call_annex_records(cmd, files=files_arg)
+        try:
+            json_objects = self._call_annex_records(cmd, files=files_arg)
+        except CommandError as e:
+            if e.stderr.startswith('Invalid'):
+                # would happen when git-annex is called with incompatible options
+                raise
+            # whereis may exit non-zero when there are too few known copies
+            # callers of whereis are interested in exactly that information,
+            # which we deliver via result, not via exception
+            json_objects = e.kwargs.get('stdout_json', [])
+
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
@@ -2703,11 +2713,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         #    args.append('--incremental')
         #    if not (incremental is True):
         #        args.append('--incremental-schedule={}'.format(incremental))
-        return self._call_annex_records(
-            ['fsck'] + args,
-            files=paths,
-            git_options=git_options,
-        )
+        try:
+            return self._call_annex_records(
+                ['fsck'] + args,
+                files=paths,
+                git_options=git_options,
+            )
+        except CommandError as e:
+            # fsck may exit non-zero when there are too few known copies
+            # callers of whereis are interested in exactly that information,
+            # which we deliver via result, not via exception
+            return e.kwargs.get('stdout_json', [])
 
     # We need --auto and --fast having exposed  TODO
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
