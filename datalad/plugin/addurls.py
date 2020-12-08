@@ -1095,9 +1095,11 @@ class Addurls(Interface):
 
         if key and key.startswith("et:") and \
            external_versions["cmd:annex"] < "8.20201116":
-            lgr.warning("et: prefix of `key` option requires "
-                        "git-annex 8.20201116 or later. Ignoring.")
-            key = None
+            yield get_status_dict(
+                action="addurls", ds=ds, status="error",
+                message=("et: prefix of `key` option requires "
+                         "git-annex 8.20201116 or later"))
+            return
 
         if url_file != "-":
             url_file = str(resolve_path(url_file, dataset))
