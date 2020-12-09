@@ -812,6 +812,9 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self, path):
         ds = Dataset(path).create(force=True)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
         data = self.data.copy()
         for row in data:
             if row["name"] == "b":
