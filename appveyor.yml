@@ -78,6 +78,8 @@ install:
   - python -c "import sys; print(sys.path)"
   # cannot do full, e.g. because libxmp is N/A, causes unguarded ERRORs
   #- pip install ".[full]"
+  # Resolves crash from python -m coverage xml
+  - conda install -c conda-forge sqlite
   - pip install ".[tests]"
   - pip install ".[devel-utils]"
   # fixup
