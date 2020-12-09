@@ -74,7 +74,7 @@ class CreateSiblingGithub(Interface):
     We will first consult Git configuration *hub.oauthtoken* for tokens possibly
     available there, and then from the system credential store.
 
-    If you provide [PY: `github_login` PY][CMD: --github-login NAME]),
+    If you provide [PY: `github_login` PY][CMD: --github-login NAME CMD],
     we will consider only tokens associated with that GitHub login from
     *hub.oauthtoken*, and store/check the token in credential store as associated
     with that specific login name.
