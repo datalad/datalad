@@ -27,10 +27,7 @@ env:
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
-    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 7.20190819"
-  matrix:
-##1    - DATALAD_REPO_VERSION=6
-    - DATALAD_REPO_VERSION=5
+    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 8.20201007"
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
@@ -65,14 +62,14 @@ matrix:
   - python: 3.5
     # Split runs for v6 since a single one is too long now
     env:
-    - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 7.20190819"
   - python: 3.5
     env:
-    - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=""
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 7.20190819"
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
