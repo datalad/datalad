@@ -106,11 +106,11 @@ test_script:
   # ImportError: DLL load failed: %1 is not a valid Win32 application
   #- python -m coverage xml
 
-#after_test:
-#  - ps: |
-#      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
-#      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
-#      bash codecov.sh -f "coverage.xml"
+after_test:
+  - ps: |
+      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+      bash codecov.sh -f "coverage.xml"
 
 on_finish:
   # enable the next to let the build VM block for up to 60min to log in via RDP and debug
