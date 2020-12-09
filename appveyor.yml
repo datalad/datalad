@@ -101,10 +101,7 @@ test_script:
   # perform selected tests for this matrix run
   - python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad %TEST_SELECTION%
   # prepare coverage.xml in a separate invocation.  If invoked directly with nose - do not include test_ files themselves
-  # crashes with:
-  #     from _sqlite3 import *
-  # ImportError: DLL load failed: %1 is not a valid Win32 application
-  #- python -m coverage xml
+  - python -m coverage xml
 
 after_test:
   - ps: |
