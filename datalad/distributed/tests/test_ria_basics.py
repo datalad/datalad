@@ -369,7 +369,7 @@ def _test_version_check(host, dspath, store):
 
     # TODO: use self.annex.error in special remote and see whether we get an
     #       actual error result
-    assert_raises(IncompleteResultsError,
+    assert_raises(CommandError,
                   ds.repo.copy_to, 'new_file', 'store')
 
     # However, we can force it by configuration

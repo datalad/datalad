@@ -2434,13 +2434,13 @@ def test_save_noperms(path):
         raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
 
     try:
-        res = repo.save(paths=['file1'])
-
+        repo.save(paths=['file1'])
+    except CommandError as exc:
+        res = exc.kwargs["stdout_json"]
         assert_result_count(res, 1)
-        assert_result_count(
-            res, 1, type='file', path=repo.pathobj / 'file1', action='add', status='error'
-        )
-        assert_in('permission denied', res[0]['message'])
+        assert_result_count(res, 1, file='file1',
+                            command='add', success=False)
+        assert_in('permission denied', res[0]['error-messages'][0])
     finally:
         sudochown(['-R', str(os.geteuid()), repo.path])
 
