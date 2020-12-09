@@ -45,6 +45,7 @@ class Credential(object):
     _FIELDS = None
     _KNOWN_ATTRS = {
         'hidden',    # UI should not display the value
+        'repeat',    # UI should repeat entry or not. Set to False to override default logic
         'optional',  # Not mandatory thus not requested if not set
     }
 
@@ -81,9 +82,6 @@ class Credential(object):
     def _is_field_optional(self, f):
         return self._FIELDS[f].get('optional', False)
 
-    def _is_field_hidden(self, f):
-        return self._FIELDS[f].get('hidden', False)
-
     @property
     def is_known(self):
         """Return True if values for all fields of the credential are known"""
@@ -101,10 +99,17 @@ class Credential(object):
                   (" %s provides information on how to gain access"
                    % self.url if self.url else ''))
 
+        # provide custom options only if set for the field
+        f_props = self._FIELDS[f]
+        kwargs = {}
+        for p in ('hidden', 'repeat'):
+            if p in f_props:
+                kwargs[p] = f_props[p]
         return ui.question(
             f,
             title=msg,
-            hidden=self._is_field_hidden(f))
+            **kwargs
+        )
 
     def _ask_and_set(self, f, instructions=None):
         v = self._ask_field_value(f, instructions=instructions)
@@ -191,7 +196,7 @@ class UserPassword(Credential):
 class Token(Credential):
     """Simple type of a credential which provides a single token"""
 
-    _FIELDS = OrderedDict([('token', {'hidden': True})])
+    _FIELDS = OrderedDict([('token', {'hidden': True, 'repeat': False})])
 
     is_expired = False  # no expiration provisioned
 
@@ -199,8 +204,8 @@ class Token(Credential):
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
 
-    _FIELDS = OrderedDict([('key_id', {}),
-                           ('secret_id', {'hidden': True}),
+    _FIELDS = OrderedDict([('key_id', {'repeat': False}),
+                           ('secret_id', {'hidden': True, 'repeat': False}),
                            ('session', {'optional': True}),
                            ('expiration', {'optional': True}),
                            ])
