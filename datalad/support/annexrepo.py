@@ -886,7 +886,11 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _call_annex(self, args, files=None, jobs=None, protocol=StdOutErrCapture,
                     git_options=None, stdin=None, merge_annex_branches=True,
                     **kwargs):
-        """Run git-annex commands
+        """Internal helper to run git-annex commands
+
+        Standard command options are applied in addition to the given arguments,
+        and certain error conditions are detected (if possible) and dedicated
+        exceptions are raised.
 
         Parameters
         ----------
@@ -905,7 +909,9 @@ class AnnexRepo(GitRepo, RepoInterface):
           StdOutErrCapture, which will provide default logging behavior and
           guarantee that stdout/stderr are included in potential CommandError
           exception.
-        git_options:
+        git_options: list, optional
+          Additional arguments for Git to include in the git-annex call
+          (in a position prior to the 'annex' subcommand.
         stdin: File-like, optional
           stdin to connect to the git-annex process. Only used when `files`
           is None.
@@ -913,6 +919,28 @@ class AnnexRepo(GitRepo, RepoInterface):
           If False, annex.merge-annex-branches=false config will be set for
           git-annex call.  Useful for operations which are not intended to
           benefit from updating information about remote git-annexes
+        **kwargs:
+          Additional arguments are passed on to the WitlessProtocol constructor
+
+        Returns
+        -------
+        dict
+          Return value of WitlessRunner.run(). The content of the dict is
+          determined by the given `protocol`. By default, it provides git-annex's
+          stdout and stderr (under these key names)
+
+        Raises
+        ------
+        CommandError
+          If the call exits with a non-zero status.
+
+        OutOfSpaceError
+          If a corresponding statement was detected in git-annex's output on
+          stderr. Only supported if the given protocol captured stderr.
+
+        RemoteNotAvailableError
+          If a corresponding statement was detected in git-annex's output on
+          stderr. Only supported if the given protocol captured stderr.
         """
         if self.git_annex_version is None:
             self._check_git_annex_version()
@@ -1016,6 +1044,45 @@ class AnnexRepo(GitRepo, RepoInterface):
                             merge_annex_branches=True,
                             progress=False,
                             **kwargs):
+        """Internal helper to run git-annex commands with JSON result processing
+
+        `_call_annex()` is used for git-annex command execution, using
+        AnnexJsonProtocol.
+
+        Parameters
+        ----------
+        args: list
+          See `_call_annex()` for details.
+        files: list, optional
+          See `_call_annex()` for details.
+        jobs : int or 'auto', optional
+          See `_call_annex()` for details.
+        git_options: list, optional
+          See `_call_annex()` for details.
+        stdin: File-like, optional
+          See `_call_annex()` for details.
+        merge_annex_branches: bool, optional
+          See `_call_annex()` for details.
+        **kwargs:
+          Additional arguments are passed on to the AnnexJsonProtocol constructor
+
+        Returns
+        -------
+        list(dict)
+          List of parsed result records.
+
+        Raises
+        ------
+        CommandError
+          See `_call_annex()` for details.
+        OutOfSpaceError
+          See `_call_annex()` for details.
+        RemoteNotAvailableError
+          See `_call_annex()` for details.
+        RuntimeError
+          Output from the git-annex process was captured, but no structured
+          records could be parsed.
+        """
         if protocol is None:
             protocol = AnnexJsonProtocol
 
@@ -1144,12 +1211,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         list(dict)
+          List of parsed result records.
 
         Raises
         ------
         CommandError if the call exits with a non-zero status. All result
         records captured until the non-zero exit are available in the
         exception's `kwargs`-dict attribute under key 'stdout_json'.
+
+        See `_call_annex()` for more information on Exceptions.
         """
         return self._call_annex_records(args, files=files)
 
@@ -1171,7 +1241,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Raises
         ------
-        CommandError if the call exits with a non-zero status.
+        See `_call_annex()` for information on Exceptions.
         """
         return self._call_annex(
             args,
@@ -1179,6 +1249,27 @@ class AnnexRepo(GitRepo, RepoInterface):
             protocol=StdOutErrCapture)['stdout']
 
     def call_annex_items_(self, args, files=None, sep=None):
+        """Call git-annex, splitting output on `sep`.
+
+        Parameters
+        ----------
+        args : list of str
+          Arguments to pass to `git-annex`.
+        files : list of str, optional
+          File arguments to pass to `git`. The advantage of passing these here
+          rather than as part of `args` is that the call will be split into
+          multiple calls to avoid exceeding the maximum command line length.
+        sep : str, optional
+          Split the output by `str.split(sep)` rather than `str.splitlines`.
+
+        Returns
+        -------
+        Generator that yields output items.
+
+        Raises
+        ------
+        See `_call_annex()` for information on Exceptions.
+        """
         out = self._call_annex(
             args,
             files=files,
@@ -1211,8 +1302,9 @@ class AnnexRepo(GitRepo, RepoInterface):
           output.
         Raises
         ------
-        CommandError if the call exits with a non-zero status.
         AssertionError if there is more than one line of output.
+
+        See `_call_annex()` for information on Exceptions.
         """
         # ignore some lines
         # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
