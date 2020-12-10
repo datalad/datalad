@@ -48,7 +48,6 @@ from datalad.cmd import (
     GitWitlessRunner,
     WitlessProtocol,
     BatchedCommand,
-    run_gitcommand_on_file_list_chunks,
     NoCapture,
     StdOutErrCapture,
 )
@@ -72,7 +71,6 @@ from datalad.utils import (
     generate_file_chunks,
     ensure_unicode,
     is_interactive,
-    split_cmdline,
 )
 
 # imports from same module:

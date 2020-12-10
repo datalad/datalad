@@ -20,7 +20,6 @@ import tempfile
 from locale import getpreferredencoding
 import asyncio
 from collections import (
-    defaultdict,
     namedtuple,
 )
 
@@ -48,66 +47,6 @@ _TEMP_std = sys.stdout, sys.stderr
 # in Runner so we take care about their removal, in contrast to those
 # which might be created outside and passed into Runner
 _MAGICAL_OUTPUT_MARKER = "_runneroutput_"
-
-
-def run_gitcommand_on_file_list_chunks(func, cmd, files, *args, **kwargs):
-    """Run a git command multiple times if `files` is too long
-
-    Parameters
-    ----------
-    func : callable
-      Typically a Runner.run variant. Assumed to return a 2-tuple with stdout
-      and stderr as strings.
-    cmd : list
-      Base Git command argument list, to be amended with '--', followed
-      by a file list chunk.
-    files : list
-      List of files.
-    args, kwargs :
-      Passed to `func`
-
-    Returns
-    -------
-    str, str
-        Concatenated stdout and stderr.
-    """
-    assert isinstance(cmd, list)
-    if not files:
-        file_chunks = [[]]
-    else:
-        file_chunks = generate_file_chunks(files, cmd)
-
-    results = []
-    for i, file_chunk in enumerate(file_chunks):
-        if file_chunk:
-            lgr.debug('Process file list chunk %i (length %i)',
-                      i, len(file_chunk))
-            results.append(func(cmd + ['--'] + file_chunk, *args, **kwargs))
-        else:
-            results.append(func(cmd, *args, **kwargs))
-    # if it was a WitlessRunner.run -- we would get dicts.
-    # If old Runner -- stdout, stderr strings
-    if results:
-        if isinstance(results[0], dict):
-            result = defaultdict(str)
-            for r in results:
-                for k, v in r.items():
-                    if k in ('stdout', 'stderr'):
-                        result[k] += v
-                    elif k == 'status':
-                        if k:
-                            # this wrapper expects commands to succeed or exception
-                            # being thrown
-                            raise RuntimeError(
-                                "Running %s with WitlessRunner resulted in "
-                                "exit %d but there were no exception" % (cmd, k))
-                    elif v:
-                        raise RuntimeError(
-                            "Have no clue what to do about %s=%r" % (k, v))
-            return result['stdout'], result['stderr']
-        else:
-            return ''.join(r[0] for r in results), \
-                   ''.join(r[1] for r in results)
 
 
 async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
