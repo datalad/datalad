@@ -1122,6 +1122,33 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return return_objects
 
+    def call_annex_records(self, args, files=None):
+        """Call annex with `--json*` to request structured result records
+
+        This method behaves like `call_annex()`, but returns parsed result
+        records.
+
+        Parameters
+        ----------
+        args : list of str
+          Arguments to pass to `annex`.
+        files : list of str, optional
+          File arguments to pass to `annex`. The advantage of passing these here
+          rather than as part of `args` is that the call will be split into
+          multiple calls to avoid exceeding the maximum command line length.
+
+        Returns
+        -------
+        list(dict)
+
+        Raises
+        ------
+        CommandError if the call exits with a non-zero status. All result
+        records captured until the non-zero exit are available in the
+        exception's `kwargs`-dict attribute under key 'stdout_json'.
+        """
+        return self._call_annex_records(args, files=files)
+
     def call_annex(self, args, files=None):
         """Call annex and return standard output.
 
