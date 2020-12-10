@@ -688,8 +688,7 @@ class MultiplexSSHManager(BaseSSHManager):
         if self._socket_dir is not None:
             return
         from datalad import cfg
-        self._socket_dir = \
-            Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
+        self._socket_dir = Path(cfg.obtain('datalad.locations.sockets'))
         self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
             os.chmod(str(self._socket_dir), 0o700)
