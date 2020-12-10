@@ -1252,7 +1252,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         args : list of str
           Arguments to pass to `git-annex`.
         files : list of str, optional
-          File arguments to pass to `git`. The advantage of passing these here
+          File arguments to pass to `annex`. The advantage of passing these here
           rather than as part of `args` is that the call will be split into
           multiple calls to avoid exceeding the maximum command line length.
         sep : str, optional
