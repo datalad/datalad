@@ -1038,7 +1038,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise
 
     def _call_annex_records(self, args, files=None, jobs=None,
-                            protocol=None,
                             git_options=None,
                             stdin=None,
                             merge_annex_branches=True,
@@ -1083,8 +1082,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           Output from the git-annex process was captured, but no structured
           records could be parsed.
         """
-        if protocol is None:
-            protocol = AnnexJsonProtocol
+        protocol = AnnexJsonProtocol
 
         args = args[:] + ['--json', '--json-error-messages']
         if progress:
@@ -1494,7 +1492,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             files=files_arg,
             jobs=jobs,
             progress=True,
-            protocol=AnnexJsonProtocol,
             total_nbytes=sum(expected_downloads.values()),
         )
         results_list = list(results)
@@ -2919,7 +2916,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             files=files,  # copy_files,
             jobs=jobs,
             progress=True,
-            protocol=AnnexJsonProtocol,
             total_nbytes=total_nbytes,
         )
         results_list = list(results)

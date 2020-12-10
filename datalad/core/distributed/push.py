@@ -848,9 +848,6 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         # and go
         res = ds_repo._call_annex_records(
             cmd,
-            # make protocol explicit, although it is default, to explain
-            # the presence of the `total_nbytes` arg
-            protocol=AnnexJsonProtocol,
             stdin=file_list,
             progress=True,
             # tailor the progress protocol with the total number of files
