@@ -52,7 +52,7 @@ def main():
     scm_conda_forge_last.add_argument("-b", "--batch", action="store_true")
     scm_conda_forge_last.add_argument("--path-miniconda")
     scm_conda_forge_last.add_argument("version", nargs="?")
-    schemata.add_parser("datalad-extensions-build", help="Linux, macOS only")
+    schemata.add_parser("datalad-git-annex-build", help="Linux, macOS only")
     scm_deb_url = schemata.add_parser("deb-url", help="Linux only")
     scm_deb_url.add_argument("url")
     schemata.add_parser("neurodebian", help="Linux only")
@@ -90,8 +90,8 @@ def main():
         installer.install_via_conda_forge_last(
             args.version, miniconda_path=args.path_miniconda, batch=args.batch
         )
-    elif args.schema == "datalad-extensions-build":
-        installer.install_via_datalad_extensions_build()
+    elif args.schema == "datalad-git-annex-build":
+        installer.install_via_datalad_git_annex_build()
     elif args.schema == "deb-url":
         installer.install_via_deb_url(args.url)
     elif args.schema == "neurodebian":
@@ -360,7 +360,7 @@ class GitAnnexInstaller:
             check=True,
         )
 
-    def install_via_datalad_extensions_build(self):
+    def install_via_datalad_git_annex_build(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             systype = platform.system()
             if systype == "Linux":
