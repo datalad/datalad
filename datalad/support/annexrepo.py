@@ -956,49 +956,21 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(runner.env)
 
-        if files:
-            return runner.run_on_filelist_chunks(
-                cmd,
-                files,
-                protocol=protocol,
-                env=env,
-                **kwargs)
-        else:
-            return runner.run(
-                cmd,
-                stdin=stdin,
-                protocol=protocol,
-                env=env,
-                **kwargs)
-
-    def _call_annex_records(self, args, files=None, jobs=None,
-                            protocol=None,
-                            git_options=None,
-                            stdin=None,
-                            merge_annex_branches=True,
-                            progress=False,
-                            **kwargs):
-        if protocol is None:
-            protocol = AnnexJsonProtocol
-
-        args = args[:] + ['--json', '--json-error-messages']
-        if progress:
-            args += ['--json-progress']
-
-        # TODO move all error handling to _call_annex() ?!
-        # BUT some of the below is JSON specific
-        out = None
         try:
-            out = self._call_annex(
-                args,
-                files=files,
-                jobs=jobs,
-                protocol=protocol,
-                git_options=git_options,
-                stdin=stdin,
-                merge_annex_branches=merge_annex_branches,
-                **kwargs,
-            )
+            if files:
+                return runner.run_on_filelist_chunks(
+                    cmd,
+                    files,
+                    protocol=protocol,
+                    env=env,
+                    **kwargs)
+            else:
+                return runner.run(
+                    cmd,
+                    stdin=stdin,
+                    protocol=protocol,
+                    env=env,
+                    **kwargs)
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -1034,6 +1006,38 @@ class AnnexRepo(GitRepo, RepoInterface):
             if in_subm_re:
                 raise e
 
+            # we don't know how to handle this, just pass it on
+            raise
+
+    def _call_annex_records(self, args, files=None, jobs=None,
+                            protocol=None,
+                            git_options=None,
+                            stdin=None,
+                            merge_annex_branches=True,
+                            progress=False,
+                            **kwargs):
+        if protocol is None:
+            protocol = AnnexJsonProtocol
+
+        args = args[:] + ['--json', '--json-error-messages']
+        if progress:
+            args += ['--json-progress']
+
+        # TODO move all error handling to _call_annex() ?!
+        # BUT some of the below is JSON specific
+        out = None
+        try:
+            out = self._call_annex(
+                args,
+                files=files,
+                jobs=jobs,
+                protocol=protocol,
+                git_options=git_options,
+                stdin=stdin,
+                merge_annex_branches=merge_annex_branches,
+                **kwargs,
+            )
+        except CommandError as e:
             # Note: Workaround for not existing files as long as annex doesn't
             # report it within JSON response:
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
