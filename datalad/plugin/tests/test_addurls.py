@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     ok_exists,
     ok_startswith,
     skip_if,
+    SkipTest,
     swallow_logs,
     with_tempfile,
     with_tree,
@@ -407,8 +408,9 @@ def test_addurls_dry_run(path):
                   cml.out)
 
 
+OLD_EXAMINEKEY = external_versions["cmd:annex"] < "8.20201116"
 skip_key_tests = skip_if(
-    external_versions["cmd:annex"] < "8.20201116",
+    OLD_EXAMINEKEY,
     "git-annex version does not support `examinekey --migrate-to-backend`")
 
 
@@ -782,6 +784,9 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def check_addurls_from_key(self, key_arg, expected_backend, path):
         ds = Dataset(path).create(force=True)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
         ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
                    key=key_arg)
         repo = ds.repo
@@ -807,6 +812,9 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self, path):
         ds = Dataset(path).create(force=True)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
         data = self.data.copy()
         for row in data:
             if row["name"] == "b":

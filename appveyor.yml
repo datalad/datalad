@@ -14,11 +14,11 @@ environment:
     # older, but essential functionality
     - TEST_SELECTION: datalad.cmdline datalad.distribution datalad.interface datalad.support datalad.ui datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3 datalad.tests.test_api datalad.tests.test_constraints datalad.tests.test_dochelpers
     # assorted other tests
-    - TEST_SELECTION: datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822 datalad.tests.test_utils datalad.tests.test_base datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives
+    - TEST_SELECTION: datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822 datalad.tests.test_utils datalad.tests.test_base datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos datalad.tests.test_utils_testrepos datalad.tests.test_archives datalad.plugin
     # also execute tests that probably still not run, but it will be
     # easier to pick the working one from the log
     - KNOWN2FAIL: 1
-      TEST_SELECTION: datalad.customremotes datalad.downloaders.tests.test_http datalad.metadata.extractors.tests.test_base datalad.metadata.test_aggregation datalad.metadata.test_base datalad.metadata.extractors.tests.test_datacite_xml datalad.plugin datalad.tests.test__main__ datalad.tests.test_cmd datalad.tests.test_log datalad.tests.test_protocols datalad.tests.test_auto datalad.tests.test_tests_utils
+      TEST_SELECTION: datalad.customremotes datalad.downloaders.tests.test_http datalad.metadata.extractors.tests.test_base datalad.metadata.test_aggregation datalad.metadata.test_base datalad.metadata.extractors.tests.test_datacite_xml datalad.tests.test__main__ datalad.tests.test_cmd datalad.tests.test_log datalad.tests.test_protocols datalad.tests.test_auto datalad.tests.test_tests_utils
  
 matrix:
   allow_failures:
@@ -71,7 +71,7 @@ install:
   # specific version mih uses to debug on real win10 box
   #- appveyor DownloadFile http://store.datalad.org/git-annex/windows/git-annex_8.20200309.exe -FileName resources\git-annex-installer.exe
   # datalad-extensions built version with fixed up special remotes handling
-  - appveyor DownloadFile http://datasets.datalad.org/datalad/packages/windows/git-annex-installer_8.20201007+git171-g7e24b2587_x64.exe -FileName resources\git-annex-installer.exe
+  - appveyor DownloadFile http://datasets.datalad.org/datalad/packages/windows/git-annex-installer_8.20201127+git11-g3be9dc6e1_x64.exe -FileName resources\git-annex-installer.exe
   # extract git annex into the system Git installation path
   - 7z x -aoa -o"C:\\Program Files\Git" resources\git-annex-installer.exe
   # info on how python is ticking

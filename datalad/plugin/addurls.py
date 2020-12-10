@@ -44,6 +44,7 @@ from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     ensure_list,
     get_suggestions_msg,
+    Path,
     unlink,
 )
 
@@ -684,10 +685,13 @@ class RegisterUrl(object):
         self.repo = repo or ds.repo
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
+        self.use_pointer = repo.is_managed_branch()
 
-    def examinekey(self, parsed_key, filename):
-        opts = ["--migrate-to-backend=" + parsed_key["target_backend"],
-                "--filename=" + filename, parsed_key["key"]]
+    def examinekey(self, parsed_key, filename, migrate=False):
+        opts = []
+        if migrate:
+            opts.append("--migrate-to-backend=" + parsed_key["target_backend"])
+        opts.extend(["--filename=" + filename, parsed_key["key"]])
         return self.repo._run_annex_command_json("examinekey", opts=opts)[0]
 
     def fromkey(self, key, filename):
@@ -697,33 +701,54 @@ class RegisterUrl(object):
     def registerurl(self, key, url):
         self.repo._run_annex_command("registerurl", annex_options=[key, url])
 
+    def _write_pointer(self, row, ek_info):
+        try:
+            fname = Path(row["filename_abs"])
+            fname.parent.mkdir(exist_ok=True, parents=True)
+            fname.write_text(ek_info["objectpointer"])
+        except Exception as exc:
+            message = exc_str(exc)
+            status = "error"
+        else:
+            message = "registered URL"
+            status = "ok"
+        return get_status_dict(action="addurls", ds=self.ds, type="file",
+                               status=status, message=message)
+
     def __call__(self, row):
         filename = row["ds_filename"]
         try:
             parsed_key = row["key"]
-            if "target_backend" in parsed_key:
-                ek_info = self.examinekey(parsed_key, filename)
-                if ek_info:
-                    key = ek_info["key"]
-                else:
+            migrate = "target_backend" in parsed_key
+            use_pointer = self.use_pointer
+            ek_info = None
+            if use_pointer or migrate:
+                ek_info = self.examinekey(parsed_key, filename,
+                                          migrate=migrate)
+                if not ek_info:
                     yield dict(self._err_res,
                                path=row["filename_abs"],
                                message=("Failed to get information for %s",
                                         parsed_key))
                     return
+                key = ek_info["key"]
             else:
                 key = parsed_key["key"]
+
             self.registerurl(key, row["url"])
-            res = self.fromkey(key, filename)
+            if use_pointer:
+                res = self._write_pointer(row, ek_info)
+            else:
+                res = annexjson2result(self.fromkey(key, filename),
+                                       self.ds, type="file", logger=lgr)
+                if not res.get("message"):
+                    res["message"] = "registered URL"
         except CommandError as exc:
-                yield dict(self._err_res,
-                           path=row["filename_abs"],
-                           message=exc_str(exc))
+            yield dict(self._err_res,
+                       path=row["filename_abs"],
+                       message=exc_str(exc))
         else:
-            yield dict(
-                annexjson2result(res, self.ds, type="file", logger=lgr),
-                message="registered URL",
-                action="addurls")
+            yield res
 
 
 # Note: If any other modules end up needing these batch operations, this should
@@ -749,8 +774,11 @@ class BatchedRegisterUrl(RegisterUrl):
             self._batch_commands[command] = bcmd
         return bcmd(batch_input)
 
-    def examinekey(self, parsed_key, filename):
-        opts = ["--migrate-to-backend=" + parsed_key["target_backend"]]
+    def examinekey(self, parsed_key, filename, migrate=False):
+        if migrate:
+            opts = ["--migrate-to-backend=" + parsed_key["target_backend"]]
+        else:
+            opts = None
         return self._batch("examinekey", (parsed_key["key"], filename),
                            json=True, batch_options=opts)
 
@@ -836,9 +864,10 @@ def _add_urls(rows, ds, repo, ifexists=None, options=None,
             assert not repo.always_commit
             for a in repo.set_metadata_(filename, add=meta):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
-                # Don't show all added metadata for the file because that
-                # could quickly flood the output.
-                del res["message"]
+                if res["status"] == "ok":
+                    # Don't show all added metadata for the file because that
+                    # could quickly flood the output.
+                    del res["message"]
                 yield res
 
 
@@ -1078,25 +1107,30 @@ class Addurls(Interface):
         from requests.exceptions import RequestException
 
         from datalad.distribution.dataset import Dataset, require_dataset
-        from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
 
         lgr = logging.getLogger("datalad.plugin.addurls")
 
         ds = require_dataset(dataset, check_installed=False)
         repo = ds.repo
+        st_dict = get_status_dict(action="addurls", ds=ds)
         if repo and not isinstance(repo, AnnexRepo):
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="error",
-                                  message="not an annex repo")
+            yield dict(st_dict, status="error", message="not an annex repo")
             return
 
-        if key and key.startswith("et:") and \
-           external_versions["cmd:annex"] < "8.20201116":
-            lgr.warning("et: prefix of `key` option requires "
-                        "git-annex 8.20201116 or later. Ignoring.")
-            key = None
+        if key:
+            old_examinekey = external_versions["cmd:annex"] < "8.20201116"
+            if old_examinekey:
+                old_msg = None
+                if key.startswith("et:"):
+                    old_msg = ("et: prefix of `key` option requires "
+                               "git-annex 8.20201116 or later")
+                elif repo.is_managed_branch():
+                    old_msg = ("Using `key` option on adjusted branch "
+                               "requires git-annex 8.20201116 or later")
+                if old_msg:
+                    yield dict(st_dict, status="error", message=old_msg)
+                    return
 
         if url_file != "-":
             url_file = str(resolve_path(url_file, dataset))
@@ -1122,28 +1156,21 @@ class Addurls(Interface):
                                          dry_run,
                                          missing_value)
             except (ValueError, RequestException) as exc:
-                yield get_status_dict(action="addurls",
-                                      ds=ds,
-                                      status="error",
-                                      message=exc_str(exc))
+                yield dict(st_dict, status="error", message=exc_str(exc))
                 return
         finally:
             if fd is not sys.stdin:
                 fd.close()
 
         if not rows:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="notneeded",
-                                  message="No rows to process")
+            yield dict(st_dict, status="notneeded",
+                       message="No rows to process")
             return
 
         if len(rows) != len(set(row["filename"] for row in rows)):
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="error",
-                                  message=("There are file name collisions; "
-                                           "consider using {_repindex}"))
+            yield dict(st_dict, status="error",
+                       message=("There are file name collisions; "
+                                "consider using {_repindex}"))
             return
 
         if dry_run:
@@ -1158,10 +1185,7 @@ class Addurls(Interface):
                     lgr.info("Metadata: %s",
                              sorted(u"{}={}".format(k, v)
                                     for k, v in row["meta_args"].items()))
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="ok",
-                                  message="dry-run finished")
+            yield dict(st_dict, status="ok", message="dry-run finished")
             return
 
         if not repo:
