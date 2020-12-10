@@ -1676,7 +1676,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if not files:
             return
         return [j["file"] for j in
-                self._call_annex_records(["unlock"], files=files)
+                self.call_annex_records(["unlock"], files=files)
                 if j["success"]]
 
     def adjust(self, options=None):
@@ -2192,7 +2192,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if batch:
                 lgr.debug("Not batching drop_key call "
                           "because fake dates are enabled")
-            json_objects = self._call_annex_records(
+            json_objects = self.call_annex_records(
                 ['dropkey'] + options, files=keys
             )
         else:
@@ -2277,7 +2277,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             files_arg = files
 
         try:
-            json_objects = self._call_annex_records(cmd, files=files_arg)
+            json_objects = self.call_annex_records(cmd, files=files_arg)
         except CommandError as e:
             if e.stderr.startswith('Invalid'):
                 # would happen when git-annex is called with incompatible options
@@ -2945,7 +2945,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files = [files]
             # anything else is assumed to be an iterable (e.g. a generator)
         if batch is False:
-            for res in self._call_annex_records(['metadata'], files=files):
+            for res in self.call_annex_records(['metadata'], files=files):
                 yield _format_response(res)
         else:
             # batch mode is different: we need to compose a JSON request object
@@ -3029,7 +3029,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # operate on files that were just added.
         self.precommit()
 
-        for jsn in self._call_annex_records(
+        for jsn in self.call_annex_records(
                 ['metadata'] + args,
                 files=files):
             yield jsn
@@ -3145,7 +3145,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 cmd += ['--include', '*']
 
-        for j in self._call_annex_records(cmd, files=files):
+        for j in self.call_annex_records(cmd, files=files):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
             if rec is None:

@@ -2171,7 +2171,7 @@ def _test_add_under_subdir(path):
 @with_tempfile(mkdir=True)
 def test_error_reporting(path):
     ar = AnnexRepo(path, create=True)
-    res = ar._call_annex_records(['add'], files='gl\\orious BS')
+    res = ar.call_annex_records(['add'], files='gl\\orious BS')
     eq_(
         res,
         [{
