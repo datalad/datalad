@@ -1088,8 +1088,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if progress:
             args += ['--json-progress']
 
-        # TODO move all error handling to _call_annex() ?!
-        # BUT some of the below is JSON specific
         out = None
         try:
             out = self._call_annex(
