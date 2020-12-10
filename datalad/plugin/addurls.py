@@ -692,14 +692,14 @@ class RegisterUrl(object):
         if migrate:
             opts.append("--migrate-to-backend=" + parsed_key["target_backend"])
         opts.extend(["--filename=" + filename, parsed_key["key"]])
-        return self.repo._run_annex_command_json("examinekey", opts=opts)[0]
+        return self.repo.call_annex_records(["examinekey"] + opts)[0]
 
     def fromkey(self, key, filename):
-        return self.repo._run_annex_command_json(
-            "fromkey", opts=["--force", key, filename])[0]
+        return self.repo.call_annex_records(
+            ["fromkey", "--force", key, filename])[0]
 
     def registerurl(self, key, url):
-        self.repo._run_annex_command("registerurl", annex_options=[key, url])
+        self.repo.call_annex(["registerurl", key, url])
 
     def _write_pointer(self, row, ek_info):
         try:
