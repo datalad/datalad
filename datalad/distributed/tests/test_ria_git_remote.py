@@ -112,7 +112,7 @@ def _test_bare_git_version_1(host, dspath, store):
 
     # Now move content from git-remote to local and see it not being available
     # via bare-git anymore.
-    ds.repo.call_git(['annex', 'move', '--all', '--from=bare-git'])
+    ds.repo.call_annex(['move', '--all', '--from=bare-git'])
     # ora-remote doesn't know yet:
     eq_(len(ds.repo.whereis('one.txt')), 2)
 
@@ -210,10 +210,10 @@ def _test_bare_git_version_2(host, dspath, store):
     ds.drop('.')
     eq_(len(ds.repo.whereis('one.txt')), 2)
     # actually consumable via git remote:
-    ds.repo.call_git(['annex', 'move', 'one.txt', '--from', 'bare-git'])
+    ds.repo.call_annex(['move', 'one.txt', '--from', 'bare-git'])
     eq_(len(ds.repo.whereis('one.txt')), 2)
     # now, move back via git - shouldn't be consumable via ORA
-    ds.repo.call_git(['annex', 'move', 'one.txt', '--to', 'bare-git'])
+    ds.repo.call_annex(['move', 'one.txt', '--to', 'bare-git'])
     # fsck to make availability known, but there's nothing from POV of ORA:
     fsck_res = [annexjson2result(r, ds)
                 for r in ds.repo.fsck(remote='ora-remote', fast=True)]

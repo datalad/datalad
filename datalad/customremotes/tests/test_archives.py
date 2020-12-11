@@ -35,6 +35,7 @@ from ...tests.utils import (
     assert_is_instance,
     assert_not_equal,
     assert_not_in,
+    assert_raises,
     assert_true,
     chpwd,
     eq_,
@@ -53,6 +54,7 @@ from datalad.cmd import (
     StdOutErrCapture,
     WitlessRunner,
 )
+from datalad.support.exceptions import CommandError
 from ...utils import (
     _path_,
     unlink,
@@ -126,7 +128,7 @@ def test_basic_scenario(d, d2):
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
-    assert_false(annex.drop(fn_extracted)['success'])
+    assert_raises(CommandError, annex.drop, fn_extracted)
 
     annex.add_url_to_file(fn_extracted, file_url)
     annex.drop(fn_extracted)

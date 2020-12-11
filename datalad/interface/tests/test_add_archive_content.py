@@ -50,7 +50,10 @@ from datalad.tests.utils import (
 )
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.support.exceptions import (
+    CommandError,
+    FileNotInRepositoryError,
+)
 from datalad.utils import (
     chpwd,
     find_files,
@@ -304,18 +307,18 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo.get(opj('1', '1 f.txt'))  # and should be able to get it again
 
     # bug was that dropping didn't work since archive was dropped first
-    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.call_annex(["drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
     repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
-    res = repo.drop(key_1tar, key=True)
-    assert_equal(res['success'], False)
-
-    assert_result_values_cond(
-        [res], 'note',
-        lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
-    )
+    with assert_raises(CommandError) as e:
+        repo.drop(key_1tar, key=True)
+        assert_equal(e.kwargs['stdout_json'][0]['success'], False)
+        assert_result_values_cond(
+            e.kwargs['stdout_json'], 'note',
+            lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
+        )
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 

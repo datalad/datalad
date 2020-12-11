@@ -270,10 +270,10 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         # hence hash would be same as for a plain GitRepo
         # and no, we cannot use the shasum of the annex branch,
         # because this will change even when no metadata has changed
-        timestamps, _ = aggfrom_ds.repo._run_annex_command(
+        timestamps, _ = aggfrom_ds.repo.call_annex_oneline([
             'metadata',
             '.',
-            '-g', 'lastchanged')
+            '-g', 'lastchanged'])
         objid += timestamps.strip()
 
     if not objid:

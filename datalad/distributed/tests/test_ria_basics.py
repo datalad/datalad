@@ -50,7 +50,7 @@ from datalad.customremotes.ria_utils import (
     get_layout_locations
 )
 from datalad.cmd import (
-    GitWitlessRunner,
+    NoCapture,
 )
 
 
@@ -126,18 +126,18 @@ def _test_initremote_basic(host, ds_path, store, link):
     assert_in("archive-id={}".format(ds.id), remote_log)
 
     # re-configure with invalid URL should fail:
-    assert_raises(CommandError,
-                  ds.repo.call_git,
-                  ['annex', 'enableremote', 'ria-remote'] + common_init_opts +
-                  ['url=ria+file:///non-existing']
-                  )
+    assert_raises(
+        CommandError,
+        ds.repo.call_annex,
+        ['enableremote', 'ria-remote'] + common_init_opts + [
+            'url=ria+file:///non-existing'])
     # but re-configure with valid URL should work
     if has_symlink_capability():
         link.symlink_to(store)
         new_url = 'ria+{}'.format(link.as_uri())
-        ds.repo.call_git(['annex', 'enableremote', 'ria-remote'] +
-                         common_init_opts +
-                         ['url={}'.format(new_url)])
+        ds.repo.call_annex(
+            ['enableremote', 'ria-remote'] + common_init_opts + [
+                'url={}'.format(new_url)])
         # git-annex:remote.log should have:
         #   - url
         #   - common_init_opts
@@ -369,7 +369,7 @@ def _test_version_check(host, dspath, store):
 
     # TODO: use self.annex.error in special remote and see whether we get an
     #       actual error result
-    assert_raises(IncompleteResultsError,
+    assert_raises(CommandError,
                   ds.repo.copy_to, 'new_file', 'store')
 
     # However, we can force it by configuration
@@ -433,9 +433,7 @@ def _test_gitannex(host, store, dspath):
     # run git-annex-testremote
     # note, that we don't want to capture output. If something goes wrong we
     # want to see it in test build's output log.
-    GitWitlessRunner(cwd=dspath).run(
-        ['git', 'annex', 'testremote', 'store']
-    )
+    ds.repo._call_annex(['testremote', 'store'], protocol=NoCapture)
 
 
 @turtle
@@ -493,11 +491,11 @@ def _test_binary_data(host, store, dspath):
     known_sources = ds.repo.whereis(str(file))
     assert_in(here_uuid, known_sources)
     assert_not_in(store_uuid, known_sources)
-    ds.repo.call_git(['annex', 'move', str(file), '--to', 'store'])
+    ds.repo.call_annex(['move', str(file), '--to', 'store'])
     known_sources = ds.repo.whereis(str(file))
     assert_not_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)
-    ds.repo.call_git(['annex', 'get', str(file), '--from', 'store'])
+    ds.repo.call_annex(['get', str(file), '--from', 'store'])
     known_sources = ds.repo.whereis(str(file))
     assert_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)

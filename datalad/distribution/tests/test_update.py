@@ -657,7 +657,7 @@ def _adjust(repo):
     # This can be removed once GIT_ANNEX_MIN_VERSION is at least
     # 7.20190912.
     if not repo.supports_unlocked_pointers:
-        repo.call_git(["annex", "upgrade"])
+        repo.call_annex(["upgrade"])
         repo.config.reload(force=True)
     repo.adjust()
 

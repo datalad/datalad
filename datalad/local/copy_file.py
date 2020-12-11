@@ -566,8 +566,7 @@ def _copy_file(src, dest, cache):
                 lgr.debug('Register URL for key %s: %s', dest_key, url)
                 # TODO OPT: add .register_url(key, batched=False) to AnnexRepo
                 #  to speed up this step by batching.
-                dest_repo._run_annex_command(
-                    'registerurl', annex_options=[dest_key, url])
+                dest_repo.call_annex(['registerurl', dest_key, url])
             dest_rid = src_rid \
                 if src_rid == '00000000-0000-0000-0000-000000000001' \
                 else [
@@ -576,8 +575,7 @@ def _copy_file(src, dest, cache):
                 ].pop()
             lgr.debug('Mark key %s as present for special remote: %s',
                       dest_key, dest_rid)
-            dest_repo._run_annex_command(
-                'setpresentkey', annex_options=[dest_key, dest_rid, '1'])
+            dest_repo.call_annex(['setpresentkey', dest_key, dest_rid, '1'])
 
     # TODO prevent copying .datalad of from other datasets?
     yield dict(
@@ -612,7 +610,7 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
     # https://github.com/datalad/datalad/issues/3357 that could prevent
     # information leakage across datasets
     if finfo.get('has_content', True):
-        dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
+        dest_key = dest_repo.call_annex_oneline(['calckey', str_src])
     else:
         lgr.debug(
             'File content not available, forced to reuse previous annex key: %s',
@@ -625,13 +623,10 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
         # failing next on 'fromkey', due to a key mismatch.
         # this is more compatible with the nature of 'cp'
         dest.unlink()
-    res = dest_repo._run_annex_command_json(
-        'fromkey',
+    res = dest_repo._call_annex_records(
         # we use force, because in all likelihood there is no content for this key
         # yet
-        opts=[dest_key, str_dest, '--force'],
-        # doesn't work in adjusted-unlock mode
-        expect_fail=True,
+        ['fromkey', dest_key, str_dest, '--force'],
     )
     if any(not r['success'] for r in res):
         return dict(
@@ -653,10 +648,7 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
         tmploc = tmploc / dest_key
         _replace_file(finfo['objloc'], tmploc, str(tmploc), follow_symlinks=False)
 
-        dest_repo._run_annex_command(
-            'reinject',
-            annex_options=[str(tmploc), str_dest],
-        )
+        dest_repo.call_annex(['reinject', str(tmploc), str_dest])
 
     return dest_key
 
