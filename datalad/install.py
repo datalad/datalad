@@ -69,8 +69,6 @@ def main():
     scm_datalad.add_argument("-b", "--batch", action="store_true")
     scm_datalad.add_argument("--path-miniconda")
     args = parser.parse_args()
-    if args.schema is None:
-        args.schema = "conda-forge"
     if args.env_write_file is not None:
         with open(args.env_write_file, "w"):
             # Force file to exist and start out empty
@@ -78,7 +76,9 @@ def main():
     installer = GitAnnexInstaller(
         adjust_bashrc=args.adjust_bashrc, env_write_file=args.env_write_file,
     )
-    if args.schema == "autobuild":
+    if args.schema is None:
+        installer.install_via_conda_forge()
+    elif args.schema == "autobuild":
         installer.install_via_autobuild()
     elif args.schema == "brew":
         installer.install_via_brew()
