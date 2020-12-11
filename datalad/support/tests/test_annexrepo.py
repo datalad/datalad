@@ -2202,8 +2202,9 @@ def test_annexjson_protocol(path):
     # not meant as an exhaustive check for output structure,
     # just some assurance that it is not totally alien
     ok_(all(j['file'] for j in orig_j))
-    # no complaints
-    eq_(res['stderr'], '')
+    # no complaints, unless git-annex is triggered to run in debug mode
+    if logging.getLogger('datalad.annex').getEffectiveLevel() >= 8:
+        eq_(res['stderr'], '')
 
     # now the same, but with a forced error
     with assert_raises(CommandError) as e:
