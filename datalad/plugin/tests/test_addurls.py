@@ -782,8 +782,9 @@ class TestAddurls(object):
                            key=fmt, exclude_autometa="*")
 
     @with_tempfile(mkdir=True)
-    def check_addurls_from_key(self, key_arg, expected_backend, path):
-        ds = Dataset(path).create(force=True)
+    def check_addurls_from_key(self, key_arg, expected_backend, fake_dates,
+                               path):
+        ds = Dataset(path).create(force=True, fake_dates=fake_dates)
         if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
             raise SkipTest("Adjusted branch functionality requires "
                            "more recent `git annex examinekey`")
@@ -804,10 +805,13 @@ class TestAddurls(object):
 
     def test_addurls_from_key(self):
         fn = self.check_addurls_from_key
-        yield fn, "MD5-s{size}--{md5sum}", "MD5"
-        yield fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"
-        yield skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"
-        yield skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5"
+        for case in [
+                (fn, "MD5-s{size}--{md5sum}", "MD5"),
+                (fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"),
+                (skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"),
+                (skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
+            yield case + (False,)
+            yield case + (True,)
 
     @with_tempfile(mkdir=True)
     def test_addurls_row_missing_key_fields(self, path):
