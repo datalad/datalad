@@ -4188,7 +4188,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         for path in paths:
             rpath = str(path.relative_to(self.pathobj).as_posix())
             subm = repo_from_path(path)
-            subm_commit = subm.get_hexsha()
+            # if there is a corresponding branch, we want to record it's state.
+            # we rely on the corresponding branch being synced already.
+            # `save` should do that each time it runs.
+            subm_commit = subm.get_hexsha(subm.get_corresponding_branch())
             if not subm_commit:
                 yield get_status_dict(
                     action='add_submodule',
