@@ -160,6 +160,59 @@ bet we will fix some bugs and make a world even a better place.
   ([#5141][]) ([#5142][])
 
 
+## 0.13.6 (??? ??, 2020) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- An assortment of fixes for Windows compatibility.  ([#5113][]) ([#5119][])
+  ([#5125][]) ([#5127][]) ([#5136][]) ([#5201][]) ([#5200][]) ([#5214][])
+
+- Adding a subdataset on a system that defaults to using an adjusted
+  branch (i.e. doesn't support symlinks) didn't properly set up the
+  submodule URL if the source dataset was not in an adjusted state.
+  ([#5127][])
+
+- [push][] failed to push to a remote that did not have an
+  `annex-uuid` value in the local `.git/config`.  ([#5148][])
+
+- The default renderer has been improved to avoid a spurious leading
+  space, which led to the displayed path being incorrect in some
+  cases.  ([#5121][])
+
+- [siblings][] showed an uninformative error message when asked to
+  configure an unknown remote.  ([#5146][])
+
+- [drop][] confusingly relayed a suggestion from `git annex drop` to
+  use `--force`, an option that does not exist in `datalad drop`.
+  ([#5194][])
+
+- [create-sibling-github][] no longer offers user/password
+  authentication because it is no longer supported by GitHub.
+  ([#5218][])
+
+- The internal command runner's handling of the event loop has been
+  tweaked to hopefully fix issues with runnning DataLad from IPython.
+  ([#5106][])
+
+- SSH cleanup wasn't reliably triggered by the ORA special remote on
+  failure, leading to a stall with git-annex 8.20201103.  (This is
+  also resolved on git-annex's end as of 8.20201127.)  ([#5151][])
+
+### Enhancements and new features
+
+- The credential helper no longer asks the user to repeat tokens or
+  AWS keys.  ([#5219][])
+
+- The new option `datalad.locations.sockets` controls where Datalad
+  stores SSH sockets, allowing users to more easily work around file
+  system and path length restrictions.  ([#5238][])
+
 ## 0.13.5 (October 30, 2020) -- .
 
 ### Fixes
@@ -3391,8 +3444,25 @@ publishing
 [#5090]: https://github.com/datalad/datalad/issues/5090
 [#5091]: https://github.com/datalad/datalad/issues/5091
 [#5098]: https://github.com/datalad/datalad/issues/5098
+[#5106]: https://github.com/datalad/datalad/issues/5106
 [#5108]: https://github.com/datalad/datalad/issues/5108
+[#5113]: https://github.com/datalad/datalad/issues/5113
+[#5119]: https://github.com/datalad/datalad/issues/5119
+[#5121]: https://github.com/datalad/datalad/issues/5121
+[#5125]: https://github.com/datalad/datalad/issues/5125
+[#5127]: https://github.com/datalad/datalad/issues/5127
 [#5128]: https://github.com/datalad/datalad/issues/5128
+[#5136]: https://github.com/datalad/datalad/issues/5136
 [#5139]: https://github.com/datalad/datalad/issues/5139
 [#5141]: https://github.com/datalad/datalad/issues/5141
 [#5142]: https://github.com/datalad/datalad/issues/5142
+[#5146]: https://github.com/datalad/datalad/issues/5146
+[#5148]: https://github.com/datalad/datalad/issues/5148
+[#5151]: https://github.com/datalad/datalad/issues/5151
+[#5194]: https://github.com/datalad/datalad/issues/5194
+[#5200]: https://github.com/datalad/datalad/issues/5200
+[#5201]: https://github.com/datalad/datalad/issues/5201
+[#5214]: https://github.com/datalad/datalad/issues/5214
+[#5218]: https://github.com/datalad/datalad/issues/5218
+[#5219]: https://github.com/datalad/datalad/issues/5219
+[#5238]: https://github.com/datalad/datalad/issues/5238
