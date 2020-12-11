@@ -58,6 +58,13 @@ definitions = {
         'destination': 'global',
         'default': opj(expanduser('~'), 'datalad'),
     },
+    'datalad.locations.sockets': {
+        'ui': ('question', {
+               'title': 'Socket directory',
+               'text': 'Where should datalad store socket files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'sockets'),
+    },
     'datalad.locations.system-plugins': {
         'ui': ('question', {
                'title': 'System plugin directory',
