@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 __python_requires__ = "~= 3.6"
 import argparse
+import json
 import logging
 import os
 import os.path
@@ -11,11 +12,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from urllib.request import urlopen
-
-DOWNLOAD_LATEST_ARTIFACT = (
-    Path(__file__).parent / "tools" / "ci" / "download-latest-artifact"
-)
+from urllib.request import Request, urlopen
+from zipfile import ZipFile
 
 log = logging.getLogger("datalad.install")
 
@@ -54,7 +52,7 @@ def main():
     scm_conda_forge_last.add_argument("-b", "--batch", action="store_true")
     scm_conda_forge_last.add_argument("--path-miniconda")
     scm_conda_forge_last.add_argument("version", nargs="?")
-    schemata.add_parser("datalad-extensions-build", help="Linux, macOS only")
+    schemata.add_parser("datalad-git-annex-build", help="Linux, macOS only")
     scm_deb_url = schemata.add_parser("deb-url", help="Linux only")
     scm_deb_url.add_argument("url")
     schemata.add_parser("neurodebian", help="Linux only")
@@ -92,8 +90,8 @@ def main():
         installer.install_via_conda_forge_last(
             args.version, miniconda_path=args.path_miniconda, batch=args.batch
         )
-    elif args.schema == "datalad-extensions-build":
-        installer.install_via_datalad_extensions_build()
+    elif args.schema == "datalad-git-annex-build":
+        installer.install_via_datalad_git_annex_build()
     elif args.schema == "deb-url":
         installer.install_via_deb_url(args.url)
     elif args.schema == "neurodebian":
@@ -362,27 +360,15 @@ class GitAnnexInstaller:
             check=True,
         )
 
-    def install_via_datalad_extensions_build(self):
+    def install_via_datalad_git_annex_build(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             systype = platform.system()
             if systype == "Linux":
-                subprocess.run(
-                    [str(DOWNLOAD_LATEST_ARTIFACT)],
-                    env=dict(os.environ, TARGET_PATH=tmpdir),
-                    check=True,
-                )
+                download_latest_git_annex("ubuntu", tmpdir)
                 (debpath,) = Path(tmpdir).glob("*.deb")
                 subprocess.run(["sudo", "dpkg", "-i", str(debpath)], check=True)
             elif systype == "Darwin":
-                subprocess.run(
-                    [str(DOWNLOAD_LATEST_ARTIFACT)],
-                    env=dict(
-                        os.environ,
-                        TARGET_PATH=tmpdir,
-                        TARGET_ARTIFACT="git-annex-macos-dmg",
-                    ),
-                    check=True,
-                )
+                download_latest_git_annex("macos", tmpdir)
                 (dmgpath,) = Path(tmpdir).glob("*.dmg")
                 self._install_from_dmg(dmgpath)
             else:
@@ -422,10 +408,68 @@ class GitAnnexInstaller:
         log.info("git-annex is available under %r", self.annex_bin)
 
 
-def download_file(url, path):
-    with urlopen(url) as r:
+def download_file(url, path, headers=None):
+    if headers is None:
+        headers = {}
+    req = Request(url, headers=headers)
+    with urlopen(req) as r:
         with open(path, "wb") as fp:
             shutil.copyfileobj(r, fp)
+
+
+def download_latest_git_annex(ostype, target_path: Path):
+    repo = "datalad/git-annex"
+    branch = "master"
+    workflow = f"build-{ostype}.yaml"
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        r = subprocess.run(
+            ["git", "config", "hub.oauthtoken"],
+            stdout=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        if r.returncode != 0 or not r.stdout.strip():
+            raise RuntimeError(
+                "GitHub OAuth token not set.  Set via GITHUB_TOKEN environment"
+                " variable or hub.oauthtoken Git config option."
+            )
+        token = r.stdout.strip()
+
+    def apicall(url):
+        req = Request(url, headers={"Authorization": f"Bearer {token}"})
+        with urlopen(req) as r:
+            return json.load(r)
+
+    jobs_url = (
+        f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/runs"
+        f"?status=success&branch={branch}"
+    )
+    log.info("Getting artifacts_url from %s", jobs_url)
+    jobs = apicall(jobs_url)
+    try:
+        artifacts_url = jobs["workflow_runs"][0]["artifacts_url"]
+    except LookupError:
+        log.exception("Unable to get artifacts_url")
+        raise
+    log.info("Getting archive download URL from %s", artifacts_url)
+    artifacts = apicall(artifacts_url)
+    if artifacts["total_count"] < 1:
+        raise RuntimeError("No artifacts found!")
+    elif artifacts["total_count"] > 1:
+        raise RuntimeError("Too many artifacts found!")
+    else:
+        archive_download_url = artifacts["artifacts"][0]["archive_download_url"]
+    log.info("Downloading artifact package from %s", archive_download_url)
+    target_path.mkdir(parents=True, exist_ok=True)
+    artifact_path = target_path / ".artifact.zip"
+    download_file(
+        archive_download_url,
+        artifact_path,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    with ZipFile(str(artifact_path)) as zipf:
+        zipf.extractall(str(target_path))
+    artifact_path.unlink()
 
 
 if __name__ == "__main__":
