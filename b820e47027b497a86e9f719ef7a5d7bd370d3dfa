@@ -1,0 +1,86 @@
+Update 0.13.5-644-g72fb4e1985:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    4cc389bc23..72fb4e1985
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  adding instructions and workflow for running tributors along with .allcontributors
+   011cb1532d^-1
+-  my token wont have permission to open pr
+   15f8b2727a^-1
+-  re-enablling test of action on PR
+   64527516b4^-1
+-  removing pull request trigger, likely not going to work
+   35abfe183f^-1
+-  moving contributors content to CONTRIBUTORS.md
+   2929afa5ad^-1
+-  updating tributors to release 16
+   2e1abec8e4^-1
+-  fixing zenodo.json bug
+   cb353bc927^-1
+-  updating to check both orderings of name
+   9c1171b3d1^-1
+-  Update CONTRIBUTING.md
+   7dcb2d667b^-1
+-  Update .github/workflows/update-contributors.yml
+   7514f63004^-1
+-  Merge remote-tracking branch 'origin/master' into add/tributors
+   e622f39fe6^-1
+-  Merge branch 'add/tributors' of git://github.com/vsoch/datalad into add/tributors
+   3ea9e38f7b^-1
+-  DOC: remove mentioning of ORCID env variables -- no longer needed AFAIK
+   df83949651^-1
+-  Merge pull request #5180 from jwodder/gh-5179
+   701b18d854^-1
++  Merge pull request #5156 from yarikoptic/enh-procedure-extra
+   1c26bdfab5^-1
+-  Merge branch 'maint'
+   52edd0e1f5^-1
+-  Merge pull request #5187 from kyleam/update-contributors-avoid-set-env
+   0b8b8ad8c2^-1
+-  Merge pull request #5197 from jwodder/gh-5193
+   26adbce68b^-1
+-  Merge branch 'maint'
+   8db91d6783^-1
++  Merge pull request #5070 from yarikoptic/enh-nofakedatescheck
+   7da7b46430^-1
+-  Merge pull request #5195 from yarikoptic/enh-jobs-get
+   28ae649de9^-1
++  Merge pull request #5184 from kyleam/addurls-by-checksum
+   6ec7051d87^-1
+-  Merge pull request #5204 from adswa/tst-adjustedbranch
+   dcd8b69dd0^-1
+-  Merge branch 'maint'
+   09a3488ddd^-1
+-  Merge branch 'maint'
+   d062f6f393^-1
+-  Merge pull request #5215 from kyleam/appveyor-plugin-knownfail
+   d71bc3fd06^-1
+-  Merge branch 'maint'
+   bb1c90f29b^-1
+-  Merge branch 'maint'
+   0e423d8867^-1
+-  Merge remote-tracking branch 'gh-master/maint'
+   3a16774d86^-1
+-  Merge pull request #5220 from kyleam/addurls-key-adjusted
+   8f078cbb6e^-1
++  Merge pull request #5163 from mih/rf-callannex
+   51d7ed056c^-1
+-  Merge remote-tracking branch 'gh-master/maint'
+   ee1ac9046b^-1
+-  Merge pull request #5239 from kyleam/addurls-test-fakedates
+   243a9de912^-1
+-  Merge pull request #5235 from jwodder/gh-5191
+   8cba427570^-1
+-  Merge pull request #5236 from jwodder/gh-5230
+   43d3f184ed^-1
+-  Merge pull request #5237 from jwodder/gh-5231
+   5f77eaae1c^-1
+-  Merge branch 'maint'
+   72fb4e1985^-1
