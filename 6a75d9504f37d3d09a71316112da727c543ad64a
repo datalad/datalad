@@ -1,0 +1,68 @@
+Update 0.13.5-1-g2c09085d4a:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    2c09085d4a04bc1922412fc54ed7eede4f258285..a1ab6b7e33fe42fb30e207a9761458baf3151d91
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #4843 from yarikoptic/enh-exc-reporting
+   f91549208a^-1
++* Merge pull request #5113 from mih/bf-5112
+   937a95c113^-1
++* Merge pull request #5119 from yarikoptic/bf-win-2020
+   bb24a2a5f5^-1
++* Merge pull request #5121 from mih/bf-5116
+   ec25697dfd^-1
++* Merge pull request #5125 from yarikoptic/enh-appveyor
+   256aefa5cd^-1
++  Merge pull request #5127 from mih/bf-5107-maint
+   ace8110e0d^-1
++* Merge pull request #5136 from mih/bf-5085
+   4434043a55^-1
++  Merge pull request #5146 from mih/bf-3733
+   78aba99400^-1
++  Merge pull request #5148 from mih/bf-5143
+   a621510f1a^-1
++  Merge pull request #5151 from kyleam/ora-stall-recent-annex
+   0a29782757^-1
+-  BF(DOC): add plain Singularity (without tags)
+   fd226aaef1^-1
+-  ENH(DOC): add supported Python version(s) badge and place badges one at a line in md
+   05dabd1cc3^-1
+-  DOC: call_git_oneline: Drop non-existent parameter from docstring
+   a1883b079a^-1
+-  Merge pull request #4898 from yarikoptic/bf-decode
+   8ee4ebd613^-1
+-  Merge pull request #5188 from yarikoptic/enh-travis
+   43af405791^-1
++  Merge pull request #5194 from kyleam/drop-force-to-check
+   f95b4340e9^-1
+-  Merge pull request #5190 from jwodder/gh-5189
+   a92ec4ced6^-1
++* Merge pull request #5201 from adswa/win-replace
+   593d4caf83^-1
++* Merge pull request #5200 from adswa/tst-pathlengths
+   295c967ab0^-1
+-  Merge remote-tracking branch 'adswa/win-addurltests' into maint
+   b7c9864455^-1
+-  Merge pull request #5212 from yarikoptic/bfs2
+   1b013a8393^-1
+-  Merge pull request #5222 from yarikoptic/rf-ci-no56
+   6de327054b^-1
++  Merge pull request #5219 from yarikoptic/enh-ux-tokens
+   d52fc4607a^-1
++  Merge pull request #5218 from yarikoptic/bf-github-auth
+   93aa999491^-1
+-  Merge pull request #5223 from yarikoptic/enh-appveyor-coverage
+   58c9070db8^-1
++  Merge pull request #5106 from mih/bf-5064
+   43b5e4afc1^-1
++  Merge pull request #5238 from mih/rf-socketdir
+   066bb643f1^-1
++* Merge pull request #5214 from adswa/bf-5211
+   a1ab6b7e33^-1
