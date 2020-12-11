@@ -844,3 +844,74 @@ def test_push_matching(path):
     # and we pushed the commit in the current branch
     eq_(remote_ds.get_hexsha(DEFAULT_BRANCH),
         ds.repo.get_hexsha(DEFAULT_BRANCH))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
+    # the aim here is this high-level test a std create-push-clone cycle for a
+    # dataset with a subdataset, with the goal to ensure that correct branches
+    # and commits are tracked, regardless of platform behavior and condition
+    # of individual clones. Nothing fancy, just that the defaults behave in
+    # sensible ways
+    from datalad.cmd import WitlessRunner as Runner
+    run = Runner().run
+
+    # create original nested dataset
+    with chpwd(origpath):
+        run(['datalad', 'create', 'super'])
+        run(['datalad', 'create', '-d', 'super', str(Path('super', 'sub'))])
+
+    # verify essential linkage properties
+    orig_super = Dataset(Path(origpath, 'super'))
+    orig_sub = Dataset(orig_super.pathobj / 'sub')
+
+    # the "true" branch that sub is on, and the gitsha of the HEAD commit of it
+    orig_sub_corr_branch = \
+        orig_sub.repo.get_corresponding_branch() or orig_sub.repo.get_active_branch()
+    orig_sub_corr_commit = orig_sub.repo.get_hexsha(orig_sub_corr_branch)
+
+    # make sure the super trackes this commit
+    assert_in_results(
+        orig_super.subdatasets(),
+        path=orig_sub.path,
+        gitshasum=orig_sub_corr_commit,
+        # TODO it should also track the branch name
+        # Attempted: https://github.com/datalad/datalad/pull/3817
+        # But reverted: https://github.com/datalad/datalad/pull/4375
+    )
+
+    # publish to a store, to get into a platform-agnostic state
+    # (i.e. no impact of an annex-init of any kind)
+    store_url = 'ria+' + get_local_file_url(storepath)
+    with chpwd(orig_super.path):
+        run(['datalad', 'create-sibling-ria', '--recursive',
+             '-s', 'store', store_url])
+        run(['datalad', 'push', '--recursive', '--to', 'store'])
+
+    # we are using the 'store' sibling's URL, which should be a plain path
+    store_super = AnnexRepo(orig_super.siblings(name='store')[0]['url'], init=False)
+    store_sub = AnnexRepo(orig_sub.siblings(name='store')[0]['url'], init=False)
+
+    # both datasets in the store only carry the real branches, and nothing
+    # adjusted
+    for r in (store_super, store_sub):
+        eq_(sorted(r.get_branches()), [orig_sub_corr_branch, 'git-annex'])
+
+    # and reobtain from a store
+    with chpwd(clonepath):
+        run(['datalad', 'clone', store_url + '#' + orig_super.id, 'super'])
+        run(['datalad', '-C', 'super', 'get', 'sub'])
+
+    # verify that nothing has changed as a result of a push/clone cycle
+    clone_super = Dataset(Path(clonepath, 'super'))
+    clone_sub = Dataset(clone_super.pathobj / 'sub')
+    assert_in_results(
+        clone_super.subdatasets(),
+        path=clone_sub.path,
+        gitshasum=orig_sub_corr_commit,
+    )
+
+    with chpwd(clone_super.path):
+        run(['datalad', 'status', '--recursive'])
