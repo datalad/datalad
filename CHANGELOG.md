@@ -102,6 +102,8 @@ bet we will fix some bugs and make a world even a better place.
   - now supports tab-separated input.  ([#4845][])
   - gained a `--drop-after` switch that signals to drop a file's
     content after downloading and adding it to the annex.  ([#5081][])
+  - is now able to construct a tree of files from known checksums
+    without downloading content via its new `--key` option.  ([#5184][])
   - records the URL file in the commit message as provided by the
     caller it rather than using the resolved absolute path. ([#5091][])
   - is now speedier.  ([#4867][]) ([#5022][])
@@ -112,6 +114,9 @@ bet we will fix some bugs and make a world even a better place.
 - DataLad now ships with a module that is capable of installing
   git-annex via various methods.  See `python -m datalad.install -h`.
   ([#5098][]) ([#5139][])
+
+- New option `datalad.locations.extra-procedures` specifies an
+  additional location that should be searched for procedures.  ([#5156][])
 
 - The class for handling configuration values, `ConfigManager`, now
   takes a lock before writes to allow for multiple processes to modify
@@ -133,6 +138,15 @@ bet we will fix some bugs and make a world even a better place.
 
 - [wtf][] now includes credentials-related information (e.g. active
   backends) in the its output.  ([#4982][])
+
+- The `call_git*` methods of `GitRepo` now have a `read_only`
+  parameter.  Callers can set this to `True` to promise that the
+  provided command does not write to the repository, bypassing the
+  cost of some checks and locking.  ([#5070][])
+
+- New `call_annex*` methods in the `AnnexRepo` class provide an
+  interface for running git-annex commands similar to that of the
+  `GitRepo.call_git*` methods.  ([#5163][])
 
 - It's now possible to register a custom metadata indexer that is
   discovered by [search][] and used it to generate an index.  ([#4963][])
@@ -3439,6 +3453,7 @@ publishing
 [#5057]: https://github.com/datalad/datalad/issues/5057
 [#5060]: https://github.com/datalad/datalad/issues/5060
 [#5067]: https://github.com/datalad/datalad/issues/5067
+[#5070]: https://github.com/datalad/datalad/issues/5070
 [#5076]: https://github.com/datalad/datalad/issues/5076
 [#5081]: https://github.com/datalad/datalad/issues/5081
 [#5090]: https://github.com/datalad/datalad/issues/5090
@@ -3459,6 +3474,9 @@ publishing
 [#5146]: https://github.com/datalad/datalad/issues/5146
 [#5148]: https://github.com/datalad/datalad/issues/5148
 [#5151]: https://github.com/datalad/datalad/issues/5151
+[#5156]: https://github.com/datalad/datalad/issues/5156
+[#5163]: https://github.com/datalad/datalad/issues/5163
+[#5184]: https://github.com/datalad/datalad/issues/5184
 [#5194]: https://github.com/datalad/datalad/issues/5194
 [#5200]: https://github.com/datalad/datalad/issues/5200
 [#5201]: https://github.com/datalad/datalad/issues/5201
