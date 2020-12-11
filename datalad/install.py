@@ -191,8 +191,7 @@ class GitAnnexInstaller:
                 current_annex_version = line.split()[1]
             prev = line
         assert devel_annex_version is not None, "Could not find devel annex version"
-        assert current_annex_version is not None, "Could not find current annex version"
-        if (
+        if current_annex_version is None or (
             subprocess.run(
                 [
                     "dpkg",
