@@ -1158,7 +1158,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         json_objects = out.pop('stdout_json')
 
-        if out.get('stdout') or out.get('stderr'):
+        if out.get('stdout'):
             if json_objects:
                 # We at least received some valid json output, so warn about
                 # non-json output and continue.
