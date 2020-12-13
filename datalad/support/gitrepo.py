@@ -4081,7 +4081,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
             to_stage_submodules = {
-                str(f.relative_to(self.pathobj)): props
+                f: props
                 for f, props in status.items()
                 if props.get('state', None) in ('modified', 'untracked')
                 and props.get('type', None) == 'dataset'}
@@ -4091,10 +4091,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     len(to_stage_submodules), self,
                     to_stage_submodules
                     if len(to_stage_submodules) < 10 else '')
-                for r in GitRepo._save_add(
-                        self,
-                        to_stage_submodules,
-                        git_opts=None):
+                for r in self._save_add_submodules(to_stage_submodules):
+                    if r.get('status', None) == 'ok':
+                        added_submodule = True
                     yield r
 
         if added_submodule or vanished_subds:
@@ -4170,7 +4169,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             raise
 
     def _save_add_submodules(self, paths):
-        """Add new submodules
+        """Add new submodules, or updates records of existing ones
 
         This method does not use `git submodule add`, but aims to be more
         efficient by limiting the scope to mere in-place registration of
@@ -4209,7 +4208,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 url = './{}'.format(rpath)
             subm_id = subm.config.get('datalad.dataset.id', None)
             info.append(
-                dict(path=path, rpath=rpath, commit=subm_commit, id=subm_id,
+                dict(
+                     # if we have additional information on this path, pass it on.
+                     # if not, treat it as an untracked directory
+                     paths[path] if isinstance(paths, dict)
+                     else dict(type='directory', state='untracked'),
+                     path=path, rpath=rpath, commit=subm_commit, id=subm_id,
                      url=url))
 
         # bypass any convenience or safe-manipulator for speed reasons
@@ -4217,17 +4221,23 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         with (self.pathobj / '.gitmodules').open('a') as gmf, \
              (self.pathobj / '.git' / 'config').open('a') as gcf:
             for i in info:
+                # we update the subproject commit unconditionally
                 self.call_git([
                     'update-index', '--add', '--replace', '--cacheinfo', '160000',
                     i['commit'], i['rpath']
                 ])
-                gmprops = dict(path=i['rpath'], url=i['url'])
-                if i['id']:
-                    gmprops['datalad-id'] = i['id']
-                write_config_section(
-                    gmf, 'submodule', i['rpath'], gmprops)
-                write_config_section(
-                    gcf, 'submodule', i['rpath'], dict(active='true', url=i['url']))
+                # only write the .gitmodules/.config changes when this is not yet
+                # a subdataset
+                # TODO: we could update the URL, and branch info at this point,
+                # even for previously registered subdatasets
+                if i['type'] != 'dataset':
+                    gmprops = dict(path=i['rpath'], url=i['url'])
+                    if i['id']:
+                        gmprops['datalad-id'] = i['id']
+                    write_config_section(
+                        gmf, 'submodule', i['rpath'], gmprops)
+                    write_config_section(
+                        gcf, 'submodule', i['rpath'], dict(active='true', url=i['url']))
 
                 # This mirrors the result structure yielded for
                 # to_stage_submodules below.

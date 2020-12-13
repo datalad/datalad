@@ -867,6 +867,13 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     orig_super = Dataset(Path(origpath, 'super'))
     orig_sub = Dataset(orig_super.pathobj / 'sub')
 
+    (orig_super.pathobj / 'file1.txt').write_text('some1')
+    (orig_sub.pathobj / 'file2.txt').write_text('some1')
+    with chpwd(orig_super.path):
+        run(['datalad', 'save', '--recursive'])
+
+    assert_repo_status(orig_super.path)
+
     # the "true" branch that sub is on, and the gitsha of the HEAD commit of it
     orig_sub_corr_branch = \
         orig_sub.repo.get_corresponding_branch() or orig_sub.repo.get_active_branch()
