@@ -4055,7 +4055,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
-        added_submodule = False
+        submodule_change = False
         untracked_dirs = [f.relative_to(self.pathobj)
                           for f, props in status.items()
                           if props.get('state', None) == 'untracked' and
@@ -4075,7 +4075,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if to_add_submodules:
                 for r in self._save_add_submodules(to_add_submodules):
                     if r.get('status', None) == 'ok':
-                        added_submodule = True
+                        submodule_change = True
                     yield r
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
@@ -4093,10 +4093,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if len(to_stage_submodules) < 10 else '')
                 for r in self._save_add_submodules(to_stage_submodules):
                     if r.get('status', None) == 'ok':
-                        added_submodule = True
+                        submodule_change = True
                     yield r
 
-        if added_submodule or vanished_subds:
+        if submodule_change or vanished_subds:
             # the config has changed too
             self.config.reload()
             # need to include .gitmodules in what needs saving
