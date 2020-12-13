@@ -2798,7 +2798,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         out = self.call_git(
             ['config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
-        db, _ = _parse_gitconfig_dump(out, cwd=self.path)
+        # disable multi-value report, because we could not deal with them
+        # anyways, and they should not appear in a normal .gitmodules file
+        # but could easily appear when duplicates are included. In this case,
+        # we better not crash
+        db, _ = _parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
