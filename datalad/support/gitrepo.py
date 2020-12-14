@@ -3880,6 +3880,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def _diffstatus_get_state_props(self, to, f, from_state, to_state,
                                     modified_in_worktree):
         props = None
+        # each branch of the conditional must set props to a state dict
         if not from_state:
             # this is new, or rather not known to the previous state
             props = dict(
@@ -3907,16 +3908,16 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             else:
                 # a dataset
                 props = dict(type=to_state['type'])
-                if to is not None:
-                    # we can only be confident without looking
-                    # at the worktree, if we compare to a recorded
-                    # state
-                    props['state'] = 'clean'
-                else:
+                if to is None:
+                    # comparison against the worktree
                     # report the shasum that we know, for further
                     # wrangling of subdatasets below
                     props['gitshasum'] = to_state['gitshasum']
                     props['prev_gitshasum'] = from_state['gitshasum']
+                else:
+                    # we compare against a recorded state, just based on
+                    # the shas we can be confident
+                    props['state'] = 'clean'
         else:
             # change in git record, or on disk
             props = dict(
