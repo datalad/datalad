@@ -174,13 +174,7 @@ bet we will fix some bugs and make a world even a better place.
   ([#5141][]) ([#5142][])
 
 
-## 0.13.6 (??? ??, 2020) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+## 0.13.6 (December 14, 2020) -- .
 
 ### Fixes
 
@@ -215,8 +209,9 @@ bet we will fix some bugs and make a world even a better place.
   ([#5106][])
 
 - SSH cleanup wasn't reliably triggered by the ORA special remote on
-  failure, leading to a stall with git-annex 8.20201103.  (This is
-  also resolved on git-annex's end as of 8.20201127.)  ([#5151][])
+  failure, leading to a stall with a particular version of git-annex,
+  8.20201103.  (This is also resolved on git-annex's end as of
+  8.20201127.)  ([#5151][])
 
 ### Enhancements and new features
 
