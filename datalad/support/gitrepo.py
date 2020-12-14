@@ -3793,7 +3793,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         status = OrderedDict()
         for f, to_state_r in to_state.items():
             props = self._diffstatus_get_state_props(
-                to, f, from_state.get(f, None), to_state_r, modified)
+                to, f, from_state.get(f, None), to_state_r,
+                # if we compare against the worktree, report if
+                # path is reported as modified in it
+                to is None and f in modified)
             # potential early exit in "global" eval mode
             if eval_submodule_state == 'global' and \
                     props.get('state', None) not in ('clean', None):
@@ -3875,7 +3878,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             return status
 
     def _diffstatus_get_state_props(self, to, f, from_state, to_state,
-                                    modified):
+                                    modified_in_worktree):
         props = None
         if not from_state:
             # this is new, or rather not known to the previous state
@@ -3885,7 +3888,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if 'type' in to_state:
                 props['type'] = to_state['type']
         elif to_state['gitshasum'] == from_state['gitshasum'] and \
-                (modified is None or f not in modified):
+                not modified_in_worktree:
             if to_state['type'] != 'dataset':
                 # no change in git record, and no change on disk
                 props = dict(
