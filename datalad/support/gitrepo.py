@@ -3796,7 +3796,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 to, f, from_state.get(f, None), to_state_r,
                 # if we compare against the worktree, report if
                 # path is reported as modified in it
-                to is None and f in modified)
+                to is None and f in modified,
+                eval_submodule_state)
             # potential early exit in "global" eval mode
             if eval_submodule_state == 'global' and \
                     props.get('state', None) not in ('clean', None):
@@ -3878,7 +3879,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             return status
 
     def _diffstatus_get_state_props(self, to, f, from_state, to_state,
-                                    modified_in_worktree):
+                                    modified_in_worktree, eval_submodule_state):
         props = {}
         if 'type' in to_state:
             props['type'] = to_state['type']
@@ -3894,10 +3895,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # this is new, or rather not known to the previous state
             state = 'added' if to_sha else 'untracked'
         elif to_sha == from_sha and not modified_in_worktree:
-            # something that is seemingly unmodified, base on the info
+            # something that is seemingly unmodified, based on the info
             # gathered so far
             if to_state['type'] == 'dataset':
-                if to is not None:
+                if to is not None or eval_submodule_state == 'commit':
                     # we compare against a recorded state, just based on
                     # the shas we can be confident, otherwise the state
                     # of a subdataset isn't fully known yet, because
