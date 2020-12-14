@@ -3793,7 +3793,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         status = OrderedDict()
         for f, to_state_r in to_state.items():
             props = self._diffstatus_get_state_props(
-                to, f, from_state, to_state_r, modified)
+                to, f, from_state.get(f, None), to_state_r, modified)
             # potential early exit in "global" eval mode
             if eval_submodule_state == 'global' and \
                     props.get('state', None) not in ('clean', None):
@@ -3877,14 +3877,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def _diffstatus_get_state_props(self, to, f, from_state, to_state_r,
                                     modified):
         props = None
-        if f not in from_state:
+        if not from_state:
             # this is new, or rather not known to the previous state
             props = dict(
                 state='added' if to_state_r['gitshasum'] else 'untracked',
             )
             if 'type' in to_state_r:
                 props['type'] = to_state_r['type']
-        elif to_state_r['gitshasum'] == from_state[f]['gitshasum'] and \
+        elif to_state_r['gitshasum'] == from_state['gitshasum'] and \
                 (modified is None or f not in modified):
             if to_state_r['type'] != 'dataset':
                 # no change in git record, and no change on disk
@@ -3913,7 +3913,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # report the shasum that we know, for further
                     # wrangling of subdatasets below
                     props['gitshasum'] = to_state_r['gitshasum']
-                    props['prev_gitshasum'] = from_state[f]['gitshasum']
+                    props['prev_gitshasum'] = from_state['gitshasum']
         else:
             # change in git record, or on disk
             props = dict(
@@ -3933,11 +3933,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if 'bytesize' in to_state_r:
                 # if we got this cheap, report it
                 props['bytesize'] = to_state_r['bytesize']
-            elif state == 'clean' and 'bytesize' in from_state[f]:
+            elif state == 'clean' and 'bytesize' in from_state:
                 # no change, we can take this old size info
-                props['bytesize'] = from_state[f]['bytesize']
+                props['bytesize'] = from_state['bytesize']
         if state in ('clean', 'modified', 'deleted'):
-            props['prev_gitshasum'] = from_state[f]['gitshasum']
+            props['prev_gitshasum'] = from_state['gitshasum']
         return props
 
     def _save_pre(self, paths, _status, **kwargs):
