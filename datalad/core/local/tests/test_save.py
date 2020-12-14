@@ -234,7 +234,7 @@ def test_subsuperdataset_save(path):
     parent.save('sub1')
     sub1.save('sub2')
     assert_raises(CommandError, parent.save, 'sub1', recursive=True)
-    # but should not fail in the top level superdataset
+    # and should not fail in the top level superdataset
     with chpwd(parent.path):
         save('sub1')
     # or in a subdataset above the problematic one
