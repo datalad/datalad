@@ -407,15 +407,17 @@ def _annex_sync(repo, remote, _target, merge_opts=None):
 def _reobtain(ds, merge_fn):
     def wrapped(*args, **kwargs):
         repo = ds.repo
+        repo_pathobj = repo.pathobj
 
         lgr.info("Applying updates to %s", ds)
         # get all annexed files that have data present
         lgr.info('Recording file content availability '
                  'to re-obtain updated files later on')
-        ds_path = ds.path
-        present_files = [
-            opj(ds_path, p)
-            for p in repo.get_annexed_files(with_content_only=True)]
+        ainfo = repo.get_content_annexinfo(
+            init=None, eval_availability=True)
+        # Recode paths for ds.get() call.
+        present_files = [str(ds.pathobj / f.relative_to(repo_pathobj))
+                         for f, st in ainfo.items() if st["has_content"]]
 
         yield from merge_fn(*args, **kwargs)
 
