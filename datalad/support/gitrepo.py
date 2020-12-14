@@ -3882,15 +3882,18 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         props = {}
         if 'type' in to_state:
             props['type'] = to_state['type']
+
+        to_sha = to_state['gitshasum']
+        from_sha = from_state['gitshasum'] if from_state else None
+
         # determine the state of `f` from from_state and to_state records, if
         # it can be determined conclusively from it. If not, it will
         # stay None for now
         state = None
         if not from_state:
             # this is new, or rather not known to the previous state
-            state = 'added' if to_state['gitshasum'] else 'untracked'
-        elif to_state['gitshasum'] == from_state['gitshasum'] and \
-                not modified_in_worktree:
+            state = 'added' if to_sha else 'untracked'
+        elif to_sha == from_sha and not modified_in_worktree:
             # something that is seemingly unmodified, base on the info
             # gathered so far
             if to_state['type'] == 'dataset':
@@ -3931,7 +3934,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # assign present gitsha to any record
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
-            props['gitshasum'] = to_state['gitshasum']
+            props['gitshasum'] = to_sha
             if 'bytesize' in to_state:
                 # if we got this cheap, report it
                 props['bytesize'] = to_state['bytesize']
@@ -3942,7 +3945,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # assign previous gitsha to any record
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
-            props['prev_gitshasum'] = from_state['gitshasum']
+            props['prev_gitshasum'] = from_sha
         if state:
             # only report a state if we could determine any
             # outside code tests for existence of the property
