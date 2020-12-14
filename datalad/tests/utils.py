@@ -98,6 +98,8 @@ from . import _TEMP_PATHS_GENERATED
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
 )
 
 # temp paths used by clones
@@ -1939,8 +1941,11 @@ def get_ssh_port(host):
     SkipTest if port cannot be found.
     """
     out = ''
+    runner = WitlessRunner()
     try:
-        out, err = Runner()(["ssh", "-G", host])
+        res = runner.run(["ssh", "-G", host], protocol=StdOutErrCapture)
+        out = res["stdout"]
+        err = res["stderr"]
     except Exception as exc:
         err = str(exc)
 
