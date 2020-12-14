@@ -3901,7 +3901,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         eval_submodule_state : {'commit', 'no', ...}
         """
         if against_commit:
-            # we can ignore any worktree modification report when
+            # we can ignore any worktree modification reported when
             # comparing against a commit
             modified_in_worktree = False
 
