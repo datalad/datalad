@@ -3793,10 +3793,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         status = OrderedDict()
         for f, to_state_r in to_state.items():
             props = self._diffstatus_get_state_props(
-                to, f, from_state.get(f, None), to_state_r,
-                # if we compare against the worktree, report if
+                f,
+                from_state.get(f, None),
+                to_state_r,
+                # are we comparing against a recorded commit or the worktree
+                to is not None,
+                # if we have worktree modification info, report if
                 # path is reported as modified in it
-                to is None and f in modified,
+                modified and f in modified,
                 eval_submodule_state)
             # potential early exit in "global" eval mode
             if eval_submodule_state == 'global' and \
@@ -3878,8 +3882,29 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         else:
             return status
 
-    def _diffstatus_get_state_props(self, to, f, from_state, to_state,
-                                    modified_in_worktree, eval_submodule_state):
+    def _diffstatus_get_state_props(self, f, from_state, to_state,
+                                    against_commit,
+                                    modified_in_worktree,
+                                    eval_submodule_state):
+        """Helper to determine diff properties for a single path
+
+        Parameters
+        ----------
+        f : Path
+        from_state : dict
+        to_state : dict
+        against_commit : bool
+          Flag whether `to_state` reflects a commit or the worktree.
+        modified_in_worktree : bool
+          Flag whether a worktree modification is reported. This is ignored
+          when `against_commit` is True.
+        eval_submodule_state : {'commit', 'no', ...}
+        """
+        if against_commit:
+            # we can ignore any worktree modification report when
+            # comparing against a commit
+            modified_in_worktree = False
+
         props = {}
         if 'type' in to_state:
             props['type'] = to_state['type']
@@ -3898,7 +3923,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # something that is seemingly unmodified, based on the info
             # gathered so far
             if to_state['type'] == 'dataset':
-                if to is not None or eval_submodule_state == 'commit':
+                if against_commit or eval_submodule_state == 'commit':
                     # we compare against a recorded state, just based on
                     # the shas we can be confident, otherwise the state
                     # of a subdataset isn't fully known yet, because
@@ -3918,7 +3943,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # gone before declaring it clean. This working tree
                 # check is irrelevant and wrong if to is a ref.
                 state = 'clean' \
-                    if to is not None or (f.exists() or f.is_symlink()) \
+                    if against_commit or (f.exists() or f.is_symlink()) \
                     else 'deleted'
         else:
             # change in git record, or on disk
