@@ -3879,20 +3879,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     def _diffstatus_get_state_props(self, to, f, from_state, to_state,
                                     modified_in_worktree):
-        props = None
-        # each branch of the conditional must set props to a state dict
+        props = {}
+        if 'type' in to_state:
+            props['type'] = to_state['type']
+        # determine the state of `f` from from_state and to_state records, if
+        # it can be determined conclusively from it. If not, it will
+        # stay None for now
+        state = None
         if not from_state:
             # this is new, or rather not known to the previous state
-            props = dict(
-                state='added' if to_state['gitshasum'] else 'untracked',
-            )
-            if 'type' in to_state:
-                props['type'] = to_state['type']
+            state = 'added' if to_state['gitshasum'] else 'untracked'
         elif to_state['gitshasum'] == from_state['gitshasum'] and \
                 not modified_in_worktree:
             # something that is seemingly unmodified, base on the info
             # gathered so far
-            props = dict(type=to_state['type'])
             if to_state['type'] == 'dataset':
                 if to is not None:
                     # we compare against a recorded state, just based on
@@ -3903,7 +3903,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     # it for uncommitted changes. Such tests are done
                     # later and based on further conditionals for
                     # performance reasons
-                    props['state'] = 'clean'
+                    state = 'clean'
             else:
                 # no change in git record, and no change on disk
                 # at this point we know that the reported object ids
@@ -3913,23 +3913,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 # identical id, so we need to check whether the file is
                 # gone before declaring it clean. This working tree
                 # check is irrelevant and wrong if to is a ref.
-                props['state'] = 'clean' \
-                if to is not None or (f.exists() or f.is_symlink()) \
-                else 'deleted'
+                state = 'clean' \
+                    if to is not None or (f.exists() or f.is_symlink()) \
+                    else 'deleted'
         else:
             # change in git record, or on disk
-            props = dict(
-                # TODO we could have a new file that is already staged
-                # but had subsequent modifications done to it that are
-                # unstaged. Such file would presently show up as 'added'
-                # ATM I think this is OK, but worth stating...
-                state='modified' if f.exists() or \
-                f.is_symlink() else 'deleted',
-                # TODO record before and after state for diff-like use
-                # cases
-                type=to_state['type'],
-            )
-        state = props.get('state', None)
+            # TODO we could have a new file that is already staged
+            # but had subsequent modifications done to it that are
+            # unstaged. Such file would presently show up as 'added'
+            # ATM I think this is OK, but worth stating...
+            state = 'modified' \
+                if f.exists() or f.is_symlink() else 'deleted'
+            # TODO record before and after state for diff-like use
+            # cases
+
         if state in ('clean', 'added', 'modified', None):
             # assign present gitsha to any record
             # state==None can only happen for subdatasets that
@@ -3946,6 +3943,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # state==None can only happen for subdatasets that
             # already existed, so also assign a sha for them
             props['prev_gitshasum'] = from_state['gitshasum']
+        if state:
+            # only report a state if we could determine any
+            # outside code tests for existence of the property
+            # and not (always) for the value
+            props['state'] = state
         return props
 
     def _save_pre(self, paths, _status, **kwargs):
