@@ -221,21 +221,25 @@ def test_subsuperdataset_save(path):
     sub2 = parent.create(sub1.pathobj / 'sub2')
     sub3 = parent.create(sub2.pathobj / 'sub3')
     assert_repo_status(path)
-    # now we will lobotomize that sub2 so git would fail if any query is performed.
-    rmtree(str(sub3.pathobj / '.git' / 'objects'))
+    # now we will lobotomize that sub3 so git would fail if any query is performed.
+    (sub3.pathobj / '.git' / 'config').chmod(0o000)
+    try:
+        sub3.repo.call_git(['ls-files'])
+        raise SkipTest
+    except CommandError:
+        # desired outcome
+        pass
     # the call should proceed fine since neither should care about sub3
     # default is no recursion
     parent.save('sub1')
     sub1.save('sub2')
     assert_raises(CommandError, parent.save, 'sub1', recursive=True)
-    # and should fail if we request saving while in the parent directory
-    # but while not providing a dataset, since operation would run within
-    # pointed subdataset
-    with chpwd(sub1.path):
-        assert_raises(CommandError, save, 'sub2')
-    # but should not fail in the top level superdataset
+    # and should not fail in the top level superdataset
     with chpwd(parent.path):
         save('sub1')
+    # or in a subdataset above the problematic one
+    with chpwd(sub1.path):
+        save('sub2')
 
 
 @skip_wo_symlink_capability
