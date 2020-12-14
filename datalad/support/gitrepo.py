@@ -3874,19 +3874,19 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         else:
             return status
 
-    def _diffstatus_get_state_props(self, to, f, from_state, to_state_r,
+    def _diffstatus_get_state_props(self, to, f, from_state, to_state,
                                     modified):
         props = None
         if not from_state:
             # this is new, or rather not known to the previous state
             props = dict(
-                state='added' if to_state_r['gitshasum'] else 'untracked',
+                state='added' if to_state['gitshasum'] else 'untracked',
             )
-            if 'type' in to_state_r:
-                props['type'] = to_state_r['type']
-        elif to_state_r['gitshasum'] == from_state['gitshasum'] and \
+            if 'type' in to_state:
+                props['type'] = to_state['type']
+        elif to_state['gitshasum'] == from_state['gitshasum'] and \
                 (modified is None or f not in modified):
-            if to_state_r['type'] != 'dataset':
+            if to_state['type'] != 'dataset':
                 # no change in git record, and no change on disk
                 props = dict(
                     # at this point we know that the reported object ids
@@ -3899,11 +3899,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     state='clean'
                     if to is not None or (f.exists() or f.is_symlink())
                     else 'deleted',
-                    type=to_state_r['type'],
+                    type=to_state['type'],
                 )
             else:
                 # a dataset
-                props = dict(type=to_state_r['type'])
+                props = dict(type=to_state['type'])
                 if to is not None:
                     # we can only be confident without looking
                     # at the worktree, if we compare to a recorded
@@ -3912,7 +3912,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 else:
                     # report the shasum that we know, for further
                     # wrangling of subdatasets below
-                    props['gitshasum'] = to_state_r['gitshasum']
+                    props['gitshasum'] = to_state['gitshasum']
                     props['prev_gitshasum'] = from_state['gitshasum']
         else:
             # change in git record, or on disk
@@ -3925,14 +3925,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 f.is_symlink() else 'deleted',
                 # TODO record before and after state for diff-like use
                 # cases
-                type=to_state_r['type'],
+                type=to_state['type'],
             )
         state = props.get('state', None)
         if state in ('clean', 'added', 'modified'):
-            props['gitshasum'] = to_state_r['gitshasum']
-            if 'bytesize' in to_state_r:
+            props['gitshasum'] = to_state['gitshasum']
+            if 'bytesize' in to_state:
                 # if we got this cheap, report it
-                props['bytesize'] = to_state_r['bytesize']
+                props['bytesize'] = to_state['bytesize']
             elif state == 'clean' and 'bytesize' in from_state:
                 # no change, we can take this old size info
                 props['bytesize'] = from_state['bytesize']
