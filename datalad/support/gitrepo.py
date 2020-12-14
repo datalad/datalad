@@ -3890,34 +3890,32 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 props['type'] = to_state['type']
         elif to_state['gitshasum'] == from_state['gitshasum'] and \
                 not modified_in_worktree:
-            if to_state['type'] != 'dataset':
-                # no change in git record, and no change on disk
-                props = dict(
-                    # at this point we know that the reported object ids
-                    # for this file are identical in the to and from
-                    # records.  If to is None, we're comparing to the
-                    # working tree and a deleted file will still have an
-                    # identical id, so we need to check whether the file is
-                    # gone before declaring it clean. This working tree
-                    # check is irrelevant and wrong if to is a ref.
-                    state='clean'
-                    if to is not None or (f.exists() or f.is_symlink())
-                    else 'deleted',
-                    type=to_state['type'],
-                )
-            else:
-                # a dataset
-                props = dict(type=to_state['type'])
-                if to is None:
-                    # comparison against the worktree
-                    # report the shasum that we know, for further
-                    # wrangling of subdatasets below
-                    props['gitshasum'] = to_state['gitshasum']
-                    props['prev_gitshasum'] = from_state['gitshasum']
-                else:
+            # something that is seemingly unmodified, base on the info
+            # gathered so far
+            props = dict(type=to_state['type'])
+            if to_state['type'] == 'dataset':
+                if to is not None:
                     # we compare against a recorded state, just based on
-                    # the shas we can be confident
+                    # the shas we can be confident, otherwise the state
+                    # of a subdataset isn't fully known yet, because
+                    # `modified_in_worktree` will only reflect changes
+                    # in the commit of a subdataset without looking into
+                    # it for uncommitted changes. Such tests are done
+                    # later and based on further conditionals for
+                    # performance reasons
                     props['state'] = 'clean'
+            else:
+                # no change in git record, and no change on disk
+                # at this point we know that the reported object ids
+                # for this file are identical in the to and from
+                # records.  If to is None, we're comparing to the
+                # working tree and a deleted file will still have an
+                # identical id, so we need to check whether the file is
+                # gone before declaring it clean. This working tree
+                # check is irrelevant and wrong if to is a ref.
+                props['state'] = 'clean' \
+                if to is not None or (f.exists() or f.is_symlink()) \
+                else 'deleted'
         else:
             # change in git record, or on disk
             props = dict(
@@ -3932,7 +3930,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 type=to_state['type'],
             )
         state = props.get('state', None)
-        if state in ('clean', 'added', 'modified'):
+        if state in ('clean', 'added', 'modified', None):
+            # assign present gitsha to any record
+            # state==None can only happen for subdatasets that
+            # already existed, so also assign a sha for them
             props['gitshasum'] = to_state['gitshasum']
             if 'bytesize' in to_state:
                 # if we got this cheap, report it
@@ -3940,7 +3941,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             elif state == 'clean' and 'bytesize' in from_state:
                 # no change, we can take this old size info
                 props['bytesize'] = from_state['bytesize']
-        if state in ('clean', 'modified', 'deleted'):
+        if state in ('clean', 'modified', 'deleted', None):
+            # assign previous gitsha to any record
+            # state==None can only happen for subdatasets that
+            # already existed, so also assign a sha for them
             props['prev_gitshasum'] = from_state['gitshasum']
         return props
 
