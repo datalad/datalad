@@ -125,7 +125,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
         assert installed_ds.is_installed()
         assert_repo_status(installed_ds.repo)
         eq_(installed_ds.id, ds.id)
-        assert_in(op.join('ds', 'file1.txt'),
+        # Note: get_annexed_files() always reports POSIX paths.
+        assert_in('ds/file1.txt',
                   installed_ds.repo.get_annexed_files())
         assert_result_count(installed_ds.get(op.join('ds', 'file1.txt')),
                             1,
