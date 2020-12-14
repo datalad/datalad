@@ -1158,7 +1158,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         json_objects = out.pop('stdout_json')
 
-        if out.get('stdout') or out.get('stderr'):
+        if out.get('stdout'):
             if json_objects:
                 # We at least received some valid json output, so warn about
                 # non-json output and continue.
@@ -2164,9 +2164,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._call_annex(
             ['addurl'] + options + urls,
             git_options=git_options,
-            # Don't capture stderr, since download progress provided by wget uses
-            # stderr.
-            protocol=StdOutCapture,
+            # In general, don't capture stderr, since download progress
+            # provided by wget uses stderr. But when git-annex runs
+            # with --debug on verbose log-levels, this would leak tons of
+            # output instead of going through normal logging. In that case,
+            # capture stderr and expense of progress reporting (where beauty
+            # is of lower priority).
+            protocol=StdOutErrCapture
+            if lgr.getEffectiveLevel() <= 8 else StdOutCapture
         )
 
         # currently simulating similar return value, assuming success
