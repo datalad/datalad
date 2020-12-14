@@ -202,14 +202,15 @@ def test_uninstall_subdataset(src, dst):
     for subds in ds.subdatasets(result_xfm='datasets'):
         ok_(subds.is_installed())
 
-        annexed_files = subds.repo.get_annexed_files()
-        subds.repo.get(annexed_files)
+        repo = subds.repo
+        annexed_files = repo.get_annexed_files()
+        repo.get(annexed_files)
 
         # drop data of subds:
         res = ds.drop(path=subds.path, result_xfm='paths')
 
         ok_(all([opj(subds.path, f) in res for f in annexed_files]))
-        ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
+        ok_(all([not i for i in repo.file_has_content(annexed_files)]))
         # subdataset is still known
         assert_in(subds.path, ds.subdatasets(result_xfm='paths'))
 
