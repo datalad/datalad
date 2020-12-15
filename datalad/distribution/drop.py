@@ -101,6 +101,12 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
         success = success_status_map[res['status']]
         respath_by_status[success] = \
             respath_by_status.get(success, []) + [res['path']]
+        if res["status"] == "error" and res["action"] == "drop":
+            msg = res["message"]
+            if isinstance(msg, str) and "Use --force to" in msg:
+                # Avoid confusing datalad-drop callers with git-annex-drop's
+                # suggestion to use --force.
+                res["message"] = msg.replace("--force", "--nocheck")
         yield res
     # report on things requested that annex was silent about
     for r in results_from_annex_noinfo(

@@ -3517,6 +3517,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             '--no-push', '--no-pull', '--no-commit', '--no-resolvemerge',
             '--no-content'])
         self.call_git(cmd)
+        # a sync can establish new config (e.g. annex-uuid for a remote)
+        self.config.reload()
         # cleanup sync'ed branch if we caused it
         if not had_synced_branch and synced_branch in self.get_branches():
             lgr.debug('Remove previously non-existent %s branch after sync',

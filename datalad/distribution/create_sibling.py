@@ -93,7 +93,12 @@ from datalad.utils import (
     quote_cmdlinearg,
 )
 
+from datalad.utils import on_windows
+
 lgr = logging.getLogger('datalad.distribution.create_sibling')
+# Window's own mkdir command creates intermediate directories by default
+# and does not take flags: https://github.com/datalad/datalad/issues/5211
+mkdir_cmd = "mkdir" if on_windows else "mkdir -p" 
 
 
 class _RunnerAdapter(Runner):
@@ -279,9 +284,8 @@ def _create_dataset_sibling(
                 raise ValueError(
                     "Do not know how to handle existing={}".format(
                         repr(existing)))
-
         if not path_exists:
-            shell("mkdir -p {}".format(sh_quote(remoteds_path)))
+            shell("{} {}".format(mkdir_cmd, sh_quote(remoteds_path)))
 
     delayed_super = _DelayedSuper(ds)
     if inherit and delayed_super.super:
@@ -791,7 +795,7 @@ class CreateSibling(Interface):
             lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
                 shell("cd {} "
-                      "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                      "&& ( [ -x hooks/post-update ] && hooks/post-update || true )"
                       "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
@@ -924,7 +928,7 @@ class CreateSibling(Interface):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
         # make sure hooks directory exists (see #1251)
-        ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
+        ssh('{} {}'.format(mkdir_cmd, sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
 
         # create json command for current dataset
@@ -985,7 +989,7 @@ done
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, WEB_HTML_DIR)
-        ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
+        ssh('{} {}'.format(mkdir_cmd, sh_quote(webresources_remote)))
         ssh.put(webresources_local, webresources_remote, recursive=True)
 
         # minimize and upload js assets

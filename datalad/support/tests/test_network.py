@@ -10,6 +10,8 @@
 import logging
 
 import os
+import sys
+
 from os.path import (
     join as opj,
     isabs,
@@ -470,6 +472,16 @@ def test_get_local_file_url():
                 #('/a b/', 'file:///a%20b/'),
                 ('/a b/name', 'file:///a%20b/name'),
             ):
+        try:
+            # Yarik found no better way to trigger.  .decode() isn't enough
+            print("D: %s" % path)
+        except UnicodeEncodeError:
+            if sys.version_info < (3, 7):
+                # observed test failing on ubuntu 18.04 with python 3.6
+                # (reproduced in conda env locally with python 3.6.10 when LANG=C
+                # We will just skip this tricky one
+                continue
+            raise
         if isabs(path):
             eq_(get_local_file_url(path), url)
         else:

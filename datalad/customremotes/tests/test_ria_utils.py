@@ -7,14 +7,18 @@ from datalad.customremotes.ria_utils import (
     create_ds_in_store,
     UnknownLayoutVersion
 )
-from datalad.utils import Path
+from datalad.utils import (
+    on_windows,
+    Path,
+)
 from datalad.tests.utils import (
     assert_equal,
     assert_raises,
     assert_true,
     rmtree,
     skip_ssh,
-    with_tempfile
+    with_tempfile,
+    SkipTest,
 )
 
 
@@ -56,6 +60,10 @@ def _test_setup_store(io_cls, io_args, store):
 def test_setup_store():
 
     yield _test_setup_store, LocalIO, []
+
+    if on_windows:
+        raise SkipTest('ora_remote.SSHRemoteIO stalls on Windows')
+
     yield skip_ssh(_test_setup_store), SSHRemoteIO, ['datalad-test']
 
 
@@ -109,4 +117,8 @@ def _test_setup_ds_in_store(io_cls, io_args, store):
 def test_setup_ds_in_store():
 
     yield _test_setup_ds_in_store, LocalIO, []
+
+    if on_windows:
+        raise SkipTest('ora_remote.SSHRemoteIO stalls on Windows')
+
     yield skip_ssh(_test_setup_ds_in_store), SSHRemoteIO, ['datalad-test']

@@ -722,27 +722,35 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
             target,
         )
         return
+
+    ds_repo = ds.repo
+
     res_kwargs['target'] = target
     if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
         # this remote either isn't an annex,
         # or hasn't been properly initialized
-        # rather than barfing tons of messages for each file, do one
-        # for the entire dataset
-        yield dict(
-            res_kwargs,
-            action='copy',
-            status='impossible'
-            if force in ('all', 'checkdatapresent')
-            else 'notneeded',
-            message=(
-                "Target '%s' does not appear to be an annex remote",
-                target)
-        )
-        return
+        # given that there was no annex-ignore, let's try to init it
+        # see https://github.com/datalad/datalad/issues/5143 for the story
+        ds_repo.localsync(target)
+
+        if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
+            # still nothing
+            # rather than barfing tons of messages for each file, do one
+            # for the entire dataset
+            yield dict(
+                res_kwargs,
+                action='copy',
+                status='impossible'
+                if force in ('all', 'checkdatapresent')
+                else 'notneeded',
+                message=(
+                    "Target '%s' does not appear to be an annex remote",
+                    target)
+            )
+            return
 
     # it really looks like we will transfer files, get info on what annex
     # has in store
-    ds_repo = ds.repo
     # paths must be recoded to a dataset REPO root (in case of a symlinked
     # location
     annex_info_init = \

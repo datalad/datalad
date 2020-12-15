@@ -687,6 +687,7 @@ def test_AnnexRepo_get_file_backend(src, dst):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
+@known_failure_windows
 @with_tempfile
 def test_AnnexRepo_always_commit(path):
 

@@ -48,6 +48,7 @@ from datalad.tests.utils import (
     integration,
     known_failure,
     known_failure_appveyor,
+    known_failure_windows,
     neq_,
     nok_,
     ok_,
@@ -69,6 +70,7 @@ from datalad.tests.utils import (
     with_tree,
     SkipTest,
 )
+from datalad.support.network import get_local_file_url
 from datalad.core.distributed.clone import (
     _get_installationpath_from_url,
     decode_source_spec,
@@ -360,9 +362,23 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
     if annex:
-        # the standard setup keeps the annex locks accessible to the user only
-        nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-             & stat.S_IWGRP)
+        if ds.repo.git_annex_version < "8.20200908":
+            # TODO: Drop when GIT_ANNEX_MIN_VERSION is at least 8.20200908.
+
+            # the standard setup keeps the annex locks accessible to the user only
+            nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP)
+        else:
+            # umask might be such (e.g. 002) that group write permissions are inherited, so
+            # for the next test we should check if that is the case on some sample file
+            dltmp_path = ds.pathobj / '.git' / "dltmp"
+            dltmp_path.write_text('')
+            default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
+            dltmp_path.unlink()
+            # the standard setup keeps the annex locks following umask inheritance
+            eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP, default_grp_write_perms)
+
         # but we can set it up for group-shared access too
         sharedds = clone(
             src, sharedpath,
@@ -895,7 +911,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     # URL to use for upload. Point is, that this should be invalid for the clone
     # so that autoenable would fail. Therefore let it be based on a to be
     # deleted symlink
-    upl_url = "ria+{}".format(link.as_uri())
+    upl_url = "ria+{}".format(get_local_file_url(str(link)))
 
     for d in (ds, subds, subgit):
 
@@ -927,7 +943,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
-@known_failure_appveyor
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
@@ -943,7 +959,7 @@ def test_ria_postclonecfg():
         id = _postclonetest_prepare(lcl, store)
 
         # test cloning via ria+file://
-        yield _test_ria_postclonecfg, Path(store).as_uri(), id
+        yield _test_ria_postclonecfg, get_local_file_url(store, compatibility='git'), id
 
         # Note: HTTP disabled for now. Requires proper implementation in ORA
         #       remote. See
@@ -1255,3 +1271,19 @@ def test_fetch_git_special_remote(url_path, url, path):
     ds_b = clone(ds_a.path, path / "other")
     ds_b.get("f1")
     ok_(ds_b.repo.file_has_content("f1"))
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_nonuniform_adjusted_subdataset(path):
+    # https://github.com/datalad/datalad/issues/5107
+    topds = Dataset(Path(path) / "top").create()
+    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    if not topds.repo.is_managed_branch():
+        raise SkipTest(
+            "Test logic assumes default dataset state is adjusted")
+    topds.clone(
+        source='git://github.com/datalad/testrepo--basic--r1',
+        path='subds')
+    eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
+        subds_url)

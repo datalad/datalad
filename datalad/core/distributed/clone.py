@@ -50,6 +50,7 @@ from datalad.support.param import Parameter
 from datalad.support.network import (
     get_local_file_url,
     download_url,
+    is_url,
     URL,
     RI,
     DataLadRI,
@@ -395,7 +396,8 @@ def clone_dataset(
             for cand in candidate_sources:
                 src = cand['giturl']
                 if track_url == src \
-                        or get_local_file_url(track_url, compatibility='git') == src \
+                        or (not is_url(track_url)
+                            and get_local_file_url(track_url, compatibility='git') == src) \
                         or track_path == expanduser(src):
                     yield get_status_dict(
                         status='notneeded',
