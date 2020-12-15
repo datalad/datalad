@@ -21,7 +21,6 @@ from ..archives import (
     ArchiveAnnexCustomRemote,
     link_file_load,
 )
-from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from .test_base import (
@@ -59,7 +58,6 @@ from ...utils import (
     _path_,
     unlink,
 )
-from . import _get_custom_runner
 
 
 from ...tests.test_archives import (
@@ -84,7 +82,7 @@ from datalad import cfg as dl_cfg
 @with_tempfile()
 def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
-    annex = AnnexRepo(d, backend='MD5E', runner=_get_custom_runner(d))
+    annex = AnnexRepo(d, backend='MD5E')
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
@@ -136,7 +134,7 @@ def test_basic_scenario(d, d2):
     annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_annex = AnnexRepo.clone(d, d2, runner=_get_custom_runner(d2))
+    cloned_annex = AnnexRepo.clone(d, d2)
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 
@@ -146,17 +144,6 @@ def test_basic_scenario(d, d2):
     assert_true(cloned_annex.file_has_content(fn_extracted))
     # as a result it would also fetch tarball
     assert_true(cloned_annex.file_has_content(fn_archive))
-
-    # Check if protocol was collected
-    if dl_cfg.get('datalad.tests.protocolremote'):
-        assert_is_instance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol)
-        protocol_file = _path_(annex.path,
-                               '.git/bin/git-annex-remote-datalad-archive')
-        ok_file_has_content(protocol_file, "VERSION 1", re_=True, match=False)
-        ok_file_has_content(protocol_file, "GETAVAILABILITY", re_=True, match=False)
-        ok_file_has_content(protocol_file, "#!/bin/bash", re_=True, match=False)
-    else:
-        assert_false(isinstance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol))
 
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py

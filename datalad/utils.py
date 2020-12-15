@@ -603,11 +603,11 @@ else:
 
         Works only on linux and OSX ATM
         """
-        from .cmd import Runner
+        from .cmd import WitlessRunner
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
-        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():

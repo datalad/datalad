@@ -145,12 +145,6 @@ definitions = {
                'title': 'Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set'}),
         'type': EnsureBool(),
     },
-    'datalad.tests.protocolremote': {
-        'ui': ('yesno', {
-            'title': 'Binary flag to specify whether to test protocol '
-                     'interactions of custom remote with annex'}),
-        'type': EnsureBool(),
-    },
     'datalad.tests.dataladremote': {
         'ui': ('yesno', {
                'title': 'Binary flag to specify whether each annex repository should get datalad special remote in every test repository'}),
@@ -267,14 +261,6 @@ definitions = {
     'datalad.log.traceback': {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
-    },
-    'datalad.cmd.protocol': {
-        'ui': ('question', {
-               'title': 'Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. "externals-time" for ExecutionTimeExternalsProtocol, "time" for ExecutionTimeProtocol and "null" for NullProtocol. Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface'}),
-    },
-    'datalad.cmd.protocol.prefix': {
-        'ui': ('question', {
-               'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
