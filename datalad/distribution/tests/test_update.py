@@ -404,7 +404,6 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     assert_repo_status(ds.path)
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_reobtain_data(originpath, destpath):

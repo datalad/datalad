@@ -1218,12 +1218,12 @@ def test_annex_ssh(topdir):
 def test_annex_remove(path):
     repo = AnnexRepo(path, create=False)
 
-    file_list = repo.get_annexed_files()
+    file_list = list(repo.get_content_annexinfo(init=None))
     assert len(file_list) >= 1
     # remove a single file
-    out = repo.remove(file_list[0])
-    assert_not_in(file_list[0], repo.get_annexed_files())
-    eq_(out[0], file_list[0])
+    out = repo.remove(str(file_list[0]))
+    assert_not_in(file_list[0], repo.get_content_annexinfo(init=None))
+    eq_(out[0], str(file_list[0].relative_to(repo.pathobj)))
 
     with open(opj(repo.path, "rm-test.dat"), "w") as f:
         f.write("whatever")
