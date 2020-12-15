@@ -2513,7 +2513,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        A list of file names
+        A list of POSIX file names
         """
         if not patterns:
             args = [] if with_content_only else ['--include', "*"]
