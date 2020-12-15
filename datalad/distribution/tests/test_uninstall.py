@@ -190,8 +190,6 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:509
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
