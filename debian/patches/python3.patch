@@ -14,14 +14,3 @@ Last-Modified: 2019-09-06
  NOSETESTS ?= $(PYTHON) -m nose
  
  MODULE ?= datalad
---- a/datalad/distribution/tests/test_create_sibling.py
-+++ b/datalad/distribution/tests/test_create_sibling.py
-@@ -542,7 +542,7 @@ def check_replace_and_relative_sshpath(u
-     try:
-         ds.create_sibling(url, ui=True)
-     except UnicodeDecodeError:
--        if sys.version_info < (3, 6):
-+        if sys.version_info < (3, 7):
-             raise SkipTest("unicode fiasco")
-         raise
-     published = ds.publish(to=sibname, transfer_data='all')

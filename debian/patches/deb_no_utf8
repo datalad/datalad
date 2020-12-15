@@ -238,7 +238,7 @@ Last-Update: 2018-06-05
          status="impossible")
 --- a/datalad/support/tests/test_network.py
 +++ b/datalad/support/tests/test_network.py
-@@ -460,9 +460,10 @@ def test_get_local_file_url():
+@@ -462,9 +462,10 @@ def test_get_local_file_url():
                  ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
              ) if on_windows else (
                  # static copy of "most_obscore_name"
@@ -260,17 +260,9 @@ Last-Update: 2018-06-05
  import stat
 +import sys
  import re
- from os.path import join as opj, exists, basename
+ import sys
  
-@@ -49,6 +50,7 @@ from datalad.tests.utils import (
-     skip_if_on_windows,
-     skip_ssh,
-     skip_if_root,
-+    SkipTest,
-     slow,
-     swallow_logs,
-     with_tempfile,
-@@ -368,13 +370,19 @@ def check_target_ssh_recursive(use_ssh,
+@@ -371,13 +372,19 @@ def check_target_ssh_recursive(use_ssh,
  
          remote_name = 'remote-' + str(flat)
          with chpwd(source.path):
@@ -297,20 +289,6 @@ Last-Update: 2018-06-05
          # raise if git repos were not created
          for suffix in [sep + 'subm 1', sep + '2', '']:
              target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
-@@ -531,7 +539,12 @@ def check_replace_and_relative_sshpath(u
-     ds = Dataset(src_path).create()
-     create_tree(ds.path, {'sub.dat': 'lots of data'})
-     ds.save('sub.dat')
--    ds.create_sibling(url, ui=True)
-+    try:
-+        ds.create_sibling(url, ui=True)
-+    except UnicodeDecodeError:
-+        if sys.version_info < (3, 6):
-+            raise SkipTest("unicode fiasco")
-+        raise
-     published = ds.publish(to=sibname, transfer_data='all')
-     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
-     # verify that hook runs and there is nothing in stderr
 --- a/datalad/tests/test_witless_runner.py
 +++ b/datalad/tests/test_witless_runner.py
 @@ -44,7 +44,7 @@ def py2cmd(code):
