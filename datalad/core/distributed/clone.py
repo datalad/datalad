@@ -526,6 +526,10 @@ def clone_dataset(
         lgr.debug('Reinit %s to enable shared access permissions', destds)
         destds.repo.call_git(['init', '--shared={}'.format(reckless[7:])])
 
+    # In case of RIA stores we need to prepare *before* annex is called at all
+    if result_props['source']['type'] == 'ria':
+        postclone_preannex_cfg_ria(destds)
+
     yield from postclonecfg_annexdataset(
         destds,
         reckless,
@@ -583,18 +587,29 @@ def postclone_check_head(ds):
                     "with commits", ds.path)
 
 
+def postclone_preannex_cfg_ria(ds):
+
+    # We need to annex-ignore origin before annex-init is called on the clone,
+    # due to issues 5186 and 5253 (and we would have done it afterwards anyway).
+    # annex/objects in RIA stores is special for several reasons.
+    # 1. 'origin' doesn't know about it (no actual local annex for origin)
+    # 2. RIA may use hashdir mixed, copying data to it via git-annex (if cloned
+    #    via ssh or local) would make it see a bare repo and establish a
+    #    hashdir lower annex object tree.
+    # 3. We want the ORA remote to receive all data for the store, so its
+    #    objects could be moved into archives (the main point of a RIA store).
+
+    # Note, that this function might need an enhancement as theoretically a RIA
+    # store could also hold simple standard annexes w/o an intended ORA remote.
+    # This needs the introduction of a new version label in RIA datasets, making
+    # the following call conditional.
+    ds.config.set('remote.origin.annex-ignore', 'true', where='local')
+
+
 def postclonecfg_ria(ds, props):
     """Configure a dataset freshly cloned from a RIA store"""
     repo = ds.repo
-    # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
-    # ssh) would make it see a bare repo and establish a hashdir lower annex
-    # object tree.
-    # Moreover, we want the ORA remote to receive all data for the store, so its
-    # objects could be moved into archives (the main point of a RIA store).
     RIA_REMOTE_NAME = 'origin'  # don't hardcode everywhere
-    ds.config.set(
-        'remote.{}.annex-ignore'.format(RIA_REMOTE_NAME), 'true',
-        where='local')
 
     # chances are that if this dataset came from a RIA store, its subdatasets
     # may live there too. Place a subdataset source candidate config that makes
