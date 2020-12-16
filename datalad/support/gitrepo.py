@@ -3775,8 +3775,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 st['state'] = 'clean'
                 continue
             # we have to recurse into the dataset and get its status
-            subrepo = GitRepo(f)
-            subrepo_commit = subrepo.get_hexsha()
+            subrepo = repo_from_path(f)
+            # get the HEAD commit, or the one of the corresponding branch
+            # only that one counts re super-sub relationship
+            # save() syncs the corresponding branch each time
+            subrepo_commit = subrepo.get_hexsha(subrepo.get_corresponding_branch())
             st['gitshasum'] = subrepo_commit
             # subdataset records must be labeled clean up to this point
             # test if current commit in subdataset deviates from what is
@@ -3874,12 +3877,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     else 'deleted'
         else:
             # change in git record, or on disk
+            # for subdatasets leave the 'modified' judgement to the caller
+            # for supporting corner cases, such as adjusted branch
+            # which require inspection of a subdataset
             # TODO we could have a new file that is already staged
             # but had subsequent modifications done to it that are
             # unstaged. Such file would presently show up as 'added'
             # ATM I think this is OK, but worth stating...
-            state = 'modified' \
-                if f.exists() or f.is_symlink() else 'deleted'
+            state = ('modified'
+                     if against_commit or to_state['type'] != 'dataset'
+                     else None
+                    ) if f.exists() or f.is_symlink() else 'deleted'
             # TODO record before and after state for diff-like use
             # cases
 

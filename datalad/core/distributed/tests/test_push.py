@@ -925,7 +925,13 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
                         (orig_sub, clone_sub, 'file2.txt')):
         eq_((ds1.pathobj / f).read_text(), (ds2.pathobj / f).read_text())
 
-    # TODO this status() report has the full TODO list
-    # presently both the subdataset and the file2.txt is reported as modified
-    with chpwd(clone_super.path):
-        run(['datalad', 'status', '--recursive'])
+    # get status info that does not recursive into subdatasets, i.e. not
+    # looking for uncommitted changes
+    # we should see no modification reported
+    assert_not_in_results(
+        clone_super.status(eval_subdataset_state='commit'),
+        state='modified')
+    # and now the same for a more expensive full status
+    assert_not_in_results(
+        clone_super.status(recursive=True),
+        state='modified')
