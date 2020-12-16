@@ -933,9 +933,6 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     yield from configure_origins(ds, ds)
 
 
-_handle_possible_annex_dataset = postclonecfg_annexdataset
-
-
 def configure_origins(cfgds, probeds, label=None):
     """Configure any discoverable local dataset 'origin' sibling as a remote
 

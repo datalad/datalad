@@ -14,12 +14,6 @@ __docformat__ = 'restructuredtext'
 
 import warnings
 
-from datalad.core.distributed.clone import (
-    Clone,
-    _get_installationpath_from_url,
-    _handle_possible_annex_dataset,
-    _get_tracking_source,
-)
 
 warnings.warn("datalad.distribution.clone is obsolete. "
               "Use datalad.core.distributed.clone module instead",
