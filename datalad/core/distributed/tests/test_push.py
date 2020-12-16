@@ -905,7 +905,7 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     # both datasets in the store only carry the real branches, and nothing
     # adjusted
     for r in (store_super, store_sub):
-        eq_(sorted(r.get_branches()), [orig_sub_corr_branch, 'git-annex'])
+        eq_(set(r.get_branches()), set([orig_sub_corr_branch, 'git-annex']))
 
     # and reobtain from a store
     with chpwd(clonepath):
