@@ -1019,7 +1019,9 @@ def test_ria_postclone_noannex(dspath, storepath, clonepath):
     rmtree(str(annex))
     assert_false(annex.exists())
 
-    clone(lcl_url + '#{}'.format(ds.id), clonepath)
+    clone_url = get_local_file_url(str(storepath), compatibility='git') + \
+                '#{}'.format(ds.id)
+    clone("ria+{}".format(clone_url), clonepath)
 
     # no need to test the cloning itself - we do that over and over in here
 
