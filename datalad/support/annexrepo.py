@@ -3452,6 +3452,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                 unit=' Bytes',
                 label='Total',
                 total=self.total_nbytes,
+                noninteractive_level=5,
             )
             self._pbars.add(self._global_pbar_id)
 
@@ -3492,6 +3493,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     lgr.info,
                     pbar_id,
                     'Finished annex action: {}'.format(j['action']),
+                    noninteractive_level=5,
                 )
                 self._pbars.discard(pbar_id)
                 # we are done here
@@ -3509,6 +3511,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     label=j['action'].get('command', '').capitalize(),
                     unit=' Bytes',
                     total=float(j['total-size']),
+                    noninteractive_level=5,
                 )
                 self._pbars.add(pbar_id)
             log_progress(
@@ -3516,6 +3519,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                 pbar_id,
                 j['percent-progress'],
                 update=float(j['byte-progress']),
+                noninteractive_level=5,
             )
             # do not let progress reports leak into the return value
             return
@@ -3537,6 +3541,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     lgr.info,
                     self._global_pbar_id,
                     'Finished annex {}'.format(j.get('command', '')),
+                    noninteractive_level=5,
                 )
                 self._pbars.discard(self._global_pbar_id)
             else:
@@ -3546,6 +3551,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     self._global_pbar_id,
                     j.get('file', ''),
                     update=self._byte_count,
+                    noninteractive_level=5,
                 )
 
     def _prepare_result(self):
@@ -3564,6 +3570,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                 lgr.info,
                 pbar_id,
                 'Finished',
+                noninteractive_level=5,
             )
         super().process_exited()
 
