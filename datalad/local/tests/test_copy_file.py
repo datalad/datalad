@@ -337,6 +337,6 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
     assert_in_results(
         dest.copy_file(
             [sub.pathobj / '.git' / 'config',
-             dest.pathobj / 'some', '.git'], on_failure='ignore'),
+             dest.pathobj / 'some' / '.git'], on_failure='ignore'),
         status='impossible',
         action='copy_file')
