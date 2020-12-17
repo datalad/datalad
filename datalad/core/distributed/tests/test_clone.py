@@ -26,6 +26,7 @@ from datalad.utils import (
     chpwd,
     Path,
     on_windows,
+    rmtree
 )
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
@@ -962,7 +963,8 @@ def test_ria_postclonecfg():
         id = _postclonetest_prepare(lcl, store)
 
         # test cloning via ria+file://
-        yield _test_ria_postclonecfg, get_local_file_url(store, compatibility='git'), id
+        yield _test_ria_postclonecfg, \
+              get_local_file_url(store, compatibility='git'), id
 
         # Note: HTTP disabled for now. Requires proper implementation in ORA
         #       remote. See
@@ -975,6 +977,59 @@ def test_ria_postclonecfg():
         # test cloning via ria+ssh://
         yield skip_ssh(_test_ria_postclonecfg), \
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile
+@with_tempfile
+def test_ria_postclone_noannex(dspath, storepath, clonepath):
+
+    # Test for gh-5186: Cloning from local FS, shouldn't lead to annex
+    # initializing origin.
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    clonepath = Path(clonepath)
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+        create_ds_in_store,
+        get_layout_locations
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+
+
+    # First create a dataset in a RIA store the standard way
+    somefile = dspath / 'a_file.txt'
+    somefile.write_text('irrelevant')
+    ds = Dataset(dspath).create(force=True)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+    lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
+    create_ds_in_store(io, storepath, ds.id, '2', '1')
+    ds.create_sibling_ria(lcl_url, "store")
+    ds.push('.', to='store')
+
+
+    # now, remove annex/ tree from store in order to see, that clone
+    # doesn't cause annex to recreate it.
+    store_loc, _, _ = get_layout_locations(1, storepath, ds.id)
+    annex = store_loc / 'annex'
+    rmtree(str(annex))
+    assert_false(annex.exists())
+
+    clone_url = get_local_file_url(str(storepath), compatibility='git') + \
+                '#{}'.format(ds.id)
+    clone("ria+{}".format(clone_url), clonepath)
+
+    # no need to test the cloning itself - we do that over and over in here
+
+    # bare repo in store still has no local annex:
+    assert_false(annex.exists())
 
 
 @slow  # 17sec on Yarik's laptop
