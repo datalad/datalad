@@ -531,7 +531,7 @@ def clone_dataset(
         try:
             postclone_checkout_commit(dest_repo, checkout_gitsha)
         except Exception as e:
-            yield dict(
+            yield get_status_dict(
                 status='error',
                 message=str(e),
                 **result_props,
