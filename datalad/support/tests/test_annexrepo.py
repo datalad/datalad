@@ -119,10 +119,8 @@ from datalad import cfg as dl_cfg
 
 # imports from same module:
 from datalad.support.annexrepo import (
-    _get_size_from_perc_complete,
     AnnexRepo,
     AnnexJsonProtocol,
-    ProcessAnnexProgressIndicators,
 )
 
 @assert_cwd_unchanged
@@ -1580,75 +1578,6 @@ def test_annex_version_handling_bad_git_annex(path):
         assert_raises(OutdatedExternalDependency, AnnexRepo, path)
 
 
-def test_ProcessAnnexProgressIndicators():
-    irrelevant_lines = (
-        'abra',
-        '{"some_json": "sure thing"}'
-    )
-    # regular lines, without completion for known downloads
-    success_lines = (
-        '{"command":"get","note":"","success":true,"key":"key1","file":"file1"}',
-        '{"command":"comm","note":"","success":true,"key":"backend-s10--key2"}',
-    )
-    progress_lines = (
-        '{"byte-progress":10,"action":{"command":"get","note":"from web...",'
-            '"key":"key1","file":"file1"},"percent-progress":"10%"}',
-    )
-
-    # without providing expected entries
-    proc = ProcessAnnexProgressIndicators()
-    # when without any target downloads, there is no total_pbar
-    assert_is(proc.total_pbar, None)
-    # for regular lines -- should just return them without side-effects
-    for l in irrelevant_lines + success_lines:
-        with swallow_outputs() as cmo:
-            eq_(proc(l), l)
-            eq_(proc.pbars, {})
-            eq_(cmo.out, '')
-            eq_(cmo.err, '')
-    # should process progress lines
-    eq_(proc(progress_lines[0]), None)
-    eq_(len(proc.pbars), 1)
-    # but when we finish download -- should get cleared
-    eq_(proc(success_lines[0]), success_lines[0])
-    eq_(proc.pbars, {})
-    # and no side-effect of any kind in finish
-    eq_(proc.finish(), None)
-
-    proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
-    # when without any target downloads, there is no total_pbar
-    assert(proc.total_pbar is not None)
-    eq_(proc.total_pbar.total, 100)  # as much as it knows at this point
-    eq_(proc.total_pbar.current, 0)
-    # for regular lines -- should still just return them without side-effects
-    for l in irrelevant_lines:
-        with swallow_outputs() as cmo:
-            eq_(proc(l), l)
-            eq_(proc.pbars, {})
-            eq_(cmo.out, '')
-            eq_(cmo.err, '')
-    # should process progress lines
-    # it doesn't swallow everything -- so there will be side-effects in output
-    with swallow_outputs() as cmo:
-        eq_(proc(progress_lines[0]), None)
-        eq_(len(proc.pbars), 1)
-        # but when we finish download -- should get cleared
-        eq_(proc(success_lines[0]), success_lines[0])
-        eq_(proc.pbars, {})
-        out = cmo.out
-
-    from datalad.ui import ui
-    from datalad.ui.dialog import QuietConsoleLog
-
-    assert out \
-        if not isinstance(ui.ui, QuietConsoleLog) else not out
-    assert proc.total_pbar is not None
-    # and no side-effect of any kind in finish
-    with swallow_outputs() as cmo:
-        eq_(proc.finish(), None)
-        eq_(proc.total_pbar, None)
-
-
 @with_tempfile
 @with_tempfile
 def test_get_description(path1, path2):
@@ -2133,16 +2062,6 @@ def test_fake_dates(path):
         eq_(timestamp, int(ar.format_commit('%ct', commit)))
     assert_in("timestamp={}s".format(timestamp),
               ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
-
-
-def test_get_size_from_perc_complete():
-    f = _get_size_from_perc_complete
-    eq_(f(0, 0), 0)
-    eq_(f(0, '0'), 0)
-    eq_(f(100, '0'), 0)  # we do not know better
-    eq_(f(1, '1'), 100)
-    # with no percentage info, we don't know better either:
-    eq_(f(1, ''), 0)
 
 
 # to prevent regression
