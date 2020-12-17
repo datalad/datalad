@@ -340,3 +340,10 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
              dest.pathobj / 'some' / '.git'], on_failure='ignore'),
         status='impossible',
         action='copy_file')
+
+    # The last path above wasn't treated as a target directory because it
+    # wasn't an existing directory. We also guard against a '.git' in the
+    # target directory code path, though the handling is different.
+    with assert_raises(ValueError):
+        dest.copy_file([sub.pathobj / '.git' / 'config',
+                        dest.pathobj / '.git'])
