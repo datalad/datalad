@@ -3440,6 +3440,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             inf = {}
             props = props_re.match(line)
             if not props:
+                # Kludge: Filter out paths starting with .git/ to work around
+                # an `ls-files -o` bug that was fixed in Git 2.25.
+                #
+                # TODO: Drop this condition when GIT_MIN_VERSION is at least
+                # 2.25.
+                if line.startswith(".git/"):
+                    lgr.debug("Filtering out .git/ file: %s", line)
+                    continue
                 # not known to Git, but Git always reports POSIX
                 path = ut.PurePosixPath(line)
                 inf['gitshasum'] = None
