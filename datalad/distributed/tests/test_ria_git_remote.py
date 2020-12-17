@@ -64,7 +64,7 @@ def _test_bare_git_version_1(host, dspath, store):
     populate_dataset(ds)
     ds.save()
 
-    bare_repo_path, _, _ = get_layout_locations(1, store, ds.id)
+    bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
     # should look like
     subprocess.run(['git', 'clone', '--bare',
@@ -84,6 +84,9 @@ def _test_bare_git_version_1(host, dspath, store):
     # set up the dataset location, too.
     # Note: Dataset layout version 1 (dirhash lower):
     create_ds_in_store(io, store, ds.id, '1', '1')
+    # Avoid triggering a git-annex safety check. See gh-5253.
+    assert objdir.is_absolute()
+    io.remove_dir(objdir)
 
     # Now, let's have the bare repo as a git remote and use it with annex
     git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
@@ -169,7 +172,7 @@ def _test_bare_git_version_2(host, dspath, store):
     populate_dataset(ds)
     ds.save()
 
-    bare_repo_path, _, _ = get_layout_locations(1, store, ds.id)
+    bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
     # should look like
     subprocess.run(['git', 'clone', '--bare',
@@ -189,6 +192,9 @@ def _test_bare_git_version_2(host, dspath, store):
     # set up the dataset location, too.
     # Note: Dataset layout version 2 (dirhash mixed):
     create_ds_in_store(io, store, ds.id, '2', '1')
+    # Avoid triggering a git-annex safety check. See gh-5253.
+    assert objdir.is_absolute()
+    io.remove_dir(objdir)
 
     # Now, let's have the bare repo as a git remote
     git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
