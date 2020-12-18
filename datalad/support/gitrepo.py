@@ -2760,7 +2760,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
              "--untracked-files=normal",
              # Ensure the result isn't influenced by diff.ignoreSubmodules.
              "--ignore-submodules=none"])
-        return bool(stdout.strip())
+        if bool(stdout.strip()):
+            # The quick `git status`-based check can give a different answer
+            # than `datalad status` for submodules on an adjusted branch.
+            #
+            # TODO: This is almost a self.status() call. Add an eval_file_type
+            # parameter to self.status() and use it here?
+            st = self.diffstatus(fr="HEAD" if self.get_hexsha() else None,
+                                 to=None, untracked="normal",
+                                 eval_file_type=False)
+            return any(r.get("state") != "clean" for r in st.values())
+        return False
 
     @property
     def untracked_files(self):
