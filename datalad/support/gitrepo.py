@@ -4089,6 +4089,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if r.get('status', None) == 'ok':
                         submodule_change = True
                     yield r
+        to_stage_submodules = {}
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
@@ -4131,7 +4132,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             str(f.relative_to(self.pathobj)): props
             for f, props in status.items()
             if (props.get('state', None) in ('modified', 'untracked') and
-                f not in to_add_submodules)}
+                not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
             lgr.debug(
                 '%i path(s) to add to %s %s',

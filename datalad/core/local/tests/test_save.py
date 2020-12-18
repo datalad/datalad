@@ -31,6 +31,7 @@ from datalad.tests.utils import (
     eq_,
     known_failure_appveyor,
     known_failure_windows,
+    maybe_adjust_repo,
     OBSCURE_FILENAME,
     ok_,
     SkipTest,
@@ -849,3 +850,14 @@ def test_save_nested_subs_explicit_paths(path):
     ds.save(path=spaths)
     eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
         set(map(str, spaths)))
+
+
+@with_tempfile
+def test_save_gitrepo_annex_subds_adjusted(path):
+    ds = Dataset(path).create(annex=False)
+    subds = ds.create("sub")
+    maybe_adjust_repo(subds.repo)
+    (subds.pathobj / "foo").write_text("foo")
+    subds.save()
+    ds.save()
+    assert_repo_status(ds.path)
