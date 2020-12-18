@@ -29,6 +29,7 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
+    known_failure,
     known_failure_appveyor,
     known_failure_windows,
     maybe_adjust_repo,
@@ -861,3 +862,17 @@ def test_save_gitrepo_annex_subds_adjusted(path):
     subds.save()
     ds.save()
     assert_repo_status(ds.path)
+
+
+@known_failure
+@with_tempfile
+def test_save_adjusted_partial(path):
+    ds = Dataset(path).create()
+    subds = ds.create("sub")
+    maybe_adjust_repo(subds.repo)
+    (subds.pathobj / "foo").write_text("foo")
+    subds.save()
+    (ds.pathobj / "other").write_text("staged, not for committing")
+    ds.repo.call_git(["add", "other"])
+    ds.save(path=["sub"])
+    assert_repo_status(ds.path, added=["other"])

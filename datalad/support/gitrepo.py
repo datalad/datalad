@@ -4089,25 +4089,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if r.get('status', None) == 'ok':
                         submodule_change = True
                     yield r
-        to_stage_submodules = {}
-        if not need_partial_commit:
-            # without a partial commit an AnnexRepo would ignore any submodule
-            # path in its add helper, hence `git add` them explicitly
-            to_stage_submodules = {
-                f: props
-                for f, props in status.items()
-                if props.get('state', None) in ('modified', 'untracked')
-                and props.get('type', None) == 'dataset'}
-            if to_stage_submodules:
-                lgr.debug(
-                    '%i submodule path(s) to stage in %r %s',
-                    len(to_stage_submodules), self,
-                    to_stage_submodules
-                    if len(to_stage_submodules) < 10 else '')
-                for r in self._save_add_submodules(to_stage_submodules):
-                    if r.get('status', None) == 'ok':
-                        submodule_change = True
-                    yield r
+        to_stage_submodules = {
+            f: props
+            for f, props in status.items()
+            if props.get('state', None) in ('modified', 'untracked')
+            and props.get('type', None) == 'dataset'}
+        if to_stage_submodules:
+            lgr.debug(
+                '%i submodule path(s) to stage in %r %s',
+                len(to_stage_submodules), self,
+                to_stage_submodules
+                if len(to_stage_submodules) < 10 else '')
+            for r in self._save_add_submodules(to_stage_submodules):
+                if r.get('status', None) == 'ok':
+                    submodule_change = True
+                yield r
 
         if submodule_change or vanished_subds:
             # the config has changed too
