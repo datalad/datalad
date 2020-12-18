@@ -10,6 +10,7 @@
 
 """
 
+import os
 import logging
 
 from datalad.distribution.dataset import Dataset
@@ -850,6 +851,14 @@ def test_push_matching(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
+    if 'DATALAD_SEED' in os.environ:
+        # we are using create-sibling-ria via the cmdline in here
+        # this will create random UUIDs for datasets
+        # however, given a fixed seed each call to this command will start
+        # with the same RNG seed, hence yield the same UUID on the same
+        # machine -- leading to a collision
+        raise SkipTest(
+            'Test incompatible with fixed random number generator seed')
     # the aim here is this high-level test a std create-push-clone cycle for a
     # dataset with a subdataset, with the goal to ensure that correct branches
     # and commits are tracked, regardless of platform behavior and condition
