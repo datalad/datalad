@@ -710,10 +710,17 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             yield r
         return
     respath_by_status = {}
-    for res in ds_repo.get(
+    try:
+        results = ds_repo.get(
             content,
             options=['--from=%s' % source] if source else [],
-            jobs=jobs):
+            jobs=jobs)
+    except CommandError as exc:
+        results = exc.kwargs.get("stdout_json")
+        if not results:
+            raise
+
+    for res in results:
         res = annexjson2result(res, ds, type='file', logger=lgr,
                                refds=refds_path)
         success = success_status_map[res['status']]
