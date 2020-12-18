@@ -227,7 +227,12 @@ class CopyFile(Interface):
         if not specs_from:
             raise ValueError("Neither `paths` nor `specs_from` given.")
 
-        if not target_dir and ds:
+        if target_dir:
+            if ".git" in target_dir.parts:
+                raise ValueError(
+                    "Target directory should not contain a .git directory: {}"
+                    .format(target_dir))
+        elif ds:
             # no specific target set, but we have to write into a dataset,
             # and one was given. It seems to make sense to use this dataset
             # as a target. it is already to reference for any path resolution.
