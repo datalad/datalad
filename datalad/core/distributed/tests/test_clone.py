@@ -1343,3 +1343,23 @@ def test_nonuniform_adjusted_subdataset(path):
         path='subds')
     eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
         subds_url)
+
+
+@with_tempfile
+def test_clone_recorded_subds_reset(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a")
+    ds_a_sub = ds_a.create("sub")
+    (ds_a_sub.pathobj / "foo").write_text("foo")
+    ds_a.save(recursive=True)
+    (ds_a_sub.pathobj / "bar").write_text("bar")
+    ds_a_sub.save()
+
+    ds_b = clone(ds_a.path, path / "ds_b")
+    ds_b.get("sub")
+    assert_repo_status(ds_b.path)
+    sub_repo = Dataset(path / "ds_b" / "sub").repo
+    branch = sub_repo.get_active_branch()
+    eq_(ds_b.subdatasets()[0]["gitshasum"],
+        sub_repo.get_hexsha(
+            sub_repo.get_corresponding_branch(branch) or branch))

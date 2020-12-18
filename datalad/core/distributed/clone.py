@@ -527,17 +527,6 @@ def clone_dataset(
     if not cand.get("version"):
         postclone_check_head(destds)
 
-    if checkout_gitsha and dest_repo.get_hexsha() != checkout_gitsha:
-        try:
-            postclone_checkout_commit(dest_repo, checkout_gitsha)
-        except Exception as e:
-            yield get_status_dict(
-                status='error',
-                message=str(e),
-                **result_props,
-            )
-            return
-
     # act on --reckless=shared-...
     # must happen prior git-annex-init, where we can cheaply alter the repo
     # setup through safe re-init'ing
@@ -553,6 +542,18 @@ def clone_dataset(
         destds,
         reckless,
         description)
+
+    if checkout_gitsha and \
+       dest_repo.get_hexsha(dest_repo.get_corresponding_branch()) != checkout_gitsha:
+        try:
+            postclone_checkout_commit(dest_repo, checkout_gitsha)
+        except Exception as e:
+            yield get_status_dict(
+                status='error',
+                message=str(e),
+                **result_props,
+            )
+            return
 
     # perform any post-processing that needs to know details of the clone
     # source
@@ -580,9 +581,12 @@ def postclone_checkout_commit(repo, target_commit):
     the same!
     """
     # record what branch we were on right after the clone
-    repo_orig_branch = repo.get_active_branch()
+    active_branch = repo.get_active_branch()
+    corr_branch = repo.get_corresponding_branch(branch=active_branch)
+    was_adjusted = bool(corr_branch)
+    repo_orig_branch = corr_branch or active_branch
     # if we are on a branch this hexsha will be the tip of that branch
-    repo_orig_hexsha = repo.get_hexsha()
+    repo_orig_hexsha = repo.get_hexsha(repo_orig_branch)
     # make sure we have the desired commit locally
     # expensive and possibly error-prone fetch conditional on cheap
     # local check
@@ -625,6 +629,10 @@ def postclone_checkout_commit(repo, target_commit):
             branch_ref = 'refs/heads/%s' % repo_orig_branch
             repo.update_ref(branch_ref, target_commit)
             repo.update_ref('HEAD', branch_ref, symbolic=True)
+            if was_adjusted:
+                # Note: The --force is needed because the adjust branch already
+                # exists.
+                repo.adjust(options=["--unlock", "--force"])
         else:
             lgr.warning(
                 "%s has a detached HEAD, because the target commit "
