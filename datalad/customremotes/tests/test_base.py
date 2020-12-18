@@ -13,6 +13,7 @@ from os.path import isabs
 
 from datalad.tests.utils import (
     eq_,
+    known_failure_githubci_win,
     with_tree,
 )
 from datalad.support.annexrepo import AnnexRepo
@@ -24,6 +25,8 @@ from ..base import (
 )
 
 
+# PermissionError: [WinError 32] The process cannot access the file because it is being used by another process:
+@known_failure_githubci_win
 @with_tree(tree={'file.dat': ''})
 def test_get_contentlocation(tdir):
     repo = AnnexRepo(tdir, create=True, init=True)
