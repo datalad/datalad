@@ -1894,6 +1894,18 @@ def get_deeply_nested_structure(path):
     return ds
 
 
+def maybe_adjust_repo(repo):
+    """Put repo into an adjusted branch if it is not already.
+    """
+    if not repo.is_managed_branch():
+        # The next condition can be removed once GIT_ANNEX_MIN_VERSION is at
+        # least 7.20190912.
+        if not repo.supports_unlocked_pointers:
+            repo.call_annex(["upgrade"])
+            repo.config.reload(force=True)
+        repo.adjust()
+
+
 @with_tempfile
 @with_tempfile
 def has_symlink_capability(p1, p2):
