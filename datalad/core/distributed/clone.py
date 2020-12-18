@@ -652,7 +652,6 @@ def postclone_check_head(ds):
         for rbranch in remote_branches:
             if rbranch in ["origin/git-annex", "HEAD"]:
                 continue
-            # TODO why would the remote adjusted state matter
             if rbranch.startswith("origin/adjusted/"):
                 # If necessary for this file system, a downstream
                 # git-annex-init call will handle moving into an
