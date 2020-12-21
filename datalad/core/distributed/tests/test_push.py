@@ -908,8 +908,9 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
         eq_(set(r.get_branches()), set([orig_sub_corr_branch, 'git-annex']))
 
     # and reobtain from a store
+    cloneurl = 'ria+' + get_local_file_url(str(storepath), compatibility='git')
     with chpwd(clonepath):
-        run(['datalad', 'clone', store_url + '#' + orig_super.id, 'super'])
+        run(['datalad', 'clone', cloneurl + '#' + orig_super.id, 'super'])
         run(['datalad', '-C', 'super', 'get', '--recursive', '.'])
 
     # verify that nothing has changed as a result of a push/clone cycle
