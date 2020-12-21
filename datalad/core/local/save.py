@@ -255,8 +255,10 @@ class Save(Interface):
                 for subds in subdss:
                     subds_path = ut.Path(subds)
                     sub_status = superds_status.get(subds_path, {})
-                    if not (sub_status.get("state") == "untracked" and
-                            sub_status.get("type") == "directory"):
+                    if not ((sub_status.get("state") == "untracked" and
+                             sub_status.get("type") == "directory") or
+                            (sub_status.get("state") == "clean" and
+                             sub_status.get("type") == "dataset")):
                         # ^ If the subdataset is already untracked directory,
                         # let it go through the normal "add submodules"
                         # handling of repo.save_().
