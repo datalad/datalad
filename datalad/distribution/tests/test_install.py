@@ -269,6 +269,7 @@ def test_install_dataset_from_instance(src, dst):
     assert_in('INFO.txt', clone.repo.get_indexed_files())
 
 
+@known_failure_githubci_win
 @with_testrepos(flavors=['network'])
 @with_tempfile
 def test_install_dataset_from_just_source_via_path(url, path):
