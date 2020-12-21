@@ -49,6 +49,7 @@ from datalad.tests.utils import (
     integration,
     known_failure,
     known_failure_appveyor,
+    known_failure_githubci_win,
     known_failure_windows,
     neq_,
     nok_,
@@ -204,6 +205,8 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+# AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
+@known_failure_githubci_win
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -976,6 +979,8 @@ def test_ria_postclonecfg():
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
 
 
+# fatal: Could not read from remote repository.
+@known_failure_githubci_win  # in datalad/git-annex as e.g. of 20201218
 @with_tempfile(mkdir=True)
 @with_tempfile
 @with_tempfile
