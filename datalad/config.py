@@ -67,7 +67,21 @@ def _where_reload(obj):
 
 
 # TODO document and make "public" (used in GitRepo too)
-def _parse_gitconfig_dump(dump, cwd=None):
+def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
+    """Parse a dump-string from `git config -z --list`
+
+    Parameters
+    ----------
+    dump : str
+      Null-byte separated output
+    cwd : path-like, optional
+      Use this path to convert relative paths for origin reports
+      into absolute paths
+    multi_value : bool, optional
+      If True, report values from multiple specifications of the
+      same key as a tuple of values assigned to this key. Otherwise,
+      the last configuration is reported.
+    """
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
@@ -91,7 +105,7 @@ def _parse_gitconfig_dump(dump, cwd=None):
             # if asked for a bool
             k, v = line, None
         present_v = dct.get(k, None)
-        if present_v is None:
+        if present_v is None or not multi_value:
             dct[k] = v
         else:
             if isinstance(present_v, tuple):

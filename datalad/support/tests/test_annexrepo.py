@@ -77,6 +77,7 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     known_failure_windows,
     local_testrepo_flavors,
+    maybe_adjust_repo,
     OBSCURE_FILENAME,
     ok_,
     ok_annex_get,
@@ -1823,6 +1824,15 @@ def test_AnnexRepo_dirty(path):
     ok_(repo.dirty ^ repo.is_managed_branch())
     repo.save()
     ok_(not repo.dirty)
+
+    subm = AnnexRepo(repo.pathobj / "subm", create=True)
+    (subm.pathobj / "foo").write_text("foo")
+    subm.save()
+    ok_(repo.dirty)
+    repo.save()
+    assert_false(repo.dirty)
+    maybe_adjust_repo(subm)
+    assert_false(repo.dirty)
 
 
 @with_tempfile(mkdir=True)

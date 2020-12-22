@@ -2760,7 +2760,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
              "--untracked-files=normal",
              # Ensure the result isn't influenced by diff.ignoreSubmodules.
              "--ignore-submodules=none"])
-        return bool(stdout.strip())
+        if bool(stdout.strip()):
+            # The quick `git status`-based check can give a different answer
+            # than `datalad status` for submodules on an adjusted branch.
+            #
+            # TODO: This is almost a self.status() call. Add an eval_file_type
+            # parameter to self.status() and use it here?
+            st = self.diffstatus(fr="HEAD" if self.get_hexsha() else None,
+                                 to=None, untracked="normal",
+                                 eval_file_type=False)
+            return any(r.get("state") != "clean" for r in st.values())
+        return False
 
     @property
     def untracked_files(self):
@@ -2798,7 +2808,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         out = self.call_git(
             ['config', '-z', '-l', '--file', '.gitmodules'])
         # abuse our config parser
-        db, _ = _parse_gitconfig_dump(out, cwd=self.path)
+        # disable multi-value report, because we could not deal with them
+        # anyways, and they should not appear in a normal .gitmodules file
+        # but could easily appear when duplicates are included. In this case,
+        # we better not crash
+        db, _ = _parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
@@ -3779,8 +3793,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 st['state'] = 'clean'
                 continue
             # we have to recurse into the dataset and get its status
-            subrepo = GitRepo(f)
-            subrepo_commit = subrepo.get_hexsha()
+            subrepo = repo_from_path(f)
+            # get the HEAD commit, or the one of the corresponding branch
+            # only that one counts re super-sub relationship
+            # save() syncs the corresponding branch each time
+            subrepo_commit = subrepo.get_hexsha(subrepo.get_corresponding_branch())
             st['gitshasum'] = subrepo_commit
             # subdataset records must be labeled clean up to this point
             # test if current commit in subdataset deviates from what is
@@ -3878,12 +3895,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     else 'deleted'
         else:
             # change in git record, or on disk
+            # for subdatasets leave the 'modified' judgement to the caller
+            # for supporting corner cases, such as adjusted branch
+            # which require inspection of a subdataset
             # TODO we could have a new file that is already staged
             # but had subsequent modifications done to it that are
             # unstaged. Such file would presently show up as 'added'
             # ATM I think this is OK, but worth stating...
-            state = 'modified' \
-                if f.exists() or f.is_symlink() else 'deleted'
+            state = ('modified'
+                     if against_commit or to_state['type'] != 'dataset'
+                     else None
+                    ) if f.exists() or f.is_symlink() else 'deleted'
             # TODO record before and after state for diff-like use
             # cases
 
@@ -4063,7 +4085,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
-        added_submodule = False
+        submodule_change = False
         untracked_dirs = [f.relative_to(self.pathobj)
                           for f, props in status.items()
                           if props.get('state', None) == 'untracked' and
@@ -4083,29 +4105,25 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if to_add_submodules:
                 for r in self._save_add_submodules(to_add_submodules):
                     if r.get('status', None) == 'ok':
-                        added_submodule = True
+                        submodule_change = True
                     yield r
-        if not need_partial_commit:
-            # without a partial commit an AnnexRepo would ignore any submodule
-            # path in its add helper, hence `git add` them explicitly
-            to_stage_submodules = {
-                str(f.relative_to(self.pathobj)): props
-                for f, props in status.items()
-                if props.get('state', None) in ('modified', 'untracked')
-                and props.get('type', None) == 'dataset'}
-            if to_stage_submodules:
-                lgr.debug(
-                    '%i submodule path(s) to stage in %r %s',
-                    len(to_stage_submodules), self,
-                    to_stage_submodules
-                    if len(to_stage_submodules) < 10 else '')
-                for r in GitRepo._save_add(
-                        self,
-                        to_stage_submodules,
-                        git_opts=None):
-                    yield r
+        to_stage_submodules = {
+            f: props
+            for f, props in status.items()
+            if props.get('state', None) in ('modified', 'untracked')
+            and props.get('type', None) == 'dataset'}
+        if to_stage_submodules:
+            lgr.debug(
+                '%i submodule path(s) to stage in %r %s',
+                len(to_stage_submodules), self,
+                to_stage_submodules
+                if len(to_stage_submodules) < 10 else '')
+            for r in self._save_add_submodules(to_stage_submodules):
+                if r.get('status', None) == 'ok':
+                    submodule_change = True
+                yield r
 
-        if added_submodule or vanished_subds:
+        if submodule_change or vanished_subds:
             # the config has changed too
             self.config.reload()
             # need to include .gitmodules in what needs saving
@@ -4128,7 +4146,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             str(f.relative_to(self.pathobj)): props
             for f, props in status.items()
             if (props.get('state', None) in ('modified', 'untracked') and
-                f not in to_add_submodules)}
+                not (f in to_add_submodules or f in to_stage_submodules))}
         if to_add:
             lgr.debug(
                 '%i path(s) to add to %s %s',
@@ -4178,7 +4196,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             raise
 
     def _save_add_submodules(self, paths):
-        """Add new submodules
+        """Add new submodules, or updates records of existing ones
 
         This method does not use `git submodule add`, but aims to be more
         efficient by limiting the scope to mere in-place registration of
@@ -4196,7 +4214,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         for path in paths:
             rpath = str(path.relative_to(self.pathobj).as_posix())
             subm = repo_from_path(path)
-            subm_commit = subm.get_hexsha()
+            # if there is a corresponding branch, we want to record it's state.
+            # we rely on the corresponding branch being synced already.
+            # `save` should do that each time it runs.
+            subm_commit = subm.get_hexsha(subm.get_corresponding_branch())
             if not subm_commit:
                 yield get_status_dict(
                     action='add_submodule',
@@ -4214,7 +4235,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 url = './{}'.format(rpath)
             subm_id = subm.config.get('datalad.dataset.id', None)
             info.append(
-                dict(path=path, rpath=rpath, commit=subm_commit, id=subm_id,
+                dict(
+                     # if we have additional information on this path, pass it on.
+                     # if not, treat it as an untracked directory
+                     paths[path] if isinstance(paths, dict)
+                     else dict(type='directory', state='untracked'),
+                     path=path, rpath=rpath, commit=subm_commit, id=subm_id,
                      url=url))
 
         # bypass any convenience or safe-manipulator for speed reasons
@@ -4222,17 +4248,23 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         with (self.pathobj / '.gitmodules').open('a') as gmf, \
              (self.pathobj / '.git' / 'config').open('a') as gcf:
             for i in info:
+                # we update the subproject commit unconditionally
                 self.call_git([
                     'update-index', '--add', '--replace', '--cacheinfo', '160000',
                     i['commit'], i['rpath']
                 ])
-                gmprops = dict(path=i['rpath'], url=i['url'])
-                if i['id']:
-                    gmprops['datalad-id'] = i['id']
-                write_config_section(
-                    gmf, 'submodule', i['rpath'], gmprops)
-                write_config_section(
-                    gcf, 'submodule', i['rpath'], dict(active='true', url=i['url']))
+                # only write the .gitmodules/.config changes when this is not yet
+                # a subdataset
+                # TODO: we could update the URL, and branch info at this point,
+                # even for previously registered subdatasets
+                if i['type'] != 'dataset':
+                    gmprops = dict(path=i['rpath'], url=i['url'])
+                    if i['id']:
+                        gmprops['datalad-id'] = i['id']
+                    write_config_section(
+                        gmf, 'submodule', i['rpath'], gmprops)
+                    write_config_section(
+                        gcf, 'submodule', i['rpath'], dict(active='true', url=i['url']))
 
                 # This mirrors the result structure yielded for
                 # to_stage_submodules below.
