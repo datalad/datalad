@@ -686,3 +686,14 @@ def test_get_subdataset_direct_fetch(path):
                         action="install", type="dataset", status="error")
     assert_result_count(res, 1,
                         action="install", type="dataset", status="ok")
+
+
+@with_tempfile()
+def test_get_relays_command_errors(path):
+    ds = Dataset(path).create()
+    (ds.pathobj / "foo").write_text("foo")
+    ds.save()
+    ds.drop("foo", check=False)
+    assert_result_count(
+        ds.get("foo", on_failure="ignore", result_renderer=None),
+        1, action="get", type="file", status="error")
