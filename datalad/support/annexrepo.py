@@ -1488,7 +1488,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             files=files_arg,
             jobs=jobs,
             progress=True,
-            total_nbytes=sum(expected_downloads.values()),
+            # filter(bool,   to avoid trying to add up None's when size is not known
+            total_nbytes=sum(filter(bool, expected_downloads.values())),
         )
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
@@ -3508,15 +3509,15 @@ class AnnexJsonProtocol(WitlessProtocol):
                     # do not crash if no command is reported
                     label=j['action'].get('command', '').capitalize(),
                     unit=' Bytes',
-                    total=float(j['total-size']),
+                    total=float(j.get('total-size', None)),
                     noninteractive_level=5,
                 )
                 self._pbars.add(pbar_id)
             log_progress(
                 lgr.info,
                 pbar_id,
-                j['percent-progress'],
-                update=float(j['byte-progress']),
+                j.get('percent-progress', 0),
+                update=float(j.get('byte-progress', 0)),
                 noninteractive_level=5,
             )
             # do not let progress reports leak into the return value
