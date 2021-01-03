@@ -124,9 +124,9 @@ class _RunnerAdapter(Runner):
                 # destination directory already exists. With Python 3.8, we can
                 # make copytree() do the same with dirs_exist_ok=True. But for
                 # now, just rely on `cp`.
-                cmd = ["cp", "--recursive"]
+                cmd = ["cp", "-R"]
                 if preserve_attrs:
-                    cmd.append("--preserve")
+                    cmd.append("-p")
                 self(cmd + [quote_cmdlinearg(a) for a in args])
         else:
             copy_fn(source, destination)
