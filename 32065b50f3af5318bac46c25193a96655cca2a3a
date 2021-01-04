@@ -1,0 +1,30 @@
+Update 0.13.6-1-gcf5a212803:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    cf5a2128033a9acbcccc4e426216b426ec94364f..6d74b7f3827f96f4ba54743881a54072476b06fa
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  BF(DOC): point to travis badge on .com not older .org
+   83463ee059^-1
+-  Merge pull request #5251 from kyleam/audit-get-annexed-files
+   b9bca87707^-1
++  Merge pull request #5254 from kyleam/ria-annex-objects-guard
+   ee25838a6e^-1
+-  TST: Proof #5186
+   049a106cd1^-1
++  BF: annex-ignore RIA sources
+   2da56cc9bb^-1
+-  BF/TST: Adjust clone URL for cross-platform use w/ git
+   791279cd8a^-1
++  Merge pull request #5258 from kyleam/contentinfo-filter-dotgit
+   5140e58160^-1
+-  Merge pull request #5262 from yarikoptic/enh-test-skip-windows
+   db77587e8b^-1
++  Merge pull request #5269 from yarikoptic/bf-cp
+   6d74b7f382^-1
