@@ -9,13 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.13.7 (??? ??, 2020) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+## 0.13.7 (January 04, 2021) -- .
 
 ### Fixes
 
@@ -25,7 +19,7 @@ bet we will fix some bugs and make a world even a better place.
   sibling.  [clone][] now sets `remote.origin.annex-ignore` to `true`
   after cloning from RIA stores to prevent this.  ([#5255][])
 
-- [create-sibling][] invoked `cp` in a way that was not compatibile
+- [create-sibling][] invoked `cp` in a way that was not compatible
   with macOS.  ([#5269][])
 
 - Due to a bug in older Git versions (before 2.25), calling [status][]
@@ -38,7 +32,7 @@ bet we will fix some bugs and make a world even a better place.
 ### Enhancements and new features
 
 - [copy-file][] now aborts if .git/ is in the target directory, adding
-  to its existing .git/ saftey checks.  ([#5258][])
+  to its existing .git/ safety checks.  ([#5258][])
 
 
 ## 0.13.6 (December 14, 2020) -- .
