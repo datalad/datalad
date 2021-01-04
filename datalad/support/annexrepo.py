@@ -3509,7 +3509,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                     # do not crash if no command is reported
                     label=j['action'].get('command', '').capitalize(),
                     unit=' Bytes',
-                    total=float(j.get('total-size', None)),
+                    total=float(j.get('total-size', 0)),
                     noninteractive_level=5,
                 )
                 self._pbars.add(pbar_id)
