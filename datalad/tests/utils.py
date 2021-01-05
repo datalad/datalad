@@ -1063,10 +1063,6 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     @wraps(t)
     @attr('with_testrepos')
     def  _wrap_with_testrepos(*arg, **kw):
-        # addurls with our generated file:// URLs doesn't work on appveyor
-        # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
-        if 'APPVEYOR' in os.environ:
-            raise SkipTest("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
