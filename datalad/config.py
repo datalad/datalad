@@ -9,6 +9,8 @@
 """
 """
 
+from collections import namedtuple
+
 import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
@@ -49,6 +51,11 @@ _where_reload_doc = """
           modification. This can be disable to make multiple sequential
           modifications slightly more efficient.""".lstrip()
 
+# Selection of os.stat_result fields we care to collect/compare to judge
+# on either file has changed to warrant reload of configuration.
+# We cannot just take a full record since st_atime could potentially
+# change on every  git config  call.
+_stat_result = namedtuple('_stat_result', 'st_ino st_size st_ctime st_mtime')
 
 # we cannot import external_versions here, as the cfg comes before anything
 # and we would have circular imports
@@ -364,7 +371,14 @@ class ConfigManager(object):
 
     @staticmethod
     def _get_stats(store):
-        return {f: f.stat() if f.exists() else None for f in store['files']}
+        stats = {}
+        for f in store['files']:
+            if f.exists:
+                stat = f.stat()
+                stats[f] = _stat_result(stat.st_ino, stat.st_size, stat.st_ctime, stat.st_mtime)
+            else:
+                stats[f] = None
+        return stats
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
