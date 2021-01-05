@@ -342,15 +342,8 @@ class ConfigManager(object):
 
         # we have read files before
         # check if any file we read from has changed
-        current_time = time()
         curstats = self._get_stats(store)
-
-        # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
-        # if mtime age is less than worst resolution assume modified.
-        # And since we are doing that -- do it first, in tests we would operate "quickly"
-        # so can decide quickly as well
-        return any(s.st_mtime - current_time <= 2.0 for s in curstats.values()) \
-               or any(curstats[f] != storestats[f] for f in store['files'])
+        return any(curstats[f] != storestats[f] for f in store['files'])
 
     def _reload(self, run_args):
         # query git-config
