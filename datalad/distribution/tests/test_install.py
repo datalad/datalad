@@ -410,7 +410,7 @@ def test_install_into_dataset(source, top_path):
     ds = create(top_path)
     assert_repo_status(ds.path)
 
-    subds = ds.install("sub", source=source, save=False)
+    subds = ds.install("sub", source=source)
     ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))

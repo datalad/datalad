@@ -19,7 +19,6 @@ from datalad.interface.common_opts import (
     recursion_limit,
     location_description,
     jobs_opt,
-    nosave_opt,
     reckless_opt,
 )
 from datalad.interface.results import (
@@ -158,7 +157,6 @@ class Install(Interface):
         description=location_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        save=nosave_opt,
         reckless=reckless_opt,
         jobs=jobs_opt,
     )
@@ -174,7 +172,6 @@ class Install(Interface):
             description=None,
             recursive=False,
             recursion_limit=None,
-            save=True,
             reckless=None,
             jobs="auto"):
 
@@ -238,7 +235,6 @@ class Install(Interface):
                 for r in Install.__call__(
                         source=s,
                         description=description,
-                        save=save,
                         # we need to disable error handling in order to have it done at
                         # the very top, otherwise we are not able to order a global
                         # "ignore-and-keep-going"
