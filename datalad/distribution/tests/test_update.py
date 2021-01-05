@@ -577,7 +577,7 @@ def test_merge_conflict_in_subdataset_only(path):
     assert_repo_status(ds_clone_sub_noconflict.path)
     # ... but the one with the conflict leaves it for the caller to handle.
     ok_(ds_clone_sub_conflict.repo.call_git(
-        ["ls-files", "--unmerged", "--", "foo"]).strip())
+        ["ls-files", "--unmerged", "--", "foo"], read_only=True).strip())
 
 
 @with_tempfile(mkdir=True)

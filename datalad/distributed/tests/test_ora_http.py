@@ -69,7 +69,8 @@ def test_initremote(store_path, store_url, ds_path):
     #   - url
     #   - common_init_opts
     #   - archive_id (which equals ds id)
-    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
+                                  read_only=True)
     assert_in("url={}".format(url), remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
     assert_in("archive-id={}".format(ds.id), remote_log)

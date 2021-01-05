@@ -1662,22 +1662,23 @@ def test_gitrepo_call_git_methods(path):
                             expect_fail=expect_fail)
             check("fatal: bad source", cml.out)
 
-    eq_(list(gr.call_git_items_(["ls-files"])),
+    eq_(list(gr.call_git_items_(["ls-files"], read_only=True)),
         ["bar", "foo.txt"])
-    eq_(list(gr.call_git_items_(["ls-files", "-z"], sep="\0")),
+    eq_(list(gr.call_git_items_(["ls-files", "-z"], sep="\0", read_only=True)),
         # Note: The custom separator has trailing empty item, but this is an
         # arbitrary command with unknown output it isn't safe to trim it.
         ["bar", "foo.txt", ""])
 
     with assert_raises(AssertionError):
-        gr.call_git_oneline(["ls-files"])
+        gr.call_git_oneline(["ls-files"], read_only=True)
 
-    eq_(gr.call_git_oneline(["ls-files"], files=["bar"]),
+    eq_(gr.call_git_oneline(["ls-files"], files=["bar"], read_only=True),
         "bar")
 
-    ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
+    ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"], read_only=True))
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
+        assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"],
+                                         read_only=True))
         assert_not_in("expected blob type", cml.out)
 
 

@@ -2759,7 +2759,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             return {}
         # pull out file content
         out = self.call_git(
-            ['config', '-z', '-l', '--file', '.gitmodules'])
+            ['config', '-z', '-l', '--file', '.gitmodules'],
+            read_only=True)
         # abuse our config parser
         # disable multi-value report, because we could not deal with them
         # anyways, and they should not appear in a normal .gitmodules file
@@ -3219,7 +3220,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # simplify work with the result
         attributes = {p: {} for p in path}
         attr = []
-        for item in self.call_git_items_(cmd, files=path, sep='\0'):
+        for item in self.call_git_items_(cmd, files=path, sep='\0',
+                                         read_only=True):
             attr.append(item)
             if len(attr) < 3:
                 continue
@@ -3404,7 +3406,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             stdout = self.call_git(
                 cmd,
                 files=path_strs,
-                expect_fail=True)
+                expect_fail=True,
+                read_only=True)
         except CommandError as exc:
             if "fatal: Not a valid object name" in exc.stderr:
                 raise InvalidGitReferenceError(ref)
@@ -3662,7 +3665,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         ['ls-files', '-z', '-m'],
                         # low-level code cannot handle pathobjs
                         files=[str(p) for p in paths] if paths else None,
-                        sep='\0')
+                        sep='\0',
+                        read_only=True)
                     if p)
                 _cache[key] = modified
         else:
