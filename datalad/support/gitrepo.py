@@ -2131,13 +2131,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool, optional
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
-        read_only : bool, optional
-          By setting this to True, the caller indicates that the command does
-          not write to the repository, which lets this function skip some
-          operations that are necessary only for commands the modify the
-          repository. Beware that even commands that are conceptually
-          read-only, such as `git-status` and `git-diff`, may refresh and write
-          the index.
 
         Returns
         -------
@@ -2214,6 +2207,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool, optional
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
+        read_only : bool, optional
+          By setting this to True, the caller indicates that the command does
+          not write to the repository, which lets this function skip some
+          operations that are necessary only for commands the modify the
+          repository. Beware that even commands that are conceptually
+          read-only, such as `git-status` and `git-diff`, may refresh and write
+          the index.
 
         Returns
         -------
