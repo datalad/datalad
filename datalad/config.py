@@ -27,7 +27,6 @@ from datalad.dochelpers import exc_str
 import re
 import os
 from pathlib import Path
-from time import time
 
 import logging
 lgr = logging.getLogger('datalad.config')
@@ -53,9 +52,8 @@ _where_reload_doc = """
 
 # Selection of os.stat_result fields we care to collect/compare to judge
 # on either file has changed to warrant reload of configuration.
-# We cannot just take a full record since st_atime could potentially
-# change on every  git config  call.
 _stat_result = namedtuple('_stat_result', 'st_ino st_size st_ctime st_mtime')
+
 
 # we cannot import external_versions here, as the cfg comes before anything
 # and we would have circular imports
