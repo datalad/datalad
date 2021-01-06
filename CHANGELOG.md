@@ -19,6 +19,13 @@ bet we will fix some bugs and make a world even a better place.
 
 - The minimum supported version of Python is now 3.6.  ([#4879][])
 
+- A new command runner was added in v0.13.  Functionality related to
+  the old runner has now been removed: `Runner`, `GitRunner`, and
+  `run_gitcommand_on_file_list_chunks` from the `datalad.cmd` module
+  along with the `datalad.tests.protocolremote`,
+  `datalad.cmd.protocol`, and `datalad.cmd.protocol.prefix`
+  configuration options.  ([#5229][])
+
 - The `--no-storage-sibling` switch of `create-sibling-ria` is
   deprecated in favor of `--storage-sibling=off` and will be removed
   in a later release.  ([#5090][])
@@ -26,6 +33,12 @@ bet we will fix some bugs and make a world even a better place.
 - The `get_git_dir` static method of `GitRepo` is deprecated and will
   be removed in a later release.  Use the `dot_git` attribute of an
   instance instead.  ([#4597][])
+
+- The `ProcessAnnexProgressIndicators` helper from
+  `datalad.support.annexrepo` has been removed.  ([#5259][])
+
+- The `save` argument of [install][], a noop since v0.6.0, has been
+  dropped.  ([#5278][])
 
 - The `get_URLS` method of `AnnexCustomRemote` is deprecated and will
   be removed in a later release.  ([#4955][])
@@ -69,7 +82,7 @@ bet we will fix some bugs and make a world even a better place.
 ### Fixes
 
 - Cloning onto a system that enters adjusted branches by default (as
-  Windows does) did not propery record the clone URL.  ([#5128][])
+  Windows does) did not properly record the clone URL.  ([#5128][])
 
 - The RIA-specific handling after calling [clone][] was correctly
   triggered by `ria+http` URLs but not `ria+https` URLs.  ([#4977][])
@@ -77,7 +90,19 @@ bet we will fix some bugs and make a world even a better place.
 - The remote calls to `cp` and `chmod` in [create-sibling][] were not
   portable and failed on macOS.  ([#5108][])
 
+- A more reliable check is now done to decide if the configuration
+  files need to be reloaded.  ([#5276][])
+
 ### Enhancements and new features
+
+- The subdataset handling for adjusted branches, which is particularly
+  important on Windows where git-annex enters an adjusted branch by
+  default, has been improved.  A core piece of the new approach is
+  registering the commit of the main branch, not its checked out
+  adjusted branch, in the superdataset.  Note: This means that `git
+  status` will always considered a subdataset on an adjusted branch as
+  dirty while `datalad status` will look more closely and see if the
+  tip of the main branch matches the registered commit.  ([#5241][])
 
 - [create-sibling-github][] learned how to create private repositories
   (thanks to Nolan Nichols).  ([#4769][])
@@ -96,6 +121,10 @@ bet we will fix some bugs and make a world even a better place.
   format used by `singularity run` and friends.  In contrast to the
   short-lived URLs obtained by querying Singularity Hub directly,
   `shub://` URLs are suitable for registering with git-annex.  ([#4816][])
+
+- A provider is now included for https://registry-1.docker.io URLs.
+  This is useful for storing an image's blobs in a dataset and
+  registering the with git-annex.  ([#5129][])
 
 - [addurls][]
   - learned how to read data from standard input.  ([#4669][])
@@ -122,12 +151,12 @@ bet we will fix some bugs and make a world even a better place.
   takes a lock before writes to allow for multiple processes to modify
   the configuration of a dataset.  ([#4829][])
 
-- Installing a subdatset now uses custom handling rather than calling
+- Installing a subdataset now uses custom handling rather than calling
   `git submodule update --init`.  This avoids some locking issues when
   running [get][] in parallel and enables more accurate source URLs to
   be recorded.  ([#4853][])
 
-- The perfomance of the [subdatasets][] command has been improved,
+- The performance of the [subdatasets][] command has been improved,
   with substantial speedups for recursive processing of many
   subdatasets.  ([#4868][]) ([#5076][])
 
@@ -171,7 +200,7 @@ bet we will fix some bugs and make a world even a better place.
 
 - More internal work to move the code base over to the new command
   runner.  ([#4699][]) ([#4855][]) ([#4900][]) ([#4996][]) ([#5002][])
-  ([#5141][]) ([#5142][])
+  ([#5141][]) ([#5142][]) ([#5229][])
 
 
 ## 0.13.7 (January 04, 2021) -- .
@@ -3488,6 +3517,7 @@ publishing
 [#5125]: https://github.com/datalad/datalad/issues/5125
 [#5127]: https://github.com/datalad/datalad/issues/5127
 [#5128]: https://github.com/datalad/datalad/issues/5128
+[#5129]: https://github.com/datalad/datalad/issues/5129
 [#5136]: https://github.com/datalad/datalad/issues/5136
 [#5139]: https://github.com/datalad/datalad/issues/5139
 [#5141]: https://github.com/datalad/datalad/issues/5141
@@ -3504,8 +3534,13 @@ publishing
 [#5214]: https://github.com/datalad/datalad/issues/5214
 [#5218]: https://github.com/datalad/datalad/issues/5218
 [#5219]: https://github.com/datalad/datalad/issues/5219
+[#5229]: https://github.com/datalad/datalad/issues/5229
 [#5238]: https://github.com/datalad/datalad/issues/5238
+[#5241]: https://github.com/datalad/datalad/issues/5241
 [#5254]: https://github.com/datalad/datalad/issues/5254
 [#5255]: https://github.com/datalad/datalad/issues/5255
 [#5258]: https://github.com/datalad/datalad/issues/5258
+[#5259]: https://github.com/datalad/datalad/issues/5259
 [#5269]: https://github.com/datalad/datalad/issues/5269
+[#5276]: https://github.com/datalad/datalad/issues/5276
+[#5278]: https://github.com/datalad/datalad/issues/5278
