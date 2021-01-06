@@ -40,7 +40,6 @@ from datalad.tests.utils import (
     assert_false,
     assert_in,
     assert_in_results,
-    assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_repo_status,
@@ -50,19 +49,15 @@ from datalad.tests.utils import (
     eq_,
     get_most_obscure_supported_name,
     integration,
-    known_failure_windows,
-    local_testrepo_flavors,
     neq_,
     ok_,
     skip_if_no_network,
     skip_if_on_windows,
     skip_nomultiplex_ssh,
-    skip_ssh,
     SkipTest,
     slow,
     swallow_logs,
     with_tempfile,
-    with_testrepos,
     with_tree,
 )
 from datalad.support.sshconnector import get_connection_hash
@@ -94,10 +89,10 @@ def test_GitRepo_invalid_path(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile
 def test_GitRepo_instance_from_clone(src, dst):
-
+    origin = GitRepo(src, create=True)
     gr = GitRepo.clone(src, dst)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(dst, '.git')))
@@ -112,8 +107,9 @@ def test_GitRepo_instance_from_clone(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile
 def test_GitRepo_instance_from_existing(path):
+    GitRepo(path, create=True)
 
     gr = GitRepo(path)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
@@ -241,14 +237,12 @@ def test_GitRepo_equals(path1, path2):
     ok_(repo1 != repo2)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:515
-@known_failure_windows
 @assert_cwd_unchanged
-@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile
 def test_GitRepo_add(src, path):
 
-    gr = GitRepo.clone(src, path)
+    gr = GitRepo(path)
     filename = get_most_obscure_supported_name()
     with open(op.join(path, filename), 'w') as f:
         f.write("File to add to git")
@@ -336,11 +330,16 @@ def test_GitRepo_commit(path):
     assert_raises(FileNotInRepositoryError, gr.commit, files="not-existing")
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
-def test_GitRepo_get_indexed_files(src, path):
+def test_GitRepo_get_indexed_files(path):
 
-    gr = GitRepo.clone(src, path)
+    gr = GitRepo(path)
+    for filename in ('some1.txt', 'some2.dat'):
+        with open(op.join(path, filename), 'w') as f:
+            f.write(filename)
+        gr.add(filename)
+    gr.commit('Some files')
+
     idx_list = gr.get_indexed_files()
 
     runner = WitlessRunner(cwd=path)
@@ -471,51 +470,47 @@ def test_GitRepo_files_decorator():
 
 
 @skip_if_no_network
-@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
-def test_GitRepo_remote_add(orig_path, path):
-
-    gr = GitRepo.clone(orig_path, path)
-    out = gr.get_remotes()
-    assert_in('origin', out)
-    eq_(len(out), 1)
+def test_GitRepo_remote_add(path):
+    gr = GitRepo(path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.get_remotes()
-    assert_in('origin', out)
     assert_in('github', out)
-    eq_(len(out), 2)
+    eq_(len(out), 1)
     eq_('git://github.com/datalad/testrepo--basic--r1', gr.config['remote.github.url'])
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
-def test_GitRepo_remote_remove(orig_path, path):
+def test_GitRepo_remote_remove(path):
 
-    gr = GitRepo.clone(orig_path, path)
+    gr = GitRepo(path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    gr.remove_remote('github')
     out = gr.get_remotes()
     eq_(len(out), 1)
-    assert_in('origin', out)
+    gr.remove_remote('github')
+    out = gr.get_remotes()
+    eq_(len(out), 0)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:491
-@known_failure_windows
-@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
-def test_GitRepo_get_remote_url(orig_path, path):
+def test_GitRepo_get_remote_url(path):
 
-    gr = GitRepo.clone(orig_path, path)
+    gr = GitRepo(path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    eq_(gr.get_remote_url('origin'), orig_path)
     eq_(gr.get_remote_url('github'),
-                 'git://github.com/datalad/testrepo--basic--r1')
+        'git://github.com/datalad/testrepo--basic--r1')
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile
 @with_tempfile
 def test_GitRepo_pull(test_path, orig_path, clone_path):
+
+    veryorigin = GitRepo(test_path)
+    with open(op.join(test_path, 'some.txt'), 'w') as f:
+        f.write("New text file.")
+    veryorigin.add('some.txt')
+    veryorigin.commit("new file added.")
 
     origin = GitRepo.clone(test_path, orig_path)
     clone = GitRepo.clone(orig_path, clone_path)
@@ -543,12 +538,16 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     )
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
-def test_GitRepo_fetch(test_path, orig_path, clone_path):
+def test_GitRepo_fetch(orig_path, clone_path):
 
-    origin = GitRepo.clone(test_path, orig_path)
+    origin = GitRepo(orig_path)
+    with open(op.join(orig_path, 'some.txt'), 'w') as f:
+        f.write("New text file.")
+    origin.add('some.txt')
+    origin.commit("new file added.")
+
     clone = GitRepo.clone(orig_path, clone_path)
     filename = get_most_obscure_supported_name()
 
@@ -586,16 +585,18 @@ def _path2localsshurl(path):
     return url
 
 
-# broken,possibly due to a GitPy issue with windows sshurls
-# see https://github.com/datalad/datalad/pull/3638
-@skip_if_on_windows
 @skip_nomultiplex_ssh
-@with_testrepos('.*basic.*', flavors=['local'])
+@with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_fetch(remote_path, repo_path):
     from datalad import ssh_manager
 
-    remote_repo = GitRepo(remote_path, create=False)
+    remote_repo = GitRepo(remote_path)
+    with open(op.join(remote_path, 'some.txt'), 'w') as f:
+        f.write("New text file.")
+    remote_repo.add('some.txt')
+    remote_repo.commit("new file added.")
+
     url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('datalad-test', bundled=True))
@@ -620,9 +621,6 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
               repo.get_remote_branches())
 
 
-# broken,possibly due to a GitPy issue with windows sshurls
-# see https://github.com/datalad/datalad/pull/3638
-@skip_if_on_windows
 @skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
@@ -659,9 +657,6 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
-# broken,possibly due to a GitPy issue with windows sshurls
-# see https://github.com/datalad/datalad/pull/3638
-@skip_if_on_windows
 @skip_nomultiplex_ssh
 @with_tempfile
 @with_tempfile
@@ -785,13 +780,17 @@ def test_GitRepo_remote_update(path1, path2, path3):
     eq_({'branch2', 'branch3'}, set(branches1))
 
 
-# TODO: Why was it "flavors=local_testrepo_flavors" ? What's the windows issue here?
-@with_testrepos('.*git.*', flavors=['clone'])
 @with_tempfile
-def test_GitRepo_get_files(url, path):
+@with_tempfile
+def test_GitRepo_get_files(src_path, path):
+    src = GitRepo(src_path)
+    for filename in ('some1.txt', 'some2.dat'):
+        with open(op.join(src_path, filename), 'w') as f:
+            f.write(filename)
+        src.add(filename)
+    src.commit('Some files')
 
-    gr = GitRepo.clone(url, path)
-
+    gr = GitRepo.clone(src.path, path)
     # get the expected files via os for comparison:
     os_files = set()
     for (dirpath, dirnames, filenames) in os.walk(path):
@@ -833,12 +832,11 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:505
-@known_failure_windows
-@with_testrepos('.*git.*', flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_GitRepo_get_toppath(repo, tempdir, repo2):
+    GitRepo(repo, create=True)
     reporeal = str(Path(repo).resolve())
     eq_(GitRepo.get_toppath(repo, follow_up=False), reporeal)
     eq_(GitRepo.get_toppath(repo), repo)
@@ -963,9 +961,15 @@ def test_GitRepo_git_get_branch_commits_(src):
     eq_(len(commits), 1)
 
 
-@with_testrepos(flavors=['local'])
-@with_tempfile(mkdir=True)
+@with_tempfile
+@with_tempfile
 def test_get_tracking_branch(o_path, c_path):
+    src = GitRepo(o_path)
+    for filename in ('some1.txt', 'some2.dat'):
+        with open(op.join(o_path, filename), 'w') as f:
+            f.write(filename)
+        src.add(filename)
+    src.commit('Some files')
 
     clone = GitRepo.clone(o_path, c_path)
     # Note, that the default branch might differ even if it is always 'master'.
@@ -991,11 +995,23 @@ def test_get_tracking_branch(o_path, c_path):
         clone.get_tracking_branch(remote_only=True))
 
 
-@with_testrepos('submodule_annex', flavors=['clone'])
-def test_submodule_deinit(path):
-    from datalad.support.annexrepo import AnnexRepo
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_submodule_deinit(src, subsrc, path):
+    src = GitRepo(src)
+    subsrc = GitRepo(subsrc)
+    for repo in (src, subsrc):
+        for filename in ('some1.txt', 'some2.dat'):
+            with open(op.join(repo.path, filename), 'w') as f:
+                f.write(filename)
+            repo.add(filename)
+        repo.commit('Some files')
+    src.add_submodule('subm 1', name='subm 1', url=subsrc.path)
+    src.add_submodule('2', name='2', url=subsrc.path)
+    src.commit('submodule added')
 
-    top_repo = AnnexRepo(path, create=False)
+    top_repo = GitRepo.clone(src.path, path)
     eq_({'subm 1', '2'},
         {s["gitmodule_name"] for s in top_repo.get_submodules_()})
     # note: here init=True is ok, since we are using it just for testing
@@ -1023,13 +1039,18 @@ def test_submodule_deinit(path):
     ok_(not GitRepo.is_valid_repo(str(top_repo.pathobj / 'subm 1')))
 
 
-@with_testrepos(".*basic_git.*", flavors=['local'])
 @with_tempfile(mkdir=True)
-def test_GitRepo_add_submodule(source, path):
+@with_tempfile(mkdir=True)
+def test_GitRepo_add_submodule(source_path, path):
+    source = GitRepo(source_path, create=True)
+    with open(op.join(source_path, 'some.txt'), 'w') as f:
+        f.write("New text file.")
+    source.add('some.txt')
+    source.commit('somefile')
 
     top_repo = GitRepo(path, create=True)
 
-    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.add_submodule('sub', name='sub', url=source_path)
     top_repo.commit('submodule added')
     eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
         ['sub'])
