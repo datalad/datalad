@@ -48,6 +48,7 @@ from datalad.tests.utils import (
     eq_,
     get_mtimes_and_digests,
     get_ssh_port,
+    known_failure_windows,
     ok_,
     ok_endswith,
     ok_exists,
@@ -849,6 +850,8 @@ def test_non_master_branch(src_path, target_path):
     eq_(get_branch(Dataset(target_path / "b" / "sub-b").repo),
         DEFAULT_BRANCH)
 
+
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5287
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_preserve_attrs(src, dest):
