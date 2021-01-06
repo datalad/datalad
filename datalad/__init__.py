@@ -92,6 +92,8 @@ _test_states = {
     'HOME': None,
 }
 
+# handle to an HTTP server instance that is used as part of the tests
+test_http_server = None
 
 def setup_package():
     import os
@@ -127,6 +129,21 @@ def setup_package():
 	email = test@example.com
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
+
+    # in order to avoid having to fiddle with rather uncommon
+    # file:// URLs in the tests, have a standard HTTP server
+    # that serves an 'httpserve' directory in the test HOME
+    # the URL will be available from datalad.test_http_server.url
+    from datalad.tests.utils import HTTPPath
+    import tempfile
+    global test_http_server
+    serve_path = tempfile.mkdtemp(
+        dir=cfg.get("datalad.tests.temp.dir"),
+        prefix='httpserve',
+    )
+    test_http_server = HTTPPath(serve_path)
+    test_http_server.start()
+    _TEMP_PATHS_GENERATED.append(serve_path)
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
@@ -217,6 +234,9 @@ def teardown_package():
             os.environ.pop('DATALAD_LOG_LEVEL')
         else:
             os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
+
+    if test_http_server:
+        test_http_server.stop()
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):
