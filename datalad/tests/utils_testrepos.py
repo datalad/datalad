@@ -19,26 +19,22 @@ from ..support.network import get_local_file_url
 from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
-from ..utils import on_windows
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
 from .utils import get_tempfile_kwargs
 from datalad.customremotes.base import init_datalad_remote
-from datalad import cfg as dl_cfg
+from datalad import (
+    cfg as dl_cfg,
+    test_http_server,
+)
 
 
-# we need a local file, that is supposed to be treated as a remote file via
-# file-scheme URL
-remote_file_fd, remote_file_path = \
-    tempfile.mkstemp(**get_tempfile_kwargs(
-        {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='testrepo'))
-# to be removed upon teardown
-_TEMP_PATHS_GENERATED.append(remote_file_path)
-with open(remote_file_path, "w") as f:
+# we need a local file, that is server via a URL
+remote_file_name = 'testrepo-annex.dat'
+with open(opj(test_http_server.path, remote_file_name), "w") as f:
     f.write("content to be annex-addurl'd")
-# OS-level descriptor needs to be closed!
-os.close(remote_file_fd)
+remote_file_url = '{}/{}'.format(test_http_server.url, remote_file_name)
 
 
 class TestRepo(object, metaclass=ABCMeta):
@@ -109,16 +105,7 @@ class BasicAnnexTestRepo(TestRepo):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
         self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
-        # even this doesn't work on bloody Windows
-        fileurl = get_local_file_url(remote_file_path, compatibility='git-annex')
-        # Note:
-        # The line above used to be conditional:
-        # if not on_windows \
-        # else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
-        # This self-reference-ish construction (pointing to 'test.dat'
-        # and therefore have the same content in git and annex) is outdated and
-        # causes trouble especially in annex V6 repos.
-        self.repo.add_url_to_file("test-annex.dat", fileurl)
+        self.repo.add_url_to_file("test-annex.dat", remote_file_url)
         self.repo.commit("Adding a rudimentary git-annex load file")
         self.repo.drop("test-annex.dat")  # since available from URL
 
