@@ -256,7 +256,7 @@ def json_stream(data):
 @known_failure_githubci_win
 def test_extract():
     info, subpaths = au.extract(
-        json_stream(ST_DATA["rows"]), "json",
+        ST_DATA["rows"],
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv")
 
@@ -287,7 +287,7 @@ def test_extract():
 
 def test_extract_disable_autometa():
     info, _ = au.extract(
-        json_stream(ST_DATA["rows"]), "json",
+        ST_DATA["rows"],
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
         exclude_autometa="*",
@@ -300,7 +300,7 @@ def test_extract_disable_autometa():
 
 def test_extract_exclude_autometa_regexp():
     info, _ = au.extract(
-        json_stream(ST_DATA["rows"]), "json",
+        ST_DATA["rows"],
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
         exclude_autometa="ea")
@@ -325,8 +325,10 @@ def check_extract_csv_json_equal(input_type):
                 url_format="{name}_{debut_season}.com",
                 meta=["group={age_group}"])
 
-    json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
-    csv_output = au.extract(csv_rows, input_type, **kwds)
+    json_output = au.extract(
+        *au._read(json_stream(ST_DATA["rows"]), "json"), **kwds)
+    csv_output = au.extract(
+        *au._read(csv_rows, input_type), **kwds)
 
     eq_(json_output, csv_output)
 
@@ -338,7 +340,7 @@ def test_extract_csv_tsv_json_equal():
 
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  au.extract, None, "invalid_input_type")
+                  au._read, None, "invalid_input_type")
 
 
 @with_tempfile(mkdir=True)
@@ -551,6 +553,13 @@ class TestAddurls(object):
                 cfg_proc=["yoda"])
         for fname in ["a", "b", "c", "code"]:
             ok_exists(os.path.join(dspath, fname))
+
+    @with_tempfile
+    def test_addurls_from_list(self, path):
+        ds = Dataset(path).create()
+        ds.addurls(self.data, "{url}", "{name}")
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(path, fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_subdataset(self, path):
