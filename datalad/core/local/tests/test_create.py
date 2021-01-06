@@ -203,7 +203,8 @@ def test_create_sub(path):
         'submodule.some/what/deeper.datalad-id={}'.format(
             subds.id),
         list(ds.repo.call_git_items_(['config', '--file', '.gitmodules',
-                                      '--list']))
+                                      '--list'],
+                                     read_only=True))
     )
 
     # subdataset is known to superdataset:

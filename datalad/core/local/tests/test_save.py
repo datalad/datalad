@@ -226,7 +226,7 @@ def test_subsuperdataset_save(path):
     # now we will lobotomize that sub3 so git would fail if any query is performed.
     (sub3.pathobj / '.git' / 'config').chmod(0o000)
     try:
-        sub3.repo.call_git(['ls-files'])
+        sub3.repo.call_git(['ls-files'], read_only=True)
         raise SkipTest
     except CommandError:
         # desired outcome

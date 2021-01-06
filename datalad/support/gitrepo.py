@@ -2117,35 +2117,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Internal helper to the call_git*() methods.
 
-        Parameters
-        ----------
-        args : list of str
-          Arguments to pass to `git`.
-        files : list of str, optional
-          File arguments to pass to `git`. The advantage of passing these here
-          rather than as part of `args` is that the call will be split into
-          multiple calls to avoid exceeding the maximum command line length.
-        expect_stderr : bool, optional
-          Standard error is expected and should not be elevated above the DEBUG
-          level.
-        expect_fail : bool, optional
-          A non-zero exit is expected and should not be elevated above the
-          DEBUG level.
-        read_only : bool, optional
-          By setting this to True, the caller indicates that the command does
-          not write to the repository, which lets this function skip some
-          operations that are necessary only for commands the modify the
-          repository. Beware that even commands that are conceptually
-          read-only, such as `git-status` and `git-diff`, may refresh and write
-          the index.
-
-        Returns
-        -------
-        stdout, stderr
-
-        Raises
-        ------
-        CommandError if the call exits with a non-zero status.
+        The parameters, return value, and raised exceptions match those
+        documented for `call_git`.
         """
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
@@ -2214,6 +2187,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         expect_fail : bool, optional
           A non-zero exit is expected and should not be elevated above the
           DEBUG level.
+        read_only : bool, optional
+          By setting this to True, the caller indicates that the command does
+          not write to the repository, which lets this function skip some
+          operations that are necessary only for commands the modify the
+          repository. Beware that even commands that are conceptually
+          read-only, such as `git-status` and `git-diff`, may refresh and write
+          the index.
 
         Returns
         -------
@@ -2235,17 +2215,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         Parameters
         ----------
-        args : list of str
-          Arguments to pass to `git`.
-        files : list of str, optional
-          File arguments to pass to `git`. The advantage of passing these here
-          rather than as part of `args` is that the call will be split into
-          multiple calls to avoid exceeding the maximum command line length.
-        expect_stderr : bool, optional
-          Standard error is expected and should not be elevated above the DEBUG
-          level.
         sep : str, optional
           Split the output by `str.split(sep)` rather than `str.splitlines`.
+
+        All other parameters match those described for `call_git`.
 
         Returns
         -------
@@ -2262,17 +2235,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def call_git_oneline(self, args, files=None, expect_stderr=False, read_only=False):
         """Call git for a single line of output.
 
-        Parameters
-        ----------
-        args : list of str
-          Arguments to pass to `git`.
-        files : list of str, optional
-          File arguments to pass to `git`. The advantage of passing these here
-          rather than as part of `args` is that the call will be split into
-          multiple calls to avoid exceeding the maximum command line length.
-        expect_stderr : bool, optional
-          Standard error is expected and should not be elevated above the DEBUG
-          level.
+        All other parameters match those described for `call_git`.
 
         Raises
         ------
@@ -2291,17 +2254,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def call_git_success(self, args, files=None, expect_stderr=False, read_only=False):
         """Call git and return true if the call exit code of 0.
 
-        Parameters
-        ----------
-        args : list of str
-          Arguments to pass to `git`.
-        files : list of str, optional
-          File arguments to pass to `git`. The advantage of passing these here
-          rather than as part of `args` is that the call will be split into
-          multiple calls to avoid exceeding the maximum command line length.
-        expect_stderr : bool, optional
-          Standard error is expected and should not be elevated above the DEBUG
-          level.
+        All parameters match those described for `call_git`.
 
         Returns
         -------
@@ -2806,7 +2759,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             return {}
         # pull out file content
         out = self.call_git(
-            ['config', '-z', '-l', '--file', '.gitmodules'])
+            ['config', '-z', '-l', '--file', '.gitmodules'],
+            read_only=True)
         # abuse our config parser
         # disable multi-value report, because we could not deal with them
         # anyways, and they should not appear in a normal .gitmodules file
@@ -3266,7 +3220,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # simplify work with the result
         attributes = {p: {} for p in path}
         attr = []
-        for item in self.call_git_items_(cmd, files=path, sep='\0'):
+        for item in self.call_git_items_(cmd, files=path, sep='\0',
+                                         read_only=True):
             attr.append(item)
             if len(attr) < 3:
                 continue
@@ -3451,7 +3406,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             stdout = self.call_git(
                 cmd,
                 files=path_strs,
-                expect_fail=True)
+                expect_fail=True,
+                read_only=True)
         except CommandError as exc:
             if "fatal: Not a valid object name" in exc.stderr:
                 raise InvalidGitReferenceError(ref)
@@ -3709,7 +3665,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                         ['ls-files', '-z', '-m'],
                         # low-level code cannot handle pathobjs
                         files=[str(p) for p in paths] if paths else None,
-                        sep='\0')
+                        sep='\0',
+                        read_only=True)
                     if p)
                 _cache[key] = modified
         else:

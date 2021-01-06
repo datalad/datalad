@@ -2071,7 +2071,7 @@ def test_fake_dates(path):
     for commit in ar.get_branch_commits_("git-annex"):
         eq_(timestamp, int(ar.format_commit('%ct', commit)))
     assert_in("timestamp={}s".format(timestamp),
-              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
+              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"], read_only=True))
 
 
 # to prevent regression

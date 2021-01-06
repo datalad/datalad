@@ -354,7 +354,8 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
         # branch.*.merge value, but that assumes a value for remote.*.fetch.
         merge_target = repo.call_git_oneline(
             ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
-             "@{upstream}"])
+             "@{upstream}"],
+            read_only=True)
     elif branch:
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
