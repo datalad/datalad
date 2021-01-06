@@ -60,6 +60,17 @@ class CommandError(RuntimeError):
         if self.stderr:
             to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
         if self.kwargs:
+            if 'stdout_json' in self.kwargs:
+                from datalad.utils import unique
+                json_errors = unique([
+                    '{}{}'.format(
+                        m['note'] if m.get('note') else m.get('error-messages'),
+                        m['error-messages'] if m.get('error-messages') else '')
+                    for m in self.kwargs['stdout_json']
+                    if m.get('error-messages') or m.get('note')
+                ])
+                if json_errors:
+                    to_str += " [errors from JSON records: {}]".format(json_errors)
             to_str += " [info keys: {}]".format(
                 ', '.join(self.kwargs.keys()))
         return to_str
