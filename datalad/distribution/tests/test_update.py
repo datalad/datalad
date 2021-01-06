@@ -41,6 +41,7 @@ from datalad.tests.utils import (
     assert_is_instance,
     ok_,
     create_tree,
+    maybe_adjust_repo,
     ok_file_has_content,
     assert_status,
     assert_repo_status,
@@ -404,7 +405,6 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     assert_repo_status(ds.path)
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_reobtain_data(originpath, destpath):
@@ -577,7 +577,7 @@ def test_merge_conflict_in_subdataset_only(path):
     assert_repo_status(ds_clone_sub_noconflict.path)
     # ... but the one with the conflict leaves it for the caller to handle.
     ok_(ds_clone_sub_conflict.repo.call_git(
-        ["ls-files", "--unmerged", "--", "foo"]).strip())
+        ["ls-files", "--unmerged", "--", "foo"], read_only=True).strip())
 
 
 @with_tempfile(mkdir=True)
@@ -651,17 +651,6 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
-def _adjust(repo):
-    """Put `repo` into an adjusted branch, upgrading if needed.
-    """
-    # This can be removed once GIT_ANNEX_MIN_VERSION is at least
-    # 7.20190912.
-    if not repo.supports_unlocked_pointers:
-        repo.call_git(["annex", "upgrade"])
-        repo.config.reload(force=True)
-    repo.adjust()
-
-
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     path = Path(path)
@@ -677,7 +666,7 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     ds_clone_subds = Dataset(ds_clone.pathobj / "subds")
-    _adjust(ds_clone_subds.repo)
+    maybe_adjust_repo(ds_clone_subds.repo)
     # Note: Were we to save ds_clone here, we would get a merge conflict in the
     # top repo for the submodule (even if using 'git annex sync' rather than
     # 'git merge').
@@ -719,7 +708,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
         # crash when there are submodules and an adjusted branch is checked
         # out, 2019-10-23).
         for ds in [ds_src, ds_src_s0, ds_src_s1]:
-            _adjust(ds.repo)
+            maybe_adjust_repo(ds.repo)
         ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
 

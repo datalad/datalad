@@ -586,10 +586,26 @@ def handle_errors(func):
                 entry = "{time}: Error:\n{exc_str}\n" \
                         "".format(time=datetime.now(),
                                   exc_str=exc_str)
-                log_target = self.store_base_path / 'error_logs' / \
+                # ensure base path is platform path
+                log_target = Path(self.store_base_path) / 'error_logs' / \
                              "{dsid}.{uuid}.log".format(dsid=self.archive_id,
                                                         uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
+
+            try:
+                # We're done using io, so let it perform any needed cleanup. At
+                # the moment, this is only relevant for SSHRemoteIO, in which
+                # case it cleans up the SSH socket and prevents a hang with
+                # git-annex 8.20201103 and later.
+                self.io.close()
+            except AttributeError:
+                pass
+            else:
+                # Note: It is documented as safe to unregister a function even
+                # if it hasn't been registered.
+                from atexit import unregister
+                unregister(self.io.close)
+
             if not isinstance(e, RIARemoteError):
                 raise RIARemoteError(str(e))
             else:
@@ -621,7 +637,7 @@ class RIARemote(SpecialRemote):
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
-        # must be absolute, and POSIX
+        # must be absolute, and POSIX (will be instance of PurePosixPath)
         # subclass must set this
         self.store_base_path = None
         # by default we can read and write
@@ -652,8 +668,9 @@ class RIARemote(SpecialRemote):
         isn't configured, sets the remote to read-only operation.
         """
 
+        # ensure base path is platform path
         dataset_tree_version_file = \
-            self.store_base_path / 'ria-layout-version'
+            Path(self.store_base_path) / 'ria-layout-version'
 
         # check dataset tree version
         try:
@@ -790,7 +807,8 @@ class RIARemote(SpecialRemote):
                     "No remote base path configured. "
                     "Specify `base-path` setting.")
 
-        self.store_base_path = Path(self.store_base_path)
+        # the base path is ultimately derived from a URL, always treat as POSIX
+        self.store_base_path = PurePosixPath(self.store_base_path)
         if not self.store_base_path.is_absolute():
             raise RIARemoteError(
                 'Non-absolute object tree base path configuration: %s'
@@ -842,10 +860,14 @@ class RIARemote(SpecialRemote):
         locations, etc.
         If this doesn't raise, the remote end should be fine to work with.
         """
+        # make sure the base path is a platform path when doing local IO
+        # the incoming Path object is a PurePosixPath
+        store_base_path = Path(self.store_base_path) \
+            if self._local_io else self.store_base_path
 
         # cache remote layout directories
         self.remote_git_dir, self.remote_archive_dir, self.remote_obj_dir = \
-            self.get_layout_locations(self.store_base_path, self.archive_id)
+            self.get_layout_locations(store_base_path, self.archive_id)
 
         read_only_msg = "Treating remote as read-only in order to" \
                         "prevent damage by putting things into an unknown " \

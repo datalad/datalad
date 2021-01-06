@@ -50,6 +50,7 @@ from datalad.tests.utils import (
     SkipTest,
     slow,
     known_failure_windows,
+    known_failure_githubci_win,
 )
 from datalad.utils import (
     with_pathsep,
@@ -74,6 +75,8 @@ def _make_dataset_hierarchy(path):
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
+# AssertionError since does get extra record {'cost': 400, 'name': 'bang', 'url': 'youredead', 'from_config': True},
+@known_failure_githubci_win
 @with_tempfile
 @with_tempfile
 @with_tempfile
@@ -683,3 +686,14 @@ def test_get_subdataset_direct_fetch(path):
                         action="install", type="dataset", status="error")
     assert_result_count(res, 1,
                         action="install", type="dataset", status="ok")
+
+
+@with_tempfile()
+def test_get_relays_command_errors(path):
+    ds = Dataset(path).create()
+    (ds.pathobj / "foo").write_text("foo")
+    ds.save()
+    ds.drop("foo", check=False)
+    assert_result_count(
+        ds.get("foo", on_failure="ignore", result_renderer=None),
+        1, action="get", type="file", status="error")

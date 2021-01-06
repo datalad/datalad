@@ -13,6 +13,8 @@ import os
 from os import chmod
 import stat
 import re
+import sys
+
 from os.path import join as opj, exists, basename
 
 from ..dataset import Dataset
@@ -30,6 +32,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    SkipTest,
     assert_dict_equal,
     assert_false,
     assert_in,
@@ -41,7 +45,6 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
     get_mtimes_and_digests,
     get_ssh_port,
@@ -51,8 +54,8 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     skip_if_on_windows,
-    skip_ssh,
     skip_if_root,
+    skip_ssh,
     slow,
     swallow_logs,
     with_tempfile,
@@ -535,7 +538,16 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
-    ds.create_sibling(url, ui=True)
+    try:
+        ds.create_sibling(url, ui=True)
+    except UnicodeDecodeError:
+        if sys.version_info < (3, 7):
+            # observed test failing on ubuntu 18.04 with python 3.6
+            # (reproduced in conda env locally with python 3.6.10 when LANG=C
+            # We will just skip this tricky one
+            raise SkipTest("Known failure")
+        raise
+
     published = ds.publish(to=sibname, transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr

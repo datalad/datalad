@@ -94,7 +94,12 @@ from datalad.utils import (
 )
 from datalad.core.local.diff import diff_dataset
 
+from datalad.utils import on_windows
+
 lgr = logging.getLogger('datalad.distribution.create_sibling')
+# Window's own mkdir command creates intermediate directories by default
+# and does not take flags: https://github.com/datalad/datalad/issues/5211
+mkdir_cmd = "mkdir" if on_windows else "mkdir -p" 
 
 
 class _RunnerAdapter(WitlessRunner):
@@ -124,9 +129,9 @@ class _RunnerAdapter(WitlessRunner):
                 # destination directory already exists. With Python 3.8, we can
                 # make copytree() do the same with dirs_exist_ok=True. But for
                 # now, just rely on `cp`.
-                cmd = ["cp", "--recursive"]
+                cmd = ["cp", "-R"]
                 if preserve_attrs:
-                    cmd.append("--preserve")
+                    cmd.append("-p")
                 self(cmd + [quote_cmdlinearg(a) for a in args])
         else:
             copy_fn(source, destination)
@@ -258,7 +263,7 @@ def _create_dataset_sibling(
                 # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
-                shell("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
+                shell("chmod -R +r+w {}".format(sh_quote(remoteds_path)))
                 # remove target at path
                 shell("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
@@ -284,9 +289,8 @@ def _create_dataset_sibling(
                 raise ValueError(
                     "Do not know how to handle existing={}".format(
                         repr(existing)))
-
         if not path_exists:
-            shell("mkdir -p {}".format(sh_quote(remoteds_path)))
+            shell("{} {}".format(mkdir_cmd, sh_quote(remoteds_path)))
 
     delayed_super = _DelayedSuper(ds)
     if inherit and delayed_super.super:
@@ -814,7 +818,7 @@ class CreateSibling(Interface):
             lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
                 shell("cd {} "
-                      "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                      "&& ( [ -x hooks/post-update ] && hooks/post-update || true )"
                       "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
@@ -947,7 +951,7 @@ class CreateSibling(Interface):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
         # make sure hooks directory exists (see #1251)
-        ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
+        ssh('{} {}'.format(mkdir_cmd, sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
 
         # create json command for current dataset
@@ -1008,7 +1012,7 @@ done
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, WEB_HTML_DIR)
-        ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
+        ssh('{} {}'.format(mkdir_cmd, sh_quote(webresources_remote)))
         ssh.put(webresources_local, webresources_remote, recursive=True)
 
         # minimize and upload js assets
@@ -1036,7 +1040,7 @@ done
             mode = shared
 
         if mode:
-            ssh('chmod {} -R {} {}'.format(
+            ssh('chmod -R {} {} {}'.format(
                 mode,
                 sh_quote(dirname(webresources_remote)),
                 sh_quote(opj(path, 'index.html'))))

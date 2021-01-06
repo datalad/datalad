@@ -454,24 +454,16 @@ def format_command(dset, command, **kwds):
 
 
 def _execute_command(command, pwd, expected_exit=None):
-    from datalad.cmd import Runner
+    from datalad.cmd import WitlessRunner
 
     exc = None
     cmd_exitcode = None
-    runner = Runner(cwd=pwd)
+    runner = WitlessRunner(cwd=pwd)
     try:
         lgr.info("== Command start (output follows) =====")
         runner.run(
-            command,
-            # immediate output
-            log_online=True,
-            # not yet sure what we should do with the command output
-            # IMHO `run` itself should be very silent and let the command talk
-            log_stdout=False,
-            log_stderr=False,
-            expect_stderr=True,
-            expect_fail=True,
-            # TODO stdin
+            # command is always a string
+            command
         )
     except CommandError as e:
         # strip our own info from the exception. The original command output

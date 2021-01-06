@@ -279,7 +279,7 @@ def test_here(path):
     res.pop('annex-description', None)
     # volatile prop
     res.pop('available_local_disk_space', None)
-    ds.repo._run_annex_command('dead', annex_options=['here'])
+    ds.repo.call_annex(['dead', 'here'])
     newres = ds.siblings('query', name='here', return_type='item-or-list')
     newres.pop('available_local_disk_space', None)
     eq_(res, newres)
@@ -370,4 +370,23 @@ def test_sibling_path_is_posix(basedir, otherpath):
     # path URL should come out POSIX as if `git clone` had configured it for origin
     # https://github.com/datalad/datalad/issues/3972
     eq_(res['url'], Path(otherpath).as_posix())
-     
+
+
+@with_tempfile()
+def test_bf3733(path):
+    ds = create(path)
+    # call siblings configure for an unknown sibling without a URL
+    # doesn't work, but also doesn't crash
+    assert_result_count(
+        ds.siblings(
+            'configure',
+            name='imaginary',
+            publish_depends='doesntmatter',
+            url=None,
+            on_failure='ignore'),
+        1,
+        status='error',
+        action="configure-sibling",
+        name="imaginary",
+        path=ds.path,
+    )

@@ -552,12 +552,9 @@ def _create_sibling_ria(
                     srname)
                 # TODO: Use AnnexRepo.enable_remote (which needs to get
                 #       `options` first)
-                cmd = [
-                    'git',
-                    'annex',
+                ds.repo.call_annex([
                     'enableremote',
-                    srname] + special_remote_options
-                subprocess.run(cmd, cwd=quote_cmdlinearg(ds.repo.path))
+                    srname] + special_remote_options)
             else:
                 yield get_status_dict(
                     status='error',
@@ -568,7 +565,7 @@ def _create_sibling_ria(
                 return
 
         if trust_level:
-            ds.repo.call_git(['annex', trust_level, srname])
+            ds.repo.call_annex([trust_level, srname])
         # get uuid for use in bare repo's config
         uuid = ds.config.get("remote.{}.annex-uuid".format(srname))
 

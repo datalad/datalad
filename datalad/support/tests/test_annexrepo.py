@@ -37,6 +37,7 @@ from unittest.mock import patch
 import gc
 
 from datalad.cmd import (
+    GitWitlessRunner,
     WitlessRunner as Runner,
 )
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
@@ -76,6 +77,7 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     known_failure_windows,
     local_testrepo_flavors,
+    maybe_adjust_repo,
     OBSCURE_FILENAME,
     ok_,
     ok_annex_get,
@@ -118,10 +120,8 @@ from datalad import cfg as dl_cfg
 
 # imports from same module:
 from datalad.support.annexrepo import (
-    _get_size_from_perc_complete,
     AnnexRepo,
     AnnexJsonProtocol,
-    ProcessAnnexProgressIndicators,
 )
 
 @assert_cwd_unchanged
@@ -258,12 +258,12 @@ def test_AnnexRepo_get_outofspace(annex_path):
             stderr="junk around not enough free space, need 905.6 MB more and after"
         )
 
-    with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
+    with patch.object(GitWitlessRunner, 'run_on_filelist_chunks', raise_cmderror) as cma, \
             assert_raises(OutOfSpaceError) as cme:
         ar.get("file")
     exc = cme.exception
     eq_(exc.sizemore_msg, '905.6 MB')
-    assert_re_in(".*annex (find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
+    assert_re_in(".*annex.*(find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:405
@@ -431,10 +431,17 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
-    res = ar.drop(testfile)
-    eq_(res['command'], 'drop')
-    eq_(res['success'], False)
-    assert_in('adjust numcopies', res['note'])
+    try:
+        res = ar.drop(testfile)
+    except CommandError as e:
+        # there should be at least one result that was captured
+        # TODO think about a more standard way of accessing such
+        # records in a CommandError, maybe having a more specialized
+        # exception derived from CommandError
+        res = e.kwargs['stdout_json'][0]
+        eq_(res['command'], 'drop')
+        eq_(res['success'], False)
+        assert_in('adjust numcopies', res['note'])
 
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)
@@ -551,13 +558,13 @@ def test_repo_info(path):
         return [custom_json]
 
     with patch.object(
-            repo, '_run_annex_command_json',
+            repo, '_call_annex_records',
             return_value=get_custom()):
         info = repo.repo_info()
         eq_(info['available local disk space'], None)
 
     with patch.object(
-        repo, '_run_annex_command_json',
+        repo, '_call_annex_records',
         return_value=get_custom({
             "available local disk space": "19193986496 (+100000 reserved)"})):
         info = repo.repo_info()
@@ -686,6 +693,7 @@ def test_AnnexRepo_get_file_backend(src, dst):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
+@known_failure_windows
 @with_tempfile
 def test_AnnexRepo_always_commit(path):
 
@@ -707,8 +715,7 @@ def test_AnnexRepo_always_commit(path):
     repo.add(file1)
 
     # Now git-annex log should show the addition:
-    out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).splitlines()
+    out_list = list(repo.call_annex_items_(['log']))
     eq_(len(out_list), 1)
     assert_in(file1, out_list[0])
     # check git log of git-annex branch:
@@ -722,7 +729,7 @@ def test_AnnexRepo_always_commit(path):
         # No additional git commit:
         eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
-        out, err = repo._run_annex_command('log')
+        out = repo.call_annex(['log'])
 
         # And we see only the file before always_commit was set to false:
         assert_in(file1, out)
@@ -732,7 +739,7 @@ def test_AnnexRepo_always_commit(path):
     # on the annex branches.
     repo.sync()
 
-    out, err = repo._run_annex_command('log')
+    out = repo.call_annex(['log'])
     assert_in(file1, out)
     assert_in(file2, out)
 
@@ -885,23 +892,23 @@ def test_AnnexRepo_get(src, dst):
 
     called = []
     # for some reason yoh failed mock to properly just call original func
-    orig_run = annex._run_annex_command
+    orig_run = annex._git_runner.run_on_filelist_chunks
 
-    def check_run(cmd, annex_options, **kwargs):
-        called.append(cmd)
-        if cmd == 'find':
-            assert_not_in('-J5', annex_options)
-        elif cmd == 'get':
-            assert_in('-J5', annex_options)
+    def check_run(cmd, files, **kwargs):
+        cmd_name = cmd[cmd.index('annex') + 1]
+        called.append(cmd_name)
+        if cmd_name == 'find':
+            assert_not_in('-J5', cmd)
+        elif cmd_name == 'get':
+            assert_in('-J5', cmd)
         else:
             raise AssertionError(
-                "no other commands so far should be ran. Got %s, %s" %
-                (cmd, annex_options)
+                "no other commands so far should be ran. Got %s" % cmd
             )
-        return orig_run(cmd, annex_options=annex_options, **kwargs)
+        return orig_run(cmd, files, **kwargs)
 
     annex.drop(testfile)
-    with patch.object(AnnexRepo, '_run_annex_command',
+    with patch.object(GitWitlessRunner, 'run_on_filelist_chunks',
                       side_effect=check_run, auto_spec=True), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
@@ -922,7 +929,7 @@ def test_v7_detached_get(opath, path):
     repo = AnnexRepo(path)
     # test getting in a detached HEAD
     repo.checkout('HEAD^{}')
-    repo._run_annex_command('upgrade')  # TODO: .upgrade ?
+    repo.call_annex(['upgrade'])  # TODO: .upgrade ?
 
     repo.get('file.dat')
     ok_file_has_content(op.join(repo.path, 'file.dat'), "content")
@@ -1215,12 +1222,12 @@ def test_annex_ssh(topdir):
 def test_annex_remove(path):
     repo = AnnexRepo(path, create=False)
 
-    file_list = repo.get_annexed_files()
+    file_list = list(repo.get_content_annexinfo(init=None))
     assert len(file_list) >= 1
     # remove a single file
-    out = repo.remove(file_list[0])
-    assert_not_in(file_list[0], repo.get_annexed_files())
-    eq_(out[0], file_list[0])
+    out = repo.remove(str(file_list[0]))
+    assert_not_in(file_list[0], repo.get_content_annexinfo(init=None))
+    eq_(out[0], str(file_list[0].relative_to(repo.pathobj)))
 
     with open(opj(repo.path, "rm-test.dat"), "w") as f:
         f.write("whatever")
@@ -1315,34 +1322,40 @@ def test_annex_copy_to(origin, clone):
         assert_in('copied1', kwargs['files'])
         assert_in('copied2', kwargs['files'])
         assert_in('existed', kwargs['files'])
-        return """
-{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
-{"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
-{"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
-""", ""
-    # Note that we patch _run_annex_command, which is also invoked by _run_annex_command_json
+        return [
+                {"command":"copy","note":"to target ...", "success":True,
+                 "key":"akey1", "file":"copied1"},
+                {"command":"copy","note":"to target ...", "success":True,
+                 "key":"akey2", "file":"copied2"},
+                {"command":"copy","note":"checking target ...", "success":True,
+                 "key":"akey3", "file":"existed"},
+        ]
+    # Note that we patch _call_annex_records,
     # which is in turn invoked first by copy_to for "find" operation.
     # TODO: provide a dedicated handling within above ok_copy for 'find' command
-    with patch.object(repo, '_run_annex_command', ok_copy):
+    with patch.object(repo, '_call_annex_records', ok_copy):
         eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
             ["copied1", "copied2"])
 
     # now let's test that we are correctly raising the exception in case if
     # git-annex execution fails
-    orig_run = repo._run_annex_command
+    orig_run = repo._call_annex
 
     # Kinda a bit off the reality since no nonex* would not be returned/handled
     # by _get_expected_files, so in real life -- wouldn't get report about Incomplete!?
     def fail_to_copy(command, **kwargs):
-        if command == 'copy':
+        if command[0] == 'copy':
             # That is not how annex behaves
             # http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             # for non-existing files output goes into stderr
             raise CommandError(
                 "Failed to run ...",
-                stdout=
-                    '{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied"}\n'
-                    '{"command":"copy","note":"checking target ...", "success":true, "key":"akey2", "file":"existed"}\n',
+                stdout_json=[
+                    {"command":"copy","note":"to target ...", "success":True,
+                     "key":"akey1", "file":"copied"},
+                    {"command":"copy","note":"checking target ...",
+                     "success":True, "key":"akey2", "file":"existed"},
+                ],
                 stderr=
                     'git-annex: nonex1 not found\n'
                     'git-annex: nonex2 not found\n'
@@ -1354,7 +1367,7 @@ def test_annex_copy_to(origin, clone):
         assert files == ["copied", "existed", "nonex1", "nonex2"]
         return {'akey1': 10}, ["copied"]
 
-    with patch.object(repo, '_run_annex_command', fail_to_copy), \
+    with patch.object(repo, '_call_annex', fail_to_copy), \
             patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
@@ -1564,75 +1577,6 @@ def test_annex_version_handling_bad_git_annex(path):
         except OSError:
             pass
         assert_raises(OutdatedExternalDependency, AnnexRepo, path)
-
-
-def test_ProcessAnnexProgressIndicators():
-    irrelevant_lines = (
-        'abra',
-        '{"some_json": "sure thing"}'
-    )
-    # regular lines, without completion for known downloads
-    success_lines = (
-        '{"command":"get","note":"","success":true,"key":"key1","file":"file1"}',
-        '{"command":"comm","note":"","success":true,"key":"backend-s10--key2"}',
-    )
-    progress_lines = (
-        '{"byte-progress":10,"action":{"command":"get","note":"from web...",'
-            '"key":"key1","file":"file1"},"percent-progress":"10%"}',
-    )
-
-    # without providing expected entries
-    proc = ProcessAnnexProgressIndicators()
-    # when without any target downloads, there is no total_pbar
-    assert_is(proc.total_pbar, None)
-    # for regular lines -- should just return them without side-effects
-    for l in irrelevant_lines + success_lines:
-        with swallow_outputs() as cmo:
-            eq_(proc(l), l)
-            eq_(proc.pbars, {})
-            eq_(cmo.out, '')
-            eq_(cmo.err, '')
-    # should process progress lines
-    eq_(proc(progress_lines[0]), None)
-    eq_(len(proc.pbars), 1)
-    # but when we finish download -- should get cleared
-    eq_(proc(success_lines[0]), success_lines[0])
-    eq_(proc.pbars, {})
-    # and no side-effect of any kind in finish
-    eq_(proc.finish(), None)
-
-    proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
-    # when without any target downloads, there is no total_pbar
-    assert(proc.total_pbar is not None)
-    eq_(proc.total_pbar.total, 100)  # as much as it knows at this point
-    eq_(proc.total_pbar.current, 0)
-    # for regular lines -- should still just return them without side-effects
-    for l in irrelevant_lines:
-        with swallow_outputs() as cmo:
-            eq_(proc(l), l)
-            eq_(proc.pbars, {})
-            eq_(cmo.out, '')
-            eq_(cmo.err, '')
-    # should process progress lines
-    # it doesn't swallow everything -- so there will be side-effects in output
-    with swallow_outputs() as cmo:
-        eq_(proc(progress_lines[0]), None)
-        eq_(len(proc.pbars), 1)
-        # but when we finish download -- should get cleared
-        eq_(proc(success_lines[0]), success_lines[0])
-        eq_(proc.pbars, {})
-        out = cmo.out
-
-    from datalad.ui import ui
-    from datalad.ui.dialog import QuietConsoleLog
-
-    assert out \
-        if not isinstance(ui.ui, QuietConsoleLog) else not out
-    assert proc.total_pbar is not None
-    # and no side-effect of any kind in finish
-    with swallow_outputs() as cmo:
-        eq_(proc.finish(), None)
-        eq_(proc.total_pbar, None)
 
 
 @with_tempfile
@@ -1881,6 +1825,15 @@ def test_AnnexRepo_dirty(path):
     repo.save()
     ok_(not repo.dirty)
 
+    subm = AnnexRepo(repo.pathobj / "subm", create=True)
+    (subm.pathobj / "foo").write_text("foo")
+    subm.save()
+    ok_(repo.dirty)
+    repo.save()
+    assert_false(repo.dirty)
+    maybe_adjust_repo(subm)
+    assert_false(repo.dirty)
+
 
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_set_remote_url(path):
@@ -2118,17 +2071,7 @@ def test_fake_dates(path):
     for commit in ar.get_branch_commits_("git-annex"):
         eq_(timestamp, int(ar.format_commit('%ct', commit)))
     assert_in("timestamp={}s".format(timestamp),
-              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
-
-
-def test_get_size_from_perc_complete():
-    f = _get_size_from_perc_complete
-    eq_(f(0, 0), 0)
-    eq_(f(0, '0'), 0)
-    eq_(f(100, '0'), 0)  # we do not know better
-    eq_(f(1, '1'), 100)
-    # with no percentage info, we don't know better either:
-    eq_(f(1, ''), 0)
+              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"], read_only=True))
 
 
 # to prevent regression
@@ -2157,7 +2100,7 @@ def _test_add_under_subdir(path):
 @with_tempfile(mkdir=True)
 def test_error_reporting(path):
     ar = AnnexRepo(path, create=True)
-    res = ar._run_annex_command_json('add', files='gl\\orious BS')
+    res = ar.call_annex_records(['add'], files='gl\\orious BS')
     eq_(
         res,
         [{
@@ -2177,10 +2120,9 @@ def test_annexjson_protocol(path):
     ar = AnnexRepo(path, create=True)
     ar.save()
     assert_repo_status(path)
-    runner = Runner(cwd=ar.path)
     # first an orderly execution
-    res = runner.run(
-        ['git', 'annex', 'find', '.', '--json'],
+    res = ar._call_annex(
+        ['find', '.', '--json'],
         protocol=AnnexJsonProtocol)
     for k in ('stdout', 'stdout_json', 'stderr'):
         assert_in(k, res)
@@ -2189,13 +2131,14 @@ def test_annexjson_protocol(path):
     # not meant as an exhaustive check for output structure,
     # just some assurance that it is not totally alien
     ok_(all(j['file'] for j in orig_j))
-    # no complaints
-    eq_(res['stderr'], '')
+    # no complaints, unless git-annex is triggered to run in debug mode
+    if logging.getLogger('datalad.annex').getEffectiveLevel() > 8:
+        eq_(res['stderr'], '')
 
     # now the same, but with a forced error
     with assert_raises(CommandError) as e:
-        res = runner.run(
-            ['git', 'annex', 'find', '.', 'error', '--json'],
+        res = ar._call_annex(
+            ['find', '.', 'error', '--json'],
             protocol=AnnexJsonProtocol)
         # normal operation is not impaired
         eq_(e.stdout_json, orig_j)
@@ -2421,34 +2364,15 @@ def test_save_noperms(path):
         raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
 
     try:
-        res = repo.save(paths=['file1'])
-
+        repo.save(paths=['file1'])
+    except CommandError as exc:
+        res = exc.kwargs["stdout_json"]
         assert_result_count(res, 1)
-        assert_result_count(
-            res, 1, type='file', path=repo.pathobj / 'file1', action='add', status='error'
-        )
-        assert_in('permission denied', res[0]['message'])
+        assert_result_count(res, 1, file='file1',
+                            command='add', success=False)
+        assert_in('permission denied', res[0]['error-messages'][0])
     finally:
         sudochown(['-R', str(os.geteuid()), repo.path])
-
-
-@with_tempfile
-def test_annex_cmd_expect_fail(path):
-    # test, that log message about stderr on non-zero exit is logged on debug level if expect_fail was set to True,
-    # warning level else
-
-    from re import DOTALL
-
-    repo = AnnexRepo(path)
-
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=True)
-        # message shows up at DEBUG level:
-        assert_re_in(r".*\[DEBUG\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
-        # message shows up at WARNING level
-        assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
 
 
 def test_get_size_from_key():
@@ -2475,14 +2399,13 @@ def test_get_size_from_key():
 
 
 @with_tempfile(mkdir=True)
-def test_run_annex_gitwitless_invalid_callable(path):
+def test_call_annex(path):
     ar = AnnexRepo(path, create=True)
-    for log_stdout, log_stderr in [(str, False),
-                                   (False, str),
-                                   (str, str)]:
-        with assert_raises(ValueError):
-            ar._run_annex_command_json(
-                "info",
-                log_stdout=log_stdout,
-                log_stderr=log_stderr,
-                runner="gitwitless")
+    # we raise on mistakes
+    with assert_raises(CommandError):
+        ar._call_annex(['not-an-annex-command'])
+    # and we get to know why
+    try:
+        ar._call_annex(['not-an-annex-command'])
+    except CommandError as e:
+        assert_in('Invalid argument', e.stderr)

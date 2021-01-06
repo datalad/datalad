@@ -15,7 +15,7 @@ from os.path import lexists, dirname, join as opj, curdir
 # Hard coded version, to be done by release process,
 # it is also "parsed" (not imported) by setup.py, that is why assigned as
 # __hardcoded_version__ later and not vise versa
-__version__ = '0.13.5'
+__version__ = '0.13.7'
 __hardcoded_version__ = __version__
 __full_version__ = __version__
 

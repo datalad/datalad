@@ -421,7 +421,7 @@ def _configure_remote(
     if name != 'here':
         # do all configure steps that are not meaningful for the 'here' sibling
         # AKA the local repo
-        if name not in known_remotes:
+        if name not in known_remotes and url:
             # this remote is fresh: make it known
             # just minimalistic name and URL, the rest is coming from `configure`
             ds.repo.add_remote(name, url)
@@ -564,13 +564,12 @@ def _configure_remote(
                     # XXX except it is not enough
 
                     # make special remote of type=git (see #335)
-                    ds.repo._run_annex_command(
+                    ds.repo.call_annex([
                         'initremote',
-                        annex_options=[
-                            as_common_datasrc,
-                            'type=git',
-                            'location={}'.format(url),
-                            'autoenable=true'])
+                        as_common_datasrc,
+                        'type=git',
+                        'location={}'.format(url),
+                        'autoenable=true'])
                 else:
                     yield dict(
                         status='impossible',
@@ -596,7 +595,7 @@ def _configure_remote(
             result_props['message'] = 'cannot set description of a plain Git repository'
             yield result_props
             return
-        ds.repo._run_annex_command('describe', annex_options=[name, description])
+        ds.repo.call_annex(['describe', name, description])
 
     # report all we know at once
     info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]

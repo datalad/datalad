@@ -98,6 +98,8 @@ from . import _TEMP_PATHS_GENERATED
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
 )
 
 # temp paths used by clones
@@ -1892,6 +1894,18 @@ def get_deeply_nested_structure(path):
     return ds
 
 
+def maybe_adjust_repo(repo):
+    """Put repo into an adjusted branch if it is not already.
+    """
+    if not repo.is_managed_branch():
+        # The next condition can be removed once GIT_ANNEX_MIN_VERSION is at
+        # least 7.20190912.
+        if not repo.supports_unlocked_pointers:
+            repo.call_annex(["upgrade"])
+            repo.config.reload(force=True)
+        repo.adjust()
+
+
 @with_tempfile
 @with_tempfile
 def has_symlink_capability(p1, p2):
@@ -1939,8 +1953,11 @@ def get_ssh_port(host):
     SkipTest if port cannot be found.
     """
     out = ''
+    runner = WitlessRunner()
     try:
-        out, err = Runner()(["ssh", "-G", host])
+        res = runner.run(["ssh", "-G", host], protocol=StdOutErrCapture)
+        out = res["stdout"]
+        err = res["stderr"]
     except Exception as exc:
         err = str(exc)
 

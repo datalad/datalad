@@ -24,9 +24,11 @@ from datalad.plugin.wtf import _HIDDEN
 from datalad.version import __version__
 
 from ..wtf import SECTION_CALLABLES
+from ...utils import Path
 
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
+    assert_greater,
     assert_in,
     assert_not_in,
     assert_repo_status,
@@ -140,6 +142,17 @@ def test_wtf(topdir):
         ok_startswith(cmo.out, '<details><summary>DataLad %s WTF' % __version__)
         assert_in('## dependencies', cmo.out)
 
+    # short flavor
+    with swallow_outputs() as cmo:
+        wtf(flavor='short')
+        assert_in("- datalad: version=%s" % __version__, cmo.out)
+        assert_in("- dependencies: ", cmo.out)
+        eq_(len(cmo.out.splitlines()), 4)  # #WTF, datalad, dependencies, trailing new line
+
+    with swallow_outputs() as cmo:
+        wtf(flavor='short', sections='*')
+        assert_greater(len(cmo.out.splitlines()), 10)  #  many more
+
     # should result only in '# WTF'
     skip_if_no_module('pyperclip')
 
@@ -184,7 +197,7 @@ def test_no_annex(path):
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed
     eq_([opj('code', 'inannex')],
-        ds.repo.get_annexed_files())
+        [str(Path(p)) for p in ds.repo.get_annexed_files()])
 
 
 _ds_template = {

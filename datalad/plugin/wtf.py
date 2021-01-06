@@ -347,9 +347,16 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
-            doc="""section to include.  If not set, all sections.
+            constraints=EnsureChoice(*sorted(SECTION_CALLABLES) + ['*']) | EnsureNone(),
+            doc="""section to include.  If not set - depends on flavor.
+            '*' could be used to force all sections.
             [CMD: This option can be given multiple times. CMD]"""),
+        flavor=Parameter(
+            args=("--flavor",),
+            constraints=EnsureChoice('full', 'short'),
+            doc="""Flavor of WTF. 'full' would produce markdown with exhaustive list of sections.
+            'short' will provide a condensed summary only of datalad and dependencies by default.
+            Use [CMD: --section CMD][PY: `section` PY] to list other sections"""),
         decor=Parameter(
             args=("-D", "--decor"),
             constraints=EnsureChoice('html_details') | EnsureNone(),
@@ -366,7 +373,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, sections=None, decor=None, clipboard=None):
+    def __call__(dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict
@@ -384,8 +391,8 @@ class WTF(Interface):
                 path=ds.path,
                 status='impossible',
                 message=(
-                'No dataset found at %s. Reporting on the dataset is '
-                'not attempted.', ds.path),
+                    'No dataset found at %s. Reporting on the dataset is '
+                    'not attempted.', ds.path),
                 logger=lgr
             )
             # we don't deal with absent datasets
@@ -410,6 +417,7 @@ class WTF(Interface):
             logger=lgr,
             decor=decor,
             infos=infos,
+            flavor=flavor,
         )
 
         # Define section callables which require variables.
@@ -425,8 +433,14 @@ class WTF(Interface):
             section_callables.pop('dataset')
         assert all(section_callables.values())  # check if none was missed
 
-        if sections is None:
-            sections = sorted(list(section_callables))
+        asked_for_all_sections = sections is not None and any(s == '*' for s in sections)
+        if sections is None or asked_for_all_sections:
+            if flavor == 'full' or asked_for_all_sections:
+                sections = sorted(list(section_callables))
+            elif flavor == 'short':
+                sections = ['datalad', 'dependencies']
+            else:
+                raise ValueError(flavor)
 
         for s in sections:
             infos[s] = section_callables[s]()
@@ -469,8 +483,22 @@ def _render_report(res):
             text += u'{}'.format(val)
         return text
 
-    report = _unwind(report, res.get('infos', {}), '')
+    def _unwind_short(text, val, top):
+        if isinstance(val, dict):
+            if not top:
+                text += '\n'
+                for k, v in val.items():
+                    text += "- " + _unwind_short(k, v, top + ' ') + '\n'
+            else:
+                text += ": " + ' '.join('%s=%s' % i for i in val.items())
+        elif isinstance(val, (list, tuple)):
+            text += (' ' if not top else '\n').join(map(str, val))
+        else:
+            text += u'{}'.format(val)
+        return text
 
+    unwinder = {'full': _unwind, 'short': _unwind_short}[res.get('flavor', 'full')]
+    report = unwinder(report, res.get('infos', {}), '')
     decor = res.get('decor', None)
 
     if not decor:

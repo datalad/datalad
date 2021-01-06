@@ -721,27 +721,35 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
             target,
         )
         return
+
+    ds_repo = ds.repo
+
     res_kwargs['target'] = target
     if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
         # this remote either isn't an annex,
         # or hasn't been properly initialized
-        # rather than barfing tons of messages for each file, do one
-        # for the entire dataset
-        yield dict(
-            res_kwargs,
-            action='copy',
-            status='impossible'
-            if force in ('all', 'checkdatapresent')
-            else 'notneeded',
-            message=(
-                "Target '%s' does not appear to be an annex remote",
-                target)
-        )
-        return
+        # given that there was no annex-ignore, let's try to init it
+        # see https://github.com/datalad/datalad/issues/5143 for the story
+        ds_repo.localsync(target)
+
+        if not ds.config.get('.'.join(('remote', target, 'annex-uuid')), None):
+            # still nothing
+            # rather than barfing tons of messages for each file, do one
+            # for the entire dataset
+            yield dict(
+                res_kwargs,
+                action='copy',
+                status='impossible'
+                if force in ('all', 'checkdatapresent')
+                else 'notneeded',
+                message=(
+                    "Target '%s' does not appear to be an annex remote",
+                    target)
+            )
+            return
 
     # it really looks like we will transfer files, get info on what annex
     # has in store
-    ds_repo = ds.repo
     # paths must be recoded to a dataset REPO root (in case of a symlinked
     # location
     annex_info_init = \
@@ -783,8 +791,7 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
                 message='Slated for transport, but no content present',
             )
 
-    cmd = ['git', 'annex', 'copy', '--batch', '-z', '--to', target,
-           '--json', '--json-error-messages', '--json-progress']
+    cmd = ['copy', '--batch', '-z', '--to', target]
 
     if jobs:
         cmd.extend(['--jobs', str(jobs)])
@@ -838,24 +845,15 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
         # rewind stdin buffer
         file_list.seek(0)
 
-        # tailor the progress protocol with the total number of files
-        # to be transferred
-        class TailoredPushAnnexJsonProtocol(AnnexJsonProtocol):
-            total_nbytes = nbytes
-
         # and go
-        # TODO try-except and yield what was captured before the crash
-        #res = GitWitlessRunner(
-        res = ds_repo._git_runner.run(
+        res = ds_repo._call_annex_records(
             cmd,
-            # TODO report how many in total, and give global progress too
-            protocol=TailoredPushAnnexJsonProtocol,
-            stdin=file_list)
-        for c in ('stdout', 'stderr'):
-            if res[c]:
-                lgr.debug('Received unexpected %s from `annex copy`: %s',
-                          c, res[c])
-        for j in res['stdout_json']:
+            stdin=file_list,
+            progress=True,
+            # tailor the progress protocol with the total number of files
+            # to be transferred
+            total_nbytes=nbytes)
+        for j in res:
             yield annexjson2result(j, ds, type='file', **res_kwargs)
 
     for annex_key, paths in repkey_paths.items():

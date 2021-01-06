@@ -258,7 +258,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             # Extract via cache only if size is not yet known
             if size is None:
                 # if for testing we want to force getting the archive extracted
-                # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
                 efile = self.cache[akey_path].get_extracted_filename(afile)
                 efile = ensure_bytes(efile)
 
@@ -417,6 +416,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # TODO: we need to report user somehow about this happening and
         # progress on the download
         from humanize import naturalsize
+        from datalad.support.annexrepo import AnnexJsonProtocol
+
         akey_size = self.repo.get_size_from_key(akey)
         self.info(
             "To obtain some keys we need to fetch an archive "
@@ -424,18 +425,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             % (naturalsize(akey_size) if akey_size else "unknown")
         )
 
-        def progress_indicators(l):
-            self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
-
-        self.runner(["git", "annex", "get",
-                     "--json", "--json-progress",
-                     "--key", akey
-                     ],
-                    log_stdout=progress_indicators,
-                    log_stderr='offline',
-                    # False, # to avoid lock down
-                    log_online=True,
-                    cwd=self.path, expect_stderr=True)
+        self.repo._call_annex(
+            ["get", "--json", "--json-progress", "--key", akey],
+            protocol=AnnexJsonProtocol,
+        )
 
 
 def main():

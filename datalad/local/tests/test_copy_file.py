@@ -27,6 +27,7 @@ from datalad.tests.utils import (
     chpwd,
     eq_,
     nok_,
+    ok_,
     ok_file_has_content,
     serve_path_via_http,
     slow,
@@ -337,6 +338,31 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
     assert_in_results(
         dest.copy_file(
             [sub.pathobj / '.git' / 'config',
-             dest.pathobj / 'some', '.git'], on_failure='ignore'),
+             dest.pathobj / 'some' / '.git'], on_failure='ignore'),
         status='impossible',
         action='copy_file')
+
+    # The last path above wasn't treated as a target directory because it
+    # wasn't an existing directory. We also guard against a '.git' in the
+    # target directory code path, though the handling is different.
+    with assert_raises(ValueError):
+        dest.copy_file([sub.pathobj / '.git' / 'config',
+                        dest.pathobj / '.git'])
+
+    # A source path can have a leading .git/ if the destination is outside of
+    # .git/.
+    nok_((dest.pathobj / "config").exists())
+    dest.copy_file(sub.pathobj / '.git' / 'config')
+    ok_((dest.pathobj / "config").exists())
+
+    target = dest.pathobj / 'some'
+    nok_(target.exists())
+    dest.copy_file([sub.pathobj / '.git' / 'config', target])
+    ok_(target.exists())
+
+    # But we only waste so many cycles trying to prevent foot shooting. This
+    # next one sneaks by because only .name, not all upstream parts, is checked
+    # for each destination that comes out of _yield_specs().
+    badobj = dest.pathobj / '.git' / 'objects' / 'i-do-not-exist'
+    dest.copy_file([sub.pathobj / '.git' / 'config', badobj])
+    ok_(badobj.exists())

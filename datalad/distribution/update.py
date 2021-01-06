@@ -354,7 +354,8 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
         # branch.*.merge value, but that assumes a value for remote.*.fetch.
         merge_target = repo.call_git_oneline(
             ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
-             "@{upstream}"])
+             "@{upstream}"],
+            read_only=True)
     elif branch:
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
@@ -396,7 +397,7 @@ def _annex_plain_merge(repo, _, target, merge_opts=None):
     yield from _plain_merge(repo, _, target, merge_opts=merge_opts)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
-    repo.call_git(["annex", "merge"])
+    repo.call_annex(["merge"])
 
 
 def _annex_sync(repo, remote, _target, merge_opts=None):
@@ -407,15 +408,17 @@ def _annex_sync(repo, remote, _target, merge_opts=None):
 def _reobtain(ds, merge_fn):
     def wrapped(*args, **kwargs):
         repo = ds.repo
+        repo_pathobj = repo.pathobj
 
         lgr.info("Applying updates to %s", ds)
         # get all annexed files that have data present
         lgr.info('Recording file content availability '
                  'to re-obtain updated files later on')
-        ds_path = ds.path
-        present_files = [
-            opj(ds_path, p)
-            for p in repo.get_annexed_files(with_content_only=True)]
+        ainfo = repo.get_content_annexinfo(
+            init=None, eval_availability=True)
+        # Recode paths for ds.get() call.
+        present_files = [str(ds.pathobj / f.relative_to(repo_pathobj))
+                         for f, st in ainfo.items() if st["has_content"]]
 
         yield from merge_fn(*args, **kwargs)
 

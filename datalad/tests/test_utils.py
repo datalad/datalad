@@ -104,6 +104,7 @@ from .utils import (
     eq_,
     has_symlink_capability,
     known_failure,
+    known_failure_appveyor,
     known_failure_v6,
     known_failure_windows,
     nok_,
@@ -1179,6 +1180,10 @@ def test_dlabspath(path):
             eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
 
 
+# OSError: [WinError 998] Invalid access to memory location:
+# '(originated from NtWow64ReadVirtualMemory64)'
+# But passes on a real win10 box -- might be server config issue
+@known_failure_appveyor
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
 def test_get_open_files(p):
     pobj = Path(p)

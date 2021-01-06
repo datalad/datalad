@@ -19,9 +19,16 @@ bet we will fix some bugs and make a world even a better place.
 
 - The minimum supported version of Python is now 3.6.  ([#4879][])
 
+- The `--no-storage-sibling` switch of `create-sibling-ria` is
+  deprecated in favor of `--storage-sibling=off` and will be removed
+  in a later release.  ([#5090][])
+
 - The `get_git_dir` static method of `GitRepo` is deprecated and will
   be removed in a later release.  Use the `dot_git` attribute of an
   instance instead.  ([#4597][])
+
+- The `get_URLS` method of `AnnexCustomRemote` is deprecated and will
+  be removed in a later release.  ([#4955][])
 
 - `ConfigManager.get` now returns a single value rather than a tuple
   when there are multiple values for the same key, as very few callers
@@ -61,12 +68,28 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Cloning onto a system that enters adjusted branches by default (as
+  Windows does) did not propery record the clone URL.  ([#5128][])
+
+- The RIA-specific handling after calling [clone][] was correctly
+  triggered by `ria+http` URLs but not `ria+https` URLs.  ([#4977][])
+
+- The remote calls to `cp` and `chmod` in [create-sibling][] were not
+  portable and failed on macOS.  ([#5108][])
 
 ### Enhancements and new features
 
 - [create-sibling-github][] learned how to create private repositories
   (thanks to Nolan Nichols).  ([#4769][])
+
+- [create-sibling-ria][] gained a `--storage-sibling` option.  When
+  `--storage-sibling=only` is specified, the storage sibling is
+  created without an accompanying Git sibling.  This enables using
+  hosts without Git installed for storage.  ([#5090][])
+
+- [get][], [save][], and [addurls][] gained support for parallel
+  operations that can be enabled via the `--jobs` command-line option
+  or the new `datalad.runtime.max-jobs` configuration option.  ([#5022][])
 
 - The download machinery (and thus the `datalad` special remote)
   gained support for a new scheme, `shub://`, which follows the same
@@ -77,7 +100,23 @@ bet we will fix some bugs and make a world even a better place.
 - [addurls][]
   - learned how to read data from standard input.  ([#4669][])
   - now supports tab-separated input.  ([#4845][])
-  - is now speedier.  ([#4867][])
+  - gained a `--drop-after` switch that signals to drop a file's
+    content after downloading and adding it to the annex.  ([#5081][])
+  - is now able to construct a tree of files from known checksums
+    without downloading content via its new `--key` option.  ([#5184][])
+  - records the URL file in the commit message as provided by the
+    caller it rather than using the resolved absolute path. ([#5091][])
+  - is now speedier.  ([#4867][]) ([#5022][])
+
+- The `add-readme` command now links to the [DataLad
+  handbook][handbook] rather than <http://docs.datalad.org>.  ([#4991][])
+
+- DataLad now ships with a module that is capable of installing
+  git-annex via various methods.  See `python -m datalad.install -h`.
+  ([#5098][]) ([#5139][])
+
+- New option `datalad.locations.extra-procedures` specifies an
+  additional location that should be searched for procedures.  ([#5156][])
 
 - The class for handling configuration values, `ConfigManager`, now
   takes a lock before writes to allow for multiple processes to modify
@@ -88,7 +127,29 @@ bet we will fix some bugs and make a world even a better place.
   running [get][] in parallel and enables more accurate source URLs to
   be recorded.  ([#4853][])
 
+- The perfomance of the [subdatasets][] command has been improved,
+  with substantial speedups for recursive processing of many
+  subdatasets.  ([#4868][]) ([#5076][])
+
 - Adding new subdatasets via [save][] has been sped up.  ([#4793][])
+
+- `GitRepo.get_content_info`, a helper that gets triggered by many
+  commands, got faster by tweaking its `git ls-files` call.  ([#5067][])
+
+- [wtf][] now includes credentials-related information (e.g. active
+  backends) in the its output.  ([#4982][])
+
+- The `call_git*` methods of `GitRepo` now have a `read_only`
+  parameter.  Callers can set this to `True` to promise that the
+  provided command does not write to the repository, bypassing the
+  cost of some checks and locking.  ([#5070][])
+
+- New `call_annex*` methods in the `AnnexRepo` class provide an
+  interface for running git-annex commands similar to that of the
+  `GitRepo.call_git*` methods.  ([#5163][])
+
+- It's now possible to register a custom metadata indexer that is
+  discovered by [search][] and used it to generate an index.  ([#4963][])
 
 - The `ConfigManager` methods `get`, `getbool`, `getfloat`, and
   `getint` now return a single value (with same precedence as `git
@@ -100,9 +161,92 @@ bet we will fix some bugs and make a world even a better place.
 - Command-line scripts are now defined via the `entry_points` argument
   of `setuptools.setup` instead of the `scripts` argument.  ([#4695][])
 
-- More internal work to move the code base over to the new command
-  runner.  ([#4699][]) ([#4855][]) ([#4900][])
+- The `datalad` special remote now tries to eliminate some unnecessary
+  interactions with git-annex by being smarter about how it queries
+  for URLs associated with a key.  ([#4955][])
 
+- The `GitRepo` class now does a better job of handling bare
+  repositories, a step towards bare repositories support in DataLad.
+  ([#4911][])
+
+- More internal work to move the code base over to the new command
+  runner.  ([#4699][]) ([#4855][]) ([#4900][]) ([#4996][]) ([#5002][])
+  ([#5141][]) ([#5142][])
+
+
+## 0.13.7 (January 04, 2021) -- .
+
+### Fixes
+
+- Cloning from a RIA store on the local file system initialized annex
+  in the Git sibling of the RIA source, which is problematic because
+  all annex-related functionality should go through the storage
+  sibling.  [clone][] now sets `remote.origin.annex-ignore` to `true`
+  after cloning from RIA stores to prevent this.  ([#5255][])
+
+- [create-sibling][] invoked `cp` in a way that was not compatible
+  with macOS.  ([#5269][])
+
+- Due to a bug in older Git versions (before 2.25), calling [status][]
+  with a file under .git/ (e.g., `datalad status .git/config`)
+  incorrectly reported the file as untracked.  A workaround has been
+  added.  ([#5258][])
+
+- Update tests for compatibility with latest git-annex.  ([#5254][])
+
+### Enhancements and new features
+
+- [copy-file][] now aborts if .git/ is in the target directory, adding
+  to its existing .git/ safety checks.  ([#5258][])
+
+
+## 0.13.6 (December 14, 2020) -- .
+
+### Fixes
+
+- An assortment of fixes for Windows compatibility.  ([#5113][]) ([#5119][])
+  ([#5125][]) ([#5127][]) ([#5136][]) ([#5201][]) ([#5200][]) ([#5214][])
+
+- Adding a subdataset on a system that defaults to using an adjusted
+  branch (i.e. doesn't support symlinks) didn't properly set up the
+  submodule URL if the source dataset was not in an adjusted state.
+  ([#5127][])
+
+- [push][] failed to push to a remote that did not have an
+  `annex-uuid` value in the local `.git/config`.  ([#5148][])
+
+- The default renderer has been improved to avoid a spurious leading
+  space, which led to the displayed path being incorrect in some
+  cases.  ([#5121][])
+
+- [siblings][] showed an uninformative error message when asked to
+  configure an unknown remote.  ([#5146][])
+
+- [drop][] confusingly relayed a suggestion from `git annex drop` to
+  use `--force`, an option that does not exist in `datalad drop`.
+  ([#5194][])
+
+- [create-sibling-github][] no longer offers user/password
+  authentication because it is no longer supported by GitHub.
+  ([#5218][])
+
+- The internal command runner's handling of the event loop has been
+  tweaked to hopefully fix issues with runnning DataLad from IPython.
+  ([#5106][])
+
+- SSH cleanup wasn't reliably triggered by the ORA special remote on
+  failure, leading to a stall with a particular version of git-annex,
+  8.20201103.  (This is also resolved on git-annex's end as of
+  8.20201127.)  ([#5151][])
+
+### Enhancements and new features
+
+- The credential helper no longer asks the user to repeat tokens or
+  AWS keys.  ([#5219][])
+
+- The new option `datalad.locations.sockets` controls where Datalad
+  stores SSH sockets, allowing users to more easily work around file
+  system and path length restrictions.  ([#5238][])
 
 ## 0.13.5 (October 30, 2020) -- .
 
@@ -3291,6 +3435,7 @@ publishing
 [#4855]: https://github.com/datalad/datalad/issues/4855
 [#4866]: https://github.com/datalad/datalad/issues/4866
 [#4867]: https://github.com/datalad/datalad/issues/4867
+[#4868]: https://github.com/datalad/datalad/issues/4868
 [#4877]: https://github.com/datalad/datalad/issues/4877
 [#4879]: https://github.com/datalad/datalad/issues/4879
 [#4896]: https://github.com/datalad/datalad/issues/4896
@@ -3298,19 +3443,27 @@ publishing
 [#4900]: https://github.com/datalad/datalad/issues/4900
 [#4904]: https://github.com/datalad/datalad/issues/4904
 [#4908]: https://github.com/datalad/datalad/issues/4908
+[#4911]: https://github.com/datalad/datalad/issues/4911
 [#4924]: https://github.com/datalad/datalad/issues/4924
 [#4926]: https://github.com/datalad/datalad/issues/4926
 [#4927]: https://github.com/datalad/datalad/issues/4927
 [#4931]: https://github.com/datalad/datalad/issues/4931
 [#4952]: https://github.com/datalad/datalad/issues/4952
 [#4953]: https://github.com/datalad/datalad/issues/4953
+[#4955]: https://github.com/datalad/datalad/issues/4955
 [#4957]: https://github.com/datalad/datalad/issues/4957
+[#4963]: https://github.com/datalad/datalad/issues/4963
 [#4966]: https://github.com/datalad/datalad/issues/4966
 [#4977]: https://github.com/datalad/datalad/issues/4977
+[#4982]: https://github.com/datalad/datalad/issues/4982
 [#4985]: https://github.com/datalad/datalad/issues/4985
+[#4991]: https://github.com/datalad/datalad/issues/4991
+[#4996]: https://github.com/datalad/datalad/issues/4996
 [#5001]: https://github.com/datalad/datalad/issues/5001
+[#5002]: https://github.com/datalad/datalad/issues/5002
 [#5008]: https://github.com/datalad/datalad/issues/5008
 [#5017]: https://github.com/datalad/datalad/issues/5017
+[#5022]: https://github.com/datalad/datalad/issues/5022
 [#5025]: https://github.com/datalad/datalad/issues/5025
 [#5026]: https://github.com/datalad/datalad/issues/5026
 [#5035]: https://github.com/datalad/datalad/issues/5035
@@ -3320,3 +3473,39 @@ publishing
 [#5051]: https://github.com/datalad/datalad/issues/5051
 [#5057]: https://github.com/datalad/datalad/issues/5057
 [#5060]: https://github.com/datalad/datalad/issues/5060
+[#5067]: https://github.com/datalad/datalad/issues/5067
+[#5070]: https://github.com/datalad/datalad/issues/5070
+[#5076]: https://github.com/datalad/datalad/issues/5076
+[#5081]: https://github.com/datalad/datalad/issues/5081
+[#5090]: https://github.com/datalad/datalad/issues/5090
+[#5091]: https://github.com/datalad/datalad/issues/5091
+[#5098]: https://github.com/datalad/datalad/issues/5098
+[#5106]: https://github.com/datalad/datalad/issues/5106
+[#5108]: https://github.com/datalad/datalad/issues/5108
+[#5113]: https://github.com/datalad/datalad/issues/5113
+[#5119]: https://github.com/datalad/datalad/issues/5119
+[#5121]: https://github.com/datalad/datalad/issues/5121
+[#5125]: https://github.com/datalad/datalad/issues/5125
+[#5127]: https://github.com/datalad/datalad/issues/5127
+[#5128]: https://github.com/datalad/datalad/issues/5128
+[#5136]: https://github.com/datalad/datalad/issues/5136
+[#5139]: https://github.com/datalad/datalad/issues/5139
+[#5141]: https://github.com/datalad/datalad/issues/5141
+[#5142]: https://github.com/datalad/datalad/issues/5142
+[#5146]: https://github.com/datalad/datalad/issues/5146
+[#5148]: https://github.com/datalad/datalad/issues/5148
+[#5151]: https://github.com/datalad/datalad/issues/5151
+[#5156]: https://github.com/datalad/datalad/issues/5156
+[#5163]: https://github.com/datalad/datalad/issues/5163
+[#5184]: https://github.com/datalad/datalad/issues/5184
+[#5194]: https://github.com/datalad/datalad/issues/5194
+[#5200]: https://github.com/datalad/datalad/issues/5200
+[#5201]: https://github.com/datalad/datalad/issues/5201
+[#5214]: https://github.com/datalad/datalad/issues/5214
+[#5218]: https://github.com/datalad/datalad/issues/5218
+[#5219]: https://github.com/datalad/datalad/issues/5219
+[#5238]: https://github.com/datalad/datalad/issues/5238
+[#5254]: https://github.com/datalad/datalad/issues/5254
+[#5255]: https://github.com/datalad/datalad/issues/5255
+[#5258]: https://github.com/datalad/datalad/issues/5258
+[#5269]: https://github.com/datalad/datalad/issues/5269

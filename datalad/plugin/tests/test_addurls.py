@@ -25,6 +25,7 @@ from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     assert_dict_equal,
     assert_false,
@@ -34,6 +35,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_re_in,
     assert_repo_status,
+    assert_result_count,
     assert_true,
     chpwd,
     create_tree,
@@ -42,9 +44,13 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     ok_exists,
     ok_startswith,
+    skip_if,
+    SkipTest,
     swallow_logs,
     with_tempfile,
     with_tree,
+    on_windows,
+    DEFAULT_BRANCH,
 )
 from datalad.utils import get_tempfile_kwargs, rmtemp
 from datalad import cfg as dl_cfg
@@ -255,14 +261,14 @@ def test_extract():
         filename_format="{age_group}//{now_dead}//{name}.csv")
 
     eq_(subpaths,
-        ["adult", "kid", "adult/no", "adult/yes", "kid/no"])
+        ["adult", "kid", op.join("adult", "no"), op.join("adult", "yes"), op.join("kid", "no")])
 
     eq_([d["url"] for d in info],
         ["will_1.com", "bob_2.com", "scott_1.com", "max_2.com"])
 
     eq_([d["filename"] for d in info],
-        ["kid/no/will.csv", "adult/yes/bob.csv",
-         "adult/no/scott.csv", "kid/no/max.csv"])
+        [op.join("kid", "no", "will.csv"), op.join("adult", "yes", "bob.csv"),
+         op.join("adult", "no", "scott.csv"), op.join("kid", "no", "max.csv")])
 
     expects = [{"name": "will", "age_group": "kid", "debut_season": "1",
                 "now_dead": "no"},
@@ -276,7 +282,7 @@ def test_extract():
         assert_dict_equal(d["meta_args"], expect)
 
     eq_([d["subpath"] for d in info],
-        ["kid/no", "adult/yes", "adult/no", "kid/no"])
+        [op.join("kid", "no"), op.join("adult", "yes"), op.join("adult", "no"), op.join("kid", "no")])
 
 
 def test_extract_disable_autometa():
@@ -402,6 +408,12 @@ def test_addurls_dry_run(path):
                   cml.out)
 
 
+OLD_EXAMINEKEY = external_versions["cmd:annex"] < "8.20201116"
+skip_key_tests = skip_if(
+    OLD_EXAMINEKEY,
+    "git-annex version does not support `examinekey --migrate-to-backend`")
+
+
 class TestAddurls(object):
 
     @classmethod
@@ -417,13 +429,24 @@ class TestAddurls(object):
         cls._hpath.start()
         cls.url = cls._hpath.url
 
+        cls.data = [{"url": cls.url + "udir/a.dat",
+                     "name": "a",
+                     "subdir": "foo",
+                     "md5sum": "3fb7c40c70b0ed19da713bd69ee12014",
+                     "size": "9"},
+                    {"url": cls.url + "udir/b.dat",
+                     "name": "b",
+                     "subdir": "bar",
+                     "md5sum": "",
+                     "size": ""},
+                    {"url": cls.url + "udir/c.dat",
+                     "name": "c",
+                     "subdir": "foo",
+                     "md5sum": "9b72648021b70b8c522642e4490d7ac3",
+                     "size": "9"}]
         cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
         with open(cls.json_file, "w") as jfh:
-            json.dump(
-                [{"url": cls.url + "udir/a.dat", "name": "a", "subdir": "foo"},
-                 {"url": cls.url + "udir/b.dat", "name": "b", "subdir": "bar"},
-                 {"url": cls.url + "udir/c.dat", "name": "c", "subdir": "foo"}],
-                jfh)
+            json.dump(cls.data, jfh)
 
     @classmethod
     def teardown_class(cls):
@@ -444,8 +467,11 @@ class TestAddurls(object):
         # Python API, and it will be the one saved in commit
         # message record
         json_file = op.relpath(self.json_file, ds.path)
-        ds.addurls(json_file, "{url}", "{name}")
-        ok_startswith(ds.repo.format_commit('%b'), f"url_file='{json_file}'")
+
+        ds.addurls(json_file, "{url}", "{name}",
+                   exclude_autometa="(md5sum|size)")
+        ok_startswith(ds.repo.format_commit('%b', DEFAULT_BRANCH), f"url_file='{json_file}'")
+
         filenames = ["a", "b", "c"]
         for fname in filenames:
             ok_exists(op.join(ds.path, fname))
@@ -457,7 +483,10 @@ class TestAddurls(object):
 
         # Ignore this check if we're faking dates because that disables
         # batch mode.
-        if not dl_cfg.get('datalad.fake-dates'):
+        # Also ignore if on Windows as it seems as if a git-annex bug 
+        # leads to separate meta data commits: 
+        # https://github.com/datalad/datalad/pull/5202#discussion_r535429704
+        if not (dl_cfg.get('datalad.fake-dates') or on_windows):
             # We should have two new commits on the git-annex: one for the
             # added urls and one for the added metadata.
             eq_(n_annex_commits + 2, get_annex_commit_counts())
@@ -728,3 +757,83 @@ class TestAddurls(object):
                        stdin=jfh)
         for fname in ["a", "b", "c"]:
             ok_exists(op.join(path, fname))
+
+    @with_tempfile(mkdir=True)
+    def test_drop_after(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.repo.set_gitattributes([('a*', {'annex.largefiles': 'nothing'})])
+        # make some files go to git, so we could test that we do not blow
+        # while trying to drop what is in git not annex
+        res = ds.addurls(self.json_file, '{url}', '{name}', drop_after=True)
+
+        assert_result_count(res, 3, action='addurl', status='ok')  # a, b, c  even if a goes to git
+        assert_result_count(res, 2, action='drop', status='ok')  # b, c
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_from_key_invalid_format(self, path):
+        ds = Dataset(path).create(force=True)
+        for fmt in ["{name}-which-has-no-double-dash",
+                    # Invalid hash length.
+                    "MD5-s{size}--{md5sum}a",
+                    # Invalid hash content.
+                    "MD5-s{size}--" + 32 * "q"]:
+            with assert_raises(IncompleteResultsError):
+                ds.addurls(self.json_file, "{url}", "{name}",
+                           key=fmt, exclude_autometa="*")
+
+    @with_tempfile(mkdir=True)
+    def check_addurls_from_key(self, key_arg, expected_backend, fake_dates,
+                               path):
+        ds = Dataset(path).create(force=True, fake_dates=fake_dates)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
+        ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
+                   key=key_arg)
+        repo = ds.repo
+        repo_path = ds.repo.pathobj
+        paths = [repo_path / x for x in "ac"]
+
+        annexinfo = repo.get_content_annexinfo(eval_availability=True)
+        for path in paths:
+            pstat = annexinfo[path]
+            eq_(pstat["backend"], expected_backend)
+            assert_false(pstat["has_content"])
+
+        get_res = ds.get(paths, result_renderer=None, on_failure="ignore")
+        assert_result_count(get_res, 2, action="get", status="ok")
+
+    def test_addurls_from_key(self):
+        fn = self.check_addurls_from_key
+        for case in [
+                (fn, "MD5-s{size}--{md5sum}", "MD5"),
+                (fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"),
+                (skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"),
+                (skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
+            yield case + (False,)
+            yield case + (True,)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_row_missing_key_fields(self, path):
+        ds = Dataset(path).create(force=True)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
+        data = self.data.copy()
+        for row in data:
+            if row["name"] == "b":
+                del row["md5sum"]
+                break
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}", exclude_autometa="*",
+                       key="MD5-s{size}--{md5sum}")
+
+        repo = ds.repo
+        repo_path = ds.repo.pathobj
+        paths = [repo_path / x for x in "ac"]
+
+        annexinfo = repo.get_content_annexinfo(eval_availability=True)
+        for path in paths:
+            pstat = annexinfo[path]
+            eq_(pstat["backend"], "MD5")
+            assert_false(pstat["has_content"])

@@ -269,6 +269,7 @@ def test_install_dataset_from_instance(src, dst):
     assert_in('INFO.txt', clone.repo.get_indexed_files())
 
 
+@known_failure_githubci_win
 @with_testrepos(flavors=['network'])
 @with_tempfile
 def test_install_dataset_from_just_source_via_path(url, path):
@@ -307,9 +308,7 @@ def test_install_dataladri(src, topurl, path):
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
 @slow   # 46sec on Yarik's laptop and tripped Travis CI
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -348,8 +347,9 @@ def test_install_recursive(src, path_nr, path_r):
         ok_(subds.is_installed(),
             "Not installed: %s" % (subds,))
         # no content was installed:
-        ok_(not any(subds.repo.file_has_content(
-            subds.repo.get_annexed_files())))
+        ainfo = subds.repo.get_content_annexinfo(init=None,
+                                                 eval_availability=True)
+        assert_false(any(st["has_content"] for st in ainfo.values()))
     # no unfulfilled subdatasets:
     ok_(top_ds.subdatasets(recursive=True, fulfilled=False) == [])
 
@@ -382,12 +382,18 @@ def test_install_recursive_with_data(src, path):
     eq_(res[0]['path'], path)
     top_ds = YieldDatasets()(res[0])
     ok_(top_ds.is_installed())
+
+    def all_have_content(repo):
+        ainfo = repo.get_content_annexinfo(init=None, eval_availability=True)
+        return all(st["has_content"] for st in ainfo.values())
+
     if isinstance(top_ds.repo, AnnexRepo):
-        ok_(all(top_ds.repo.file_has_content(top_ds.repo.get_annexed_files())))
+        ok_(all_have_content(top_ds.repo))
+
     for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subds.is_installed(), "Not installed: %s" % (subds,))
         if isinstance(subds.repo, AnnexRepo):
-            ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
+            ok_(all_have_content(subds.repo))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
@@ -404,7 +410,7 @@ def test_install_into_dataset(source, top_path):
     ds = create(top_path)
     assert_repo_status(ds.path)
 
-    subds = ds.install("sub", source=source, save=False)
+    subds = ds.install("sub", source=source)
     ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
@@ -739,7 +745,9 @@ def test_install_noautoget_data(src, path):
     # there should only be datasets in the list of installed items,
     # and none of those should have any data for their annexed files yet
     for ds in cdss:
-        assert_false(any(ds.repo.file_has_content(ds.repo.get_annexed_files())))
+        ainfo = ds.repo.get_content_annexinfo(init=None,
+                                              eval_availability=True)
+        assert_false(any(st["has_content"] for st in ainfo.values()))
 
 
 @with_tempfile

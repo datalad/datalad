@@ -9,6 +9,7 @@
 """
 """
 
+import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
 import datalad
@@ -66,7 +67,21 @@ def _where_reload(obj):
 
 
 # TODO document and make "public" (used in GitRepo too)
-def _parse_gitconfig_dump(dump, cwd=None):
+def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
+    """Parse a dump-string from `git config -z --list`
+
+    Parameters
+    ----------
+    dump : str
+      Null-byte separated output
+    cwd : path-like, optional
+      Use this path to convert relative paths for origin reports
+      into absolute paths
+    multi_value : bool, optional
+      If True, report values from multiple specifications of the
+      same key as a tuple of values assigned to this key. Otherwise,
+      the last configuration is reported.
+    """
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
@@ -90,7 +105,7 @@ def _parse_gitconfig_dump(dump, cwd=None):
             # if asked for a bool
             k, v = line, None
         present_v = dct.get(k, None)
-        if present_v is None:
+        if present_v is None or not multi_value:
             dct[k] = v
         else:
             if isinstance(present_v, tuple):
@@ -176,10 +191,17 @@ class ConfigManager(object):
 
     _checked_git_identity = False
 
+    # Lock for running changing operation across multiple threads.
+    # Since config itself to the same path could
+    # potentially be created independently in multiple threads, and we might be
+    # modifying global config as well, making lock static should not allow more than
+    # one thread to  write at a time, even if to different repositories.
+    _run_lock = threading.Lock()
+
     def __init__(self, dataset=None, overrides=None, source='any'):
         if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
-                'Unkown ConfigManager(source=) setting: {}'.format(source))
+                'Unknown ConfigManager(source=) setting: {}'.format(source))
         store = dict(
             # store in a simple dict
             # no subclassing, because we want to be largely read-only, and implement
@@ -698,7 +720,7 @@ class ConfigManager(object):
             lockfile = Path(self.obtain('datalad.locations.cache')) \
                 / 'locks' / 'gitconfig.lck'
 
-        with InterProcessLock(lockfile, logger=lgr):
+        with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)
 
         if reload:

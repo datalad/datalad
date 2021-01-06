@@ -129,7 +129,6 @@ def test_process_www_authenticate():
                  [])
 
 
-@known_failure_githubci_win
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_HTTPDownloader_basic(toppath, topurl):
@@ -808,7 +807,6 @@ def test_lorisadapter(d, keyring):
     assert_equal(content, "correct body")
 
 
-@known_failure_githubci_win
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_download_url(toppath, topurl):

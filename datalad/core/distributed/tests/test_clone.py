@@ -26,6 +26,7 @@ from datalad.utils import (
     chpwd,
     Path,
     on_windows,
+    rmtree
 )
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
@@ -51,6 +52,8 @@ from datalad.tests.utils import (
     integration,
     known_failure,
     known_failure_appveyor,
+    known_failure_githubci_win,
+    known_failure_windows,
     neq_,
     nok_,
     ok_,
@@ -72,6 +75,7 @@ from datalad.tests.utils import (
     with_tree,
     SkipTest,
 )
+from datalad.support.network import get_local_file_url
 from datalad.core.distributed.clone import (
     _get_installationpath_from_url,
     decode_source_spec,
@@ -204,6 +208,8 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+# AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
+@known_failure_githubci_win
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -363,9 +369,23 @@ def check_reckless(annex, src_path, top_path, sharedpath):
         raise SkipTest("Remainder of test needs proper filesystem permissions")
 
     if annex:
-        # the standard setup keeps the annex locks accessible to the user only
-        nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
-             & stat.S_IWGRP)
+        if ds.repo.git_annex_version < "8.20200908":
+            # TODO: Drop when GIT_ANNEX_MIN_VERSION is at least 8.20200908.
+
+            # the standard setup keeps the annex locks accessible to the user only
+            nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP)
+        else:
+            # umask might be such (e.g. 002) that group write permissions are inherited, so
+            # for the next test we should check if that is the case on some sample file
+            dltmp_path = ds.pathobj / '.git' / "dltmp"
+            dltmp_path.write_text('')
+            default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
+            dltmp_path.unlink()
+            # the standard setup keeps the annex locks following umask inheritance
+            eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP, default_grp_write_perms)
+
         # but we can set it up for group-shared access too
         sharedds = clone(
             src, sharedpath,
@@ -898,7 +918,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     # URL to use for upload. Point is, that this should be invalid for the clone
     # so that autoenable would fail. Therefore let it be based on a to be
     # deleted symlink
-    upl_url = "ria+{}".format(link.as_uri())
+    upl_url = "ria+{}".format(get_local_file_url(str(link)))
 
     for d in (ds, subds, subgit):
 
@@ -930,7 +950,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     return ds.id
 
 
-@known_failure_appveyor
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5134
 @slow  # 14 sec on travis
 def test_ria_postclonecfg():
 
@@ -946,7 +966,8 @@ def test_ria_postclonecfg():
         id = _postclonetest_prepare(lcl, store)
 
         # test cloning via ria+file://
-        yield _test_ria_postclonecfg, Path(store).as_uri(), id
+        yield _test_ria_postclonecfg, \
+              get_local_file_url(store, compatibility='git'), id
 
         # Note: HTTP disabled for now. Requires proper implementation in ORA
         #       remote. See
@@ -959,6 +980,61 @@ def test_ria_postclonecfg():
         # test cloning via ria+ssh://
         yield skip_ssh(_test_ria_postclonecfg), \
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+
+
+# fatal: Could not read from remote repository.
+@known_failure_githubci_win  # in datalad/git-annex as e.g. of 20201218
+@with_tempfile(mkdir=True)
+@with_tempfile
+@with_tempfile
+def test_ria_postclone_noannex(dspath, storepath, clonepath):
+
+    # Test for gh-5186: Cloning from local FS, shouldn't lead to annex
+    # initializing origin.
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    clonepath = Path(clonepath)
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+        create_ds_in_store,
+        get_layout_locations
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+
+
+    # First create a dataset in a RIA store the standard way
+    somefile = dspath / 'a_file.txt'
+    somefile.write_text('irrelevant')
+    ds = Dataset(dspath).create(force=True)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+    lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
+    create_ds_in_store(io, storepath, ds.id, '2', '1')
+    ds.create_sibling_ria(lcl_url, "store")
+    ds.push('.', to='store')
+
+
+    # now, remove annex/ tree from store in order to see, that clone
+    # doesn't cause annex to recreate it.
+    store_loc, _, _ = get_layout_locations(1, storepath, ds.id)
+    annex = store_loc / 'annex'
+    rmtree(str(annex))
+    assert_false(annex.exists())
+
+    clone_url = get_local_file_url(str(storepath), compatibility='git') + \
+                '#{}'.format(ds.id)
+    clone("ria+{}".format(clone_url), clonepath)
+
+    # no need to test the cloning itself - we do that over and over in here
+
+    # bare repo in store still has no local annex:
+    assert_false(annex.exists())
 
 
 @slow  # 17sec on Yarik's laptop
@@ -1240,10 +1316,9 @@ def test_fetch_git_special_remote(url_path, url, path):
 
     clone_url = url + "special/.git"
     ds_a = clone(clone_url, path / "a")
-    ds_a.repo._run_annex_command(
-        "initremote",
-        annex_options=["special", "type=git", "autoenable=true",
-                       "location=" + clone_url])
+    ds_a.repo.call_annex(
+        ["initremote", "special", "type=git", "autoenable=true",
+         "location=" + clone_url])
 
     # Set up a situation where a file is present only on the special remote,
     # and its existence is known only to the special remote's git-annex branch.
@@ -1257,3 +1332,39 @@ def test_fetch_git_special_remote(url_path, url, path):
     ds_b = clone(ds_a.path, path / "other")
     ds_b.get("f1")
     ok_(ds_b.repo.file_has_content("f1"))
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_nonuniform_adjusted_subdataset(path):
+    # https://github.com/datalad/datalad/issues/5107
+    topds = Dataset(Path(path) / "top").create()
+    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    if not topds.repo.is_managed_branch():
+        raise SkipTest(
+            "Test logic assumes default dataset state is adjusted")
+    topds.clone(
+        source='git://github.com/datalad/testrepo--basic--r1',
+        path='subds')
+    eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
+        subds_url)
+
+
+@with_tempfile
+def test_clone_recorded_subds_reset(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a")
+    ds_a_sub = ds_a.create("sub")
+    (ds_a_sub.pathobj / "foo").write_text("foo")
+    ds_a.save(recursive=True)
+    (ds_a_sub.pathobj / "bar").write_text("bar")
+    ds_a_sub.save()
+
+    ds_b = clone(ds_a.path, path / "ds_b")
+    ds_b.get("sub")
+    assert_repo_status(ds_b.path)
+    sub_repo = Dataset(path / "ds_b" / "sub").repo
+    branch = sub_repo.get_active_branch()
+    eq_(ds_b.subdatasets()[0]["gitshasum"],
+        sub_repo.get_hexsha(
+            sub_repo.get_corresponding_branch(branch) or branch))

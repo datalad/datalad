@@ -182,6 +182,7 @@ class DownloadURL(Interface):
                     message=exc_str(e),
                     type="file",
                     path=path,
+                    exception=e,
                     **common_report)
             else:
                 downloaded_paths.append(downloaded_path)

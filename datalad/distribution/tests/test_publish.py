@@ -98,7 +98,7 @@ def test_invalid_call(origin, tdir):
         type='dataset')
 
 
-@known_failure_appveyor
+@known_failure_windows
 @with_tempfile
 @with_tempfile
 def test_since_empty_and_unsupported(p1, p2):
@@ -759,7 +759,7 @@ def test_publish_no_fetch_refspec_configured(path):
     ds.publish(to="origin")
 
 
-@known_failure_appveyor
+@known_failure_windows
 @slow  # 14sec on Yarik's laptop
 @skip_ssh
 @with_tempfile(mkdir=True)

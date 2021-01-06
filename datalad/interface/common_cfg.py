@@ -58,6 +58,13 @@ definitions = {
         'destination': 'global',
         'default': opj(expanduser('~'), 'datalad'),
     },
+    'datalad.locations.sockets': {
+        'ui': ('question', {
+               'title': 'Socket directory',
+               'text': 'Where should datalad store socket files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'sockets'),
+    },
     'datalad.locations.system-plugins': {
         'ui': ('question', {
                'title': 'System plugin directory',
@@ -85,6 +92,12 @@ definitions = {
                'text': 'Where should datalad search for user procedures?'}),
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'procedures'),
+    },
+    'datalad.locations.extra-procedures': {
+        'ui': ('question', {
+            'title': 'Extra procedure directory',
+            'text': 'Where should datalad search for some additional procedures?'}),
+        'destination': 'global',
     },
     'datalad.locations.dataset-procedures': {
         'ui': ('question', {
@@ -130,12 +143,6 @@ definitions = {
     'datalad.tests.noteardown': {
         'ui': ('yesno', {
                'title': 'Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set'}),
-        'type': EnsureBool(),
-    },
-    'datalad.tests.protocolremote': {
-        'ui': ('yesno', {
-            'title': 'Binary flag to specify whether to test protocol '
-                     'interactions of custom remote with annex'}),
         'type': EnsureBool(),
     },
     'datalad.tests.dataladremote': {
@@ -254,14 +261,6 @@ definitions = {
     'datalad.log.traceback': {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
-    },
-    'datalad.cmd.protocol': {
-        'ui': ('question', {
-               'title': 'Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. "externals-time" for ExecutionTimeExternalsProtocol, "time" for ExecutionTimeProtocol and "null" for NullProtocol. Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface'}),
-    },
-    'datalad.cmd.protocol.prefix': {
-        'ui': ('question', {
-               'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
@@ -405,6 +404,17 @@ definitions = {
             'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
+    },
+    'datalad.save.no-message': {
+        'ui': ('question', {
+            'title': 'Commit message handling',
+            'text': 'When no commit message was provided: '
+                    'attempt to obtain one interactively (interactive); '
+                    'or use a generic commit message (generic). '
+                    'NOTE: The interactive option is experimental. The '
+                    'behavior may change in backwards-incompatible ways.'}),
+        'default': 'generic',
+        'type': EnsureChoice('interactive', 'generic'),
     },
     'datalad.install.inherit-local-origin': {
         'ui': ('question', {

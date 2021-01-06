@@ -475,7 +475,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 os.utime(temp_filepath, (time.time(), status.mtime))
 
             # place successfully downloaded over the filepath
-            os.rename(temp_filepath, filepath)
+            os.replace(temp_filepath, filepath)
 
             if stats:
                 stats.downloaded += 1

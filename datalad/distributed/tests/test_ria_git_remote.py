@@ -64,7 +64,7 @@ def _test_bare_git_version_1(host, dspath, store):
     populate_dataset(ds)
     ds.save()
 
-    bare_repo_path, _, _ = get_layout_locations(1, store, ds.id)
+    bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
     # should look like
     subprocess.run(['git', 'clone', '--bare',
@@ -84,6 +84,9 @@ def _test_bare_git_version_1(host, dspath, store):
     # set up the dataset location, too.
     # Note: Dataset layout version 1 (dirhash lower):
     create_ds_in_store(io, store, ds.id, '1', '1')
+    # Avoid triggering a git-annex safety check. See gh-5253.
+    assert objdir.is_absolute()
+    io.remove_dir(objdir)
 
     # Now, let's have the bare repo as a git remote and use it with annex
     git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
@@ -112,7 +115,7 @@ def _test_bare_git_version_1(host, dspath, store):
 
     # Now move content from git-remote to local and see it not being available
     # via bare-git anymore.
-    ds.repo.call_git(['annex', 'move', '--all', '--from=bare-git'])
+    ds.repo.call_annex(['move', '--all', '--from=bare-git'])
     # ora-remote doesn't know yet:
     eq_(len(ds.repo.whereis('one.txt')), 2)
 
@@ -169,7 +172,7 @@ def _test_bare_git_version_2(host, dspath, store):
     populate_dataset(ds)
     ds.save()
 
-    bare_repo_path, _, _ = get_layout_locations(1, store, ds.id)
+    bare_repo_path, _, objdir = get_layout_locations(1, store, ds.id)
     # Use git to make sure the remote end is what git thinks a bare clone of it
     # should look like
     subprocess.run(['git', 'clone', '--bare',
@@ -189,6 +192,9 @@ def _test_bare_git_version_2(host, dspath, store):
     # set up the dataset location, too.
     # Note: Dataset layout version 2 (dirhash mixed):
     create_ds_in_store(io, store, ds.id, '2', '1')
+    # Avoid triggering a git-annex safety check. See gh-5253.
+    assert objdir.is_absolute()
+    io.remove_dir(objdir)
 
     # Now, let's have the bare repo as a git remote
     git_url = "ssh://{host}{path}".format(host=host, path=bare_repo_path) \
@@ -210,10 +216,10 @@ def _test_bare_git_version_2(host, dspath, store):
     ds.drop('.')
     eq_(len(ds.repo.whereis('one.txt')), 2)
     # actually consumable via git remote:
-    ds.repo.call_git(['annex', 'move', 'one.txt', '--from', 'bare-git'])
+    ds.repo.call_annex(['move', 'one.txt', '--from', 'bare-git'])
     eq_(len(ds.repo.whereis('one.txt')), 2)
     # now, move back via git - shouldn't be consumable via ORA
-    ds.repo.call_git(['annex', 'move', 'one.txt', '--to', 'bare-git'])
+    ds.repo.call_annex(['move', 'one.txt', '--to', 'bare-git'])
     # fsck to make availability known, but there's nothing from POV of ORA:
     fsck_res = [annexjson2result(r, ds)
                 for r in ds.repo.fsck(remote='ora-remote', fast=True)]
