@@ -1,0 +1,56 @@
+Update 0.13.7-611-gfcb5750a96:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    b820e47027b497a86e9f719ef7a5d7bd370d3dfa..4247523acc7159d0ea36461dfa5f273988e7fc87
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge branch 'maint'
+   b0accf2b33^-1
+-  Merge pull request #5247 from mih/bf-logleak
+   a07f06cd00^-1
+-  Merge pull request #5246 from mih/rf-diffstatus
+   c2a692192f^-1
+-  Merge pull request #5252 from kyleam/get-ssh-port-runner
+   3a1c517328^-1
++  Merge pull request #5229 from mih/rf-norunner
+   b747ff59a3^-1
+-  Merge branch 'maint'
+   390337fd70^-1
+-  Merge branch 'maint'
+   f57d5551ac^-1
+-  Merge branch 'maint'
+   7d0542fc9e^-1
+-  Merge branch 'maint'
+   689b2a19d4^-1
++  Merge pull request #5259 from mih/bf-noninterlog
+   36c0ce72d8^-1
+-  Merge branch 'maint'
+   a4eb60ee5f^-1
+-  Merge pull request #5261 from kyleam/get-command-annex-error
+   c46cbe55de^-1
++* Merge pull request #5241 from mih/bf-5137
+   3fbf48658f^-1
+-  Merge branch 'maint'
+   fcb5750a96^-1
+-  Merge pull request #5267 from yarikoptic/bf-get
+   d996ec3517^-1
++  Merge pull request #5278 from yarikoptic/rm-install-save
+   b6ed9fa84a^-1
+-  Merge pull request #5284 from yarikoptic/bf-githubci-windows
+   e6552c992b^-1
+-  Merge pull request #5279 from kyleam/readonly-round-2
+   84213919d8^-1
+-  Merge branch 'maint'
+   afb86aa694^-1
++* Merge branch 'bf-cfg-reload5'
+   f589bc9ef3^-1
++  Merge pull request #5129 from kyleam/docker-registry-blob
+   d3e4e52009^-1
+-  Merge branch 'gh-4941b'
+   4247523acc^-1
