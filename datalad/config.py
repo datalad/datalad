@@ -9,6 +9,8 @@
 """
 """
 
+from collections import namedtuple
+
 import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
@@ -25,7 +27,6 @@ from datalad.dochelpers import exc_str
 import re
 import os
 from pathlib import Path
-from time import time
 
 import logging
 lgr = logging.getLogger('datalad.config')
@@ -48,6 +49,10 @@ _where_reload_doc = """
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
           modifications slightly more efficient.""".lstrip()
+
+# Selection of os.stat_result fields we care to collect/compare to judge
+# on either file has changed to warrant reload of configuration.
+_stat_result = namedtuple('_stat_result', 'st_ino st_size st_ctime st_mtime')
 
 
 # we cannot import external_versions here, as the cfg comes before anything
@@ -210,7 +215,7 @@ class ConfigManager(object):
             # track the files that jointly make up the config in this store
             files=set(),
             # and their modification times to be able to avoid needless unforced reloads
-            mtimes=None,
+            stats=None,
         )
         self._stores = dict(
             # populated with info from git
@@ -336,19 +341,14 @@ class ConfigManager(object):
         self._merged_store = merged
 
     def _need_reload(self, store):
-        if not store['mtimes']:
+        storestats = store['stats']
+        if not storestats:
             return True
+
         # we have read files before
         # check if any file we read from has changed
-        current_time = time()
-        curmtimes = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
-        if all(curmtimes[c] == store['mtimes'].get(c) and
-               # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
-               # if mtime age is less than worst resolution assume modified
-               (current_time - curmtimes[c]) > 2.0
-               for c in curmtimes):
-            return False
-        return True
+        curstats = self._get_stats(store)
+        return any(curstats[f] != storestats[f] for f in store['files'])
 
     def _reload(self, run_args):
         # query git-config
@@ -362,10 +362,21 @@ class ConfigManager(object):
         store['cfg'], store['files'] = _parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
-        # update mtimes of config files, they have just been discovered
+        # update stats of config files, they have just been discovered
         # and should still exist
-        store['mtimes'] = {c: c.stat().st_mtime for c in store['files']}
+        store['stats'] = self._get_stats(store)
         return store
+
+    @staticmethod
+    def _get_stats(store):
+        stats = {}
+        for f in store['files']:
+            if f.exists:
+                stat = f.stat()
+                stats[f] = _stat_result(stat.st_ino, stat.st_size, stat.st_ctime, stat.st_mtime)
+            else:
+                stats[f] = None
+        return stats
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,

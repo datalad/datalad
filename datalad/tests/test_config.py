@@ -573,3 +573,29 @@ def test_write_config_section(path):
         for testcase in tc[3]:
             assert_in(testcase[0], gr.config)
             assert_equal(testcase[1], gr.config[testcase[0]])
+
+
+@with_tempfile()
+def test_external_modification(path):
+    from datalad.cmd import WitlessRunner as Runner
+    runner = Runner(cwd=path)
+    repo = GitRepo(path, create=True)
+    config = repo.config
+
+    key = 'sec.sub.key'
+    assert_not_in(key, config)
+    config.set(key, '1', where='local')
+    assert_equal(config[key], '1')
+
+    # we pick up the case where we modified so size changed
+    runner.run(['git', 'config', '--local', '--replace-all', key, '10'])
+    # unfortunately we do not react for .get unless reload. But here
+    # we will test if reload is correctly decides to reload without force
+    config.reload()
+    assert_equal(config[key], '10')
+
+    # and no size change
+    runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
+    config.reload()
+    assert_equal(config[key], '11')
+
