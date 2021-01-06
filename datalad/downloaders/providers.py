@@ -22,6 +22,7 @@ from .base import NoneAuthenticator, NotImplementedAuthenticator
 
 from .http import (
     HTMLFormAuthenticator,
+    HTTPAnonBearerTokenAuthenticator,
     HTTPAuthAuthenticator,
     HTTPBasicAuthAuthenticator,
     HTTPDigestAuthAuthenticator,
@@ -50,6 +51,7 @@ AUTHENTICATION_TYPES = {
     'http_basic_auth': HTTPBasicAuthAuthenticator,
     'http_digest_auth': HTTPDigestAuthAuthenticator,
     'bearer_token': HTTPBearerTokenAuthenticator,
+    'bearer_token_anon': HTTPAnonBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
     'nda-s3': S3Authenticator,
     'loris-token': HTTPBearerTokenAuthenticator,
