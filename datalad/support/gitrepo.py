@@ -1361,6 +1361,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             toppath = GitRepo.get_toppath(dirname(path), follow_up=follow_up,
                                           git_options=git_options)
 
+        # normalize the report, because, e.g. on windows it can come out
+        # with improper directory seperators (C:/Users/datalad)
+        toppath = str(Path(toppath))
+
         if follow_up:
             path_ = path
             path_prev = ""
