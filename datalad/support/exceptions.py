@@ -60,6 +60,11 @@ class CommandError(RuntimeError):
         if self.stderr:
             to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
         if self.kwargs:
+            if 'stdout_json' in self.kwargs:
+                to_str += " [errors from JSON records: {}]".format(
+                    [m['error-messages'] for m in self.kwargs['stdout_json']
+                     if 'error-messages' in m]
+                )
             to_str += " [info keys: {}]".format(
                 ', '.join(self.kwargs.keys()))
         return to_str
