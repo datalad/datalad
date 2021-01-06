@@ -2,10 +2,16 @@ import os.path
 from pathlib import Path
 import subprocess
 import sys
-from .utils import assert_in, turtle, with_tempfile
+from .utils import (
+    assert_in,
+    skip_if_on_windows,
+    turtle,
+    with_tempfile,
+)
 
 
 @turtle
+@skip_if_on_windows  # all development for this functionality is moving to datalad-installer
 @with_tempfile(mkdir=True)
 def test_install_miniconda(tmpdir):
     miniconda_path = os.path.join(tmpdir, "conda")
