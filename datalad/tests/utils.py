@@ -71,13 +71,17 @@ from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
 from nose import SkipTest
 
-from datalad import cfg as dl_cfg
+from datalad import (
+    cfg as dl_cfg,
+    __version__ as datalad_version,
+)
 import datalad.utils as ut
 # TODO this must go
 from ..utils import *
 from datalad.utils import (
     Path,
     ensure_unicode,
+    rmtree,
 )
 
 from .. import utils
@@ -1099,6 +1103,71 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 pass  # might need to provide additional handling so, handle
     return  _wrap_with_testrepos
 with_testrepos.__test__ = False
+
+
+@optional_args
+def with_testdatasets(t, access='auto'):
+    def _get_dataset(basepath, baseurl):
+        basepath.mkdir(exist_ok=True, parents=True)
+        # we need a local file, that is served via a URL
+        remote_file_name = 'testrepo-annex.dat'
+        with open(basepath / remote_file_name, "w") as f:
+            f.write("content to be annex-addurl'd")
+        remote_file_url = '{}/{}'.format(baseurl, remote_file_name)
+
+        ds = Dataset(basepath / 'ds').create()
+        (ds.pathobj / 'INFO.txt').write_text(
+            'repo: {}\ngit: {}\nannex: {}\ndatalad: {}\n'.format(
+                ds.path,
+                external_versions['cmd:git'],
+                external_versions['cmd:annex'],
+                datalad_version))
+        (ds.pathobj / 'test.dat').write_text('123\n')
+        ds.save(message="Adding a basic INFO file and rudimentary load file for annex testing",
+                to_git=True)
+        ds.repo.add_url_to_file('test-annex.dat', remote_file_url)
+        ds.save(message="Adding a rudimentary git-annex load file")
+        ds.drop("test-annex.dat", check=False)
+        return ds
+
+    @wraps(t)
+    @attr('with_testdatasets')
+    def _wrap_with_testdataset(*arg, **kw):
+        if access == 'auto':
+            access_flavors = ['path']
+            if not dl_cfg.get('datalad.tests.nonetwork'):
+                access_flavors.append(['http'])
+        else:
+            access_flavors = access
+
+        from datalad import test_http_server
+        basepath = tempfile.mkdtemp(
+            dir=test_http_server.path,
+            prefix='testds_',
+        )
+        for acc in ensure_list(access_flavors):
+            ds = _get_dataset(
+                Path(basepath),
+                '{}{}'.format(
+                    test_http_server.url,
+                    Path(basepath).relative_to(test_http_server.path
+                                               ).as_posix()))
+
+            if acc == 'path':
+                uri = ds.path
+            elif acc == 'http':
+                ds.repo.call_git(['update-server-info'])
+                uri = '{}{}'.format(
+                    test_http_server.url,
+                    relpath(ds.path, test_http_server.path))
+            else:
+                ValueError('Unknown access flavor "{}"'.format(access))
+            try:
+                t(*(arg + (uri,)), **kw)
+            finally:
+                rmtree(basepath)
+
+    return _wrap_with_testdataset
 
 
 @optional_args
