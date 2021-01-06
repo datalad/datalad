@@ -30,6 +30,7 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     eq_,
     known_failure_githubci_osx,
+    known_failure_githubci_win,
     neq_,
     ok_,
     ok_file_has_content,
@@ -847,6 +848,7 @@ def test_push_matching(path):
         ds.repo.get_hexsha(DEFAULT_BRANCH))
 
 
+@known_failure_githubci_win  # https://github.com/datalad/datalad/issues/5271
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
