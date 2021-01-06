@@ -68,7 +68,7 @@ from datalad.tests.utils import (
     swallow_logs,
     swallow_outputs,
     with_tempfile,
-    with_testrepos,
+    with_testdatasets,
     with_tree,
 )
 
@@ -276,13 +276,9 @@ def test_run_from_subds_gh3551(path):
         ok_(subds.repo.file_has_content("f"))
 
 
-# unexpected content of state "modified", likely a more fundamental issue with the
-# testrepo setup
-@known_failure_githubci_win
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_testdatasets(access='path')
 def test_run_explicit(path):
     ds = Dataset(path)
-
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
     create_tree(ds.path, {"dirt_untracked": "untracked",
@@ -291,17 +287,18 @@ def test_run_explicit(path):
     with open(op.join(path, "dirt_modified"), "a") as ofh:
         ofh.write(", more")
 
+    test_cmd = "type test-annex.dat test-annex.dat >doubled.dat" \
+        if on_windows else "cat test-annex.dat test-annex.dat >doubled.dat"
+
     # We need explicit=True to run with dirty repo.
-    assert_status("impossible",
-                  ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-                         inputs=["test-annex.dat"],
-                         on_failure="ignore"))
+    assert_status(
+        "impossible",
+        ds.run(test_cmd, inputs=["test-annex.dat"], on_failure="ignore"))
 
     hexsha_initial = ds.repo.get_hexsha()
     # If we specify test-annex.dat as an input, it will be retrieved before the
     # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-           inputs=["test-annex.dat"], explicit=True)
+    ds.run(test_cmd, inputs=["test-annex.dat"], explicit=True)
     ok_(ds.repo.file_has_content("test-annex.dat"))
     # We didn't commit anything because outputs weren't specified.
     assert_false(ds.repo.file_has_content("doubled.dat"))
@@ -310,13 +307,14 @@ def test_run_explicit(path):
     # If an input doesn't exist, we just show the standard warning.
     with swallow_logs(new_level=logging.WARN) as cml:
         with swallow_outputs():
-            ds.run("ls", inputs=["not-there"], explicit=True)
+            ds.run("dir" if on_windows else "ls",
+                   inputs=["not-there"], explicit=True)
         assert_in("Input does not exist: ", cml.out)
 
     remove(op.join(path, "doubled.dat"))
 
     hexsha_initial = ds.repo.get_hexsha()
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.run(test_cmd,
            inputs=["test-annex.dat"], outputs=["doubled.dat"],
            explicit=True)
     ok_(ds.repo.file_has_content("doubled.dat"))

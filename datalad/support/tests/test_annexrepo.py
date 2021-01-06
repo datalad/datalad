@@ -49,7 +49,6 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.utils import (
     chpwd,
     get_linux_distribution,
-    on_windows,
     rmtree,
     unlink,
     Path,
@@ -60,7 +59,6 @@ from datalad.tests.utils import (
     assert_equal,
     assert_false,
     assert_in,
-    assert_is,
     assert_is_instance,
     assert_not_equal,
     assert_not_in,
@@ -76,7 +74,6 @@ from datalad.tests.utils import (
     get_most_obscure_supported_name,
     known_failure_githubci_win,
     known_failure_windows,
-    local_testrepo_flavors,
     maybe_adjust_repo,
     OBSCURE_FILENAME,
     ok_,
@@ -90,7 +87,6 @@ from datalad.tests.utils import (
     skip_if_on_windows,
     skip_if_root,
     skip_nomultiplex_ssh,
-    skip_ssh,
     SkipTest,
     slow,
     swallow_logs,
@@ -98,7 +94,7 @@ from datalad.tests.utils import (
     with_parametric_batch,
     with_sameas_remote,
     with_tempfile,
-    with_testrepos,
+    with_testdatasets,
     with_tree,
 )
 from datalad.support.exceptions import (
@@ -124,11 +120,13 @@ from datalad.support.annexrepo import (
     AnnexJsonProtocol,
 )
 
+
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*')
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
+    origin = AnnexRepo(src, create=True)
     ar = AnnexRepo.clone(src, dst)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     ok_(os.path.exists(os.path.join(dst, '.git', 'annex')))
@@ -140,8 +138,9 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
 def test_AnnexRepo_instance_from_existing(path):
+    AnnexRepo(path, create=True)
 
     ar = AnnexRepo(path)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
@@ -161,11 +160,10 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*')
 @with_tempfile
-def test_AnnexRepo_crippled_filesystem(src, dst):
+def test_AnnexRepo_crippled_filesystem(dst):
 
-    ar = AnnexRepo.clone(src, dst)
+    ar = AnnexRepo(dst)
 
     # fake git-annex entries in .git/config:
     ar.config.set(
@@ -185,8 +183,8 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 
 
 @known_failure_githubci_win
+@with_tempfile
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
@@ -210,14 +208,16 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
     assert_false(dm)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:473
-@known_failure_windows
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-def test_AnnexRepo_get_file_key(src, annex_path):
+def test_AnnexRepo_get_file_key(annex_path):
 
-    ar = AnnexRepo.clone(src, annex_path)
+    ar = AnnexRepo(annex_path)
+    (ar.pathobj / 'test.dat').write_text('123\n')
+    ar.save('test.dat', git=True)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
 
     # test-annex.dat should return the correct key:
     test_annex_key = \
@@ -247,7 +247,6 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     eq_(ar.get_file_key("test-annex.dat", batch=True), test_annex_key)
 
 
-
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_get_outofspace(annex_path):
     ar = AnnexRepo(annex_path, create=True)
@@ -266,11 +265,13 @@ def test_AnnexRepo_get_outofspace(annex_path):
     assert_re_in(".*annex.*(find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:405
-@known_failure_windows
-@with_testrepos('basic_annex', flavors=['local'])
-def test_AnnexRepo_get_remote_na(path):
-    ar = AnnexRepo(path)
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_get_remote_na(src, path):
+    origin = AnnexRepo(src, create=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save()
+    ar = AnnexRepo.clone(src, path)
 
     with assert_raises(RemoteNotAvailableError) as cme:
         ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
@@ -296,9 +297,14 @@ def test_annex_repo_sameas_special(repo):
 
 # 1 is enough to test file_has_content
 @with_parametric_batch
-@with_testrepos('.*annex.*', flavors=['local'], count=1)
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_file_has_content(batch, src, annex_path):
+    origin = AnnexRepo(src)
+    (origin.pathobj / 'test.dat').write_text('123\n')
+    origin.save('test.dat', git=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save('some')
     ar = AnnexRepo.clone(src, annex_path)
     testfiles = ["test-annex.dat", "test.dat"]
 
@@ -325,9 +331,12 @@ def test_AnnexRepo_file_has_content(batch, src, annex_path):
 
 # 1 is enough to test
 @with_parametric_batch
-@with_testrepos('.*annex.*', flavors=['local'], count=1)
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_is_under_annex(batch, src, annex_path):
+    origin = AnnexRepo(src)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save('some')
     ar = AnnexRepo.clone(src, annex_path)
 
     with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
@@ -358,7 +367,6 @@ def test_AnnexRepo_is_under_annex(batch, src, annex_path):
         [False])
 
 
-@known_failure_githubci_win
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -571,9 +579,12 @@ def test_repo_info(path):
         eq_(info['available local disk space'], 19193986496)
 
 
-@with_testrepos('.*annex.*', flavors=['local', 'network'])
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
+    origin = AnnexRepo(src)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save('some')
     ar = AnnexRepo.clone(src, dst, backend='MD5')
     eq_(ar.default_backends, ['MD5'])
     # GitPython has a bug which causes .git/config being wiped out
@@ -678,11 +689,12 @@ def test_AnnexRepo_backend_option(path, url):
         for f in ar.get_indexed_files() if 'faraway' in f)
 
 
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
-    #init local test-annex before cloning:
-    AnnexRepo(src)
+    origin = AnnexRepo(src, create=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save()
 
     ar = AnnexRepo.clone(src, dst)
 
@@ -693,11 +705,12 @@ def test_AnnexRepo_get_file_backend(src, dst):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
-@known_failure_windows
 @with_tempfile
 def test_AnnexRepo_always_commit(path):
 
     repo = AnnexRepo(path)
+    if repo.is_managed_branch():
+        raise SkipTest('Test logic invalid for adjusted repos')
 
     def get_annex_commit_counts():
         return len(repo.get_revisions("git-annex"))
@@ -747,14 +760,15 @@ def test_AnnexRepo_always_commit(path):
     eq_(get_annex_commit_counts(), n_annex_commits_initial + 2)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:445
-@known_failure_windows
-@with_testrepos('basic_annex', flavors=['local'])
 @with_tempfile
-def test_AnnexRepo_on_uninited_annex(origin, path):
+@with_tempfile
+def test_AnnexRepo_on_uninited_annex(src, path):
+    origin = AnnexRepo(src, create=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save()
     # "Manually" clone to avoid initialization:
     runner = Runner()
-    runner.run(["git", "clone", origin, path])
+    runner.run(["git", "clone", origin.path, path])
 
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
@@ -792,14 +806,9 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
-@with_testrepos('.*annex.*', flavors=['clone'])
+@with_tempfile
 def test_AnnexRepo_add_to_annex(path):
-
-    # Note: Some test repos appears to not be initialized.
-    #       Therefore: 'init=True'
-    # TODO: Fix these repos finally!
-    # clone as provided by with_testrepos:
-    repo = AnnexRepo(path, create=False, init=True)
+    repo = AnnexRepo(path)
 
     assert_repo_status(repo, annex=True)
     filename = get_most_obscure_supported_name()
@@ -838,15 +847,9 @@ def test_AnnexRepo_add_to_annex(path):
     assert_repo_status(repo, annex=True)
 
 
-@with_testrepos('.*annex.*', flavors=['clone'])
+@with_tempfile
 def test_AnnexRepo_add_to_git(path):
-
-    # Note: Some test repos appears to not be initialized.
-    #       Therefore: 'init=True'
-    # TODO: Fix these repos finally!
-
-    # clone as provided by with_testrepos:
-    repo = AnnexRepo(path, create=False, init=True)
+    repo = AnnexRepo(path)
 
     assert_repo_status(repo, annex=True)
     filename = get_most_obscure_supported_name()
@@ -875,10 +878,13 @@ def test_AnnexRepo_add_to_git(path):
     assert_repo_status(repo, annex=True)
 
 
-@with_testrepos('.*annex.*', flavors=['local'])
-# TODO: flavor 'network' has wrong content for test-annex.dat!
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
 
     annex = AnnexRepo.clone(src, dst)
     assert_is_instance(annex, AnnexRepo, "AnnexRepo was not created.")
@@ -939,10 +945,16 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
-@with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
-def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
-    annex = AnnexRepo(path, create=False, init=False)
+@with_tempfile
+@with_tempfile
+def _test_AnnexRepo_get_contentlocation(batch, src, path, work_dir_outside):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
+
+    annex = AnnexRepo.clone(src, path)
     fname = 'test-annex.dat'
     key = annex.get_file_key(fname)
     # TODO: see if we can avoid this or specify custom exception
@@ -1218,8 +1230,13 @@ def test_annex_ssh(topdir):
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_tempfile
 def test_annex_remove(path):
+    ar = AnnexRepo(path)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
+
     repo = AnnexRepo(path, create=False)
 
     file_list = list(repo.get_content_annexinfo(init=None))
@@ -1287,17 +1304,22 @@ def test_init_scanning_message(path):
         assert_in("for unlocked", cml.out)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:330
-@known_failure_windows
-@with_testrepos('.*annex.*', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_annex_copy_to(origin, clone):
-    repo = AnnexRepo(origin, create=False)
-    remote = AnnexRepo.clone(origin, clone, create=True)
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_annex_copy_to(src, origin, clone):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test.dat').write_text("123\n")
+    ar.save('some', git=True)
+    (ar.pathobj / 'test-annex.dat').write_text("content")
+    ar.save('some')
+
+    repo = AnnexRepo.clone(src, origin)
+    remote = AnnexRepo.clone(origin, clone)
     repo.add_remote("target", clone)
 
     assert_raises(IOError, repo.copy_to, "doesnt_exist.dat", "target")
-    assert_raises(FileInGitError, repo.copy_to, "INFO.txt", "target")
+    assert_raises(FileInGitError, repo.copy_to, "test.dat", "target")
     assert_raises(ValueError, repo.copy_to, "test-annex.dat", "invalid_target")
 
     # see #3102
@@ -1312,7 +1334,7 @@ def test_annex_copy_to(origin, clone):
     # now it has:
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
     # and will not be copied again since it was already copied
-    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), [])
+    eq_(repo.copy_to(["test.dat", "test-annex.dat"], "target"), [])
 
     # Test that if we pass a list of items and annex processes them nicely,
     # we would obtain a list back. To not stress our tests even more -- let's mock
@@ -1375,11 +1397,13 @@ def test_annex_copy_to(origin, clone):
     eq_(cme.exception.failed, ['nonex1', 'nonex2'])
 
 
-
-@with_testrepos('.*annex.*', flavors=['local'])
-# TODO: flavor 'network' has wrong content for test-annex.dat!
+@with_tempfile
 @with_tempfile
 def test_annex_drop(src, dst):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test-annex.dat').write_text("content")
+    ar.save('some')
+
     ar = AnnexRepo.clone(src, dst)
     testfile = 'test-annex.dat'
     assert_false(ar.file_has_content(testfile))
@@ -1446,9 +1470,10 @@ def test_annex_get_annexed_files(path):
 
 
 @with_parametric_batch
-@with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(batch, p):
-    annex = AnnexRepo(p)
+@with_testdatasets
+@with_tempfile
+def test_is_available(batch, src, p):
+    annex = AnnexRepo.clone(src, p)
 
     # bkw = {'batch': batch}
     if batch:
@@ -1721,12 +1746,11 @@ def test_AnnexRepo_flyweight(path1, path2):
                          if isinstance(o, AnnexRepo) and o.path == path1]))
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
-@known_failure_windows
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
+    AnnexRepo(repo, create=True)
 
     reporeal = str(Path(repo).resolve())
     eq_(AnnexRepo.get_toppath(repo, follow_up=False), reporeal)
@@ -1742,14 +1766,21 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
-@known_failure_windows  # https://github.com/datalad/datalad/issues/5272
-@with_testrepos(".*basic.*", flavors=['local'])
-@with_tempfile(mkdir=True)
-def test_AnnexRepo_add_submodule(source, path):
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_add_submodule(source_path, path):
+    source = AnnexRepo(source_path, create=True)
+    (source.pathobj / 'test-annex.dat').write_text("content")
+    source.save('some')
+
+    if source.is_managed_branch():
+        raise SkipTest(
+            'AnnexRepo.add_submodule() is incompatible with '
+            'managed-branch submodules')
 
     top_repo = AnnexRepo(path, create=True)
 
-    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.add_submodule('sub', name='sub', url=source_path)
     top_repo.commit('submodule added')
     eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
         ['sub'])
@@ -1886,7 +1917,6 @@ def test_wanted(path):
     eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
-@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
@@ -1992,10 +2022,14 @@ def test_change_description(path):
     eq_(ar.get_description(), 'someother')
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_AnnexRepo_get_corresponding_branch(path):
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_get_corresponding_branch(src_path, path):
+    src = AnnexRepo(src_path, create=True)
+    (src.pathobj / 'test-annex.dat').write_text("content")
+    src.save('some')
 
-    ar = AnnexRepo(path)
+    ar = AnnexRepo.clone(src_path, path)
 
     # we should be on the default branch.
     eq_(DEFAULT_BRANCH,
@@ -2011,19 +2045,24 @@ def test_AnnexRepo_get_corresponding_branch(path):
         eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_AnnexRepo_get_tracking_branch(path):
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_get_tracking_branch(src_path, path):
+    src = AnnexRepo(src_path, create=True)
+    (src.pathobj / 'test-annex.dat').write_text("content")
+    src.save('some')
 
-    ar = AnnexRepo(path)
+    ar = AnnexRepo.clone(src_path, path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
     eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_tempfile
 def test_AnnexRepo_is_managed_branch(path):
-
-    ar = AnnexRepo(path)
+    ar = AnnexRepo(path, create=True)
+    (ar.pathobj / 'test-annex.dat').write_text("content")
+    ar.save('some')
 
     if ar.is_managed_branch():
         raise SkipTest("Test needs repository with non-managed branch")

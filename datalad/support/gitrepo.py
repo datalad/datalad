@@ -2859,6 +2859,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         configuration differs from the one provided, the existing submodule
         is considered as already added and no further action is performed.
 
+        NOTE: This method does not work with submodules that use git-annex adjusted
+              branches. Use Repo.save() instead.
+
         Parameters
         ----------
         path : str
