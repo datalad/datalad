@@ -63,6 +63,7 @@ from datalad.tests.utils import (
     patch_config,
     set_date,
     serve_path_via_http,
+    skip_annex_getconfig_bug,
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
@@ -811,6 +812,7 @@ def test_ria_http(lcl, storepath, url):
     eq_(cloned_by_alias.pathobj.name, 'myname')
 
 
+@skip_annex_getconfig_bug
 @with_tempfile
 def _test_ria_postclonecfg(url, dsid, clone_path):
     # Test cloning from RIA store while ORA special remote autoenabling failed
@@ -866,6 +868,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
     assert_result_count(res, 2)
 
 
+@skip_annex_getconfig_bug
 @with_tempfile
 def _postclonetest_prepare(lcl, storepath, link):
 
@@ -974,6 +977,7 @@ def test_ria_postclonecfg():
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
 
 
+@skip_annex_getconfig_bug
 # fatal: Could not read from remote repository.
 @known_failure_githubci_win  # in datalad/git-annex as e.g. of 20201218
 @with_tempfile(mkdir=True)

@@ -263,6 +263,17 @@ def skip_if(func, cond=True, msg=None, method='raise'):
         return func(*args, **kwargs)
     return  _wrap_skip_if
 
+def skip_annex_getconfig_bug(func):
+    """Due to a bug in annex (see issue 4259), we can't call initremote w/ an
+    ORA remote. It will fail since annex fails to pass on the name of the
+    to be initialized special remote"""
+
+    check_not_generatorfunction(func)
+
+    return skip_if(cond='7.20200202.7' <= external_versions['cmd:annex']
+                        < '8.20200309',
+                   msg="Skip due to a bug in git-annex special remote protocol "
+                       "implementation")(func)
 
 def skip_ssh(func):
     """Skips SSH tests if on windows or if environment variable

@@ -12,6 +12,7 @@ from datalad.tests.utils import (
     assert_result_count,
     known_failure_windows,
     serve_path_via_http,
+    skip_annex_getconfig_bug,
     SkipTest,
     with_tempfile
 )
@@ -38,6 +39,7 @@ from datalad.customremotes.ria_utils import (
 #       different layouts via those requests is up to the server side, which we
 #       don't test here.
 
+@skip_annex_getconfig_bug
 @known_failure_windows  # see gh-4469
 @with_tempfile(mkdir=True)
 @serve_path_via_http
@@ -76,6 +78,7 @@ def test_initremote(store_path, store_url, ds_path):
     assert_in("archive-id={}".format(ds.id), remote_log)
 
 
+@skip_annex_getconfig_bug
 @known_failure_windows  # see gh-4469
 @with_tempfile(mkdir=True)
 @serve_path_via_http

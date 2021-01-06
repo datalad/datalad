@@ -25,6 +25,7 @@ from datalad.utils import (
 from datalad.tests.utils import (
     assert_status,
     known_failure_windows,
+    skip_annex_getconfig_bug,
     skip_ssh,
     slow,
     with_tempfile
@@ -44,6 +45,7 @@ from datalad.customremotes.ria_utils import (
 )
 
 
+@skip_annex_getconfig_bug
 @known_failure_windows  # see gh-4469
 @with_tempfile()
 @with_tempfile(mkdir=True)
@@ -154,6 +156,7 @@ def test_bare_git_version_1():
     yield _test_bare_git_version_1, None
 
 
+@skip_annex_getconfig_bug
 @known_failure_windows  # see gh-4469
 @with_tempfile()
 @with_tempfile(mkdir=True)

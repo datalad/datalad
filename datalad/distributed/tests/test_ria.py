@@ -10,6 +10,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_true,
     has_symlink_capability,
+    skip_annex_getconfig_bug,
     skip_if,
     skip_if_on_windows,
     with_tempfile,
@@ -17,6 +18,7 @@ from datalad.tests.utils import (
 )
 
 
+@skip_annex_getconfig_bug
 @skip_if_on_windows  # currently all tests re RIA/ORA don't run on windows
 @skip_if(cond=not has_symlink_capability(),
          msg="skip testing ephemeral clone w/o symlink capabilities")

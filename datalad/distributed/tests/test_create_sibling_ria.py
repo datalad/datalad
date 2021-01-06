@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     chpwd,
     eq_,
     known_failure_githubci_win,
+    skip_annex_getconfig_bug,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -180,11 +181,13 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 @slow  # 11 + 42 sec on travis
 def test_create_simple():
 
-    yield _test_create_store, None
+    yield skip_annex_getconfig_bug(_test_create_store), None
     # TODO: Skipped due to gh-4436
-    yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
+    yield skip_annex_getconfig_bug(
+        skip_if_on_windows(skip_ssh(_test_create_store))), 'datalad-test'
 
 
+@skip_annex_getconfig_bug
 @skip_if_on_windows  # ORA remote is incompatible with windows clients
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})

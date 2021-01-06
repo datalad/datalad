@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     ok_,
     ok_file_has_content,
     serve_path_via_http,
+    skip_annex_getconfig_bug,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -482,6 +483,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
                       message='Slated for transport, but no content present')
 
 
+@skip_annex_getconfig_bug
 @skip_if_on_windows  # https://github.com/datalad/datalad/issues/4278
 @with_tempfile(mkdir=True)
 @with_tree(tree={'ria-layout-version': '1\n'})
@@ -849,6 +851,7 @@ def test_push_matching(path):
 
 
 @known_failure_githubci_win  # https://github.com/datalad/datalad/issues/5271
+@skip_annex_getconfig_bug
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
