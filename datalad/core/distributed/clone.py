@@ -567,6 +567,12 @@ def clone_dataset(
             'datalad.clone.reckless', reckless,
             where='local',
             reload=True)
+    else:
+        # We would still want to reload configuration to ensure that any of the
+        # above git invocations could have potentially changed the config
+        # TODO: might no longer be necessary if 0.14.0 adds reloading upon
+        # non-readonly commands invocation
+        destds.config.reload()
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
