@@ -247,10 +247,14 @@ def test_clone_dataladri(src, topurl, path):
     ok_file_has_content(ds.pathobj / 'test.txt', 'some')
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_isnot_recursive(src, path_nr, path_r):
+@with_tempfile(mkdir=True)
+def test_clone_isnot_recursive(path_src, path_nr, path_r):
+    src = Dataset(path_src).create()
+    src.create('subm 1')
+    src.create('2')
+
     ds = clone(src, path_nr, result_xfm='datasets', return_type='item-or-list')
     ok_(ds.is_installed())
     # check nothin is unintentionally installed
@@ -262,14 +266,10 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 
 
 @slow  # 23.1478s
-@with_testrepos(flavors=['local'])
-# 'local-url', 'network'
-# TODO: Somehow annex gets confused while initializing installed ds, whose
-# .git/config show a submodule url "file:///aaa/bbb%20b/..."
-# this is delivered by with_testrepos as the url to clone
 @with_tempfile
-def test_clone_into_dataset(source, top_path):
-
+@with_tempfile
+def test_clone_into_dataset(source_path, top_path):
+    source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
 
@@ -294,9 +294,12 @@ def test_clone_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-def test_notclone_known_subdataset(src, path):
+@with_tempfile(mkdir=True)
+def test_notclone_known_subdataset(src_path, path):
+    src = Dataset(src_path).create()
+    sub = src.create('subm 1')
+    sub_id = sub.id
     # get the superdataset:
     ds = clone(src, path,
                result_xfm='datasets', return_type='item-or-list')
@@ -318,8 +321,7 @@ def test_notclone_known_subdataset(src, path):
     ok_(AnnexRepo.is_valid_repo(subds.path, allow_noninitialized=False))
     # Verify that it is the correct submodule installed and not
     # new repository initiated
-    eq_(set(subds.repo.get_indexed_files()),
-        {'test.dat', 'INFO.txt', 'test-annex.dat'})
+    eq_(subds.id, sub_id)
     assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
 
@@ -528,8 +530,8 @@ def test_installationpath_from_url():
 def test_expanduser(srcpath, destpath):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
-   
-    with chpwd(destpath), patch.dict('os.environ', {'USERPROFILE' if on_windows else 
+
+    with chpwd(destpath), patch.dict('os.environ', {'USERPROFILE' if on_windows else
                                                     'HOME': srcpath}):
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
