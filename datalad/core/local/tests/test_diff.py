@@ -58,14 +58,18 @@ from datalad.api import (
 )
 
 
-def test_magic_number():
+@with_tempfile(mkdir=True)
+def test_magic_number(path):
     # we hard code the magic SHA1 that represents the state of a Git repo
     # prior to the first commit -- used to diff from scratch to a specific
     # commit
     # given the level of dark magic, we better test whether this stays
     # constant across Git versions (it should!)
-    out = GitWitlessRunner().run(
-        'cd ./ | git hash-object --stdin -t tree',
+    runner = GitWitlessRunner(cwd=path)
+    runner.run(['git', 'init'])
+    runner.run(['git', 'commit', '--allow-empty', '-m', 'empty'])
+    out = runner.run(
+        ['git', 'show', '--pretty=format:%T'],
         protocol=StdOutCapture)
     eq_(out['stdout'].strip(), PRE_INIT_COMMIT_SHA)
 
