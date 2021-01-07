@@ -1761,7 +1761,6 @@ def test_AnnexRepo_update_submodule():
     raise SkipTest("TODO")
 
 
-@known_failure_v6  #FIXME
 def test_AnnexRepo_get_submodules():
     raise SkipTest("TODO")
 
