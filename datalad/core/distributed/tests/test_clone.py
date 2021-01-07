@@ -580,7 +580,7 @@ def test_cfg_originorigin(path):
     with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*Async run \[('git', 'annex'|'git-annex'), "
+        cml.assert_logged(msg=r"[^[]*Async run \[('git', '-c', 'gc.autodetach=0', 'annex'|'git-annex'), "
                               r"'init'",
                           match=False,
                           level='DEBUG')
