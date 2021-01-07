@@ -581,6 +581,18 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
         return results
 
 
+    def run(self, cmd, **kwargs):
+        """Execute a command and communicate with it.
+
+        TODO
+        """
+        assert isinstance(cmd, list), "we do not do strings here"
+        assert cmd[0] == 'git'
+        # We need to ensure that git does not engage gc in the background
+        cmd_ = [cmd[0], '-c', 'gc.autodetach=0'] + cmd[1:]
+        return super().run(cmd_, **kwargs)
+
+
 def readline_rstripped(stdout):
     #return iter(stdout.readline, b'').next().rstrip()
     return stdout.readline().rstrip()

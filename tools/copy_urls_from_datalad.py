@@ -58,4 +58,4 @@ if __name__ == '__main__':
                 "registerurl", '-c', 'annex.alwayscommit=false', k, url])
     # to cause annex to commit all the changes
     annex.call_annex(["merge"])
-    annex.gc(allow_background=False)
+    annex.gc()

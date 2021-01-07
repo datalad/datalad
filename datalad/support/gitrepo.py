@@ -2745,8 +2745,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
         cmd_options = []
-        if not allow_background:
-            cmd_options += ['-c', 'gc.autodetach=0']
+        if allow_background:
+            raise NotImplementedError("no longer supported")
         cmd_options += ['gc', '--aggressive']
         if auto:
             cmd_options += ['--auto']
