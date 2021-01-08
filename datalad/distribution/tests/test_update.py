@@ -198,17 +198,19 @@ def test_update_git_smoke(src_path, dst_path):
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:606
-@known_failure_windows
-@slow  # 20.6910s
-@with_testrepos('.*annex.*', flavors=['clone'])
+@slow  # ~9s
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_update_fetch_all(src, remote_1, remote_2):
+def test_update_fetch_all(path):
+    path = Path(path)
+    remote_1 = str(path / "remote_1")
+    remote_2 = str(path / "remote_2")
+
+    ds = Dataset(path / "src").create()
+    src = ds.repo.path
+
     ds_rmt1 = clone(source=src, path=remote_1)
     ds_rmt2 = clone(source=src, path=remote_2)
 
-    ds = Dataset(src)
     ds.siblings('add', name="sibling_1", url=remote_1)
     ds.siblings('add', name="sibling_2", url=remote_2)
 
