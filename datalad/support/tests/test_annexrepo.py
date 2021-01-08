@@ -1742,6 +1742,7 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5272
 @with_testrepos(".*basic.*", flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_add_submodule(source, path):
