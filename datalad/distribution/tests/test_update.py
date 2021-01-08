@@ -261,7 +261,6 @@ def test_update_fetch_all(path):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_newthings_coming_down(originpath, destpath):
@@ -309,11 +308,13 @@ def test_newthings_coming_down(originpath, destpath):
     # for now this should simply not fail (see gh-793), later might be enhanced to a
     # graceful downgrade
     before_branches = ds.repo.get_branches()
+    ok_(any("git-annex" in b
+            for b in ds.repo.get_remote_branches()))
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(before_branches, ds.repo.get_branches())
     # annex branch got pruned
-    eq_(['origin/HEAD', 'origin/' + DEFAULT_BRANCH],
-        ds.repo.get_remote_branches())
+    assert_false(any("git-annex" in b
+                     for b in ds.repo.get_remote_branches()))
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
