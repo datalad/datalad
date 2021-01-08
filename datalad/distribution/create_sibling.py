@@ -115,7 +115,7 @@ class _RunnerAdapter(Runner):
         import shutil
         copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
         if recursive:
-            args = source, destination
+            args = [source, destination]
             kwargs = {"copy_function": copy_fn}
             try:
                 shutil.copytree(*args, **kwargs)
@@ -127,7 +127,7 @@ class _RunnerAdapter(Runner):
                 cmd = ["cp", "-R"]
                 if preserve_attrs:
                     cmd.append("-p")
-                self(cmd + [quote_cmdlinearg(a) for a in args])
+                self(cmd + args)
         else:
             copy_fn(source, destination)
 
