@@ -90,7 +90,6 @@ from datalad.utils import (
     _path_,
     slash_join,
     ensure_list,
-    quote_cmdlinearg,
 )
 from datalad.core.local.diff import diff_dataset
 
@@ -120,7 +119,7 @@ class _RunnerAdapter(WitlessRunner):
         import shutil
         copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
         if recursive:
-            args = source, destination
+            args = [source, destination]
             kwargs = {"copy_function": copy_fn}
             try:
                 shutil.copytree(*args, **kwargs)
@@ -132,7 +131,7 @@ class _RunnerAdapter(WitlessRunner):
                 cmd = ["cp", "-R"]
                 if preserve_attrs:
                     cmd.append("-p")
-                self(cmd + [quote_cmdlinearg(a) for a in args])
+                self(cmd + args)
         else:
             copy_fn(source, destination)
 
