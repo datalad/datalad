@@ -23,6 +23,7 @@ from datalad.tests.utils import (
     assert_status,
     chpwd,
     eq_,
+    known_failure_githubci_win,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -209,6 +210,7 @@ def test_storage_only(base_path, ds_path):
     assert_result_count(res, 1, action='copy')
 
 
+@known_failure_githubci_win  # reported in https://github.com/datalad/datalad/issues/5210
 @with_tempfile
 @with_tempfile
 @with_tree({'ds': {'file1.txt': 'some'}})
