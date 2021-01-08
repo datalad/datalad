@@ -56,6 +56,7 @@ from datalad.tests.utils import (
 from datalad import cfg as dl_cfg
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
+# At least one aspect of the failure is a more general adjusted branch issue.
 @known_failure_windows
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
