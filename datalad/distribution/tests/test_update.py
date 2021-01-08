@@ -17,6 +17,7 @@ from os.path import (
 )
 from ..dataset import Dataset
 from datalad.api import (
+    clone,
     install,
     update,
     remove,
@@ -204,24 +205,21 @@ def test_update_git_smoke(src_path, dst_path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_fetch_all(src, remote_1, remote_2):
-    rmt1 = AnnexRepo.clone(src, remote_1)
-    rmt2 = AnnexRepo.clone(src, remote_2)
+    ds_rmt1 = clone(source=src, path=remote_1)
+    ds_rmt2 = clone(source=src, path=remote_2)
 
     ds = Dataset(src)
     ds.siblings('add', name="sibling_1", url=remote_1)
     ds.siblings('add', name="sibling_2", url=remote_2)
 
     # modify the remotes:
-    with open(opj(remote_1, "first.txt"), "w") as f:
-        f.write("some file load")
-    rmt1.add("first.txt")
-    rmt1.commit()
+    (ds_rmt1.pathobj / "first.txt").write_text("some file load")
+    ds_rmt1.save()
+
     # TODO: Modify an already present file!
 
-    with open(opj(remote_2, "second.txt"), "w") as f:
-        f.write("different file load")
-    rmt2.add("second.txt", git=True)
-    rmt2.commit(msg="Add file to git.")
+    (ds_rmt2.pathobj / "second.txt").write_text("different file load")
+    ds_rmt2.save()
 
     # Let's init some special remote which we couldn't really update/fetch
     if not dl_cfg.get('datalad.tests.dataladremote'):
