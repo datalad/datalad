@@ -321,12 +321,17 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
+    repo = origin.repo
+    if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
+        # Fails before git-annex's fd161da2c (adjustTree: Consider submodule
+        # deletions, 2021-01-06).
+        raise SkipTest(
+            "On adjusted branch, test requires fix in more recent git-annex")
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
