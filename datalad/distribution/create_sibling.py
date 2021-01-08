@@ -90,7 +90,6 @@ from datalad.utils import (
     _path_,
     slash_join,
     assure_list,
-    quote_cmdlinearg,
 )
 
 from datalad.utils import on_windows
