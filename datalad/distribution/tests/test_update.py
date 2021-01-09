@@ -17,6 +17,7 @@ from os.path import (
 )
 from ..dataset import Dataset
 from datalad.api import (
+    clone,
     install,
     update,
     remove,
@@ -55,6 +56,7 @@ from datalad.tests.utils import (
 from datalad import cfg as dl_cfg
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
+# At least one aspect of the failure is a more general adjusted branch issue.
 @known_failure_windows
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -197,31 +199,30 @@ def test_update_git_smoke(src_path, dst_path):
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:606
-@known_failure_windows
-@slow  # 20.6910s
-@with_testrepos('.*annex.*', flavors=['clone'])
+@slow  # ~9s
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_update_fetch_all(src, remote_1, remote_2):
-    rmt1 = AnnexRepo.clone(src, remote_1)
-    rmt2 = AnnexRepo.clone(src, remote_2)
+def test_update_fetch_all(path):
+    path = Path(path)
+    remote_1 = str(path / "remote_1")
+    remote_2 = str(path / "remote_2")
 
-    ds = Dataset(src)
+    ds = Dataset(path / "src").create()
+    src = ds.repo.path
+
+    ds_rmt1 = clone(source=src, path=remote_1)
+    ds_rmt2 = clone(source=src, path=remote_2)
+
     ds.siblings('add', name="sibling_1", url=remote_1)
     ds.siblings('add', name="sibling_2", url=remote_2)
 
     # modify the remotes:
-    with open(opj(remote_1, "first.txt"), "w") as f:
-        f.write("some file load")
-    rmt1.add("first.txt")
-    rmt1.commit()
+    (ds_rmt1.pathobj / "first.txt").write_text("some file load")
+    ds_rmt1.save()
+
     # TODO: Modify an already present file!
 
-    with open(opj(remote_2, "second.txt"), "w") as f:
-        f.write("different file load")
-    rmt2.add("second.txt", git=True)
-    rmt2.commit(msg="Add file to git.")
+    (ds_rmt2.pathobj / "second.txt").write_text("different file load")
+    ds_rmt2.save()
 
     # Let's init some special remote which we couldn't really update/fetch
     if not dl_cfg.get('datalad.tests.dataladremote'):
@@ -261,7 +262,6 @@ def test_update_fetch_all(src, remote_1, remote_2):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_newthings_coming_down(originpath, destpath):
@@ -309,23 +309,30 @@ def test_newthings_coming_down(originpath, destpath):
     # for now this should simply not fail (see gh-793), later might be enhanced to a
     # graceful downgrade
     before_branches = ds.repo.get_branches()
+    ok_(any("git-annex" in b
+            for b in ds.repo.get_remote_branches()))
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(before_branches, ds.repo.get_branches())
     # annex branch got pruned
-    eq_(['origin/HEAD', 'origin/' + DEFAULT_BRANCH],
-        ds.repo.get_remote_branches())
+    assert_false(any("git-annex" in b
+                     for b in ds.repo.get_remote_branches()))
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
+    repo = origin.repo
+    if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
+        # Fails before git-annex's fd161da2c (adjustTree: Consider submodule
+        # deletions, 2021-01-06).
+        raise SkipTest(
+            "On adjusted branch, test requires fix in more recent git-annex")
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
