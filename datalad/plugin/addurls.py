@@ -399,6 +399,31 @@ def _read(stream, input_type):
     return rows, idx_map
 
 
+def _read_from_file(fname, input_type):
+    from_stdin = fname == "-"
+    if input_type == "ext":
+        if from_stdin:
+            input_type = "json"
+        else:
+            extension = os.path.splitext(fname)[1]
+            if extension == ".json":
+                input_type = "json"
+            elif extension == ".tsv":
+                input_type = "tsv"
+            else:
+                input_type = "csv"
+
+    fd = sys.stdin if from_stdin else open(fname)
+    try:
+        records, colidx_to_name = _read(fd, input_type)
+        if not records:
+            lgr.warning("No rows found in %s", fd)
+    finally:
+        if fd is not sys.stdin:
+            fd.close()
+    return records, colidx_to_name
+
+
 def _get_placeholder_exception(exc, msg_prefix, known):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
@@ -540,16 +565,17 @@ def sort_paths(paths):
     yield from sorted(paths, key=level_and_name)
 
 
-def extract(stream, input_type, url_format="{0}", filename_format="{1}",
+def extract(rows, colidx_to_name=None,
+            url_format="{0}", filename_format="{1}",
             exclude_autometa=None, meta=None, key=None,
             dry_run=False, missing_value=None):
-    """Extract and format information from `url_file`.
+    """Extract and format information from `rows`.
 
     Parameters
     ----------
-    stream : file object
-        Items used to construct the file names and URLs.
-    input_type : {'csv', 'tsv', 'json'}
+    rows : list of dict
+    colidx_to_name : dict, optional
+        Mapping from a position index to a column name.
 
     All other parameters match those described in `AddUrls`.
 
@@ -560,11 +586,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     sorted breadth-first.
     """
     meta = ensure_list(meta)
-
-    rows, colidx_to_name = _read(stream, input_type)
-    if not rows:
-        lgr.warning("No rows found in %s", stream)
-        return [], []
+    colidx_to_name = colidx_to_name or {}
 
     # Formatter for everything but file names
     fmt = Formatter(colidx_to_name, missing_value)
@@ -978,7 +1000,8 @@ class Addurls(Interface):
             first row) or a JSON file (structured as a list of objects with
             string values). If '-', read from standard input, taking the
             content as JSON when --input-type is at its default value of
-            'ext'."""),
+            'ext'. [PY:  Alternatively, an iterable of dicts can be given.
+            PY]"""),
         urlformat=Parameter(
             args=("urlformat",),
             metavar="URL-FORMAT",
@@ -1132,25 +1155,28 @@ class Addurls(Interface):
                     yield dict(st_dict, status="error", message=old_msg)
                     return
 
-        if url_file != "-":
-            url_file = str(resolve_path(url_file, dataset))
-
-        if input_type == "ext":
-            if url_file == "-":
-                input_type = "json"
-            else:
-                extension = os.path.splitext(url_file)[1]
-                if extension == ".json":
-                    input_type = "json"
-                elif extension == ".tsv":
-                    input_type = "tsv"
-                else:
-                    input_type = "csv"
-
-        fd = sys.stdin if url_file == "-" else open(url_file)
-        try:
+        if isinstance(url_file, str):
+            if url_file != "-":
+                url_file = str(resolve_path(url_file, dataset))
             try:
-                rows, subpaths = extract(fd, input_type,
+                records, colidx_to_name = _read_from_file(
+                    url_file, input_type)
+            except ValueError as exc:
+                yield get_status_dict(action="addurls",
+                                      ds=ds,
+                                      status="error",
+                                      message=exc_str(exc))
+                return
+            displayed_source = "'{}'".format(urlfile)
+        else:
+            displayed_source = "<records>"
+            records = ensure_list(url_file)
+            colidx_to_name = {}
+
+        rows = None
+        if records:
+            try:
+                rows, subpaths = extract(records, colidx_to_name,
                                          url_format, filename_format,
                                          exclude_autometa, meta, key,
                                          dry_run,
@@ -1158,9 +1184,6 @@ class Addurls(Interface):
             except (ValueError, RequestException) as exc:
                 yield dict(st_dict, status="error", message=exc_str(exc))
                 return
-        finally:
-            if fd is not sys.stdin:
-                fd.close()
 
         if not rows:
             yield dict(st_dict, status="notneeded",
@@ -1329,7 +1352,7 @@ class Addurls(Interface):
 [DATALAD] add {len(files_to_add)} files to {nrows_by_ds_orig} (sub)datasets from URLs
 
 {os.linesep.join(extra_msgs)}
-url_file='{urlfile}'
+url_file={displayed_source}
 url_format='{url_format}'
 filename_format='{filenameformat}'"""
 
