@@ -25,7 +25,10 @@ from datalad.cmd import (
     WitlessRunner as Runner,
     StdOutErrCapture,
 )
-from datalad.ui.utils import get_console_width
+from datalad.ui.utils import (
+    get_console_width,
+    get_terminal_size,
+)
 from datalad.api import create
 from datalad.utils import (
     chpwd,
@@ -42,6 +45,7 @@ from datalad.tests.utils import (
     assert_re_in,
     assert_not_in,
     slow,
+    SkipTest,
 )
 
 
@@ -113,6 +117,10 @@ def test_help_np():
               'Plumbing commands',
               'Plugins'}:
         assert_in(s, sections)
+
+    if not get_terminal_size()[0] or 0:
+        raise SkipTest(
+            "Could not determine terminal size, skipping the rest of the test")
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
