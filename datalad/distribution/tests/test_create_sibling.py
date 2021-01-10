@@ -317,8 +317,10 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
                     digests.pop(f)
                     mtimes.pop(f)
             # and just pop some leftovers from annex
+            # and ignore .git/logs content (gh-5298)
             for f in list(digests):
-                if f.startswith('.git/annex/mergedrefs'):
+                if f.startswith('.git/annex/mergedrefs') \
+                        or f.startswith('.git/logs/'):
                     digests.pop(f)
                     mtimes.pop(f)
 
