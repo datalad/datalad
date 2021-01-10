@@ -97,6 +97,12 @@ test_http_server = None
 
 def setup_package():
     import os
+    from datalad.utils import on_osx
+    if on_osx:
+        # enforce honoring TMPDIR (see gh-5307)
+        import tempfile
+        tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
+
     from datalad import consts
     _test_states['HOME'] = os.environ.get('HOME', None)
     _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
