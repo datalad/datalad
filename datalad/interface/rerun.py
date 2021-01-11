@@ -215,6 +215,16 @@ class Rerun(Interface):
                 message='cannot rerun command, nothing recorded')
             return
 
+        # ATTN: Use get_corresponding_branch() rather than is_managed_branch()
+        # for compatibility with a plain GitRepo.
+        if (onto is not None or branch is not None) and \
+           ds_repo.get_corresponding_branch():
+            yield get_status_dict(
+                "run", ds=ds, status="impossible",
+                message=("--%s is incompatible with adjusted branch",
+                         "branch" if onto is None else "onto"))
+            return
+
         if branch and branch in ds_repo.get_branches():
             yield get_status_dict(
                 "run", ds=ds, status="error",

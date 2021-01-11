@@ -71,6 +71,8 @@ from datalad.tests.utils import (
     known_failure_windows,
     known_failure_githubci_win,
     slow,
+    skip_if_adjusted_branch,
+    SkipTest,
 )
 
 from datalad.core.local.tests.test_run import last_commit_msg
@@ -170,6 +172,11 @@ def test_rerun_empty_branch(path):
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(onto="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
+
     # Make sure we have more than one commit. The one commit case is checked
     # elsewhere.
     ds.repo.commit(msg="noop commit", options=["--allow-empty"])
@@ -264,10 +271,14 @@ def test_rerun_chain(path):
     eq_(info["chain"], commits[:1])
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
+
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo.call_git(["reset", "--hard"])
     ds.repo.config.reload()
@@ -340,10 +351,13 @@ def test_run_failure(path):
     assert_false(op.exists(msgfile))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_branch(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
 
     ds.repo.tag("prerun")
 
@@ -390,7 +404,7 @@ def test_rerun_branch(path):
                   ds.rerun, since="prerun", branch="rerun2")
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
@@ -406,7 +420,7 @@ def test_rerun_cherry_pick(path):
         assert_in_results(results, status='ok', rerun_action=action)
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_invalid_merge_run_commit(path):
     ds = Dataset(path).create()
@@ -769,7 +783,7 @@ def test_run_inputs_no_annex_repo(path):
     ds.rerun()
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tree(tree={"to_modify": "to_modify"})
 def test_rerun_explicit(path):
     ds = Dataset(path).create(force=True)
