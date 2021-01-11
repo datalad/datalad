@@ -107,8 +107,9 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
 def _get_flexible_source_candidates_for_submodule(ds, sm):
     """Assemble candidate locations from where to clone a submodule
 
-    The following locations candidates are considered. For each candidate a
-    cost is given in parenthesis, lower values indicate higher cost:
+    The following location candidates are considered. For each candidate a
+    cost is given in parenthesis, higher values indicate higher cost, and
+    thus lower priority:
 
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
@@ -672,7 +673,7 @@ class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
 
     This command only operates on dataset content. To obtain a new independent
-    dataset from some source use the `install` command.
+    dataset from some source use the `clone` command.
 
     By default this command operates recursively within a dataset, but not
     across potential subdatasets, i.e. if a directory is provided, all files in
@@ -684,6 +685,55 @@ class Get(Interface):
     obtained from some available location (according to git-annex configuration
     and possibly assigned remote priorities), unless a specific source is
     specified.
+
+    *Getting subdatasets*
+
+    Just as DataLad supports getting file content from more than one location,
+    the same is supported for subdatasets, including a ranking of individual
+    sources for prioritization.
+
+    The following location candidates are considered. For each candidate a
+    cost is given in parenthesis, higher values indicate higher cost, and thus
+    lower priority:
+
+    - URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with the submodule path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - In case `.gitmodules` contains a relative path instead of a URL,
+      the URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with this relative path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+
+    - In case `.gitmodules` contains a relative path as a URL, the absolute
+      path of the superdataset, appended with this relative path (cost 900).
+
+    Additional candidate URLs can be generated based on templates specified as
+    configuration variables with the pattern
+
+      `datalad.get.subdataset-source-candidate-<name>`
+
+    where `name` is an arbitrary identifier. If `name` starts with three digits
+    (e.g. '400myserver') these will be interpreted as a cost, and the
+    respective candidate will be sorted into the generated candidate list
+    according to this cost. If no cost is given, a default of 700 is used.
+
+    A template string assigned to such a variable can utilize the Python format
+    mini language and may reference a number of properties that are inferred
+    from the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respective `.gitmodules`
+    record. For convenience, an existing `datalad-id` record is made available
+    under the shortened name `id`.
+
+    Additionally, the URL of any configured remote that contains the respective
+    submodule commit is available as `remote-<name>` properties, where `name`
+    is the configured remote name.
+
+    Lastly, all candidates are sorted according to their cost (lower values
+    first, and duplicate URLs are stripped, while preserving the first item in the
+    candidate list.
 
     .. note::
       Power-user info: This command uses :command:`git annex get` to fulfill
