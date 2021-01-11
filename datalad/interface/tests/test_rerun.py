@@ -455,8 +455,8 @@ def test_rerun_ambiguous_revision_file(path):
     ds.run('echo ambig > ambig')
     ds.repo.tag("ambig")
     # Don't fail when "ambig" refers to both a file and revision.
-    ds.rerun(since="", revision="ambig", branch="rerun")
-    eq_(len(ds.repo.get_revisions("rerun")),
+    ds.rerun(since="", revision="ambig")
+    eq_(len(ds.repo.get_revisions()),
         len(ds.repo.get_revisions("ambig")))
 
 
