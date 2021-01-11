@@ -255,11 +255,11 @@ def test_rerun_chain(path):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
         _, info = get_run_info(ds, ds.repo.format_commit("%B"))
-        assert info["chain"] == commits
+        eq_(info["chain"], commits)
 
     ds.rerun(revision="first-run")
     _, info = get_run_info(ds, ds.repo.format_commit("%B"))
-    assert info["chain"] == commits[:1]
+    eq_(info["chain"], commits[:1])
 
 
 @known_failure_windows
