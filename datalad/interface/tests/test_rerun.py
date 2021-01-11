@@ -251,10 +251,10 @@ def test_rerun_chain(path):
 
     with swallow_outputs():
         ds.run('echo x$(cat grows) > grows')
-    ds.repo.tag("first-run")
+    ds.repo.tag("first-run", commit=DEFAULT_BRANCH)
 
     for _ in range(3):
-        commits.append(ds.repo.get_hexsha())
+        commits.append(ds.repo.get_hexsha(DEFAULT_BRANCH))
         ds.rerun()
         _, info = get_run_info(ds, last_commit_msg(ds.repo))
         eq_(info["chain"], commits)
@@ -455,10 +455,10 @@ def test_rerun_outofdate_tree(path):
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
-    ds.repo.tag("ambig")
+    ds.repo.tag("ambig", commit=DEFAULT_BRANCH)
     # Don't fail when "ambig" refers to both a file and revision.
     ds.rerun(since="", revision="ambig")
-    eq_(len(ds.repo.get_revisions()),
+    eq_(len(ds.repo.get_revisions(DEFAULT_BRANCH)),
         len(ds.repo.get_revisions("ambig")))
 
 
@@ -562,7 +562,7 @@ def test_rerun_script(path):
     # a run record sidecar file was added with the last commit
     assert(any(d['path'].startswith(op.join(ds.path, '.datalad', 'runinfo'))
                for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
-    bar_hexsha = ds.repo.get_hexsha()
+    bar_hexsha = ds.repo.get_hexsha(DEFAULT_BRANCH)
 
     script_file = op.join(path, "commands.sh")
 
@@ -777,7 +777,7 @@ def test_rerun_explicit(path):
     ds.run("echo o >> foo", explicit=True, outputs=["foo"])
     with open(op.join(ds.path, "foo")) as ifh:
         orig_content = ifh.read()
-        orig_head = ds.repo.get_hexsha()
+        orig_head = ds.repo.get_hexsha(DEFAULT_BRANCH)
 
     # Explicit rerun is allowed in a dirty tree.
     ok_(ds.repo.dirty)
