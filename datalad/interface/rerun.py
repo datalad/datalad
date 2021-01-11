@@ -85,9 +85,11 @@ class Rerun(Interface):
             nargs="?",
             doc="""rerun command(s) in `revision`. By default, the command from
             this commit will be executed, but [CMD: --since CMD][PY: `since`
-            PY] can be used to construct a revision range.""",
-            default="HEAD",
-            constraints=EnsureStr()),
+            PY] can be used to construct a revision range. The default value is
+            like "HEAD" but resolves to the main branch when on an adjusted
+            branch.""",
+            default=None,
+            constraints=EnsureStr() | EnsureNone()),
         since=Parameter(
             args=("--since",),
             doc="""If `since` is a commit-ish, the commands from all commits
@@ -179,7 +181,7 @@ class Rerun(Interface):
     @datasetmethod(name='rerun')
     @eval_results
     def __call__(
-            revision="HEAD",
+            revision=None,
             since=None,
             dataset=None,
             branch=None,
@@ -218,6 +220,10 @@ class Rerun(Interface):
                 "run", ds=ds, status="error",
                 message="branch '{}' already exists".format(branch))
             return
+
+        if revision is None:
+            revision = ds_repo.get_corresponding_branch() or \
+                ds_repo.get_active_branch() or "HEAD"
 
         if not ds_repo.commit_exists(revision + "^"):
             # Only a single commit is reachable from `revision`.  In
