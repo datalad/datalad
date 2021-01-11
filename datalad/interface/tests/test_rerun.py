@@ -712,12 +712,11 @@ def test_run_inputs_outputs(src, path):
             eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
-    ds.repo.call_git(["reset", "--hard", "HEAD~2"])
     ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
     if not on_windows:
         # MIH doesn't yet understand how to port this
         with open(op.join(path, "a.dat")) as fh:
-            eq_(fh.read(), "a.dat appended\n")
+            eq_(fh.read(), " appended\n appended\n")
 
     if not on_windows:
         # see datalad#2606
