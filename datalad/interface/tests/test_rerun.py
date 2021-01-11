@@ -73,6 +73,8 @@ from datalad.tests.utils import (
     slow,
 )
 
+from datalad.core.local.tests.test_run import last_commit_msg
+
 
 @slow  # 17.1880s
 @known_failure_windows
@@ -100,7 +102,7 @@ def test_rerun(path, nodspath):
     eq_('xx\n', open(probe_path).read())
 
     # Rerunning from a subdataset skips the command.
-    _, sub_info = get_run_info(ds, sub.repo.format_commit("%B"))
+    _, sub_info = get_run_info(ds, last_commit_msg(sub.repo))
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
@@ -123,7 +125,7 @@ def test_rerun(path, nodspath):
     ds.rerun(revision="HEAD~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
-    eq_(ds.repo.format_commit("%B").splitlines()[0],
+    eq_(last_commit_msg(ds.repo).splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
     ds.rerun(since="HEAD~3")
@@ -254,11 +256,11 @@ def test_rerun_chain(path):
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
-        _, info = get_run_info(ds, ds.repo.format_commit("%B"))
+        _, info = get_run_info(ds, last_commit_msg(ds.repo))
         eq_(info["chain"], commits)
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds, ds.repo.format_commit("%B"))
+    _, info = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(info["chain"], commits[:1])
 
 
@@ -410,7 +412,7 @@ def test_rerun_invalid_merge_run_commit(path):
     ds = Dataset(path).create()
     ds.run("echo foo >>foo")
     ds.run("echo invalid >>invalid")
-    run_msg = ds.repo.format_commit("%B")
+    run_msg = last_commit_msg(ds.repo)
     run_hexsha = ds.repo.get_hexsha()
     ds.repo.call_git(["reset", "--hard", DEFAULT_BRANCH + "~"])
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
@@ -479,7 +481,7 @@ def test_rerun_subdir(path):
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
-    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
+    rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -495,7 +497,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     assert_repo_status(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
-    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
+    rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -664,7 +666,7 @@ def test_run_inputs_outputs(src, path):
         ds.run("cd .> dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
-        assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
+        assert_in(inputs_arg[0], last_commit_msg(ds.repo))
         ds.repo.drop(inputs, options=["--force"])
 
     # --input can be passed a subdirectory.
@@ -732,8 +734,8 @@ def test_run_inputs_outputs(src, path):
 
     # --input/--output globs can be stored in expanded form.
     ds.run("cd .> expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
-    assert_in("a.dat", ds.repo.format_commit("%B"))
-    assert_in("b.dat", ds.repo.format_commit("%B"))
+    assert_in("a.dat", last_commit_msg(ds.repo))
+    assert_in("b.dat", last_commit_msg(ds.repo))
 
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
@@ -845,7 +847,7 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(op.join(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
-    eq_(get_run_info(ds, ds.repo.format_commit("%B"))[1]["pwd"],
+    eq_(get_run_info(ds, last_commit_msg(ds.repo))[1]["pwd"],
         "subdir")
 
     # Double brackets can be used to escape placeholders.
