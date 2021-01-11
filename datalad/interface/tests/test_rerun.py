@@ -122,13 +122,13 @@ def test_rerun(path, nodspath):
         f.write("foo")
     ds.save("nonrun-file")
     # Now rerun the buried command.
-    ds.rerun(revision="HEAD~", message="rerun buried")
+    ds.rerun(revision=DEFAULT_BRANCH + "~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
     eq_(last_commit_msg(ds.repo).splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
-    ds.rerun(since="HEAD~3")
+    ds.rerun(since=DEFAULT_BRANCH + "~3")
     eq_('xxxxx\n', open(probe_path).read())
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
@@ -447,7 +447,7 @@ def test_rerun_outofdate_tree(path):
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
     with swallow_outputs():
-        assert_raises(CommandError, ds.rerun, revision="HEAD~")
+        assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
 
 
 @known_failure_windows
@@ -694,7 +694,7 @@ def test_run_inputs_outputs(src, path):
     ds.save()
     ds.repo.copy_to(["after-dot-run"], remote="origin")
     ds.repo.drop(["after-dot-run"], options=["--force"])
-    ds.rerun("HEAD^")
+    ds.rerun(DEFAULT_BRANCH + "^")
     ds.repo.file_has_content("after-dot-run")
 
     # --output will unlock files that are present.
