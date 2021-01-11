@@ -151,6 +151,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     first, and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
 
+    More information on this feature can be found at
+    http://handbook.datalad.org/r.html?clone-priority
+
     Parameters
     ----------
     ds : Dataset
