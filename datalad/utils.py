@@ -2620,7 +2620,7 @@ def copy_file(src, dst, follow_symlinks=True):
         # command will still likely output its usage info.
         _cp_supports_reflink = "--reflink" in r.stdout
     if _cp_supports_reflink:
-        symopts = ["-R", "-L"] if follow_symlinks else ["-R", "-P"]
+        symopts = [] if follow_symlinks else ["-P"]
         subprocess.run(
             ["cp", "-f", "-p", "--reflink=auto"]
             + symopts
