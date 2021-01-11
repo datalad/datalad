@@ -278,9 +278,16 @@ def _test_remote_layout(host, dspath, store, archiv_store):
                      sorted([p for p in local_objects])
                      )
 
+        if not io.get_7z():
+            raise SkipTest("No 7z available in RIA store")
+
         # we can simply pack up the content of the remote into a
         # 7z archive and place it in the right location to get a functional
         # archive remote
+
+        create_store(io, archiv_store, '1')
+        create_ds_in_store(io, archiv_store, ds.id, '2', '1')
+
         whereis = ds.repo.whereis('one.txt')
         dsgit_dir, archive_dir, dsobj_dir = \
             get_layout_locations(1, archiv_store, ds.id)
