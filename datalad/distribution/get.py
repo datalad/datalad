@@ -148,7 +148,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     is the configured remote name.
 
     Lastly, all candidates are sorted according to their cost (lower values
-    first, and duplicate URLs are stripped, while preserving the first item in the
+    first), and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
 
     More information on this feature can be found at
@@ -735,7 +735,7 @@ class Get(Interface):
     is the configured remote name.
 
     Lastly, all candidates are sorted according to their cost (lower values
-    first, and duplicate URLs are stripped, while preserving the first item in the
+    first), and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
 
     .. note::
