@@ -45,9 +45,9 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_message,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     skip_ssh,
     skip_if_on_windows,
-    SkipTest,
     slow,
     known_failure_windows,
     known_failure_githubci_win,
@@ -643,6 +643,8 @@ def test_gh3356(src, path):
         action='status', has_content=True)
 
 
+# The setup here probably breaks down with adjusted branches.
+@skip_if_adjusted_branch
 @slow  # ~12s
 @skip_if_on_windows
 @skip_ssh
@@ -650,10 +652,6 @@ def test_gh3356(src, path):
 def test_get_subdataset_direct_fetch(path):
     path = Path(path)
     origin = Dataset(path / "origin").create()
-    if origin.repo.is_managed_branch():
-        # The setup here probably breaks down with adjusted branches.
-        raise SkipTest("Test assumes non-adjusted branches")
-
     for sub in ["s0", "s1"]:
         sds = origin.create(origin.pathobj / sub)
         sds.repo.commit(msg="another commit", options=["--allow-empty"])

@@ -87,6 +87,7 @@ from datalad.tests.utils import (
     serve_path_via_http,
     set_annex_version,
     skip_if,
+    skip_if_adjusted_branch,
     skip_if_on_windows,
     skip_if_root,
     skip_nomultiplex_ssh,
@@ -2020,14 +2021,12 @@ def test_AnnexRepo_get_tracking_branch(path):
     eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
+# Test needs repository with non-managed branch.
+@skip_if_adjusted_branch
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_is_managed_branch(path):
 
     ar = AnnexRepo(path)
-
-    if ar.is_managed_branch():
-        raise SkipTest("Test needs repository with non-managed branch")
-
     if ar.supports_unlocked_pointers:
         ar.adjust()
         ok_(ar.is_managed_branch())
