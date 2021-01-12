@@ -381,8 +381,6 @@ class WitlessRunner(object):
                 )
             )
         finally:
-            # be kind to callers and leave asyncio as we found it
-            asyncio.set_event_loop(None)
             # terminate the event loop, cannot be undone, hence we start a fresh
             # one each time (see BlockingIOError notes above)
             event_loop.close()
