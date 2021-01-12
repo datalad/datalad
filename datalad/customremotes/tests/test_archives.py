@@ -174,7 +174,6 @@ def test_annex_get_from_subdir(topdir):
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
-@known_failure_githubci_win
 def test_get_git_environ_adjusted():
     gitrunner = GitWitlessRunner()
     env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
@@ -188,8 +187,9 @@ def test_get_git_environ_adjusted():
     assert_equal(adj_env["TEST_VAR"], env["TEST_VAR"])
 
     # test import of sys_env if no environment passed to function
-    sys_env = gitrunner.get_git_environ_adjusted()
-    assert_equal(sys_env["PWD"], os.environ.get("PWD"))
+    with patch.dict('os.environ', {'BOGUS': '123'}):
+        sys_env = gitrunner.get_git_environ_adjusted()
+        assert_equal(sys_env["BOGUS"], "123")
 
 
 def test_no_rdflib_loaded():
