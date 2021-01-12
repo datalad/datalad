@@ -217,7 +217,8 @@ class CreateSiblingRia(Interface):
             constraints=EnsureChoice(
                 'trust', 'semitrust', 'untrust') | EnsureNone(),
             doc="""specify a trust level for the storage sibling. If not
-            specified, the default git-annex trust level is used.""",),
+            specified, the default git-annex trust level is used. 'trust'
+            should be used with care (see the git-annex-trust man page).""",),
         disable_storage__=Parameter(
             args=("--no-storage-sibling",),
             dest='disable_storage__',
@@ -565,7 +566,12 @@ def _create_sibling_ria(
                 return
 
         if trust_level:
-            ds.repo.call_annex([trust_level, srname])
+            trust_cmd = [trust_level]
+            if trust_level == 'trust':
+                # Following git-annex 8.20201129-73-g6a0030a11, using `git
+                # annex trust` requires --force.
+                trust_cmd.append('--force')
+            ds.repo.call_annex(trust_cmd + [srname])
         # get uuid for use in bare repo's config
         uuid = ds.config.get("remote.{}.annex-uuid".format(srname))
 
