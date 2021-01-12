@@ -74,6 +74,7 @@ Plumbing commands
    api.clean
    api.clone
    api.copy_file
+   api.configuration
    api.create_test_dataset
    api.diff
    api.download_url
