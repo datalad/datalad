@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     has_symlink_capability,
     SkipTest,
     known_failure_windows,
+    skip_if_adjusted_branch,
     skip_if_no_network,
     skip_ssh,
     slow,
@@ -387,6 +388,10 @@ def test_version_check():
     yield _test_version_check, None
 
 
+# git-annex-testremote is way too slow on crippled FS.
+# Use is_managed_branch() as a proxy and skip only here
+# instead of in a decorator
+@skip_if_adjusted_branch
 @known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
@@ -397,12 +402,6 @@ def _test_gitannex(host, store, dspath):
     store = Path(store)
 
     ds = Dataset(dspath).create()
-
-    if ds.repo.is_managed_branch():
-        # git-annex-testremote is way too slow on crippled FS.
-        # Use is_managed_branch() as a proxy and skip only here
-        # instead of in a decorator
-        raise SkipTest("Test too slow on crippled FS")
 
     populate_dataset(ds)
     ds.save()

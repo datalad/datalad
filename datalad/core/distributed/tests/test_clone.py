@@ -63,6 +63,7 @@ from datalad.tests.utils import (
     patch_config,
     set_date,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
@@ -1087,6 +1088,8 @@ def test_ria_http_storedataladorg(path):
 
 
 @skip_if_on_windows  # see gh-4131
+# Ephemeral clones cannot use adjusted mode repos
+@skip_if_adjusted_branch
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -1104,9 +1107,6 @@ def test_ephemeral(origin_path, bare_path,
     file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
 
     origin = Dataset(origin_path).create(force=True)
-    if origin.repo.is_managed_branch():
-        raise SkipTest('Ephemeral clones cannot use adjusted mode repos')
-
     origin.save()
     # 1. clone via path
     clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
@@ -1300,6 +1300,9 @@ def test_gin_cloning(path):
     ok_file_has_content(op.join(ds.path, git_path), 'one\n')
 
 
+# TODO: git-annex-init fails in the second clone call below when this is
+# executed under ./tools/eval_under_testloopfs.
+@skip_if_adjusted_branch
 @with_tree(tree={"special": {"f0": "0"}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
@@ -1307,10 +1310,6 @@ def test_fetch_git_special_remote(url_path, url, path):
     url_path = Path(url_path)
     path = Path(path)
     ds_special = Dataset(url_path / "special").create(force=True)
-    if ds_special.repo.is_managed_branch():
-        # TODO: git-annex-init fails in the second clone call below when this is
-        # executed under ./tools/eval_under_testloopfs.
-        raise SkipTest("Test fails on managed branch")
     ds_special.save()
     ds_special.repo.call_git(["update-server-info"])
 
@@ -1334,15 +1333,13 @@ def test_fetch_git_special_remote(url_path, url, path):
     ok_(ds_b.repo.file_has_content("f1"))
 
 
+@skip_if_adjusted_branch
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 def test_nonuniform_adjusted_subdataset(path):
     # https://github.com/datalad/datalad/issues/5107
     topds = Dataset(Path(path) / "top").create()
     subds_url = 'git://github.com/datalad/testrepo--basic--r1'
-    if not topds.repo.is_managed_branch():
-        raise SkipTest(
-            "Test logic assumes default dataset state is adjusted")
     topds.clone(
         source='git://github.com/datalad/testrepo--basic--r1',
         path='subds')

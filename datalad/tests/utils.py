@@ -1930,6 +1930,29 @@ def skip_wo_symlink_capability(func):
     return  _wrap_skip_wo_symlink_capability
 
 
+_TESTS_ADJUSTED_TMPDIR = None
+
+
+def skip_if_adjusted_branch(func):
+    """Skip test if adjusted branch is used by default on TMPDIR file system.
+    """
+    @wraps(func)
+    @attr('skip_if_adjusted_branch')
+    def _wrap_skip_if_adjusted_branch(*args, **kwargs):
+        global _TESTS_ADJUSTED_TMPDIR
+        if _TESTS_ADJUSTED_TMPDIR is None:
+            @with_tempfile
+            def _check(path):
+                ds = Dataset(path).create(force=True)
+                return ds.repo.is_managed_branch()
+            _TESTS_ADJUSTED_TMPDIR = _check()
+
+        if _TESTS_ADJUSTED_TMPDIR:
+            raise SkipTest("Test incompatible with adjusted branch default")
+        return func(*args, **kwargs)
+    return _wrap_skip_if_adjusted_branch
+
+
 def get_ssh_port(host):
     """Get port of `host` in ssh_config.
 

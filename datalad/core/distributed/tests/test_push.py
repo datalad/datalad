@@ -35,6 +35,7 @@ from datalad.tests.utils import (
     ok_,
     ok_file_has_content,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -537,6 +538,7 @@ def test_gh1426(origin_path, target_path):
         target.get_hexsha(DEFAULT_BRANCH))
 
 
+@skip_if_adjusted_branch  # gh-4075
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree={'1': '123'})
@@ -545,9 +547,6 @@ def test_gh1426(origin_path, target_path):
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
-    if ds.repo.is_managed_branch():
-        raise SkipTest(
-            'Skipped due to https://github.com/datalad/datalad/issues/4075')
     ds.save('1')
     ds.create_sibling('ssh://datalad-test:%s/subdir' % desttop,
                       name='target',
@@ -608,15 +607,13 @@ def test_gh1811(srcpath, clonepath):
     )
 
 
+# FIXME: on crippled FS post-update hook enabling via create-sibling doesn't
+# work ATM
+@skip_if_adjusted_branch
 @with_tempfile()
 @with_tempfile()
 def test_push_wanted(srcpath, dstpath):
     src = Dataset(srcpath).create()
-
-    if src.repo.is_managed_branch():
-        # on crippled FS post-update hook enabling via create-sibling doesn't
-        # work ATM
-        raise SkipTest("no create-sibling on crippled FS")
     (src.pathobj / 'data.0').write_text('0')
     (src.pathobj / 'secure.1').write_text('1')
     (src.pathobj / 'secure.2').write_text('2')
@@ -662,15 +659,14 @@ def test_push_wanted(srcpath, dstpath):
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
 
 
+# FIXME: on crippled FS post-update hook enabling via create-sibling doesn't
+# work ATM
+@skip_if_adjusted_branch
 @slow  # 10sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_data_transfer(path):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
-    if ds_a.repo.is_managed_branch():
-        # on crippled FS post-update hook enabling via create-sibling doesn't
-        # work ATM
-        raise SkipTest("no create-sibling on crippled FS")
     (ds_a.pathobj / "foo.dat").write_text("foo")
     ds_a.save()
 
@@ -723,15 +719,14 @@ def test_auto_data_transfer(path):
         path=str(ds_a.pathobj / "bar.dat"))
 
 
+# FIXME: on crippled FS post-update hook enabling via create-sibling doesn't
+# work ATM
+@skip_if_adjusted_branch
 @slow  # 16sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_if_wanted_data_transfer_path_restriction(path):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
-    if ds_a.repo.is_managed_branch():
-        # on crippled FS post-update hook enabling via create-sibling doesn't
-        # work ATM
-        raise SkipTest("no create-sibling on crippled FS")
     ds_a_sub0 = ds_a.create("sub0")
     ds_a_sub1 = ds_a.create("sub1")
 

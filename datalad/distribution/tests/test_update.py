@@ -49,6 +49,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_in_results,
     DEFAULT_BRANCH,
+    skip_if_adjusted_branch,
     SkipTest,
     slow,
     known_failure_windows,
@@ -471,15 +472,14 @@ def test_multiway_merge(path):
     assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
 
 
+# `git annex sync REMOTE` rather than `git merge TARGET` is used on an
+# adjusted branch, so we don't give an error if TARGET can't be
+# determined.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_no_merge_target(path):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
-        # adjusted branch, so we don't give an error if TARGET can't be
-        # determined.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     assert_repo_status(ds_src.path)
@@ -488,15 +488,14 @@ def test_merge_no_merge_target(path):
     assert_in_results(res, status="impossible", action="update")
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge TARGET` being used.
+@skip_if_adjusted_branch
 @slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge TARGET` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_src_s0 = ds_src.create("s0")
     ds_src_s1 = ds_src.create("s1")
     ds_src.save()
@@ -543,15 +542,14 @@ def test_merge_conflict(path):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge TARGET` being used.
+@skip_if_adjusted_branch
 @slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict_in_subdataset_only(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge TARGET` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_src_sub_conflict = ds_src.create("sub_conflict")
     ds_src_sub_noconflict = ds_src.create("sub_noconflict")
     ds_src.save()
@@ -587,15 +585,13 @@ def test_merge_conflict_in_subdataset_only(path):
         ["ls-files", "--unmerged", "--", "foo"], read_only=True).strip())
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge --ff-only ...` being used.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_ff_only(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge --ff-only ...` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
-
     ds_clone_ff = install(source=ds_src.path, path=path / "clone_ff",
                           result_xfm="datasets")
 
@@ -658,16 +654,13 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
+# This test depends on the source repo being an un-adjusted branch.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     path = Path(path)
 
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        raise SkipTest(
-            "This test depends on the source repo being "
-            "an un-adjusted branch")
-
     ds_src_subds = ds_src.create("subds")
 
     ds_clone = install(source=ds_src.path, path=path / "clone",
@@ -692,6 +685,8 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
+# Skip non-adjusted case for systems that only support adjusted branches.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # Note: For the adjusted case, this is not much more than a smoke test that
@@ -702,10 +697,6 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # The additional dataset level is to gain some confidence that this works
     # for nested datasets.
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        if not on_adjusted:
-            raise SkipTest("System only supports adjusted branches. "
-                           "Skipping non-adjusted test")
     ds_src_s0 = ds_src.create("s0")
     ds_src_s1 = ds_src_s0.create("s1")
     ds_src.save(recursive=True)
