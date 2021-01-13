@@ -9,6 +9,32 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.13.7 (January 04, 2021) -- .
+
+### Fixes
+
+- Cloning from a RIA store on the local file system initialized annex
+  in the Git sibling of the RIA source, which is problematic because
+  all annex-related functionality should go through the storage
+  sibling.  [clone][] now sets `remote.origin.annex-ignore` to `true`
+  after cloning from RIA stores to prevent this.  ([#5255][])
+
+- [create-sibling][] invoked `cp` in a way that was not compatible
+  with macOS.  ([#5269][])
+
+- Due to a bug in older Git versions (before 2.25), calling [status][]
+  with a file under .git/ (e.g., `datalad status .git/config`)
+  incorrectly reported the file as untracked.  A workaround has been
+  added.  ([#5258][])
+
+- Update tests for compatibility with latest git-annex.  ([#5254][])
+
+### Enhancements and new features
+
+- [copy-file][] now aborts if .git/ is in the target directory, adding
+  to its existing .git/ safety checks.  ([#5258][])
+
+
 ## 0.13.6 (December 14, 2020) -- .
 
 ### Fixes
@@ -3270,3 +3296,7 @@ publishing
 [#5218]: https://github.com/datalad/datalad/issues/5218
 [#5219]: https://github.com/datalad/datalad/issues/5219
 [#5238]: https://github.com/datalad/datalad/issues/5238
+[#5254]: https://github.com/datalad/datalad/issues/5254
+[#5255]: https://github.com/datalad/datalad/issues/5255
+[#5258]: https://github.com/datalad/datalad/issues/5258
+[#5269]: https://github.com/datalad/datalad/issues/5269

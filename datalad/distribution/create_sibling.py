@@ -124,9 +124,9 @@ class _RunnerAdapter(Runner):
                 # destination directory already exists. With Python 3.8, we can
                 # make copytree() do the same with dirs_exist_ok=True. But for
                 # now, just rely on `cp`.
-                cmd = ["cp", "--recursive"]
+                cmd = ["cp", "-R"]
                 if preserve_attrs:
-                    cmd.append("--preserve")
+                    cmd.append("-p")
                 self(cmd + [quote_cmdlinearg(a) for a in args])
         else:
             copy_fn(source, destination)
@@ -258,7 +258,7 @@ def _create_dataset_sibling(
                 # just a directory.
                 lgr.info(_msg + " Replacing")
                 # enable write permissions to allow removing dir
-                shell("chmod +r+w -R {}".format(sh_quote(remoteds_path)))
+                shell("chmod -R +r+w {}".format(sh_quote(remoteds_path)))
                 # remove target at path
                 shell("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
