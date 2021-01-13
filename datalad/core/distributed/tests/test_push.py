@@ -311,11 +311,6 @@ def test_push_recursive(
     assert_in_results(
         res, status='notneeded', refspec=DEFAULT_REFSPEC)
 
-    if top.repo.is_managed_branch():
-        raise SkipTest(
-            'Save/status of subdataset with managed branches is an still '
-            'unresolved issue')
-
     # now annex a file in subsub
     test_copy_file = subsub.pathobj / 'test_mod_annex_file'
     test_copy_file.write_text("Heavy stuff.")
@@ -350,7 +345,7 @@ def test_push_recursive(
     top.save(sub.pathobj, message='annexadd', recursive=True)
     top.save(subnoannex.pathobj, message='gitadd', recursive=True)
     # now only publish the latter one
-    res = top.push(to="target", since='HEAD~1', recursive=True)
+    res = top.push(to="target", since=DEFAULT_BRANCH + '~1', recursive=True)
     # nothing copied, no reports on the other modification
     assert_not_in_results(res, action='copy')
     assert_not_in_results(res, path=sub.path)
