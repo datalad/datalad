@@ -215,6 +215,8 @@ def teardown_package():
     import os
     from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
 
+    lgr.setLevel(5)
+
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
     print(ev.dumps(query=True))
