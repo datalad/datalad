@@ -1547,7 +1547,7 @@ def test_annex_version_handling_bad_git_annex(path):
             AnnexRepo(path)
         linux_distribution_name = get_linux_distribution()[0]
         if linux_distribution_name == 'debian':
-            assert_in("http://neuro.debian.net", str(cme.exception))
+            assert_in("handbook.datalad.org", str(cme.exception))
         eq_(AnnexRepo.git_annex_version, None)
 
     with set_annex_version('6.20160505'):
