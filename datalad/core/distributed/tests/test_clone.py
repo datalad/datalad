@@ -265,7 +265,6 @@ def test_clone_isnot_recursive(path_src, path_nr, path_r):
         {'subm 1', '2'})
 
 
-@slow  # 23.1478s
 @with_tempfile
 @with_tempfile
 def test_clone_into_dataset(source_path, top_path):
