@@ -101,8 +101,8 @@ def test_basics(path, nodspath):
         # provoke command failure
         with assert_raises(CommandError) as cme:
             ds.run('7i3amhmuch9invalid')
-            # let's not speculate that the exit code is always 127
-            ok_(cme.code > 0)
+        # let's not speculate that the exit code is always 127
+        ok_(cme.exception.code > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('cd .> empty', message='TEST')
