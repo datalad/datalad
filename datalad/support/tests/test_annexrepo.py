@@ -706,12 +706,11 @@ def test_AnnexRepo_get_file_backend(src, dst):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
+@skip_if_adjusted_branch
 @with_tempfile
 def test_AnnexRepo_always_commit(path):
 
     repo = AnnexRepo(path)
-    if repo.is_managed_branch():
-        raise SkipTest('Test logic invalid for adjusted repos')
 
     def get_annex_commit_counts():
         return len(repo.get_revisions("git-annex"))
@@ -1766,17 +1765,13 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
+@skip_if_adjusted_branch
 @with_tempfile
 @with_tempfile
 def test_AnnexRepo_add_submodule(source_path, path):
     source = AnnexRepo(source_path, create=True)
     (source.pathobj / 'test-annex.dat').write_text("content")
     source.save('some')
-
-    if source.is_managed_branch():
-        raise SkipTest(
-            'AnnexRepo.add_submodule() is incompatible with '
-            'managed-branch submodules')
 
     top_repo = AnnexRepo(path, create=True)
 
