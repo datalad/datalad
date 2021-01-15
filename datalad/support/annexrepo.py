@@ -2152,23 +2152,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             options.extend(('--backend', backend))
 
-        self._call_annex(
+        return self._call_annex_records(
             ['addurl'] + options + urls,
             git_options=git_options,
-            # In general, don't capture stderr, since download progress
-            # provided by wget uses stderr. But when git-annex runs
-            # with --debug on verbose log-levels, this would leak tons of
-            # output instead of going through normal logging. In that case,
-            # capture stderr and expense of progress reporting (where beauty
-            # is of lower priority).
-            protocol=StdOutErrCapture
-            if lgr.getEffectiveLevel() <= 8 else StdOutCapture
-        )
-
-        # currently simulating similar return value, assuming success
-        # for all files:
-        # TODO: Make return values consistent across both *Repo classes!
-        return [{u'file': f, u'success': True} for f in urls]
+            progress=True)
 
     @normalize_path
     def rm_url(self, file_, url):
