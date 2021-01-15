@@ -25,6 +25,8 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_raises,
     rmtree,
+    on_windows,
+    on_osx,
     skip_if,
     slow,
     with_tempfile,
@@ -191,7 +193,10 @@ def test_gracefull_death():
     # we will get some results, seems around 4 and they should be "sequential"
     assert_equal(results, list(range(len(results))))
     assert_greater_equal(len(results), 2)
-    if info_log_level:
+    if info_log_level and not (on_windows or on_osx):
+        # windows does not behave according to the initial performance
+        # expectations gh-5296 (~9), and neither does a macosx cloud instance
+        # (~7)
         assert_greater_equal(6, len(results))
 
     # Simulate situation close to what we have when outside code consumes
