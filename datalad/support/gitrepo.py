@@ -1361,6 +1361,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             toppath = GitRepo.get_toppath(dirname(path), follow_up=follow_up,
                                           git_options=git_options)
 
+        # normalize the report, because, e.g. on windows it can come out
+        # with improper directory seperators (C:/Users/datalad)
+        toppath = str(Path(toppath))
+
         if follow_up:
             path_ = path
             path_prev = ""
@@ -2854,6 +2858,9 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         create a new commit.  If the submodule already exists, no matter if the
         configuration differs from the one provided, the existing submodule
         is considered as already added and no further action is performed.
+
+        NOTE: This method does not work with submodules that use git-annex adjusted
+              branches. Use Repo.save() instead.
 
         Parameters
         ----------
