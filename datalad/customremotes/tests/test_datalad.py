@@ -58,15 +58,9 @@ def check_basic_scenario(url, d):
     eq_(len(whereis2), 1)  # datalad
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output
-    with swallow_outputs() as cmo, swallow_logs() as cml:
-        with assert_raises(CommandError) as cme:
-            annex.add_urls([url + '_bogus'])
-            assert_in('addurl: 1 failed', cme.stderr)
-        # assert_equal(cml.out, '')
-        err, out = cmo.err, cmo.out
-    assert_equal(out, '')
-    assert_equal(err, '')
-    # and there should be nothing more
+    with assert_raises(CommandError) as cme:
+        annex.add_urls([url + '_bogus'])
+    assert_in('addurl: 1 failed', cme.exception.stderr)
 
 
 # unfortunately with_tree etc decorators aren't generators friendly thus
