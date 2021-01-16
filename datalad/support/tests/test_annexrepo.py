@@ -1440,6 +1440,18 @@ def test_annex_drop(src, dst):
     # too much arguments:
     assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
 
+    (ar.pathobj / 'somefile.txt').write_text('this')
+    ar.save()
+    with assert_raises(CommandError) as e:
+        ar.drop('somefile.txt')
+    # CommandError has to pull the errors from the JSON record 'note'
+    assert_in('necessary copies', str(e.exception))
+
+    with assert_raises(CommandError) as e:
+        ar._call_annex_records(['fsck', '-N', '3'])
+    # CommandError has to pull the errors from the JSON record 'error-messages'
+    assert_in('1 of 3 trustworthy copies', str(e.exception))
+
 
 @with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
 def test_annex_get_annexed_files(path):
@@ -2172,10 +2184,13 @@ def test_annexjson_protocol(path):
         res = ar._call_annex(
             ['find', '.', 'error', '--json'],
             protocol=AnnexJsonProtocol)
-        # normal operation is not impaired
-        eq_(e.stdout_json, orig_j)
-        # we get a clue what went wrong
-        assert_in('error not found', e.stderr)
+    # normal operation is not impaired
+    eq_(e.exception.kwargs['stdout_json'], orig_j)
+    # we get a clue what went wrong
+    assert_in('error not found', e.exception.stderr)
+    # there should be no errors reported in an individual records
+    # hence also no pointless statement in the str()
+    assert_not_in('errors from JSON records', str(e.exception))
 
 
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
