@@ -31,11 +31,13 @@ from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
-from datalad.support.repo import path_based_str_repr
+from datalad.dataset.repo import (
+    path_based_str_repr,
+    PathBasedFlyweight,
+)
 from datalad.support.gitrepo import (
     GitRepo,
 )
-from datalad.support.repo import PathBasedFlyweight
 from datalad.support import path as op
 
 import datalad.utils as ut
