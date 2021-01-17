@@ -272,11 +272,3 @@ def test_info_path_inside_submodule(path):
     cinfo = ds.repo.get_content_info(
         ref="HEAD", paths=[foo.relative_to(ds.pathobj)])
     assert_in("gitshasum", cinfo[subds.pathobj])
-
-
-@with_tempfile
-def test_get_content_info_dotgit(path):
-    ds = Dataset(path).create()
-    # Files in .git/ won't be reported, though this takes a kludge on our side
-    # before Git 2.25.
-    assert_false(ds.repo.get_content_info(paths=[op.join(".git", "config")]))

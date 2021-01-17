@@ -66,7 +66,7 @@ from datalad.cmd import (
 )
 
 # imports from same module:
-from datalad.core.dataset.repo import RepoInterface
+from datalad.dataset.repo import RepoInterface
 from .gitrepo import (
     GitRepo,
     normalize_path,

@@ -31,7 +31,7 @@ from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
-from datalad.core.dataset.repo import (
+from datalad.dataset.repo import (
     path_based_str_repr,
     PathBasedFlyweight,
 )

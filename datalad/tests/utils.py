@@ -1661,7 +1661,10 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
             # 'annex' True
             assert_is(annex, False)
 
-    status = r.status(untracked=untracked_mode)
+    status = r.compare_states(
+        fr='HEAD' if r.get_hexsha() else None,
+        to=None,
+        untracked=untracked_mode)
     # for any file state that indicates some kind of change (all but 'clean)
     for state in ('added', 'untracked', 'deleted', 'modified'):
         oktobefound = sorted(r.pathobj.joinpath(ut.PurePosixPath(p))

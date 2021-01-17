@@ -6,33 +6,36 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-""" utility classes for repositories
+"""Utility classes for repositories
 
 """
 
 import logging
-import weakref
 
 from datalad.support.exceptions import InvalidInstanceRequestError
-from datalad.support import path as op
 from datalad.support.network import RI
-from datalad import utils as ut
+from datalad.utils import (
+    on_windows,
+    Path,
+    PurePath,
+    quote_cmdlinearg,
+)
 
-lgr = logging.getLogger('datalad.repo')
+lgr = logging.getLogger('datalad.dataset')
 
 
 class Flyweight(type):
     """Metaclass providing an implementation of the flyweight pattern.
 
-    Since the flyweight is very similar to a singleton, we occasionally use this
-    term to make clear there's only one instance (at a time).
-    This integrates the "factory" into the actual classes, which need
-    to have a class attribute `_unique_instances` (WeakValueDictionary).
-    By providing an implementation of __call__, you don't need to call a
-    factory's get_xy_repo() method to get a singleton. Instead this is called
-    when you simply instantiate via MyClass(). So, you basically don't even need
-    to know there were singletons. Therefore it is also less likely to sabotage
-    the concept by not being aware of how to get an appropriate object.
+    Since the flyweight is very similar to a singleton, we occasionally use
+    this term to make clear there's only one instance (at a time).  This
+    integrates the "factory" into the actual classes, which need to have a
+    class attribute `_unique_instances` (WeakValueDictionary).  By providing an
+    implementation of __call__, you don't need to call a factory's
+    get_xy_repo() method to get a singleton. Instead this is called when you
+    simply instantiate via MyClass(). So, you basically don't even need to know
+    there were singletons. Therefore it is also less likely to sabotage the
+    concept by not being aware of how to get an appropriate object.
 
     Multiple instances, pointing to the same physical repository can cause a
     lot of trouble. This is why this class exists. You should be very aware of
@@ -69,7 +72,7 @@ class Flyweight(type):
     """
 
     def _flyweight_id_from_args(cls, *args, **kwargs):
-        """create an ID from arguments passed to `__call__`
+        """Create an ID from arguments passed to `__call__`
 
         Subclasses need to implement this method. The ID it returns is used to
         determine whether or not there already is an instance of that kind and
@@ -120,13 +123,13 @@ class Flyweight(type):
     # TODO: document the suggestion to implement a finalizer!
 
     def _flyweight_reject(cls, id, *args, **kwargs):
-        """decides whether to reject a request for an instance
+        """Decides whether to reject a request for an instance
 
         This gives the opportunity to detect a conflict of an instance request
         with an already existing instance, that is not invalidated by
-        `_flyweight_invalid`. In case the return value is not `None`, it will be
-        used as the message for an `InvalidInstanceRequestError`,
-        raised by `__call__`
+        `_flyweight_invalid`. In case the return value is not `None`, it will
+        be used as the message for an `InvalidInstanceRequestError`, raised by
+        `__call__`
 
         Parameters
         ----------
@@ -175,14 +178,14 @@ class Flyweight(type):
 class PathBasedFlyweight(Flyweight):
 
     def _flyweight_preproc_path(cls, path):
-        """perform any desired path preprocessing (e.g., aliases)
+        """Perform any desired path preprocessing (e.g., aliases)
 
         By default nothing is done
         """
         return path
 
     def _flyweight_postproc_path(cls, path):
-        """perform any desired path post-processing (e.g., dereferencing etc)
+        """Perform any desired path post-processing (e.g., dereferencing etc)
 
         By default - realpath to guarantee reuse. Derived classes (e.g.,
         Dataset) could override to allow for symlinked datasets to have
@@ -192,14 +195,14 @@ class PathBasedFlyweight(Flyweight):
         # physical repository at a time
         # do absolute() in addition to always get an absolute path
         # even with non-existing paths on windows
-        resolved = str(ut.Path(path).resolve().absolute())
-        if ut.on_windows and resolved.startswith('\\\\'):
+        resolved = str(Path(path).resolve().absolute())
+        if on_windows and resolved.startswith('\\\\'):
             # resolve() ended up converting a mounted network drive into a UNC path.
             # such paths are not supoprted (e.g. as cmd.exe CWD), hence redo and take
             # absolute path at face value. This has the consequence we cannot determine
             # repo duplicates mounted on different drives, but this is no worse than
             # on UNIX
-            return str(ut.Path(path).absolute())
+            return str(Path(path).absolute())
         return resolved
 
     def _flyweight_id_from_args(cls, *args, **kwargs):
@@ -225,7 +228,7 @@ class PathBasedFlyweight(Flyweight):
         path_ = cls._flyweight_preproc_path(path)
 
         # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
+        if isinstance(path, PurePath):
             path = str(path)
 
         # Sanity check for argument `path`:
@@ -240,10 +243,9 @@ class PathBasedFlyweight(Flyweight):
     # End Flyweight
 
 
-
 # TODO: see issue #1100
 class RepoInterface(object):
-    """common operations for annex and plain git repositories
+    """Common operations for annex and plain git repositories
 
     Especially provides "annex operations" on plain git repos, that just do
     (or return) the "right thing"
@@ -282,7 +284,7 @@ def path_based_str_repr(cls):
         s = self._str
         if s is None:
             s = self._str = \
-                '%s(%s)' % (self.__class__.__name__, ut.quote_cmdlinearg(self.path))
+                '%s(%s)' % (self.__class__.__name__, quote_cmdlinearg(self.path))
         return s
 
     def __repr__(self):
@@ -297,4 +299,3 @@ def path_based_str_repr(cls):
     cls._repr = None
     cls.__repr__ = __repr__
     return cls
-
