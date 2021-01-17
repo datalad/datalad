@@ -90,7 +90,7 @@ from .network import (
     is_ssh
 )
 from .path import get_parent_paths
-from .repo import (
+from datalad.core.dataset.repo import (
     PathBasedFlyweight,
     RepoInterface,
     path_based_str_repr,
