@@ -68,12 +68,12 @@ environment:
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     # Windows core tests
-    - ID: WinP38core
+    - ID: WinP36core
       # ~35 min
       DTS: datalad.core
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
-      PY: 38-x64
+      PY: 36-x64
     # MacOS core tests
     - ID: MacP38core
       # ~25min
@@ -87,15 +87,15 @@ environment:
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
 
     # Additional test runs
-    - ID: WinP38a1
+    - ID: WinP36a1
       # ~30min
       DTS: >
           datalad.cmdline
           datalad.customremotes
           datalad.distribution
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 38-x64
-    - ID: WinP38a2
+      PY: 36-x64
+    - ID: WinP36a2
       # TODO: datalad.metadata (this is completely non-functional on Windows,
       #       either tests only, or actual code too)
       # ~20min
@@ -104,8 +104,8 @@ environment:
           datalad.interface
           datalad.plugin
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 38-x64
-    - ID: WinP38a3
+      PY: 36-x64
+    - ID: WinP36a3
       # ~18min
       DTS: >
           datalad.local
@@ -114,7 +114,7 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 38-x64
+      PY: 36-x64
 
     - ID: MacP38a1
       # ~45min
