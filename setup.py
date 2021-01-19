@@ -28,6 +28,7 @@ requires = {
         'appdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
+        'deprecated',
         'distro; python_version >= "3.8"',
         'iso8601',
         'humanize',

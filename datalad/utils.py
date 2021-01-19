@@ -38,6 +38,9 @@ from time import sleep
 import inspect
 from itertools import tee
 
+# Centralize the choice of @deprecated decorator
+from deprecated.sphinx import deprecated
+
 import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix

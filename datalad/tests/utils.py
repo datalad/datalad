@@ -77,6 +77,7 @@ import datalad.utils as ut
 from ..utils import *
 from datalad.utils import (
     Path,
+    deprecated,
     ensure_unicode,
 )
 
@@ -852,6 +853,7 @@ def known_failure_v6_or_later(func):
 known_failure_v6 = known_failure_v6_or_later
 
 
+@deprecated(version="0.12.0", reason="Direct mode support is deprecated")
 def known_failure_direct_mode(func):
     """DEPRECATED.  Stop using.  Does nothing
 
@@ -860,15 +862,6 @@ def known_failure_direct_mode(func):
     If datalad.repo.direct is set to True behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
     """
-    # TODO: consider adopting   nibabel/deprecated.py  nibabel/deprecator.py
-    # mechanism to consistently deprecate functionality and ensure they are
-    # displayed.
-    # Since 2.7 Deprecation warnings aren't displayed by default
-    # and thus kinda pointless to issue a warning here, so we will just log
-    msg = "Direct mode support is deprecated, so no point in using " \
-          "@known_failure_direct_mode for %r since glorious future " \
-          "DataLad 0.12" % func.__name__
-    lgr.warning(msg)
     return func
 
 

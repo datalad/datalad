@@ -32,6 +32,7 @@ from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
 from datalad.utils import (
+    deprecated,
     ensure_unicode,
     getargspec,
     Path,
@@ -518,11 +519,10 @@ class AnnexCustomRemote(object):
 
         self.heavydebug("Got %d URL(s) for key %s", nurls, key)
 
+
+    @deprecated(version="0.14.0", reason="Optimization: use a generator gen_URLS")
     def get_URLS(self, key):
         """Gets URL(s) associated with a Key.
-
-        Use a generator gen_URLS where possible.
-        This one should be deprecated in 0.15.
         """
         return list(self.gen_URLS(key))
 
