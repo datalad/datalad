@@ -95,6 +95,9 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
+- New [configuration][] command provides a '.datalad/config'-aware
+  interface for getting and setting configuration values.  ([#5274][])
+
 - The subdataset handling for adjusted branches, which is particularly
   important on Windows where git-annex enters an adjusted branch by
   default, has been improved.  A core piece of the new approach is
@@ -129,6 +132,8 @@ bet we will fix some bugs and make a world even a better place.
 - [addurls][]
   - learned how to read data from standard input.  ([#4669][])
   - now supports tab-separated input.  ([#4845][])
+  - now lets Python callers pass in a list of records rather than a
+    file name.  ([#5285][])
   - gained a `--drop-after` switch that signals to drop a file's
     content after downloading and adding it to the annex.  ([#5081][])
   - is now able to construct a tree of files from known checksums
@@ -378,7 +383,10 @@ bet we will fix some bugs and make a world even a better place.
   - compares a revision given to `--since=` with `HEAD` rather than
     the working tree to speed up the operation.  ([#4448][])
 
-- [rerun][] emits more INFO-level log messages.  ([#4764][])
+- [rerun][]
+  - emits more INFO-level log messages.  ([#4764][])
+  - provides better handling of adjusted branches and aborts with a
+    clear error for cases that are not supported.  ([#5328][])
 
 - The archives are handled with p7zip, if available, since DataLad
   v0.12.0.  This implementation now supports .tgz and .tbz2 archives.
@@ -2926,6 +2934,7 @@ publishing
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
 [config]: http://docs.datalad.org/en/latest/config.html
+[configuration]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-configuration.html
 [copy-file]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-copy-file.html
 [copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
 [create]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html
@@ -3542,5 +3551,8 @@ publishing
 [#5258]: https://github.com/datalad/datalad/issues/5258
 [#5259]: https://github.com/datalad/datalad/issues/5259
 [#5269]: https://github.com/datalad/datalad/issues/5269
+[#5274]: https://github.com/datalad/datalad/issues/5274
 [#5276]: https://github.com/datalad/datalad/issues/5276
 [#5278]: https://github.com/datalad/datalad/issues/5278
+[#5285]: https://github.com/datalad/datalad/issues/5285
+[#5328]: https://github.com/datalad/datalad/issues/5328
