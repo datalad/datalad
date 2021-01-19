@@ -39,6 +39,10 @@
 #   - to prevent the CI run from exiting, create a textfile named `BLOCK` on the
 #     Desktop (a required .txt extension will be added automatically). The session
 #     will run until the file is removed (or 60 min have passed)
+#
+#   - in a terminal execute, for example, `C:\datalad_debug.bat 38` to set up the
+#     environment to debug in a Python 3.8 session (should generally match the
+#     respective CI run configuration).
 
 
 # make repository clone cheap
@@ -214,6 +218,8 @@ init:
 
 
 install:
+  # place a debug setup helper at a convenient location
+  - cmd: tools\ci\appveyor_env_setup.bat C:\\datalad_debug.bat
   # deploy standard SSH config for localhost access on Windows
   - cmd: tools\ci\appveyor_ssh2localhost.bat
   - sh: sh tools/ci/appveyor_ssh2localhost.sh
