@@ -197,6 +197,7 @@ def test_clone_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        ok_(uuid_before)  # make sure we actually have an uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
@@ -207,6 +208,7 @@ def test_clone_simple_local(src, path):
     ok_(ds.is_installed())
     if isinstance(origin.repo, AnnexRepo):
         eq_(uuid_before, ds.repo.uuid)
+
 
 
 # AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
