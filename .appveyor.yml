@@ -39,6 +39,10 @@
 #   - to prevent the CI run from exiting, create a textfile named `BLOCK` on the
 #     Desktop (a required .txt extension will be added automatically). The session
 #     will run until the file is removed (or 60 min have passed)
+#
+#   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
+#     environment to debug in a Python 3.8 session (should generally match the
+#     respective CI run configuration).
 
 
 # make repository clone cheap
@@ -68,12 +72,12 @@ environment:
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     # Windows core tests
-    - ID: WinP38core
+    - ID: WinP39core
       # ~35 min
       DTS: datalad.core
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
-      PY: 38-x64
+      PY: 39-x64
     # MacOS core tests
     - ID: MacP38core
       # ~25min
@@ -87,15 +91,15 @@ environment:
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
 
     # Additional test runs
-    - ID: WinP38a1
+    - ID: WinP39a1
       # ~30min
       DTS: >
           datalad.cmdline
           datalad.customremotes
           datalad.distribution
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 38-x64
-    - ID: WinP38a2
+      PY: 39-x64
+    - ID: WinP39a2
       # TODO: datalad.metadata (this is completely non-functional on Windows,
       #       either tests only, or actual code too)
       # ~20min
@@ -104,8 +108,8 @@ environment:
           datalad.interface
           datalad.plugin
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 38-x64
-    - ID: WinP38a3
+      PY: 39-x64
+    - ID: WinP39a3
       # ~18min
       DTS: >
           datalad.local
@@ -114,7 +118,7 @@ environment:
           datalad.tests
           datalad.ui
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 38-x64
+      PY: 39-x64
 
     - ID: MacP38a1
       # ~45min
@@ -149,6 +153,21 @@ environment:
       INSTALL_GITANNEX: git-annex
       DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
 
+    # Test alternative Python versions
+    - ID: Ubu20P36
+      PY: 3.6
+      DTS: datalad
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+    - ID: Ubu20P37
+      PY: 3.7
+      DTS: datalad
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
 
 matrix:
   allow_failures:
@@ -214,6 +233,8 @@ init:
 
 
 install:
+  # place a debug setup helper at a convenient location
+  - cmd: copy tools\ci\appveyor_env_setup.bat C:\\datalad_debug.bat
   # deploy standard SSH config for localhost access on Windows
   - cmd: tools\ci\appveyor_ssh2localhost.bat
   - sh: sh tools/ci/appveyor_ssh2localhost.sh
