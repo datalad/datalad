@@ -1,0 +1,48 @@
+Update 0.13.7-639-g933964fe93:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    933964fe932f6f36ab2434f110cbd4c00009ae09..4e5794e0e80c2c92fd984319576ef6b5ab71aa82
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #5292 from adswa/non-interactive-log-wrap
+   82f2fcbc7e^-1
+-  Merge branch 'maint'
+   3070349f2f^-1
+-  Merge pull request #5305 from yarikoptic/bf-win-skips
+   f861b1a6dd^-1
+-  Merge pull request #5306 from kyleam/test-update-adjusted-fixes
+   696b34e7cc^-1
++  Merge pull request #5285 from kyleam/addurls-no-file
+   2f8ec83b44^-1
++  Merge pull request #5274 from mih/bf-4359
+   4ac10eb04b^-1
+-  Merge branch 'maint'
+   571939d5f5^-1
+-  Merge pull request #5316 from bpoldrack/bf-5315
+   a83b660623^-1
+-  Merge pull request #5311 from mih/doc-get
+   a64ce245f4^-1
+-  Merge pull request #5325 from kyleam/skip-if-adjusted-branch
+   0b26f63f88^-1
+-  Merge pull request #5330 from mih/tst-minimalnewappveyor
+   476089cda7^-1
+?  Merge pull request #5328 from kyleam/rerun-adjusted
+   cc850d1a88^-1
+-  Merge branch 'maint' into mnt-master
+   e4fd5d8f09^-1
+-  Merge pull request #5331 from mih/tst-lesstestrepos
+   d56daeed29^-1
+-  Merge pull request #5334 from kyleam/audit-assert-raises
+   330d07b7e6^-1
+-  Merge pull request #5333 from mih/enh-commanderror
+   3fa1e328aa^-1
+-  Merge pull request #5340 from mih/tst-moreappveyor
+   570ecac001^-1
+-  Merge pull request #5341 from bpoldrack/fix-tst-uuid
+   4e5794e0e8^-1
