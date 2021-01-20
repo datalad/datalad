@@ -63,111 +63,13 @@ environment:
     # List a CI run for each platform first, to have immediate access when there
     # is a need for debugging
 
-    # Ubuntu core tests
-    - ID: Ubu20
-      # ~35min
-      DTS: datalad
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     # Windows core tests
     - ID: WinP39core
-      # ~35 min
-      DTS: datalad.core
+      # seconds
+      DTS: datalad.tests.test_utils:test_path_
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 39-x64
-    # MacOS core tests
-    - ID: MacP38core
-      # ~25min
-      DTS: datalad.core
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      # does not give a functional installation
-      # INSTALL_GITANNEX: git-annex -m snapshot
-      #INSTALL_GITANNEX: git-annex=8.20201129
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-
-    # Additional test runs
-    - ID: WinP39a1
-      # ~30min
-      DTS: >
-          datalad.cmdline
-          datalad.customremotes
-          datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 39-x64
-    - ID: WinP39a2
-      # TODO: datalad.metadata (this is completely non-functional on Windows,
-      #       either tests only, or actual code too)
-      # ~20min
-      DTS: >
-          datalad.downloaders
-          datalad.interface
-          datalad.plugin
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 39-x64
-    - ID: WinP39a3
-      # ~18min
-      DTS: >
-          datalad.local
-          datalad.distributed
-          datalad.support
-          datalad.tests
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PY: 39-x64
-
-    - ID: MacP38a1
-      # ~45min
-      DTS: >
-          datalad.cmdline
-          datalad.customremotes
-          datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-    - ID: MacP38a2
-      # ~25min
-      DTS: >
-          datalad.downloaders
-          datalad.interface
-          datalad.plugin
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-    - ID: MacP38a3
-      # ~35min
-      DTS: >
-          datalad.local
-          datalad.distributed
-          datalad.support
-          datalad.tests
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-
-    # Test alternative Python versions
-    - ID: Ubu20P36
-      PY: 3.6
-      DTS: datalad
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
-    - ID: Ubu20P37
-      PY: 3.7
-      DTS: datalad
-      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
-      INSTALL_SYSPKGS: python3-virtualenv
-      # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
 
 matrix:
   allow_failures:
