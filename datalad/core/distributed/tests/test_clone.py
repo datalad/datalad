@@ -24,6 +24,7 @@ from datalad.api import (
 )
 from datalad.utils import (
     chpwd,
+    get_home_envvars,
     Path,
     on_windows,
     rmtree
@@ -525,7 +526,7 @@ def test_expanduser(srcpath, destpath):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
 
-    with chpwd(destpath), patch.dict('os.environ', {'HOME': srcpath}):
+    with chpwd(destpath), patch.dict('os.environ', get_home_envvars(srcpath)):
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
         assert_result_count(res, 1)
