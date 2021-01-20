@@ -183,6 +183,27 @@ def not_supported_on_windows(msg=None):
                                   + (": %s" % msg if msg else ""))
 
 
+def get_home_envvars(new_home):
+    """Return dict with env variables to be adjusted for a new HOME
+
+    Only variables found in current os.environ are adjusted.
+
+    Parameters
+    ----------
+    new_home: str
+      New home path, in native to OS "schema"
+    """
+    environ = os.environ
+    out = {'HOME': new_home}
+    if on_windows:
+        # requires special handling, since it has a number of relevant variables
+        # and also Python changed its behavior and started to respect USERPROFILE only
+        # since python 3.8: https://bugs.python.org/issue36264
+        out['USERPROFILE'] = new_home
+        out['HOMEDRIVE'], out['HOMEPATH'] = op.splitdrive(new_home)
+    return {v: val for v, val in out.items() if v in os.environ}
+
+
 def shortened_repr(value, l=30):
     try:
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
