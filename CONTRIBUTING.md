@@ -235,7 +235,7 @@ Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.in
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
 Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
-be used to establish a clean docker environment (based on any NtesteuroDebian-supported
+be used to establish a clean docker environment (based on any NeuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
 #### Test attributes
