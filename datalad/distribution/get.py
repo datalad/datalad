@@ -115,7 +115,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       desired submodule commit, with the submodule path appended to it.
       There can be more than one candidate (cost 500).
 
-    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+    - A datalad URL recorded in `.gitmodules` (cost 590). This allows for
+      datalad URLs that require additional handling/resolution by datalad, like
+      ria-schemes (ria+http, ria+ssh, etc.)
+
+    - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
 
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
@@ -168,9 +172,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       Names are not unique and either derived from the name of the respective
       remote, template configuration variable, or 'local'.
     """
+
     # short cuts
     ds_repo = ds.repo
     sm_url = sm.get('gitmodule_url', None)
+    sm_datalad_url = sm.get('gitmodule_datalad-url', None)
     sm_path = op.relpath(sm['path'], start=sm['parentds'])
 
     clone_urls = []
@@ -230,6 +236,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         remote_url,
                         alternate_suffix=False)
                 )
+
     cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
     for name, tmpl in [(c[len(candcfg_prefix):],
@@ -260,6 +267,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 alternate_suffix=False)
             # avoid inclusion of submodule location itself
             if url != sm['path']
+        )
+
+    # Consider original datalad URL in .gitmodules before any URL that is meant
+    # to be consumed by git:
+    if sm_datalad_url:
+        clone_urls.append(
+            dict(cost=590, name='dl-url', url=sm_datalad_url)
         )
 
     # sort all candidates by their label, thereby allowing a

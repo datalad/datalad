@@ -134,6 +134,12 @@ class Subdatasets(Interface):
         is recursively installing its superdataset. However, the subdataset
         remains installable when explicitly requested, and no other features
         are impaired.
+
+    "datalad-url"
+        If a subdataset was originally established by cloning, 'datalad-url'
+        records the URL that was used to do so. This might be different from
+        'url' if the URL contains datalad specific pieces like any URL of the
+        form "ria+<some protocol>...".
     """
     _params_ = dict(
         dataset=Parameter(

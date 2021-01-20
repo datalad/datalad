@@ -111,6 +111,12 @@ class Clone(Interface):
     URL for common cases (such as appending '.git' to the URL in case the
     accessing the base URL failed).
 
+    In case the clone is registered as a subdataset, the original URL passed to
+    `clone` is recorded in `.gitmodules` of the parent dataset in addition
+    to the resolved URL used internally for git-clone. This allows to preserve
+    datalad specific URLs like ria+ssh://... for subsequent calls to `get` if
+    the subdataset was locally removed later on.
+
     || PYTHON >>By default, the command returns a single Dataset instance for
     an installed dataset, regardless of whether it was newly installed ('ok'
     result), or found already installed from the specified source ('notneeded'
@@ -294,8 +300,8 @@ class Clone(Interface):
             cfg=None if ds is None else ds.config,
         )
 
-        # TODO handle any 'version' property handling and verification using a dedicated
-        # public helper
+        # TODO handle any 'version' property handling and verification using a
+        # dedicated public helper
 
         if ds is not None:
             # we created a dataset in another dataset
@@ -307,6 +313,11 @@ class Clone(Interface):
                     result_xfm=None,
                     on_failure='ignore'):
                 yield r
+
+            # Modify .gitmodules to contain originally given url. This is
+            # particularly relevant for postclone routines on a later `get` for
+            # that subdataset. See gh-5256.
+            ds.subdatasets(path, set_property=[("datalad-url", source)])
 
 
 def clone_dataset(
