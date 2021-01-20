@@ -137,7 +137,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # reasons
     _ALLOW_LOCAL_URLS = False
 
-    def __init__(self, path, url=None, runner=None,
+    def __init__(self, path, runner=None,
                  backend=None, always_commit=True,
                  create=True, create_sanity_checks=True,
                  init=False, batch_size=None, version=None, description=None,
@@ -154,10 +154,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         path: str
           Path to git-annex repository. In case it's not an absolute path, it's
           relative to PWD
-        url: str, optional
-          url to the to-be-cloned repository. Requires valid git url
-          according to
-          http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
         runner: Runner, optional
           Provide a Runner in case AnnexRepo shall not create it's own.
           This is especially needed in case of desired dry runs.
@@ -193,7 +189,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # scope.
         do_init = False
         super(AnnexRepo, self).__init__(
-            path, url, runner=runner,
+            path, runner=runner,
             create=create, create_sanity_checks=create_sanity_checks,
             repo=repo, git_opts=git_opts, fake_dates=fake_dates)
 

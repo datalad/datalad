@@ -77,7 +77,6 @@ from datalad.utils import (
 from .external_versions import external_versions
 from .exceptions import (
     CommandError,
-    DeprecatedError,
     FileNotInRepositoryError,
     GitIgnoreError,
     InvalidGitReferenceError,
@@ -828,7 +827,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                # override path since there is no need ATM for such details
                path="datalad",
                description="DataLad - Data management and distribution platform")
-    def __init__(self, path, url=None, runner=None, create=True,
+    def __init__(self, path, runner=None, create=True,
                  git_opts=None, repo=None, fake_dates=False,
                  create_sanity_checks=True,
                  **kwargs):
@@ -841,11 +840,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         path: str
           path to the git repository; In case it's not an absolute path,
           it's relative to PWD
-        url: str, optional
-          DEPRECATED -- use .clone() class method
-          url to the to-be-cloned repository. Requires a valid git url
-          according to:
-          http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
         create: bool, optional
           if true, creates a git repository at `path` if there is none. Also
           creates `path`, if it doesn't exist.
@@ -919,13 +913,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             if not _valid_repo:
                 raise InvalidGitRepositoryError(path)
         # END Repo validity test
-
-        if url is not None:
-            raise DeprecatedError(
-                new=".clone() class method",
-                version="0.5.0",
-                msg="RF: url passed to init()"
-            )
 
         # So that we "share" control paths with git/git-annex
         if ssh_manager:

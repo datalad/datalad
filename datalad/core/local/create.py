@@ -380,7 +380,6 @@ class Create(Interface):
             lgr.info("Creating a new git repo at %s", tbds.path)
             tbrepo = GitRepo(
                 tbds.path,
-                url=None,
                 create=True,
                 create_sanity_checks=False,
                 git_opts=initopts,
@@ -396,7 +395,6 @@ class Create(Interface):
             lgr.info("Creating a new annex repo at %s", tbds.path)
             tbrepo = AnnexRepo(
                 tbds.path,
-                url=None,
                 create=True,
                 create_sanity_checks=False,
                 # do not set backend here, to avoid a dedicated commit
