@@ -703,7 +703,9 @@ def test_partition():
 
 def test_path_():
     eq_(_path_('a'), 'a')
+    print("And here we go")
     if on_windows:
+        print("I must be covered")
         eq_(_path_('a/b'), r'a\b')
     else:
         p = 'a/b/c'
