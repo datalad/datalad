@@ -31,6 +31,7 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import (
+    get_home_envvars,
     swallow_logs,
     Path
 )
@@ -177,8 +178,9 @@ def test_something(path, new_home):
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
     # lame datalad unittest sections in his precious ~/.gitconfig
+    env = get_home_envvars(new_home)
     with patch.dict('os.environ',
-                    {'HOME': new_home, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
+                    dict(get_home_envvars(new_home), DATALAD_SNEAKY_ADDITION='ignore')):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
         globalcfg = ConfigManager()
