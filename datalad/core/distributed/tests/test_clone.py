@@ -283,6 +283,10 @@ def test_clone_into_dataset(source_path, top_path):
     assert_repo_status(subds.path, annex=None)
     # top is clean:
     assert_repo_status(ds.path, annex=None)
+    # source is recorded in .gitmodules:
+    sds = ds.subdatasets("sub")
+    assert_result_count(sds, 1, action='subdataset')
+    eq_(sds[0]['gitmodule_datalad-url'], source.path)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -825,7 +829,8 @@ def test_ria_http(lcl, storepath, url):
 
 
 @with_tempfile
-def _test_ria_postclonecfg(url, dsid, clone_path):
+@with_tempfile
+def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     # Test cloning from RIA store while ORA special remote autoenabling failed
     # due to an invalid URL from the POV of the cloner.
     # Origin's git-config-file should contain the UUID to enable. This needs to
@@ -877,6 +882,44 @@ def _test_ria_postclonecfg(url, dsid, clone_path):
     assert_result_count(res, 1, status='ok', type='dataset', action='install')
     assert_result_count(res, 1, status='notneeded', type='file')
     assert_result_count(res, 2)
+
+    # Now, test that if cloning into a dataset, ria-URL is preserved and
+    # post-clone configuration is triggered again, when we remove the subds and
+    # retrieve it again via `get`:
+    ds = Dataset(superds).create()
+    ria_url = 'ria+{}#{}'.format(url, dsid)
+    ds.clone(ria_url, 'sub')
+    sds = ds.subdatasets('sub')
+    eq_(len(sds), 1)
+    eq_(sds[0]['gitmodule_datalad-url'], ria_url)
+    assert_repo_status(ds.path)
+    ds.uninstall('sub', check=False)
+    assert_repo_status(ds.path)
+
+    # .gitmodules still there:
+    sds = ds.subdatasets('sub')
+    eq_(len(sds), 1)
+    eq_(sds[0]['gitmodule_datalad-url'], ria_url)
+    # get it again:
+
+    # Autoenabling should fail initially by git-annex-init and we would report
+    # on INFO level. Only postclone routine would deal with it.
+    with swallow_logs(new_level=logging.INFO) as cml:
+        ds.get('sub', get_data=False)
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
+
+    subds = Dataset(ds.pathobj / 'sub')
+    # special remote is fine:
+    res = subds.get('test.txt')
+    assert_result_count(res, 1,
+                        status='ok',
+                        path=str(subds.pathobj / 'test.txt'),
+                        message="from {}...".format("origin"
+                                                    if url.startswith('http')
+                                                    else "store-storage"))
 
 
 @with_tempfile
