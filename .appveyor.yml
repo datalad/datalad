@@ -62,6 +62,13 @@ environment:
 
     # List a CI run for each platform first, to have immediate access when there
     # is a need for debugging
+    - ID: Ubu20
+      # ~35min
+      DTS: datalad.tests.test_utils:test_path_
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
 
     # Windows core tests
     - ID: WinP39core
@@ -184,14 +191,17 @@ test_script:
   - cmd: md __testhome__
   - sh: mkdir __testhome__
   - cd __testhome__
+  - cmd: dir
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
   - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - cmd: dir
   - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
 
 
 after_test:
   # prepare coverage.xml in a separate invocation.
   # if invoked directly with nose - do not include test_ files themselves
+  - cmd: dir
   - python -m coverage xml
   - cmd: powershell Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
   - cmd: "set PATH=C:\\msys64\\usr\\bin;%PATH%"
