@@ -47,7 +47,12 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-from datalad.utils import get_encoding_info, get_envvars_info, getpwd
+from datalad.utils import (
+    get_encoding_info,
+    get_envvars_info,
+    get_home_envvars,
+    getpwd,
+)
 
 # To analyze/initiate our decision making on what current directory to return
 getpwd()
@@ -89,14 +94,12 @@ test.__test__ = False
 _test_states = {
     'loglevel': None,
     'DATALAD_LOG_LEVEL': None,
-    'HOME': None,
 }
 
 
 def setup_package():
     import os
     from datalad import consts
-    _test_states['HOME'] = os.environ.get('HOME', None)
     _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
     os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
@@ -117,7 +120,11 @@ def setup_package():
         from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
-            os.environ['HOME'] = new_home
+            pass
+        _test_states['HOME_VARS'] = {}
+        for v, val in get_home_envvars(new_home).items():
+            _test_states['HOME_VARS'][v] = os.environ.get(v)
+            os.environ[v] = val
         if not os.path.exists(new_home):
             os.makedirs(new_home)
         with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
@@ -227,8 +234,12 @@ def teardown_package():
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
 
-    if _test_states['HOME'] is not None:
-        os.environ['HOME'] = _test_states['HOME']
+    # restore all the home variables
+    for v, val in _test_states['HOME_VARS'].items():
+        if val is not None:
+            os.environ[v] = val
+        else:
+            os.environ.pop(v)
 
     git_config_params = _test_states["GIT_CONFIG_PARAMETERS"]
     if git_config_params is None:
