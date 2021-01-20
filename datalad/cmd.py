@@ -354,19 +354,27 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        # start a new event loop, which we will close again further down
-        # if this is not done events like this will occur
-        #   BlockingIOError: [Errno 11] Resource temporarily unavailable
-        #   Exception ignored when trying to write to the signal wakeup fd:
-        # It is unclear to me why it happens when reusing an event looped
-        # that it stopped from time to time, but starting fresh and doing
-        # a full termination seems to address the issue
-        if sys.platform == "win32":
-            # use special event loop that supports subprocesses on windows
-            event_loop = asyncio.ProactorEventLoop()
-        else:
-            event_loop = asyncio.SelectorEventLoop()
-        asyncio.set_event_loop(event_loop)
+        # rescue any event-loop to be able to reassign after we are done
+        # with our own event loop management
+        # this is how ipython does it
+        try:
+            event_loop = asyncio.get_event_loop()
+            new_loop = False
+        except RuntimeError:
+            new_loop = True
+            # start a new event loop, which we will close again further down
+            # if this is not done events like this will occur
+            #   BlockingIOError: [Errno 11] Resource temporarily unavailable
+            #   Exception ignored when trying to write to the signal wakeup fd:
+            # It is unclear to me why it happens when reusing an event looped
+            # that it stopped from time to time, but starting fresh and doing
+            # a full termination seems to address the issue
+            if sys.platform == "win32":
+                # use special event loop that supports subprocesses on windows
+                event_loop = asyncio.ProactorEventLoop()
+            else:
+                event_loop = asyncio.SelectorEventLoop()
+            asyncio.set_event_loop(event_loop)
         try:
             # include the subprocess manager in the asyncio event loop
             results = event_loop.run_until_complete(
@@ -381,11 +389,12 @@ class WitlessRunner(object):
                 )
             )
         finally:
-            # be kind to callers and leave asyncio as we found it
-            asyncio.set_event_loop(None)
-            # terminate the event loop, cannot be undone, hence we start a fresh
-            # one each time (see BlockingIOError notes above)
-            event_loop.close()
+            if new_loop:
+                # be kind to callers and leave asyncio as we found it
+                asyncio.set_event_loop(None)
+                # terminate the event loop, cannot be undone, hence we start a fresh
+                # one each time (see BlockingIOError notes above)
+                event_loop.close()
 
         # log before any exception is raised
         lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
