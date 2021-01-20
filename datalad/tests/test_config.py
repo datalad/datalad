@@ -509,7 +509,7 @@ def test_global_config():
 
     # from within tests, global config should be read from faked $HOME (see
     # setup_package)
-    glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
+    glb_cfg_file = Path(os.path.expanduser('~')) / '.gitconfig'
     assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._cfgfiles)
     assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
