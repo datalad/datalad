@@ -28,7 +28,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
      Archives should also be under annex control.
     """
 
-    SUPPORTED_SCHEMES = ('http', 'https', 's3')
+    SUPPORTED_SCHEMES = ('http', 'https', 's3', 'shub')
 
     AVAILABILITY = "global"
 
@@ -38,7 +38,6 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
-        self._last_url = None  # for heuristic to choose among multiple URLs
         self._providers = Providers.from_config_files()
 
     #
@@ -93,7 +92,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
         lgr.debug("VERIFYING key %s" % key)
         resp = None
-        for url in self.get_URLS(key):
+        for url in self.gen_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
                 status = self._providers.get_status(url)
@@ -143,16 +142,12 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
         # TODO: We might want that one to be a generator so we do not bother requesting
         # all possible urls at once from annex.
-        urls = self.get_URLS(key)
-
-        if self._last_url in urls:
-            # place it first among candidates... some kind of a heuristic
-            urls.pop(self._last_url)
-            urls = [self._last_url] + urls
+        urls = []
 
         # TODO: priorities etc depending on previous experience or settings
 
-        for url in urls:
+        for url in self.gen_URLS(key):
+            urls.append(url)
             try:
                 downloaded_path = self._providers.download(
                     url, path=path, overwrite=True

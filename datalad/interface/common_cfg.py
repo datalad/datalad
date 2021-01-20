@@ -93,6 +93,12 @@ definitions = {
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'procedures'),
     },
+    'datalad.locations.extra-procedures': {
+        'ui': ('question', {
+            'title': 'Extra procedure directory',
+            'text': 'Where should datalad search for some additional procedures?'}),
+        'destination': 'global',
+    },
     'datalad.locations.dataset-procedures': {
         'ui': ('question', {
                'title': 'Dataset procedure directory',
@@ -137,12 +143,6 @@ definitions = {
     'datalad.tests.noteardown': {
         'ui': ('yesno', {
                'title': 'Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set'}),
-        'type': EnsureBool(),
-    },
-    'datalad.tests.protocolremote': {
-        'ui': ('yesno', {
-            'title': 'Binary flag to specify whether to test protocol '
-                     'interactions of custom remote with annex'}),
         'type': EnsureBool(),
     },
     'datalad.tests.dataladremote': {
@@ -262,14 +262,6 @@ definitions = {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
     },
-    'datalad.cmd.protocol': {
-        'ui': ('question', {
-               'title': 'Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. "externals-time" for ExecutionTimeExternalsProtocol, "time" for ExecutionTimeProtocol and "null" for NullProtocol. Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface'}),
-    },
-    'datalad.cmd.protocol.prefix': {
-        'ui': ('question', {
-               'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
-    },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
                'title': "If set, pass this file as ssh's -i option."}),
@@ -360,6 +352,15 @@ definitions = {
         'type': EnsureInt(),
         'default': 1,
     },
+    'datalad.runtime.max-jobs': {
+        'ui': ('question', {
+            'title': 'Maximum number of jobs DataLad can run in "parallel"',
+            'text': 'Set this value to enable parallel multi-threaded DataLad jobs that may speed up certain '
+                    'operations, in particular operation across multiple datasets (e.g., install multiple '
+                    'subdatasets, etc).'}),
+        'type': EnsureInt(),
+        'default': 1,
+    },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
                'title': 'Error behavior',
@@ -373,6 +374,15 @@ definitions = {
                'text': "If set (to other than 'all'), constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
         'type': EnsureChoice('all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
         'default': None,
+    },
+    'datalad.runtime.stalled-external': {
+        'ui': ('question', {
+            'title': 'Behavior for handing external processes',
+            'text': 'What to do with external processes if they do not finish in some minimal reasonable time. '
+                    'If "abandon", datalad would proceed without waiting for external process to exit. '
+                    'ATM applies only to batched git-annex processes. Should be changed with caution.'}),
+        'type': EnsureChoice('wait', 'abandon'),
+        'default': 'wait',
     },
     'datalad.search.indexercachesize': {
         'ui': ('question', {
@@ -394,6 +404,17 @@ definitions = {
             'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
+    },
+    'datalad.save.no-message': {
+        'ui': ('question', {
+            'title': 'Commit message handling',
+            'text': 'When no commit message was provided: '
+                    'attempt to obtain one interactively (interactive); '
+                    'or use a generic commit message (generic). '
+                    'NOTE: The interactive option is experimental. The '
+                    'behavior may change in backwards-incompatible ways.'}),
+        'default': 'generic',
+        'type': EnsureChoice('interactive', 'generic'),
     },
     'datalad.install.inherit-local-origin': {
         'ui': ('question', {

@@ -20,8 +20,10 @@ from datalad.tests.utils import (
     assert_raises,
     assert_repo_status,
     assert_result_count,
+    assert_status,
     chpwd,
     eq_,
+    known_failure_githubci_win,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -30,6 +32,7 @@ from datalad.tests.utils import (
 )
 from datalad.utils import Path
 from functools import wraps
+from datalad.support.network import get_local_file_url
 
 
 def with_store_insteadof(func):
@@ -37,7 +40,7 @@ def with_store_insteadof(func):
 
     @wraps(func)
     @attr('with_config')
-    def  _wrap_with_store_insteadof(*args, **kwargs):
+    def _wrap_with_store_insteadof(*args, **kwargs):
         host = args[0]
         base_path = args[1]
         try:
@@ -53,7 +56,7 @@ def with_store_insteadof(func):
                                    host=host if host else '',
                                    path=base_path),
                          where='global', reload=True)
-    return  _wrap_with_store_insteadof
+    return _wrap_with_store_insteadof
 
 
 @with_tempfile
@@ -68,6 +71,14 @@ def test_invalid_calls(path):
     assert_raises(ValueError, ds.create_sibling_ria, 'ria+file:///some/where',
                   name='some', storage_name='some')
 
+    # missing ria+ URL prefix
+    assert_result_count(
+        ds.create_sibling_ria(
+            'file:///some/where', name='some', on_failure='ignore'),
+        1,
+        status='error',
+    )
+
 
 @skip_if_on_windows  # running into short path issues; same as gh-4131
 @with_tempfile
@@ -81,7 +92,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     ds = Dataset(ds_path).create(force=True)
 
     subds = ds.create('sub', force=True)
-    subds2 = ds.create('sub2', force=True, no_annex=True)
+    subds2 = ds.create('sub2', force=True, annex=False)
     ds.save(recursive=True)
     assert_repo_status(ds.path)
 
@@ -110,7 +121,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     assert_in("uuid = {}".format(super_uuid), content)
 
     # implicit test of success by ria-installing from store:
-    ds.publish(to="datastore", transfer_data='all')
+    ds.push(to="datastore")
     with chpwd(clone_path):
         if host:
             # note, we are not using the "test-store"-label here
@@ -173,5 +184,59 @@ def test_create_simple():
     # TODO: Skipped due to gh-4436
     yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
 
+
+@skip_if_on_windows  # ORA remote is incompatible with windows clients
+@with_tempfile
+@with_tree({'ds': {'file1.txt': 'some'}})
+def test_storage_only(base_path, ds_path):
+    store_url = 'ria+' + get_local_file_url(base_path)
+
+    ds = Dataset(ds_path).create(force=True)
+    ds.save(recursive=True)
+    assert_repo_status(ds.path)
+
+    res = ds.create_sibling_ria(store_url, "datastore", storage_sibling='only')
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    eq_(len(res), 1)
+
+    # the storage sibling uses the main name, not -storage
+    siblings = ds.siblings(result_renderer=None)
+    eq_({'datastore', 'here'},
+        {s['name'] for s in siblings})
+
+    # smoke test that we can push to it
+    res = ds.push(to='datastore')
+    assert_status('ok', res)
+    assert_result_count(res, 1, action='copy')
+
+
+@known_failure_githubci_win  # reported in https://github.com/datalad/datalad/issues/5210
+@with_tempfile
+@with_tempfile
+@with_tree({'ds': {'file1.txt': 'some'}})
+def test_no_storage(store1, store2, ds_path):
+    store1_url = 'ria+' + get_local_file_url(store1)
+    store2_url = 'ria+' + get_local_file_url(store2)
+
+    ds = Dataset(ds_path).create(force=True)
+    ds.save(recursive=True)
+    assert_repo_status(ds.path)
+
+    res = ds.create_sibling_ria(store1_url, "datastore1", storage_sibling=False)
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    eq_({'datastore1', 'here'},
+        {s['name'] for s in ds.siblings(result_renderer=None)})
+
+    # deprecated way of disabling storage still works
+    res = ds.create_sibling_ria(store2_url, "datastore2", disable_storage__=True)
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    eq_({'datastore2', 'datastore1', 'here'},
+        {s['name'] for s in ds.siblings(result_renderer=None)})
+
+    # smoke test that we can push to it
+    res = ds.push(to='datastore1')
+    assert_status('ok', res)
+    # but nothing was copied, because there is no storage sibling
+    assert_result_count(res, 0, action='copy')
 
 # TODO: explicit naming of special remote

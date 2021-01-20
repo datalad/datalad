@@ -14,11 +14,14 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from functools import partial
+
 from datalad.interface.base import (
     Interface,
     build_doc,
 )
 from datalad.interface.common_opts import (
+    jobs_opt,
     recursion_limit,
     recursion_flag,
     save_message_opt,
@@ -34,8 +37,12 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.exceptions import CommandError
+from datalad.support.parallel import (
+    no_subds_in_futures,
+    ProducerConsumerProgressLog,
+)
 from datalad.utils import (
-    assure_list,
+    ensure_list,
 )
 import datalad.utils as ut
 
@@ -139,6 +146,7 @@ class Save(Interface):
             file types, or file sizes with either Git or git-annex.
             (see https://git-annex.branchable.com/tips/largefiles).
             """),
+        jobs=jobs_opt,
     )
 
     @staticmethod
@@ -150,12 +158,13 @@ class Save(Interface):
                  updated=False,
                  message_file=None,
                  to_git=None,
+                 jobs=None,
                  ):
         if message and message_file:
             raise ValueError(
                 "Both a message and message file were specified for save()")
 
-        path = assure_list(path)
+        path = ensure_list(path)
 
         if message_file:
             with open(message_file) as mfh:
@@ -246,12 +255,8 @@ class Save(Interface):
                 for subds in subdss:
                     subds_path = ut.Path(subds)
                     sub_status = superds_status.get(subds_path, {})
-                    if not (sub_status.get("state") == "untracked" and
-                            sub_status.get("type") == "directory"):
-                        # ^ If the subdataset is already untracked directory,
-                        # let it go through the normal "add submodules"
-                        # handling of repo.save_().
-
+                    if not (sub_status.get("state") == "clean" and
+                            sub_status.get("type") == "dataset"):
                         # TODO actually start from an entry that may already
                         # exist in the status record
                         superds_status[subds_path] = dict(
@@ -262,10 +267,9 @@ class Save(Interface):
                             type='dataset')
                 paths_by_ds[superds] = superds_status
 
-        # TODO parallelize, whenever we have multiple subdataset of a single
-        # dataset they can all be processed simultaneously
-        # sort list of dataset to handle, starting with the ones deep down
-        for pdspath in sorted(paths_by_ds, reverse=True):
+        def save_ds(args, version_tag=None):
+            pdspath, paths = args
+
             pds = Dataset(pdspath)
             pds_repo = pds.repo
             # pop status for this dataset, we are not coming back to it
@@ -275,7 +279,7 @@ class Save(Interface):
                 # cumbersome symlink handling without context in the
                 # lower levels
                 pds_repo.pathobj / p.relative_to(pdspath): props
-                for p, props in paths_by_ds.pop(pdspath).items()}
+                for p, props in paths.items()}
             start_commit = pds_repo.get_hexsha()
             if not all(p['state'] == 'clean' for p in pds_status.values()):
                 for res in pds_repo.save_(
@@ -315,7 +319,7 @@ class Save(Interface):
             )
             if not version_tag:
                 yield dsres
-                continue
+                return
             try:
                 # method requires str
                 version_tag = str(version_tag)
@@ -327,9 +331,33 @@ class Save(Interface):
             except CommandError as e:
                 if dsres['status'] == 'ok':
                     # first we yield the result for the actual save
+                    # TODO: we will get duplicate dataset/save record obscuring
+                    # progress reporting.  yoh thought to decouple "tag" from "save"
+                    # messages but was worrying that original authors would disagree
                     yield dsres.copy()
                 # and now complain that tagging didn't work
                 dsres.update(
                     status='error',
                     message=('cannot tag this version: %s', e.stderr.strip()))
                 yield dsres
+
+        # TODO: in principle logging could be improved to go not by a dataset
+        # but by path(s) within subdatasets. That should provide a bit better ETA
+        # and more "dynamic" feedback than jumpy datasets count.
+        # See addurls where it is implemented that way by providing agg and another
+        # log_filter
+        yield from ProducerConsumerProgressLog(
+            sorted(paths_by_ds.items(), key=lambda v: v[0], reverse=True),
+            partial(save_ds, version_tag=version_tag),
+            safe_to_consume=no_subds_in_futures,
+            producer_future_key=lambda ds_items: ds_items[0],
+            jobs=jobs,
+            log_filter=_log_filter_save_dataset,
+            unit="datasets",
+            lgr=lgr,
+        )
+
+
+def _log_filter_save_dataset(res):
+    return res.get('type') == 'dataset' and res.get('action') == 'save'
+

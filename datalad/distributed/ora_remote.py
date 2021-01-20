@@ -84,6 +84,10 @@ class RIARemoteError(RemoteError):
 
 class IOBase(object):
     """Abstract class with the desired API for local/remote operations"""
+
+    def get_7z(self):
+        raise NotImplementedError
+
     def mkdir(self, path):
         raise NotImplementedError
 
@@ -207,16 +211,19 @@ class LocalIO(IOBase):
             # no archive, not file
             return False
         loc = str(file_path)
-        from datalad.cmd import Runner
-        runner = Runner()
+        from datalad.cmd import (
+            StdOutErrCapture,
+            WitlessRunner,
+        )
+        runner = WitlessRunner()
         # query 7z for the specific object location, keeps the output
         # lean, even for big archives
-        out, err = runner(
+        out = runner.run(
             ['7z', 'l', str(archive_path),
              loc],
-            log_stdout=True,
+            protocol=StdOutErrCapture,
         )
-        return loc in out
+        return loc in out['stdout']
 
     def read_file(self, file_path):
 
@@ -229,6 +236,32 @@ class LocalIO(IOBase):
             content += '\n'
         with open(str(file_path), mode) as f:
             f.write(content)
+
+    def get_7z(self):
+        from datalad.cmd import CommandError, StdOutErrCapture, WitlessRunner
+        # from datalad.utils import on_windows
+
+        runner = WitlessRunner()
+        # TODO: To not rely on availability in PATH we might want to use `which`
+        #       (`where` on windows) and get the actual path to 7z to re-use in
+        #       in_archive() and get().
+        #       Note: `command -v XXX` or `type` might be cross-platform
+        #       solution!
+        #       However, for availability probing only, it would be sufficient
+        #       to just call 7z and see whether it returns zero.
+
+        # cmd = 'where' if on_windows else 'which'
+        # try:
+        #     out = runner.run([cmd, '7z'], protocol=StdOutErrCapture)
+        #     return out['stdout']
+        # except CommandError:
+        #     return None
+
+        try:
+            runner.run('7z', protocol=StdOutErrCapture)
+            return True
+        except (FileNotFoundError, CommandError):
+            return False
 
 
 class SSHRemoteIO(IOBase):
@@ -517,6 +550,28 @@ class SSHRemoteIO(IOBase):
             self._run(cmd, check=True)
         except RemoteCommandFailedError:
             raise RIARemoteError("Could not write to {}".format(str(file_path)))
+
+
+    def get_7z(self):
+        # TODO: To not rely on availability in PATH we might want to use `which`
+        #       (`where` on windows) and get the actual path to 7z to re-use in
+        #       in_archive() and get().
+        #       Note: `command -v XXX` or `type` might be cross-platform
+        #       solution!
+        #       However, for availability probing only, it would be sufficient
+        #       to just call 7z and see whether it returns zero.
+
+        try:
+            self._run("7z", check=True, no_output=False)
+            return True
+        except RemoteCommandFailedError:
+            return False
+
+        # try:
+        #     out = self._run("which 7z", check=True, no_output=False)
+        #     return out
+        # except RemoteCommandFailedError:
+        #     return None
 
 
 class HTTPRemoteIO(object):
@@ -994,12 +1049,14 @@ class RIARemote(SpecialRemote):
         if not isinstance(self.io, HTTPRemoteIO):
             self.get_store()
 
-        # report active special remote configuration
+        # report active special remote configuration/status
         self.info = {
             'store_base_path': str(self.store_base_path),
             'storage_host': 'local'
             if self._local_io() else self.storage_host,
         }
+        if not isinstance(self.io, HTTPRemoteIO):
+            self.info['7z'] = ("not " if not self.io.get_7z() else "") + "available"
 
     @handle_errors
     def transfer_store(self, key, filename):

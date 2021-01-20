@@ -64,6 +64,7 @@ def test__make_github_repos():
     ]
     existing = '???'
     access_protocol = '???'
+    private = False
     dryrun = False
     args = (
             github_login,
@@ -71,6 +72,7 @@ def test__make_github_repos():
             rinfo,
             existing,
             access_protocol,
+            private,
             dryrun,
     )
 

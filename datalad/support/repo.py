@@ -11,6 +11,7 @@
 """
 
 import logging
+import weakref
 
 from .exceptions import InvalidInstanceRequestError
 from . import path as op
@@ -115,6 +116,8 @@ class Flyweight(type):
     #       False.
     #     """
     #     return False
+
+    # TODO: document the suggestion to implement a finalizer!
 
     def _flyweight_reject(cls, id, *args, **kwargs):
         """decides whether to reject a request for an instance

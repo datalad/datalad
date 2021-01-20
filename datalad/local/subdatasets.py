@@ -37,8 +37,10 @@ from datalad.distribution.dataset import (
 from datalad.support.gitrepo import GitRepo
 from datalad.dochelpers import exc_str
 from datalad.utils import (
-    assure_list,
+    ensure_list,
+    getpwd,
     partition,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -53,8 +55,9 @@ lgr = logging.getLogger('datalad.local.subdatasets')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 
-def _parse_git_submodules(ds_pathobj, repo, paths):
+def _parse_git_submodules(ds, paths, cache):
     """All known ones with some properties"""
+    ds_pathobj = ds.pathobj
     if not (ds_pathobj / ".gitmodules").exists():
         # easy way out. if there is no .gitmodules file
         # we cannot have (functional) subdatasets
@@ -73,21 +76,15 @@ def _parse_git_submodules(ds_pathobj, repo, paths):
             else:
                 # we had path contraints, but none matched this dataset
                 return
-    for props in repo.get_submodules_(paths=paths):
-        path = props["path"]
-        if props.get('type', None) != 'dataset':
-            continue
-        if ds_pathobj != repo.pathobj:
-            props['path'] = ds_pathobj / path.relative_to(repo.pathobj)
-        else:
-            props['path'] = path
-        if not path.exists() or not GitRepo.is_valid_repo(str(path)):
-            props['state'] = 'absent'
-        # TODO kill this after some time. We used to do custom things here
-        # and gitshasum was called revision. Be nice and duplicate for a bit
-        # wipe out when patience is gone
-        props['revision'] = props['gitshasum']
-        yield props
+    # can we use the reported as such, or do we need to recode wrt to the
+    # query context dataset?
+    cache['repo'] = repo = ds.repo
+    if ds_pathobj == repo.pathobj:
+        yield from repo.get_submodules_(paths=paths)
+    else:
+        for props in repo.get_submodules_(paths=paths):
+            props['path'] = ds_pathobj / props['path'].relative_to(repo.pathobj)
+            yield props
 
 
 @build_doc
@@ -218,14 +215,16 @@ class Subdatasets(Interface):
             bottomup=False,
             set_property=None,
             delete_property=None):
-        # no constraints given -> query subdatasets under curdir
-        if not path and dataset is None:
-            path = os.curdir
-        paths = [resolve_path(p, dataset) for p in assure_list(path)] \
-            if path else None
-
         ds = require_dataset(
             dataset, check_installed=True, purpose='subdataset reporting/modification')
+
+        paths = resolve_path(ensure_list(path), dataset, ds) if path else None
+
+        # no constraints given -> query subdatasets under curdir
+        if not paths and dataset is None:
+            cwd = Path(getpwd())
+            paths = None if cwd == ds.pathobj else [cwd]
+
         lgr.debug('Query subdatasets of %s', dataset)
         if paths is not None:
             lgr.debug('Query subdatasets underneath paths: %s', paths)
@@ -242,11 +241,16 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must "
                         "start with a letter)" % k)
         if contains:
-            contains = [resolve_path(c, dataset) for c in assure_list(contains)]
+            contains = resolve_path(ensure_list(contains), dataset, ds)
+            # expand all test cases for the contains test in the loop below
+            # leads to ~20% speedup per loop iteration of a non-match
+            expanded_contains = [[c] + list(c.parents) for c in contains]
+        else:
+            expanded_contains = []
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
-                contains, bottomup, set_property, delete_property,
+                expanded_contains, bottomup, set_property, delete_property,
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
             # Path objects
@@ -280,29 +284,36 @@ class Subdatasets(Interface):
 def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     contains, bottomup, set_property, delete_property,
                     refds_path):
-    dspath = ds.path
-    repo = ds.repo
-    if not GitRepo.is_valid_repo(dspath):
-        return
+    lookup_cache = {}
+    # it should be OK to skip the extra check, because _parse_git_submodules()
+    # we specifically look for .gitmodules and the rest of the function
+    # is on its results
+    #if not GitRepo.is_valid_repo(dspath):
+    #    return
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(ds.pathobj, repo, paths):
-        contains_hits = []
+    for sm in _parse_git_submodules(ds, paths, lookup_cache):
+        repo = lookup_cache['repo']
+        sm_path = sm['path']
+        contains_hits = None
         if contains:
-            contains_hits = [
-                c for c in contains if sm['path'] == c or sm['path'] in c.parents
-            ]
+            contains_hits = [c[0] for c in contains if sm_path in c]
             if not contains_hits:
                 # we are not looking for this subds, because it doesn't
                 # match the target path
                 continue
+        # the following used to be done by _parse_git_submodules()
+        # but is expensive and does not need to be done for submodules
+        # not matching `contains`
+        if not sm_path.exists() or not GitRepo.is_valid_repo(sm_path):
+            sm['state'] = 'absent'
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \
-            or any(p == sm['path'] or p in sm['path'].parents
+            or any(p == sm_path or p in sm_path.parents
                    for p in paths)
         if to_report and (set_property or delete_property):
             # first deletions
-            for dprop in assure_list(delete_property):
+            for dprop in ensure_list(delete_property):
                 try:
                     repo.call_git(
                         ['config', '--file', '.gitmodules',
@@ -324,16 +335,16 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 # also kick from the info we just read above
                 sm.pop('gitmodule_{}'.format(dprop), None)
             # and now setting values
-            for sprop in assure_list(set_property):
+            for sprop in ensure_list(set_property):
                 prop, val = sprop
                 if val.startswith('<') and val.endswith('>') and '{' in val:
                     # expand template string
                     val = val[1:-1].format(
                         **dict(
                             sm,
-                            refds_relpath=sm['path'].relative_to(refds_path),
+                            refds_relpath=sm_path.relative_to(refds_path),
                             refds_relname=str(
-                                sm['path'].relative_to(refds_path)
+                                sm_path.relative_to(refds_path)
                             ).replace(os.sep, '-')))
                 try:
                     repo.call_git(
@@ -375,13 +386,13 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             type='dataset',
             logger=lgr)
         subdsres.update(sm)
-        subdsres['parentds'] = dspath
+        subdsres['parentds'] = ds.path
         if to_report:
             if contains_hits:
                 subdsres['contains'] = contains_hits
             if (not bottomup and \
                 (fulfilled is None or
-                 GitRepo.is_valid_repo(sm['path']) == fulfilled)):
+                 GitRepo.is_valid_repo(sm_path) == fulfilled)):
                 yield subdsres
 
         # expand list with child submodules. keep all paths relative to parent
@@ -391,7 +402,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                  (isinstance(recursion_limit, int) and
                   recursion_limit > 1)):
             for r in _get_submodules(
-                    Dataset(sm['path']),
+                    Dataset(sm_path),
                     paths,
                     fulfilled, recursive,
                     (recursion_limit - 1)
@@ -405,5 +416,5 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                 yield r
         if to_report and (bottomup and \
                 (fulfilled is None or
-                 GitRepo.is_valid_repo(sm['path']) == fulfilled)):
+                 GitRepo.is_valid_repo(sm_path) == fulfilled)):
             yield subdsres

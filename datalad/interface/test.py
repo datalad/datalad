@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 import datalad
 from .base import Interface
 from datalad.interface.base import build_doc
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from ..support.param import Parameter
 
 import logging
@@ -63,7 +63,7 @@ class Test(Interface):
             from pkg_resources import iter_entry_points
             module = ['datalad']
             module.extend(ep.module_name for ep in iter_entry_points('datalad.tests'))
-        module = assure_list(module)
+        module = ensure_list(module)
         lgr.info('Starting test run for module(s): %s', module)
         for mod in module:
             datalad.test(module=mod, verbose=verbose, nocapture=nocapture, pdb=pdb, stop=stop)

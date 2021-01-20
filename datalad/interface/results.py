@@ -24,7 +24,7 @@ from os.path import (
 
 from datalad.dochelpers import exc_str
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     path_is_subpath,
     PurePosixPath,
 )
@@ -111,7 +111,7 @@ def results_from_paths(paths, action=None, type=None, logger=None, refds=None,
     generator
 
     """
-    for p in assure_list(paths):
+    for p in ensure_list(paths):
         yield get_status_dict(
             action, path=p, type=type, logger=logger, refds=refds,
             status=status, message=(message, p) if '%s' in message else message,
@@ -258,7 +258,7 @@ def count_results(res, **kwargs):
 
 def only_matching_paths(res, **kwargs):
     # TODO handle relative paths by using a contained 'refds' value
-    paths = assure_list(kwargs.get('path', []))
+    paths = ensure_list(kwargs.get('path', []))
     respath = res.get('path', None)
     return respath in paths
 
@@ -283,7 +283,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         # otherwise this is not what we are looking for
         return source == res.get('source_url', None)
     # the only thing left is a potentially heterogeneous list of paths/URLs
-    paths = assure_list(kwargs.get('path', []))
+    paths = ensure_list(kwargs.get('path', []))
     # three cases left:
     # 1. input arg was an absolute path -> must match 'path' property
     # 2. input arg was relative to a dataset -> must match refds/relpath

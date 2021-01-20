@@ -99,6 +99,12 @@ _test_states = {
 
 def setup_package():
     import os
+    from datalad.utils import on_osx
+    if on_osx:
+        # enforce honoring TMPDIR (see gh-5307)
+        import tempfile
+        tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
+
     from datalad import consts
 
     _test_states['env'] = {}

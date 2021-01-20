@@ -1,0 +1,311 @@
+# This CI setup provides a largely homogeneous configuration across all
+# major platforms (Windows, MacOS, and Linux). The aim of this test setup is
+# to create a "native" platform experience, using as few cross-platform
+# helper tools as possible.
+#
+# On Linux/Mac a virtualenv is used for testing. The effective virtual env
+# is available under ~/VENV.
+#
+# All workers support remote login. Login details are shown at the top of each
+# CI run log.
+#
+# - Linux/Mac workers (via SSH):
+#
+#   - A permitted SSH key must be defined in an APPVEYOR_SSH_KEY environment
+#     variable (via the appveyor project settings)
+#
+#   - SSH login info is given in the form of: 'appveyor@67.225.164.xx -p 22xxx'
+#
+#   - Login with:
+#
+#     ssh -o StrictHostKeyChecking=no <LOGIN>
+#
+#   - to prevent the CI run from exiting, `touch` a file named `BLOCK` in the
+#     user HOME directory (current directory directly after login). The session
+#     will run until the file is removed (or 60 min have passed)
+#
+# - Windows workers (via RDP):
+#
+#   - An RDP password should be defined in an APPVEYOR_RDP_PASSWORD environment
+#     variable (via the appveyor project settings), or a random password is used
+#     every time
+#
+#   - RDP login info is given in the form of IP:PORT
+#
+#   - Login with:
+#
+#     xfreerdp /cert:ignore /dynamic-resolution /u:appveyor /p:<PASSWORD> /v:<LOGIN>
+#
+#   - to prevent the CI run from exiting, create a textfile named `BLOCK` on the
+#     Desktop (a required .txt extension will be added automatically). The session
+#     will run until the file is removed (or 60 min have passed)
+#
+#   - in a terminal execute, for example, `C:\datalad_debug.bat 39` to set up the
+#     environment to debug in a Python 3.8 session (should generally match the
+#     respective CI run configuration).
+
+
+# make repository clone cheap
+shallow_clone: true
+
+
+environment:
+  DATALAD_TESTS_SSH: 1
+
+  # Do not use `image` as a matrix dimension, to have fine-grained control over
+  # what tests run on which platform
+  # The ID variable had no impact, but sorts first in the CI run overview
+  # an intelligible name can help to locate a specific test run
+  matrix:
+    ## going for ~30min CI job duration to leave ample time for debugging and
+    ## get fast turn around via multi-job parallelization
+
+    # List a CI run for each platform first, to have immediate access when there
+    # is a need for debugging
+
+    # Ubuntu core tests
+    - ID: Ubu20
+      # ~35min
+      DTS: datalad
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+    # Windows core tests
+    - ID: WinP39core
+      # ~35 min
+      DTS: datalad.core
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      # Python version specification is non-standard on windows
+      PY: 39-x64
+    # MacOS core tests
+    - ID: MacP38core
+      # ~25min
+      DTS: datalad.core
+      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      PY: 3.8
+      # does not give a functional installation
+      # INSTALL_GITANNEX: git-annex -m snapshot
+      #INSTALL_GITANNEX: git-annex=8.20201129
+      INSTALL_GITANNEX: git-annex
+      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+
+    # Additional test runs
+    - ID: WinP39a1
+      # ~30min
+      DTS: >
+          datalad.cmdline
+          datalad.customremotes
+          datalad.distribution
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      PY: 39-x64
+    - ID: WinP39a2
+      # TODO: datalad.metadata (this is completely non-functional on Windows,
+      #       either tests only, or actual code too)
+      # ~20min
+      DTS: >
+          datalad.downloaders
+          datalad.interface
+          datalad.plugin
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      PY: 39-x64
+    - ID: WinP39a3
+      # ~18min
+      DTS: >
+          datalad.local
+          datalad.distributed
+          datalad.support
+          datalad.tests
+          datalad.ui
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      PY: 39-x64
+
+    - ID: MacP38a1
+      # ~45min
+      DTS: >
+          datalad.cmdline
+          datalad.customremotes
+          datalad.distribution
+      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      PY: 3.8
+      INSTALL_GITANNEX: git-annex
+      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    - ID: MacP38a2
+      # ~25min
+      DTS: >
+          datalad.downloaders
+          datalad.interface
+          datalad.plugin
+      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      PY: 3.8
+      INSTALL_GITANNEX: git-annex
+      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    - ID: MacP38a3
+      # ~35min
+      DTS: >
+          datalad.local
+          datalad.distributed
+          datalad.support
+          datalad.tests
+          datalad.ui
+      APPVEYOR_BUILD_WORKER_IMAGE: macOS
+      PY: 3.8
+      INSTALL_GITANNEX: git-annex
+      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+
+    # Test alternative Python versions
+    - ID: Ubu20P36
+      PY: 3.6
+      DTS: datalad
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+    - ID: Ubu20P37
+      PY: 3.7
+      DTS: datalad
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+
+matrix:
+  allow_failures:
+    - KNOWN2FAIL: 1
+
+
+# tests need specific hostnames to be available
+# note, this is insufficient on MacOS, and needs to be reflected
+# in the SSH config too (tools/ci/appveyor_ssh_config)
+hosts:
+  datalad-test: 127.0.0.1
+  datalad-test2: 127.0.0.1
+
+
+# it is OK to specify paths that may not exist for a particular test run
+cache:
+  # pip cache
+  - C:\Users\appveyor\AppData\Local\pip\Cache -> .appveyor.yml
+  - /home/appveyor/.cache/pip -> .appveyor.yml
+  # TODO: where is the cache on macOS?
+  #- /Users/appveyor/.cache/pip -> .appveyor.yml
+  # TODO: Can we cache `brew`?
+  #- /usr/local/Cellar
+  #- /usr/local/bin
+
+
+# turn of support for MS project build support (not needed)
+build: off
+
+
+# init cannot use any components from the repo, because it runs prior to
+# cloning it
+init:
+  # remove windows 260-char limit on path names
+  - cmd: powershell Set-Itemproperty -path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -value 1
+  # enable developer mode on windows
+  # this should enable mklink without admin privileges, but it doesn't seem to work
+  #- cmd: powershell tools\ci\appveyor_enable_windevmode.ps1
+  # enable RDP access on windows (RDP password is in appveyor project config)
+  # this is relatively expensive (1-2min), but very convenient to jump into any build at any time
+  - cmd: powershell.exe iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+  # enable external SSH access to CI worker on all other systems
+  # needs APPVEYOR_SSH_KEY defined in project settings (or environment)
+  - sh: curl -sflL 'https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-ssh.sh' | bash -e -
+  # Identity setup
+  - git config --global user.email "test@appveyor.land"
+  - git config --global user.name "Appveyor Almighty"
+  # Scratch space
+  - cmd: md C:\DLTMP
+  # we place the "unix" one into the user's HOME to avoid git-annex issues on MacOSX
+  # gh-5291
+  - sh: mkdir ~/DLTMP
+  # and use that scratch space to get short paths in test repos
+  # (avoiding length-limits as much as possible)
+  - cmd: "set TMP=C:\\DLTMP"
+  - cmd: "set TEMP=C:\\DLTMP"
+  - sh: export TMPDIR=~/DLTMP
+  # Temporary keys for localhost access in default place
+  - cmd: ssh-keygen -f C:\Users\appveyor\.ssh\id_rsa -N ""
+  - sh: ssh-keygen -f ~/.ssh/id_rsa -N ""
+  # deploy the datalad installer
+  - appveyor DownloadFile https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py -FileName datalad_installer.py
+
+
+install:
+  # place a debug setup helper at a convenient location
+  - cmd: copy tools\ci\appveyor_env_setup.bat C:\\datalad_debug.bat
+  # deploy standard SSH config for localhost access on Windows
+  - cmd: tools\ci\appveyor_ssh2localhost.bat
+  - sh: sh tools/ci/appveyor_ssh2localhost.sh
+  # If a particular Python version is requested, use env setup (using the
+  # appveyor provided environments/installation). Note, these are broken
+  # on the ubuntu images
+  # https://help.appveyor.com/discussions/problems/28217-appveyor-ubunu-image-with-python3-lzma-module
+  # Otherwise create a virtualenv using the default Python 3, to enable uniform
+  # use of python/pip executables below
+  - sh: "[ \"x$PY\" != x ] && . ${HOME}/venv${PY}/bin/activate || virtualenv -p 3 ${HOME}/dlvenv && . ${HOME}/dlvenv/bin/activate; ln -s \"$VIRTUAL_ENV\" \"${HOME}/VENV\""
+  - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
+  # Missing system software
+  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
+  # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
+  # deploy git-annex, if desired
+  - cmd: IF DEFINED INSTALL_GITANNEX python datalad_installer.py %INSTALL_GITANNEX%
+  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && python datalad_installer.py ${INSTALL_GITANNEX}"
+  # TODO remove when datalad-installer can handle this
+  - cmd: tools\ci\appveyor_install_git-annex.bat
+
+
+#before_build:
+#
+
+
+build_script:
+  - pip install ".[tests]"
+  - pip install ".[devel-utils]"
+
+
+#after_build:
+#
+
+
+before_test:
+  # test SSH login
+  - ssh -v localhost exit
+  - ssh datalad-test exit
+  - ssh datalad-test2 exit
+  - datalad wtf
+
+
+test_script:
+  # run tests on installed module, not source tree files
+  - cmd: md __testhome__
+  - sh: mkdir __testhome__
+  - cd __testhome__
+    # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
+  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+
+
+after_test:
+  # prepare coverage.xml in a separate invocation.
+  # if invoked directly with nose - do not include test_ files themselves
+  - python -m coverage xml
+  - cmd: powershell Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+  - cmd: "set PATH=C:\\msys64\\usr\\bin;%PATH%"
+  - cmd: bash codecov.sh -f "coverage.xml" -U "-s" -A "-s" 
+  - sh: bash <(curl -s https://codecov.io/bash)
+
+
+#on_success:
+#
+
+
+#on_failure:
+#
+
+
+on_finish:
+  # conditionally block the exit of a CI run for direct debugging
+  - sh: while [ -f ~/BLOCK ]; do sleep 5; done
+  - cmd: powershell.exe while ((Test-Path "C:\Users\\appveyor\\Desktop\\BLOCK.txt")) { Start-Sleep 5 }

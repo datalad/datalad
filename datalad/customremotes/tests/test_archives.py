@@ -21,7 +21,6 @@ from ..archives import (
     ArchiveAnnexCustomRemote,
     link_file_load,
 )
-from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from .test_base import (
@@ -35,28 +34,30 @@ from ...tests.utils import (
     assert_is_instance,
     assert_not_equal,
     assert_not_in,
+    assert_raises,
     assert_true,
     chpwd,
     eq_,
-    get_most_obscure_supported_name,
     in_,
     known_failure_githubci_win,
     ok_,
     ok_file_has_content,
     serve_path_via_http,
     swallow_logs,
-    swallow_outputs,
     with_tempfile,
     with_tree,
 )
-from ...cmd import Runner, GitRunner
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
+)
+from datalad.support.exceptions import CommandError
 from ...utils import (
     _path_,
-    on_linux,
-    on_osx,
     unlink,
 )
-from . import _get_custom_runner
 
 
 from ...tests.test_archives import (
@@ -81,7 +82,7 @@ from datalad import cfg as dl_cfg
 @with_tempfile()
 def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
-    annex = AnnexRepo(d, backend='MD5E', runner=_get_custom_runner(d))
+    annex = AnnexRepo(d, backend='MD5E')
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
@@ -125,7 +126,7 @@ def test_basic_scenario(d, d2):
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
-    assert_false(annex.drop(fn_extracted)['success'])
+    assert_raises(CommandError, annex.drop, fn_extracted)
 
     annex.add_url_to_file(fn_extracted, file_url)
     annex.drop(fn_extracted)
@@ -133,7 +134,7 @@ def test_basic_scenario(d, d2):
     annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_annex = AnnexRepo.clone(d, d2, runner=_get_custom_runner(d2))
+    cloned_annex = AnnexRepo.clone(d, d2)
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 
@@ -143,17 +144,6 @@ def test_basic_scenario(d, d2):
     assert_true(cloned_annex.file_has_content(fn_extracted))
     # as a result it would also fetch tarball
     assert_true(cloned_annex.file_has_content(fn_archive))
-
-    # Check if protocol was collected
-    if dl_cfg.get('datalad.tests.protocolremote'):
-        assert_is_instance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol)
-        protocol_file = _path_(annex.path,
-                               '.git/bin/git-annex-remote-datalad-archive')
-        ok_file_has_content(protocol_file, "VERSION 1", re_=True, match=False)
-        ok_file_has_content(protocol_file, "GETAVAILABILITY", re_=True, match=False)
-        ok_file_has_content(protocol_file, "#!/bin/bash", re_=True, match=False)
-    else:
-        assert_false(isinstance(annex.cmd_call_wrapper.protocol, AnnexExchangeProtocol))
 
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py
@@ -173,16 +163,19 @@ def test_annex_get_from_subdir(topdir):
     fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
     with chpwd(op.join(topdir, 'a', 'd')):
-        runner = Runner()
-        runner(['git', 'annex', 'drop', '--', fn_in_archive_obscure])  # run git annex drop
+        runner = WitlessRunner()
+        runner.run(
+            ['git', 'annex', 'drop', '--', fn_in_archive_obscure],
+            protocol=KillOutput)  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
-        runner(['git', 'annex', 'get', '--', fn_in_archive_obscure])   # run git annex get
+        runner.run(
+            ['git', 'annex', 'get', '--', fn_in_archive_obscure],
+            protocol=KillOutput)   # run git annex get
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
-@known_failure_githubci_win
 def test_get_git_environ_adjusted():
-    gitrunner = GitRunner()
+    gitrunner = GitWitlessRunner()
     env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
 
     # test conversion of relevant env vars from relative_path to correct absolute_path
@@ -194,26 +187,24 @@ def test_get_git_environ_adjusted():
     assert_equal(adj_env["TEST_VAR"], env["TEST_VAR"])
 
     # test import of sys_env if no environment passed to function
-    sys_env = gitrunner.get_git_environ_adjusted()
-    assert_equal(sys_env["PWD"], os.environ.get("PWD"))
+    with patch.dict('os.environ', {'BOGUS': '123'}):
+        sys_env = gitrunner.get_git_environ_adjusted()
+        assert_equal(sys_env["BOGUS"], "123")
 
 
 def test_no_rdflib_loaded():
     # rely on rdflib polluting stdout to see that it is not loaded whenever we load this remote
     # since that adds 300ms delay for no immediate use
-    from ...cmd import Runner
-    runner = Runner()
-    with swallow_outputs() as cmo:
-        runner.run(
-            [sys.executable,
-             '-c',
-             'import datalad.customremotes.archives, sys; '
-             'print([k for k in sys.modules if k.startswith("rdflib")])'],
-            log_stdout=False,
-            log_stderr=False)
-        # print cmo.out
-        assert_not_in("rdflib", cmo.out)
-        assert_not_in("rdflib", cmo.err)
+    runner = WitlessRunner()
+    out = runner.run(
+        [sys.executable,
+         '-c',
+         'import datalad.customremotes.archives, sys; '
+         'print([k for k in sys.modules if k.startswith("rdflib")])'],
+        protocol=StdOutErrCapture)
+    # print cmo.out
+    assert_not_in("rdflib", out['stdout'])
+    assert_not_in("rdflib", out['stderr'])
 
 
 @with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})

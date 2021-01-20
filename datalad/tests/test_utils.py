@@ -15,6 +15,7 @@ import os
 import os.path as op
 import shutil
 import sys
+import time
 import logging
 from unittest.mock import patch
 import builtins
@@ -38,10 +39,10 @@ from datalad.utils import (
     _path_,
     all_same,
     any_re_search,
-    assure_unicode,
     auto_repr,
     better_wraps,
     CMD_MAX_ARG,
+    Path,
     create_tree,
     disable_logger,
     dlabspath,
@@ -59,6 +60,8 @@ from datalad.utils import (
     import_module_from_file,
     import_modules,
     is_explicit_path,
+    is_interactive,
+    join_cmdline,
     knows_annex,
     line_profile,
     make_tempfile,
@@ -68,12 +71,12 @@ from datalad.utils import (
     not_supported_on_windows,
     on_windows,
     partition,
-    Path,
     path_is_subpath,
     path_startswith,
     rotree,
     safe_print,
     setup_exceptionhook,
+    split_cmdline,
     swallow_logs,
     swallow_outputs,
     unique,
@@ -92,12 +95,12 @@ from .utils import (
     assert_not_in,
     assert_raises,
     assert_true,
-    assure_bool,
-    assure_dict_from_str,
-    assure_iter,
-    assure_list,
-    assure_list_from_str,
-    assure_unicode,
+    ensure_bool,
+    ensure_dict_from_str,
+    ensure_iter,
+    ensure_list,
+    ensure_list_from_str,
+    ensure_unicode,
     eq_,
     has_symlink_capability,
     known_failure,
@@ -110,6 +113,7 @@ from .utils import (
     ok_file_has_content,
     ok_generator,
     ok_startswith,
+    on_travis,
     probe_known_failure,
     skip_if,
     skip_if_no_module,
@@ -310,13 +314,13 @@ def _check_setup_exceptionhook(interactive):
                 "TODO: Not clear why in PY3 calls cleanup if we try to "
                 "access the beast"
             )
-            assert_in('Traceback (most recent call last)', cmo.err)
-            assert_in('in _check_setup_exceptionhook', cmo.err)
-            if interactive:
-                assert_equal(post_mortem_tb[0], tb_)
-            else:
-                assert_equal(post_mortem_tb, [])
-                # assert_in('We cannot setup exception hook', cml.out)
+            #assert_in('Traceback (most recent call last)', cmo.err)
+            #assert_in('in _check_setup_exceptionhook', cmo.err)
+            #if interactive:
+            #    assert_equal(post_mortem_tb[0], tb_)
+            #else:
+            #    assert_equal(post_mortem_tb, [])
+            #    # assert_in('We cannot setup exception hook', cml.out)
 
     eq_(old_exceptionhook, sys.excepthook)
 
@@ -459,39 +463,39 @@ def test_auto_repr():
 
 def test_assure_iter():
     s = {1}
-    assert assure_iter(None, set) == set()
-    assert assure_iter(1, set) == s
-    assert assure_iter(1, list) == [1]
-    assert assure_iter(s, set) is s
-    assert assure_iter(s, set, copy=True) is not s
+    assert ensure_iter(None, set) == set()
+    assert ensure_iter(1, set) == s
+    assert ensure_iter(1, list) == [1]
+    assert ensure_iter(s, set) is s
+    assert ensure_iter(s, set, copy=True) is not s
 
 
 def test_assure_list_copy():
     l = [1]
-    assert assure_list(l) is l
-    assert assure_list(l, copy=True) is not l
+    assert ensure_list(l) is l
+    assert ensure_list(l, copy=True) is not l
 
 
 def test_assure_list_from_str():
-    assert_equal(assure_list_from_str(''), None)
-    assert_equal(assure_list_from_str([]), None)
-    assert_equal(assure_list_from_str('somestring'), ['somestring'])
-    assert_equal(assure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
-    assert_equal(assure_list_from_str(['something']), ['something'])
-    assert_equal(assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
+    assert_equal(ensure_list_from_str(''), None)
+    assert_equal(ensure_list_from_str([]), None)
+    assert_equal(ensure_list_from_str('somestring'), ['somestring'])
+    assert_equal(ensure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
+    assert_equal(ensure_list_from_str(['something']), ['something'])
+    assert_equal(ensure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
 
 
 def test_assure_dict_from_str():
-    assert_equal(assure_dict_from_str(''), None)
-    assert_equal(assure_dict_from_str({}), None)
+    assert_equal(ensure_dict_from_str(''), None)
+    assert_equal(ensure_dict_from_str({}), None)
     target_dict = dict(
         __ac_name='{user}', __ac_password='{password}',
         cookies_enabled='', submit='Log in'
     )
     string = '__ac_name={user}\n__ac_password={password}\nsubmit=Log ' \
                'in\ncookies_enabled='
-    assert_equal(assure_dict_from_str(string), target_dict)
-    assert_equal(assure_dict_from_str(
+    assert_equal(ensure_dict_from_str(string), target_dict)
+    assert_equal(ensure_dict_from_str(
         target_dict),
         target_dict)
 
@@ -502,8 +506,8 @@ def test_assure_bool():
         (['False', 0, '0', 'no', 'off'], False)
     ]:
         for v in values:
-            eq_(assure_bool(v), t)
-    assert_raises(ValueError, assure_bool, "unknown")
+            eq_(ensure_bool(v), t)
+    assert_raises(ValueError, ensure_bool, "unknown")
 
 
 def test_generate_chunks():
@@ -605,7 +609,10 @@ def test_expandpath():
     eq_(expandpath("some", False), expandvars('some'))
     assert_true(isabs(expandpath('some')))
     # this may have to go because of platform issues
-    eq_(expandpath("$HOME"), expanduser('~'))
+    if not on_windows:
+        # expanduser is not influenced by our HOME setting adjustments
+        # for the tests on windows
+        eq_(expandpath("$HOME"), expanduser('~'))
 
 
 def test_is_explicit_path():
@@ -707,9 +714,12 @@ def test_path_():
 def test_get_timestamp_suffix():
     # we need to patch temporarily TZ
     with patch.dict('os.environ', {'TZ': 'GMT'}):
+        # figure out how GMT time zone suffix is represented
+        # could be +0 or -0, depending on platform
+        # just use whatever it is, not the subject of this test
+        tz_suffix = time.strftime('%z', time.gmtime(0))
         # skynet DOB
-        target_ts = '1970-01-01T00:00:00-0000' \
-            if on_windows else '1970-01-01T00:00:00+0000'
+        target_ts = '1970-01-01T00:00:00' + tz_suffix
         assert_equal(get_timestamp_suffix(0), '-' + target_ts)
         assert_equal(get_timestamp_suffix(0, prefix="+"),
                      '+' + target_ts)
@@ -748,28 +758,28 @@ def test_memoized_generator():
 
 
 def test_assure_unicode():
-    ok_(isinstance(assure_unicode("m"), str))
-    ok_(isinstance(assure_unicode('grandchild_äöü東'), str))
-    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), str))
-    eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+    ok_(isinstance(ensure_unicode("m"), str))
+    ok_(isinstance(ensure_unicode('grandchild_äöü東'), str))
+    ok_(isinstance(ensure_unicode(u'grandchild_äöü東'), str))
+    eq_(ensure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
     # now, non-utf8
     # Decoding could be deduced with high confidence when the string is
     # really encoded in that codepage
     mom_koi8r = u"мама".encode('koi8-r')
-    eq_(assure_unicode(mom_koi8r), u"мама")
-    eq_(assure_unicode(mom_koi8r, confidence=0.9), u"мама")
+    eq_(ensure_unicode(mom_koi8r), u"мама")
+    eq_(ensure_unicode(mom_koi8r, confidence=0.9), u"мама")
     mom_iso8859 = u'mamá'.encode('iso-8859-1')
-    eq_(assure_unicode(mom_iso8859), u'mamá')
-    eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
+    eq_(ensure_unicode(mom_iso8859), u'mamá')
+    eq_(ensure_unicode(mom_iso8859, confidence=0.5), u'mamá')
     # but when we mix, it does still guess something allowing to decode:
     mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
-    ok_(isinstance(assure_unicode(mixedin), str))
+    ok_(isinstance(ensure_unicode(mixedin), str))
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
-        assure_unicode(mixedin, confidence=0.9)
+        ensure_unicode(mixedin, confidence=0.9)
     # For other, non string values, actually just returns original value
     # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
-    assert assure_unicode(1) == 1
+    assert ensure_unicode(1) == 1
 
 
 def test_pathlib_unicode():
@@ -792,7 +802,7 @@ def test_as_unicode():
     assert_in("1 is not of any of known or provided", str(cme.exception))
 
 
-@known_failure_windows
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 def test_path_prefix(path):
     eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
@@ -860,7 +870,7 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(fname), os.curdir)
 
 
-@known_failure_windows
+@skip_if_on_windows
 def test_path_startswith():
     ok_(path_startswith('/a/b', '/a'))
     ok_(path_startswith('/a/b', '/a/b'))
@@ -876,7 +886,7 @@ def test_path_startswith():
     assert_raises(ValueError, path_startswith, '/a/b', 'a')
 
 
-@known_failure_windows
+@skip_if_on_windows
 def test_path_is_subpath():
     ok_(path_is_subpath('/a/b', '/a'))
     ok_(path_is_subpath('/a/b/c', '/a'))
@@ -1209,7 +1219,7 @@ def test_get_open_files(p):
                  stdout=PIPE,
                  cwd=str(subd))
     # Assure that it started and we read the OK
-    eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
+    eq_(ensure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
     eq_(get_open_files(p)[str(subd.resolve())].pid, proc.pid)
     eq_(get_open_files(subd)[str(subd.resolve())].pid, proc.pid)
@@ -1287,12 +1297,22 @@ def test_never_fail():
 def test_is_interactive(fout):
     # must not fail if one of the streams is no longer open:
     # https://github.com/datalad/datalad/issues/3267
-    from ..cmd import Runner
+    from datalad.cmd import (
+        KillOutput,
+        NoCapture,
+        StdOutErrCapture,
+        WitlessRunner,
+    )
+    from datalad.support.gitrepo import GitProgress
+    from datalad.support.annexrepo import (
+        AnnexInitOutput,
+        AnnexJsonProtocol,
+    )
 
     bools = ["False", "True"]
 
     def get_interactive(py_pre="", **run_kwargs):
-        out, err = Runner().run(
+        out = WitlessRunner().run(
             [sys.executable,
              "-c",
              py_pre +
@@ -1309,9 +1329,47 @@ def test_is_interactive(fout):
         assert_in(out, bools)
         return bool(bools.index(out))
 
-    # we never request for pty in our Runner, so can't be interactive
-    eq_(get_interactive(), False)
+    # verify that NoCapture can make fully interactive execution
+    # happen, also test the core protocols
+    # (we can only be interactive in a runner, if the test execution
+    # itself happens in an interactive environment)
+    for proto, interactive in ((NoCapture,
+                                # It is unclear why (on travis only) a child
+                                # process can report to be interactive
+                                # whenever the parent process is not.
+                                # Maintain this test exception until
+                                # someone can provide insight. The point of
+                                # this test is to ensure that NoCapture
+                                # in an interactive parent also keeps the
+                                # child interactive, so this oddity is not
+                                # relevant.
+                                True if on_travis else is_interactive()),
+                               (KillOutput, False),
+                               (StdOutErrCapture, False),
+                               (GitProgress, False),
+                               (AnnexInitOutput, False),
+                               (AnnexJsonProtocol, False)):
+        eq_(get_interactive(protocol=proto),
+            interactive,
+            msg='{} -> {}'.format(str(proto), interactive))
     # and it must not crash if smth is closed
     for o in ('stderr', 'stdin', 'stdout'):
         eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
 
+
+def test_splitjoin_cmdline():
+    # Do full round trip on a number of tricky samples
+    for args in (
+        ['cmd', '-o1', 'simple'],
+        ['c o', r'\m', ''],
+        ['c o', ' '],
+    ):
+        cmdline = join_cmdline(args)
+        assert isinstance(cmdline, str)
+        eq_(split_cmdline(cmdline), args)
+    # assure that there is no needless quoting
+    if on_windows:
+        # in quote_cmdlinearg we always quote on Windows
+        eq_(join_cmdline(['abc', 'def']), '"abc" "def"')
+    else:
+        eq_(join_cmdline(['abc', 'def']), 'abc def')

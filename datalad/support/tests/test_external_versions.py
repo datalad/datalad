@@ -80,17 +80,17 @@ def test_external_versions_basic():
     assert_raises(TypeError, assert_greater, ev['os'], '0')
 
     return
-    # Code below is from original duecredit, and we don't care about
-    # testing this one
-    # And we can get versions based on modules themselves
-    from datalad.tests import mod
-    assert_equal(ev[mod], mod.__version__)
+    ## Code below is from original duecredit, and we don't care about
+    ## testing this one
+    ## And we can get versions based on modules themselves
+    #from datalad.tests import mod
+    #assert_equal(ev[mod], mod.__version__)
 
-    # Check that we can get a copy of the versions
-    versions_dict = ev.versions
-    versions_dict[our_module] = "0.0.1"
-    assert_equal(versions_dict[our_module], "0.0.1")
-    assert_equal(ev[our_module], __version__)
+    ## Check that we can get a copy of the versions
+    #versions_dict = ev.versions
+    #versions_dict[our_module] = "0.0.1"
+    #assert_equal(versions_dict[our_module], "0.0.1")
+    #assert_equal(ev[our_module], __version__)
 
 
 def test_external_version_contains():
@@ -164,10 +164,10 @@ def test_custom_versions():
 def test_ancient_annex():
 
     class _runner(object):
-        def run(self, cmd):
+        def run(self, cmd, *args, **kwargs):
             if '--raw' in cmd:
                 raise CommandError
-            return "git-annex version: 0.1", ""
+            return dict(stdout="git-annex version: 0.1", stderr="")
 
     ev = ExternalVersions()
     with patch('datalad.support.external_versions._runner', _runner()):
@@ -176,8 +176,8 @@ def test_ancient_annex():
 
 def _test_annex_version_comparison(v, cmp_):
     class _runner(object):
-        def run(self, cmd):
-            return v, ""
+        def run(self, cmd, *args, **kwargs):
+            return dict(stdout=v, stderr="")
 
     ev = ExternalVersions()
     with set_annex_version(None), \
@@ -237,8 +237,8 @@ def test_system_ssh_version():
         ev = ExternalVersions()
         # TODO: figure out leaner way
         class _runner(object):
-            def run(self, cmd, expect_fail, expect_stderr):
-                return "", s
+            def run(self, cmd, *args, **kwargs):
+                return dict(stdout="", stderr=s)
         with patch('datalad.support.external_versions._runner', _runner()):
             assert_equal(ev['cmd:system-ssh'], v)
 

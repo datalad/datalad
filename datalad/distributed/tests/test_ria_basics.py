@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     has_symlink_capability,
     SkipTest,
     known_failure_windows,
+    skip_if_adjusted_branch,
     skip_if_no_network,
     skip_ssh,
     slow,
@@ -48,6 +49,9 @@ from datalad.customremotes.ria_utils import (
     create_store,
     create_ds_in_store,
     get_layout_locations
+)
+from datalad.cmd import (
+    NoCapture,
 )
 
 
@@ -117,30 +121,32 @@ def _test_initremote_basic(host, ds_path, store, link):
     #   - url
     #   - common_init_opts
     #   - archive_id (which equals ds id)
-    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
+                                  read_only=True)
     assert_in("url={}".format(url), remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
     assert_in("archive-id={}".format(ds.id), remote_log)
 
     # re-configure with invalid URL should fail:
-    assert_raises(CommandError,
-                  ds.repo.call_git,
-                  ['annex', 'enableremote', 'ria-remote'] + common_init_opts +
-                  ['url=ria+file:///non-existing']
-                  )
+    assert_raises(
+        CommandError,
+        ds.repo.call_annex,
+        ['enableremote', 'ria-remote'] + common_init_opts + [
+            'url=ria+file:///non-existing'])
     # but re-configure with valid URL should work
     if has_symlink_capability():
         link.symlink_to(store)
         new_url = 'ria+{}'.format(link.as_uri())
-        ds.repo.call_git(['annex', 'enableremote', 'ria-remote'] +
-                         common_init_opts +
-                         ['url={}'.format(new_url)])
+        ds.repo.call_annex(
+            ['enableremote', 'ria-remote'] + common_init_opts + [
+                'url={}'.format(new_url)])
         # git-annex:remote.log should have:
         #   - url
         #   - common_init_opts
         #   - archive_id (which equals ds id)
         remote_log = ds.repo.call_git(['cat-file', 'blob',
-                                       'git-annex:remote.log'])
+                                       'git-annex:remote.log'],
+                                      read_only=True)
         assert_in("url={}".format(new_url), remote_log)
         [assert_in(c, remote_log) for c in common_init_opts]
         assert_in("archive-id={}".format(ds.id), remote_log)
@@ -200,7 +206,8 @@ def _test_initremote_rewrite(host, ds_path, store):
     #   - rewritten url
     #   - common_init_opts
     #   - archive_id (which equals ds id)
-    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
+                                  read_only=True)
     assert_in("url={}".format(replacement), remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
     assert_in("archive-id={}".format(ds.id), remote_log)
@@ -268,9 +275,16 @@ def _test_remote_layout(host, dspath, store, archiv_store):
                      sorted([p for p in local_objects])
                      )
 
+        if not io.get_7z():
+            raise SkipTest("No 7z available in RIA store")
+
         # we can simply pack up the content of the remote into a
         # 7z archive and place it in the right location to get a functional
         # archive remote
+
+        create_store(io, archiv_store, '1')
+        create_ds_in_store(io, archiv_store, ds.id, '2', '1')
+
         whereis = ds.repo.whereis('one.txt')
         dsgit_dir, archive_dir, dsobj_dir = \
             get_layout_locations(1, archiv_store, ds.id)
@@ -366,7 +380,7 @@ def _test_version_check(host, dspath, store):
 
     # TODO: use self.annex.error in special remote and see whether we get an
     #       actual error result
-    assert_raises(IncompleteResultsError,
+    assert_raises(CommandError,
                   ds.repo.copy_to, 'new_file', 'store')
 
     # However, we can force it by configuration
@@ -381,27 +395,20 @@ def test_version_check():
     yield _test_version_check, None
 
 
+# git-annex-testremote is way too slow on crippled FS.
+# Use is_managed_branch() as a proxy and skip only here
+# instead of in a decorator
+@skip_if_adjusted_branch
 @known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
 def _test_gitannex(host, store, dspath):
-
-    from datalad.cmd import (
-        GitRunner,
-        WitlessRunner
-    )
     store = Path(store)
 
     dspath = Path(dspath)
     store = Path(store)
 
     ds = Dataset(dspath).create()
-
-    if ds.repo.is_managed_branch():
-        # git-annex-testremote is way too slow on crippled FS.
-        # Use is_managed_branch() as a proxy and skip only here
-        # instead of in a decorator
-        raise SkipTest("Test too slow on crippled FS")
 
     populate_dataset(ds)
     ds.save()
@@ -435,9 +442,7 @@ def _test_gitannex(host, store, dspath):
     # run git-annex-testremote
     # note, that we don't want to capture output. If something goes wrong we
     # want to see it in test build's output log.
-    WitlessRunner(cwd=dspath, env=GitRunner.get_git_environ_adjusted()).run(
-        ['git', 'annex', 'testremote', 'store']
-    )
+    ds.repo._call_annex(['testremote', 'store'], protocol=NoCapture)
 
 
 @turtle
@@ -495,11 +500,11 @@ def _test_binary_data(host, store, dspath):
     known_sources = ds.repo.whereis(str(file))
     assert_in(here_uuid, known_sources)
     assert_not_in(store_uuid, known_sources)
-    ds.repo.call_git(['annex', 'move', str(file), '--to', 'store'])
+    ds.repo.call_annex(['move', str(file), '--to', 'store'])
     known_sources = ds.repo.whereis(str(file))
     assert_not_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)
-    ds.repo.call_git(['annex', 'get', str(file), '--from', 'store'])
+    ds.repo.call_annex(['get', str(file), '--from', 'store'])
     known_sources = ds.repo.whereis(str(file))
     assert_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)

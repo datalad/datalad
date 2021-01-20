@@ -32,7 +32,10 @@ from datalad.utils import (
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
+from datalad.cmd import (
+    GitWitlessRunner,
+    WitlessRunner as Runner,
+)
 from datalad.tests.utils import (
     assert_false,
     assert_in,
@@ -61,6 +64,7 @@ from datalad.tests.utils import (
     patch_config,
     set_date,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     skip_if_no_network,
     skip_if_on_windows,
     skip_ssh,
@@ -194,6 +198,7 @@ def test_clone_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        ok_(uuid_before)  # make sure we actually have an uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
@@ -204,6 +209,7 @@ def test_clone_simple_local(src, path):
     ok_(ds.is_installed())
     if isinstance(origin.repo, AnnexRepo):
         eq_(uuid_before, ds.repo.uuid)
+
 
 
 # AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
@@ -235,7 +241,7 @@ def test_clone_dataladri(src, topurl, path):
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
-    Runner(cwd=gr.path)(['git', 'update-server-info'])
+    Runner(cwd=gr.path).run(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
@@ -244,10 +250,14 @@ def test_clone_dataladri(src, topurl, path):
     ok_file_has_content(ds.pathobj / 'test.txt', 'some')
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_isnot_recursive(src, path_nr, path_r):
+@with_tempfile(mkdir=True)
+def test_clone_isnot_recursive(path_src, path_nr, path_r):
+    src = Dataset(path_src).create()
+    src.create('subm 1')
+    src.create('2')
+
     ds = clone(src, path_nr, result_xfm='datasets', return_type='item-or-list')
     ok_(ds.is_installed())
     # check nothin is unintentionally installed
@@ -258,15 +268,10 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
         {'subm 1', '2'})
 
 
-@slow  # 23.1478s
-@with_testrepos(flavors=['local'])
-# 'local-url', 'network'
-# TODO: Somehow annex gets confused while initializing installed ds, whose
-# .git/config show a submodule url "file:///aaa/bbb%20b/..."
-# this is delivered by with_testrepos as the url to clone
 @with_tempfile
-def test_clone_into_dataset(source, top_path):
-
+@with_tempfile
+def test_clone_into_dataset(source_path, top_path):
+    source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
 
@@ -291,9 +296,12 @@ def test_clone_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-def test_notclone_known_subdataset(src, path):
+@with_tempfile(mkdir=True)
+def test_notclone_known_subdataset(src_path, path):
+    src = Dataset(src_path).create()
+    sub = src.create('subm 1')
+    sub_id = sub.id
     # get the superdataset:
     ds = clone(src, path,
                result_xfm='datasets', return_type='item-or-list')
@@ -315,8 +323,7 @@ def test_notclone_known_subdataset(src, path):
     ok_(AnnexRepo.is_valid_repo(subds.path, allow_noninitialized=False))
     # Verify that it is the correct submodule installed and not
     # new repository initiated
-    eq_(set(subds.repo.get_indexed_files()),
-        {'test.dat', 'INFO.txt', 'test-annex.dat'})
+    eq_(subds.id, sub_id)
     assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
 
@@ -904,7 +911,7 @@ def _postclonetest_prepare(lcl, storepath, link):
     subds.save()
     # add a plain git dataset as well
     subgit = Dataset(lcl / 'ds' / 'subdir' / 'subgit').create(force=True,
-                                                              no_annex=True)
+                                                              annex=False)
     subgit.save()
     ds = Dataset(lcl / 'ds').create(force=True)
     ds.save(version_tag='original')
@@ -1085,6 +1092,8 @@ def test_ria_http_storedataladorg(path):
 
 
 @skip_if_on_windows  # see gh-4131
+# Ephemeral clones cannot use adjusted mode repos
+@skip_if_adjusted_branch
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -1102,9 +1111,6 @@ def test_ephemeral(origin_path, bare_path,
     file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
 
     origin = Dataset(origin_path).create(force=True)
-    if origin.repo.is_managed_branch():
-        raise SkipTest('Ephemeral clones cannot use adjusted mode repos')
-
     origin.save()
     # 1. clone via path
     clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
@@ -1160,7 +1166,6 @@ def test_ephemeral(origin_path, bare_path,
     eq_(res, [origin.config.get("annex.uuid")])
 
     # 4. ephemeral clone from a bare repo
-    from datalad.cmd import GitWitlessRunner
     runner = GitWitlessRunner()
     runner.run(['git', 'clone', '--bare', origin_path, bare_path])
     runner.run(['git', 'annex', 'init'], cwd=bare_path)
@@ -1299,6 +1304,9 @@ def test_gin_cloning(path):
     ok_file_has_content(op.join(ds.path, git_path), 'one\n')
 
 
+# TODO: git-annex-init fails in the second clone call below when this is
+# executed under ./tools/eval_under_testloopfs.
+@skip_if_adjusted_branch
 @with_tree(tree={"special": {"f0": "0"}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
@@ -1306,19 +1314,14 @@ def test_fetch_git_special_remote(url_path, url, path):
     url_path = Path(url_path)
     path = Path(path)
     ds_special = Dataset(url_path / "special").create(force=True)
-    if ds_special.repo.is_managed_branch():
-        # TODO: git-annex-init fails in the second clone call below when this is
-        # executed under ./tools/eval_under_testloopfs.
-        raise SkipTest("Test fails on managed branch")
     ds_special.save()
     ds_special.repo.call_git(["update-server-info"])
 
     clone_url = url + "special/.git"
     ds_a = clone(clone_url, path / "a")
-    ds_a.repo._run_annex_command(
-        "initremote",
-        annex_options=["special", "type=git", "autoenable=true",
-                       "location=" + clone_url])
+    ds_a.repo.call_annex(
+        ["initremote", "special", "type=git", "autoenable=true",
+         "location=" + clone_url])
 
     # Set up a situation where a file is present only on the special remote,
     # and its existence is known only to the special remote's git-annex branch.
@@ -1334,17 +1337,35 @@ def test_fetch_git_special_remote(url_path, url, path):
     ok_(ds_b.repo.file_has_content("f1"))
 
 
+@skip_if_adjusted_branch
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 def test_nonuniform_adjusted_subdataset(path):
     # https://github.com/datalad/datalad/issues/5107
     topds = Dataset(Path(path) / "top").create()
     subds_url = 'git://github.com/datalad/testrepo--basic--r1'
-    if not topds.repo.is_managed_branch():
-        raise SkipTest(
-            "Test logic assumes default dataset state is adjusted")
     topds.clone(
         source='git://github.com/datalad/testrepo--basic--r1',
         path='subds')
     eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
         subds_url)
+
+
+@with_tempfile
+def test_clone_recorded_subds_reset(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a")
+    ds_a_sub = ds_a.create("sub")
+    (ds_a_sub.pathobj / "foo").write_text("foo")
+    ds_a.save(recursive=True)
+    (ds_a_sub.pathobj / "bar").write_text("bar")
+    ds_a_sub.save()
+
+    ds_b = clone(ds_a.path, path / "ds_b")
+    ds_b.get("sub")
+    assert_repo_status(ds_b.path)
+    sub_repo = Dataset(path / "ds_b" / "sub").repo
+    branch = sub_repo.get_active_branch()
+    eq_(ds_b.subdatasets()[0]["gitshasum"],
+        sub_repo.get_hexsha(
+            sub_repo.get_corresponding_branch(branch) or branch))

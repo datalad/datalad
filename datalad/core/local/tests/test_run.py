@@ -26,8 +26,8 @@ import sys
 from unittest.mock import patch
 
 from datalad.utils import (
-    assure_unicode,
     chpwd,
+    ensure_unicode,
     on_windows,
 )
 
@@ -101,8 +101,8 @@ def test_basics(path, nodspath):
         # provoke command failure
         with assert_raises(CommandError) as cme:
             ds.run('7i3amhmuch9invalid')
-            # let's not speculate that the exit code is always 127
-            ok_(cme.code > 0)
+        # let's not speculate that the exit code is always 127
+        ok_(cme.exception.code > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('cd .> empty', message='TEST')
@@ -348,7 +348,7 @@ def test_inputs_quotes_needed(path):
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
     with open(op.join(path, "out0")) as ifh:
-        eq_(assure_unicode(ifh.read()), expected)
+        eq_(ensure_unicode(ifh.read()), expected)
     # ... but the list form of a command does not. (Don't test this failure
     # with the obscure file name because we'd need to know its composition to
     # predict the failure.)

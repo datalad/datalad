@@ -163,7 +163,9 @@ class CreateSiblingRia(Interface):
             metavar="NAME",
             doc="""Name of the storage sibling (git-annex special remote).
             Must not be identical to the sibling name. If not specified,
-            defaults to the sibling name plus '-storage' suffix.""",
+            defaults to the sibling name plus '-storage' suffix. If only
+            a storage sibling is created, this setting is ignored, and
+            the primary sibling name is used.""",
             constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
@@ -185,10 +187,17 @@ class CreateSiblingRia(Interface):
             crucial when [CMD: --shared=group CMD][PY: shared="group" PY]""",
             constraints=EnsureStr() | EnsureNone()),
         storage_sibling=Parameter(
-            args=("--no-storage-sibling",),
+            args=("--storage-sibling",),
             dest='storage_sibling',
-            doc="""Flag to disable establishing a storage sibling.""",
-            action="store_false"),
+            metavar='MODE',
+            constraints=EnsureChoice('only') | EnsureBool() | EnsureNone(),
+            doc="""By default, an ORA storage sibling and a Git repository
+            sibling are created ([CMD: on CMD][PY: True|'on' PY]).
+            Alternatively, creation of the storage sibling can be disabled
+            ([CMD: off CMD][PY: False|'off' PY]), or a storage sibling
+            created only and no Git sibling
+            ([CMD: only CMD][PY: 'only' PY]). In the latter mode, no Git
+            installation is required on the target host."""),
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice(
@@ -210,6 +219,12 @@ class CreateSiblingRia(Interface):
             doc="""specify a trust level for the storage sibling. If not
             specified, the default git-annex trust level is used. 'trust'
             should be used with care (see the git-annex-trust man page).""",),
+        disable_storage__=Parameter(
+            args=("--no-storage-sibling",),
+            dest='disable_storage__',
+            doc="""This option is deprecated. Use '--storage-sibling off'
+            instead.""",
+            action="store_false"),
     )
 
     @staticmethod
@@ -226,8 +241,24 @@ class CreateSiblingRia(Interface):
                  existing='error',
                  trust_level=None,
                  recursive=False,
-                 recursion_limit=None
+                 recursion_limit=None,
+                 disable_storage__=None,
                  ):
+        if disable_storage__ is not None:
+            import warnings
+            warnings.warn("datalad-create-sibling-ria --no-storage-sibling "
+                          "is deprecated, use --storage-sibling off instead.",
+                          DeprecationWarning)
+            # recode to new setup
+            disable_storage__ = None
+            storage_sibling = False
+
+        if storage_sibling == 'only' and storage_name:
+            lgr.warning(
+                "Sibling name will be used for storage sibling in "
+                "storage-sibling-only mode, but a storage sibling name "
+                "was provided"
+            )
 
         ds = require_dataset(
             dataset, check_installed=True, purpose='create sibling RIA')
@@ -236,6 +267,17 @@ class CreateSiblingRia(Interface):
             action="create-sibling-ria",
             logger=lgr,
         )
+
+        # parse target URL
+        try:
+            ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
+        except ValueError as e:
+            yield get_status_dict(
+                status='error',
+                message=str(e),
+                **res_kwargs
+            )
+            return
 
         if ds.repo.get_hexsha() is None or ds.id is None:
             raise RuntimeError(
@@ -329,16 +371,6 @@ class CreateSiblingRia(Interface):
         # reduced to single instance, since rewriting url based on config could
         # be different for subdatasets.
 
-        # parse target URL
-        try:
-            ssh_host, base_path, rewritten_url = verify_ria_url(url, ds.config)
-        except ValueError as e:
-            yield get_status_dict(
-                status='error',
-                message=str(e),
-                **res_kwargs
-            )
-            return
         create_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                      Path(base_path),
                      '1')
@@ -484,15 +516,22 @@ def _create_sibling_ria(
                 )
                 return
 
-    lgr.info("create sibling{} '{}'{} ...".format(
-        's' if storage_name else '',
-        name,
-        " and '{}'".format(storage_name) if storage_name else '',
-    ))
+    if storage_sibling == 'only':
+        lgr.info("create storage sibling '{}' ...".format(name))
+    else:
+        lgr.info("create sibling{} '{}'{} ...".format(
+            's' if storage_name else '',
+            name,
+            " and '{}'".format(storage_name) if storage_name else '',
+        ))
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
                        base_path, ds.id, '2', '1')
     if storage_sibling:
-        lgr.debug('init special remote {}'.format(storage_name))
+        # we are using the main `name`, if the only thing we are creating
+        # is the storage sibling
+        srname = name if storage_sibling == 'only' else storage_name
+
+        lgr.debug('init special remote {}'.format(srname))
         special_remote_options = [
             'type=external',
             'externaltype=ora',
@@ -501,7 +540,7 @@ def _create_sibling_ria(
             'url={}'.format(url)]
         try:
             ds.repo.init_remote(
-                storage_name,
+                srname,
                 options=special_remote_options)
         except CommandError as e:
             if existing == 'reconfigure' \
@@ -511,15 +550,12 @@ def _create_sibling_ria(
                 lgr.debug(
                     "special remote '%s' already exists. "
                     "Run enableremote instead.",
-                    storage_name)
+                    srname)
                 # TODO: Use AnnexRepo.enable_remote (which needs to get
                 #       `options` first)
-                cmd = [
-                    'git',
-                    'annex',
+                ds.repo.call_annex([
                     'enableremote',
-                    storage_name] + special_remote_options
-                subprocess.run(cmd, cwd=quote_cmdlinearg(ds.repo.path))
+                    srname] + special_remote_options)
             else:
                 yield get_status_dict(
                     status='error',
@@ -530,14 +566,23 @@ def _create_sibling_ria(
                 return
 
         if trust_level:
-            trust_cmd = ['annex', trust_level]
+            trust_cmd = [trust_level]
             if trust_level == 'trust':
                 # Following git-annex 8.20201129-73-g6a0030a11, using `git
                 # annex trust` requires --force.
                 trust_cmd.append('--force')
-            ds.repo.call_git(trust_cmd + [storage_name])
+            ds.repo.call_annex(trust_cmd + [srname])
         # get uuid for use in bare repo's config
-        uuid = ds.config.get("remote.{}.annex-uuid".format(storage_name))
+        uuid = ds.config.get("remote.{}.annex-uuid".format(srname))
+
+    if storage_sibling == 'only':
+        # we can stop here, the rest of the function is about setting up
+        # the git remote part of the sibling
+        yield get_status_dict(
+            status='ok',
+            **res_kwargs,
+        )
+        return
 
     # 2. create a bare repository in-store:
 

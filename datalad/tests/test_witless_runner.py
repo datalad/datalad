@@ -27,7 +27,10 @@ from datalad.cmd import (
     WitlessRunner as Runner,
     StdOutCapture,
 )
-from datalad.utils import Path
+from datalad.utils import (
+    on_windows,
+    Path,
+)
 from datalad.support.exceptions import CommandError
 
 
@@ -44,8 +47,8 @@ def py2cmd(code):
 @with_tempfile
 def test_runner(tempfile):
     runner = Runner()
-    content = 'Testing äöü東 real run'
-    cmd = ['sh', '-c', 'echo %s > %r' % (content, tempfile)]
+    content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
+    cmd = 'echo %s > %s' % (content, tempfile)
     res = runner.run(cmd)
     # no capture of any kind, by default
     ok_(not res['stdout'])

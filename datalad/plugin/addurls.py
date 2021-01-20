@@ -10,28 +10,41 @@
 """
 
 from collections.abc import Mapping
-from functools import partial
+
 import logging
 import os
 import re
 import string
+import sys
 
+from functools import partial
 from urllib.parse import urlparse
 
+from datalad.support.external_versions import external_versions
+import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import exc_str
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import annexjson2result, get_status_dict
-from datalad.interface.common_opts import nosave_opt
-from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.interface.common_opts import (
+    jobs_opt,
+    nosave_opt,
+)
+from datalad.support.exceptions import CommandError
+from datalad.support.itertools import groupby_sorted
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
+from datalad.support.parallel import (
+    ProducerConsumerProgressLog,
+    no_parentds_in_futures,
+)
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     get_suggestions_msg,
+    Path,
     unlink,
 )
 
@@ -207,6 +220,108 @@ def filter_legal_metafield(fields):
     return legal
 
 
+class AnnexKeyParser(object):
+    """Parse a full annex key into subparts.
+
+    The key may have an "et:" prefix appended, which signals that the backend's
+    extension state should be toggled.
+
+    See <https://git-annex.branchable.com/internals/key_format/>.
+
+    Parameters
+    ----------
+    format_fn : callable
+        Function that takes a format string and a row and returns the full key.
+    format_string : str
+        Format string for the full key.
+    """
+
+    def __init__(self, format_fn, format_string):
+        self.format_fn = format_fn
+        self.format_string = format_string
+        self.regexp = re.compile(r"(?P<et>et:)?"
+                                 r"(?P<backend>[A-Z0-9]+)"
+                                 r"(?:-[^-]+)?"
+                                 r"--(?P<keyname>[^/\n]+)\Z")
+        self.empty = "".join(i[0]
+                             for i in string.Formatter().parse(format_string))
+
+    @staticmethod
+    def _validate_common(backend, key):
+        if backend.endswith("E"):
+            ext = True
+            backend = backend[:-1]
+        else:
+            ext = False
+
+        expected_lengths = {"MD5": 32,
+                            "SHA1": 40,
+                            "SHA256": 64}
+
+        expected_len = expected_lengths.get(backend)
+        if not expected_len:
+            return
+
+        if ext and "." in key:
+            key = key.split(".", maxsplit=1)[0]
+
+        if len(key) != expected_len:
+            raise ValueError("{} key does not have expected length of {}: {}"
+                             .format(backend, expected_len, key))
+
+        if not re.match(r"[a-f0-9]+\Z", key):
+            raise ValueError("{} key has non-hexadecimal character: {}"
+                             .format(backend, key))
+
+    def parse(self, row):
+        """Format the key with the fields in `row` and parse it.
+
+        Returns
+        -------
+        A dictionary with the following keys that match their counterparts in
+        the output of `git annex examinekey --json`: "key" (the full annex
+        key), "backend", and "keyname". If the key had an "et:" prefix, there
+        is also a "target_backend" key.
+
+        Raises
+        ------
+        ValueError if the formatted value doesn't look like a valid key
+        """
+        try:
+            key = self.format_fn(self.format_string, row)
+        except KeyError as exc:
+            lgr.debug("Row missing fields for --key: %s",
+                      exc_str(exc))
+            return {}
+
+        if key == self.empty:
+            lgr.debug("All fields in --key's value are empty in row: %s", row)
+            # We got the same string that'd we get if all the fields were
+            # empty, so this doesn't have a key.
+            return {}
+
+        match = self.regexp.match(key)
+        if match:
+            info = match.groupdict()
+            et = info.pop("et", None)
+            if et:
+                info["key"] = key[3:]  # Drop "et:" from full key.
+                backend = info["backend"]
+                if backend.endswith("E"):
+                    info["target_backend"] = backend[:-1]
+                else:
+                    info["target_backend"] = backend + "E"
+            else:
+                info["key"] = key
+            self._validate_common(info["backend"], info["keyname"])
+            return info
+        else:
+            raise ValueError(
+                "Key does not match expected "
+                "[et:]<backend>[-[CmsS]NNN]--<key> format: {}"
+                .format(key))
+
+
 def get_fmt_names(format_string):
     """Yield field names in `format_string`.
     """
@@ -249,14 +364,19 @@ def fmt_to_name(format_string, num_to_name):
         return name
 
 
+INPUT_TYPES = ["ext", "csv", "tsv", "json"]
+
+
 def _read(stream, input_type):
-    if input_type == "csv":
+    if input_type in ["csv", "tsv"]:
         import csv
-        csvrows = csv.reader(stream)
+        csvrows = csv.reader(stream,
+                             delimiter="\t" if input_type == "tsv" else ",")
         try:
             headers = next(csvrows)
         except StopIteration:
-            raise ValueError("Failed to read CSV rows from {}".format(stream))
+            raise ValueError("Failed to read {} rows from {}"
+                             .format(input_type.upper(), stream))
         lgr.debug("Taking %s fields from first line as headers: %s",
                   len(headers), headers)
         idx_map = dict(enumerate(headers))
@@ -273,8 +393,35 @@ def _read(stream, input_type):
         # only names.
         idx_map = {}
     else:
-        raise ValueError("input_type must be 'csv', 'json', or 'ext'")
+        raise ValueError(
+            "input_type {} is invalid. Known values: {}"
+            .format(input_type, ", ".join(INPUT_TYPES)))
     return rows, idx_map
+
+
+def _read_from_file(fname, input_type):
+    from_stdin = fname == "-"
+    if input_type == "ext":
+        if from_stdin:
+            input_type = "json"
+        else:
+            extension = os.path.splitext(fname)[1]
+            if extension == ".json":
+                input_type = "json"
+            elif extension == ".tsv":
+                input_type = "tsv"
+            else:
+                input_type = "csv"
+
+    fd = sys.stdin if from_stdin else open(fname)
+    try:
+        records, colidx_to_name = _read(fd, input_type)
+        if not records:
+            lgr.warning("No rows found in %s", fd)
+    finally:
+        if fd is not sys.stdin:
+            fd.close()
+    return records, colidx_to_name
 
 
 def _get_placeholder_exception(exc, msg_prefix, known):
@@ -415,20 +562,20 @@ def sort_paths(paths):
     def level_and_name(p):
         return p.count(os.path.sep), p
 
-    for path in sorted(paths, key=level_and_name):
-        yield path
+    yield from sorted(paths, key=level_and_name)
 
 
-def extract(stream, input_type, url_format="{0}", filename_format="{1}",
-            exclude_autometa=None, meta=None,
+def extract(rows, colidx_to_name=None,
+            url_format="{0}", filename_format="{1}",
+            exclude_autometa=None, meta=None, key=None,
             dry_run=False, missing_value=None):
-    """Extract and format information from `url_file`.
+    """Extract and format information from `rows`.
 
     Parameters
     ----------
-    stream : file object
-        Items used to construct the file names and URLs.
-    input_type : {'csv', 'json'}
+    rows : list of dict
+    colidx_to_name : dict, optional
+        Mapping from a position index to a column name.
 
     All other parameters match those described in `AddUrls`.
 
@@ -438,14 +585,11 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     for each row in `stream` and the second item a list subdataset paths,
     sorted breadth-first.
     """
-    meta = assure_list(meta)
+    meta = ensure_list(meta)
+    colidx_to_name = colidx_to_name or {}
 
-    rows, colidx_to_name = _read(stream, input_type)
-    if not rows:
-        lgr.warning("No rows found in %s", stream)
-        return [], []
-
-    fmt = Formatter(colidx_to_name, missing_value)  # For URL and meta
+    # Formatter for everything but file names
+    fmt = Formatter(colidx_to_name, missing_value)
     format_url = partial(fmt.format, url_format)
 
     auto_meta_args = []
@@ -464,6 +608,19 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     # because meta may be given multiple times on the command line.
     formats_meta = [partial(fmt.format, m) for m in meta + auto_meta_args]
 
+    info_fns = []
+    if formats_meta:
+        def set_meta_args(info, row):
+            info["meta_args"] = clean_meta_args(fmt(row)
+                                                for fmt in formats_meta)
+        info_fns.append(set_meta_args)
+    if key:
+        key_parser = AnnexKeyParser(fmt.format, key)
+
+        def set_key(info, row):
+            info["key"] = key_parser.parse(row)
+        info_fns.append(set_key)
+
     rows_with_url = []
     infos = []
     for row in rows:
@@ -475,8 +632,10 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
-        meta_args = clean_meta_args(fmt(row) for fmt in formats_meta)
-        infos.append({"url": url, "meta_args": meta_args})
+        info = {"url": url}
+        for fn in info_fns:
+            fn(info, row)
+        infos.append(info)
 
     n_dropped = len(rows) - len(rows_with_url)
     if n_dropped:
@@ -496,14 +655,197 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     return infos, list(sort_paths(subpaths))
 
 
-@with_result_progress("Adding URLs")
-def add_urls(rows, ifexists=None, options=None):
+def _add_url(row, ds, repo, options=None, drop_after=False):
+    filename_abs = row["filename_abs"]
+    filename = row["ds_filename"]
+    try:
+        out_json = repo.add_url_to_file(filename, row["url"],
+                                        batch=True, options=options)
+    except CommandError as exc:
+        yield get_status_dict(action="addurls",
+                              ds=ds,
+                              type="file",
+                              path=filename_abs,
+                              message=exc_str(exc),
+                              status="error")
+        return
+
+    # In the case of an error, the json object has file=None.
+    if out_json["file"] is None:
+        out_json["file"] = filename_abs
+    res_addurls = annexjson2result(
+        out_json, ds, action="addurls",
+        type="file", logger=lgr)
+    yield res_addurls
+
+    if not res_addurls["status"] == "ok":
+        return
+
+    if drop_after and 'annexkey' in res_addurls:
+        # unfortunately .drop has no batched mode, and drop_key ATM would
+        # raise AssertionError if not success, and otherwise return nothing
+        try:
+            repo.drop_key(res_addurls['annexkey'], batch=True)
+            st_kwargs = dict(status="ok")
+        except (AssertionError, CommandError) as exc:
+            st_kwargs = dict(message=exc_str(exc),
+                             status="error")
+        yield get_status_dict(action="drop",
+                              ds=ds,
+                              annexkey=res_addurls['annexkey'],
+                              type="file",
+                              path=filename_abs,
+                              **st_kwargs)
+
+
+class RegisterUrl(object):
+    """Create files (without content) from user-supplied keys and register URLs.
+    """
+
+    def __init__(self, ds, repo=None):
+        self.ds = ds
+        self.repo = repo or ds.repo
+        self._err_res = get_status_dict(action="addurls", ds=self.ds,
+                                        type="file", status="error")
+        self.use_pointer = repo.is_managed_branch()
+
+    def examinekey(self, parsed_key, filename, migrate=False):
+        opts = []
+        if migrate:
+            opts.append("--migrate-to-backend=" + parsed_key["target_backend"])
+        opts.extend(["--filename=" + filename, parsed_key["key"]])
+        return self.repo.call_annex_records(["examinekey"] + opts)[0]
+
+    def fromkey(self, key, filename):
+        return self.repo.call_annex_records(
+            ["fromkey", "--force", key, filename])[0]
+
+    def registerurl(self, key, url):
+        self.repo.call_annex(["registerurl", key, url])
+
+    def _write_pointer(self, row, ek_info):
+        try:
+            fname = Path(row["filename_abs"])
+            fname.parent.mkdir(exist_ok=True, parents=True)
+            fname.write_text(ek_info["objectpointer"])
+        except Exception as exc:
+            message = exc_str(exc)
+            status = "error"
+        else:
+            message = "registered URL"
+            status = "ok"
+        return get_status_dict(action="addurls", ds=self.ds, type="file",
+                               status=status, message=message)
+
+    def __call__(self, row):
+        filename = row["ds_filename"]
+        try:
+            parsed_key = row["key"]
+            migrate = "target_backend" in parsed_key
+            use_pointer = self.use_pointer
+            ek_info = None
+            if use_pointer or migrate:
+                ek_info = self.examinekey(parsed_key, filename,
+                                          migrate=migrate)
+                if not ek_info:
+                    yield dict(self._err_res,
+                               path=row["filename_abs"],
+                               message=("Failed to get information for %s",
+                                        parsed_key))
+                    return
+                key = ek_info["key"]
+            else:
+                key = parsed_key["key"]
+
+            self.registerurl(key, row["url"])
+            if use_pointer:
+                res = self._write_pointer(row, ek_info)
+            else:
+                res = annexjson2result(self.fromkey(key, filename),
+                                       self.ds, type="file", logger=lgr)
+                if not res.get("message"):
+                    res["message"] = "registered URL"
+        except CommandError as exc:
+            yield dict(self._err_res,
+                       path=row["filename_abs"],
+                       message=exc_str(exc))
+        else:
+            yield res
+
+
+# Note: If any other modules end up needing these batch operations, this should
+# find a new home.
+
+
+class BatchedRegisterUrl(RegisterUrl):
+    """Like `RegisterUrl`, but use batched commands underneath.
+    """
+
+    def __init__(self, ds, repo=None):
+        super().__init__(ds, repo)
+        self._batch_commands = {}
+
+    def _batch(self, command, batch_input,
+               output_proc=None, json=False, batch_options=None):
+        bcmd = self._batch_commands.get(command)
+        if not bcmd:
+            repo = self.repo
+            bcmd = repo._batched.get(
+                command, path=repo.path, json=json, output_proc=output_proc,
+                annex_options=batch_options)
+            self._batch_commands[command] = bcmd
+        return bcmd(batch_input)
+
+    def examinekey(self, parsed_key, filename, migrate=False):
+        if migrate:
+            opts = ["--migrate-to-backend=" + parsed_key["target_backend"]]
+        else:
+            opts = None
+        return self._batch("examinekey", (parsed_key["key"], filename),
+                           json=True, batch_options=opts)
+
+    def fromkey(self, key, filename):
+        return self._batch("fromkey", (key, filename), json=True,
+                           # --force is needed because the key (usually) does
+                           # not exist in the local repository.
+                           batch_options=["--force"])
+
+    @staticmethod
+    def _ignore(_stdout):
+        return
+
+    def registerurl(self, key, url):
+        self._batch("registerurl", (key, url),
+                    output_proc=self._ignore, json=False)
+
+
+def _log_filter_addurls(res):
+    return res.get('type') == 'file' and res.get('action') in ["addurl", "addurls"]
+
+
+@with_result_progress("Adding URLs", log_filter=_log_filter_addurls)
+def _add_urls(rows, ds, repo, ifexists=None, options=None,
+              drop_after=False, by_key=False):
     """Call `git annex addurl` using information in `rows`.
     """
+    add_url = partial(_add_url, ds=ds, repo=repo,
+                      drop_after=drop_after, options=options)
+    if by_key:
+        # The by_key parameter isn't strictly needed, but it lets us avoid some
+        # setup if --key wasn't specified.
+        if repo.fake_dates_enabled:
+            register_url = RegisterUrl(ds, repo)
+        else:
+            register_url = BatchedRegisterUrl(ds, repo)
+    else:
+        def register_url(*args, **kwargs):
+            raise RuntimeError("bug: this should be impossible")
+
+    add_metadata = {}
     for row in rows:
         filename_abs = row["filename_abs"]
-        ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+        filename = row["ds_filename"]
+        lgr.debug("Adding URLs to %s in %s", filename, ds.path)
 
         if os.path.exists(filename_abs) or os.path.islink(filename_abs):
             if ifexists == "skip":
@@ -519,54 +861,35 @@ def add_urls(rows, ifexists=None, options=None):
             else:
                 lgr.debug("File %s already exists", filename_abs)
 
-        try:
-            out_json = ds.repo.add_url_to_file(filename, row["url"],
-                                               batch=True, options=options)
-        except AnnexBatchCommandError as exc:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  type="file",
-                                  path=filename_abs,
-                                  message=exc_str(exc),
-                                  status="error")
+        fn = register_url if row.get("key") else add_url
+        all_ok = True
+        for res in fn(row):
+            if res["status"] != "ok":
+                all_ok = False
+            yield res
+        if not all_ok:
             continue
 
-        # In the case of an error, the json object has file=None.
-        if out_json["file"] is None:
-            out_json["file"] = filename_abs
-        yield annexjson2result(out_json, ds, action="addurls",
-                               type="file", logger=lgr)
+        if row.get("meta_args"):
+            add_metadata[filename] = row["meta_args"]
 
+    if not add_metadata:
+        return
 
-@with_result_progress("Adding metadata")
-def add_meta(rows):
-    """Call `git annex metadata --set` using information in `rows`.
-    """
+    # For some reason interleaving batched addurl and regular metadata calls
+    # causes multiple commits, so we do need to have it separate.
+    # TODO: figure out with Joey either could be avoided
     from unittest.mock import patch
-
-    for row in rows:
-        ds, filename = row["ds"], row["ds_filename"]
-        with patch.object(ds.repo, "always_commit", False):
-            res = ds.repo.add(filename)
-            res_status = 'notneeded' if not res \
-                else 'ok' if res.get('success', False) \
-                else 'error'
-
-            yield dict(
-                action='add',
-                # decorator dies with Path()
-                path=str(ds.pathobj / filename),
-                type='file',
-                status=res_status,
-                parentds=ds.path,
-            )
-
-            lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
+    with patch.object(repo, "always_commit", False):
+        for filename, meta in add_metadata.items():
+            lgr.debug("Adding metadata to %s in %s", filename, repo.path)
+            assert not repo.always_commit
+            for a in repo.set_metadata_(filename, add=meta):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
-                # Don't show all added metadata for the file because that
-                # could quickly flood the output.
-                del res["message"]
+                if res["status"] == "ok":
+                    # Don't show all added metadata for the file because that
+                    # could quickly flood the output.
+                    del res["message"]
                 yield res
 
 
@@ -577,10 +900,11 @@ class Addurls(Interface):
     *Format specification*
 
     Several arguments take format strings.  These are similar to normal Python
-    format strings where the names from `URL-FILE` (column names for a CSV or
-    properties for JSON) are available as placeholders.  If `URL-FILE` is a CSV
-    file, a positional index can also be used (i.e., "{0}" for the first
-    column).  Note that a placeholder cannot contain a ':' or '!'.
+    format strings where the names from `URL-FILE` (column names for a comma-
+    or tab-separated file or properties for JSON) are available as
+    placeholders. If `URL-FILE` is a CSV or TSV file, a positional index can
+    also be used (i.e., "{0}" for the first column). Note that a placeholder
+    cannot contain a ':' or '!'.
 
     In addition, the `FILENAME-FORMAT` arguments has a few special
     placeholders.
@@ -639,6 +963,12 @@ class Addurls(Interface):
 
       $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
+    If the information is represented as JSON lines instead of comma separated
+    values or a JSON array, you can use a utility like jq to transform the JSON
+    lines into an array that addurls accepts::
+
+      $ ... | jq --slurp . | datalad addurls - '{link}' '{who}.{ext}'
+
     .. note::
 
        For users familiar with 'git annex addurl': A large part of this
@@ -666,8 +996,12 @@ class Addurls(Interface):
             metavar="URL-FILE",
             doc="""A file that contains URLs or information that can be used to
             construct URLs.  Depending on the value of --input-type, this
-            should be a CSV file (with a header as the first row) or a JSON
-            file (structured as a list of objects with string values)."""),
+            should be a comma- or tab-separated file (with a header as the
+            first row) or a JSON file (structured as a list of objects with
+            string values). If '-', read from standard input, taking the
+            content as JSON when --input-type is at its default value of
+            'ext'. [PY:  Alternatively, an iterable of dicts can be given.
+            PY]"""),
         urlformat=Parameter(
             args=("urlformat",),
             metavar="URL-FORMAT",
@@ -687,11 +1021,11 @@ class Addurls(Interface):
         input_type=Parameter(
             args=("-t", "--input-type"),
             metavar="TYPE",
-            doc="""Whether `URL-FILE` should be considered a CSV file or a JSON
-            file.  The default value, "ext", means to consider `URL-FILE` as a
-            JSON file if it ends with ".json".  Otherwise, treat it as a CSV
-            file.""",
-            constraints=EnsureChoice("ext", "csv", "json")),
+            doc="""Whether `URL-FILE` should be considered a CSV file, TSV
+            file, or JSON file. The default value, "ext", means to consider
+            `URL-FILE` as a JSON file if it ends with ".json" or a TSV file if
+            it ends with ".tsv". Otherwise, treat it as a CSV file.""",
+            constraints=EnsureChoice(*INPUT_TYPES)),
         exclude_autometa=Parameter(
             args=("-x", "--exclude_autometa"),
             metavar="REGEXP",
@@ -710,6 +1044,26 @@ class Addurls(Interface):
             would mean that the value for the "location" metadata field should
             be set the value of the fourth column.  This option can be given
             multiple times."""),
+        key=Parameter(
+            args=("--key",),
+            metavar="FORMAT",
+            doc="""A format string that specifies an annex key for the file
+            content. In this case, the file is not downloaded; instead the key
+            is used to create the file without content. The value should be
+            structured as "[et:]<input backend>[-s<bytes>]--<hash>". The
+            optional "et:" prefix, which requires git-annex 8.20201116 or
+            later, signals to toggle extension state of the input backend
+            (i.e., MD5 vs MD5E). As an example, "et:MD5-s{size}--{md5sum}"
+            would use the 'md5sum' and 'size' columns to construct the key,
+            migrating the key from MD5 to MD5E, with an extension based on the
+            file name. Note: If the *input* backend itself is an annex
+            extension backend (i.e., a backend with a trailing "E"), the key's
+            extension will not be updated to match the extension of the
+            corresponding file name. Thus, unless the input keys and file names
+            are generated from git-annex, it is recommended to avoid using
+            extension backends as input. If an extension is desired, use the
+            plain variant as input and prepend "et:" so that git-annex will
+            migrate from the plain backend to the extension variant."""),
         message=Parameter(
             args=("--message",),
             metavar="MESSAGE",
@@ -753,16 +1107,22 @@ class Addurls(Interface):
             action='append',
             doc="""Pass this [PY: cfg_proc PY][CMD: --cfg_proc CMD] value when
             calling `create` to make datasets."""),
+        jobs=jobs_opt,
+        drop_after=Parameter(
+            args=("--drop-after",),
+            action="store_true",
+            doc="""drop files after adding to annex""",
+        ),
     )
 
     @staticmethod
     @datasetmethod(name='addurls')
     @eval_results
     def __call__(dataset, urlfile, urlformat, filenameformat,
-                 input_type="ext", exclude_autometa=None, meta=None,
+                 input_type="ext", exclude_autometa=None, meta=None, key=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
-                 cfg_proc=None):
+                 cfg_proc=None, jobs=None, drop_after=False):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
@@ -770,147 +1130,239 @@ class Addurls(Interface):
         from requests.exceptions import RequestException
 
         from datalad.distribution.dataset import Dataset, require_dataset
-        from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
 
         lgr = logging.getLogger("datalad.plugin.addurls")
 
         ds = require_dataset(dataset, check_installed=False)
-        if ds.repo and not isinstance(ds.repo, AnnexRepo):
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="error",
-                                  message="not an annex repo")
+        repo = ds.repo
+        st_dict = get_status_dict(action="addurls", ds=ds)
+        if repo and not isinstance(repo, AnnexRepo):
+            yield dict(st_dict, status="error", message="not an annex repo")
             return
 
-        url_file = str(resolve_path(url_file, dataset))
+        if key:
+            old_examinekey = external_versions["cmd:annex"] < "8.20201116"
+            if old_examinekey:
+                old_msg = None
+                if key.startswith("et:"):
+                    old_msg = ("et: prefix of `key` option requires "
+                               "git-annex 8.20201116 or later")
+                elif repo.is_managed_branch():
+                    old_msg = ("Using `key` option on adjusted branch "
+                               "requires git-annex 8.20201116 or later")
+                if old_msg:
+                    yield dict(st_dict, status="error", message=old_msg)
+                    return
 
-        if input_type == "ext":
-            extension = os.path.splitext(url_file)[1]
-            input_type = "json" if extension == ".json" else "csv"
-
-        with open(url_file) as fd:
+        if isinstance(url_file, str):
+            if url_file != "-":
+                url_file = str(resolve_path(url_file, dataset))
             try:
-                rows, subpaths = extract(fd, input_type,
-                                         url_format, filename_format,
-                                         exclude_autometa, meta,
-                                         dry_run,
-                                         missing_value)
-            except (ValueError, RequestException) as exc:
+                records, colidx_to_name = _read_from_file(
+                    url_file, input_type)
+            except ValueError as exc:
                 yield get_status_dict(action="addurls",
                                       ds=ds,
                                       status="error",
                                       message=exc_str(exc))
                 return
+            displayed_source = "'{}'".format(urlfile)
+        else:
+            displayed_source = "<records>"
+            records = ensure_list(url_file)
+            colidx_to_name = {}
+
+        rows = None
+        if records:
+            try:
+                rows, subpaths = extract(records, colidx_to_name,
+                                         url_format, filename_format,
+                                         exclude_autometa, meta, key,
+                                         dry_run,
+                                         missing_value)
+            except (ValueError, RequestException) as exc:
+                yield dict(st_dict, status="error", message=exc_str(exc))
+                return
 
         if not rows:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="notneeded",
-                                  message="No rows to process")
+            yield dict(st_dict, status="notneeded",
+                       message="No rows to process")
             return
 
         if len(rows) != len(set(row["filename"] for row in rows)):
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="error",
-                                  message=("There are file name collisions; "
-                                           "consider using {_repindex}"))
+            yield dict(st_dict, status="error",
+                       message=("There are file name collisions; "
+                                "consider using {_repindex}"))
             return
 
         if dry_run:
             for subpath in subpaths:
                 lgr.info("Would create a subdataset at %s", subpath)
             for row in rows:
-                lgr.info("Would download %s to %s",
+                lgr.info("Would %s %s to %s",
+                         "register" if row.get("key") else "download",
                          row["url"],
                          os.path.join(ds.path, row["filename"]))
-                lgr.info("Metadata: %s",
-                         sorted(u"{}={}".format(k, v)
-                                for k, v in row["meta_args"].items()))
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  status="ok",
-                                  message="dry-run finished")
+                if "meta_args" in row:
+                    lgr.info("Metadata: %s",
+                             sorted(u"{}={}".format(k, v)
+                                    for k, v in row["meta_args"].items()))
+            yield dict(st_dict, status="ok", message="dry-run finished")
             return
 
-        if not ds.repo:
+        if not repo:
             # Populate a new dataset with the URLs.
-            for r in ds.create(result_xfm=None,
-                               return_type='generator',
-                               cfg_proc=cfg_proc):
-                yield r
+            yield from ds.create(
+                result_xfm=None,
+                return_type='generator',
+                cfg_proc=cfg_proc)
 
         annex_options = ["--fast"] if fast else []
 
-        for spath in subpaths:
-            if os.path.exists(os.path.join(ds.path, spath)):
-                lgr.warning(
-                    "Not creating subdataset at existing path: %s",
-                    spath)
-            else:
-                for r in ds.create(spath, result_xfm=None,
-                                   cfg_proc=cfg_proc,
-                                   return_type='generator'):
-                    yield r
-
-        for row in rows:
-            # Add additional information that we'll need for various
-            # operations.
-            filename_abs = os.path.join(ds.path, row["filename"])
-            if row["subpath"]:
-                ds_current = Dataset(os.path.join(ds.path,
-                                                  row["subpath"]))
-            else:
-                ds_current = ds
-            ds_filename = os.path.relpath(filename_abs, ds_current.path)
-            row.update({"filename_abs": filename_abs,
-                        "ds": ds_current,
-                        "ds_filename": ds_filename})
-
-        if version_urls:
-            num_urls = len(rows)
-            log_progress(lgr.info, "addurls_versionurls",
-                         "Versioning %d URLs", num_urls,
-                         label="Versioning URLs",
-                         total=num_urls, unit=" URLs")
-            for row in rows:
-                url = row["url"]
-                try:
-                    row["url"] = get_versioned_url(url)
-                except (ValueError, NotImplementedError) as exc:
-                    # We don't expect this to happen because get_versioned_url
-                    # should return the original URL if it isn't an S3 bucket.
-                    # It only raises exceptions if it doesn't know how to
-                    # handle the scheme for what looks like an S3 bucket.
-                    lgr.warning("error getting version of %s: %s",
-                                row["url"], exc_str(exc))
-                log_progress(lgr.info, "addurls_versionurls",
-                             "Versioned result for %s: %s", url, row["url"],
-                             update=1, increment=True)
-            log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
-
+        # to be populated by addurls_to_ds
         files_to_add = set()
-        for r in add_urls(rows, ifexists=ifexists, options=annex_options):
-            if r["status"] == "ok":
-                files_to_add.add(r["path"])
-            yield r
+        created_subds = []
 
-            msg = message or """\
-[DATALAD] add files from URLs
+        def addurls_to_ds(args):
+            """The "consumer" for ProducerConsumer parallel execution"""
+            subpath, rows = args
 
-url_file='{}'
-url_format='{}'
-filename_format='{}'""".format(url_file, url_format, filename_format)
+            ds_path = ds.path  # shortcut on closure from outside
 
-        if files_to_add:
-            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
-            for r in add_meta(meta_rows):
+            # technically speaking, subds might be the ds
+            if subpath:
+                subds_path = os.path.join(ds_path, subpath)
+            else:
+                subds_path = ds_path
+
+            for row in rows:
+                # Add additional information that we'll need for various
+                # operations.
+                filename_abs = op.join(ds_path, row["filename"])
+                ds_filename = op.relpath(filename_abs, subds_path)
+                row.update({"filename_abs": filename_abs,
+                            "ds_filename": ds_filename})
+
+            subds = Dataset(subds_path)
+
+            if subds.is_installed():
+                lgr.debug(
+                    "Not creating subdataset at existing path: %s",
+                    subds_path)
+            else:
+                yield from subds.create(result_xfm=None,
+                                        cfg_proc=cfg_proc,
+                                        return_type='generator')
+                created_subds.append(subpath)
+            repo = subds.repo  # "expensive" so we get it once
+
+            if version_urls:
+                num_urls = len(rows)
+                log_progress(lgr.info, "addurls_versionurls",
+                             "Versioning %d URLs", num_urls,
+                             label="Versioning URLs",
+                             total=num_urls, unit=" URLs")
+                for row in rows:
+                    url = row["url"]
+                    try:
+                        # TODO: make get_versioned_url more efficient while going
+                        # through the same bucket(s)
+                        row["url"] = get_versioned_url(url)
+                    except (ValueError, NotImplementedError) as exc:
+                        # We don't expect this to happen because get_versioned_url
+                        # should return the original URL if it isn't an S3 bucket.
+                        # It only raises exceptions if it doesn't know how to
+                        # handle the scheme for what looks like an S3 bucket.
+                        lgr.warning("error getting version of %s: %s",
+                                    row["url"], exc_str(exc))
+                    log_progress(lgr.info, "addurls_versionurls",
+                                 "Versioned result for %s: %s", url, row["url"],
+                                 update=1, increment=True)
+                log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
+
+            subds_files_to_add = set()
+            for r in _add_urls(rows, subds, repo,
+                               ifexists=ifexists, options=annex_options,
+                               drop_after=drop_after, by_key=key):
+                if r["status"] == "ok":
+                    subds_files_to_add.add(r["path"])
                 yield r
 
-            if save:
-                for r in ds.save(path=files_to_add, message=msg, recursive=True):
-                    yield r
+            files_to_add.update(subds_files_to_add)
+            pass  # end of addurls_to_ds
+
+
+        # We need to group by dataset since otherwise we will initiate
+        # batched annex process per each subdataset, which might be infeasible
+        # in any use-case with a considerable number of subdatasets.
+        # Also groupping allows us for parallelization across datasets, and avoids
+        # proliferation of commit messages upon creation of each individual subdataset.
+
+        def keyfn(d):
+            # The top-level dataset has a subpath of None.
+            return d.get("subpath") or ""
+
+        # We need to serialize itertools.groupby .
+        rows_by_ds = [(k, tuple(v)) for k, v in groupby_sorted(rows, key=keyfn)]
+
+        # There could be "intermediate" subdatasets which have no rows but would need
+        # their datasets created and saved, so let's add them
+        add_subpaths = set(subpaths).difference(r[0] for r in rows_by_ds)
+        nrows_by_ds_orig = len(rows_by_ds)
+        if add_subpaths:
+            for subpath in add_subpaths:
+                rows_by_ds.append((subpath, tuple()))
+            # and now resort them again since we added
+            rows_by_ds = sorted(rows_by_ds, key=lambda r: r[0])
+
+        # We want to provide progress overall files not just datasets
+        # so our total will be just a len of rows
+        def agg_files(*args, **kwargs):
+            return len(rows)
+
+        yield from ProducerConsumerProgressLog(
+            rows_by_ds,
+            addurls_to_ds,
+            agg=agg_files,
+            # It is ok to start with subdatasets since top dataset already exists
+            safe_to_consume=partial(no_parentds_in_futures, skip=("", None, ".")),
+            # our producer provides not only dataset paths and also rows, take just path
+            producer_future_key=lambda row_by_ds: row_by_ds[0],
+            jobs=jobs,
+            # Logging options
+            # we will be yielding all kinds of records, but of interest for progress
+            # reporting only addurls on files
+            # note: annexjson2result overrides 'action' with 'command' content from
+            # annex, so we end up with 'addurl' even if we provide 'action'='addurls'.
+            # TODO: see if it is all ok, since we might be now yielding both
+            # addurls and addurl records.
+            log_filter=_log_filter_addurls,
+            unit="files",
+            lgr=lgr,
+        )
+
+        if save:
+            extra_msgs = []
+            if created_subds:
+                extra_msgs.append(f"{len(created_subds)} subdatasets were created")
+            if extra_msgs:
+                extra_msgs.append('')
+            message_addurls = message or f"""\
+[DATALAD] add {len(files_to_add)} files to {nrows_by_ds_orig} (sub)datasets from URLs
+
+{os.linesep.join(extra_msgs)}
+url_file={displayed_source}
+url_format='{url_format}'
+filename_format='{filenameformat}'"""
+
+            # save all in bulk
+            files_to_add.update([r[0] for r in rows_by_ds])
+            yield from ds.save(
+                list(files_to_add),
+                message=message_addurls,
+                jobs=jobs,
+                return_type='generator')
 
 
 __datalad_plugin__ = Addurls

@@ -36,7 +36,7 @@ from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge c
 from datalad.utils import (
     path_startswith,
     path_is_subpath,
-    assure_unicode,
+    ensure_unicode,
     getargspec,
     get_wrapped_class,
 )
@@ -56,7 +56,6 @@ from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
-from datalad.config import ConfigManager
 from datalad.core.local.resulthooks import (
     get_jsonhooks_from_config,
     match_jsonhook2result,
@@ -232,7 +231,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     filematch = False
     if isdir(basepath):
         for p in listdir(basepath):
-            p = assure_unicode(opj(basepath, p))
+            p = ensure_unicode(opj(basepath, p))
             if not isdir(p):
                 if p in targetpaths:
                     filematch = True
@@ -368,20 +367,8 @@ def eval_results(func):
         from datalad.distribution.dataset import Dataset
         ds = dataset_arg if isinstance(dataset_arg, Dataset) \
             else Dataset(dataset_arg) if dataset_arg else None
-        # do not reuse a dataset's existing config manager here
-        # they are configured to read the committed dataset configuration
-        # too. That means a datalad update can silently bring in new
-        # procedure definitions from the outside, and in some sense enable
-        # remote code execution by a 3rd-party
-        # To avoid that, create a new config manager that only reads local
-        # config (system and .git/config), plus any overrides given to this
-        # datalad session
-        proc_cfg = ConfigManager(
-            ds, source='local', overrides=dlcfg.overrides
-        ) if ds and ds.is_installed() else dlcfg
-
         # look for hooks
-        hooks = get_jsonhooks_from_config(proc_cfg)
+        hooks = get_jsonhooks_from_config(ds.config if ds else dlcfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,

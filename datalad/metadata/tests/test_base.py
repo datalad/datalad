@@ -29,13 +29,14 @@ from datalad.metadata.metadata import (
     query_aggregated_metadata,
 )
 from datalad.utils import (
-    assure_unicode,
     chpwd,
+    ensure_unicode,
 )
 from datalad.tests.utils import (
     assert_dict_equal,
     assert_equal,
     assert_in,
+    assert_in_results,
     assert_raises,
     assert_re_in,
     assert_repo_status,
@@ -138,9 +139,8 @@ def test_aggregation(path):
     res = ds.aggregate_metadata(recursive=True, update_mode='all')
     # we get success report for both subdatasets and the superdataset,
     # and they get saved
-    assert_result_count(res, 6)
     assert_result_count(res, 3, status='ok', action='aggregate_metadata')
-    assert_result_count(res, 3, status='ok', action='save')
+    assert_in_results(res, action='save', status="ok")
     # nice and tidy
     assert_repo_status(ds.path)
 
@@ -163,7 +163,7 @@ def test_aggregation(path):
     for name in ('MOTHER_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(
             sum([s['metadata']['frictionless_datapackage']['name'] \
-                    == assure_unicode(name) for s in origres
+                    == ensure_unicode(name) for s in origres
                  if s['type'] == 'dataset']))
 
     # now clone the beast to simulate a new user installing an empty dataset

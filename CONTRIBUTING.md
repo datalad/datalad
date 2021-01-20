@@ -35,6 +35,12 @@
   benchmarking of DataLad.  Implemented in any most appropriate language
   (Python, bash, etc.)
 
+Whenever a new top-level file or folder is added to the repository, it should
+be listed in `MANIFEST.in` so that it will be either included in or excluded
+from source distributions as appropriate.  [See
+here](https://packaging.python.org/guides/using-manifest-in/) for information
+about writing a `MANIFEST.in`.
+
 ## How to contribute
 
 The preferred way to contribute to the DataLad code base is
@@ -119,7 +125,7 @@ we outline the workflow used by the developers:
 
 ## Development environment
 
-We support Python 3 only (>= 3.5).
+We support Python 3 only (>= 3.6).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -149,6 +155,64 @@ pip install -r requirements-devel.txt
 
 and you will need to install recent git-annex using appropriate for your
 OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
+
+Contributor Files History
+-------------------------
+
+The original repository provided a [.zenodo.json](.zenodo.json)
+file, and we generate a [.contributors file](.all-contributorsrc) from that via:
+
+```bash
+pip install tributors
+tributors --version
+0.0.18
+```
+
+It helps to have a GitHub token to increase API limits:
+
+```bash
+export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment). 
+Then update zenodo:
+
+```bash
+tributors update  zenodo
+INFO:    zenodo:Updating .zenodo.json
+INFO:    zenodo:Updating .tributors cache from .zenodo.json
+WARNING:tributors:zenodo does not support updating from names.
+```
+
+In the case that there is more than one orcid found for a user, you will be given a list
+to check. Others will be updated in the file. You can then curate the file as you see fit.
+We next want to add the .allcontributors file:
+
+```bash
+$ tributors init allcontrib
+INFO:allcontrib:Generating .all-contributorsrc for datalad/datalad
+$ tributors update allcontrib
+INFO:allcontrib:Updating .all-contributorsrc
+INFO:allcontrib:Updating .tributors cache from .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor glalteva in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor adswa in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
+...
+INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor bhanuprasad14 in .all-contributorsrc
+WARNING:tributors:allcontrib does not support updating from orcids.
+WARNING:tributors:allcontrib does not support updating from email.
+```
+
+We can then populate the shared .tributors file:
+
+```bash
+$ tributors update-lookup allcontrib
+```
+
+And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
+look for new orcids as we did above.
 
 
 ## Documentation
@@ -450,6 +514,10 @@ We welcome and recognize all contributions from documentation to testing to code
 
 You can see a list of current contributors in our [zenodo file][link_zenodo].
 If you are new to the project, don't forget to add your name and affiliation there!
+We also have an .all-contributorsrc that is updated automatically on merges. Once it's
+merged, if you helped in a non standard way (e.g., a contribution other than code)
+you can open a pull request to add any [All Contributors Emoji][contrib_emoji] that
+match your contribution types.
 
 ## Thank you!
 
@@ -597,7 +665,7 @@ Refer datalad/config.py for information on how to add these environment variable
 For the upcoming release use this template
 
 ```markdown
-## 0.13.9 (??? ??, 2021) -- will be better than ever
+## 0.15.0 (??? ??, 2020) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -615,3 +683,4 @@ bet we will fix some bugs and make a world even a better place.
 ```
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
+[contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

@@ -14,30 +14,44 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import join as opj
-from os.path import isabs
-from os.path import normpath
-
-from datalad.utils import assure_list
+from os.path import (
+    join as opj,
+    isabs,
+    normpath,
+)
+from datalad.utils import ensure_list
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.gitrepo import GitRepo
-from datalad.distribution.dataset import Dataset, EnsureDataset, \
-    datasetmethod
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
-from datalad.interface.base import Interface
-from datalad.interface.common_opts import if_dirty_opt
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
-from datalad.interface.results import get_status_dict
-from datalad.interface.results import annexjson2result
-from datalad.interface.results import success_status_map
-from datalad.interface.results import results_from_annex_noinfo
-from datalad.interface.utils import handle_dirty_dataset
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.common_opts import (
+    if_dirty_opt,
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.interface.results import (
+    get_status_dict,
+    annexjson2result,
+    success_status_map,
+    results_from_annex_noinfo,
+)
+from datalad.interface.utils import (
+    handle_dirty_dataset,
+    eval_results,
+)
+from datalad.core.local.status import Status
 
 lgr = logging.getLogger('datalad.distribution.drop')
 
@@ -59,6 +73,22 @@ check_argument = Parameter(
     dest='check')
 
 
+def _postproc_result(res, respath_by_status, ds, **kwargs):
+    res = annexjson2result(
+        # annex reports are always about files
+        res, ds, type='file', **kwargs)
+    success = success_status_map[res['status']]
+    respath_by_status[success] = \
+        respath_by_status.get(success, []) + [res['path']]
+    if res["status"] == "error" and res["action"] == "drop":
+        msg = res["message"]
+        if isinstance(msg, str) and "Use --force to" in msg:
+            # Avoid confusing datalad-drop callers with git-annex-drop's
+            # suggestion to use --force.
+            res["message"] = msg.replace("--force", "--nocheck")
+    return res
+
+
 def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
     """Helper to drop content in datasets.
 
@@ -76,12 +106,14 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
     **kwargs
       additional payload for the result dicts
     """
+    # expensive, access only once
+    ds_repo = ds.repo
     if 'action' not in kwargs:
         kwargs['action'] = 'drop'
     # always need to make sure that we pass a list
     # `normalize_paths` decorator will otherwise screw all logic below
-    paths = assure_list(paths)
-    if not hasattr(ds.repo, 'drop'):
+    paths = ensure_list(paths)
+    if not hasattr(ds_repo, 'drop'):
         for p in paths:
             r = get_status_dict(
                 status='impossible' if noannex_iserror else 'notneeded',
@@ -92,22 +124,23 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
             yield r
         return
 
-    opts = ['--force'] if not check else []
+    cmd = ['drop']
+    if not check:
+        cmd.append('--force')
+
     respath_by_status = {}
-    for res in ds.repo.drop(paths, options=opts):
-        res = annexjson2result(
-            # annex reports are always about files
-            res, ds, type='file', **kwargs)
-        success = success_status_map[res['status']]
-        respath_by_status[success] = \
-            respath_by_status.get(success, []) + [res['path']]
-        if res["status"] == "error" and res["action"] == "drop":
-            msg = res["message"]
-            if isinstance(msg, str) and "Use --force to" in msg:
-                # Avoid confusing datalad-drop callers with git-annex-drop's
-                # suggestion to use --force.
-                res["message"] = msg.replace("--force", "--nocheck")
-        yield res
+    try:
+        yield from (
+            _postproc_result(res, respath_by_status, ds)
+            for res in ds_repo._call_annex_records(cmd, files=paths)
+        )
+    except CommandError as e:
+        # pick up the results captured so far and yield them
+        # the error will be amongst them
+        yield from (
+            _postproc_result(res, respath_by_status, ds)
+            for res in e.kwargs.get('stdout_json', [])
+        )
     # report on things requested that annex was silent about
     for r in results_from_annex_noinfo(
             ds, paths, respath_by_status,
@@ -184,41 +217,52 @@ class Drop(Interface):
                 "insufficient information for `drop`: requires at least a path or dataset")
         refds_path = Interface.get_refds_path(dataset)
         res_kwargs = dict(action='drop', logger=lgr, refds=refds_path)
+        # this try-except dance is only to maintain a previous behavior of `drop`
+        # where it did not ValueError, but yielded error status
+        try:
+            ds = require_dataset(
+                dataset, check_installed=True, purpose='dropping content')
+        except ValueError as e:
+            yield dict(
+                status='error',
+                message=str(e),
+                **res_kwargs,
+            )
+            return
+
         if dataset and not path:
             # act on the whole dataset if nothing else was specified
             path = refds_path
-        to_drop = []
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
+        content_by_ds = {}
+        for st in Status.__call__(
+                # do not use `ds` to preserve path semantics
+                dataset=dataset,
                 path=path,
+                annex=None,
+                untracked='no',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                action='drop',
-                # justification for status:
-                # content need not be dropped where there is none
-                unavailable_path_status='notneeded',
-                nondataset_path_status='error',
+                eval_subdataset_state='no',
+                report_filetype='raw',
                 return_type='generator',
+                result_renderer=None,
+                # yield errors and let caller decide
                 on_failure='ignore'):
-            if ap.get('status', None):
-                # this is done
-                yield ap
+            if st['status'] == 'error':
+                # Downstream code can't do anything with these. Let the caller
+                # decide their fate.
+                yield st
                 continue
-            if ap.get('type', None) == 'dataset' and \
-                    GitRepo.is_valid_repo(ap['path']) and \
-                    not ap['path'] == refds_path:
-                ap['process_content'] = True
-            if ap.get('registered_subds', False) and ap.get('state', None) == 'absent':
-                # nothing to drop in an absent subdataset, don't be annoying
-                # and skip silently
-                continue
-            to_drop.append(ap)
-
-        content_by_ds, ds_props, completed, nondataset_paths = \
-            annotated2content_by_ds(
-                to_drop,
-                refds_path=refds_path)
-        assert(not completed)
+            # ignore submodule entries
+            if st.get('type') == 'dataset':
+                if not Dataset(st['path']).is_installed():
+                    continue
+                parentds = st['path']
+            else:
+                parentds = st['parentds']
+            cbd = content_by_ds.get(parentds, [])
+            cbd.append(st['path'])
+            content_by_ds[parentds] = cbd
 
         # iterate over all datasets, order doesn't matter
         for ds_path in content_by_ds:
@@ -226,11 +270,10 @@ class Drop(Interface):
             # TODO generator
             # this should yield what it did
             handle_dirty_dataset(ds, mode=if_dirty)
-            # ignore submodule entries
-            content = [ap['path'] for ap in content_by_ds[ds_path]
-                       if ap.get('type', None) != 'dataset' or ap['path'] == ds.path]
-            if not content:
-                continue
-            for r in _drop_files(ds, content, check=check, **res_kwargs):
+            for r in _drop_files(
+                    ds,
+                    content_by_ds[ds_path],
+                    check=check,
+                    **res_kwargs):
                 yield r
         # there is nothing to save at the end

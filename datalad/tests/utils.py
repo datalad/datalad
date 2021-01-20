@@ -80,7 +80,6 @@ from datalad.utils import (
     ensure_unicode,
 )
 
-from ..cmd import Runner
 from .. import utils
 from ..support.exceptions import (
     CommandError,
@@ -96,6 +95,12 @@ from ..consts import (
     ARCHIVES_TEMP_DIR,
 )
 from . import _TEMP_PATHS_GENERATED
+from datalad.cmd import (
+    GitWitlessRunner,
+    KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
@@ -704,10 +709,12 @@ def with_memory_keyring(t):
 def without_http_proxy(tfunc):
     """Decorator to remove http*_proxy env variables for the duration of the test
     """
-
+    
     @wraps(tfunc)
     @attr('without_http_proxy')
     def  _wrap_without_http_proxy(*args, **kwargs):
+        if on_windows:
+            raise SkipTest('Unclear why this is not working on windows')
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
         env = os.environ.copy()
@@ -947,22 +954,17 @@ def _get_resolved_flavors(flavors):
 
 
 def clone_url(url):
-    # delay import of our code until needed for certain
-    from ..cmd import Runner
-    runner = Runner()
+    runner = GitWitlessRunner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs(
         {'dir': dl_cfg.get("datalad.tests.temp.dir")}, prefix='clone_url'))
-    _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    runner.run(["git", "clone", url, tdir], protocol=KillOutput)
     if GitRepo(tdir).is_with_annex():
         AnnexRepo(tdir, init=True)
     _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
 
-if not on_windows:
-    local_testrepo_flavors = ['local'] # 'local-url'
-else:
-    local_testrepo_flavors = ['network-clone']
+local_testrepo_flavors = ['local'] # 'local-url'
 
 _TESTREPOS = None
 
@@ -1312,8 +1314,8 @@ def assert_status(label, results):
     `label` can be a sequence, in which case status must be one of the items
     in this sequence.
     """
-    label = assure_list(label)
-    results = assure_list(results)
+    label = ensure_list(label)
+    results = ensure_list(results)
     for i, r in enumerate(results):
         try:
             assert_in('status', r)
@@ -1332,7 +1334,7 @@ def assert_message(message, results):
     This only tests the message template string, and not a formatted message
     with args expanded.
     """
-    for r in assure_list(results):
+    for r in ensure_list(results):
         assert_in('message', r)
         m = r['message'][0] if isinstance(r['message'], tuple) else r['message']
         assert_equal(m, message)
@@ -1347,7 +1349,7 @@ def _format_res(x):
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
-    results = assure_list(results)
+    results = ensure_list(results)
     for r in results:
         if not len(kwargs):
             count += 1
@@ -1367,7 +1369,7 @@ def assert_in_results(results, **kwargs):
     """Verify that the particular combination of keys and values is found in
     one of the results"""
     found = False
-    for r in assure_list(results):
+    for r in ensure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
     if not found:
@@ -1379,7 +1381,7 @@ def assert_in_results(results, **kwargs):
 def assert_not_in_results(results, **kwargs):
     """Verify that the particular combination of keys and values is not in any
     of the results"""
-    for r in assure_list(results):
+    for r in ensure_list(results):
         assert any(k not in r or r[k] != v for k, v in kwargs.items())
 
 
@@ -1401,7 +1403,7 @@ def assert_result_values_cond(results, prop, cond):
     prop: str
     cond: callable
     """
-    for r in assure_list(results):
+    for r in ensure_list(results):
         ok_(cond(r[prop]),
             msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
 
@@ -1892,6 +1894,18 @@ def get_deeply_nested_structure(path):
     return ds
 
 
+def maybe_adjust_repo(repo):
+    """Put repo into an adjusted branch if it is not already.
+    """
+    if not repo.is_managed_branch():
+        # The next condition can be removed once GIT_ANNEX_MIN_VERSION is at
+        # least 7.20190912.
+        if not repo.supports_unlocked_pointers:
+            repo.call_annex(["upgrade"])
+            repo.config.reload(force=True)
+        repo.adjust()
+
+
 @with_tempfile
 @with_tempfile
 def has_symlink_capability(p1, p2):
@@ -1914,6 +1928,29 @@ def skip_wo_symlink_capability(func):
             raise SkipTest("no symlink capabilities")
         return func(*args, **kwargs)
     return  _wrap_skip_wo_symlink_capability
+
+
+_TESTS_ADJUSTED_TMPDIR = None
+
+
+def skip_if_adjusted_branch(func):
+    """Skip test if adjusted branch is used by default on TMPDIR file system.
+    """
+    @wraps(func)
+    @attr('skip_if_adjusted_branch')
+    def _wrap_skip_if_adjusted_branch(*args, **kwargs):
+        global _TESTS_ADJUSTED_TMPDIR
+        if _TESTS_ADJUSTED_TMPDIR is None:
+            @with_tempfile
+            def _check(path):
+                ds = Dataset(path).create(force=True)
+                return ds.repo.is_managed_branch()
+            _TESTS_ADJUSTED_TMPDIR = _check()
+
+        if _TESTS_ADJUSTED_TMPDIR:
+            raise SkipTest("Test incompatible with adjusted branch default")
+        return func(*args, **kwargs)
+    return _wrap_skip_if_adjusted_branch
 
 
 def get_ssh_port(host):
@@ -1939,8 +1976,11 @@ def get_ssh_port(host):
     SkipTest if port cannot be found.
     """
     out = ''
+    runner = WitlessRunner()
     try:
-        out, err = Runner()(["ssh", "-G", host])
+        res = runner.run(["ssh", "-G", host], protocol=StdOutErrCapture)
+        out = res["stdout"]
+        err = res["stderr"]
     except Exception as exc:
         err = str(exc)
 
@@ -1966,8 +2006,12 @@ def get_ssh_port(host):
 
 def patch_config(vars):
     """Patch our config with custom settings. Returns mock.patch cm
+
+    Only the merged configuration from all sources (global, local, dataset)
+    will be patched. Source-constrained patches (e.g. only committed dataset
+    configuration) are not supported.
     """
-    return patch.dict(dl_cfg._store, vars)
+    return patch.dict(dl_cfg._merged_store, vars)
 
 
 @contextmanager
