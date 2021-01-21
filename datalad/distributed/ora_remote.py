@@ -631,6 +631,8 @@ class RIARemote(SpecialRemote):
         if hasattr(self, 'configs'):
             # introduced in annexremote 1.4.2 to support LISTCONFIGS
             self.configs['url'] = "RIA store to use"
+            self.configs['archive-id'] = "Dataset ID. Should be set " \
+                                         "automatically by datalad"
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
