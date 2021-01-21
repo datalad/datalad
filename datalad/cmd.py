@@ -268,6 +268,9 @@ class WitlessRunner(object):
     """
     __slots__ = ['cwd', 'env']
 
+    _event_loop = None
+    _event_loop_pid = None
+
     def __init__(self, cwd=None, env=None):
         """
         Parameters
@@ -284,6 +287,17 @@ class WitlessRunner(object):
         self.env = env
         # stringify to support Path instances on PY35
         self.cwd = str(cwd) if cwd is not None else None
+
+    @staticmethod
+    def _get_event_loop():
+        pid = os.getpid()
+        if WitlessRunner._event_loop_pid is None \
+                or pid != WitlessRunner._event_loop_pid \
+                or WitlessRunner._event_loop.is_closed():
+            WitlessRunner._event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(WitlessRunner._event_loop)
+            WitlessRunner._event_loop_pid = pid
+        return WitlessRunner._event_loop
 
     def _get_adjusted_env(self, env=None, cwd=None, copy=True):
         """Return an adjusted copy of an execution environment
@@ -354,49 +368,19 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        # rescue any event-loop to be able to reassign after we are done
-        # with our own event loop management
-        # this is how ipython does it
-        try:
-            event_loop = asyncio.get_event_loop()
-            if event_loop.is_closed():
-                raise RuntimeError("the loop was closed - use our own")
-            new_loop = False
-        except RuntimeError:
-            new_loop = True
-            # start a new event loop, which we will close again further down
-            # if this is not done events like this will occur
-            #   BlockingIOError: [Errno 11] Resource temporarily unavailable
-            #   Exception ignored when trying to write to the signal wakeup fd:
-            # It is unclear to me why it happens when reusing an event looped
-            # that it stopped from time to time, but starting fresh and doing
-            # a full termination seems to address the issue
-            if sys.platform == "win32":
-                # use special event loop that supports subprocesses on windows
-                event_loop = asyncio.ProactorEventLoop()
-            else:
-                event_loop = asyncio.SelectorEventLoop()
-            asyncio.set_event_loop(event_loop)
-        try:
-            # include the subprocess manager in the asyncio event loop
-            results = event_loop.run_until_complete(
-                run_async_cmd(
-                    event_loop,
-                    cmd,
-                    protocol,
-                    stdin,
-                    protocol_kwargs=kwargs,
-                    cwd=cwd,
-                    env=env,
-                )
+        event_loop = WitlessRunner._get_event_loop()
+        # include the subprocess manager in the asyncio event loop
+        results = event_loop.run_until_complete(
+            run_async_cmd(
+                event_loop,
+                cmd,
+                protocol,
+                stdin,
+                protocol_kwargs=kwargs,
+                cwd=cwd,
+                env=env,
             )
-        finally:
-            if new_loop:
-                # be kind to callers and leave asyncio as we found it
-                asyncio.set_event_loop(None)
-                # terminate the event loop, cannot be undone, hence we start a fresh
-                # one each time (see BlockingIOError notes above)
-                event_loop.close()
+        )
 
         # log before any exception is raised
         lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
