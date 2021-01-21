@@ -17,6 +17,7 @@ from datalad.tests.utils import (
     assert_in,
     assert_raises,
     eq_,
+    integration,
     OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
@@ -150,3 +151,21 @@ def test_runner_parametrized_protocol():
         value=b'5',
     )
     eq_(res['stdout'], '5')
+
+
+@integration  # ~3 sec
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_asyncio_loop_noninterference1(path1, path2):
+    # minimalistic use case provided by Dorota
+    import datalad.api as dl
+    src = dl.create(path1)
+    reproducer = src.pathobj/ "reproducer.py"
+    reproducer.write_text(f"""\
+import asyncio
+asyncio.get_event_loop()
+import datalad.api as datalad
+datalad.clone(path='{path2}', source="{path1}")
+asyncio.get_event_loop()
+""")
+    Runner().run([sys.executable, str(reproducer)])  # if Error -- the test failed
