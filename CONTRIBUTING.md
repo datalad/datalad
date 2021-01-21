@@ -299,8 +299,25 @@ Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.in
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
 Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
-be used to establish a clean docker environment (based on any NeuroDebian-supported
+be used to establish a clean docker environment (based on any NtesteuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
+
+#### Test attributes
+
+[datalad/tests/utils.py]() defines many useful decorators. Some of those just to annotate tests
+for various aspects to allow for easy sub-selection.
+
+##### Speed
+
+Please annotate with following decorators
+- `@slow` if test runs over 10 seconds
+- `@turtle` if test runs over 120 seconds (those would not typically be ran on CIs)
+
+##### Purpose
+
+As those tests also usually tend to be slower, use in conjunction with `@slow` or `@turtle` when slow
+- `@integration` - tests verifying correct operation with external tools/services beyond git/git-annex
+- `@usecase` - represents some (user) use-case, and not necessarily a "unit-test" of functionality
 
 ### CI setup
 
