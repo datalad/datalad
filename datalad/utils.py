@@ -2607,6 +2607,13 @@ def copy_file(src, dst, follow_symlinks=True):
       path to the file to copy
     dst: str or os.PathLike
       path that `src` should be copied to
+
+    Raises
+    ------
+    CalledProcessError
+      if `cp` supports `--reflink` and an error occurs 
+    IOError
+      if `cp` does not support `--reflink` and an error occurs 
     """
     global _cp_supports_reflink
     if _cp_supports_reflink is None:
