@@ -165,7 +165,12 @@ def test_asyncio_loop_noninterference1(path1, path2):
 import asyncio
 asyncio.get_event_loop()
 import datalad.api as datalad
-datalad.clone(path='{path2}', source="{path1}")
-asyncio.get_event_loop()
+ds = datalad.clone(path='{path2}', source="{path1}")
+loop = asyncio.get_event_loop()
+assert loop
+# simulate outside process closing the loop
+loop.close()
+# and us still doing ok
+ds.status()
 """)
     Runner().run([sys.executable, str(reproducer)])  # if Error -- the test failed

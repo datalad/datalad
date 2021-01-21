@@ -359,6 +359,8 @@ class WitlessRunner(object):
         # this is how ipython does it
         try:
             event_loop = asyncio.get_event_loop()
+            if event_loop.is_closed():
+                raise RuntimeError("the loop was closed - use our own")
             new_loop = False
         except RuntimeError:
             new_loop = True
