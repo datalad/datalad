@@ -77,6 +77,14 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 39-x64
+    
+    # Windows core tests
+    - ID: WinP37core
+      # seconds
+      DTS: datalad.tests.test_utils:test_path_
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      # Python version specification is non-standard on windows
+      PY: 37-x64
 
 matrix:
   allow_failures:
