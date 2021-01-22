@@ -11,6 +11,7 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
+import threading
 import subprocess
 import sys
 import logging
@@ -270,6 +271,7 @@ class WitlessRunner(object):
 
     _event_loop = None
     _event_loop_pid = None
+    _event_loop_lock = threading.Lock()
 
     def __init__(self, cwd=None, env=None):
         """
@@ -291,12 +293,13 @@ class WitlessRunner(object):
     @staticmethod
     def _get_event_loop():
         pid = os.getpid()
-        if WitlessRunner._event_loop_pid is None \
-                or pid != WitlessRunner._event_loop_pid \
-                or WitlessRunner._event_loop.is_closed():
-            WitlessRunner._event_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(WitlessRunner._event_loop)
-            WitlessRunner._event_loop_pid = pid
+        with WitlessRunner._event_loop_lock:
+            if WitlessRunner._event_loop_pid is None \
+                    or pid != WitlessRunner._event_loop_pid \
+                    or WitlessRunner._event_loop.is_closed():
+                WitlessRunner._event_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(WitlessRunner._event_loop)
+                WitlessRunner._event_loop_pid = pid
         return WitlessRunner._event_loop
 
     def _get_adjusted_env(self, env=None, cwd=None, copy=True):
