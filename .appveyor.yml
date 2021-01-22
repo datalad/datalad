@@ -170,8 +170,8 @@ install:
 
 
 build_script:
-  - pip install ".[tests]"
-  - pip install ".[devel-utils]"
+  - pip install -e ".[tests]"
+  - pip install -e ".[devel-utils]"
 
 
 #after_build:
