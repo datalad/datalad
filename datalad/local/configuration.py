@@ -69,20 +69,21 @@ class Configuration(Interface):
     Query and modification of three distinct configuration scopes is
     supported:
 
-    - 'dataset': the persistent configuration in .datalad/config of a dataset
+    - 'branch': the persistent configuration in .datalad/config of a dataset
+      branch
     - 'local': a dataset clone's Git repository configuration in .git/config
     - 'global': non-dataset-specific configuration (usually in $USER/.gitconfig)
 
-    Modifications of the persistent 'dataset' configuration will not be saved
+    Modifications of the persistent 'branch' configuration will not be saved
     by this command, but have to be committed with a subsequent `save`
     call.
 
     Rules of precedence regarding different configuration scopes are the same
     as in Git, with two exceptions: 1) environment variables can be used to
     override any datalad configuration, and have precedence over any other
-    configuration scope (see below). 2) the 'dataset' scope is considered in
+    configuration scope (see below). 2) the 'branch' scope is considered in
     addition to the standard git configuration scopes. Its content has lower
-    precedence than Git configuration scopes, but it is committed to a dataset,
+    precedence than Git configuration scopes, but it is committed to a branch,
     hence can be used to ship (default and branch-specific) configuration with
     a dataset.
 
@@ -104,9 +105,9 @@ class Configuration(Interface):
         dict(text="Recursively set configuration in all (sub)dataset repositories",
              code_py="configuration('set', [('my.config.name', 'value')], recursive=True)",
              code_cmd="datalad configuration -r set my.config=value"),
-        dict(text="Modify the persistent dataset configuration (changes are not committed)",
-             code_py="configuration('set', [('my.config.name', 'value')], scope='dataset')",
-             code_cmd="datalad configuration --scope dataset set my.config=value"),
+        dict(text="Modify the persistent branch configuration (changes are not committed)",
+             code_py="configuration('set', [('my.config.name', 'value')], scope='branch')",
+             code_cmd="datalad configuration --scope branch set my.config=value"),
     ]
 
     result_renderer = 'tailored'
@@ -127,10 +128,10 @@ class Configuration(Interface):
             configuration. If no scope is declared for a query, all
             configuration sources (including overrides via environment
             variables) are considered according to the normal
-            rules of precedence. For action 'get' only 'dataset' and 'local'
+            rules of precedence. For action 'get' only 'branch' and 'local'
             (with include 'global' here) are supported. For action 'dump',
             a scope selection is ignored and all scopes are considered.""",
-            constraints=EnsureChoice('global', 'local', 'dataset', None)),
+            constraints=EnsureChoice('global', 'local', 'branch', None)),
         spec=Parameter(
             args=("spec",),
             doc="""configuration name (for actions 'get' and 'unset'),
@@ -266,6 +267,11 @@ def configuration(action, scope, specs, res_kwargs, ds=None):
         cfg = dlcfg
     else:
         cfg = ds.config
+
+    # TODO for now we map to the old name, until ConfigManager
+    # is adjusted
+    if scope == 'branch':
+        scope = 'dataset'
 
     if action not in config_actions:
         raise ValueError("Unsupported action '{}'".format(action))

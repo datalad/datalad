@@ -52,7 +52,7 @@ def test_something(path, new_home):
 
     # catches unsupported argument combinations
     assert_raises(ValueError, ds.configuration, 'dump', spec='some')
-    assert_raises(ValueError, ds.configuration, 'dump', scope='dataset')
+    assert_raises(ValueError, ds.configuration, 'dump', scope='branch')
     assert_raises(ValueError, ds.configuration, 'set', spec=('onlyname',))
     assert_raises(ValueError, ds.configuration, 'set', spec='nosection=value')
     # we also get that from the internal helper
@@ -111,7 +111,7 @@ def test_something(path, new_home):
 
     # remove something that does not exist in the specified scope
     assert_in_results(
-        ds.configuration('unset', scope='dataset', spec='lonely.val',
+        ds.configuration('unset', scope='branch', spec='lonely.val',
                          result_renderer='disabled', on_failure='ignore'),
         status='error')
     # remove something that does not exist in the specified scope
