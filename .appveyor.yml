@@ -69,7 +69,7 @@ environment:
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
       INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
-
+    
     # Windows core tests
     - ID: WinP39core
       # seconds
@@ -81,10 +81,26 @@ environment:
     # Windows core tests
     - ID: WinP37core
       # seconds
-      DTS: datalad.tests.test_utils:test_path_
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 37-x64
+
+    - ID: Ubu20P36
+      PY: 3.6
+      DTS: datalad.tests.test_utils:test_path_
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+
+    - ID: Ubu20P37
+      PY: 3.7
+      DTS: datalad.tests.test_utils:test_path_
+      APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
+      INSTALL_SYSPKGS: python3-virtualenv
+      # system git-annex is way too old, use better one
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+
 
 matrix:
   allow_failures:
