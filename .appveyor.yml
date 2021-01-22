@@ -202,9 +202,9 @@ test_script:
   - cd __testhome__
   - cmd: dir
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
-  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - cmd: python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
   - cmd: dir
-  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+  - sh:  python -m nose -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
 
 
 after_test:
