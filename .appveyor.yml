@@ -180,6 +180,7 @@ install:
 build_script:
   - pip install -e ".[tests]"
   - pip install -e ".[devel-utils]"
+  - pip install --upgrade coverage
 
 
 #after_build:
