@@ -203,7 +203,9 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                             indexer.name,
                             str(indexer.dist),
                             exc_str(e))
-        lgr.info('Falling back to standard indexer for metadata format: %s', metadata_format_name)
+        lgr.debug(
+            'Falling back to standard indexer for metadata format: %s',
+            metadata_format_name)
         return lambda metadata: _deep_kv('', metadata)
 
     if val2str:
