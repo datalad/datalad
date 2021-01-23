@@ -193,16 +193,15 @@ test_script:
   - cd __testhome__
   - cmd: dir
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
-  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
+  - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad --cover-xml %DTS%
   - cmd: dir
-  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad ${DTS}
+  - sh:  python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad --cover-xml ${DTS}
 
 
 after_test:
   # prepare coverage.xml in a separate invocation.
   # if invoked directly with nose - do not include test_ files themselves
   - cmd: dir
-  - python -m coverage xml
   - cmd: powershell Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
   - cmd: "set PATH=C:\\msys64\\usr\\bin;%PATH%"
   - cmd: bash codecov.sh -f "coverage.xml" -U "-s" -A "-s" 
