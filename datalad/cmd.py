@@ -26,6 +26,7 @@ from collections import (
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import (
     borrowdoc,
+    exc_str,
 )
 from .support import path as op
 from .support.exceptions import CommandError
@@ -268,6 +269,12 @@ class WitlessRunner(object):
     """
     __slots__ = ['cwd', 'env']
 
+    # To workaround issues where parent process does not take care about proper
+    # new loop instantiation in a child process
+    # https://bugs.python.org/issue21998
+    _loop_pid = None
+    _loop_need_new = False
+
     def __init__(self, cwd=None, env=None):
         """
         Parameters
@@ -358,7 +365,33 @@ class WitlessRunner(object):
         # with our own event loop management
         # this is how ipython does it
         try:
+            pid = os.getpid()
+            is_new_proc = WitlessRunner._loop_pid is None or WitlessRunner._loop_pid != pid
+            if WitlessRunner._loop_need_new and not is_new_proc:
+                raise RuntimeError("we know we need a new loop")
             event_loop = asyncio.get_event_loop()
+            if is_new_proc:
+                WitlessRunner._loop_pid = pid
+                # We need to check if we can any command
+                try:
+                    event_loop.run_until_complete(
+                        run_async_cmd(
+                            event_loop,
+                            [sys.executable, "--version"],
+                            protocol,
+                            stdin,
+                            protocol_kwargs=kwargs,
+                            cwd=cwd,
+                            env=env,
+                        )
+                    )
+                    WitlessRunner._loop_need_new = False
+                except OSError as e:
+                    # due to https://bugs.python.org/issue21998
+                    # exhibits in https://github.com/ReproNim/testkraken/issues/95
+                    lgr.debug("It seems we need a new loop when running our commands: %s", exc_str(e))
+                    WitlessRunner._loop_need_new = True
+                    raise RuntimeError("the loop is not reusable")
             if event_loop.is_closed():
                 raise RuntimeError("the loop was closed - use our own")
             new_loop = False
