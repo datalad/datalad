@@ -28,6 +28,7 @@ from datalad.tests.utils import (
     OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
+    SkipTest,
     with_tempfile,
 )
 from datalad.cmd import (
@@ -189,7 +190,12 @@ def test_asyncio_forked(temp):
     temp = Path(temp)
     runner = Runner()
     import os
-    pid = os.fork()
+    try:
+        pid = os.fork()
+    except BaseException as exc:
+        # .fork availability is "Unix", and there are cases where it is "not supported"
+        # so we will just skip if no forking is possible
+        raise SkipTest(f"Cannot fork: {exc}")
     # if does not fail (in original or in a fork) -- we are good
     try:
         runner.run([sys.executable, '--version'], protocol=StdOutCapture)
