@@ -139,6 +139,8 @@ init:
   - sh: ssh-keygen -f ~/.ssh/id_rsa -N ""
   # deploy the datalad installer
   - appveyor DownloadFile https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py -FileName datalad_installer.py
+  - cmd: md __testhome__
+  - sh: mkdir -p __testhome__
 
 
 install:
@@ -188,8 +190,6 @@ before_test:
 
 test_script:
   # run tests on installed module, not source tree files
-  - cmd: md __testhome__
-  - sh: mkdir __testhome__
   - cd __testhome__
   - cmd: dir
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
