@@ -200,7 +200,7 @@ def test_asyncio_forked(temp):
     if sys.version_info < (3, 8) and pid != 0:
         # for some reason it is crucial to sleep a little (but 0.001 is not enough)
         # in the master process with older pythons or it takes forever to make the child run
-        sleep(0.01)
+        sleep(0.1)
     try:
         runner.run([sys.executable, '--version'], protocol=StdOutCapture)
         if pid == 0:
