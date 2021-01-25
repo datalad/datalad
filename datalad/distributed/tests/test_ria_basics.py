@@ -145,6 +145,17 @@ def _test_initremote_basic(host, ds_path, store, link):
         [assert_in(c, remote_log) for c in common_init_opts]
         assert_in("archive-id={}".format(ds.id), remote_log)
 
+    # we can deal with --sameas, which leads to a special remote not having a
+    # 'name' property, but only a 'sameas-name'. See gh-4259
+    try:
+        ds.repo.init_remote('ora2',
+                            options=init_opts + ['--sameas', 'ria-remote'])
+    except CommandError as e:
+        if 'Invalid option `--sameas' in e.stderr:
+            # annex too old - doesn't know --sameas
+            pass
+        else:
+            raise 
     # TODO: - check output of failures to verify it's failing the right way
     #       - might require to run initremote directly to get the output
 
