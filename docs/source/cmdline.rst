@@ -94,7 +94,6 @@ Plumbing commands
    generated/man/datalad-annotate-paths
    generated/man/datalad-clone
    generated/man/datalad-copy-file
-   generated/man/datalad-configuration
    generated/man/datalad-create-test-dataset
    generated/man/datalad-diff
    generated/man/datalad-push
