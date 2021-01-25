@@ -223,3 +223,23 @@ def test_asyncio_forked(temp):
     else:
        # sleep enough so parent just kills me the kid before I continue doing bad deeds
        sleep(10)
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_popen_invocation(src_path, dest_path):
+    # https://github.com/ReproNim/testkraken/issues/93
+    from datalad.distribution.dataset import Dataset
+    from datalad.api import clone
+    from multiprocessing import Process
+    src = Dataset(src_path).create()
+    (src.pathobj / "file.dat").write_bytes(b"\000")
+    src.save(message="got data")
+    dest = clone(source=src_path, path=dest_path)
+    fetching_data = Process(target=dest.get, kwargs={"path": 'file.dat'})
+    fetching_data.start()
+    t0 = time()
+    while fetching_data.is_alive():
+        if time() - t0 > 5:
+            raise AssertionError("Child is stuck!")
+        sleep(0.1)
