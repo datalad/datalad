@@ -10,68 +10,9 @@ Problems go away if UTF-8 locale is configured and set (instead of C or POSIX)
 
 Last-Update: 2018-06-05
 
---- a/datalad/tests/test_cmd.py
-+++ b/datalad/tests/test_cmd.py
-@@ -56,7 +56,7 @@ def test_runner_dry(tempfile):
-     runner = Runner(protocol=dry)
- 
-     # test dry command call
--    cmd = 'echo Testing äöü東 dry run > %s' % tempfile
-+    cmd = 'echo Testing nounicode dry run > %s' % tempfile
-     with swallow_logs(new_level=5) as cml:
-         ret = runner.run(cmd)
-         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
-@@ -80,7 +80,7 @@ def test_runner(tempfile):
- 
-     # test non-dry command call
-     runner = Runner()
--    content = 'Testing äöü東 real run'
-+    content = 'Testing nounicode real run'
-     cmd = 'echo %s > %r' % (content, tempfile)
-     ret = runner.run(cmd)
-     assert_equal(ret, ('', ''))  # no out or err
-@@ -184,7 +184,7 @@ def test_runner_log_stdout():
-     # assertion yet.
- 
-     runner = Runner(log_outputs=True)
--    cmd_ = ['echo', 'stdout-Message äöü東 should be logged']
-+    cmd_ = ['echo', 'stdout-Message nounicode should be logged']
-     for cmd in [cmd_, ' '.join(cmd_)]:
-         # should be identical runs, either as a string or as a list
-         kw = {}
-@@ -197,16 +197,16 @@ def test_runner_log_stdout():
-             if not on_windows:
-                 # we can just count on sanity
-                 cm.assert_logged("stdout| stdout-"
--                                 "Message äöü東 should be logged", regex=False)
-+                                 "Message nounicode should be logged", regex=False)
-             else:
-                 # echo outputs quoted lines for some reason, so relax check
--                ok_("stdout-Message äöü東 should be logged" in cm.lines[1])
-+                ok_("stdout-Message nounicode should be logged" in cm.lines[1])
- 
--    cmd = 'echo stdout-Message äöü東 should not be logged'
-+    cmd = 'echo stdout-Message nounicode should not be logged'
-     with swallow_outputs() as cmo:
-         with swallow_logs(new_level=11) as cml:
-             ret = runner.run(cmd, log_stdout=False)
--            eq_(cmo.out, "stdout-Message äöü東 should not be logged\n")
-+            eq_(cmo.out, "stdout-Message nounicode should not be logged\n")
-             eq_(cml.out, "")
- 
- 
-@@ -281,7 +281,7 @@ def test_runner_failure_unicode(path):
-     # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
-     runner = Runner()
-     with assert_raises(CommandError), swallow_logs():
--        runner.run(u"β-command-doesnt-exist", cwd=path)
-+        runner.run(u"B-command-doesnt-exist", cwd=path)
- 
- 
- @skip_if_on_windows  # likely would fail
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -57,7 +57,7 @@ novalue
+@@ -59,7 +59,7 @@ novalue
  empty =
  myint = 3
  
@@ -80,7 +21,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -83,16 +83,16 @@ def test_something(path, new_home):
+@@ -85,16 +85,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -100,8 +41,8 @@ Last-Update: 2018-06-05
           ('something.empty', ''),
           ('something.myint', '3'),
           ('something.novalue', None),
-@@ -109,7 +109,7 @@ def test_something(path, new_home):
-         cfg.get('something.user'),
+@@ -114,7 +114,7 @@ def test_something(path, new_home):
+         cfg.get('something.user', get_all=True),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
 -    assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
@@ -109,7 +50,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      # git demands a key without value at all to be used as a flag, thus True
-@@ -128,8 +128,8 @@ def test_something(path, new_home):
+@@ -133,8 +133,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -209,7 +150,7 @@ Last-Update: 2018-06-05
          eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1460,7 +1460,9 @@ def with_parametric_batch(t):
+@@ -1475,7 +1475,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -222,7 +163,7 @@ Last-Update: 2018-06-05
  # so Й might get recoded
 --- a/datalad/core/local/tests/test_diff.py
 +++ b/datalad/core/local/tests/test_diff.py
-@@ -500,9 +500,12 @@ def test_diff_rsync_syntax(path):
+@@ -505,9 +505,12 @@ def test_diff_rsync_syntax(path):
  
  @with_tempfile(mkdir=True)
  def test_diff_nonexistent_ref_unicode(path):
@@ -262,7 +203,7 @@ Last-Update: 2018-06-05
  import re
  import sys
  
-@@ -371,13 +372,19 @@ def check_target_ssh_recursive(use_ssh,
+@@ -376,13 +377,19 @@ def check_target_ssh_recursive(use_ssh,
  
          remote_name = 'remote-' + str(flat)
          with chpwd(source.path):
@@ -291,12 +232,12 @@ Last-Update: 2018-06-05
              target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
 --- a/datalad/tests/test_witless_runner.py
 +++ b/datalad/tests/test_witless_runner.py
-@@ -44,7 +44,7 @@ def py2cmd(code):
+@@ -56,7 +56,7 @@ def py2cmd(code):
  @with_tempfile
  def test_runner(tempfile):
      runner = Runner()
--    content = 'Testing äöü東 real run'
+-    content = 'Testing real run' if on_windows else 'Testing äöü東 real run' 
 +    content = 'Testing real run'
-     cmd = ['sh', '-c', 'echo %s > %r' % (content, tempfile)]
+     cmd = 'echo %s > %s' % (content, tempfile)
      res = runner.run(cmd)
      # no capture of any kind, by default
