@@ -420,6 +420,15 @@ class WitlessRunner(object):
     def _check_if_new_proc(cls):
         """Check if WitlessRunner is used under a new PID
 
+        Note that this is a function that is meant to be called from within a
+        particular context only. The RuntimeError is expected to be catched by
+        the caller and is meant to be more like a response message than an
+        exception.
+
+        Returns
+        -------
+        bool
+
         Raises
         ------
         RuntimeError
@@ -441,6 +450,11 @@ class WitlessRunner(object):
         """Check if given event_loop could run a simple command
 
         Sets _loop_need_new variable to a bool depending on what it finds
+
+        Note that this is a function that is meant to be called from within a
+        particular context only. The RuntimeError is expected to be catched by
+        the caller and is meant to be more like a response message than an
+        exception.
 
         Raises
         ------
