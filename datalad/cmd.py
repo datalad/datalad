@@ -26,6 +26,7 @@ from collections import (
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import (
     borrowdoc,
+    exc_str,
 )
 from .support import path as op
 from .support.exceptions import CommandError
@@ -268,6 +269,12 @@ class WitlessRunner(object):
     """
     __slots__ = ['cwd', 'env']
 
+    # To workaround issues where parent process does not take care about proper
+    # new loop instantiation in a child process
+    # https://bugs.python.org/issue21998
+    _loop_pid = None
+    _loop_need_new = None
+
     def __init__(self, cwd=None, env=None):
         """
         Parameters
@@ -358,25 +365,16 @@ class WitlessRunner(object):
         # with our own event loop management
         # this is how ipython does it
         try:
+            is_new_proc = self._check_if_new_proc()
             event_loop = asyncio.get_event_loop()
+            if is_new_proc:
+                self._check_if_loop_usable(event_loop, stdin)
             if event_loop.is_closed():
                 raise RuntimeError("the loop was closed - use our own")
             new_loop = False
         except RuntimeError:
+            event_loop = self._get_new_event_loop()
             new_loop = True
-            # start a new event loop, which we will close again further down
-            # if this is not done events like this will occur
-            #   BlockingIOError: [Errno 11] Resource temporarily unavailable
-            #   Exception ignored when trying to write to the signal wakeup fd:
-            # It is unclear to me why it happens when reusing an event looped
-            # that it stopped from time to time, but starting fresh and doing
-            # a full termination seems to address the issue
-            if sys.platform == "win32":
-                # use special event loop that supports subprocesses on windows
-                event_loop = asyncio.ProactorEventLoop()
-            else:
-                event_loop = asyncio.SelectorEventLoop()
-            asyncio.set_event_loop(event_loop)
         try:
             # include the subprocess manager in the asyncio event loop
             results = event_loop.run_until_complete(
@@ -417,6 +415,86 @@ class WitlessRunner(object):
         # denoise, must be zero at this point
         results.pop('code', None)
         return results
+
+    @classmethod
+    def _check_if_new_proc(cls):
+        """Check if WitlessRunner is used under a new PID
+
+        Note that this is a function that is meant to be called from within a
+        particular context only. The RuntimeError is expected to be catched by
+        the caller and is meant to be more like a response message than an
+        exception.
+
+        Returns
+        -------
+        bool
+
+        Raises
+        ------
+        RuntimeError
+          If it is not a new proc and we already know that we need a new loop
+          in this pid
+        """
+        pid = os.getpid()
+        is_new_proc = cls._loop_pid is None or cls._loop_pid != pid
+        if is_new_proc:
+            # We need to check if we can run any command smoothly
+            cls._loop_pid = pid
+            cls._loop_need_new = None
+        elif cls._loop_need_new:
+            raise RuntimeError("we know we need a new loop")
+        return is_new_proc
+
+    @classmethod
+    def _check_if_loop_usable(cls, event_loop, stdin):
+        """Check if given event_loop could run a simple command
+
+        Sets _loop_need_new variable to a bool depending on what it finds
+
+        Note that this is a function that is meant to be called from within a
+        particular context only. The RuntimeError is expected to be catched by
+        the caller and is meant to be more like a response message than an
+        exception.
+
+        Raises
+        ------
+        RuntimeError
+          If loop is not reusable
+        """
+        # We need to check if we can run any command smoothly
+        try:
+            event_loop.run_until_complete(
+                run_async_cmd(
+                    event_loop,
+                    [sys.executable, "--version"],  # fast! 0.004 sec and to be ran once per process
+                    KillOutput,
+                    stdin,
+                )
+            )
+            cls._loop_need_new = False
+        except OSError as e:
+            # due to https://bugs.python.org/issue21998
+            # exhibits in https://github.com/ReproNim/testkraken/issues/95
+            lgr.debug("It seems we need a new loop when running our commands: %s", exc_str(e))
+            cls._loop_need_new = True
+            raise RuntimeError("the loop is not reusable")
+
+    @staticmethod
+    def _get_new_event_loop():
+        # start a new event loop, which we will close again further down
+        # if this is not done events like this will occur
+        #   BlockingIOError: [Errno 11] Resource temporarily unavailable
+        #   Exception ignored when trying to write to the signal wakeup fd:
+        # It is unclear to me why it happens when reusing an event looped
+        # that it stopped from time to time, but starting fresh and doing
+        # a full termination seems to address the issue
+        if sys.platform == "win32":
+            # use special event loop that supports subprocesses on windows
+            event_loop = asyncio.ProactorEventLoop()
+        else:
+            event_loop = asyncio.SelectorEventLoop()
+        asyncio.set_event_loop(event_loop)
+        return event_loop
 
 
 class GitRunnerBase(object):

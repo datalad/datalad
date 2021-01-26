@@ -10,7 +10,14 @@
 """
 
 import os
+import signal
 import sys
+
+from pathlib import Path
+from time import (
+    sleep,
+    time,
+)
 
 from datalad.tests.utils import (
     assert_cwd_unchanged,
@@ -21,6 +28,7 @@ from datalad.tests.utils import (
     OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
+    SkipTest,
     with_tempfile,
 )
 from datalad.cmd import (
@@ -174,3 +182,44 @@ loop.close()
 ds.status()
 """)
     Runner().run([sys.executable, str(reproducer)])  # if Error -- the test failed
+
+
+@with_tempfile
+def test_asyncio_forked(temp):
+    # temp will be used to communicate from child either it succeeded or not
+    temp = Path(temp)
+    runner = Runner()
+    import os
+    try:
+        pid = os.fork()
+    except BaseException as exc:
+        # .fork availability is "Unix", and there are cases where it is "not supported"
+        # so we will just skip if no forking is possible
+        raise SkipTest(f"Cannot fork: {exc}")
+    # if does not fail (in original or in a fork) -- we are good
+    if sys.version_info < (3, 8) and pid != 0:
+        # for some reason it is crucial to sleep a little (but 0.001 is not enough)
+        # in the master process with older pythons or it takes forever to make the child run
+        sleep(0.1)
+    try:
+        runner.run([sys.executable, '--version'], protocol=StdOutCapture)
+        if pid == 0:
+            temp.write_text("I rule")
+    except:
+        if pid == 0:
+            temp.write_text("I suck")
+    if pid != 0:
+       # parent: look after the child
+       t0 = time()
+       try:
+           while not temp.exists() or temp.stat().st_size < 6:
+               if time() - t0 > 5:
+                   raise AssertionError("Child process did not create a file we expected!")
+       finally:
+           # kill the child
+           os.kill(pid, signal.SIGTERM)
+       # see if it was a good one
+       eq_(temp.read_text(), "I rule")
+    else:
+       # sleep enough so parent just kills me the kid before I continue doing bad deeds
+       sleep(10)

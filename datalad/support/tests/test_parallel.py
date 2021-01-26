@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     assert_greater_equal,
     assert_repo_status,
     assert_raises,
+    known_failure_osx,
     rmtree,
     on_windows,
     on_osx,
@@ -134,6 +135,7 @@ def test_creatsubdatasets(topds_path, n=2):
     assert_repo_status(ds.repo)
 
 
+@known_failure_osx  # https://github.com/datalad/datalad/issues/5309
 @skip_if(not ProducerConsumer._can_use_threads, msg="Test relies on having parallel execution")
 def test_gracefull_death():
 
