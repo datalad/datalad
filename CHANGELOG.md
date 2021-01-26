@@ -99,16 +99,21 @@ bet we will fix some bugs and make a world even a better place.
 - A more reliable check is now done to decide if the configuration
   files need to be reloaded.  ([#5276][])
 
+- The internal command runner's handling of the event loop has been
+  improved to play nicer with outside applications and scripts that
+  use asyncio.  ([#5350][]) ([#5367][])
+
 ### Enhancements and new features
 
 - The subdataset handling for adjusted branches, which is particularly
   important on Windows where git-annex enters an adjusted branch by
   default, has been improved.  A core piece of the new approach is
-  registering the commit of the main branch, not its checked out
+  registering the commit of the primary branch, not its checked out
   adjusted branch, in the superdataset.  Note: This means that `git
   status` will always considered a subdataset on an adjusted branch as
   dirty while `datalad status` will look more closely and see if the
-  tip of the main branch matches the registered commit.  ([#5241][])
+  tip of the primary branch matches the registered commit.
+  ([#5241][])
 
 - [create-sibling-github][] learned how to create private repositories
   (thanks to Nolan Nichols).  ([#4769][])
@@ -130,7 +135,7 @@ bet we will fix some bugs and make a world even a better place.
 
 - A provider is now included for https://registry-1.docker.io URLs.
   This is useful for storing an image's blobs in a dataset and
-  registering the with git-annex.  ([#5129][])
+  registering the URLs with git-annex.  ([#5129][])
 
 - [addurls][]
   - learned how to read data from standard input.  ([#4669][])
@@ -276,8 +281,8 @@ bet we will fix some bugs and make a world even a better place.
   ([#5218][])
 
 - The internal command runner's handling of the event loop has been
-  tweaked to better handle cases where DataLad is used from other
-  applications, including IPython.  ([#5106][]) ([#5350][]) ([#5367][])
+  tweaked to hopefully fix issues with runnning DataLad from IPython.
+  ([#5106][])
 
 - SSH cleanup wasn't reliably triggered by the ORA special remote on
   failure, leading to a stall with a particular version of git-annex,
