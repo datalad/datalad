@@ -19,6 +19,9 @@ bet we will fix some bugs and make a world even a better place.
 
 - The minimum supported version of Python is now 3.6.  ([#4879][])
 
+- [publish][] is now deprecated in favor of [push][].  It will be
+  removed in the 0.15.0 release at the earliest.
+
 - A new command runner was added in v0.13.  Functionality related to
   the old runner has now been removed: `Runner`, `GitRunner`, and
   `run_gitcommand_on_file_list_chunks` from the `datalad.cmd` module
@@ -79,6 +82,9 @@ bet we will fix some bugs and make a world even a better place.
 - The `compat` parameter of `GitRepo.get_submodules`, added in v0.12
   as a temporary compatibility layer, has been removed.  ([#4904][])
 
+- The long-deprecated (and non-functional) `url` parameter of
+  `GitRepo.__init__` has been removed.  ([#5342][])
+
 ### Fixes
 
 - Cloning onto a system that enters adjusted branches by default (as
@@ -94,9 +100,6 @@ bet we will fix some bugs and make a world even a better place.
   files need to be reloaded.  ([#5276][])
 
 ### Enhancements and new features
-
-- New [configuration][] command provides a '.datalad/config'-aware
-  interface for getting and setting configuration values.  ([#5274][])
 
 - The subdataset handling for adjusted branches, which is particularly
   important on Windows where git-annex enters an adjusted branch by
@@ -156,6 +159,11 @@ bet we will fix some bugs and make a world even a better place.
   takes a lock before writes to allow for multiple processes to modify
   the configuration of a dataset.  ([#4829][])
 
+- [clone][] now records the original, unresolved URL for a subdataset
+  under `submodule.<name>.datalad-url` in the parent's .gitmodules,
+  enabling later [get][] calls to use the original URL.  This is
+  particularly useful for `ria+` URLs.  ([#5346][])
+
 - Installing a subdataset now uses custom handling rather than calling
   `git submodule update --init`.  This avoids some locking issues when
   running [get][] in parallel and enables more accurate source URLs to
@@ -194,6 +202,9 @@ bet we will fix some bugs and make a world even a better place.
 
 - Command-line scripts are now defined via the `entry_points` argument
   of `setuptools.setup` instead of the `scripts` argument.  ([#4695][])
+
+- Interactive use of `--help` on the command-line now invokes a pager
+  on more systems and installation setups.  ([#5344][])
 
 - The `datalad` special remote now tries to eliminate some unnecessary
   interactions with git-annex by being smarter about how it queries
@@ -265,8 +276,8 @@ bet we will fix some bugs and make a world even a better place.
   ([#5218][])
 
 - The internal command runner's handling of the event loop has been
-  tweaked to hopefully fix issues with runnning DataLad from IPython.
-  ([#5106][])
+  tweaked to better handle cases where DataLad is used from other
+  applications, including IPython.  ([#5106][]) ([#5350][]) ([#5367][])
 
 - SSH cleanup wasn't reliably triggered by the ORA special remote on
   failure, leading to a stall with a particular version of git-annex,
@@ -3551,8 +3562,12 @@ publishing
 [#5258]: https://github.com/datalad/datalad/issues/5258
 [#5259]: https://github.com/datalad/datalad/issues/5259
 [#5269]: https://github.com/datalad/datalad/issues/5269
-[#5274]: https://github.com/datalad/datalad/issues/5274
 [#5276]: https://github.com/datalad/datalad/issues/5276
 [#5278]: https://github.com/datalad/datalad/issues/5278
 [#5285]: https://github.com/datalad/datalad/issues/5285
 [#5328]: https://github.com/datalad/datalad/issues/5328
+[#5342]: https://github.com/datalad/datalad/issues/5342
+[#5344]: https://github.com/datalad/datalad/issues/5344
+[#5346]: https://github.com/datalad/datalad/issues/5346
+[#5350]: https://github.com/datalad/datalad/issues/5350
+[#5367]: https://github.com/datalad/datalad/issues/5367
