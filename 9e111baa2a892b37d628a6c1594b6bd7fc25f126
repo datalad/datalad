@@ -1,0 +1,36 @@
+Update 0.13.7-715-g58ae70adfa:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    58ae70adfab5fd27c8a6780713cbd67583380a20..742931138ce7806e4a3f331f5ae24ddd689f3d3a
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #5342 from yarikoptic/rm-deprecated
+   fb323fb472^-1
++  Merge pull request #5344 from kyleam/help-pager
+   6945d71df2^-1
++  Merge pull request #5346 from bpoldrack/nf-datalad-url
+   a94cf417cd^-1
+-  Merge branch 'bf-better-HOME-master', remote-tracking branch 'origin/maint'
+   b8fe20e81b^-1
+-  Merge branch 'maint'
+   053b680c64^-1
+-  Merge branch 'maint'
+   b748922fd3^-1
++  Merge pull request #5350 from yarikoptic/bf-asyncio-loop
+   5bde9c82eb^-1
+-  Merge pull request #5358 from christian-monch/bf-flooding_info_log
+   30412cdddc^-1
++  Merge pull request #5370 from mih/rm-configuration
+   e42cc1c608^-1
+-  Merge branch 'maint'
+   b302f7cd48^-1
++  Merge pull request #5373 from kyleam/publish-deprecate
+   7e6157ecff^-1
++  Merge pull request #5367 from yarikoptic/bf-workaround-forked
+   742931138c^-1
