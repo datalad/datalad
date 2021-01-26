@@ -832,6 +832,8 @@ class RIARemote(SpecialRemote):
         # try loading all needed info from (git) config
         name = self.annex.getconfig('name')
         if not name:
+            name = self.annex.getconfig('sameas-name')
+        if not name:
             raise RIARemoteError(
                 "Cannot determine special remote name, got: {}".format(
                     repr(name)))
