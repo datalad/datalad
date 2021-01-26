@@ -585,10 +585,11 @@ class Publish(Interface):
       upload).
 
     .. note::
-      The `push` command (new in 0.13.0) provides an alternative interface.
-      Critical differences are that `push` transfers annexed data by default
-      and does not handle sibling creation (i.e. it does not have a `--missing`
-      option).
+      This command is deprecated. It will be removed from DataLad eventually,
+      but no earlier than the 0.15 release. The `push` command (new in 0.13.0)
+      provides an alternative interface. Critical differences are that `push`
+      transfers annexed data by default and does not handle sibling creation
+      (i.e. it does not have a `--missing` option).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
@@ -673,6 +674,10 @@ class Publish(Interface):
             annex_copy_opts=None,
             jobs=None
     ):
+
+        import warnings
+        warnings.warn("`publish` is deprecated. Use `datalad push` instead.",
+                      DeprecationWarning)
 
         # if ever we get a mode, for "with-data" we would need this
         #if dataset and not path:
