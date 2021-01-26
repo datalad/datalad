@@ -33,7 +33,7 @@ from ..support.constraints import (
     EnsureStr,
 )
 from ..utils import (
-    assure_list,
+    ensure_list,
 )
 from .dataset import (
     datasetmethod,
@@ -134,6 +134,14 @@ class CreateSiblingGithub(Interface):
             constraints=EnsureChoice('https', 'ssh'),
             doc="""Which access protocol/URL to configure for the sibling"""),
         publish_depends=publish_depends,
+        private=Parameter(
+            args=("--private",),
+            action="store_true",
+            default=False,
+            doc="""If this flag is set, the repository created on github
+            will be marked as private and only visible to those granted 
+            access or by membership of a team/organization/etc.
+            """),
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
@@ -156,6 +164,7 @@ class CreateSiblingGithub(Interface):
             github_organization=None,
             access_protocol='https',
             publish_depends=None,
+            private=False,
             dryrun=False):
         # this is an absolute leaf package, import locally to avoid
         # unnecessary dependencies
@@ -204,7 +213,7 @@ class CreateSiblingGithub(Interface):
         # actually make it happen on GitHub
         rinfo = _make_github_repos(
             github_login, github_organization, filtered,
-            existing, access_protocol, dryrun)
+            existing, access_protocol, private, dryrun)
 
         # lastly configure the local datasets
         for d, url, existed in rinfo:
@@ -229,7 +238,7 @@ class CreateSiblingGithub(Interface):
     @staticmethod
     def result_renderer_cmdline(res, args):
         from datalad.ui import ui
-        res = assure_list(res)
+        res = ensure_list(res)
         if args.dryrun:
             ui.message('DRYRUN -- Anticipated results:')
         if not len(res):

@@ -22,10 +22,12 @@ from datalad.support.exceptions import CommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import (
     chpwd,
-    on_windows,
     Path,
 )
-from datalad.cmd import Runner
+from datalad.cmd import (
+    WitlessRunner as Runner,
+    StdOutErrCapture,
+)
 
 from datalad.tests.utils import (
     assert_in,
@@ -42,8 +44,6 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-
-
 
 _dataset_hierarchy_template = {
     'origin': {
@@ -180,11 +180,9 @@ def test_create(probe, path):
     eq_(ds.config.get("annex.backends"), 'MD5E')
     if not ar.is_managed_branch():
         eq_(ds.config.get("core.sharedrepository"), '2')
-    runner = Runner()
     # check description in `info`
-    cmd = ['git', 'annex', 'info']
-    cmlout = runner.run(cmd, cwd=path)
-    assert_in('funny [here]', cmlout[0])
+    cmlout = ds.repo.call_annex(['info'])
+    assert_in('funny [here]', cmlout)
     # check datset ID
     eq_(ds.config.get_value('datalad.dataset', 'id'),
         ds.id)
@@ -205,7 +203,8 @@ def test_create_sub(path):
         'submodule.some/what/deeper.datalad-id={}'.format(
             subds.id),
         list(ds.repo.call_git_items_(['config', '--file', '.gitmodules',
-                                      '--list']))
+                                      '--list'],
+                                     read_only=True))
     )
 
     # subdataset is known to superdataset:
@@ -245,7 +244,7 @@ def test_create_sub_gh3463(path):
     assert_repo_status(ds.path)
 
     # Test command-line invocation directly.
-    Runner(cwd=ds.path)(["datalad", "create", "-d.", "subds1"])
+    Runner(cwd=ds.path).run(["datalad", "create", "-d.", "subds1"])
     assert_repo_status(ds.path)
 
 
@@ -272,7 +271,7 @@ def test_create_sub_dataset_dot_no_path(path):
     # Test command-line invocation directly (regression from gh-3484).
     sub1_path = str(ds.pathobj / "sub1")
     os.mkdir(sub1_path)
-    Runner(cwd=sub1_path)(["datalad", "create", "-d."])
+    Runner(cwd=sub1_path).run(["datalad", "create", "-d."])
     assert_repo_status(ds.path, untracked=[subds0.path, sub1_path])
 
 
@@ -346,7 +345,7 @@ def test_nested_create(path):
     #              on_failure='ignore', result_xfm=None, result_filter=None),
     #    status='error', action='add')
     # only way to make it work is to unannex the content upfront
-    ds.repo._run_annex_command('unannex', annex_options=[op.join(lvl2relpath, 'file')])
+    ds.repo.call_annex(['unannex', op.join(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself, but only on v5
     ds.repo.commit()
     # still nothing without force

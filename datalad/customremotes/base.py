@@ -17,6 +17,8 @@ import errno
 import os
 import sys
 
+from collections import Counter
+
 from ..support.path import exists, join as opj, dirname, lexists
 
 from urllib.parse import urlparse
@@ -26,12 +28,11 @@ lgr = logging.getLogger('datalad.customremotes')
 lgr.log(5, "Importing datalad.customremotes.main")
 
 from ..ui import ui
-from ..support.protocol import ProtocolInterface
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
 from datalad.utils import (
-    assure_unicode,
+    ensure_unicode,
     getargspec,
     Path,
 )
@@ -41,8 +42,6 @@ SUPPORTED_PROTOCOL = 1
 
 DEFAULT_COST = 100
 DEFAULT_AVAILABILITY = "LOCAL"
-
-from datalad.ui.progressbars import ProgressBarBase
 
 
 class AnnexRemoteQuit(Exception):
@@ -62,131 +61,6 @@ def get_function_nargs(f):
         assert argspec.args, "ATM no static methods"
         assert argspec.args[0] == "self"
         return len(argspec.args) - 1
-
-
-class AnnexExchangeProtocol(ProtocolInterface):
-    """A little helper to protocol interactions of custom remote with annex
-    """
-
-    HEADER = r"""#!/bin/bash
-
-set -e
-
-# Gets a VALUE response and stores it in $RET
-report () {
-    echo "$@" >&2
-}
-
-recv () {
-    read resp
-    #resp=${resp%\n}
-    target="$@"
-    if [ "$resp" != "$target" ]; then
-        report "! exp $target"
-        report "  got $resp"
-    else
-        report "+ got $resp"
-    fi
-}
-
-send () {
-    echo "$@"
-    report "sent $@"
-}
-
-"""
-
-    def __init__(self, repopath, custom_remote_name=None):
-        super(AnnexExchangeProtocol, self).__init__()
-        self.repopath = repopath
-        # resolve once, repeated resolution is slow and depending on
-        # file system operations
-        # unclear why logging needs it at all
-        self.realrepopath = Path(repopath).resolve()
-        self.custom_remote_name = custom_remote_name
-        self._file = None
-        self._initiated = False
-
-    def initiate(self):
-        if self._initiated:
-            return
-        self._initiated = True
-        d = opj(self.repopath, '.git', 'bin')
-        if not exists(d):
-            os.makedirs(d)
-
-        suf = '-' + self.custom_remote_name.rstrip(':') if self.custom_remote_name else ''
-        self._file = _file = opj(d, 'git-annex-remote-datalad' + suf)
-
-        if exists(_file):
-            lgr.debug("Commenting out previous entries")
-            # comment out all the past entries
-            with open(_file, 'rb') as f:
-                entries = list(map(assure_unicode, f.readlines()))
-            for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
-                e = entries[i]
-                if e.startswith('recv ') or e.startswith('send '):
-                    entries[i] = '#' + e
-            with open(_file, 'wb') as f:
-                f.write(u''.join(entries).encode('utf-8'))
-            return  # nothing else to be done
-
-        lgr.debug("Initiating protocoling."
-                  "cd %s; vim %s"
-                  % (self.realrepopath,
-                     _file[len(self.repopath) + 1:]))
-        with open(_file, 'a') as f:
-            f.write(self.HEADER)
-        os.chmod(_file, 0o755)
-
-    def write_section(self, cmd):
-        self.initiate()
-        with open(self._file, 'a') as f:
-            f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
-        lgr.debug("New section in the protocol: "
-                  "cd %s; PATH=%s:$PATH %s"
-                  % (self.realrepopath,
-                     dirname(self._file),
-                     cmd))
-
-    def write_entries(self, entries):
-        self.initiate()
-        with open(self._file, 'a') as f:
-            f.write(os.linesep.join(entries + ['']))
-
-    def __iadd__(self, entry):
-        self.initiate()
-        with open(self._file, 'a') as f:
-            f.write(entry + os.linesep)
-        return self
-
-    def start_section(self, cmd):
-        self._sections.append({'command': cmd})
-        self.write_section(cmd)
-        return len(self._sections) - 1
-
-    def end_section(self, id_, exception):
-        # raise exception in case of invalid id_ for consistency:
-        self._sections.__getitem__(id_)
-
-    def add_section(self, cmd, exception):
-        self.start_section(cmd)
-
-    @property
-    def records_callables(self):
-        return False
-
-    @property
-    def records_ext_commands(self):
-        return True
-
-    @property
-    def do_execute_ext_commands(self):
-        return True
-
-    @property
-    def do_execute_callables(self):
-        return True
 
 
 class AnnexCustomRemote(object):
@@ -218,12 +92,7 @@ class AnnexCustomRemote(object):
         fout:
             input/output streams.  If not specified, stdin, stdout used
         """
-        # TODO: probably we shouldn't have runner here but rather delegate
-        # to AnnexRepo's functionality
         from ..support.annexrepo import AnnexRepo
-        from ..cmd import GitRunner
-
-        self.runner = GitRunner()
 
         # Custom remotes correspond to annex via stdin/stdout
         self.fin = fin or sys.stdin
@@ -244,10 +113,6 @@ class AnnexCustomRemote(object):
 
         # To signal whether we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
-        self._protocol = \
-            AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
-            if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE') else None
-
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
 
         # instruct annex backend UI to use this remote
@@ -257,6 +122,12 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
+
+        # OPT: a counter to increment upon successful encounter of the scheme
+        # (ATM only in gen_URLS but later could also be used in other requests).
+        # This would allow to consider schemes in order of decreasing success instead
+        # of arbitrary hardcoded order
+        self._scheme_hits = Counter({s: 0 for s in self.SUPPORTED_SCHEMES})
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -332,8 +203,6 @@ class AnnexCustomRemote(object):
             self.heavydebug("Sending %r" % msg)
             self.fout.write(msg + "\n")  # .encode())
             self.fout.flush()
-            if self._protocol is not None:
-                self._protocol += "send %s" % msg
         except IOError as exc:
             lgr.debug("Failed to send due to %s" % str(exc))
             if exc.errno == errno.EPIPE:
@@ -363,8 +232,6 @@ class AnnexCustomRemote(object):
         # with filenames starting/ending with spaces - encoded?
         # Split right away
         l = self.fin.readline().rstrip(os.linesep)
-        if self._protocol is not None:
-            self._protocol += "recv %s" % l
         msg = l.split(None, n)
         if req and ((not msg) or (req != msg[0])):
             # verify correct response was given
@@ -619,14 +486,17 @@ class AnnexCustomRemote(object):
         else:
             return val
 
-    def get_URLS(self, key):
-        """Gets URL(s) associated with a Key.
+    def gen_URLS(self, key):
+        """Yield URL(s) associated with a Key.
 
         """
-        urls = []
-        for scheme in self.SUPPORTED_SCHEMES:
+        nurls = 0
+        for scheme, _ in self._scheme_hits.most_common():
             scheme_ = scheme + ":"
             self.send("GETURLS", key, scheme_)
+            # we need to first to slurp in all for a given SCHEME
+            # since annex would be expecting to send its final empty VALUE
+            scheme_urls = []
             while True:
                 url = self.read("VALUE", 1)
                 if not url or len(url) <= 1:
@@ -635,27 +505,26 @@ class AnnexCustomRemote(object):
                 url = url[1:]
                 if url:
                     assert(len(url) == 1)
-                    urls.append(url[0])
+                    nurls += 1
+                    scheme_urls.append(url[0])
                 else:
                     break
+            if scheme_urls:
+                # note: generator would cease to exist thus not asking
+                # for URLs for other schemes if this scheme is good enough
+                self._scheme_hits[scheme] += 1
+                for url in scheme_urls:
+                    yield url
 
-        self.heavydebug("Got %d URL(s) for key %s: %s", len(urls), key, urls)
+        self.heavydebug("Got %d URL(s) for key %s", nurls, key)
 
-        #if not urls:
-        #    raise ValueError("Did not get any URLs for %s which we support" % key)
+    def get_URLS(self, key):
+        """Gets URL(s) associated with a Key.
 
-        return urls
-
-    def _get_key_path(self, key):
-        """Return path to the KEY file
+        Use a generator gen_URLS where possible.
+        This one should be deprecated in 0.15.
         """
-        # TODO: should actually be implemented by AnnexRepo
-        #       Command is available in annex >= 20140410
-        (out, err) = \
-            self.runner(['git', 'annex', 'contentlocation', key], cwd=self.path)
-        # TODO: it would exit with non-0 if key is not present locally.
-        # we need to catch and throw our exception
-        return opj(self.path, out.rstrip(os.linesep))
+        return list(self.gen_URLS(key))
 
     # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED

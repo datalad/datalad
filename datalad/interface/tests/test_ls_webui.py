@@ -40,7 +40,7 @@ from datalad.utils import (
     swallow_outputs,
     _path_,
 )
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner
 
 
 def test_machinesize():
@@ -192,7 +192,8 @@ def test_ls_json(topdir, topurl):
     # register "external" submodule  by installing and uninstalling it
     ext_url = topurl + '/dir/subgit/.git'
     # need to make it installable via http
-    Runner()('git update-server-info', cwd=opj(topdir, 'dir', 'subgit'))
+    WitlessRunner(cwd=opj(topdir, 'dir', 'subgit')).run(
+        ['git', 'update-server-info'])
     ds.install(opj('dir', 'subgit_ext'), source=ext_url)
     ds.uninstall(opj('dir', 'subgit_ext'))
     meta_dir = opj('.git', 'datalad', 'metadata')

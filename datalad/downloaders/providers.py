@@ -22,6 +22,7 @@ from .base import NoneAuthenticator, NotImplementedAuthenticator
 
 from .http import (
     HTMLFormAuthenticator,
+    HTTPAnonBearerTokenAuthenticator,
     HTTPAuthAuthenticator,
     HTTPBasicAuthAuthenticator,
     HTTPDigestAuthAuthenticator,
@@ -29,12 +30,13 @@ from .http import (
     HTTPDownloader,
 )
 from .s3 import S3Authenticator, S3Downloader
+from .shub import SHubDownloader
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..support.network import RI
 from ..support import path
-from ..utils import assure_list_from_str
 from ..utils import auto_repr
+from ..utils import ensure_list_from_str
 from ..utils import get_dataset_root
 
 from ..interface.common_cfg import dirs
@@ -49,6 +51,7 @@ AUTHENTICATION_TYPES = {
     'http_basic_auth': HTTPBasicAuthAuthenticator,
     'http_digest_auth': HTTPDigestAuthAuthenticator,
     'bearer_token': HTTPBearerTokenAuthenticator,
+    'bearer_token_anon': HTTPAnonBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
     'nda-s3': S3Authenticator,
     'loris-token': HTTPBearerTokenAuthenticator,
@@ -68,6 +71,7 @@ class Provider(object):
     DOWNLOADERS = {
         'http': {'class': HTTPDownloader, 'externals': {'requests'}},
         'https': {'class': HTTPDownloader, 'externals': {'requests'}},
+        'shub': {'class': SHubDownloader, 'externals': {'requests'}},
         'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
         's3': {'class': S3Downloader, 'externals': {'boto'}}
         # ... TODO
@@ -87,7 +91,7 @@ class Provider(object):
 
         """
         self.name = name
-        self.url_res = assure_list_from_str(url_res)
+        self.url_res = ensure_list_from_str(url_res)
         self.credential = credential
         self.authenticator = authenticator
         self._downloader = downloader
@@ -294,7 +298,7 @@ class Providers(object):
             authenticator = None
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
-        url_res = assure_list_from_str(items.pop('url_re', []))
+        url_res = ensure_list_from_str(items.pop('url_re', []))
         assert url_res, "current implementation relies on having url_re defined"
 
         credential = items.pop('credential', None)

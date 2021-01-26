@@ -26,8 +26,9 @@ from datalad.version import __version__
 from ..wtf import SECTION_CALLABLES
 from ...utils import Path
 
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
+    assert_greater,
     assert_in,
     assert_not_in,
     assert_repo_status,
@@ -90,7 +91,7 @@ def test_wtf(topdir):
         assert_in('## configuration', cmo.out)
         assert_in('## dataset', cmo.out)
         assert_in(u'path: {}'.format(ds.path),
-                  assure_unicode(cmo.out))
+                  ensure_unicode(cmo.out))
 
     # and if we run with all sensitive
     for sensitive in ('some', True):
@@ -140,6 +141,17 @@ def test_wtf(topdir):
         wtf(sections=['dependencies'], decor='html_details')
         ok_startswith(cmo.out, '<details><summary>DataLad %s WTF' % __version__)
         assert_in('## dependencies', cmo.out)
+
+    # short flavor
+    with swallow_outputs() as cmo:
+        wtf(flavor='short')
+        assert_in("- datalad: version=%s" % __version__, cmo.out)
+        assert_in("- dependencies: ", cmo.out)
+        eq_(len(cmo.out.splitlines()), 4)  # #WTF, datalad, dependencies, trailing new line
+
+    with swallow_outputs() as cmo:
+        wtf(flavor='short', sections='*')
+        assert_greater(len(cmo.out.splitlines()), 10)  #  many more
 
     # should result only in '# WTF'
     skip_if_no_module('pyperclip')
@@ -237,7 +249,7 @@ PDDL
 This is a DataLad dataset (id: {id}).
 
 For more information on DataLad and on how to work with its datasets,
-see the DataLad documentation at: http://docs.datalad.org
+see the DataLad documentation at: http://handbook.datalad.org
 """.format(
     id=ds.id))
 

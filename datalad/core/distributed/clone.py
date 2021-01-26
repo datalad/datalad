@@ -30,9 +30,9 @@ from datalad.support.gitrepo import (
 )
 from datalad.cmd import (
     CommandError,
-    GitRunner,
+    GitWitlessRunner,
     StdOutCapture,
-    WitlessRunner,
+    StdOutErrCapture,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -61,7 +61,7 @@ from datalad.dochelpers import (
     single_or_plural,
 )
 from datalad.utils import (
-    assure_bool,
+    ensure_bool,
     knows_annex,
     make_tempfile,
     Path,
@@ -110,6 +110,12 @@ class Clone(Interface):
     examples); and 4) automatic configurable generation of alternative access
     URL for common cases (such as appending '.git' to the URL in case the
     accessing the base URL failed).
+
+    In case the clone is registered as a subdataset, the original URL passed to
+    `clone` is recorded in `.gitmodules` of the parent dataset in addition
+    to the resolved URL used internally for git-clone. This allows to preserve
+    datalad specific URLs like ria+ssh://... for subsequent calls to `get` if
+    the subdataset was locally removed later on.
 
     || PYTHON >>By default, the command returns a single Dataset instance for
     an installed dataset, regardless of whether it was newly installed ('ok'
@@ -294,8 +300,8 @@ class Clone(Interface):
             cfg=None if ds is None else ds.config,
         )
 
-        # TODO handle any 'version' property handling and verification using a dedicated
-        # public helper
+        # TODO handle any 'version' property handling and verification using a
+        # dedicated public helper
 
         if ds is not None:
             # we created a dataset in another dataset
@@ -308,6 +314,11 @@ class Clone(Interface):
                     on_failure='ignore'):
                 yield r
 
+            # Modify .gitmodules to contain originally given url. This is
+            # particularly relevant for postclone routines on a later `get` for
+            # that subdataset. See gh-5256.
+            ds.subdatasets(path, set_property=[("datalad-url", source)])
+
 
 def clone_dataset(
         srcs,
@@ -315,7 +326,8 @@ def clone_dataset(
         reckless=None,
         description=None,
         result_props=None,
-        cfg=None):
+        cfg=None,
+        checkout_gitsha=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -338,6 +350,12 @@ def clone_dataset(
     cfg : ConfigManager, optional
       Configuration for parent dataset. This will be queried instead
       of the global DataLad configuration.
+    checkout_gitsha : str, optional
+      If given, a specific commit, identified by shasum, will be checked out after
+      cloning. A dedicated follow-up fetch will be performed, if the initial clone
+      did not obtain the commit object. Should the checkout of the target commit
+      cause a detached HEAD, the previously active branch will be reset to the
+      target commit.
 
     Yields
     ------
@@ -516,6 +534,7 @@ def clone_dataset(
             **result_props)
         return
 
+    dest_repo = destds.repo
     if not cand.get("version"):
         postclone_check_head(destds)
 
@@ -535,6 +554,18 @@ def clone_dataset(
         reckless,
         description)
 
+    if checkout_gitsha and \
+       dest_repo.get_hexsha(dest_repo.get_corresponding_branch()) != checkout_gitsha:
+        try:
+            postclone_checkout_commit(dest_repo, checkout_gitsha)
+        except Exception as e:
+            yield get_status_dict(
+                status='error',
+                message=str(e),
+                **result_props,
+            )
+            return
+
     # perform any post-processing that needs to know details of the clone
     # source
     if result_props['source']['type'] == 'ria':
@@ -547,11 +578,83 @@ def clone_dataset(
             'datalad.clone.reckless', reckless,
             where='local',
             reload=True)
+    else:
+        # We would still want to reload configuration to ensure that any of the
+        # above git invocations could have potentially changed the config
+        # TODO: might no longer be necessary if 0.14.0 adds reloading upon
+        # non-readonly commands invocation
+        destds.config.reload()
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
     # parent
     yield get_status_dict(status='ok', **result_props)
+
+
+def postclone_checkout_commit(repo, target_commit):
+    """Helper to check out a specific target commit in a fresh clone.
+
+    Will not check (again) if current commit and target commit are already
+    the same!
+    """
+    # record what branch we were on right after the clone
+    active_branch = repo.get_active_branch()
+    corr_branch = repo.get_corresponding_branch(branch=active_branch)
+    was_adjusted = bool(corr_branch)
+    repo_orig_branch = corr_branch or active_branch
+    # if we are on a branch this hexsha will be the tip of that branch
+    repo_orig_hexsha = repo.get_hexsha(repo_orig_branch)
+    # make sure we have the desired commit locally
+    # expensive and possibly error-prone fetch conditional on cheap
+    # local check
+    if not repo.commit_exists(target_commit):
+        try:
+            repo.fetch(remote='origin', refspec=target_commit)
+        except CommandError:
+            pass
+        # instead of inspecting the fetch results for possible ways
+        # with which it could failed to produced the desired result
+        # let's verify the presence of the commit directly, we are in
+        # expensive-land already anyways
+        if not repo.commit_exists(target_commit):
+            # there is nothing we can do about this
+            # MIH thinks that removing the clone is not needed, as a likely
+            # next step will have to be a manual recovery intervention
+            # and not another blind attempt
+            raise ValueError(
+                'Target commit %s does not exist in the clone, and '
+                'a fetch that commit from origin failed'
+                % target_commit[:8])
+    # checkout the desired commit
+    repo.call_git(['checkout', target_commit])
+    # did we detach?
+    if repo_orig_branch and not repo.get_active_branch():
+        # trace if current state is a predecessor of the branch_hexsha
+        lgr.debug(
+            "Detached HEAD after resetting worktree of %s "
+            "(original branch: %s)", repo, repo_orig_branch)
+        if repo.get_merge_base(
+                [repo_orig_hexsha, target_commit]) == target_commit:
+            # we assume the target_commit to be from the same branch,
+            # because it is an ancestor -- update that original branch
+            # to point to the target_commit, and update HEAD to point to
+            # that location
+            lgr.info(
+                "Reset branch '%s' to %s (from %s) to "
+                "avoid a detached HEAD",
+                repo_orig_branch, target_commit[:8], repo_orig_hexsha[:8])
+            branch_ref = 'refs/heads/%s' % repo_orig_branch
+            repo.update_ref(branch_ref, target_commit)
+            repo.update_ref('HEAD', branch_ref, symbolic=True)
+            if was_adjusted:
+                # Note: The --force is needed because the adjust branch already
+                # exists.
+                repo.adjust(options=["--unlock", "--force"])
+        else:
+            lgr.warning(
+                "%s has a detached HEAD, because the target commit "
+                "%s has no unique ancestor with branch '%s'",
+                repo, target_commit[:8], repo_orig_branch)
 
 
 def postclone_check_head(ds):
@@ -690,7 +793,7 @@ def postclonecfg_ria(ds, props):
             #       to work and would read from stdin. Make sure we know this
             #       works for required git versions and on all platforms.
             with make_tempfile(content=config_content) as cfg_file:
-                runner = WitlessRunner(env=GitRunner.get_git_environ_adjusted())
+                runner = GitWitlessRunner()
                 try:
                     result = runner.run(
                         ['git', 'config', '-f', cfg_file,
@@ -782,7 +885,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     if not repo.is_initialized() or description:
         repo._init(description=description)
     if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
-        repo._run_annex_command('untrust', annex_options=['here'])
+        repo.call_annex(['untrust', 'here'])
 
     elif reckless == 'ephemeral':
         # with ephemeral we declare 'here' as 'dead' right away, whenever
@@ -806,7 +909,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
         if check_symlink_capability(ds.repo.dot_git / 'dl_link_test',
                                     ds.repo.dot_git / 'dl_target_test'):
-            # symlink the annex to avoid needless copies in an emphemeral clone
+            # symlink the annex to avoid needless copies in an ephemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
             origin_annex_url = ds.config.get("remote.origin.url", None)
             origin_git_path = None
@@ -818,14 +921,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
                     # we are local; check for a bare repo first to not mess w/
                     # the path
-                    # Note, that w/o support for bare repos in GitRepo we also
-                    # can't use ConfigManager ATM.
-                    from datalad.cmd import GitWitlessRunner, StdOutErrCapture
-                    gc_response = GitWitlessRunner(
-                        cwd=origin_git_path,
-                    ).run(['git', 'config', '--local', '--get', 'core.bare'],
-                          protocol=StdOutErrCapture)
-                    if gc_response['stdout'].lower().strip() == 'true':
+                    if GitRepo(origin_git_path, create=False).bare:
                         # origin is a bare repo -> use path as is
                         pass
                     elif origin_git_path.name != '.git':
@@ -868,7 +964,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             continue
         sr_autoenable = config.get('autoenable', False)
         try:
-            sr_autoenable = assure_bool(sr_autoenable)
+            sr_autoenable = ensure_bool(sr_autoenable)
         except ValueError:
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '

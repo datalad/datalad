@@ -20,7 +20,7 @@ from ..interface.common_opts import nosave_opt
 from ..interface.common_opts import save_message_opt
 from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
-from ..utils import assure_list_from_str
+from ..utils import ensure_list_from_str
 from ..utils import Path
 from ..utils import PurePosixPath
 from ..distribution.dataset import Dataset
@@ -126,7 +126,7 @@ class DownloadURL(Interface):
             # resolve_path() doesn't preserve trailing separators. Add one for
             # the download() call.
             path = path + op.sep
-        urls = assure_list_from_str(urls)
+        urls = ensure_list_from_str(urls)
 
         if not dir_is_target:
             if len(urls) > 1:

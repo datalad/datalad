@@ -14,8 +14,8 @@ import re
 from urllib.parse import urlsplit, unquote as urlunquote
 
 from ..utils import (
-    assure_dict_from_str,
     auto_repr,
+    ensure_dict_from_str,
 )
 from ..dochelpers import (
     borrowkwargs,
@@ -191,9 +191,9 @@ class S3Downloader(BaseDownloader):
         if re.search('%[0-9a-fA-F]{2}', filepath):
             lgr.debug("URL unquoting S3 URL filepath %s", filepath)
             filepath = urlunquote(filepath)
-        # TODO: needs replacement to assure_ since it doesn't
+        # TODO: needs replacement to ensure_ since it doesn't
         # deal with non key=value
-        return rec.netloc, filepath, assure_dict_from_str(rec.query, sep='&') or {}
+        return rec.netloc, filepath, ensure_dict_from_str(rec.query, sep='&') or {}
 
     def _establish_session(self, url, allow_old=True):
         """

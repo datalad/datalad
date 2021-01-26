@@ -34,7 +34,7 @@ class CommandError(RuntimeError):
     def to_str(self, include_output=True):
         from datalad.utils import (
             ensure_unicode,
-            quote_cmdlinearg,
+            join_cmdline,
         )
         to_str = "{}: ".format(self.__class__.__name__)
         cmd = self.cmd
@@ -42,8 +42,7 @@ class CommandError(RuntimeError):
             to_str += "'{}'".format(
                 # go for a compact, normal looking, properly quoted
                 # command rendering if the command is in list form
-                ' '.join(quote_cmdlinearg(c) for c in cmd)
-                if isinstance(cmd, list) else cmd
+                join_cmdline(cmd) if isinstance(cmd, list) else cmd
             )
         if self.code:
             to_str += " failed with exitcode {}".format(self.code)
@@ -61,6 +60,16 @@ class CommandError(RuntimeError):
         if self.stderr:
             to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
         if self.kwargs:
+            if 'stdout_json' in self.kwargs:
+                src_keys = ('note', 'error-messages')
+                from datalad.utils import unique
+                json_errors = unique(
+                    '; '.join(str(m[key]) for key in src_keys if m.get(key))
+                    for m in self.kwargs['stdout_json']
+                    if any(m.get(k) for k in src_keys)
+                )
+                if json_errors:
+                    to_str += " [errors from JSON records: {}]".format(json_errors)
             to_str += " [info keys: {}]".format(
                 ', '.join(self.kwargs.keys()))
         return to_str

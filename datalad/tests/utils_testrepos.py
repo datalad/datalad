@@ -163,14 +163,14 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         # add submodules
         annex = BasicAnnexTestRepo()
         annex.create()
-        kw = dict(cwd=self.path, expect_stderr=True)
-        self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.url, 'subm 1'], **kw)
-        self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.url, '2'], **kw)
+        kw = dict(expect_stderr=True)
+        self.repo.call_git(
+            ['submodule', 'add', annex.url, 'subm 1'], **kw)
+        self.repo.call_git(
+            ['submodule', 'add', annex.url, '2'], **kw)
         self.repo.commit('Added subm 1 and 2.')
-        self.repo._git_custom_command(
-            '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
+        self.repo.call_git(
+            ['submodule', 'update', '--init', '--recursive'], **kw)
         # init annex in subdatasets
         for s in ('subm 1', '2'):
             AnnexRepo(opj(self.path, s), init=True)
@@ -183,17 +183,17 @@ class NestedDataset(BasicAnnexTestRepo):
         ds = SubmoduleDataset()
         ds.create()
         kw = dict(expect_stderr=True)
-        self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', ds.url, 'sub dataset1'],
-            cwd=self.path, **kw)
-        self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', ds.url, 'sub sub dataset1'],
-            cwd=opj(self.path, 'sub dataset1'), **kw)
+        self.repo.call_git(
+            ['submodule', 'add', ds.url, 'sub dataset1'], **kw)
+        self.repo.call_git(
+            ['-C', opj(self.path, 'sub dataset1'),
+             'submodule', 'add', ds.url, 'sub sub dataset1'],
+            **kw)
         GitRepo(opj(self.path, 'sub dataset1')).commit('Added sub dataset.')
         self.repo.commit('Added subdatasets.', options=["-a"])
-        self.repo._git_custom_command(
-            '', ['git', 'submodule', 'update', '--init', '--recursive'],
-            cwd=self.path, **kw)
+        self.repo.call_git(
+            ['submodule', 'update', '--init', '--recursive'],
+            **kw)
         # init all annexes
         for s in ('', 'sub dataset1', opj('sub dataset1', 'sub sub dataset1')):
             AnnexRepo(opj(self.path, s), init=True)

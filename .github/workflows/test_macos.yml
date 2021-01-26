@@ -16,6 +16,7 @@ jobs:
     steps:
     - name: Set up environment
       run: |
+        brew install exempi
         git config --global user.email "test@github.land"
         git config --global user.name "GitHub Almighty"
 
@@ -23,7 +24,8 @@ jobs:
 
     - name: Install git-annex
       run: |
-        eval source tools/ci/install-annex.sh ${{ matrix.install_scenario }}
+        python3 datalad/install.py -E new.env ${{ matrix.install_scenario }}
+        . new.env
         echo "PATH=$PATH" >> "$GITHUB_ENV"
 
     - name: Set up Python 3.6

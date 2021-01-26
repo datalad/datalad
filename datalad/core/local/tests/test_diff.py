@@ -21,7 +21,10 @@ from datalad.support.exceptions import (
 )
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
-from datalad.cmd import GitRunner
+from datalad.cmd import (
+    GitWitlessRunner,
+    StdOutCapture,
+)
 from datalad.utils import (
     Path,
     on_windows,
@@ -61,8 +64,10 @@ def test_magic_number():
     # commit
     # given the level of dark magic, we better test whether this stays
     # constant across Git versions (it should!)
-    out, err = GitRunner().run('cd ./ | git hash-object --stdin -t tree')
-    eq_(out.strip(), PRE_INIT_COMMIT_SHA)
+    out = GitWitlessRunner().run(
+        'cd ./ | git hash-object --stdin -t tree',
+        protocol=StdOutCapture)
+    eq_(out['stdout'].strip(), PRE_INIT_COMMIT_SHA)
 
 
 @with_tempfile(mkdir=True)

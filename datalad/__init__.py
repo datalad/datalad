@@ -47,7 +47,12 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-from datalad.utils import get_encoding_info, get_envvars_info, getpwd
+from datalad.utils import (
+    get_encoding_info,
+    get_envvars_info,
+    get_home_envvars,
+    getpwd,
+)
 
 # To analyze/initiate our decision making on what current directory to return
 getpwd()
@@ -88,36 +93,47 @@ test.__test__ = False
 # To store settings which setup_package changes and teardown_package should return
 _test_states = {
     'loglevel': None,
-    'DATALAD_LOG_LEVEL': None,
-    'HOME': None,
+    'env': {},
 }
 
 
 def setup_package():
     import os
+    from datalad.utils import on_osx
+    if on_osx:
+        # enforce honoring TMPDIR (see gh-5307)
+        import tempfile
+        tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
+
     from datalad import consts
-    _test_states['HOME'] = os.environ.get('HOME', None)
-    _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
+
+    _test_states['env'] = {}
+
+    def set_envvar(v, val):
+        """Memoize and then set env var"""
+        _test_states['env'][v] = os.environ.get(v, None)
+        os.environ[v] = val
+
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
-    os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
     from datalad.tests.utils import DEFAULT_BRANCH
-    _test_states["GIT_CONFIG_PARAMETERS"] = os.environ.get(
-        "GIT_CONFIG_PARAMETERS")
-    os.environ["GIT_CONFIG_PARAMETERS"] = "'init.defaultBranch={}'".format(
-        DEFAULT_BRANCH)
+    set_envvar("GIT_CONFIG_PARAMETERS", "'init.defaultBranch={}'".format(DEFAULT_BRANCH))
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
-        os.environ['HOME'] = os.environ['GIT_HOME']
+        set_envvar('HOME', os.environ['GIT_HOME'])
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile
         from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
-            os.environ['HOME'] = new_home
+            pass
+        for v, val in get_home_envvars(new_home).items():
+            set_envvar(v, val)
         if not os.path.exists(new_home):
             os.makedirs(new_home)
         with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
@@ -155,8 +171,7 @@ def setup_package():
         lgr.setLevel(100)
 
         # And we should also set it within environ so underlying commands also stay silent
-        _test_states['DATALAD_LOG_LEVEL'] = DATALAD_LOG_LEVEL
-        os.environ['DATALAD_LOG_LEVEL'] = '100'
+        set_envvar('DATALAD_LOG_LEVEL', '100')
     else:
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
@@ -213,10 +228,6 @@ def teardown_package():
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
-        if _test_states['DATALAD_LOG_LEVEL'] is None:
-            os.environ.pop('DATALAD_LOG_LEVEL')
-        else:
-            os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):
@@ -227,14 +238,12 @@ def teardown_package():
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
 
-    if _test_states['HOME'] is not None:
-        os.environ['HOME'] = _test_states['HOME']
-
-    git_config_params = _test_states["GIT_CONFIG_PARAMETERS"]
-    if git_config_params is None:
-        os.environ.pop("GIT_CONFIG_PARAMETERS")
-    else:
-        os.environ["GIT_CONFIG_PARAMETERS"] = git_config_params
+    # restore all the env variables
+    for v, val in _test_states['env'].items():
+        if val is not None:
+            os.environ[v] = val
+        else:
+            os.environ.pop(v)
 
     # Re-establish correct global config after changing $HOME.
     # Might be superfluous, since after teardown datalad.cfg shouldn't be
@@ -242,8 +251,6 @@ def teardown_package():
     # either way.
     cfg.reload(force=True)
 
-    if _test_states['DATASETS_TOPURL_ENV']:
-        os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
     from datalad.support.cookies import cookies_db

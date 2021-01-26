@@ -12,6 +12,8 @@
 import re
 import requests
 import requests.auth
+from requests.utils import parse_dict_header
+
 # at some point was trying to be too specific about which exceptions to
 # catch for a retry of a download.
 # from urllib3.exceptions import MaxRetryError, NewConnectionError
@@ -20,8 +22,8 @@ import io
 from time import sleep
 
 from ..utils import (
-    assure_list_from_str,
-    assure_dict_from_str,
+    ensure_list_from_str,
+    ensure_dict_from_str,
     ensure_bytes,
 )
 from ..dochelpers import borrowkwargs
@@ -142,9 +144,9 @@ class HTTPBaseAuthenticator(Authenticator):
         """
         super(HTTPBaseAuthenticator, self).__init__(**kwargs)
         self.url = url
-        self.failure_re = assure_list_from_str(failure_re)
-        self.success_re = assure_list_from_str(success_re)
-        self.session_cookies = assure_list_from_str(session_cookies)
+        self.failure_re = ensure_list_from_str(failure_re)
+        self.success_re = ensure_list_from_str(success_re)
+        self.session_cookies = ensure_list_from_str(session_cookies)
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
@@ -267,7 +269,7 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
           Passed to super class HTTPBaseAuthenticator
         """
         super(HTMLFormAuthenticator, self).__init__(**kwargs)
-        self.fields = assure_dict_from_str(fields)
+        self.fields = ensure_dict_from_str(fields)
         self.tagid = tagid
 
     def _post_credential(self, credentials, post_url, session):
@@ -361,6 +363,44 @@ class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
     def _post_credential(self, credentials, post_url, session):
         # we do not need to post anything, just inject token into the session
         session.headers['Authorization'] = "Bearer %s" % credentials['token']
+
+
+@auto_repr
+class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
+    """Retrieve token via 401 response and add Authorization: Bearer header.
+    """
+
+    allows_anonymous = True
+
+    def authenticate(self, url, credential, session, update=False):
+        if credential:
+            lgr.warning(
+                "Argument 'credential' specified, but it will be ignored: %s",
+                credential)
+        response = session.head(url)
+        status = response.status_code
+        if status == 200:
+            lgr.debug("No authorization needed for %s", url)
+            return
+        if status != 401:
+            raise DownloadError(
+                "Expected 200 or 401 but got {} from {}"
+                .format(status, url))
+
+        lgr.debug("Requesting authorization token for %s", url)
+        auth_parts = parse_dict_header(response.headers["www-authenticate"])
+        auth_url = ("{}?service={}&scope={}"
+                    .format(auth_parts["Bearer realm"],
+                            auth_parts["service"],
+                            auth_parts["scope"]))
+        auth_response = session.get(auth_url)
+        try:
+            auth_info = auth_response.json()
+        except ValueError as e:
+            raise DownloadError(
+                "Failed to get information from {}: {}"
+                .format(auth_url, exc_str(e)))
+        session.headers['Authorization'] = "Bearer " + auth_info["token"]
 
 
 @auto_repr

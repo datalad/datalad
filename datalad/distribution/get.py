@@ -15,6 +15,8 @@ import re
 
 import os.path as op
 
+from functools import partial
+
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -40,6 +42,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
+from datalad.support.collections import ReadOnlyDict
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import (
@@ -47,12 +50,16 @@ from datalad.support.gitrepo import (
     _fixup_submodule_dotgit_setup,
 )
 from datalad.support.exceptions import (
+    CommandError,
     InsufficientArgumentsError,
 )
 from datalad.support.network import (
     URL,
     RI,
     urlquote,
+)
+from datalad.support.parallel import (
+    ProducerConsumerProgressLog,
 )
 from datalad.dochelpers import (
     single_or_plural,
@@ -100,14 +107,19 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
 def _get_flexible_source_candidates_for_submodule(ds, sm):
     """Assemble candidate locations from where to clone a submodule
 
-    The following locations candidates are considered. For each candidate a
-    cost is given in parenthesis, lower values indicate higher cost:
+    The following location candidates are considered. For each candidate a
+    cost is given in parenthesis, higher values indicate higher cost, and
+    thus lower priority:
 
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
       There can be more than one candidate (cost 500).
 
-    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+    - A datalad URL recorded in `.gitmodules` (cost 590). This allows for
+      datalad URLs that require additional handling/resolution by datalad, like
+      ria-schemes (ria+http, ria+ssh, etc.)
+
+    - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
 
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
@@ -140,8 +152,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     is the configured remote name.
 
     Lastly, all candidates are sorted according to their cost (lower values
-    first, and duplicate URLs are stripped, while preserving the first item in the
+    first), and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
+
+    More information on this feature can be found at
+    http://handbook.datalad.org/r.html?clone-priority
 
     Parameters
     ----------
@@ -157,9 +172,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       Names are not unique and either derived from the name of the respective
       remote, template configuration variable, or 'local'.
     """
+
     # short cuts
     ds_repo = ds.repo
     sm_url = sm.get('gitmodule_url', None)
+    sm_datalad_url = sm.get('gitmodule_datalad-url', None)
     sm_path = op.relpath(sm['path'], start=sm['parentds'])
 
     clone_urls = []
@@ -219,6 +236,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         remote_url,
                         alternate_suffix=False)
                 )
+
     cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
     for name, tmpl in [(c[len(candcfg_prefix):],
@@ -249,6 +267,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 alternate_suffix=False)
             # avoid inclusion of submodule location itself
             if url != sm['path']
+        )
+
+    # Consider original datalad URL in .gitmodules before any URL that is meant
+    # to be consumed by git:
+    if sm_datalad_url:
+        clone_urls.append(
+            dict(cost=590, name='dl-url', url=sm_datalad_url)
         )
 
     # sort all candidates by their label, thereby allowing a
@@ -299,19 +324,30 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             clone_urls_,
             Dataset(dest_path),
             cfg=ds.config,
+            checkout_gitsha=sm['gitshasum'],
             **kwargs):
-        # make sure to fix a detached HEAD before yielding the install success
-        # result. The resetting of the branch would undo any change done
-        # to the repo by processing in response to the result
         if res.get('action', None) == 'install' and \
                 res.get('status', None) == 'ok' and \
                 res.get('type', None) == 'dataset' and \
                 res.get('path', None) == dest_path:
             _fixup_submodule_dotgit_setup(ds, sm_path)
 
-            # do fancy update
-            lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
-            ds.repo.update_submodule(sm_path, init=True)
+            section_name = 'submodule.{}'.format(sm['gitmodule_name'])
+            # register the submodule as "active" in the superdataset
+            ds.config.set(
+                '{}.active'.format(section_name),
+                'true',
+                reload=False, force=True, where='local',
+            )
+            ds.config.set(
+                '{}.url'.format(section_name),
+                # record the actual source URL of the successful clone
+                # and not a funky prediction based on the parent ds
+                # like ds.repo.update_submodule() would do (does not
+                # accept a URL)
+                res['source']['giturl'],
+                reload=True, force=True, where='local',
+            )
         yield res
 
     subds = Dataset(dest_path)
@@ -411,53 +447,80 @@ def _install_necessary_subdatasets(
 
 
 def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=None,
-                                        refds_path=None, description=None):
+                 refds_path=None, description=None, jobs=None, producer_only=False):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
     # install using helper that give some flexibility regarding where to
     # get the module from
 
-    for sub in ds.subdatasets(
-            path=start,
-            return_type='generator',
-            result_renderer='disabled'):
+    # Keep only paths, to not drag full instances of Datasets along,
+    # they are cheap to instantiate
+    sub_paths_considered = []
+    subs_notneeded = []
+
+    def gen_subs_to_install():  # producer
+        for sub in ds.subdatasets(
+                path=start,
+                return_type='generator',
+                result_renderer='disabled'):
+            sub_path = sub['path']
+            sub_paths_considered.append(sub_path)
+            if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
+                lgr.debug(
+                    "subdataset %s is configured to be skipped on recursive installation",
+                    sub_path)
+                continue
+            # TODO: Yarik is lost among all parentds, ds, start, refds_path so is not brave enough to
+            # assume any from the record, thus will pass "ds.path" around to consumer
+            yield ds.path, ReadOnlyDict(sub), recursion_limit
+
+    def consumer(ds_path__sub__limit):
+        ds_path, sub, recursion_limit = ds_path__sub__limit
         subds = Dataset(sub['path'])
-        if sub.get('gitmodule_datalad-recursiveinstall', '') == 'skip':
-            lgr.debug(
-                "subdataset %s is configured to be skipped on recursive installation",
-                sub['path'])
-            continue
         if sub.get('state', None) != 'absent':
-            # dataset was already found to exist
-            yield get_status_dict(
-                'install', ds=subds, status='notneeded', logger=lgr,
-                refds=refds_path)
+            rec = get_status_dict('install', ds=subds, status='notneeded', logger=lgr, refds=refds_path)
+            subs_notneeded.append(rec)
+            yield rec
             # do not continue, even if an intermediate dataset exists it
             # does not imply that everything below it does too
         else:
-            # try to get this dataset
-            for res in _install_subds_from_flexible_source(
-                    ds,
-                    sub,
-                    reckless=reckless,
-                    description=description):
-                # yield everything to let the caller decide how to deal with
-                # errors
-                yield res
+            # TODO: here we need another "ds"!  is it within "sub"?
+            yield from _install_subds_from_flexible_source(
+                Dataset(ds_path), sub, reckless=reckless, description=description)
+
         if not subds.is_installed():
             # an error result was emitted, and the external consumer can decide
             # what to do with it, but there is no point in recursing into
             # something that should be there, but isn't
             lgr.debug('Subdataset %s could not be installed, skipped', subds)
-            continue
+            return
+
         # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
                 subds,
                 recursion_limit=recursion_limit - 1 if isinstance(recursion_limit, int) else recursion_limit,
                 reckless=reckless,
-                refds_path=refds_path):
-            yield res
+                refds_path=refds_path,
+                jobs=jobs,
+                producer_only=True  # we will be adding to producer queue
+        ):
+            producer_consumer.add_to_producer_queue(res)
+
+    producer = gen_subs_to_install()
+    if producer_only:
+        yield from producer
+    else:
+        producer_consumer = ProducerConsumerProgressLog(
+            producer,
+            consumer,
+            # no safe_to_consume= is needed since we are doing only at a single level ATM
+            label="Installing",
+            unit="datasets",
+            jobs=jobs,
+            lgr=lgr
+        )
+        yield from producer_consumer
 
 
 def _install_targetpath(
@@ -467,7 +530,9 @@ def _install_targetpath(
         recursion_limit,
         reckless,
         refds_path,
-        description):
+        description,
+        jobs=None,
+):
     """Helper to install as many subdatasets as needed to verify existence
     of a target path
 
@@ -552,7 +617,9 @@ def _install_targetpath(
             # TODO keep Path when RF is done
             start=str(target_path),
             refds_path=refds_path,
-            description=description):
+            description=description,
+            jobs=jobs,
+    ):
         # yield immediately so errors could be acted upon
         # outside, before we continue
         res.update(
@@ -581,10 +648,17 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             yield r
         return
     respath_by_status = {}
-    for res in ds_repo.get(
+    try:
+        results = ds_repo.get(
             content,
             options=['--from=%s' % source] if source else [],
-            jobs=jobs):
+            jobs=jobs)
+    except CommandError as exc:
+        results = exc.kwargs.get("stdout_json")
+        if not results:
+            raise
+
+    for res in results:
         res = annexjson2result(res, ds, type='file', logger=lgr,
                                refds=refds_path)
         success = success_status_map[res['status']]
@@ -616,7 +690,7 @@ class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
 
     This command only operates on dataset content. To obtain a new independent
-    dataset from some source use the `install` command.
+    dataset from some source use the `clone` command.
 
     By default this command operates recursively within a dataset, but not
     across potential subdatasets, i.e. if a directory is provided, all files in
@@ -628,6 +702,55 @@ class Get(Interface):
     obtained from some available location (according to git-annex configuration
     and possibly assigned remote priorities), unless a specific source is
     specified.
+
+    *Getting subdatasets*
+
+    Just as DataLad supports getting file content from more than one location,
+    the same is supported for subdatasets, including a ranking of individual
+    sources for prioritization.
+
+    The following location candidates are considered. For each candidate a
+    cost is given in parenthesis, higher values indicate higher cost, and thus
+    lower priority:
+
+    - URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with the submodule path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - In case `.gitmodules` contains a relative path instead of a URL,
+      the URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with this relative path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+
+    - In case `.gitmodules` contains a relative path as a URL, the absolute
+      path of the superdataset, appended with this relative path (cost 900).
+
+    Additional candidate URLs can be generated based on templates specified as
+    configuration variables with the pattern
+
+      `datalad.get.subdataset-source-candidate-<name>`
+
+    where `name` is an arbitrary identifier. If `name` starts with three digits
+    (e.g. '400myserver') these will be interpreted as a cost, and the
+    respective candidate will be sorted into the generated candidate list
+    according to this cost. If no cost is given, a default of 700 is used.
+
+    A template string assigned to such a variable can utilize the Python format
+    mini language and may reference a number of properties that are inferred
+    from the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respective `.gitmodules`
+    record. For convenience, an existing `datalad-id` record is made available
+    under the shortened name `id`.
+
+    Additionally, the URL of any configured remote that contains the respective
+    submodule commit is available as `remote-<name>` properties, where `name`
+    is the configured remote name.
+
+    Lastly, all candidates are sorted according to their cost (lower values
+    first), and duplicate URLs are stripped, while preserving the first item in the
+    candidate list.
 
     .. note::
       Power-user info: This command uses :command:`git annex get` to fulfill
@@ -762,7 +885,9 @@ class Get(Interface):
                             recursion_limit,
                             reckless,
                             refds_path,
-                            description):
+                            description,
+                            jobs=jobs,
+                    ):
                         # fish out the datasets that 'contains' a targetpath
                         # and store them for later
                         if res.get('status', None) in ('ok', 'notneeded') and \
@@ -798,7 +923,9 @@ class Get(Interface):
                         recursion_limit,
                         reckless,
                         refds_path,
-                        description):
+                        description,
+                        jobs=jobs,
+                ):
                     known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \
                             'contains' in res:

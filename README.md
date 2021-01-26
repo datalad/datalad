@@ -15,7 +15,8 @@
 [![Supported Python version](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
-
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
 # 10000ft overview
@@ -102,11 +103,6 @@ are available, so you could provide enhanced installation via
 - `full`
      to install all dependencies.
 
-There is also a [Singularity container](http://singularity.lbl.gov) available.
-The latest release version can be obtained by running:
-
-    singularity pull shub://datalad/datalad
-
 More details on installation and initial configuration could be found in the
 [DataLad Handbook: Installation].
 
@@ -118,8 +114,7 @@ MIT/Expat
 # Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in internals or
-contributing to the project.
-
+contributing to the project. 
 
 ## Acknowledgements
 
@@ -132,6 +127,9 @@ is provided by the German federal state of Saxony-Anhalt and the European
 Regional Development Fund (ERDF), Project: Center for Behavioral Brain
 Sciences, Imaging Platform.  This work is further facilitated by the ReproNim
 project (NIH 1P41EB019936-01A1).
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 
 [Git]: https://git-scm.com

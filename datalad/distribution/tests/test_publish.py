@@ -32,6 +32,7 @@ from datalad.utils import (
     Path,
     _path_,
 )
+from datalad.cmd import GitWitlessRunner
 from datalad.tests.utils import (
     assert_false as nok_,
     assert_false,
@@ -569,6 +570,7 @@ def test_publish_depends(
         on_failure='ignore')
     assert_result_count(
         res, 1,
+        path=source.path,
         status='error',
         message=(
             'unknown sibling(s) specified as publication dependency: %s',
@@ -744,10 +746,10 @@ def test_gh1811(srcpath, clonepath):
 
 @with_tempfile(mkdir=True)
 def test_publish_no_fetch_refspec_configured(path):
-    from datalad.cmd import GitRunner
 
     path = Path(path)
-    GitRunner(cwd=str(path)).run(["git", "init", "--bare", "empty-remote"])
+    GitWitlessRunner(cwd=str(path)).run(
+        ["git", "init", "--bare", "empty-remote"])
     ds = Dataset(path / "ds").create()
     ds.repo.add_remote("origin", str(ds.pathobj.parent / "empty-remote"))
     # Mimic a situation that can happen with an LFS remote. See gh-4199.

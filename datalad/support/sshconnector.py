@@ -13,12 +13,16 @@ Allows for connecting via ssh and keeping the connection open
 git calls to a ssh remote without the need to reauthenticate.
 """
 
+import fasteners
 import os
 import logging
 from socket import gethostname
 from hashlib import md5
 from subprocess import Popen
 import tempfile
+import threading
+
+
 # importing the quote function here so it can always be imported from this
 # module
 # this used to be shlex.quote(), but is now a cross-platform helper
@@ -36,10 +40,14 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
     Path,
-    assure_list,
+    ensure_list,
     on_windows,
 )
-from datalad.cmd import Runner
+from datalad.cmd import (
+    NoCapture,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
@@ -134,7 +142,7 @@ class BaseSSHConnection(object):
     @property
     def runner(self):
         if self._runner is None:
-            self._runner = Runner()
+            self._runner = WitlessRunner()
         return self._runner
 
     def _adjust_cmd_for_bundle_execution(self, cmd):
@@ -160,21 +168,15 @@ class BaseSSHConnection(object):
         # what we can do on the remote, e.g. concatenate commands with '&&'
         ssh_cmd += [self.sshri.as_str()] + [cmd]
 
-        kwargs = dict(
-            log_stdout=log_output, log_stderr=log_output,
-            log_online=not log_output
-        )
-
         lgr.debug("%s is used to run %s", self, ssh_cmd)
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
-        return self.runner.run(
+        out = self.runner.run(
             ssh_cmd,
-            expect_fail=True,
-            expect_stderr=True,
-            stdin=stdin,
-            **kwargs)
+            protocol=StdOutErrCapture if log_output else NoCapture,
+            stdin=stdin)
+        return out['stdout'], out['stderr']
 
     def _get_scp_command_spec(self, recursive, preserve_attrs):
         """Internal helper for SCP interface methods"""
@@ -215,13 +217,14 @@ class BaseSSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command
-        scp_cmd += assure_list(source)
+        scp_cmd += ensure_list(source)
         # add destination path
         scp_cmd += ['%s:%s' % (
             self.sshri.hostname,
             _quote_filename_for_scp(destination),
         )]
-        return self.runner.run(scp_cmd)
+        out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
@@ -254,10 +257,11 @@ class BaseSSHConnection(object):
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
         scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
-                    for s in assure_list(source)]
+                    for s in ensure_list(source)]
         # add destination path
         scp_cmd += [destination]
-        return self.runner.run(scp_cmd)
+        out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get_annex_installdir(self):
         key = 'installdir:annex'
@@ -419,6 +423,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ]
         self.ctrl_path = Path(ctrl_path)
         self._opened_by_us = False
+        self._lock = threading.Lock()
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
@@ -479,7 +484,11 @@ class MultiplexSSHConnection(BaseSSHConnection):
             # "Master is running" and that is normal, not worthy warning about
             # etc -- we are doing the check here for successful operation
             with tempfile.TemporaryFile() as tempf:
-                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
+                self.runner.run(
+                    cmd,
+                    # do not leak output
+                    protocol=StdOutErrCapture,
+                    stdin=tempf)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -494,6 +503,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             {True: 'succeeded', False: 'failed'}[res])
         return res
 
+    @fasteners.locked
     def open(self):
         """Opens the connection.
 
@@ -553,7 +563,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
         cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
-            self.runner.run(cmd, expect_stderr=True, expect_fail=True)
+            self.runner.run(cmd, protocol=StdOutErrCapture)
         except CommandError as e:
             lgr.debug("Failed to run close command")
             if self.ctrl_path.exists():
@@ -768,7 +778,7 @@ class MultiplexSSHManager(BaseSSHManager):
           If specified, only the path(s) provided would be considered
         """
         if self._connections:
-            ctrl_paths = [Path(p) for p in assure_list(ctrl_path)]
+            ctrl_paths = [Path(p) for p in ensure_list(ctrl_path)]
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path

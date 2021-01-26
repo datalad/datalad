@@ -37,8 +37,8 @@ from unittest.mock import patch
 import gc
 
 from datalad.cmd import (
-    Runner,
-    WitlessRunner,
+    GitWitlessRunner,
+    WitlessRunner as Runner,
 )
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.support.external_versions import external_versions
@@ -49,7 +49,6 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.utils import (
     chpwd,
     get_linux_distribution,
-    on_windows,
     rmtree,
     unlink,
     Path,
@@ -60,7 +59,6 @@ from datalad.tests.utils import (
     assert_equal,
     assert_false,
     assert_in,
-    assert_is,
     assert_is_instance,
     assert_not_equal,
     assert_not_in,
@@ -76,7 +74,7 @@ from datalad.tests.utils import (
     get_most_obscure_supported_name,
     known_failure_githubci_win,
     known_failure_windows,
-    local_testrepo_flavors,
+    maybe_adjust_repo,
     OBSCURE_FILENAME,
     ok_,
     ok_annex_get,
@@ -86,10 +84,10 @@ from datalad.tests.utils import (
     serve_path_via_http,
     set_annex_version,
     skip_if,
+    skip_if_adjusted_branch,
     skip_if_on_windows,
     skip_if_root,
     skip_nomultiplex_ssh,
-    skip_ssh,
     SkipTest,
     slow,
     swallow_logs,
@@ -119,17 +117,17 @@ from datalad import cfg as dl_cfg
 
 # imports from same module:
 from datalad.support.annexrepo import (
-    _get_size_from_perc_complete,
     AnnexRepo,
     AnnexJsonProtocol,
-    ProcessAnnexProgressIndicators,
 )
 
+
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*')
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
+    origin = AnnexRepo(src, create=True)
     ar = AnnexRepo.clone(src, dst)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     ok_(os.path.exists(os.path.join(dst, '.git', 'annex')))
@@ -141,8 +139,9 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
 def test_AnnexRepo_instance_from_existing(path):
+    AnnexRepo(path, create=True)
 
     ar = AnnexRepo(path)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
@@ -162,11 +161,10 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*')
 @with_tempfile
-def test_AnnexRepo_crippled_filesystem(src, dst):
+def test_AnnexRepo_crippled_filesystem(dst):
 
-    ar = AnnexRepo.clone(src, dst)
+    ar = AnnexRepo(dst)
 
     # fake git-annex entries in .git/config:
     ar.config.set(
@@ -186,8 +184,8 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 
 
 @known_failure_githubci_win
+@with_tempfile
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
@@ -211,14 +209,16 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
     assert_false(dm)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:473
-@known_failure_windows
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-def test_AnnexRepo_get_file_key(src, annex_path):
+def test_AnnexRepo_get_file_key(annex_path):
 
-    ar = AnnexRepo.clone(src, annex_path)
+    ar = AnnexRepo(annex_path)
+    (ar.pathobj / 'test.dat').write_text('123\n')
+    ar.save('test.dat', git=True)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
 
     # test-annex.dat should return the correct key:
     test_annex_key = \
@@ -248,7 +248,6 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     eq_(ar.get_file_key("test-annex.dat", batch=True), test_annex_key)
 
 
-
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_get_outofspace(annex_path):
     ar = AnnexRepo(annex_path, create=True)
@@ -259,19 +258,21 @@ def test_AnnexRepo_get_outofspace(annex_path):
             stderr="junk around not enough free space, need 905.6 MB more and after"
         )
 
-    with patch.object(AnnexRepo, '_run_annex_command', raise_cmderror) as cma, \
+    with patch.object(GitWitlessRunner, 'run_on_filelist_chunks', raise_cmderror) as cma, \
             assert_raises(OutOfSpaceError) as cme:
         ar.get("file")
     exc = cme.exception
     eq_(exc.sizemore_msg, '905.6 MB')
-    assert_re_in(".*annex (find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
+    assert_re_in(".*annex.*(find|get).*needs 905.6 MB more", str(exc), re.DOTALL)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:405
-@known_failure_windows
-@with_testrepos('basic_annex', flavors=['local'])
-def test_AnnexRepo_get_remote_na(path):
-    ar = AnnexRepo(path)
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_get_remote_na(src, path):
+    origin = AnnexRepo(src, create=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save()
+    ar = AnnexRepo.clone(src, path)
 
     with assert_raises(RemoteNotAvailableError) as cme:
         ar.get('test-annex.dat', options=["--from=NotExistingRemote"])
@@ -297,9 +298,14 @@ def test_annex_repo_sameas_special(repo):
 
 # 1 is enough to test file_has_content
 @with_parametric_batch
-@with_testrepos('.*annex.*', flavors=['local'], count=1)
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_file_has_content(batch, src, annex_path):
+    origin = AnnexRepo(src)
+    (origin.pathobj / 'test.dat').write_text('123\n')
+    origin.save('test.dat', git=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save('some')
     ar = AnnexRepo.clone(src, annex_path)
     testfiles = ["test-annex.dat", "test.dat"]
 
@@ -326,9 +332,12 @@ def test_AnnexRepo_file_has_content(batch, src, annex_path):
 
 # 1 is enough to test
 @with_parametric_batch
-@with_testrepos('.*annex.*', flavors=['local'], count=1)
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_is_under_annex(batch, src, annex_path):
+    origin = AnnexRepo(src)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save('some')
     ar = AnnexRepo.clone(src, annex_path)
 
     with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
@@ -359,7 +368,6 @@ def test_AnnexRepo_is_under_annex(batch, src, annex_path):
         [False])
 
 
-@known_failure_githubci_win
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -432,10 +440,17 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
-    res = ar.drop(testfile)
-    eq_(res['command'], 'drop')
-    eq_(res['success'], False)
-    assert_in('adjust numcopies', res['note'])
+    try:
+        res = ar.drop(testfile)
+    except CommandError as e:
+        # there should be at least one result that was captured
+        # TODO think about a more standard way of accessing such
+        # records in a CommandError, maybe having a more specialized
+        # exception derived from CommandError
+        res = e.kwargs['stdout_json'][0]
+        eq_(res['command'], 'drop')
+        eq_(res['success'], False)
+        assert_in('adjust numcopies', res['note'])
 
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)
@@ -552,22 +567,25 @@ def test_repo_info(path):
         return [custom_json]
 
     with patch.object(
-            repo, '_run_annex_command_json',
+            repo, '_call_annex_records',
             return_value=get_custom()):
         info = repo.repo_info()
         eq_(info['available local disk space'], None)
 
     with patch.object(
-        repo, '_run_annex_command_json',
+        repo, '_call_annex_records',
         return_value=get_custom({
             "available local disk space": "19193986496 (+100000 reserved)"})):
         info = repo.repo_info()
         eq_(info['available local disk space'], 19193986496)
 
 
-@with_testrepos('.*annex.*', flavors=['local', 'network'])
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
+    origin = AnnexRepo(src)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save('some')
     ar = AnnexRepo.clone(src, dst, backend='MD5')
     eq_(ar.default_backends, ['MD5'])
     # GitPython has a bug which causes .git/config being wiped out
@@ -672,11 +690,12 @@ def test_AnnexRepo_backend_option(path, url):
         for f in ar.get_indexed_files() if 'faraway' in f)
 
 
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
-    #init local test-annex before cloning:
-    AnnexRepo(src)
+    origin = AnnexRepo(src, create=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save()
 
     ar = AnnexRepo.clone(src, dst)
 
@@ -687,7 +706,7 @@ def test_AnnexRepo_get_file_backend(src, dst):
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile
 def test_AnnexRepo_always_commit(path):
 
@@ -709,8 +728,7 @@ def test_AnnexRepo_always_commit(path):
     repo.add(file1)
 
     # Now git-annex log should show the addition:
-    out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).splitlines()
+    out_list = list(repo.call_annex_items_(['log']))
     eq_(len(out_list), 1)
     assert_in(file1, out_list[0])
     # check git log of git-annex branch:
@@ -724,7 +742,7 @@ def test_AnnexRepo_always_commit(path):
         # No additional git commit:
         eq_(get_annex_commit_counts(), n_annex_commits_initial + 1)
 
-        out, err = repo._run_annex_command('log')
+        out = repo.call_annex(['log'])
 
         # And we see only the file before always_commit was set to false:
         assert_in(file1, out)
@@ -734,7 +752,7 @@ def test_AnnexRepo_always_commit(path):
     # on the annex branches.
     repo.sync()
 
-    out, err = repo._run_annex_command('log')
+    out = repo.call_annex(['log'])
     assert_in(file1, out)
     assert_in(file2, out)
 
@@ -742,15 +760,15 @@ def test_AnnexRepo_always_commit(path):
     eq_(get_annex_commit_counts(), n_annex_commits_initial + 2)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:445
-@known_failure_windows
-@with_testrepos('basic_annex', flavors=['local'])
 @with_tempfile
-def test_AnnexRepo_on_uninited_annex(origin, path):
+@with_tempfile
+def test_AnnexRepo_on_uninited_annex(src, path):
+    origin = AnnexRepo(src, create=True)
+    (origin.pathobj / 'test-annex.dat').write_text("content")
+    origin.save()
     # "Manually" clone to avoid initialization:
-    from datalad.cmd import Runner
     runner = Runner()
-    _ = runner(["git", "clone", origin, path], expect_stderr=True)
+    runner.run(["git", "clone", origin.path, path])
 
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
@@ -788,14 +806,9 @@ def test_AnnexRepo_commit(path):
     assert_raises(FileNotInRepositoryError, ds.commit, files="not-existing")
 
 
-@with_testrepos('.*annex.*', flavors=['clone'])
+@with_tempfile
 def test_AnnexRepo_add_to_annex(path):
-
-    # Note: Some test repos appears to not be initialized.
-    #       Therefore: 'init=True'
-    # TODO: Fix these repos finally!
-    # clone as provided by with_testrepos:
-    repo = AnnexRepo(path, create=False, init=True)
+    repo = AnnexRepo(path)
 
     assert_repo_status(repo, annex=True)
     filename = get_most_obscure_supported_name()
@@ -834,15 +847,9 @@ def test_AnnexRepo_add_to_annex(path):
     assert_repo_status(repo, annex=True)
 
 
-@with_testrepos('.*annex.*', flavors=['clone'])
+@with_tempfile
 def test_AnnexRepo_add_to_git(path):
-
-    # Note: Some test repos appears to not be initialized.
-    #       Therefore: 'init=True'
-    # TODO: Fix these repos finally!
-
-    # clone as provided by with_testrepos:
-    repo = AnnexRepo(path, create=False, init=True)
+    repo = AnnexRepo(path)
 
     assert_repo_status(repo, annex=True)
     filename = get_most_obscure_supported_name()
@@ -871,10 +878,13 @@ def test_AnnexRepo_add_to_git(path):
     assert_repo_status(repo, annex=True)
 
 
-@with_testrepos('.*annex.*', flavors=['local'])
-# TODO: flavor 'network' has wrong content for test-annex.dat!
+@with_tempfile
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
 
     annex = AnnexRepo.clone(src, dst)
     assert_is_instance(annex, AnnexRepo, "AnnexRepo was not created.")
@@ -888,23 +898,23 @@ def test_AnnexRepo_get(src, dst):
 
     called = []
     # for some reason yoh failed mock to properly just call original func
-    orig_run = annex._run_annex_command
+    orig_run = annex._git_runner.run_on_filelist_chunks
 
-    def check_run(cmd, annex_options, **kwargs):
-        called.append(cmd)
-        if cmd == 'find':
-            assert_not_in('-J5', annex_options)
-        elif cmd == 'get':
-            assert_in('-J5', annex_options)
+    def check_run(cmd, files, **kwargs):
+        cmd_name = cmd[cmd.index('annex') + 1]
+        called.append(cmd_name)
+        if cmd_name == 'find':
+            assert_not_in('-J5', cmd)
+        elif cmd_name == 'get':
+            assert_in('-J5', cmd)
         else:
             raise AssertionError(
-                "no other commands so far should be ran. Got %s, %s" %
-                (cmd, annex_options)
+                "no other commands so far should be ran. Got %s" % cmd
             )
-        return orig_run(cmd, annex_options=annex_options, **kwargs)
+        return orig_run(cmd, files, **kwargs)
 
     annex.drop(testfile)
-    with patch.object(AnnexRepo, '_run_annex_command',
+    with patch.object(GitWitlessRunner, 'run_on_filelist_chunks',
                       side_effect=check_run, auto_spec=True), \
             swallow_outputs():
         annex.get(testfile, jobs=5)
@@ -925,7 +935,7 @@ def test_v7_detached_get(opath, path):
     repo = AnnexRepo(path)
     # test getting in a detached HEAD
     repo.checkout('HEAD^{}')
-    repo._run_annex_command('upgrade')  # TODO: .upgrade ?
+    repo.call_annex(['upgrade'])  # TODO: .upgrade ?
 
     repo.get('file.dat')
     ok_file_has_content(op.join(repo.path, 'file.dat'), "content")
@@ -935,10 +945,16 @@ def test_v7_detached_get(opath, path):
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
 
-@with_testrepos('basic_annex$', flavors=['clone'])
 @with_tempfile
-def _test_AnnexRepo_get_contentlocation(batch, path, work_dir_outside):
-    annex = AnnexRepo(path, create=False, init=False)
+@with_tempfile
+@with_tempfile
+def _test_AnnexRepo_get_contentlocation(batch, src, path, work_dir_outside):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
+
+    annex = AnnexRepo.clone(src, path)
     fname = 'test-annex.dat'
     key = annex.get_file_key(fname)
     # TODO: see if we can avoid this or specify custom exception
@@ -1214,8 +1230,13 @@ def test_annex_ssh(topdir):
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_tempfile
 def test_annex_remove(path):
+    ar = AnnexRepo(path)
+    (ar.pathobj / 'test-annex.dat').write_text(
+        "content to be annex-addurl'd")
+    ar.save('some')
+
     repo = AnnexRepo(path, create=False)
 
     file_list = list(repo.get_content_annexinfo(init=None))
@@ -1283,17 +1304,22 @@ def test_init_scanning_message(path):
         assert_in("for unlocked", cml.out)
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:330
-@known_failure_windows
-@with_testrepos('.*annex.*', flavors=['clone'])
-@with_tempfile(mkdir=True)
-def test_annex_copy_to(origin, clone):
-    repo = AnnexRepo(origin, create=False)
-    remote = AnnexRepo.clone(origin, clone, create=True)
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_annex_copy_to(src, origin, clone):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test.dat').write_text("123\n")
+    ar.save('some', git=True)
+    (ar.pathobj / 'test-annex.dat').write_text("content")
+    ar.save('some')
+
+    repo = AnnexRepo.clone(src, origin)
+    remote = AnnexRepo.clone(origin, clone)
     repo.add_remote("target", clone)
 
     assert_raises(IOError, repo.copy_to, "doesnt_exist.dat", "target")
-    assert_raises(FileInGitError, repo.copy_to, "INFO.txt", "target")
+    assert_raises(FileInGitError, repo.copy_to, "test.dat", "target")
     assert_raises(ValueError, repo.copy_to, "test-annex.dat", "invalid_target")
 
     # see #3102
@@ -1308,7 +1334,7 @@ def test_annex_copy_to(origin, clone):
     # now it has:
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
     # and will not be copied again since it was already copied
-    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), [])
+    eq_(repo.copy_to(["test.dat", "test-annex.dat"], "target"), [])
 
     # Test that if we pass a list of items and annex processes them nicely,
     # we would obtain a list back. To not stress our tests even more -- let's mock
@@ -1318,34 +1344,40 @@ def test_annex_copy_to(origin, clone):
         assert_in('copied1', kwargs['files'])
         assert_in('copied2', kwargs['files'])
         assert_in('existed', kwargs['files'])
-        return """
-{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
-{"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
-{"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
-""", ""
-    # Note that we patch _run_annex_command, which is also invoked by _run_annex_command_json
+        return [
+                {"command":"copy","note":"to target ...", "success":True,
+                 "key":"akey1", "file":"copied1"},
+                {"command":"copy","note":"to target ...", "success":True,
+                 "key":"akey2", "file":"copied2"},
+                {"command":"copy","note":"checking target ...", "success":True,
+                 "key":"akey3", "file":"existed"},
+        ]
+    # Note that we patch _call_annex_records,
     # which is in turn invoked first by copy_to for "find" operation.
     # TODO: provide a dedicated handling within above ok_copy for 'find' command
-    with patch.object(repo, '_run_annex_command', ok_copy):
+    with patch.object(repo, '_call_annex_records', ok_copy):
         eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
             ["copied1", "copied2"])
 
     # now let's test that we are correctly raising the exception in case if
     # git-annex execution fails
-    orig_run = repo._run_annex_command
+    orig_run = repo._call_annex
 
     # Kinda a bit off the reality since no nonex* would not be returned/handled
     # by _get_expected_files, so in real life -- wouldn't get report about Incomplete!?
     def fail_to_copy(command, **kwargs):
-        if command == 'copy':
+        if command[0] == 'copy':
             # That is not how annex behaves
             # http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             # for non-existing files output goes into stderr
             raise CommandError(
                 "Failed to run ...",
-                stdout=
-                    '{"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied"}\n'
-                    '{"command":"copy","note":"checking target ...", "success":true, "key":"akey2", "file":"existed"}\n',
+                stdout_json=[
+                    {"command":"copy","note":"to target ...", "success":True,
+                     "key":"akey1", "file":"copied"},
+                    {"command":"copy","note":"checking target ...",
+                     "success":True, "key":"akey2", "file":"existed"},
+                ],
                 stderr=
                     'git-annex: nonex1 not found\n'
                     'git-annex: nonex2 not found\n'
@@ -1357,7 +1389,7 @@ def test_annex_copy_to(origin, clone):
         assert files == ["copied", "existed", "nonex1", "nonex2"]
         return {'akey1': 10}, ["copied"]
 
-    with patch.object(repo, '_run_annex_command', fail_to_copy), \
+    with patch.object(repo, '_call_annex', fail_to_copy), \
             patch.object(repo, '_get_expected_files', fail_to_copy_get_expected):
         with assert_raises(IncompleteResultsError) as cme:
             repo.copy_to(["copied", "existed", "nonex1", "nonex2"], "target")
@@ -1365,11 +1397,13 @@ def test_annex_copy_to(origin, clone):
     eq_(cme.exception.failed, ['nonex1', 'nonex2'])
 
 
-
-@with_testrepos('.*annex.*', flavors=['local'])
-# TODO: flavor 'network' has wrong content for test-annex.dat!
+@with_tempfile
 @with_tempfile
 def test_annex_drop(src, dst):
+    ar = AnnexRepo(src)
+    (ar.pathobj / 'test-annex.dat').write_text("content")
+    ar.save('some')
+
     ar = AnnexRepo.clone(src, dst)
     testfile = 'test-annex.dat'
     assert_false(ar.file_has_content(testfile))
@@ -1405,6 +1439,18 @@ def test_annex_drop(src, dst):
 
     # too much arguments:
     assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
+
+    (ar.pathobj / 'somefile.txt').write_text('this')
+    ar.save()
+    with assert_raises(CommandError) as e:
+        ar.drop('somefile.txt')
+    # CommandError has to pull the errors from the JSON record 'note'
+    assert_in('necessary copies', str(e.exception))
+
+    with assert_raises(CommandError) as e:
+        ar._call_annex_records(['fsck', '-N', '3'])
+    # CommandError has to pull the errors from the JSON record 'error-messages'
+    assert_in('1 of 3 trustworthy copies', str(e.exception))
 
 
 @with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
@@ -1547,7 +1593,7 @@ def test_annex_version_handling_bad_git_annex(path):
             AnnexRepo(path)
         linux_distribution_name = get_linux_distribution()[0]
         if linux_distribution_name == 'debian':
-            assert_in("http://neuro.debian.net", str(cme.exception))
+            assert_in("handbook.datalad.org", str(cme.exception))
         eq_(AnnexRepo.git_annex_version, None)
 
     with set_annex_version('6.20160505'):
@@ -1567,75 +1613,6 @@ def test_annex_version_handling_bad_git_annex(path):
         except OSError:
             pass
         assert_raises(OutdatedExternalDependency, AnnexRepo, path)
-
-
-def test_ProcessAnnexProgressIndicators():
-    irrelevant_lines = (
-        'abra',
-        '{"some_json": "sure thing"}'
-    )
-    # regular lines, without completion for known downloads
-    success_lines = (
-        '{"command":"get","note":"","success":true,"key":"key1","file":"file1"}',
-        '{"command":"comm","note":"","success":true,"key":"backend-s10--key2"}',
-    )
-    progress_lines = (
-        '{"byte-progress":10,"action":{"command":"get","note":"from web...",'
-            '"key":"key1","file":"file1"},"percent-progress":"10%"}',
-    )
-
-    # without providing expected entries
-    proc = ProcessAnnexProgressIndicators()
-    # when without any target downloads, there is no total_pbar
-    assert_is(proc.total_pbar, None)
-    # for regular lines -- should just return them without side-effects
-    for l in irrelevant_lines + success_lines:
-        with swallow_outputs() as cmo:
-            eq_(proc(l), l)
-            eq_(proc.pbars, {})
-            eq_(cmo.out, '')
-            eq_(cmo.err, '')
-    # should process progress lines
-    eq_(proc(progress_lines[0]), None)
-    eq_(len(proc.pbars), 1)
-    # but when we finish download -- should get cleared
-    eq_(proc(success_lines[0]), success_lines[0])
-    eq_(proc.pbars, {})
-    # and no side-effect of any kind in finish
-    eq_(proc.finish(), None)
-
-    proc = ProcessAnnexProgressIndicators(expected={'key1': 100, 'key2': None})
-    # when without any target downloads, there is no total_pbar
-    assert(proc.total_pbar is not None)
-    eq_(proc.total_pbar.total, 100)  # as much as it knows at this point
-    eq_(proc.total_pbar.current, 0)
-    # for regular lines -- should still just return them without side-effects
-    for l in irrelevant_lines:
-        with swallow_outputs() as cmo:
-            eq_(proc(l), l)
-            eq_(proc.pbars, {})
-            eq_(cmo.out, '')
-            eq_(cmo.err, '')
-    # should process progress lines
-    # it doesn't swallow everything -- so there will be side-effects in output
-    with swallow_outputs() as cmo:
-        eq_(proc(progress_lines[0]), None)
-        eq_(len(proc.pbars), 1)
-        # but when we finish download -- should get cleared
-        eq_(proc(success_lines[0]), success_lines[0])
-        eq_(proc.pbars, {})
-        out = cmo.out
-
-    from datalad.ui import ui
-    from datalad.ui.dialog import QuietConsoleLog
-
-    assert out \
-        if not isinstance(ui.ui, QuietConsoleLog) else not out
-    assert proc.total_pbar is not None
-    # and no side-effect of any kind in finish
-    with swallow_outputs() as cmo:
-        eq_(proc.finish(), None)
-        eq_(proc.total_pbar, None)
 
 
 @with_tempfile
@@ -1673,8 +1650,28 @@ def test_get_description(path1, path2):
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_flyweight(path1, path2):
 
+    import sys
+
     repo1 = AnnexRepo(path1, create=True)
     assert_is_instance(repo1, AnnexRepo)
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # As long as we don't reintroduce any circular references or produce
+    # garbage during instantiation that isn't picked up immediately, `repo1`
+    # should be the only counted reference to this instance.
+    # Note, that sys.getrefcount reports its own argument and therefore one
+    # reference too much.
+    assert_equal(1, sys.getrefcount(repo1) - 1)
+
     # instantiate again:
     repo2 = AnnexRepo(path1, create=False)
     assert_is_instance(repo2, AnnexRepo)
@@ -1697,13 +1694,74 @@ def test_AnnexRepo_flyweight(path1, path2):
     assert_is_instance(repo4, GitRepo)
     assert_not_is_instance(repo4, AnnexRepo)
 
+    orig_id = id(repo1)
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:417
-@known_failure_windows
-@with_testrepos(flavors=local_testrepo_flavors)
+    # Be sure we have exactly one object in memory:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
+
+
+    # But we have two GitRepos in memory (the AnnexRepo and repo4):
+    assert_equal(2, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # deleting one reference doesn't change anything - we still get the same
+    # thing:
+    del repo1
+    gc.collect()  # TODO: see first comment above
+    ok_(repo2 is not None)
+    ok_(repo2 is repo3)
+    ok_(repo2 == repo3)
+
+    repo1 = AnnexRepo(path1)
+    eq_(orig_id, id(repo1))
+
+    del repo1
+    del repo2
+
+    # for testing that destroying the object calls close() on BatchedAnnex:
+    class Dummy:
+        def __init__(self, *args, **kwargs):
+            self.close_called = False
+
+        def close(self):
+            self.close_called = True
+
+    fake_batch = Dummy()
+
+    # Killing last reference will lead to garbage collection which will call
+    # AnnexRepo's finalizer:
+    with patch.object(repo3._batched, 'close', fake_batch.close):
+        with swallow_logs(new_level=1) as cml:
+            del repo3
+            gc.collect()  # TODO: see first comment above
+            cml.assert_logged(msg="Finalizer called on: AnnexRepo(%s)" % path1,
+                              level="Level 1",
+                              regex=False)
+            # finalizer called close() on BatchedAnnex:
+            assert_true(fake_batch.close_called)
+
+    # Flyweight is gone:
+    assert_not_in(path1, AnnexRepo._unique_instances.keys())
+
+    # gc doesn't know any instance anymore:
+    assert_equal([], [o for o in gc.get_objects()
+                      if isinstance(o, AnnexRepo) and o.path == path1])
+    # GitRepo is unaffected:
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, GitRepo) and o.path == path1]))
+
+    # new object is created on re-request:
+    repo1 = AnnexRepo(path1)
+    assert_equal(1, len([o for o in gc.get_objects()
+                         if isinstance(o, AnnexRepo) and o.path == path1]))
+
+
+@with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
+    AnnexRepo(repo, create=True)
 
     reporeal = str(Path(repo).resolve())
     eq_(AnnexRepo.get_toppath(repo, follow_up=False), reporeal)
@@ -1719,13 +1777,17 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
-@with_testrepos(".*basic.*", flavors=['local'])
-@with_tempfile(mkdir=True)
-def test_AnnexRepo_add_submodule(source, path):
+@skip_if_adjusted_branch
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_add_submodule(source_path, path):
+    source = AnnexRepo(source_path, create=True)
+    (source.pathobj / 'test-annex.dat').write_text("content")
+    source.save('some')
 
     top_repo = AnnexRepo(path, create=True)
 
-    top_repo.add_submodule('sub', name='sub', url=source)
+    top_repo.add_submodule('sub', name='sub', url=source_path)
     top_repo.commit('submodule added')
     eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
         ['sub'])
@@ -1738,7 +1800,6 @@ def test_AnnexRepo_update_submodule():
     raise SkipTest("TODO")
 
 
-@known_failure_v6  #FIXME
 def test_AnnexRepo_get_submodules():
     raise SkipTest("TODO")
 
@@ -1802,6 +1863,15 @@ def test_AnnexRepo_dirty(path):
     repo.save()
     ok_(not repo.dirty)
 
+    subm = AnnexRepo(repo.pathobj / "subm", create=True)
+    (subm.pathobj / "foo").write_text("foo")
+    subm.save()
+    ok_(repo.dirty)
+    repo.save()
+    assert_false(repo.dirty)
+    maybe_adjust_repo(subm)
+    assert_false(repo.dirty)
+
 
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_set_remote_url(path):
@@ -1853,7 +1923,6 @@ def test_wanted(path):
     eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
-@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
@@ -1959,10 +2028,14 @@ def test_change_description(path):
     eq_(ar.get_description(), 'someother')
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_AnnexRepo_get_corresponding_branch(path):
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_get_corresponding_branch(src_path, path):
+    src = AnnexRepo(src_path, create=True)
+    (src.pathobj / 'test-annex.dat').write_text("content")
+    src.save('some')
 
-    ar = AnnexRepo(path)
+    ar = AnnexRepo.clone(src_path, path)
 
     # we should be on the default branch.
     eq_(DEFAULT_BRANCH,
@@ -1978,22 +2051,25 @@ def test_AnnexRepo_get_corresponding_branch(path):
         eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
-def test_AnnexRepo_get_tracking_branch(path):
+@with_tempfile
+@with_tempfile
+def test_AnnexRepo_get_tracking_branch(src_path, path):
+    src = AnnexRepo(src_path, create=True)
+    (src.pathobj / 'test-annex.dat').write_text("content")
+    src.save('some')
 
-    ar = AnnexRepo(path)
+    ar = AnnexRepo.clone(src_path, path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
     eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
 
 
-@with_testrepos('basic_annex', flavors=['clone'])
+@skip_if_adjusted_branch
+@with_tempfile
 def test_AnnexRepo_is_managed_branch(path):
-
-    ar = AnnexRepo(path)
-
-    if ar.is_managed_branch():
-        raise SkipTest("Test needs repository with non-managed branch")
+    ar = AnnexRepo(path, create=True)
+    (ar.pathobj / 'test-annex.dat').write_text("content")
+    ar.save('some')
 
     if ar.supports_unlocked_pointers:
         ar.adjust()
@@ -2039,17 +2115,7 @@ def test_fake_dates(path):
     for commit in ar.get_branch_commits_("git-annex"):
         eq_(timestamp, int(ar.format_commit('%ct', commit)))
     assert_in("timestamp={}s".format(timestamp),
-              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
-
-
-def test_get_size_from_perc_complete():
-    f = _get_size_from_perc_complete
-    eq_(f(0, 0), 0)
-    eq_(f(0, '0'), 0)
-    eq_(f(100, '0'), 0)  # we do not know better
-    eq_(f(1, '1'), 100)
-    # with no percentage info, we don't know better either:
-    eq_(f(1, ''), 0)
+              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"], read_only=True))
 
 
 # to prevent regression
@@ -2068,9 +2134,9 @@ def _test_add_under_subdir(path):
     create_tree(subdir, {'empty': ''})
     runner = Runner(cwd=subdir)
     with chpwd(subdir):
-        runner(['git', 'add', 'empty'])  # should add sucesfully
+        runner.run(['git', 'add', 'empty'])  # should add sucesfully
         # gr.commit('important') #
-        runner(['git', 'commit', '-m', 'important'])
+        runner.run(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
 
 
@@ -2078,7 +2144,7 @@ def _test_add_under_subdir(path):
 @with_tempfile(mkdir=True)
 def test_error_reporting(path):
     ar = AnnexRepo(path, create=True)
-    res = ar._run_annex_command_json('add', files='gl\\orious BS')
+    res = ar.call_annex_records(['add'], files='gl\\orious BS')
     eq_(
         res,
         [{
@@ -2098,10 +2164,9 @@ def test_annexjson_protocol(path):
     ar = AnnexRepo(path, create=True)
     ar.save()
     assert_repo_status(path)
-    runner = WitlessRunner(cwd=ar.path)
     # first an orderly execution
-    res = runner.run(
-        ['git', 'annex', 'find', '.', '--json'],
+    res = ar._call_annex(
+        ['find', '.', '--json'],
         protocol=AnnexJsonProtocol)
     for k in ('stdout', 'stdout_json', 'stderr'):
         assert_in(k, res)
@@ -2110,18 +2175,22 @@ def test_annexjson_protocol(path):
     # not meant as an exhaustive check for output structure,
     # just some assurance that it is not totally alien
     ok_(all(j['file'] for j in orig_j))
-    # no complaints
-    eq_(res['stderr'], '')
+    # no complaints, unless git-annex is triggered to run in debug mode
+    if logging.getLogger('datalad.annex').getEffectiveLevel() > 8:
+        eq_(res['stderr'], '')
 
     # now the same, but with a forced error
     with assert_raises(CommandError) as e:
-        res = runner.run(
-            ['git', 'annex', 'find', '.', 'error', '--json'],
+        res = ar._call_annex(
+            ['find', '.', 'error', '--json'],
             protocol=AnnexJsonProtocol)
-        # normal operation is not impaired
-        eq_(e.stdout_json, orig_j)
-        # we get a clue what went wrong
-        assert_in('error not found', e.stderr)
+    # normal operation is not impaired
+    eq_(e.exception.kwargs['stdout_json'], orig_j)
+    # we get a clue what went wrong
+    assert_in('error not found', e.exception.stderr)
+    # there should be no errors reported in an individual records
+    # hence also no pointless statement in the str()
+    assert_not_in('errors from JSON records', str(e.exception))
 
 
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
@@ -2269,8 +2338,6 @@ def test_ro_operations(path):
     # This test would function only if there is a way to run sudo
     # non-interactively, e.g. on Travis or on your local (watchout!) system
     # after you ran sudo command recently.
-
-    from datalad.cmd import Runner
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
@@ -2332,47 +2399,27 @@ def test_save_noperms(path):
     # after you ran sudo command recently.
     repo = AnnexRepo(path, init=True)
 
-    from datalad.cmd import Runner
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
     try:
         # To assure that git/git-annex really cannot acquire a lock and do
         # any changes (e.g. merge git-annex branch), we make this repo owned by root
-        sudochown(['-R', 'root:root', repo.pathobj / 'file1'])
+        sudochown(['-R', 'root:root', str(repo.pathobj / 'file1')])
     except Exception as exc:
         # Exception could be CommandError or IOError when there is no sudo
         raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
 
     try:
-        res = repo.save(paths=['file1'])
-
+        repo.save(paths=['file1'])
+    except CommandError as exc:
+        res = exc.kwargs["stdout_json"]
         assert_result_count(res, 1)
-        assert_result_count(
-            res, 1, type='file', path=repo.pathobj / 'file1', action='add', status='error'
-        )
-        assert_in('permission denied', res[0]['message'])
+        assert_result_count(res, 1, file='file1',
+                            command='add', success=False)
+        assert_in('permission denied', res[0]['error-messages'][0])
     finally:
         sudochown(['-R', str(os.geteuid()), repo.path])
-
-
-@with_tempfile
-def test_annex_cmd_expect_fail(path):
-    # test, that log message about stderr on non-zero exit is logged on debug level if expect_fail was set to True,
-    # warning level else
-
-    from re import DOTALL
-
-    repo = AnnexRepo(path)
-
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=True)
-        # message shows up at DEBUG level:
-        assert_re_in(r".*\[DEBUG\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
-        # message shows up at WARNING level
-        assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
 
 
 def test_get_size_from_key():
@@ -2399,14 +2446,13 @@ def test_get_size_from_key():
 
 
 @with_tempfile(mkdir=True)
-def test_run_annex_gitwitless_invalid_callable(path):
+def test_call_annex(path):
     ar = AnnexRepo(path, create=True)
-    for log_stdout, log_stderr in [(str, False),
-                                   (False, str),
-                                   (str, str)]:
-        with assert_raises(ValueError):
-            ar._run_annex_command_json(
-                "info",
-                log_stdout=log_stdout,
-                log_stderr=log_stderr,
-                runner="gitwitless")
+    # we raise on mistakes
+    with assert_raises(CommandError):
+        ar._call_annex(['not-an-annex-command'])
+    # and we get to know why
+    try:
+        ar._call_annex(['not-an-annex-command'])
+    except CommandError as e:
+        assert_in('Invalid argument', e.stderr)

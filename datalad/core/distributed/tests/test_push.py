@@ -10,6 +10,7 @@
 
 """
 
+import os
 import logging
 
 from datalad.distribution.dataset import Dataset
@@ -29,10 +30,12 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     eq_,
     known_failure_githubci_osx,
+    known_failure_githubci_win,
     neq_,
     ok_,
     ok_file_has_content,
     serve_path_via_http,
+    skip_if_adjusted_branch,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -95,6 +98,7 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
     if annex:
         if bare:
             target = GitRepo(path=path, bare=True, create=True)
+            # cannot use call_annex()
             target.call_git(['annex', 'init'])
         else:
             target = AnnexRepo(path, init=True, create=True)
@@ -113,8 +117,8 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
         # commit for the managed branch.
         # the only sane approach is to let git-annex establish a shared
         # history
-        ds.repo.call_git(['annex', 'sync'])
-        ds.repo.call_git(['annex', 'sync', '--cleanup'])
+        ds.repo.call_annex(['sync'])
+        ds.repo.call_annex(['sync', '--cleanup'])
     return target
 
 
@@ -261,8 +265,9 @@ def test_push_recursive(
     # running on a clone should make the test scenario more different than
     # test_push(), even for the pieces that should be identical
     top = Clone.__call__(source=origin.path, path=src_path)
-    sub, subsub, subnoannex = top.get(
-        '.', recursive=True, get_data=False, result_xfm='datasets')
+    subs = top.get('.', recursive=True, get_data=False, result_xfm='datasets')
+    # order for '.' should not be relied upon, so sort by path
+    sub, subsub, subnoannex = sorted(subs, key=lambda ds: ds.path)
 
     target_top = mk_push_target(top, 'target', dst_top, annex=True)
     # subdatasets have no remote yet, so recursive publishing should fail:
@@ -311,11 +316,6 @@ def test_push_recursive(
     assert_in_results(
         res, status='notneeded', refspec=DEFAULT_REFSPEC)
 
-    if top.repo.is_managed_branch():
-        raise SkipTest(
-            'Save/status of subdataset with managed branches is an still '
-            'unresolved issue')
-
     # now annex a file in subsub
     test_copy_file = subsub.pathobj / 'test_mod_annex_file'
     test_copy_file.write_text("Heavy stuff.")
@@ -350,7 +350,7 @@ def test_push_recursive(
     top.save(sub.pathobj, message='annexadd', recursive=True)
     top.save(subnoannex.pathobj, message='gitadd', recursive=True)
     # now only publish the latter one
-    res = top.push(to="target", since='HEAD~1', recursive=True)
+    res = top.push(to="target", since=DEFAULT_BRANCH + '~1', recursive=True)
     # nothing copied, no reports on the other modification
     assert_not_in_results(res, action='copy')
     assert_not_in_results(res, path=sub.path)
@@ -533,6 +533,7 @@ def test_gh1426(origin_path, target_path):
         target.get_hexsha(DEFAULT_BRANCH))
 
 
+@skip_if_adjusted_branch  # gh-4075
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree={'1': '123'})
@@ -541,9 +542,6 @@ def test_gh1426(origin_path, target_path):
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
-    if ds.repo.is_managed_branch():
-        raise SkipTest(
-            'Skipped due to https://github.com/datalad/datalad/issues/4075')
     ds.save('1')
     ds.create_sibling('ssh://datalad-test:%s/subdir' % desttop,
                       name='target',
@@ -604,15 +602,13 @@ def test_gh1811(srcpath, clonepath):
     )
 
 
+# FIXME: on crippled FS post-update hook enabling via create-sibling doesn't
+# work ATM
+@skip_if_adjusted_branch
 @with_tempfile()
 @with_tempfile()
 def test_push_wanted(srcpath, dstpath):
     src = Dataset(srcpath).create()
-
-    if src.repo.is_managed_branch():
-        # on crippled FS post-update hook enabling via create-sibling doesn't
-        # work ATM
-        raise SkipTest("no create-sibling on crippled FS")
     (src.pathobj / 'data.0').write_text('0')
     (src.pathobj / 'secure.1').write_text('1')
     (src.pathobj / 'secure.2').write_text('2')
@@ -658,15 +654,14 @@ def test_push_wanted(srcpath, dstpath):
     eq_((dst.pathobj / 'secure.1').read_text(), '1')
 
 
+# FIXME: on crippled FS post-update hook enabling via create-sibling doesn't
+# work ATM
+@skip_if_adjusted_branch
 @slow  # 10sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_data_transfer(path):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
-    if ds_a.repo.is_managed_branch():
-        # on crippled FS post-update hook enabling via create-sibling doesn't
-        # work ATM
-        raise SkipTest("no create-sibling on crippled FS")
     (ds_a.pathobj / "foo.dat").write_text("foo")
     ds_a.save()
 
@@ -719,15 +714,14 @@ def test_auto_data_transfer(path):
         path=str(ds_a.pathobj / "bar.dat"))
 
 
+# FIXME: on crippled FS post-update hook enabling via create-sibling doesn't
+# work ATM
+@skip_if_adjusted_branch
 @slow  # 16sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_auto_if_wanted_data_transfer_path_restriction(path):
     path = Path(path)
     ds_a = Dataset(path / "a").create()
-    if ds_a.repo.is_managed_branch():
-        # on crippled FS post-update hook enabling via create-sibling doesn't
-        # work ATM
-        raise SkipTest("no create-sibling on crippled FS")
     ds_a_sub0 = ds_a.create("sub0")
     ds_a_sub1 = ds_a.create("sub1")
 
@@ -842,3 +836,104 @@ def test_push_matching(path):
     # and we pushed the commit in the current branch
     eq_(remote_ds.get_hexsha(DEFAULT_BRANCH),
         ds.repo.get_hexsha(DEFAULT_BRANCH))
+
+
+@known_failure_githubci_win  # https://github.com/datalad/datalad/issues/5271
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
+    if 'DATALAD_SEED' in os.environ:
+        # we are using create-sibling-ria via the cmdline in here
+        # this will create random UUIDs for datasets
+        # however, given a fixed seed each call to this command will start
+        # with the same RNG seed, hence yield the same UUID on the same
+        # machine -- leading to a collision
+        raise SkipTest(
+            'Test incompatible with fixed random number generator seed')
+    # the aim here is this high-level test a std create-push-clone cycle for a
+    # dataset with a subdataset, with the goal to ensure that correct branches
+    # and commits are tracked, regardless of platform behavior and condition
+    # of individual clones. Nothing fancy, just that the defaults behave in
+    # sensible ways
+    from datalad.cmd import WitlessRunner as Runner
+    run = Runner().run
+
+    # create original nested dataset
+    with chpwd(origpath):
+        run(['datalad', 'create', 'super'])
+        run(['datalad', 'create', '-d', 'super', str(Path('super', 'sub'))])
+
+    # verify essential linkage properties
+    orig_super = Dataset(Path(origpath, 'super'))
+    orig_sub = Dataset(orig_super.pathobj / 'sub')
+
+    (orig_super.pathobj / 'file1.txt').write_text('some1')
+    (orig_sub.pathobj / 'file2.txt').write_text('some1')
+    with chpwd(orig_super.path):
+        run(['datalad', 'save', '--recursive'])
+
+    # TODO not yet reported clean with adjusted branches
+    #assert_repo_status(orig_super.path)
+
+    # the "true" branch that sub is on, and the gitsha of the HEAD commit of it
+    orig_sub_corr_branch = \
+        orig_sub.repo.get_corresponding_branch() or orig_sub.repo.get_active_branch()
+    orig_sub_corr_commit = orig_sub.repo.get_hexsha(orig_sub_corr_branch)
+
+    # make sure the super trackes this commit
+    assert_in_results(
+        orig_super.subdatasets(),
+        path=orig_sub.path,
+        gitshasum=orig_sub_corr_commit,
+        # TODO it should also track the branch name
+        # Attempted: https://github.com/datalad/datalad/pull/3817
+        # But reverted: https://github.com/datalad/datalad/pull/4375
+    )
+
+    # publish to a store, to get into a platform-agnostic state
+    # (i.e. no impact of an annex-init of any kind)
+    store_url = 'ria+' + get_local_file_url(storepath)
+    with chpwd(orig_super.path):
+        run(['datalad', 'create-sibling-ria', '--recursive',
+             '-s', 'store', store_url])
+        run(['datalad', 'push', '--recursive', '--to', 'store'])
+
+    # we are using the 'store' sibling's URL, which should be a plain path
+    store_super = AnnexRepo(orig_super.siblings(name='store')[0]['url'], init=False)
+    store_sub = AnnexRepo(orig_sub.siblings(name='store')[0]['url'], init=False)
+
+    # both datasets in the store only carry the real branches, and nothing
+    # adjusted
+    for r in (store_super, store_sub):
+        eq_(set(r.get_branches()), set([orig_sub_corr_branch, 'git-annex']))
+
+    # and reobtain from a store
+    cloneurl = 'ria+' + get_local_file_url(str(storepath), compatibility='git')
+    with chpwd(clonepath):
+        run(['datalad', 'clone', cloneurl + '#' + orig_super.id, 'super'])
+        run(['datalad', '-C', 'super', 'get', '--recursive', '.'])
+
+    # verify that nothing has changed as a result of a push/clone cycle
+    clone_super = Dataset(Path(clonepath, 'super'))
+    clone_sub = Dataset(clone_super.pathobj / 'sub')
+    assert_in_results(
+        clone_super.subdatasets(),
+        path=clone_sub.path,
+        gitshasum=orig_sub_corr_commit,
+    )
+
+    for ds1, ds2, f in ((orig_super, clone_super, 'file1.txt'),
+                        (orig_sub, clone_sub, 'file2.txt')):
+        eq_((ds1.pathobj / f).read_text(), (ds2.pathobj / f).read_text())
+
+    # get status info that does not recursive into subdatasets, i.e. not
+    # looking for uncommitted changes
+    # we should see no modification reported
+    assert_not_in_results(
+        clone_super.status(eval_subdataset_state='commit'),
+        state='modified')
+    # and now the same for a more expensive full status
+    assert_not_in_results(
+        clone_super.status(recursive=True),
+        state='modified')

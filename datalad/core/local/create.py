@@ -39,7 +39,7 @@ from datalad.support.constraints import (
 from datalad.support.param import Parameter
 from datalad.utils import (
     getpwd,
-    assure_list,
+    ensure_list,
     get_dataset_root,
 )
 
@@ -86,7 +86,7 @@ class Create(Interface):
     to it, even if the target directory already contains additional files or
     directories.
 
-    Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
+    Plain Git repositories can be created via [PY: `annex=False` PY][CMD: --no-annex CMD].
     However, the result will not be a full dataset, and, consequently,
     not all features are supported (e.g. a description).
 
@@ -125,7 +125,7 @@ class Create(Interface):
              code_py="create(force=True)",
              code_cmd="datalad create --force"),
         dict(text="Create a plain Git repository",
-             code_py="create(path='mydataset', no_annex=True)",
+             code_py="create(path='mydataset', annex=False)",
              code_cmd="datalad create --no-annex mydataset"),
     ]
 
@@ -213,7 +213,9 @@ class Create(Interface):
             fake_dates=False,
             cfg_proc=None
     ):
-        # TODO: introduced with 0.13, remove with 0.14
+        # TODO: The current release of datalad-metalad (v0.2.1) still uses
+        # no_annex in its tests. Remove this compatibility kludge once a
+        # release is made, which will include 16a170e (2020-09-08).
         if no_annex is not _NoAnnexDefault:
             # the two mirror options do not agree and the deprecated one is
             # not at default value
@@ -268,7 +270,7 @@ class Create(Interface):
         assert(path is not None)
 
         # assure cfg_proc is a list (relevant if used via Python API)
-        cfg_proc = assure_list(cfg_proc)
+        cfg_proc = ensure_list(cfg_proc)
 
         # prep for yield
         res = dict(action='create', path=str(path),
@@ -378,7 +380,6 @@ class Create(Interface):
             lgr.info("Creating a new git repo at %s", tbds.path)
             tbrepo = GitRepo(
                 tbds.path,
-                url=None,
                 create=True,
                 create_sanity_checks=False,
                 git_opts=initopts,
@@ -394,7 +395,6 @@ class Create(Interface):
             lgr.info("Creating a new annex repo at %s", tbds.path)
             tbrepo = AnnexRepo(
                 tbds.path,
-                url=None,
                 create=True,
                 create_sanity_checks=False,
                 # do not set backend here, to avoid a dedicated commit

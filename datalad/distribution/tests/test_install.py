@@ -34,7 +34,6 @@ from datalad.utils import (
     Path,
 )
 from datalad.support import path as op
-from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
@@ -42,7 +41,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
+from datalad.cmd import WitlessRunner as Runner
 from datalad.tests.utils import (
     skip_ssh,
     create_tree,
@@ -73,7 +72,6 @@ from datalad.tests.utils import (
     slow,
     usecase,
     get_datasets_topdir,
-    SkipTest,
     known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
@@ -98,7 +96,7 @@ def _test_guess_dot_git(annex, path, url, tdir):
         assert_raises(IncompleteResultsError, install, path=tdir, source=url)
     ok_(not exists(tdir))
 
-    Runner(cwd=path)(['git', 'update-server-info'])
+    Runner(cwd=path).run(['git', 'update-server-info'])
 
     with swallow_logs() as cml:
         installed = install(tdir, source=url)
@@ -231,6 +229,7 @@ def test_install_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        ok_(uuid_before)  # we actually have an uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
@@ -300,7 +299,7 @@ def test_install_dataladri(src, topurl, path):
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
-    Runner(cwd=gr.path)(['git', 'update-server-info'])
+    Runner(cwd=gr.path).run(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.consts.DATASETS_TOPURL', topurl), \
             swallow_logs():
@@ -412,7 +411,7 @@ def test_install_into_dataset(source, top_path):
     ds = create(top_path)
     assert_repo_status(ds.path)
 
-    subds = ds.install("sub", source=source, save=False)
+    subds = ds.install("sub", source=source)
     ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))

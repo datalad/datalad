@@ -17,6 +17,7 @@ from os.path import (
 )
 from ..dataset import Dataset
 from datalad.api import (
+    clone,
     install,
     update,
     remove,
@@ -41,12 +42,14 @@ from datalad.tests.utils import (
     assert_is_instance,
     ok_,
     create_tree,
+    maybe_adjust_repo,
     ok_file_has_content,
     assert_status,
     assert_repo_status,
     assert_result_count,
     assert_in_results,
     DEFAULT_BRANCH,
+    skip_if_adjusted_branch,
     SkipTest,
     slow,
     known_failure_windows,
@@ -54,6 +57,7 @@ from datalad.tests.utils import (
 from datalad import cfg as dl_cfg
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
+# At least one aspect of the failure is a more general adjusted branch issue.
 @known_failure_windows
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -196,31 +200,30 @@ def test_update_git_smoke(src_path, dst_path):
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:606
-@known_failure_windows
-@slow  # 20.6910s
-@with_testrepos('.*annex.*', flavors=['clone'])
+@slow  # ~9s
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_update_fetch_all(src, remote_1, remote_2):
-    rmt1 = AnnexRepo.clone(src, remote_1)
-    rmt2 = AnnexRepo.clone(src, remote_2)
+def test_update_fetch_all(path):
+    path = Path(path)
+    remote_1 = str(path / "remote_1")
+    remote_2 = str(path / "remote_2")
 
-    ds = Dataset(src)
+    ds = Dataset(path / "src").create()
+    src = ds.repo.path
+
+    ds_rmt1 = clone(source=src, path=remote_1)
+    ds_rmt2 = clone(source=src, path=remote_2)
+
     ds.siblings('add', name="sibling_1", url=remote_1)
     ds.siblings('add', name="sibling_2", url=remote_2)
 
     # modify the remotes:
-    with open(opj(remote_1, "first.txt"), "w") as f:
-        f.write("some file load")
-    rmt1.add("first.txt")
-    rmt1.commit()
+    (ds_rmt1.pathobj / "first.txt").write_text("some file load")
+    ds_rmt1.save()
+
     # TODO: Modify an already present file!
 
-    with open(opj(remote_2, "second.txt"), "w") as f:
-        f.write("different file load")
-    rmt2.add("second.txt", git=True)
-    rmt2.commit(msg="Add file to git.")
+    (ds_rmt2.pathobj / "second.txt").write_text("different file load")
+    ds_rmt2.save()
 
     # Let's init some special remote which we couldn't really update/fetch
     if not dl_cfg.get('datalad.tests.dataladremote'):
@@ -260,7 +263,6 @@ def test_update_fetch_all(src, remote_1, remote_2):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_newthings_coming_down(originpath, destpath):
@@ -308,23 +310,30 @@ def test_newthings_coming_down(originpath, destpath):
     # for now this should simply not fail (see gh-793), later might be enhanced to a
     # graceful downgrade
     before_branches = ds.repo.get_branches()
+    ok_(any("git-annex" in b
+            for b in ds.repo.get_remote_branches()))
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(before_branches, ds.repo.get_branches())
     # annex branch got pruned
-    eq_(['origin/HEAD', 'origin/' + DEFAULT_BRANCH],
-        ds.repo.get_remote_branches())
+    assert_false(any("git-annex" in b
+                     for b in ds.repo.get_remote_branches()))
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
+    repo = origin.repo
+    if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
+        # Fails before git-annex's fd161da2c (adjustTree: Consider submodule
+        # deletions, 2021-01-06).
+        raise SkipTest(
+            "On adjusted branch, test requires fix in more recent git-annex")
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -463,15 +472,14 @@ def test_multiway_merge(path):
     assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
 
 
+# `git annex sync REMOTE` rather than `git merge TARGET` is used on an
+# adjusted branch, so we don't give an error if TARGET can't be
+# determined.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_no_merge_target(path):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
-        # adjusted branch, so we don't give an error if TARGET can't be
-        # determined.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     assert_repo_status(ds_src.path)
@@ -480,15 +488,14 @@ def test_merge_no_merge_target(path):
     assert_in_results(res, status="impossible", action="update")
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge TARGET` being used.
+@skip_if_adjusted_branch
 @slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge TARGET` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_src_s0 = ds_src.create("s0")
     ds_src_s1 = ds_src.create("s1")
     ds_src.save()
@@ -535,15 +542,14 @@ def test_merge_conflict(path):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge TARGET` being used.
+@skip_if_adjusted_branch
 @slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict_in_subdataset_only(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge TARGET` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_src_sub_conflict = ds_src.create("sub_conflict")
     ds_src_sub_noconflict = ds_src.create("sub_noconflict")
     ds_src.save()
@@ -576,18 +582,16 @@ def test_merge_conflict_in_subdataset_only(path):
     assert_repo_status(ds_clone_sub_noconflict.path)
     # ... but the one with the conflict leaves it for the caller to handle.
     ok_(ds_clone_sub_conflict.repo.call_git(
-        ["ls-files", "--unmerged", "--", "foo"]).strip())
+        ["ls-files", "--unmerged", "--", "foo"], read_only=True).strip())
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge --ff-only ...` being used.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_ff_only(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge --ff-only ...` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
-
     ds_clone_ff = install(source=ds_src.path, path=path / "clone_ff",
                           result_xfm="datasets")
 
@@ -650,33 +654,19 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
-def _adjust(repo):
-    """Put `repo` into an adjusted branch, upgrading if needed.
-    """
-    # This can be removed once GIT_ANNEX_MIN_VERSION is at least
-    # 7.20190912.
-    if not repo.supports_unlocked_pointers:
-        repo.call_git(["annex", "upgrade"])
-        repo.config.reload(force=True)
-    repo.adjust()
-
-
+# This test depends on the source repo being an un-adjusted branch.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     path = Path(path)
 
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        raise SkipTest(
-            "This test depends on the source repo being "
-            "an un-adjusted branch")
-
     ds_src_subds = ds_src.create("subds")
 
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     ds_clone_subds = Dataset(ds_clone.pathobj / "subds")
-    _adjust(ds_clone_subds.repo)
+    maybe_adjust_repo(ds_clone_subds.repo)
     # Note: Were we to save ds_clone here, we would get a merge conflict in the
     # top repo for the submodule (even if using 'git annex sync' rather than
     # 'git merge').
@@ -695,6 +685,8 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
+# Skip non-adjusted case for systems that only support adjusted branches.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # Note: For the adjusted case, this is not much more than a smoke test that
@@ -705,10 +697,6 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # The additional dataset level is to gain some confidence that this works
     # for nested datasets.
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        if not on_adjusted:
-            raise SkipTest("System only supports adjusted branches. "
-                           "Skipping non-adjusted test")
     ds_src_s0 = ds_src.create("s0")
     ds_src_s1 = ds_src_s0.create("s1")
     ds_src.save(recursive=True)
@@ -718,7 +706,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
         # crash when there are submodules and an adjusted branch is checked
         # out, 2019-10-23).
         for ds in [ds_src, ds_src_s0, ds_src_s1]:
-            _adjust(ds.repo)
+            maybe_adjust_repo(ds.repo)
         ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
 

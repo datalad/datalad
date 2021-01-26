@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test logging facilities """
 
+import inspect
 import logging
 import os.path
 from os.path import exists
@@ -21,6 +22,8 @@ from datalad.log import (
     LoggerHelper,
     log_progress,
     TraceBack,
+    with_progress,
+    with_result_progress,
 )
 from datalad import cfg as dl_cfg
 from datalad.support.constraints import EnsureBool
@@ -34,9 +37,13 @@ from datalad.tests.utils import (
     known_failure_githubci_win,
     ok_,
     ok_endswith,
+    ok_generator,
     swallow_logs,
     with_tempfile,
+    SkipTest,
 )
+from datalad.utils import on_windows
+
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -158,6 +165,8 @@ def test_color_formatter():
                  name='some name'))
 
         cf = ColorFormatter(use_color=use_color)
+        if on_windows:
+            raise SkipTest('Unclear under which conditions coloring should work')
         (assert_in if use_color else assert_not_in)(colors.RESET_SEQ, cf.format(rec))
 
 
@@ -180,3 +189,47 @@ def test_log_progress_noninteractive_filter():
         for present in ["Start", "THERE0", "THERE1", "Done"]:
             assert_in(present, cml.out)
         assert_not_in("NOT", cml.out)
+
+
+def test_with_result_progress_generator():
+    # Tests ability for the decorator to decorate a regular function
+    # or a generator function (then it returns a generator function)
+
+    @with_result_progress
+    def func(l):
+        return l
+
+    generated = []
+    @with_result_progress
+    def gen(l):
+        for i in l:
+            generated.append(i)
+            yield i
+
+    recs = [{'status': 'ok', 'unrelated': i} for i in range(2)]
+    # still works for a func and returns provided list
+    ok_(not inspect.isgeneratorfunction(func))
+    assert_equal(func(recs), recs)
+
+    # generator should still yield and next iteration should only happen
+    # when requested
+    ok_(inspect.isgeneratorfunction(gen))
+    g = gen(recs)
+
+    ok_generator(g)
+    assert_equal(generated, [])  # nothing yet
+    assert_equal(next(g), recs[0])
+    assert_equal(generated, recs[:1])
+    assert_equal(next(g), recs[1])
+    assert_equal(generated, recs)
+
+    # just to make sure all good to redo
+    assert_equal(list(gen(recs)), recs)
+
+
+def test_with_progress_generator():
+    # Well, we could also pass an iterable directly now and display
+    # progress iterative over it
+    g = with_progress(range(3))
+    ok_generator(g)
+    assert_equal(list(g), list(range(3)))

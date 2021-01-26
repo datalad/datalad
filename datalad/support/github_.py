@@ -16,7 +16,7 @@ from ..consts import (
 from ..dochelpers import exc_str
 from ..downloaders.credentials import Token
 from ..ui import ui
-from ..utils import unique, assure_list, assure_tuple_or_list
+from ..utils import unique, ensure_list, ensure_tuple_or_list
 
 from .exceptions import (
     AccessDeniedError,
@@ -100,7 +100,7 @@ def _gen_github_ses(github_login):
 
     # see if we have tokens - might be many. Doesn't cost us much so get at once
     tokens = unique(
-        assure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None)),
+        ensure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None)),
         reverse=True
     )
 
@@ -187,7 +187,7 @@ def _gen_github_entity(
 
 def _make_github_repos(
         github_login, github_organization, rinfo, existing,
-        access_protocol, dryrun):
+        access_protocol, private, dryrun):
     res = []
     if not rinfo:
         return res  # no need to even try!
@@ -209,10 +209,11 @@ def _make_github_repos(
                     reponame,
                     existing,
                     access_protocol,
+                    private,
                     dryrun)
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
-                res.append((ds,) + assure_tuple_or_list(res_))
+                res.append((ds,) + ensure_tuple_or_list(res_))
             except (gh.BadCredentialsException, gh.GithubException) as e:
                 hint = None
                 if (isinstance(e, gh.BadCredentialsException) and e.status != 403):
@@ -255,7 +256,8 @@ def _make_github_repos(
         raise RuntimeError("Did not even try to create a repo on github")
 
 
-def _make_github_repo(github_login, entity, reponame, existing, access_protocol, dryrun):
+def _make_github_repo(github_login, entity, reponame, existing,
+                      access_protocol, private, dryrun):
     repo = None
     try:
         repo = entity.get_repo(reponame)
@@ -308,7 +310,7 @@ def _make_github_repo(github_login, entity, reponame, existing, access_protocol,
                 reponame,
                 # TODO description='',
                 # TODO homepage='',
-                # TODO private=False,
+                private=private,
                 has_issues=False,
                 has_wiki=False,
                 has_downloads=False,

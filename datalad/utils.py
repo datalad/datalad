@@ -183,6 +183,27 @@ def not_supported_on_windows(msg=None):
                                   + (": %s" % msg if msg else ""))
 
 
+def get_home_envvars(new_home):
+    """Return dict with env variables to be adjusted for a new HOME
+
+    Only variables found in current os.environ are adjusted.
+
+    Parameters
+    ----------
+    new_home: str
+      New home path, in native to OS "schema"
+    """
+    environ = os.environ
+    out = {'HOME': new_home}
+    if on_windows:
+        # requires special handling, since it has a number of relevant variables
+        # and also Python changed its behavior and started to respect USERPROFILE only
+        # since python 3.8: https://bugs.python.org/issue36264
+        out['USERPROFILE'] = new_home
+        out['HOMEDRIVE'], out['HOMEPATH'] = op.splitdrive(new_home)
+    return {v: val for v, val in out.items() if v in os.environ}
+
+
 def shortened_repr(value, l=30):
     try:
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
@@ -277,6 +298,7 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
+# unused in -core
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
@@ -369,31 +391,6 @@ from pathlib import (
     PurePath,
     PurePosixPath,
 )
-
-if sys.version_info.major == 3 and sys.version_info.minor < 6:
-    # Path.resolve() doesn't have strict=False until 3.6
-    # monkey patch it -- all code imports this class from this
-    # module
-    Path._datalad_moved_resolve = Path.resolve
-
-    def _resolve_without_strict(self, strict=False):
-        if strict or self.exists():
-            # this is pre 3.6 behavior
-            return self._datalad_moved_resolve()
-
-        # if strict==False, find the closest component
-        # that actually exists and resolve that one
-        for p in self.parents:
-            if not p.exists():
-                continue
-            resolved = p._datalad_moved_resolve()
-            # append the rest that did not exist
-            return resolved / self.relative_to(p)
-        # pathlib return the unresolved if nothing resolved
-        return self
-
-    Path.resolve = _resolve_without_strict
-
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -573,6 +570,7 @@ def file_basename(name, return_ext=False):
         return fbname
 
 
+# unused in -core
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
@@ -581,6 +579,7 @@ def escape_filename(filename):
     return filename
 
 
+# unused in -core
 def encode_filename(filename):
     """Encode unicode filename
     """
@@ -590,6 +589,7 @@ def encode_filename(filename):
         return filename
 
 
+# unused in -core
 def decode_input(s):
     """Given input string/bytes, decode according to stdin codepage (or UTF-8)
     if not defined
@@ -610,6 +610,7 @@ def decode_input(s):
             return s.decode(encoding, errors='replace')
 
 
+# unused in -core
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -623,11 +624,11 @@ else:
 
         Works only on linux and OSX ATM
         """
-        from .cmd import Runner
+        from .cmd import WitlessRunner
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
-        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():
@@ -1095,6 +1096,7 @@ def line_profile(func):
     return  _wrap_line_profile
 
 
+# unused in -core
 @optional_args
 def collect_method_callstats(func):
     """Figure out methods which call the method repeatedly on the same instance
@@ -1190,6 +1192,7 @@ def never_fail(f):
 #
 
 
+# unused in -core
 @contextmanager
 def nothing_cm():
     """Just a dummy cm to programmically switch context managers"""
@@ -1619,8 +1622,6 @@ class chpwd(object):
     def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
-            # PY35 has no auto-conversion of Path to str
-            path = str(path)
             pwd = getpwd()
             self._prev_pwd = pwd
         else:
@@ -1636,7 +1637,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = path
+        os.environ['PWD'] = str(path)
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1847,6 +1848,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
+# unused in -core
 def get_logfilename(dspath, cmd='datalad'):
     """Return a filename to use for logging under a dataset/repository
 
@@ -2098,6 +2100,7 @@ def safe_print(s):
 # IO Helpers
 #
 
+# unused in -core
 def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
 
@@ -2493,6 +2496,12 @@ def guard_for_format(arg):
     return arg.replace('{', '{{').replace('}', '}}')
 
 
+def join_cmdline(args):
+    """Join command line args into a string using quote_cmdlinearg
+    """
+    return ' '.join(map(quote_cmdlinearg, args))
+
+
 def split_cmdline(s):
     """Perform platform-appropriate command line splitting.
 
@@ -2546,16 +2555,32 @@ def get_wrapped_class(wrapped):
     return _func_class
 
 
-# TODO whenever we feel ready for English kill the compat block below
-assure_tuple_or_list = ensure_tuple_or_list
-assure_iter = ensure_iter
-assure_list = ensure_list
-assure_list_from_str = ensure_list_from_str
-assure_dict_from_str = ensure_dict_from_str
-assure_bytes = ensure_bytes
-assure_unicode = ensure_unicode
-assure_bool = ensure_bool
-assure_dir = ensure_dir
+def _make_assure_kludge(fn):
+    old_name = fn.__name__.replace("ensure", "assure")
+
+    @wraps(fn)
+    def compat_fn(*args, **kwargs):
+        warnings.warn(
+            "{} is deprecated and will be removed in a future release. "
+            "Use {} instead."
+            .format(old_name, fn.__name__),
+            DeprecationWarning)
+        return fn(*args, **kwargs)
+
+    compat_fn.__doc__ = ("Note: This function is deprecated. Use {} instead."
+                         .format(fn.__name__))
+    return compat_fn
+
+
+assure_tuple_or_list = _make_assure_kludge(ensure_tuple_or_list)
+assure_iter = _make_assure_kludge(ensure_iter)
+assure_list = _make_assure_kludge(ensure_list)
+assure_list_from_str = _make_assure_kludge(ensure_list_from_str)
+assure_dict_from_str = _make_assure_kludge(ensure_dict_from_str)
+assure_bytes = _make_assure_kludge(ensure_bytes)
+assure_unicode = _make_assure_kludge(ensure_unicode)
+assure_bool = _make_assure_kludge(ensure_bool)
+assure_dir = _make_assure_kludge(ensure_dir)
 
 
 lgr.log(5, "Done importing datalad.utils")

@@ -13,7 +13,6 @@ from ...consts import DATALAD_SPECIAL_REMOTE
 from ...tests.utils import *
 from ...support.external_versions import external_versions
 
-from . import _get_custom_runner
 from ...support.exceptions import CommandError
 from ...downloaders.tests.utils import get_test_providers
 from ..datalad import DataladAnnexCustomRemote
@@ -22,7 +21,7 @@ from ..datalad import DataladAnnexCustomRemote
 @with_tempfile()
 @skip_if_no_network
 def check_basic_scenario(url, d):
-    annex = AnnexRepo(d, runner=_get_custom_runner(d))
+    annex = AnnexRepo(d)
     annex.init_remote(
         DATALAD_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,
@@ -59,14 +58,9 @@ def check_basic_scenario(url, d):
     eq_(len(whereis2), 1)  # datalad
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output
-    with swallow_outputs() as cmo, swallow_logs() as cml:
-        with assert_raises(CommandError) as cme:
-            annex.add_urls([url + '_bogus'])
-        # assert_equal(cml.out, '')
-        err, out = cmo.err, cmo.out
-    assert_equal(out, '')
-    assert_in('addurl: 1 failed', err)
-    # and there should be nothing more
+    with assert_raises(CommandError) as cme:
+        annex.add_urls([url + '_bogus'])
+    assert_in('addurl: 1 failed', cme.exception.stderr)
 
 
 # unfortunately with_tree etc decorators aren't generators friendly thus
@@ -89,6 +83,17 @@ from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario
 def test_interactions(tdir):
     # Just a placeholder since constructor expects a repo
     repo = AnnexRepo(tdir, create=True, init=True)
+
+    fetch_scenarios = [('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey http:')]
+    fetch_scenarios += [
+        ('VALUE', 'GETURLS somekey {}:'.format(scheme))
+        for scheme in DataladAnnexCustomRemote.SUPPORTED_SCHEMES
+        if scheme != "http"]
+    fetch_scenarios.append(
+        ('VALUE',
+         re.compile(
+             'TRANSFER-FAILURE RETRIEVE somekey Failed to download from any')))
+
     for scenario in BASE_INTERACTION_SCENARIOS + [
         [
             ('GETCOST', 'COST %d' % DataladAnnexCustomRemote.COST),
@@ -101,13 +106,7 @@ def test_interactions(tdir):
             #('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
 
         ],
-            # basic interaction failing to fetch content from archive
-        [
-            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey http:'),
-            ('VALUE', 'GETURLS somekey https:'),
-            ('VALUE', 'GETURLS somekey s3:'),
-            ('VALUE', re.compile(
-             'TRANSFER-FAILURE RETRIEVE somekey Failed to download from any'))
-        ],
+        # basic interaction failing to fetch content from archive
+        fetch_scenarios
     ]:
         check_interaction_scenario(DataladAnnexCustomRemote, tdir, scenario)

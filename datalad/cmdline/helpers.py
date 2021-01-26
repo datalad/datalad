@@ -19,7 +19,7 @@ import gzip
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
-from ..cmd import Runner
+from ..cmd import WitlessRunner as Runner
 from ..log import is_interactive
 from ..utils import (
     getpwd,
@@ -40,7 +40,8 @@ class HelpAction(argparse.Action):
         # It is important since we do discover all subcommands from entry
         # points at run time and thus any static manpage would like be out of
         # date
-        if is_interactive() \
+        interactive = is_interactive()
+        if interactive \
                 and option_string == '--help' \
                 and ' ' in parser.prog:  # subcommand
             try:
@@ -107,7 +108,11 @@ class HelpAction(argparse.Action):
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
 
-        print(helpstr)
+        if interactive and option_string == '--help':
+            import pydoc
+            pydoc.pager(helpstr)
+        else:
+            print(helpstr)
         sys.exit(0)
 
 

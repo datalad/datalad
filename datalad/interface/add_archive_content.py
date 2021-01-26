@@ -41,7 +41,7 @@ from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import Path
-from ..utils import assure_tuple_or_list
+from ..utils import ensure_tuple_or_list
 from ..utils import get_dataset_root
 from ..utils import split_cmdline
 
@@ -206,9 +206,9 @@ class AddArchiveContent(Interface):
         annex
         """
         if exclude:
-            exclude = assure_tuple_or_list(exclude)
+            exclude = ensure_tuple_or_list(exclude)
         if rename:
-            rename = assure_tuple_or_list(rename)
+            rename = ensure_tuple_or_list(rename)
 
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex

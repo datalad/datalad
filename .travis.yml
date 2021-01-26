@@ -5,8 +5,7 @@ services:
   - docker
 
 python:
-  - 3.5
-##1  - 3.6
+  - 3.6
 
 cache:
   - apt
@@ -27,7 +26,7 @@ env:
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
-    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 8.20201007"
+    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge --batch 8.20201007"
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
@@ -59,21 +58,21 @@ matrix:
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
-  - python: 3.5
+  - python: 3.6
     # Split runs for v6 since a single one is too long now
     env:
     - NOSE_SELECTION_OP=not
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
-    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 7.20190819"
-  - python: 3.5
+    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge --batch 7.20190819"
+  - python: 3.6
     env:
     - NOSE_SELECTION_OP=""
     - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
-    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge 7.20190819"
+    - _DL_ANNEX_INSTALL_SCENARIO="conda-forge --batch 7.20190819"
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
-  - python: 3.5
+  - python: 3.6
     # Run slow etc tests under a single tricky scenario
     env:
     - _DL_TMPDIR="/var/tmp/sym link"
@@ -81,7 +80,7 @@ matrix:
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
-  - python: 3.5
+  - python: 3.6
     # A run loaded with various customizations to smoke test those functionalities
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
@@ -94,7 +93,7 @@ matrix:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
     - DATALAD_LOG_VMEM=1
-  - python: 3.5
+  - python: 3.6
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
@@ -114,7 +113,7 @@ matrix:
     - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
-  - python: 3.5
+  - python: 3.6
     # Test some under NFS mount  (only selected sub-set)
     env:
     # do not run SSH-based tests due to stall(s)
@@ -130,24 +129,24 @@ matrix:
   # TODO: ATM we do not have that minimal version as a Debian package in
   # snapshots!
   - if: type = cron
-    python: 3.5
+    python: 3.6
     env:
     - _DL_ANNEX_INSTALL_SCENARIO="deb-url http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb"
   # Run with git's master branch rather the default one on the system.
   - if: type = cron
-    python: 3.5
+    python: 3.6
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
   # Run with our reported minimum Git version.
   - if: type = cron
-    python: 3.5
+    python: 3.6
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_MIN_GIT=1
     - PATH="$PWD/git-src/bin-wrappers/:$PATH"
   - if: type = cron
-    python: 3.5
+    python: 3.6
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
@@ -155,19 +154,19 @@ matrix:
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
   - if: type = cron
-    python: 3.5
+    python: 3.6
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
   - if: type = cron
-    python: 3.5
+    python: 3.6
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
 #  - if: type = cron
-#    python: 3.5
+#    python: 3.6
 #    # test whether known v6 failures still fail
 #    env:
 #    - DATALAD_REPO_VERSION=6
@@ -178,7 +177,7 @@ matrix:
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - if: type = cron
-    python: 3.5
+    python: 3.6
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
 #  # test whether known v6 failures still fail
@@ -191,7 +190,7 @@ matrix:
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
-#  - python: 3.5
+#  - python: 3.6
 #    # we would need to migrate to boto3 to test it fully, but SSH should work
 #    env:
 #    - DATALAD_TESTS_SSH=1
@@ -232,7 +231,8 @@ before_install:
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # Install git-annex
-  - eval source tools/ci/install-annex.sh --adjust-bashrc ${_DL_ANNEX_INSTALL_SCENARIO}
+  - python3 datalad/install.py --adjust-bashrc -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+  - source new.env
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   - pip install --upgrade pip

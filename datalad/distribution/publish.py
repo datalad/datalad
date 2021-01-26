@@ -36,7 +36,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
@@ -295,7 +295,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     depvar = 'remote.{}.datalad-publish-depends'.format(remote)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = assure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, []))
 
     # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # make sure we are up-to-date on this topic on all affected remotes, before
@@ -446,11 +446,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # TODO: this should become it own helper
             if is_annex_repo:
                 # annex could manage this branch
-                if current_branch.startswith('annex/direct') \
-                        and ds.config.getbool('annex', 'direct', default=False):
-                    # this is a "fake" annex direct mode branch
-                    # we want to publish the underlying branch
-                    current_branch = current_branch[12:]
                 match_adjusted = re.match(
                     r'adjusted/(.*)\([a-z]*\)',
                     current_branch)
@@ -590,10 +585,11 @@ class Publish(Interface):
       upload).
 
     .. note::
-      The `push` command (new in 0.13.0) provides an alternative interface.
-      Critical differences are that `push` transfers annexed data by default
-      and does not handle sibling creation (i.e. it does not have a `--missing`
-      option).
+      This command is deprecated. It will be removed from DataLad eventually,
+      but no earlier than the 0.15 release. The `push` command (new in 0.13.0)
+      provides an alternative interface. Critical differences are that `push`
+      transfers annexed data by default and does not handle sibling creation
+      (i.e. it does not have a `--missing` option).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
@@ -678,6 +674,10 @@ class Publish(Interface):
             annex_copy_opts=None,
             jobs=None
     ):
+
+        import warnings
+        warnings.warn("`publish` is deprecated. Use `datalad push` instead.",
+                      DeprecationWarning)
 
         # if ever we get a mode, for "with-data" we would need this
         #if dataset and not path:

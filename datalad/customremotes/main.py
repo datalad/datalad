@@ -18,7 +18,6 @@ from .. import __doc__ as m__doc__, __version__ as m__version__
 from ..log import lgr
 
 from ..cmdline import helpers
-from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
 from ..ui import ui
@@ -58,7 +57,7 @@ def setup_parser(backend):
     helpers.parser_add_common_opt(
         parser,
         'version',
-        version='datalad %s\n\n%s' % (m__version__, _license_info()))
+        version='datalad %s' % m__version__)
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',

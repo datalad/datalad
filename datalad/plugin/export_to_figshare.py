@@ -338,12 +338,9 @@ class ExportToFigshare(Interface):
             repo.add(fname, git=False)
             key = repo.get_file_key(fname)
             lgr.info("Adding URL %(download_url)s for it", file_info)
-            repo._annex_custom_command([],
-                [
-                    "git", "annex", "registerurl", '-c', 'annex.alwayscommit=false',
-                    key, file_info['download_url']
-                ]
-            )
+            repo.call_annex([
+                "registerurl", '-c', 'annex.alwayscommit=false',
+                key, file_info['download_url']])
 
             lgr.info("Registering links back for the content of the archive")
             add_archive_content(

@@ -33,11 +33,18 @@ ssh-keygen -f /tmp/dl-test-ssh-id -N ""
 curl -fSsL \
      https://raw.githubusercontent.com/datalad-tester/docker-ssh-target/master/setup \
      >setup-docker-ssh
-sh setup-docker-ssh --key=/tmp/dl-test-ssh-id.pub -2 \
-   --from=dataladtester/docker-ssh-target:latest
+sh setup-docker-ssh --key=/tmp/dl-test-ssh-id.pub -2
 
-until nc -vz localhost 42241 && nc -vz localhost 42242
-do sleep 1
+tries=60
+n=0
+while true
+do
+    nc -vz localhost 42241 && nc -vz localhost 42242 && break
+    ((n++))
+    if [ "$n" -lt "$tries" ]
+    then sleep 1
+    else exit 1
+    fi
 done
 
 ssh -v datalad-test exit

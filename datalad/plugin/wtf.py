@@ -21,9 +21,10 @@ from collections import OrderedDict
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
-    assure_unicode,
+    ensure_unicode,
     getpwd,
     unlink,
+    Path,
 )
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
@@ -83,24 +84,28 @@ def get_max_path_length(top_path=None, maxl=1000):
 def _describe_datalad():
 
     return {
-        'version': assure_unicode(__version__),
-        'full_version': assure_unicode(__full_version__),
+        'version': ensure_unicode(__version__),
+        'full_version': ensure_unicode(__full_version__),
     }
 
 
 def _describe_annex():
-    from datalad.cmd import GitRunner
+    from datalad.cmd import (
+        GitWitlessRunner,
+        StdOutErrCapture,
+    )
 
-    runner = GitRunner()
+    runner = GitWitlessRunner()
     try:
-        out, err = runner.run(['git', 'annex', 'version'])
+        out = runner.run(
+            ['git', 'annex', 'version'], protocol=StdOutErrCapture)
     except CommandError as e:
         return dict(
             version='not available',
             message=exc_str(e),
         )
     info = {}
-    for line in out.split(os.linesep):
+    for line in out['stdout'].split(os.linesep):
         key = line.split(':')[0]
         if not key:
             continue
@@ -199,16 +204,17 @@ def _describe_extensions():
     return infos
 
 
-def _describe_metadata_extractors():
+def _describe_metadata_elements(group):
     infos = {}
     from pkg_resources import iter_entry_points
     from importlib import import_module
 
-    for e in iter_entry_points('datalad.metadata.extractors'):
+    for e in iter_entry_points(group):
         info = {}
-        infos[e.name] = info
+        infos['%s (%s)' % (e.name, str(e.dist))] = info
         try:
             info['module'] = e.module_name
+            info['distribution'] = str(e.dist)
             mod = import_module(e.module_name, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
             e.load()
@@ -261,6 +267,32 @@ def _describe_location(res):
     }
 
 
+def _describe_credentials():
+    import keyring
+    from keyring.util import platform_
+
+    def describe_keyring_backend(be):
+        be_repr = repr(be)
+        return be.name if 'object at 0' in be_repr else be_repr.strip('<>')
+
+    # might later add information on non-keyring credentials gh-4981
+    props = {}
+
+    active_keyring = keyring.get_keyring()
+    krp = {
+        'config_file': Path(platform_.config_root(), 'keyringrc.cfg'),
+        'data_root': platform_.data_root(),
+        'active_backends': [
+            describe_keyring_backend(be)
+            for be in getattr(active_keyring, 'backends', [active_keyring])
+        ],
+    }
+    props.update(
+        keyring=krp,
+    )
+    return props
+
+
 # Actuall callables for WTF. If None -- should be bound later since depend on
 # the context
 SECTION_CALLABLES = {
@@ -272,9 +304,11 @@ SECTION_CALLABLES = {
     'configuration': None,
     'location': None,
     'extensions': _describe_extensions,
-    'metadata_extractors': _describe_metadata_extractors,
+    'metadata_extractors': lambda: _describe_metadata_elements('datalad.metadata.extractors'),
+    'metadata_indexers': lambda: _describe_metadata_elements('datalad.metadata.indexers'),
     'dependencies': _describe_dependencies,
     'dataset': None,
+    'credentials': _describe_credentials,
 }
 
 
@@ -313,9 +347,16 @@ class WTF(Interface):
             action='append',
             dest='sections',
             metavar="SECTION",
-            constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
-            doc="""section to include.  If not set, all sections.
+            constraints=EnsureChoice(*sorted(SECTION_CALLABLES) + ['*']) | EnsureNone(),
+            doc="""section to include.  If not set - depends on flavor.
+            '*' could be used to force all sections.
             [CMD: This option can be given multiple times. CMD]"""),
+        flavor=Parameter(
+            args=("--flavor",),
+            constraints=EnsureChoice('full', 'short'),
+            doc="""Flavor of WTF. 'full' would produce markdown with exhaustive list of sections.
+            'short' will provide a condensed summary only of datalad and dependencies by default.
+            Use [CMD: --section CMD][PY: `section` PY] to list other sections"""),
         decor=Parameter(
             args=("-D", "--decor"),
             constraints=EnsureChoice('html_details') | EnsureNone(),
@@ -332,7 +373,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, sections=None, decor=None, clipboard=None):
+    def __call__(dataset=None, sensitive=None, sections=None, flavor="full", decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetFound
         from datalad.interface.results import get_status_dict
@@ -350,8 +391,8 @@ class WTF(Interface):
                 path=ds.path,
                 status='impossible',
                 message=(
-                'No dataset found at %s. Reporting on the dataset is '
-                'not attempted.', ds.path),
+                    'No dataset found at %s. Reporting on the dataset is '
+                    'not attempted.', ds.path),
                 logger=lgr
             )
             # we don't deal with absent datasets
@@ -370,12 +411,13 @@ class WTF(Interface):
         infos = OrderedDict()
         res = get_status_dict(
             action='wtf',
-            path=ds.path if ds else assure_unicode(op.abspath(op.curdir)),
+            path=ds.path if ds else ensure_unicode(op.abspath(op.curdir)),
             type='dataset' if ds else 'directory',
             status='ok',
             logger=lgr,
             decor=decor,
             infos=infos,
+            flavor=flavor,
         )
 
         # Define section callables which require variables.
@@ -391,8 +433,14 @@ class WTF(Interface):
             section_callables.pop('dataset')
         assert all(section_callables.values())  # check if none was missed
 
-        if sections is None:
-            sections = sorted(list(section_callables))
+        asked_for_all_sections = sections is not None and any(s == '*' for s in sections)
+        if sections is None or asked_for_all_sections:
+            if flavor == 'full' or asked_for_all_sections:
+                sections = sorted(list(section_callables))
+            elif flavor == 'short':
+                sections = ['datalad', 'dependencies']
+            else:
+                raise ValueError(flavor)
 
         for s in sections:
             infos[s] = section_callables[s]()
@@ -435,8 +483,22 @@ def _render_report(res):
             text += u'{}'.format(val)
         return text
 
-    report = _unwind(report, res.get('infos', {}), '')
+    def _unwind_short(text, val, top):
+        if isinstance(val, dict):
+            if not top:
+                text += '\n'
+                for k, v in val.items():
+                    text += "- " + _unwind_short(k, v, top + ' ') + '\n'
+            else:
+                text += ": " + ' '.join('%s=%s' % i for i in val.items())
+        elif isinstance(val, (list, tuple)):
+            text += (' ' if not top else '\n').join(map(str, val))
+        else:
+            text += u'{}'.format(val)
+        return text
 
+    unwinder = {'full': _unwind, 'short': _unwind_short}[res.get('flavor', 'full')]
+    report = unwinder(report, res.get('infos', {}), '')
     decor = res.get('decor', None)
 
     if not decor:

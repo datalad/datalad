@@ -23,7 +23,11 @@ from datalad.api import (
     install,
     publish,
 )
-from datalad.cmd import Runner
+from datalad.cmd import (
+    WitlessRunner as Runner,
+    StdOutErrCapture,
+)
+from datalad.distribution.create_sibling import _RunnerAdapter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
@@ -44,6 +48,7 @@ from datalad.tests.utils import (
     eq_,
     get_mtimes_and_digests,
     get_ssh_port,
+    known_failure_windows,
     ok_,
     ok_endswith,
     ok_exists,
@@ -548,9 +553,10 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr
     # since it exits with 0 exit even if there was a problem
-    out, err = Runner(cwd=opj(dst_path, '.git'))(_path_('hooks/post-update'))
-    assert_false(out)
-    assert_false(err)
+    out = Runner(cwd=opj(dst_path, '.git')).run([_path_('hooks/post-update')],
+                                                protocol=StdOutErrCapture)
+    assert_false(out['stdout'])
+    assert_false(out['stderr'])
 
     # Verify that we could replace and publish no problem
     # https://github.com/datalad/datalad/issues/1656
@@ -843,3 +849,17 @@ def test_non_master_branch(src_path, target_path):
         "other-sub")
     eq_(get_branch(Dataset(target_path / "b" / "sub-b").repo),
         DEFAULT_BRANCH)
+
+
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5287
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_preserve_attrs(src, dest):
+    create_tree(src, {"src": {"foo": {"bar": "This is test text."}}})
+    os.utime(opj(src, "src", "foo", "bar"), (1234567890, 1234567890))
+    _RunnerAdapter().put(opj(src, "src"), dest, recursive=True, preserve_attrs=True)
+    s = os.stat(opj(dest, "src", "foo", "bar"))
+    assert s.st_atime == 1234567890
+    assert s.st_mtime == 1234567890
+    with open(opj(dest, "src", "foo", "bar")) as fp:
+        assert fp.read() == "This is test text."
