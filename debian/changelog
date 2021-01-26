@@ -1,3 +1,11 @@
+datalad (0.14.0~rc1-1) experimental; urgency=medium
+
+  * Fresh release candidate
+  * d/control
+    - need python >= 3.6 and fasteners >= 0.14
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 26 Jan 2021 16:36:17 -0500
+
 datalad (0.13.7-1) unstable; urgency=medium
 
   * Recent upstream bugfix/minor release
