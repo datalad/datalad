@@ -165,6 +165,10 @@ def test_runner_parametrized_protocol():
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_asyncio_loop_noninterference1(path1, path2):
+    if on_windows and sys.version_info < (3, 8):
+        raise SkipTest(
+            "get_event_loop() raises "
+            "RuntimeError: There is no current event loop in thread 'MainThread'.")
     # minimalistic use case provided by Dorota
     import datalad.api as dl
     src = dl.create(path1)
@@ -173,7 +177,7 @@ def test_asyncio_loop_noninterference1(path1, path2):
 import asyncio
 asyncio.get_event_loop()
 import datalad.api as datalad
-ds = datalad.clone(path='{path2}', source="{path1}")
+ds = datalad.clone(path=r'{path2}', source=r"{path1}")
 loop = asyncio.get_event_loop()
 assert loop
 # simulate outside process closing the loop
