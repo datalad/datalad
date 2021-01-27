@@ -204,10 +204,10 @@ after_test:
   - cmd: dir
   - cmd: powershell Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
   - cmd: "set PATH=C:\\msys64\\usr\\bin;%PATH%"
-  - cmd: bash codecov.sh -f "coverage.xml" -U "-s" -A "-s" 
+  - cmd: bash codecov.sh -f "coverage.xml" -U "-s" -A "-s" -v -R ..
   - sh: head -n 20 coverage.xml
   - sh: tail -n 20 coverage.xml
-  - sh: bash <(curl -s https://codecov.io/bash)
+  - sh: bash <(curl -s https://codecov.io/bash) -v -R ..
 
 
 #on_success:
