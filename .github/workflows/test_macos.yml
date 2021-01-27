@@ -24,7 +24,8 @@ jobs:
 
     - name: Install git-annex
       run: |
-        python3 datalad/install.py -E new.env ${{ matrix.install_scenario }}
+        wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
+        python3 datalad_installer.py -E new.env git-annex -m ${{ matrix.install_scenario }}
         . new.env
         echo "PATH=$PATH" >> "$GITHUB_ENV"
 
