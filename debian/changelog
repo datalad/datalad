@@ -1,4 +1,4 @@
-datalad (0.14.0~rc1-1) UNRELEASED; urgency=medium
+datalad (0.14.0~rc1-1) experimental; urgency=medium
 
   * Fresh release candidate
   * d/control
