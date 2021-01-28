@@ -2297,10 +2297,32 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self.config.reload()
         return
 
+    def _maybe_open_ssh_connection(self, remote, prefer_push=True):
+        """Open connection if `remote` has an SSH URL.
+
+        Doing so enables SSH caching, preventing datalad-sshrun subprocesses
+        from opening (and then closing) their own.
+
+        Parameters
+        ----------
+        remote : str
+        prefer_push : bool, optional
+            Use `remote.<remote>.pushurl` if there is one, falling back to
+            `remote.<remote>.url`.
+        """
+        if remote:
+            url = None
+            if prefer_push:
+                url = self.get_remote_url(remote, push=True)
+            url = url or self.get_remote_url(remote)
+            if url and is_ssh(url):
+                ssh_manager.get_connection(url).open()
+
     def update_remote(self, name=None, verbose=False):
         """
         """
         options = ["-v"] if verbose else []
+        self._maybe_open_ssh_connection(name)
         name = [name] if name else []
         self.call_git(
             ['remote'] + name + ['update'] + options,
@@ -2400,10 +2422,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if refspec:
             cmd += ensure_list(refspec)
 
-        # best effort to enable SSH connection caching
-        url = self.config.get('remote.{}.url'.format(remote), None)
-        if url and is_ssh(url):
-            ssh_manager.get_connection(url).open()
+        self._maybe_open_ssh_connection(remote)
         self._git_runner.run(
             cmd,
             protocol=StdOutCaptureWithGitProgress,

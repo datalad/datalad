@@ -1199,6 +1199,11 @@ def test_annex_ssh(topdir):
     ar.commit("add files")
 
     ar.copy_to(["foo"], remote="ssh-remote-1")
+    # copy_to() opens it if needed.
+    #
+    # Note: This isn't racy because datalad-sshrun should not close this itself
+    # because the connection was either already open before this test or
+    # copy_to(), not the underlying git-annex/datalad-sshrun call, opens it.
     ok_(exists(socket_1))
 
     # add another remote:
@@ -1213,6 +1218,8 @@ def test_annex_ssh(topdir):
         ok_(not exists(socket_2))
 
     # copy to the new remote:
+    #
+    # Same racy note as the copy_to() call above.
     ar.copy_to(["foo"], remote="ssh-remote-2")
 
     if not exists(socket_2):  # pragma: no cover

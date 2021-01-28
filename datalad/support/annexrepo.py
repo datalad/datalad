@@ -1369,6 +1369,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     msg="Remote is not known. Known are: %s"
                     % (self.get_remotes(),)
                 )
+            self._maybe_open_ssh_connection(remote)
             options += ['--from', remote]
 
         # analyze provided files to decide which actually are needed to be
@@ -2811,6 +2812,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(copy_files) != len(files):
             lgr.debug("Actually copying %d files", len(copy_files))
 
+        self._maybe_open_ssh_connection(remote)
         annex_options = ['--to=%s' % remote]
         if options:
             annex_options.extend(split_cmdline(options))
