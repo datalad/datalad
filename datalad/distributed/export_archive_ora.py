@@ -61,7 +61,7 @@ class ExportArchiveORA(Interface):
 
       <dataset location>/archives/archive.7z
 
-    Enables the ORA special remote to locate and retrieve all key contained
+    Enables the ORA special remote to locate and retrieve all keys contained
     in the archive.
     """
     _params_ = dict(
