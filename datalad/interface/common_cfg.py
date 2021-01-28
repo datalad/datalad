@@ -48,7 +48,7 @@ definitions = {
                'title': 'Cache directory',
                'text': 'Where should datalad cache files?'}),
         'destination': 'global',
-        'default': dirs.user_cache_dir,
+        'default_fn': lambda: dirs.user_cache_dir,
     },
     'datalad.locations.default-dataset': {
         'ui': ('question', {
@@ -56,42 +56,42 @@ definitions = {
                'text': 'Where should datalad should look for (or install) a '
                        'default dataset?'}),
         'destination': 'global',
-        'default': opj(expanduser('~'), 'datalad'),
+        'default_fn': lambda: opj(expanduser('~'), 'datalad'),
     },
     'datalad.locations.sockets': {
         'ui': ('question', {
                'title': 'Socket directory',
                'text': 'Where should datalad store socket files?'}),
         'destination': 'global',
-        'default': opj(dirs.user_cache_dir, 'sockets'),
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'sockets'),
     },
     'datalad.locations.system-plugins': {
         'ui': ('question', {
                'title': 'System plugin directory',
                'text': 'Where should datalad search for system plugins?'}),
         'destination': 'global',
-        'default': opj(dirs.site_config_dir, 'plugins'),
+        'default_fn': lambda: opj(dirs.site_config_dir, 'plugins'),
     },
     'datalad.locations.user-plugins': {
         'ui': ('question', {
                'title': 'User plugin directory',
                'text': 'Where should datalad search for user plugins?'}),
         'destination': 'global',
-        'default': opj(dirs.user_config_dir, 'plugins'),
+        'default_fn': lambda: opj(dirs.user_config_dir, 'plugins'),
     },
     'datalad.locations.system-procedures': {
         'ui': ('question', {
                'title': 'System procedure directory',
                'text': 'Where should datalad search for system procedures?'}),
         'destination': 'global',
-        'default': opj(dirs.site_config_dir, 'procedures'),
+        'default_fn': lambda: opj(dirs.site_config_dir, 'procedures'),
     },
     'datalad.locations.user-procedures': {
         'ui': ('question', {
                'title': 'User procedure directory',
                'text': 'Where should datalad search for user procedures?'}),
         'destination': 'global',
-        'default': opj(dirs.user_config_dir, 'procedures'),
+        'default_fn': lambda: opj(dirs.user_config_dir, 'procedures'),
     },
     'datalad.locations.extra-procedures': {
         'ui': ('question', {
@@ -182,7 +182,7 @@ definitions = {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
         'type': EnsureStr(),
-        'default': environ.get('TMPDIR'),
+        'default_fn': lambda: environ.get('TMPDIR'),
     },
     'datalad.tests.temp.keep': {
         'ui': ('yesno', {
@@ -213,7 +213,7 @@ definitions = {
             'title': 'Cache directory for tests',
             'text': 'Where should datalad cache test files?'}),
         'destination': 'global',
-        'default': opj(dirs.user_cache_dir, 'tests')
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'tests')
     },
     'datalad.log.level': {
         'ui': ('question', {
@@ -428,3 +428,18 @@ definitions = {
         'type': EnsureBool(),
     },
 }
+
+
+def compute_cfg_defaults():
+    """Compute dynamic defaults for configuration options.
+
+    These are options that depend on things like $HOME that change under our
+    testing setup.
+    """
+    for key, value in definitions.items():
+        def_fn = value.get("default_fn")
+        if def_fn:
+            value['default'] = def_fn()
+
+
+compute_cfg_defaults()
