@@ -570,6 +570,7 @@ class GitRunnerBase(object):
         if 'GIT_SSH_COMMAND' not in git_env:
             git_env['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
             git_env['GIT_SSH_VARIANT'] = 'ssh'
+        git_env['GIT_ANNEX_USE_GIT_SSH'] = '1'
 
         # We are parsing error messages and hints. For those to work more
         # reliably we are doomed to sacrifice i18n effort of git, and enforce

@@ -17,6 +17,7 @@ from functools import partial
 from glob import glob
 import os
 import re
+import sys
 from os import mkdir
 from os.path import (
     join as opj,
@@ -49,6 +50,7 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.utils import (
     chpwd,
     get_linux_distribution,
+    quote_cmdlinearg,
     rmtree,
     unlink,
     Path,
@@ -1199,8 +1201,10 @@ def test_annex_ssh(topdir):
 
     # remote interaction causes socket to be created:
     (ar.pathobj / "foo").write_text("foo")
+    (ar.pathobj / "bar").write_text("bar")
     ar.add("foo")
-    ar.commit("add foo")
+    ar.add("bar")
+    ar.commit("add files")
 
     ar.copy_to(["foo"], remote="ssh-remote-1")
     ok_(exists(socket_1))
@@ -1226,6 +1230,13 @@ def test_annex_ssh(topdir):
     if not exists(socket_2):  # pragma: no cover
         # @known_failure (marked for grep)
         raise SkipTest("test_annex_ssh hit known failure (gh-4781)")
+
+    # Check that git-annex is actually using datalad-sshrun.
+    fail_cmd = quote_cmdlinearg(sys.executable) + "-c 'assert 0'"
+    with patch.dict('os.environ', {'GIT_SSH_COMMAND': fail_cmd}):
+        with assert_raises(CommandError):
+            ar.copy_to(["bar"], remote="ssh-remote-2")
+    ar.copy_to(["bar"], remote="ssh-remote-2")
 
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
