@@ -12,14 +12,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/)
 [![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/)
-[![Supported Python version](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/datalad)](https://pypi.org/project/datalad/)
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
-# 10000ft overview
+# 10000-ft. overview
 
 DataLad makes data management and data distribution more accessible.
 To do that, it stands on the shoulders of [Git] and [Git-annex] to deliver a
@@ -44,16 +44,16 @@ the [DataLad handbook](http://handbook.datalad.org).
 
 # Support
 
-The documentation of this project is found here:
+The documentation for this project is found here:
 http://docs.datalad.org
 
-All bugs, concerns and enhancement requests for this software can be submitted here:
+All bugs, concerns, and enhancement requests for this software can be submitted here:
 https://github.com/datalad/datalad/issues
 
 If you have a problem or would like to ask a question about how to use DataLad,
 please [submit a question to
 NeuroStars.org](https://neurostars.org/new-topic?body=-%20Please%20describe%20the%20problem.%0A-%20What%20steps%20will%20reproduce%20the%20problem%3F%0A-%20What%20version%20of%20DataLad%20are%20you%20using%20%28run%20%60datalad%20--version%60%29%3F%20On%20what%20operating%20system%20%28consider%20running%20%60datalad%20plugin%20wtf%60%29%3F%0A-%20Please%20provide%20any%20additional%20information%20below.%0A-%20Have%20you%20had%20any%20luck%20using%20DataLad%20before%3F%20%28Sometimes%20we%20get%20tired%20of%20reading%20bug%20reports%20all%20day%20and%20a%20lil'%20positive%20end%20note%20does%20wonders%29&tags=datalad)
-with a ``datalad`` tag.  NeuroStars.org is a platform similar to StackOverflow
+with a `datalad` tag.  NeuroStars.org is a platform similar to StackOverflow
 but dedicated to neuroinformatics.
 
 All previous DataLad questions are available here:
@@ -64,7 +64,7 @@ http://neurostars.org/tags/datalad/
 
 ## Debian-based systems
 
-On Debian-based systems, we recommend to enable [NeuroDebian] from which we
+On Debian-based systems, we recommend enabling [NeuroDebian], via which we
 provide recent releases of DataLad. Once enabled, just do:
 
     apt-get install datalad
@@ -73,37 +73,37 @@ provide recent releases of DataLad. Once enabled, just do:
 
     conda install -c conda-forge datalad
 
-will install released released version, and release candidates are available
-via
+will install the most recently released version, and release candidates are
+available via
 
     conda install -c conda-forge/label/rc datalad
 
-## Other Linux'es, OSX via pip
+## Other Linux'es, macOS via pip
 
 Before you install this package, please make sure that you [install a recent
 version of git-annex](https://git-annex.branchable.com/install).  Afterwards,
 install the latest version of `datalad` from
-[PyPi](https://pypi.org/project/datalad). It is recommended to use
+[PyPI](https://pypi.org/project/datalad). It is recommended to use
 a dedicated [virtualenv](https://virtualenv.pypa.io):
 
-    # create and enter a new virtual environment (optional)
+    # Create and enter a new virtual environment (optional)
     virtualenv --python=python3 ~/env/datalad
     . ~/env/datalad/bin/activate
 
-    # install from PyPi
+    # Install from PyPI
     pip install datalad
 
-By default, installation via pip installs core functionality of datalad
+By default, installation via pip installs the core functionality of DataLad,
 allowing for managing datasets etc.  Additional installation schemes
-are available, so you could provide enhanced installation via
-`pip install datalad[SCHEME]` where `SCHEME` could be
+are available, so you can request enhanced installation via
+`pip install datalad[SCHEME]`, where `SCHEME` could be:
 
 - `tests`
-     to also install dependencies used by unit-tests battery of the datalad
+     to also install dependencies used by DataLad's battery of unit tests
 - `full`
      to install all dependencies.
 
-More details on installation and initial configuration could be found in the
+More details on installation and initial configuration can be found in the
 [DataLad Handbook: Installation].
 
 # License
