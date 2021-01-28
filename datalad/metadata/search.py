@@ -1205,7 +1205,7 @@ class Search(Interface):
       indexed datasets) which either have a field starting with "age" or
       "gender"::
 
-        % datalad search --mode autofield --show-keys name '\.age' '\.gender'
+        % datalad search --mode autofield --show-keys name '\\.age' '\\.gender'
 
       Fuzzy search for datasets with an author that is specified in a particular
       metadata field::
