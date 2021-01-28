@@ -1167,10 +1167,6 @@ def test_annex_ssh(topdir):
     remote_1_path = rm1.path
     remote_2_path = rm2.path
 
-    # Clear instances so that __init__() is invoked and
-    # _set_shared_connection() the next time AnnexRepo is called.
-    AnnexRepo._unique_instances.clear()
-
     from datalad import ssh_manager
 
     # check whether we are the first to use these sockets:
@@ -1188,12 +1184,8 @@ def test_annex_ssh(topdir):
     gr.add_remote("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
 
     ar = AnnexRepo(repo_path, create=False)
-    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
-    ok_(all(hash_2 not in opt for opt in ar._annex_common_options))
 
-    # connection to 'datalad-test' should be known to ssh manager:
-    assert_in(socket_1, list(map(str, ssh_manager._connections)))
-    # but socket was not touched:
+    # socket was not touched:
     if datalad_test_was_open:
         ok_(exists(socket_1))
     else:
@@ -1212,11 +1204,7 @@ def test_annex_ssh(topdir):
     # add another remote:
     ar.add_remote('ssh-remote-2', "ssh://datalad-test2" + remote_2_path)
 
-    # now, this connection was requested:
-    assert_in(socket_2, list(map(str, ssh_manager._connections)))
-    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
-    ok_(any(hash_2 in opt for opt in ar._annex_common_options))
-    # but socket was not touched:
+    # socket was not touched:
     if datalad_test2_was_open:
         # FIXME: occasionally(?) fails in V6:
         if not ar.supports_unlocked_pointers:

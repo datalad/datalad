@@ -34,7 +34,6 @@ from weakref import (
     WeakValueDictionary
 )
 
-from datalad import ssh_manager
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
     exc_str,
@@ -235,15 +234,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         # just in case we do need to pass annex specific options, even if
         # there is no need ATM
         self._ANNEX_GIT_COMMON_OPTIONS = self._GIT_COMMON_OPTIONS[:]
-
-        # check for possible SSH URLs of the remotes in order to set up
-        # shared connections:
-        for r in self.get_remotes():
-            for url in [self.get_remote_url(r),
-                        self.get_remote_url(r, push=True)]:
-                if url is not None:
-                    self._set_shared_connection(r, url)
-
         self.always_commit = always_commit
 
         config = self.config
@@ -390,57 +380,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # well as in super class __del__;
             # At least log it:
             safe__del__debug(e)
-
-    def _set_shared_connection(self, remote_name, url):
-        """Make sure a remote with SSH URL uses shared connections.
-
-        Set ssh options for annex on a per call basis, using
-        '-c remote.<name>.annex-ssh-options'.
-
-        Note
-        ----
-        There's currently no solution for using these connections, if the SSH
-        URL is just connected to a file instead of a remote
-        (`annex addurl` for example).
-
-        Parameters
-        ----------
-        remote_name: str
-        url: str
-        """
-        if not self.config.obtain('datalad.ssh.multiplex-connections'):
-            return
-
-        from datalad.support.network import is_ssh
-        # Note:
-        #
-        # before any possible invocation of git-annex
-        # Temporary approach to ssh connection sharing:
-        # Register every ssh remote with the corresponding control master.
-        # Issues:
-        # - currently overwrites existing ssh config of the remote
-        # - request SSHConnection instance and write config even if no
-        #   connection needed (but: connection is not actually created/opened)
-        # - no solution for a ssh url of a file (annex addurl)
-
-        if is_ssh(url):
-            c = ssh_manager.get_connection(url)
-            ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
-            # options to add:
-            # Note: must use -S to overload -S provided by annex itself
-            # if we provide -o ControlPath=... it is not in effect
-            # Note: ctrl_path must not contain spaces, since it seems to be
-            # impossible to anyhow guard them here
-            # http://git-annex.branchable.com/bugs/cannot___40__or_how__63____41___to_pass_socket_path_with_a_space_in_its_path_via_annex-ssh-options/
-            cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
-            # read user-defined options from .git/config:
-            cfg_string_old = self.config.get(ssh_cfg_var, None)
-            self._annex_common_options += \
-                ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
-                       ''.format(remote_name,
-                                 (cfg_string_old + " ") if cfg_string_old else "",
-                                 cfg_string
-                                 )]
 
     def is_managed_branch(self, branch=None):
         """Whether `branch` is managed by git-annex.
@@ -724,12 +663,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return initialized_annex
 
-    def add_remote(self, name, url, options=None):
-        """Overrides method from GitRepo in order to set
-        remote.<name>.annex-ssh-options in case of a SSH remote."""
-        super(AnnexRepo, self).add_remote(name, url, options if options else [])
-        self._set_shared_connection(name, url)
-
     def set_remote_url(self, name, url, push=False):
         """Set the URL a remote is pointing to
 
@@ -754,7 +687,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             var = 'remote.{0}.{1}'.format(name, 'annexurl')
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
-        self._set_shared_connection(name, url)
 
     def set_remote_dead(self, name):
         """Announce to annex that remote is "dead"
