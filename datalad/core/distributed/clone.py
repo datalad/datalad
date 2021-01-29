@@ -564,6 +564,15 @@ def clone_dataset(
                 message=str(e),
                 **result_props,
             )
+
+            # We were supposed to clone a particular version but failed to.
+            # This is particularly pointless in case of subdatasets and
+            # potentially fatal with current implementation of recursion.
+            # see gh-5387
+            lgr.debug("removing failed clone attempt at %s", dest_path)
+            # TODO stringification can be removed once pathlib compatible
+            # or if PY35 is no longer supported
+            rmtree(str(dest_path), children_only=dest_path_existed)
             return
 
     # perform any post-processing that needs to know details of the clone

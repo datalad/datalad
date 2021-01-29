@@ -39,6 +39,7 @@ from datalad.cmd import (
 from datalad.tests.utils import (
     assert_false,
     assert_in,
+    assert_in_results,
     assert_message,
     assert_not_in,
     assert_raises,
@@ -340,6 +341,40 @@ def test_failed_clone(dspath):
     assert_status('error', res)
     assert_message('Failed to clone from all attempted sources: %s',
                    res)
+
+
+@with_tree(tree={
+    'ds': {'test.txt': 'some'},
+    })
+@with_tempfile
+def test_clone_missing_commit(source, clone):
+
+    from datalad.core.distributed.clone import clone_dataset
+
+    source = Path(source)
+    clone = Path(clone)
+
+    # Commit SHA from another repository - should never be recreated in a fresh
+    # dataset:
+    commit_sha = "c29691b37b05b78ffa76e5fdf0044e9df673e8f1"
+
+    origin = Dataset(source).create(force=True)
+    origin.save()
+
+    # clone origin but request commit_sha to be checked out:
+
+    results = [x for x in
+               clone_dataset(srcs=[source], destds=Dataset(clone),
+                             checkout_gitsha=commit_sha)
+               ]
+    # expected error result:
+    assert_result_count(results, 1)
+    assert_in_results(results, status='error', action='install',
+                      path=str(clone), type='dataset')
+    assert_in("Target commit c29691b3 does not exist in the clone",
+              results[0]['message'])
+    # failed attempt was removed:
+    assert_false(clone.exists())
 
 
 @with_tempfile(mkdir=True)
