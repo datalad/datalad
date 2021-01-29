@@ -15,6 +15,11 @@ We would recommend to consult log of the
 
 - Git versions below v2.19.1 are no longer supported.  ([#4650][])
 
+- The minimum git-annex version is still 7.20190503, but, if you're on
+  Windows (or use adjusted branches in general), please upgrade to at
+  least 8.20200330 but ideally 8.20210127 to get subdataset-related
+  fixes.  ([#4292][]) ([#5290][])
+
 - The minimum supported version of Python is now 3.6.  ([#4879][])
 
 - [publish][] is now deprecated in favor of [push][].  It will be
@@ -3367,6 +3372,7 @@ publishing
 [#4285]: https://github.com/datalad/datalad/issues/4285
 [#4290]: https://github.com/datalad/datalad/issues/4290
 [#4291]: https://github.com/datalad/datalad/issues/4291
+[#4292]: https://github.com/datalad/datalad/issues/4292
 [#4296]: https://github.com/datalad/datalad/issues/4296
 [#4301]: https://github.com/datalad/datalad/issues/4301
 [#4303]: https://github.com/datalad/datalad/issues/4303
@@ -3562,6 +3568,7 @@ publishing
 [#5276]: https://github.com/datalad/datalad/issues/5276
 [#5278]: https://github.com/datalad/datalad/issues/5278
 [#5285]: https://github.com/datalad/datalad/issues/5285
+[#5290]: https://github.com/datalad/datalad/issues/5290
 [#5328]: https://github.com/datalad/datalad/issues/5328
 [#5342]: https://github.com/datalad/datalad/issues/5342
 [#5344]: https://github.com/datalad/datalad/issues/5344
