@@ -549,33 +549,20 @@ def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
     add_to_git[tbrepo.pathobj / '.gitattributes'] = {
         'type': 'file',
         'state': 'added'}
-    # make sure that v6 annex repos never commit content under .datalad
-    attrs_cfg = (
-        ('config', 'annex.largefiles', 'nothing'),
-        ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
-        ('metadata/objects/**', 'annex.largefiles',
-         '({})'.format(cfg.obtain(
-             'datalad.metadata.create-aggregate-annex-limit'))))
-    attrs = tbrepo.get_gitattributes(
-        [op.join('.datalad', i[0]) for i in attrs_cfg])
-    set_attrs = []
-    for p, k, v in attrs_cfg:
-        if not attrs.get(
-                op.join('.datalad', p), {}).get(k, None) == v:
-            set_attrs.append((p, {k: v}))
-    if set_attrs:
-        tbrepo.set_gitattributes(
-            set_attrs,
-            attrfile=op.join('.datalad', '.gitattributes'))
 
-    # prevent git annex from ever annexing .git* stuff (gh-1597)
-    attrs = tbrepo.get_gitattributes('.git')
-    if not attrs.get('.git', {}).get(
-            'annex.largefiles', None) == 'nothing':
-        tbrepo.set_gitattributes([
-            ('**/.git*', {'annex.largefiles': 'nothing'})])
-        # must use the repo.pathobj as this will have resolved symlinks
-        add_to_git[tbrepo.pathobj / '.gitattributes'] = {
-            'type': 'file',
-            'state': 'untracked'}
+    # configure git-annex which files to annex when (or if at all)
+    # - never anything (under any) .git*
+    # - never .datalad/config
+    # - never the metadata catalog
+    # use git-annex-config, in order to leave .gitattributes
+    # as a higher priority config layer to users
+    largefile_config = \
+        'anything and ' \
+        'exclude=.git* and ' \
+        'exclude=*/.git* and ' \
+        'exclude=.datalad/config and ' \
+        'exclude=.datalad/metadata/aggregate*'
+    tbrepo.call_annex(
+        ['config', '--set', 'annex.largefiles', largefile_config]
+    )
     return tbrepo

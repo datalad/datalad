@@ -69,7 +69,7 @@ def test_status_basics(path, linkpath, otherdir):
     eq_(stat, ds.status(result_renderer=None))
     assert_status('ok', stat)
     # we have a bunch of reports (be vague to be robust to future changes
-    assert len(stat) > 2
+    assert len(stat) > 1
     # check the composition
     for s in stat:
         eq_(s['status'], 'ok')
