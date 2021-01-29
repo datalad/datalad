@@ -1,0 +1,24 @@
+Update 0.14.0rc1:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    1e254ee738c74ec72afd27f048be0dace8eaa163..1b986aaedd561c076830b0e24735c56614aa849e
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #5375 from jwodder/grep-i-location
+   07766c1127^-1
+-  Merge branch 'maint'
+   e60e583399^-1
++  Merge pull request #5243 from jwodder/rm-install
+   ecf074dddb^-1
+-  Merge pull request #5377 from yarikoptic/bf-noninterference-windows
+   1b22107ac9^-1
+-  Merge branch 'maint'
+   723fbb7b92^-1
+-  Merge pull request #5388 from jwodder/readme-fixes
+   1b986aaedd^-1
