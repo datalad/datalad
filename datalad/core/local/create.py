@@ -41,6 +41,7 @@ from datalad.utils import (
     getpwd,
     ensure_list,
     get_dataset_root,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -54,7 +55,6 @@ from datalad.distribution.dataset import (
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-import datalad.utils as ut
 
 
 __docformat__ = 'restructuredtext'
@@ -305,11 +305,11 @@ class Create(Interface):
             op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)
-            parentds_path = ut.Path(parentds_path)
+            parentds_path = Path(parentds_path)
             # we cannot get away with a simple
             # GitRepo.get_content_info(), as we need to detect
             # uninstalled/added subdatasets too
-            check_path = ut.Path(path)
+            check_path = Path(path)
             pstatus = prepo.status(
                 untracked='no',
                 # limit query to target path for a potentially massive speed-up
@@ -385,7 +385,7 @@ class Create(Interface):
                 git_opts=initopts,
                 fake_dates=fake_dates)
             # place a .noannex file to indicate annex to leave this repo alone
-            stamp_path = ut.Path(tbrepo.path) / '.noannex'
+            stamp_path = Path(tbrepo.path) / '.noannex'
             stamp_path.touch()
             add_to_git[stamp_path] = {
                 'type': 'file',
