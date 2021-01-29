@@ -151,10 +151,6 @@ We would recommend to consult log of the
 - The `add-readme` command now links to the [DataLad
   handbook][handbook] rather than <http://docs.datalad.org>.  ([#4991][])
 
-- DataLad now ships with a module that is capable of installing
-  git-annex via various methods.  See `python -m datalad.install -h`.
-  ([#5098][]) ([#5139][])
-
 - New option `datalad.locations.extra-procedures` specifies an
   additional location that should be searched for procedures.  ([#5156][])
 
@@ -3531,7 +3527,6 @@ publishing
 [#5081]: https://github.com/datalad/datalad/issues/5081
 [#5090]: https://github.com/datalad/datalad/issues/5090
 [#5091]: https://github.com/datalad/datalad/issues/5091
-[#5098]: https://github.com/datalad/datalad/issues/5098
 [#5106]: https://github.com/datalad/datalad/issues/5106
 [#5108]: https://github.com/datalad/datalad/issues/5108
 [#5113]: https://github.com/datalad/datalad/issues/5113
@@ -3542,7 +3537,6 @@ publishing
 [#5128]: https://github.com/datalad/datalad/issues/5128
 [#5129]: https://github.com/datalad/datalad/issues/5129
 [#5136]: https://github.com/datalad/datalad/issues/5136
-[#5139]: https://github.com/datalad/datalad/issues/5139
 [#5141]: https://github.com/datalad/datalad/issues/5141
 [#5142]: https://github.com/datalad/datalad/issues/5142
 [#5146]: https://github.com/datalad/datalad/issues/5146
