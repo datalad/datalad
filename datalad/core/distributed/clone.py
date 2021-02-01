@@ -569,7 +569,7 @@ def clone_dataset(
             # This is particularly pointless in case of subdatasets and
             # potentially fatal with current implementation of recursion.
             # see gh-5387
-            lgr.debug("removing failed clone attempt at %s", dest_path)
+            lgr.debug("Failed to checkout %s, removing this clone attempt at %s", checkout_gitsha, dest_path)
             # TODO stringification can be removed once pathlib compatible
             # or if PY35 is no longer supported
             rmtree(str(dest_path), children_only=dest_path_existed)
