@@ -15,14 +15,20 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the `DataLad git
 repository <http://github.com/datalad/datalad>`__ for more details.
 
-0.14.0rc1 (January 26, 2021) – .
---------------------------------
+0.14.0 (February 02, 2021) – .
+------------------------------
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  Git versions below v2.19.1 are no longer supported.
    (`#4650 <https://github.com/datalad/datalad/issues/4650>`__)
+
+-  The minimum git-annex version is still 7.20190503, but, if you’re on
+   Windows (or use adjusted branches in general), please upgrade to at
+   least 8.20200330 but ideally 8.20210127 to get subdataset-related
+   fixes. (`#4292 <https://github.com/datalad/datalad/issues/4292>`__)
+   (`#5290 <https://github.com/datalad/datalad/issues/5290>`__)
 
 -  The minimum supported version of Python is now 3.6.
    (`#4879 <https://github.com/datalad/datalad/issues/4879>`__)
@@ -122,13 +128,17 @@ Fixes
    was correctly triggered by ``ria+http`` URLs but not ``ria+https``
    URLs. (`#4977 <https://github.com/datalad/datalad/issues/4977>`__)
 
+-  If the registered commit wasn’t found when cloning a subdataset, the
+   failed attempt was left around.
+   (`#5391 <https://github.com/datalad/datalad/issues/5391>`__)
+
 -  The remote calls to ``cp`` and ``chmod`` in
    `create-sibling <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html>`__
    were not portable and failed on macOS.
    (`#5108 <https://github.com/datalad/datalad/issues/5108>`__)
 
--  A more reliable check is now done to decide if the configuration
-   files need to be reloaded.
+-  A more reliable check is now done to decide if configuration files
+   need to be reloaded.
    (`#5276 <https://github.com/datalad/datalad/issues/5276>`__)
 
 -  The internal command runner’s handling of the event loop has been
@@ -144,21 +154,22 @@ Enhancements and new features
    default, has been improved. A core piece of the new approach is
    registering the commit of the primary branch, not its checked out
    adjusted branch, in the superdataset. Note: This means that
-   ``git status`` will always considered a subdataset on an adjusted
+   ``git status`` will always consider a subdataset on an adjusted
    branch as dirty while ``datalad status`` will look more closely and
    see if the tip of the primary branch matches the registered commit.
    (`#5241 <https://github.com/datalad/datalad/issues/5241>`__)
 
--  `create-sibling-github <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html>`__
-   learned how to create private repositories (thanks to Nolan Nichols).
-   (`#4769 <https://github.com/datalad/datalad/issues/4769>`__)
+-  The performance of the
+   `subdatasets <http://datalad.readthedocs.io/en/latest/generated/man/datalad-subdatasets.html>`__
+   command has been improved, with substantial speedups for recursive
+   processing of many subdatasets.
+   (`#4868 <https://github.com/datalad/datalad/issues/4868>`__)
+   (`#5076 <https://github.com/datalad/datalad/issues/5076>`__)
 
--  `create-sibling-ria <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-ria.html>`__
-   gained a ``--storage-sibling`` option. When
-   ``--storage-sibling=only`` is specified, the storage sibling is
-   created without an accompanying Git sibling. This enables using hosts
-   without Git installed for storage.
-   (`#5090 <https://github.com/datalad/datalad/issues/5090>`__)
+-  Adding new subdatasets via
+   `save <http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html>`__
+   has been sped up.
+   (`#4793 <https://github.com/datalad/datalad/issues/4793>`__)
 
 -  `get <http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html>`__,
    `save <http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html>`__,
@@ -168,18 +179,6 @@ Enhancements and new features
    ``--jobs`` command-line option or the new
    ``datalad.runtime.max-jobs`` configuration option.
    (`#5022 <https://github.com/datalad/datalad/issues/5022>`__)
-
--  The download machinery (and thus the ``datalad`` special remote)
-   gained support for a new scheme, ``shub://``, which follows the same
-   format used by ``singularity run`` and friends. In contrast to the
-   short-lived URLs obtained by querying Singularity Hub directly,
-   ``shub://`` URLs are suitable for registering with git-annex.
-   (`#4816 <https://github.com/datalad/datalad/issues/4816>`__)
-
--  A provider is now included for https://registry-1.docker.io URLs.
-   This is useful for storing an image’s blobs in a dataset and
-   registering the URLs with git-annex.
-   (`#5129 <https://github.com/datalad/datalad/issues/5129>`__)
 
 -  `addurls <http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html>`__
 
@@ -197,21 +196,39 @@ Enhancements and new features
       without downloading content via its new ``--key`` option.
       (`#5184 <https://github.com/datalad/datalad/issues/5184>`__)
    -  records the URL file in the commit message as provided by the
-      caller it rather than using the resolved absolute path.
+      caller rather than using the resolved absolute path.
       (`#5091 <https://github.com/datalad/datalad/issues/5091>`__)
    -  is now speedier.
       (`#4867 <https://github.com/datalad/datalad/issues/4867>`__)
       (`#5022 <https://github.com/datalad/datalad/issues/5022>`__)
 
+-  `create-sibling-github <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html>`__
+   learned how to create private repositories (thanks to Nolan Nichols).
+   (`#4769 <https://github.com/datalad/datalad/issues/4769>`__)
+
+-  `create-sibling-ria <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-ria.html>`__
+   gained a ``--storage-sibling`` option. When
+   ``--storage-sibling=only`` is specified, the storage sibling is
+   created without an accompanying Git sibling. This enables using hosts
+   without Git installed for storage.
+   (`#5090 <https://github.com/datalad/datalad/issues/5090>`__)
+
+-  The download machinery (and thus the ``datalad`` special remote)
+   gained support for a new scheme, ``shub://``, which follows the same
+   format used by ``singularity run`` and friends. In contrast to the
+   short-lived URLs obtained by querying Singularity Hub directly,
+   ``shub://`` URLs are suitable for registering with git-annex.
+   (`#4816 <https://github.com/datalad/datalad/issues/4816>`__)
+
+-  A provider is now included for https://registry-1.docker.io URLs.
+   This is useful for storing an image’s blobs in a dataset and
+   registering the URLs with git-annex.
+   (`#5129 <https://github.com/datalad/datalad/issues/5129>`__)
+
 -  The ``add-readme`` command now links to the `DataLad
    handbook <http://handbook.datalad.org>`__ rather than
    http://docs.datalad.org.
    (`#4991 <https://github.com/datalad/datalad/issues/4991>`__)
-
--  DataLad now ships with a module that is capable of installing
-   git-annex via various methods. See ``python -m datalad.install -h``.
-   (`#5098 <https://github.com/datalad/datalad/issues/5098>`__)
-   (`#5139 <https://github.com/datalad/datalad/issues/5139>`__)
 
 -  New option ``datalad.locations.extra-procedures`` specifies an
    additional location that should be searched for procedures.
@@ -238,18 +255,6 @@ Enhancements and new features
    in parallel and enables more accurate source URLs to be recorded.
    (`#4853 <https://github.com/datalad/datalad/issues/4853>`__)
 
--  The performance of the
-   `subdatasets <http://datalad.readthedocs.io/en/latest/generated/man/datalad-subdatasets.html>`__
-   command has been improved, with substantial speedups for recursive
-   processing of many subdatasets.
-   (`#4868 <https://github.com/datalad/datalad/issues/4868>`__)
-   (`#5076 <https://github.com/datalad/datalad/issues/5076>`__)
-
--  Adding new subdatasets via
-   `save <http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html>`__
-   has been sped up.
-   (`#4793 <https://github.com/datalad/datalad/issues/4793>`__)
-
 -  ``GitRepo.get_content_info``, a helper that gets triggered by many
    commands, got faster by tweaking its ``git ls-files`` call.
    (`#5067 <https://github.com/datalad/datalad/issues/5067>`__)
@@ -273,7 +278,7 @@ Enhancements and new features
 -  It’s now possible to register a custom metadata indexer that is
    discovered by
    `search <http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html>`__
-   and used it to generate an index.
+   and used to generate an index.
    (`#4963 <https://github.com/datalad/datalad/issues/4963>`__)
 
 -  The ``ConfigManager`` methods ``get``, ``getbool``, ``getfloat``, and
