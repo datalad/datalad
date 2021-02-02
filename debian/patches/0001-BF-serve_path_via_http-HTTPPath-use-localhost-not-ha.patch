@@ -11,7 +11,7 @@ In hope that it could potentially work on IPv6 only setups
 
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -629,14 +629,9 @@ class HTTPPath(object):
+@@ -634,14 +634,9 @@ class HTTPPath(object):
      def start(self):
          """Start serving `path` via HTTP.
          """
