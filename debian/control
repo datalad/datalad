@@ -124,6 +124,7 @@ Suggests: python3-duecredit,
           datalad-containers,
           datalad-crawler,
           datalad-neuroimaging
+Breaks: datalad-container (<< 1.1.2)
 Provides: ${python3:Provides}
 Description: data files management and distribution platform
  DataLad is a data management and distribution platform providing
