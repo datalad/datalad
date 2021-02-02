@@ -9,11 +9,16 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.14.0rc1 (January 26, 2021) -- .
+## 0.14.0 (February 02, 2021) -- .
 
 ### Major refactoring and deprecations
 
 - Git versions below v2.19.1 are no longer supported.  ([#4650][])
+
+- The minimum git-annex version is still 7.20190503, but, if you're on
+  Windows (or use adjusted branches in general), please upgrade to at
+  least 8.20200330 but ideally 8.20210127 to get subdataset-related
+  fixes.  ([#4292][]) ([#5290][])
 
 - The minimum supported version of Python is now 3.6.  ([#4879][])
 
@@ -91,11 +96,14 @@ We would recommend to consult log of the
 - The RIA-specific handling after calling [clone][] was correctly
   triggered by `ria+http` URLs but not `ria+https` URLs.  ([#4977][])
 
+- If the registered commit wasn't found when cloning a subdataset, the
+  failed attempt was left around.  ([#5391][])
+
 - The remote calls to `cp` and `chmod` in [create-sibling][] were not
   portable and failed on macOS.  ([#5108][])
 
-- A more reliable check is now done to decide if the configuration
-  files need to be reloaded.  ([#5276][])
+- A more reliable check is now done to decide if configuration files
+  need to be reloaded.  ([#5276][])
 
 - The internal command runner's handling of the event loop has been
   improved to play nicer with outside applications and scripts that
@@ -108,32 +116,20 @@ We would recommend to consult log of the
   default, has been improved.  A core piece of the new approach is
   registering the commit of the primary branch, not its checked out
   adjusted branch, in the superdataset.  Note: This means that `git
-  status` will always considered a subdataset on an adjusted branch as
+  status` will always consider a subdataset on an adjusted branch as
   dirty while `datalad status` will look more closely and see if the
   tip of the primary branch matches the registered commit.
   ([#5241][])
 
-- [create-sibling-github][] learned how to create private repositories
-  (thanks to Nolan Nichols).  ([#4769][])
+- The performance of the [subdatasets][] command has been improved,
+  with substantial speedups for recursive processing of many
+  subdatasets.  ([#4868][]) ([#5076][])
 
-- [create-sibling-ria][] gained a `--storage-sibling` option.  When
-  `--storage-sibling=only` is specified, the storage sibling is
-  created without an accompanying Git sibling.  This enables using
-  hosts without Git installed for storage.  ([#5090][])
+- Adding new subdatasets via [save][] has been sped up.  ([#4793][])
 
 - [get][], [save][], and [addurls][] gained support for parallel
   operations that can be enabled via the `--jobs` command-line option
   or the new `datalad.runtime.max-jobs` configuration option.  ([#5022][])
-
-- The download machinery (and thus the `datalad` special remote)
-  gained support for a new scheme, `shub://`, which follows the same
-  format used by `singularity run` and friends.  In contrast to the
-  short-lived URLs obtained by querying Singularity Hub directly,
-  `shub://` URLs are suitable for registering with git-annex.  ([#4816][])
-
-- A provider is now included for https://registry-1.docker.io URLs.
-  This is useful for storing an image's blobs in a dataset and
-  registering the URLs with git-annex.  ([#5129][])
 
 - [addurls][]
   - learned how to read data from standard input.  ([#4669][])
@@ -145,15 +141,29 @@ We would recommend to consult log of the
   - is now able to construct a tree of files from known checksums
     without downloading content via its new `--key` option.  ([#5184][])
   - records the URL file in the commit message as provided by the
-    caller it rather than using the resolved absolute path. ([#5091][])
+    caller rather than using the resolved absolute path. ([#5091][])
   - is now speedier.  ([#4867][]) ([#5022][])
+
+- [create-sibling-github][] learned how to create private repositories
+  (thanks to Nolan Nichols).  ([#4769][])
+
+- [create-sibling-ria][] gained a `--storage-sibling` option.  When
+  `--storage-sibling=only` is specified, the storage sibling is
+  created without an accompanying Git sibling.  This enables using
+  hosts without Git installed for storage.  ([#5090][])
+
+- The download machinery (and thus the `datalad` special remote)
+  gained support for a new scheme, `shub://`, which follows the same
+  format used by `singularity run` and friends.  In contrast to the
+  short-lived URLs obtained by querying Singularity Hub directly,
+  `shub://` URLs are suitable for registering with git-annex.  ([#4816][])
+
+- A provider is now included for https://registry-1.docker.io URLs.
+  This is useful for storing an image's blobs in a dataset and
+  registering the URLs with git-annex.  ([#5129][])
 
 - The `add-readme` command now links to the [DataLad
   handbook][handbook] rather than <http://docs.datalad.org>.  ([#4991][])
-
-- DataLad now ships with a module that is capable of installing
-  git-annex via various methods.  See `python -m datalad.install -h`.
-  ([#5098][]) ([#5139][])
 
 - New option `datalad.locations.extra-procedures` specifies an
   additional location that should be searched for procedures.  ([#5156][])
@@ -172,12 +182,6 @@ We would recommend to consult log of the
   running [get][] in parallel and enables more accurate source URLs to
   be recorded.  ([#4853][])
 
-- The performance of the [subdatasets][] command has been improved,
-  with substantial speedups for recursive processing of many
-  subdatasets.  ([#4868][]) ([#5076][])
-
-- Adding new subdatasets via [save][] has been sped up.  ([#4793][])
-
 - `GitRepo.get_content_info`, a helper that gets triggered by many
   commands, got faster by tweaking its `git ls-files` call.  ([#5067][])
 
@@ -194,7 +198,7 @@ We would recommend to consult log of the
   `GitRepo.call_git*` methods.  ([#5163][])
 
 - It's now possible to register a custom metadata indexer that is
-  discovered by [search][] and used it to generate an index.  ([#4963][])
+  discovered by [search][] and used to generate an index.  ([#4963][])
 
 - The `ConfigManager` methods `get`, `getbool`, `getfloat`, and
   `getint` now return a single value (with same precedence as `git
@@ -3371,6 +3375,7 @@ publishing
 [#4285]: https://github.com/datalad/datalad/issues/4285
 [#4290]: https://github.com/datalad/datalad/issues/4290
 [#4291]: https://github.com/datalad/datalad/issues/4291
+[#4292]: https://github.com/datalad/datalad/issues/4292
 [#4296]: https://github.com/datalad/datalad/issues/4296
 [#4301]: https://github.com/datalad/datalad/issues/4301
 [#4303]: https://github.com/datalad/datalad/issues/4303
@@ -3531,7 +3536,6 @@ publishing
 [#5081]: https://github.com/datalad/datalad/issues/5081
 [#5090]: https://github.com/datalad/datalad/issues/5090
 [#5091]: https://github.com/datalad/datalad/issues/5091
-[#5098]: https://github.com/datalad/datalad/issues/5098
 [#5106]: https://github.com/datalad/datalad/issues/5106
 [#5108]: https://github.com/datalad/datalad/issues/5108
 [#5113]: https://github.com/datalad/datalad/issues/5113
@@ -3542,7 +3546,6 @@ publishing
 [#5128]: https://github.com/datalad/datalad/issues/5128
 [#5129]: https://github.com/datalad/datalad/issues/5129
 [#5136]: https://github.com/datalad/datalad/issues/5136
-[#5139]: https://github.com/datalad/datalad/issues/5139
 [#5141]: https://github.com/datalad/datalad/issues/5141
 [#5142]: https://github.com/datalad/datalad/issues/5142
 [#5146]: https://github.com/datalad/datalad/issues/5146
@@ -3568,9 +3571,11 @@ publishing
 [#5276]: https://github.com/datalad/datalad/issues/5276
 [#5278]: https://github.com/datalad/datalad/issues/5278
 [#5285]: https://github.com/datalad/datalad/issues/5285
+[#5290]: https://github.com/datalad/datalad/issues/5290
 [#5328]: https://github.com/datalad/datalad/issues/5328
 [#5342]: https://github.com/datalad/datalad/issues/5342
 [#5344]: https://github.com/datalad/datalad/issues/5344
 [#5346]: https://github.com/datalad/datalad/issues/5346
 [#5350]: https://github.com/datalad/datalad/issues/5350
 [#5367]: https://github.com/datalad/datalad/issues/5367
+[#5391]: https://github.com/datalad/datalad/issues/5391
