@@ -555,6 +555,7 @@ class LoggerHelper(object):
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         if is_interactive():
             phandler = ProgressHandler(other_handler=loghandler)
+            phandler.filters.extend(loghandler.filters)
             self.lgr.addHandler(phandler)
         else:
             loghandler.addFilter(partial(filter_noninteractive_progress,
