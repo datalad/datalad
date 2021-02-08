@@ -66,7 +66,7 @@ environment:
     - ID: MacP38a1
       # ~45min
       DTS: >
-          datalad.distribution
+          datalad.distribution.tests.test_get:test_get_recurse_dirs
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       INSTALL_GITANNEX: git-annex
