@@ -184,6 +184,7 @@ test_script:
   # run tests on installed module, not source tree files
   - cmd: md __testhome__
   - sh: mkdir __testhome__
+  - sh: touch ~/BLOCK
   - cd __testhome__
     # run test selecion (--traverse-namespace needed from Python 3.8 onwards)
   - cmd: python -m nose --traverse-namespace -s -v -A "not (turtle)" --with-cov --cover-package datalad %DTS%
