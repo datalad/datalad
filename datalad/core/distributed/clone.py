@@ -723,48 +723,17 @@ def postclonecfg_ria(ds, props):
     repo = ds.repo
     RIA_REMOTE_NAME = 'origin'  # don't hardcode everywhere
 
-    # chances are that if this dataset came from a RIA store, its subdatasets
-    # may live there too. Place a subdataset source candidate config that makes
-    # get probe this RIA store when obtaining subdatasets
-    ds.config.set(
-        # we use the label 'origin' for this candidate in order to not have to
-        # generate a complicated name from the actual source specification.
-        # we pick a cost of 200 to sort it before datalad's default candidates
-        # for non-RIA URLs, because they prioritize hierarchical layouts that
-        # cannot be found in a RIA store
-        'datalad.get.subdataset-source-candidate-200origin',
-        # use the entire original URL, up to the fragment + plus dataset ID
-        # placeholder, this should make things work with any store setup we
-        # support (paths, ports, ...)
-        props['source'].split('#', maxsplit=1)[0] + '#{id}',
-        where='local')
-
-    # setup publication dependency, if a corresponding special remote exists
-    # and was enabled (there could be RIA stores that actually only have repos)
-    # make this function be a generator
-    ora_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
-                   if s.get('annex-externaltype') == 'ora']
-    if not ora_remotes and any(
-            r.get('externaltype') == 'ora'
-            for r in (repo.get_special_remotes().values()
-                      if hasattr(repo, 'get_special_remotes')
-                      else [])):
-        # no ORA remote autoenabled, but configuration known about at least one.
-        # Let's check origin's config for datalad.ora-remote.uuid as stored by
-        # create-sibling-ria and enable try enabling that one.
-        lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
-                  "up in source config ...")
-
+    def get_uuid_from_store(store_url):
         # First figure whether we cloned via SSH, HTTP or local path and then
         # get that config file the same way:
         config_content = None
-        scheme = props['giturl'].split(':', 1)[0]
+        scheme = store_url.split(':', 1)[0]
         if scheme in ['http', 'https']:
             try:
                 config_content = download_url(
                     "{}{}config".format(
-                        props['giturl'],
-                        '/' if not props['giturl'].endswith('/') else ''))
+                        store_url,
+                        '/' if not store_url.endswith('/') else ''))
             except DownloadError as e:
                 lgr.debug("Failed to get config file from source:\n%s",
                           exc_str(e))
@@ -773,8 +742,8 @@ def postclonecfg_ria(ds, props):
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
             # changed with command abstractions). So we need to get that part to
             # have a valid path to origin's config file:
-            cfg_path = PurePosixPath(URL(props['giturl']).path) / 'config'
-            op = SSHRemoteIO(props['giturl'])
+            cfg_path = PurePosixPath(URL(store_url).path) / 'config'
+            op = SSHRemoteIO(store_url)
             try:
                 config_content = op.read_file(cfg_path)
             except RIARemoteError as e:
@@ -784,7 +753,7 @@ def postclonecfg_ria(ds, props):
         elif scheme == 'file':
             # TODO: switch the following to proper command abstraction:
             op = LocalIO()
-            cfg_path = Path(URL(props['giturl']).localpath) / 'config'
+            cfg_path = Path(URL(store_url).localpath) / 'config'
             try:
                 config_content = op.read_file(cfg_path)
             except (RIARemoteError, OSError) as e:
@@ -794,8 +763,8 @@ def postclonecfg_ria(ds, props):
             lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
                       "FILE scheme URLs.", scheme, props['source'])
 
-        # 3. And read it
-        org_uuid = None
+        # And read it
+        uuid = None
         if config_content:
             # TODO: We might be able to spare the saving to a file.
             #       "git config -f -" is not explicitly documented but happens
@@ -809,17 +778,60 @@ def postclonecfg_ria(ds, props):
                          'datalad.ora-remote.uuid'],
                         protocol=StdOutCapture
                     )
-                    org_uuid = result['stdout'].strip()
+                    uuid = result['stdout'].strip()
                 except CommandError as e:
                     # doesn't contain what we are looking for
                     lgr.debug("Found no UUID for ORA special remote at "
                               "'%s' (%s)", RIA_REMOTE_NAME, exc_str(e))
 
+        return uuid
+
+
+
+
+    # chances are that if this dataset came from a RIA store, its subdatasets
+    # may live there too. Place a subdataset source candidate config that makes
+    # get probe this RIA store when obtaining subdatasets
+    ria_store_url = props['source'].split('#', maxsplit=1)[0]
+    ds.config.set(
+        # we use the label 'origin' for this candidate in order to not have to
+        # generate a complicated name from the actual source specification.
+        # we pick a cost of 200 to sort it before datalad's default candidates
+        # for non-RIA URLs, because they prioritize hierarchical layouts that
+        # cannot be found in a RIA store
+        'datalad.get.subdataset-source-candidate-200origin',
+        # use the entire original URL, up to the fragment + plus dataset ID
+        # placeholder, this should make things work with any store setup we
+        # support (paths, ports, ...)
+        ria_store_url + '#{id}',
+        where='local')
+
+    # setup publication dependency, if a corresponding special remote exists
+    # and was enabled (there could be RIA stores that actually only have repos)
+    # make this function be a generator
+    ora_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
+                   if s.get('annex-externaltype') == 'ora']
+    # get full special remotes' config for access to stored URL
+    srs = repo.get_special_remotes() \
+        if hasattr(repo, 'get_special_remotes') else dict()
+
+    if (not ora_remotes and any(
+            r.get('externaltype') == 'ora' for r in srs.values())) or \
+            all(not srs[r['annex-uuid']]['url'].startswith(ria_store_url)
+                for r in ora_remotes):
+        # No ORA remote autoenabled, but configuration known about at least one,
+        # or enabled ORA remotes seem to not match clone URL.
+        # Let's check origin's config for datalad.ora-remote.uuid as stored by
+        # create-sibling-ria and enable try enabling that one.
+        lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
+                  "up in source config ...")
+
+        org_uuid = get_uuid_from_store(props['giturl'])
+
         # Now, enable it. If annex-init didn't fail to enable it as stored, we
         # wouldn't end up here, so enable with store URL as suggested by the URL
         # we cloned from.
         if org_uuid:
-            srs = repo.get_special_remotes()
             if org_uuid in srs.keys():
                 # TODO: - Double-check autoenable value and only do this when
                 #         true?
@@ -847,20 +859,59 @@ def postclonecfg_ria(ds, props):
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
                           RIA_REMOTE_NAME, org_uuid)
+
+    # Set publication dependency for origin on the respective ORA remote:
     if ora_remotes:
-        if len(ora_remotes) == 1:
+        url_matching_remotes = [r for r in ora_remotes
+                                if srs[r['annex-uuid']]['url'] == ria_store_url]
+
+        if len(url_matching_remotes) == 1:
+            # We have exactly one ORA remote with the same store URL we used for
+            # cloning (includes previously reconfigured remote).
+            # Set publication dependency:
             yield from ds.siblings('configure',
                                    name=RIA_REMOTE_NAME,
-                                   publish_depends=ora_remotes[0]['name'],
+                                   publish_depends=url_matching_remotes[0]['name'],
                                    result_filter=None,
                                    result_renderer='disabled')
+
+        elif not url_matching_remotes:
+            # No matches but we have successfully autoenabled ORA remotes. Could
+            # be the same store accessed by different method (cloning via HTTP
+            # but special remote access via SSH). We can confidently set
+            # publication dependency if the store knows the UUID.
+            org_uuid = get_uuid_from_store(props['giturl'])
+            uuid_matching_remotes = [r for r in ora_remotes
+                                     if r['annex-uuid'] == org_uuid]
+            if uuid_matching_remotes:
+                # Multiple uuid matches are actually possible via same-as.
+                # However, in that case we can't decide which one is supposed to
+                # be used with publishing to origin.
+                if len(uuid_matching_remotes) == 1:
+                    yield from ds.siblings(
+                        'configure',
+                        name=RIA_REMOTE_NAME,
+                        publish_depends=uuid_matching_remotes[0]['name'],
+                        result_filter=None,
+                        result_renderer='disabled')
+                else:
+                    lgr.warning(
+                        "Found multiple matching ORA remotes. Couldn't decide "
+                        "which one publishing to 'origin' should depend on: %s."
+                        " Consider running 'datalad siblings configure -s "
+                        "origin --publish-depends ORAREMOTENAME' to set "
+                        "publication dependency manually.",
+                        [r['name'] for r in uuid_matching_remotes])
+
         else:
-            lgr.warning("Found multiple ORA remotes. Couldn't decide which "
-                        "publishing to 'origin' should depend on: %s. Consider "
-                        "running 'datalad siblings configure -s origin "
-                        "--publish-depends ORAREMOTENAME' to set publication "
-                        "dependency manually.",
-                        [r['name'] for r in ora_remotes])
+            # We have multiple ORA remotes with the same store URL we cloned
+            # from.
+            lgr.warning("Found multiple matching ORA remotes. Couldn't decide "
+                        "which one publishing to 'origin' should depend on: %s."
+                        " Consider running 'datalad siblings configure -s "
+                        "origin --publish-depends ORAREMOTENAME' to set "
+                        "publication dependency manually.",
+                        [r['name'] for r in url_matching_remotes])
 
 
 def postclonecfg_annexdataset(ds, reckless, description=None):
