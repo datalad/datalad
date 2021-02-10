@@ -122,7 +122,7 @@ def check_filters(name):
         lgr3.info('log3')
         assert_in('log1', cml.out)
         assert_in('log2', cml.out)
-        assert 'log3' not in cml.out
+        assert_not_in('log3', cml.out)
 
 
 def test_filters():
