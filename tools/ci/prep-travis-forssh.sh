@@ -3,20 +3,25 @@ set -eu
 
 mkdir -p "$HOME/.ssh"
 
-cat >>"$HOME/.ssh/config" <<'EOF'
+if command -V docker-machine &> /dev/null
+then docker_host="$(docker-machine inspect --format='{{.Driver.IPAddress}}' default)"
+else docker_host=localhost
+fi
+
+cat >>"$HOME/.ssh/config" <<EOF
 
 Host datalad-test
-HostName localhost
+HostName $docker_host
 Port 42241
 User dl
 StrictHostKeyChecking no
 IdentityFile /tmp/dl-test-ssh-id
 EOF
 
-cat >>"$HOME/.ssh/config" <<'EOF'
+cat >>"$HOME/.ssh/config" <<EOF
 
 Host datalad-test2
-HostName localhost
+HostName $docker_host
 Port 42242
 User dl
 StrictHostKeyChecking no
@@ -38,13 +43,12 @@ sh setup-docker-ssh --key=/tmp/dl-test-ssh-id.pub -2
 tries=60
 n=0
 while true
-do
-    nc -vz localhost 42241 && nc -vz localhost 42242 && break
-    ((n++))
-    if [ "$n" -lt "$tries" ]
-    then sleep 1
-    else exit 1
-    fi
+do nc -vz "$docker_host" 42241 && nc -vz "$docker_host" 42242 && break
+   ((n++))
+   if [ "$n" -lt "$tries" ]
+   then sleep 1
+   else exit 1
+   fi
 done
 
 ssh -v datalad-test exit
