@@ -3464,7 +3464,11 @@ class AnnexJsonProtocol(WitlessProtocol):
 
     def _get_pbar_label(self, action):
         # do not crash if no command is reported
-        return action.get('command', '').capitalize()
+        label = action.get('command', '').capitalize()
+        target = action.get('file') or action.get('key')
+        if target:
+            label += " " + target
+        return label
 
     def _proc_json_record(self, j):
         # check for progress reports and act on them immediately
