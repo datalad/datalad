@@ -686,14 +686,18 @@ class RIARemote(SpecialRemote):
         if hasattr(self, 'configs'):
             # introduced in annexremote 1.4.2 to support LISTCONFIGS
             self.configs['url'] = "RIA store to use"
+            self.configs['push-url'] = "URL for pushing to the RIA store. " \
+                                       "Optional."
             self.configs['archive-id'] = "Dataset ID. Should be set " \
                                          "automatically by datalad"
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
+        self.storage_host_push = None
         # must be absolute, and POSIX (will be instance of PurePosixPath)
         # subclass must set this
         self.store_base_path = None
+        self.store_base_path_push = None
         # by default we can read and write
         self.read_only = False
         self.force_write = None
@@ -707,7 +711,9 @@ class RIARemote(SpecialRemote):
         self.remote_git_dir = None
         self.remote_archive_dir = None
         self.remote_obj_dir = None
-        self._io = None  # lazy
+        # lazy IO:
+        self._io = None
+        self._push_io = None
 
         # cache obj_locations:
         self._last_archive_path = None
@@ -837,19 +843,31 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError(
                 "Cannot determine special remote name, got: {}".format(
                     repr(name)))
-        # get store url:
+        # get store url(s):
         self.ria_store_url = self.annex.getconfig('url')
+        self.ria_store_pushurl = self.annex.getconfig('push-url')
+        # Support URL rewrite without talking to a DataLad ConfigManager,
+        # because of additional import cost otherwise. Remember that this is a
+        # special remote not a "real" datalad process.
+        url_cfgs = dict()
+        url_cfgs_raw = _get_gitcfg(gitdir, "^url.*", regex=True)
+        if url_cfgs_raw:
+            for line in url_cfgs_raw.splitlines():
+                k, v = line.split()
+                url_cfgs[k] = v
+
         if self.ria_store_url:
-            # support URL rewrite without talking to a DataLad ConfigManager
-            # Q is why? Why not use the config manager?
-            url_cfgs = dict()
-            url_cfgs_raw = _get_gitcfg(gitdir, "^url.*", regex=True)
-            if url_cfgs_raw:
-                for line in url_cfgs_raw.splitlines():
-                    k, v = line.split()
-                    url_cfgs[k] = v
             self.storage_host, self.store_base_path, self.ria_store_url = \
                 verify_ria_url(self.ria_store_url, url_cfgs)
+
+        if self.ria_store_pushurl:
+            if self.ria_store_pushurl.startswith("ria+http"):
+                raise RIARemoteError("Invalid push-url: {}. Pushing over HTTP "
+                                     "not implemented."
+                                     "".format(self.ria_store_pushurl))
+            self.storage_host_push, self.store_base_path_push, \
+                self.ria_store_pushurl = verify_ria_url(self.ria_store_pushurl,
+                                                        url_cfgs)
 
         # TODO duplicates call to `git-config` after RIA url rewrite
         self._load_cfg(gitdir, name)
@@ -983,6 +1001,8 @@ class RIARemote(SpecialRemote):
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
         self.annex.setconfig('url', self.ria_store_url)
+        if self.ria_store_pushurl:
+            self.annex.setconfig('push-url', self.ria_store_pushurl)
 
     def _local_io(self):
         """Are we doing local operations?"""
@@ -1043,6 +1063,61 @@ class RIARemote(SpecialRemote):
                     "host configuration found.")
         return self._io
 
+    @property
+    def push_io(self):
+        # Instance of an IOBase subclass for execution based on configured
+        # 'push-url' if such exists. Otherwise identical to `self.io`.
+        # Note, that once we discover we need to use the push-url (that is on
+        # TRANSFER_STORE and REMOVE), we should switch all operations to that IO
+        # instance instead of using different connections for read and write
+        # operations. Ultimately this is due to the design of annex' special
+        # remote protocol - we don't know which annex command is running and
+        # therefore we don't know whether to use fetch or push URL during
+        # PREPARE.
+
+        if not self._push_io:
+            if self.ria_store_pushurl:
+                self.debug("switching ORA to push-url")
+                # Not-implemented-push-HTTP is ruled out already when reading
+                # push-url, so either local or SSH:
+                if not self.storage_host_push:
+                    # local operation
+                    self._push_io = LocalIO()
+                else:
+                    self._push_io = SSHRemoteIO(self.storage_host_push,
+                                                self.buffer_size)
+
+                # We have a new instance. Kill the existing one and replace.
+                from atexit import register, unregister
+                if hasattr(self.io, 'close'):
+                    unregister(self.io.close)
+                    self.io.close()
+
+                self._io = self._push_io
+                if hasattr(self.io, 'close'):
+                    register(self.io.close)
+
+                self.storage_host = self.storage_host_push
+                self.store_base_path = self.store_base_path_push
+
+                # delete/update cached locations:
+                self._last_archive_path = None
+                self._last_keypath = None
+
+                store_base_path = Path(self.store_base_path) \
+                    if self._local_io else self.store_base_path
+
+                self.remote_git_dir, \
+                self.remote_archive_dir, \
+                self.remote_obj_dir = \
+                    self.get_layout_locations(store_base_path, self.archive_id)
+
+            else:
+                # no push-url: use existing IO
+                self._push_io = self._io
+
+        return self._push_io
+
     @handle_errors
     def prepare(self):
 
@@ -1069,32 +1144,36 @@ class RIARemote(SpecialRemote):
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
 
-        if self.io.exists(key_path):
+        if self.push_io.exists(key_path):
             # if the key is here, we trust that the content is in sync
             # with the key
             return
 
-        self.io.mkdir(key_path.parent)
+        self.push_io.mkdir(key_path.parent)
 
-        # we need to copy to a temp location to let
-        # checkpresent fail while the transfer is still in progress
-        # and furthermore not interfere with administrative tasks in annex/objects
-        # In addition include uuid, to not interfere with parallel uploads from different remotes
-        transfer_dir = self.remote_git_dir / "ora-remote-{}".format(self.uuid) / "transfer"
-        self.io.mkdir(transfer_dir)
+        # We need to copy to a temp location to let checkpresent fail while the
+        # transfer is still in progress and furthermore not interfere with
+        # administrative tasks in annex/objects.
+        # In addition include uuid, to not interfere with parallel uploads from
+        # different remotes.
+        transfer_dir = \
+            self.remote_git_dir / "ora-remote-{}".format(self.uuid) / "transfer"
+        self.push_io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 
         if tmp_path.exists():
-            # Just in case - some parallel job could already be writing to it
-            # at least tell the conclusion, not just some obscure permission error
-            raise RIARemoteError('{}: upload already in progress'.format(filename))
+            # Just in case - some parallel job could already be writing to it at
+            # least tell the conclusion, not just some obscure permission error
+            raise RIARemoteError('{}: upload already in progress'
+                                 ''.format(filename))
         try:
-            self.io.put(filename, tmp_path, self.annex.progress)
+            self.push_io.put(filename, tmp_path, self.annex.progress)
             # copy done, atomic rename to actual target
-            self.io.rename(tmp_path, key_path)
+            self.push_io.rename(tmp_path, key_path)
         except Exception as e:
-            # whatever went wrong, we don't want to leave the transfer location blocked
-            self.io.remove(tmp_path)
+            # whatever went wrong, we don't want to leave the transfer location
+            # blocked
+            self.push_io.remove(tmp_path)
             raise e
 
     @handle_errors
@@ -1146,14 +1225,14 @@ class RIARemote(SpecialRemote):
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
-        if self.io.exists(key_path):
-            self.io.remove(key_path)
+        if self.push_io.exists(key_path):
+            self.push_io.remove(key_path)
         key_dir = key_path
         # remove at most two levels of empty directories
         for level in range(2):
             key_dir = key_dir.parent
             try:
-                self.io.remove_dir(key_dir)
+                self.push_io.remove_dir(key_dir)
             except Exception:
                 break
 

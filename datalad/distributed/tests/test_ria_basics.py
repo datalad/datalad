@@ -525,3 +525,60 @@ def test_binary_data():
     # TODO: Skipped due to gh-4436
     yield known_failure_windows(skip_ssh(_test_binary_data)), 'datalad-test'
     yield skip_if_no_network(_test_binary_data), None
+
+
+@known_failure_windows
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_push_url(storepath, dspath, blockfile):
+
+    dspath = Path(dspath)
+    store = Path(storepath)
+    blockfile = Path(blockfile)
+    blockfile.touch()
+
+    ds = Dataset(dspath).create()
+    populate_dataset(ds)
+    ds.save()
+    assert_repo_status(ds.path)
+
+    # set up store:
+    io = LocalIO()
+    store_url = "ria+{}".format(store.as_uri())
+    create_store(io, store, '1')
+    create_ds_in_store(io, store, ds.id, '2', '1')
+
+    # initremote fails with invalid url (not a ria+ URL):
+    invalid_url = (store.parent / "non-existent").as_uri()
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(invalid_url)]
+    assert_raises(CommandError, ds.repo.init_remote, 'store', options=init_opts)
+
+    # initremote succeeds with valid but inaccessible URL (pointing to a file
+    # instead of a store):
+    block_url = "ria+" + blockfile.as_uri()
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(block_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    # but a push will fail:
+    assert_raises(CommandError, ds.repo.call_annex,
+                  ['copy', 'one.txt', '--to', 'store'])
+
+    # reconfigure with correct push-url:
+    init_opts = common_init_opts + ['url={}'.format(store_url),
+                                    'push-url={}'.format(store_url)]
+    ds.repo.enable_remote('store', options=init_opts)
+
+    # push works now:
+    ds.repo.call_annex(['copy', 'one.txt', '--to', 'store'])
+
+    store_uuid = ds.siblings(name='store',
+                             return_type='item-or-list')['annex-uuid']
+    here_uuid = ds.siblings(name='here',
+                            return_type='item-or-list')['annex-uuid']
+
+    known_sources = ds.repo.whereis('one.txt')
+    assert_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
