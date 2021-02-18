@@ -3453,20 +3453,21 @@ class AnnexJsonProtocol(WitlessProtocol):
     def _proc_json_record(self, j):
         # check for progress reports and act on them immediately
         # but only if there is something to build a progress report from
-        if 'action' in j and 'byte-progress' in j:
-            for err_msg in j['action'].pop('error-messages', []):
+        action = j.get('action')
+        if action and 'byte-progress' in j:
+            for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
             # use the action report to build a stable progress bar ID
             pbar_id = 'annexprogress-{}-{}'.format(
                 id(self),
-                hash(frozenset(j['action'])))
+                hash(frozenset(action)))
             if pbar_id in self._pbars and \
                     j.get('byte-progress', None) == j.get('total-size', None):
                 # take a known pbar down, completion or broken report
                 log_progress(
                     lgr.info,
                     pbar_id,
-                    'Finished annex action: {}'.format(j['action']),
+                    'Finished annex action: {}'.format(action),
                     noninteractive_level=5,
                 )
                 self._pbars.discard(pbar_id)
@@ -3480,9 +3481,9 @@ class AnnexJsonProtocol(WitlessProtocol):
                 log_progress(
                     lgr.info,
                     pbar_id,
-                    'Start annex action: {}'.format(j['action']),
+                    'Start annex action: {}'.format(action),
                     # do not crash if no command is reported
-                    label=j['action'].get('command', '').capitalize(),
+                    label=action.get('command', '').capitalize(),
                     unit=' Bytes',
                     total=float(j.get('total-size', 0)),
                     noninteractive_level=5,
