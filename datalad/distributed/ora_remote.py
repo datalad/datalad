@@ -270,7 +270,8 @@ class SSHRemoteIO(IOBase):
     It doesn't even think about a windows server.
     """
 
-    # output markers to detect possible command failure as well as end of output from a particular command:
+    # output markers to detect possible command failure as well as end of output
+    # from a particular command:
     REMOTE_CMD_FAIL = "ora-remote: end - fail"
     REMOTE_CMD_OK = "ora-remote: end - ok"
 
@@ -295,7 +296,10 @@ class SSHRemoteIO(IOBase):
         self.ssh.open()
         # open a remote shell
         cmd = ['ssh'] + self.ssh._ssh_args + [self.ssh.sshri.as_str()]
-        self.shell = subprocess.Popen(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        self.shell = subprocess.Popen(cmd,
+                                      stderr=subprocess.DEVNULL,
+                                      stdout=subprocess.PIPE,
+                                      stdin=subprocess.PIPE)
         # swallow login message(s):
         self.shell.stdin.write(b"echo RIA-REMOTE-LOGIN-END\n")
         self.shell.stdin.flush()
@@ -315,7 +319,8 @@ class SSHRemoteIO(IOBase):
         exitcode = self.shell.wait(timeout=0.5)
         # be more brutal if it doesn't work
         if exitcode is None:  # timed out
-            # TODO: Theoretically terminate() can raise if not successful. How to deal with that?
+            # TODO: Theoretically terminate() can raise if not successful.
+            #       How to deal with that?
             self.shell.terminate()
         self.sshmanager.close()
 
@@ -329,7 +334,8 @@ class SSHRemoteIO(IOBase):
     def _get_download_size_from_key(self, key):
         """Get the size of an annex object file from it's key
 
-        Note, that this is not necessarily the size of the annexed file, but possibly only a chunk of it.
+        Note, that this is not necessarily the size of the annexed file, but
+        possibly only a chunk of it.
 
         Parameter
         ---------
@@ -341,10 +347,13 @@ class SSHRemoteIO(IOBase):
         int
           size in bytes
         """
-        # TODO: datalad's AnnexRepo.get_size_from_key() is not correct/not fitting. Incorporate the wisdom there, too.
-        #       We prob. don't want to actually move this method there, since AnnexRepo would be quite an expensive
-        #       import. Startup time for special remote matters.
-        # TODO: this method can be more compact. we don't need particularly elaborated error distinction
+        # TODO: datalad's AnnexRepo.get_size_from_key() is not correct/not
+        #       fitting. Incorporate the wisdom there, too.
+        #       We prob. don't want to actually move this method there, since
+        #       AnnexRepo would be quite an expensive import. Startup time for
+        #       special remote matters.
+        # TODO: this method can be more compact. we don't need particularly
+        #       elaborated error distinction
 
         # see: https://git-annex.branchable.com/internals/key_format/
         key_parts = key.split('--')
@@ -352,7 +361,7 @@ class SSHRemoteIO(IOBase):
 
         s = S = C = None
 
-        for field in key_fields[1:]:  # note: first one has to be backend -> ignore
+        for field in key_fields[1:]:  # note: first has to be backend -> ignore
             if field.startswith('s'):
                 # size of the annexed file content:
                 s = int(field[1:]) if field[1:].isdigit() else None
@@ -377,11 +386,13 @@ class SSHRemoteIO(IOBase):
 
     def _run(self, cmd, no_output=True, check=False):
 
-        # TODO: we might want to redirect stderr to stdout here (or have additional end marker in stderr)
-        #       otherwise we can't empty stderr to be ready for next command. We also can't read stderr for better error
-        #       messages (RemoteError) without making sure there's something to read in any case (it's blocking!)
-        #       However, if we are sure stderr can only ever happen if we would raise RemoteError anyway, it might be
-        #       okay
+        # TODO: we might want to redirect stderr to stdout here (or have
+        #       additional end marker in stderr) otherwise we can't empty stderr
+        #       to be ready for next command. We also can't read stderr for
+        #       better error messages (RemoteError) without making sure there's
+        #       something to read in any case (it's blocking!).
+        #       However, if we are sure stderr can only ever happen if we would
+        #       raise RemoteError anyway, it might be okay.
         call = self._append_end_markers(cmd)
         self.shell.stdin.write(call.encode())
         self.shell.stdin.flush()
@@ -395,9 +406,10 @@ class SSHRemoteIO(IOBase):
                 break
             elif line == self.REMOTE_CMD_FAIL + '\n':
                 if check:
-                    raise RemoteCommandFailedError("{cmd} failed: {msg}".format(cmd=cmd,
-                                                                                msg="".join(lines[:-1]))
-                                                   )
+                    raise RemoteCommandFailedError(
+                        "{cmd} failed: {msg}".format(cmd=cmd,
+                                                     msg="".join(lines[:-1]))
+                    )
                 else:
                     break
         if no_output and len(lines) > 1:
@@ -416,15 +428,19 @@ class SSHRemoteIO(IOBase):
         # actual get (that is 'cat').
         # Therefore check beforehand.
         if not self.exists(src):
-            raise RIARemoteError("annex object {src} does not exist.".format(src=src))
+            raise RIARemoteError("annex object {src} does not exist."
+                                 "".format(src=src))
 
         # TODO: see get_from_archive()
 
-        # TODO: Currently we will hang forever if the file isn't readable and it's supposed size is bigger than whatever
-        #       cat spits out on stdout. This is because we don't notice that cat has exited non-zero.
-        #       We could have end marker on stderr instead, but then we need to empty stderr beforehand to not act upon
-        #       output from earlier calls. This is a problem with blocking reading, since we need to make sure there's
-        #       actually something to read in any case.
+        # TODO: Currently we will hang forever if the file isn't readable and
+        #       it's supposed size is bigger than whatever cat spits out on
+        #       stdout. This is because we don't notice that cat has exited
+        #       non-zero. We could have end marker on stderr instead, but then
+        #       we need to empty stderr beforehand to not act upon output from
+        #       earlier calls. This is a problem with blocking reading, since we
+        #       need to make sure there's actually something to read in any
+        #       case.
         cmd = 'cat {}'.format(sh_quote(str(src)))
         self.shell.stdin.write(cmd.encode())
         self.shell.stdin.write(b"\n")
@@ -444,10 +460,13 @@ class SSHRemoteIO(IOBase):
 
         with open(dst, 'wb') as target_file:
             bytes_received = 0
-            while bytes_received < size:  # TODO: some additional abortion criteria? check stderr in addition?
+            while bytes_received < size:
+                # TODO: some additional abortion criteria? check stderr in
+                #       addition?
                 c = self.shell.stdout.read1(self.buffer_size)
-                # no idea yet, whether or not there's sth to gain by a sophisticated determination of how many bytes to
-                # read at once (like size - bytes_received)
+                # no idea yet, whether or not there's sth to gain by a
+                # sophisticated determination of how many bytes to read at once
+                # (like size - bytes_received)
                 if c:
                     bytes_received += len(c)
                     target_file.write(c)
@@ -490,13 +509,15 @@ class SSHRemoteIO(IOBase):
 
     def get_from_archive(self, archive, src, dst, progress_cb):
 
-        # Note, that as we are in blocking mode, we can't easily fail on the actual get (that is 'cat').
-        # Therefore check beforehand.
+        # Note, that as we are in blocking mode, we can't easily fail on the
+        # actual get (that is 'cat'). Therefore check beforehand.
         if not self.exists(archive):
-            raise RIARemoteError("archive {arc} does not exist.".format(arc=archive))
+            raise RIARemoteError("archive {arc} does not exist."
+                                 "".format(arc=archive))
 
-        # TODO: We probably need to check exitcode on stderr (via marker). If archive or content is missing we will
-        #       otherwise hang forever waiting for stdout to fill `size`
+        # TODO: We probably need to check exitcode on stderr (via marker). If
+        #       archive or content is missing we will otherwise hang forever
+        #       waiting for stdout to fill `size`.
 
         cmd = '7z x -so {} {}\n'.format(
             sh_quote(str(archive)),
@@ -506,8 +527,9 @@ class SSHRemoteIO(IOBase):
 
         # TODO: - size needs double-check and some robustness
         #       - can we assume src to be a posixpath?
-        #       - RF: Apart from the executed command this should be pretty much identical to self.get(), so move that
-        #         code into a common function
+        #       - RF: Apart from the executed command this should be pretty much
+        #         identical to self.get(), so move that code into a common
+        #         function
 
         from os.path import basename
         size = self._get_download_size_from_key(basename(str(src)))
@@ -550,7 +572,6 @@ class SSHRemoteIO(IOBase):
             self._run(cmd, check=True)
         except RemoteCommandFailedError:
             raise RIARemoteError("Could not write to {}".format(str(file_path)))
-
 
     def get_7z(self):
         # TODO: To not rely on availability in PATH we might want to use `which`
@@ -627,7 +648,7 @@ def handle_errors(func):
     # TODO: configurable on remote end (flag within layout_version!)
 
     @wraps(func)
-    def  _wrap_handle_errors(self, *args, **kwargs):
+    def _wrap_handle_errors(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
@@ -640,8 +661,8 @@ def handle_errors(func):
                                   exc_str=exc_str)
                 # ensure base path is platform path
                 log_target = Path(self.store_base_path) / 'error_logs' / \
-                             "{dsid}.{uuid}.log".format(dsid=self.archive_id,
-                                                        uuid=self.uuid)
+                    "{dsid}.{uuid}.log".format(dsid=self.archive_id,
+                                               uuid=self.uuid)
                 self.io.write_file(log_target, entry, mode='a')
 
             try:
@@ -663,7 +684,7 @@ def handle_errors(func):
             else:
                 raise e
 
-    return  _wrap_handle_errors
+    return _wrap_handle_errors
 
 
 class NoLayoutVersion(Exception):
@@ -819,13 +840,15 @@ class RIARemote(SpecialRemote):
                 gitdir, 'annex.ora-remote.{}.base-path'.format(name))
             self.store_base_path = store_base_path.strip() \
                 if store_base_path else None
-        # Whether or not to force writing to the remote. Currently used to overrule write protection due to layout
-        # version mismatch.
+        # Whether or not to force writing to the remote. Currently used to
+        # overrule write protection due to layout version mismatch.
         self.force_write = _get_gitcfg(
             gitdir, 'annex.ora-remote.{}.force-write'.format(name))
 
         # whether to ignore config flags set at the remote end
-        self.ignore_remote_config = _get_gitcfg(gitdir, 'annex.ora-remote.{}.ignore-remote-config'.format(name))
+        self.ignore_remote_config = \
+            _get_gitcfg(gitdir,
+                        'annex.ora-remote.{}.ignore-remote-config'.format(name))
 
         # buffer size for reading files over HTTP and SSH
         self.buffer_size = _get_gitcfg(gitdir,
@@ -890,8 +913,9 @@ class RIARemote(SpecialRemote):
 
         # for now still accept the configs, if no ria-URL is known:
         if not self.ria_store_url:
-            # Note: Special value '0' is replaced by None only after checking the repository's annex config.
-            # This is to uniformly handle '0' and None later on, but let a user's config '0' overrule what's
+            # Note: Special value '0' is replaced by None only after checking
+            # the repository's annex config. This is to uniformly handle '0' and
+            # None later on, but let a user's config '0' overrule what's
             # stored by git-annex.
             if not self.storage_host:
                 self.storage_host = self.annex.getconfig('ssh-host')
@@ -904,8 +928,9 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError(
                 "No archive ID configured. This should not happen.")
 
-        # TODO: This should prob. not be done! Would only have an effect if force-write was committed
-        #       annex-special-remote-config and this is likely a bad idea.
+        # TODO: This should prob. not be done! Would only have an effect if
+        #       force-write was committed annex-special-remote-config and this
+        #       is likely a bad idea.
         if not self.force_write:
             self.force_write = self.annex.getconfig('force-write')
 
@@ -919,11 +944,14 @@ class RIARemote(SpecialRemote):
             return None
 
         remote_version = file_content[0]
-        remote_config_flags = file_content[1] if len(file_content) == 2 else None
+        remote_config_flags = file_content[1] \
+            if len(file_content) == 2 else None
         if not self.ignore_remote_config and remote_config_flags:
-            # Note: 'or', since config flags can come from toplevel (dataset-tree-root) as well as
-            #       from dataset-level. toplevel is supposed flag the entire tree.
-            self.remote_log_enabled = self.remote_log_enabled or 'l' in remote_config_flags
+            # Note: 'or', since config flags can come from toplevel
+            #       (dataset-tree-root) as well as from dataset-level.
+            #       toplevel is supposed flag the entire tree.
+            self.remote_log_enabled = self.remote_log_enabled or \
+                                      'l' in remote_config_flags
 
         return remote_version
 
@@ -1012,6 +1040,9 @@ class RIARemote(SpecialRemote):
         # coincidence. Instead, let's do remote whenever there
         # is a remote host configured
         #return self.store_base_path.is_dir()
+
+        # TODO: Isn't that wrong with HTTP anyway?
+        #       + just isinstance(LocalIO)?
         return not self.storage_host
 
     def debug(self, msg):
@@ -1134,8 +1165,11 @@ class RIARemote(SpecialRemote):
             'storage_host': 'local'
             if self._local_io() else self.storage_host,
         }
+
+        # TODO: following prob. needs hasattr instead:
         if not isinstance(self.io, HTTPRemoteIO):
-            self.info['7z'] = ("not " if not self.io.get_7z() else "") + "available"
+            self.info['7z'] = ("not " if not self.io.get_7z() else "") + \
+                              "available"
 
     @handle_errors
     def transfer_store(self, key, filename):
@@ -1198,7 +1232,8 @@ class RIARemote(SpecialRemote):
                 self.io.get_from_archive(archive_path, key_path, filename,
                                          self.annex.progress)
             except Exception as e2:
-                raise RIARemoteError('Failed to key: {}'.format([str(e1), str(e2)]))
+                raise RIARemoteError('Failed to key: {}'
+                                     ''.format([str(e1), str(e2)]))
 
     @handle_errors
     def checkpresent(self, key):
@@ -1291,6 +1326,8 @@ class RIARemote(SpecialRemote):
 
         return self.remote_obj_dir, self._last_archive_path, \
             self._last_keypath[1]
+
+    # TODO: implement method 'error'
 
 
 def main():
