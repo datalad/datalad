@@ -3451,10 +3451,16 @@ class AnnexJsonProtocol(WitlessProtocol):
             self._proc_json_record(j)
 
     def _get_pbar_id(self, record):
-        # use the action report to build a stable progress bar ID
+        # NOTE: Look at the "action" field for byte-progress records and the
+        # top-level `record` for the final record. The action record as a whole
+        # should be stable link across byte-progress records, but a subset of
+        # the keys is hard coded below so that the action record can be linked
+        # to the final one.
+        info = record.get("action") or record
         return 'annexprogress-{}-{}'.format(
             id(self),
-            hash(frozenset(record)))
+            hash(frozenset((k, info.get(k))
+                           for k in ["command", "key", "file"])))
 
     def _get_pbar_label(self, action):
         # do not crash if no command is reported
@@ -3463,28 +3469,30 @@ class AnnexJsonProtocol(WitlessProtocol):
     def _proc_json_record(self, j):
         # check for progress reports and act on them immediately
         # but only if there is something to build a progress report from
+        pbar_id = self._get_pbar_id(j)
+        known_pbar = pbar_id in self._pbars
         action = j.get('action')
         if action:
             for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
 
-        if action and 'byte-progress' in j:
-            pbar_id = self._get_pbar_id(action)
-            if pbar_id in self._pbars and \
-                    j.get('byte-progress', None) == j.get('total-size', None):
-                # take a known pbar down, completion or broken report
-                log_progress(
-                    lgr.info,
-                    pbar_id,
-                    'Finished annex action: {}'.format(action),
-                    noninteractive_level=5,
-                )
-                self._pbars.discard(pbar_id)
-                # we are done here
+        is_progress = action and 'byte-progress' in j
+        if known_pbar and (not is_progress or
+                           j.get('byte-progress') == j.get('total-size')):
+            # take a known pbar down, completion or broken report
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished annex action: {}'.format(action),
+                noninteractive_level=5,
+            )
+            self._pbars.discard(pbar_id)
+            if is_progress:
+                # The final record is yet to come.
                 return
 
-            if pbar_id not in self._pbars and \
-                    j.get('byte-progress', None) != j.get('total-size', None):
+        if is_progress:
+            if not known_pbar:
                 # init the pbar, the is some progress left to be made
                 # worth it
                 log_progress(
