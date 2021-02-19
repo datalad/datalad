@@ -3454,9 +3454,11 @@ class AnnexJsonProtocol(WitlessProtocol):
         # check for progress reports and act on them immediately
         # but only if there is something to build a progress report from
         action = j.get('action')
-        if action and 'byte-progress' in j:
+        if action:
             for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
+
+        if action and 'byte-progress' in j:
             # use the action report to build a stable progress bar ID
             pbar_id = 'annexprogress-{}-{}'.format(
                 id(self),
