@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os.path as op
+from unittest.mock import patch
 
 from datalad import cfg as dl_cfg
 from datalad.api import (
@@ -183,6 +184,67 @@ def test_create_simple():
     yield _test_create_store, None
     # TODO: Skipped due to gh-4436
     yield skip_if_on_windows(skip_ssh(_test_create_store)), 'datalad-test'
+
+
+@skip_ssh
+@skip_if_on_windows  # ORA remote is incompatible with windows clients
+@with_tempfile
+@with_tree({'ds': {'file1.txt': 'some'},
+            'sub': {'other.txt': 'other'},
+            'sub2': {'evenmore.txt': 'more'}})
+@with_tempfile
+def test_create_push_url(detection_path, ds_path, store_path):
+
+    store_path = Path(store_path)
+    ds_path = Path(ds_path)
+    detection_path = Path(detection_path)
+
+    ds = Dataset(ds_path).create(force=True)
+    ds.save()
+
+    # patch SSHConnection to signal it was used:
+    from datalad.support.sshconnector import SSHManager
+    def detector(f, d):
+        @wraps(f)
+        def _wrapper(*args, **kwargs):
+            d.touch()
+            return f(*args, **kwargs)
+        return _wrapper
+
+    url = "ria+{}".format(store_path.as_uri())
+    push_url = "ria+ssh://datalad-test{}".format(store_path.as_posix())
+    assert not detection_path.exists()
+
+    with patch('datalad.support.sshconnector.SSHManager.get_connection',
+               new=detector(SSHManager.get_connection, detection_path)):
+
+        ds.create_sibling_ria(url, "datastore", push_url=push_url)
+        # used ssh_manager despite file-url hence used push-url (ria+ssh):
+        assert detection_path.exists()
+
+        # correct config in special remote:
+        sr_cfg = ds.repo.get_special_remotes()[
+            ds.siblings(name='datastore-storage')[0]['annex-uuid']]
+        eq_(sr_cfg['url'], url)
+        eq_(sr_cfg['push-url'], push_url)
+
+        # git remote based on url (local path):
+        eq_(ds.config.get("remote.datastore.url"),
+            (store_path / ds.id[:3] / ds.id[3:]).as_posix())
+        eq_(ds.config.get("remote.datastore.pushurl"),
+            "ssh://datalad-test{}".format((store_path / ds.id[:3] / ds.id[3:]).as_posix()))
+
+        # git-push uses SSH:
+        detection_path.unlink()
+        ds.push('.', to="datastore", data='nothing')
+        assert detection_path.exists()
+
+        # data push
+        # Note, that here the patching has no effect, since the special remote
+        # is running in a subprocess of git-annex. Hence we can't detect SSH
+        # usage really. However, ORA remote is tested elsewhere - if it succeeds
+        # all should be good wrt `create-sibling-ria`.
+        ds.repo.call_annex(['copy', '.', '--to', 'datastore-storage'])
 
 
 @skip_if_on_windows  # ORA remote is incompatible with windows clients
