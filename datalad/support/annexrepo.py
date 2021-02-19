@@ -3468,6 +3468,19 @@ class AnnexJsonProtocol(WitlessProtocol):
         target = action.get('file') or action.get('key')
         if target:
             label += " " + target
+
+        if label:
+            from datalad.ui import utils as ui_utils
+            # Reserving 55 characters for the progress bar is based
+            # approximately off what used to be done in the now-removed
+            # (948ccf3e18) ProcessAnnexProgressIndicators.
+            max_label_width = ui_utils.get_console_width() - 55
+            if max_label_width < 0:
+                # We're squeezed. Just show bar.
+                label = ""
+            elif len(label) > max_label_width:
+                mid = max_label_width // 2
+                label = label[:mid] + " .. " + label[-mid:]
         return label
 
     def _proc_json_record(self, j):
