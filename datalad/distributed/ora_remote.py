@@ -1133,7 +1133,7 @@ class RIARemote(SpecialRemote):
 
                 # delete/update cached locations:
                 self._last_archive_path = None
-                self._last_keypath = None
+                self._last_keypath = (None, None)
 
                 store_base_path = Path(self.store_base_path) \
                     if self._local_io else self.store_base_path
