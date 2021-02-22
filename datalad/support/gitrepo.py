@@ -1676,13 +1676,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         orig_msg = msg
         if not msg:
-            msg = 'Recorded changes'
-            _datalad_msg = True
+            if '--amend' in options and '--no-edit' not in options:
+                # don't overwrite old commit message with our default message
+                # by default, but re-use old one. In other words: Make --no-edit
+                # the default:
+                options += ["--no-edit"]
+            else:
+                msg = 'Recorded changes'
+                _datalad_msg = True
 
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
 
-        options += ["-m", msg]
+        if msg:
+            options += ["-m", msg]
         cmd.extend(options)
 
         # set up env for commit
@@ -1700,15 +1707,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         try:
             for i, chunk in enumerate(file_chunks):
-                cur_cmd = cmd + (
-                    # if this is an explicit dry-run, there is no point in
-                    # amending, because no commit was ever made
-                    # otherwise, amend the first commit, and prevent
-                    # leaving multiple commits behind
-                    ['--amend', '--no-edit']
-                    if i > 0 and '--dry-run' not in cmd
-                    else []
-                ) + ['--'] + chunk
+                cur_cmd = cmd.copy()
+                # if this is an explicit dry-run, there is no point in
+                # amending, because no commit was ever made
+                # otherwise, amend the first commit, and prevent
+                # leaving multiple commits behind
+                if i > 0 and '--dry-run' not in cmd:
+                    if '--amend' not in cmd:
+                        cur_cmd.append('--amend')
+                    if '--no-edit' not in cmd:
+                        cur_cmd.append('--no-edit')
+                cur_cmd += ['--'] + chunk
                 self._git_runner.run(
                     cur_cmd,
                     protocol=StdOutErrCapture,
@@ -1742,10 +1751,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if orig_msg \
                 or '--dry-run' in cmd \
                 or prev_sha == self.get_hexsha() \
+                or ('--amend' in cmd and '--no-edit' in cmd) \
                 or (not is_interactive()) \
                 or self.config.obtain('datalad.save.no-message') != 'interactive':
-            # we had a message given, or nothing was committed, or we are not
-            # connected to a terminal, or no interactive message input is desired:
+            # we had a message given, or nothing was committed, or prev. commit
+            # was amended, or we are not connected to a terminal, or no
+            # interactive message input is desired:
             # we can go home
             return
 
