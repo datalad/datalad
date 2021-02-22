@@ -831,15 +831,6 @@ class RIARemote(SpecialRemote):
                 raise NoLayoutVersion
 
     def _load_cfg(self, gitdir, name):
-        # for now still accept the configs, if no ria-URL is known:
-        if not self.ria_store_url:
-            self.storage_host = _get_gitcfg(
-                gitdir, 'annex.ora-remote.{}.ssh-host'.format(name))
-
-            store_base_path = _get_gitcfg(
-                gitdir, 'annex.ora-remote.{}.base-path'.format(name))
-            self.store_base_path = store_base_path.strip() \
-                if store_base_path else None
         # Whether or not to force writing to the remote. Currently used to
         # overrule write protection due to layout version mismatch.
         self.force_write = _get_gitcfg(
@@ -883,6 +874,43 @@ class RIARemote(SpecialRemote):
             self.storage_host, self.store_base_path, self.ria_store_url = \
                 verify_ria_url(self.ria_store_url, url_cfgs)
 
+        else:
+            # for now still accept the configs, if no ria-URL is known, but
+            # issue deprecation warning:
+            host = _get_gitcfg(gitdir,
+                               'annex.ora-remote.{}.ssh-host'.format(name)) or \
+                   self.annex.getconfig('ssh-host')
+            # Note: Special value '0' is replaced by None only after checking
+            # the repository's annex config. This is to uniformly handle '0' and
+            # None later on, but let a user's config '0' overrule what's
+            # stored by git-annex.
+            self.storage_host = None if host == '0' else host
+
+            path = _get_gitcfg(gitdir,
+                               'annex.ora-remote.{}.base-path'.format(name)) or \
+                   self.annex.getconfig('base-path')
+            self.store_base_path = path.strip() if path else path
+
+            if path or host:
+                self.message("WARNING: base-path + ssh-host configs are "
+                             "deprecated and won't be considered in the future."
+                             " Use 'git annex enableremote {} "
+                             "url=<RIA-URL-TO-STORE>' to store a ria+<scheme>:"
+                             "//... URL in the special remote's config."
+                             "".format(name))
+
+        if not self.store_base_path:
+            raise RIARemoteError(
+                "No base path configured for RIA store. Specify a proper "
+                "ria+<scheme>://... URL.")
+
+        # the base path is ultimately derived from a URL, always treat as POSIX
+        self.store_base_path = PurePosixPath(self.store_base_path)
+        if not self.store_base_path.is_absolute():
+            raise RIARemoteError(
+                'Non-absolute object tree base path configuration: %s'
+                '' % str(self.store_base_path))
+
         if self.ria_store_pushurl:
             if self.ria_store_pushurl.startswith("ria+http"):
                 raise RIARemoteError("Invalid push-url: {}. Pushing over HTTP "
@@ -894,33 +922,6 @@ class RIARemote(SpecialRemote):
 
         # TODO duplicates call to `git-config` after RIA url rewrite
         self._load_cfg(gitdir, name)
-
-        # for now still accept the configs, if no ria-URL is known:
-        if not self.ria_store_url:
-            if not self.store_base_path:
-                self.store_base_path = self.annex.getconfig('base-path')
-            if not self.store_base_path:
-                raise RIARemoteError(
-                    "No remote base path configured. "
-                    "Specify `base-path` setting.")
-
-        # the base path is ultimately derived from a URL, always treat as POSIX
-        self.store_base_path = PurePosixPath(self.store_base_path)
-        if not self.store_base_path.is_absolute():
-            raise RIARemoteError(
-                'Non-absolute object tree base path configuration: %s'
-                '' % str(self.store_base_path))
-
-        # for now still accept the configs, if no ria-URL is known:
-        if not self.ria_store_url:
-            # Note: Special value '0' is replaced by None only after checking
-            # the repository's annex config. This is to uniformly handle '0' and
-            # None later on, but let a user's config '0' overrule what's
-            # stored by git-annex.
-            if not self.storage_host:
-                self.storage_host = self.annex.getconfig('ssh-host')
-            elif self.storage_host == '0':
-                self.storage_host = None
 
         # go look for an ID
         self.archive_id = self.annex.getconfig('archive-id')
