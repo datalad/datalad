@@ -3931,7 +3931,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.debug(exc_str(e))
             return []
 
-    def _save_post(self, message, status, partial_commit):
+    def _save_post(self, message, status, partial_commit, amend=False,
+                   allow_empty=False):
         # helper to commit changes reported in status
 
         # TODO remove pathobj stringification when commit() can
@@ -3939,7 +3940,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         to_commit = [str(f.relative_to(self.pathobj))
                      for f, props in status.items()] \
                     if partial_commit else None
-        if not partial_commit or to_commit:
+        if not partial_commit or to_commit or allow_empty or \
+                (amend and message):
             # we directly call GitRepo.commit() to avoid a whole slew
             # if direct-mode safeguards and workarounds in the AnnexRepo
             # implementation (which also run an additional dry-run commit
@@ -3947,7 +3949,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 self,
                 files=to_commit,
                 msg=message,
-                options=None,
+                options=to_options(amend=amend, allow_empty=allow_empty),
                 # do not raise on empty commit
                 # it could be that the `add` in this save-cycle has already
                 # brought back a 'modified' file into a clean state
@@ -3982,6 +3984,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           - eval_submodule_state : {'full', 'commit', 'no'}
             passed to Repo.status()
           - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
+          - amend : bool (passed to GitRepo.commit)
         """
         return list(
             self.save_(
@@ -3997,7 +4000,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         from datalad.interface.results import get_status_dict
 
         status = self._save_pre(paths, _status, **kwargs)
-        if not status:
+        amend = kwargs.get('amend', False)
+        if not status and not (message and amend):
             # all clean, nothing todo
             lgr.debug('Nothing to save in %r, exiting early', self)
             return
@@ -4123,7 +4127,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                 else tuple())}):
                 yield r
 
-        self._save_post(message, status, need_partial_commit)
+        self._save_post(message, status, need_partial_commit, amend=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
 

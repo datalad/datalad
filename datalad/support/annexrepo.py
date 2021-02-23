@@ -3327,12 +3327,58 @@ class AnnexRepo(GitRepo, RepoInterface):
                     if 'error-messages' in r else None,
                     logger=lgr)
 
-    def _save_post(self, message, status, partial_commit):
+    def _save_post(self, message, status, partial_commit, amend=False):
+
+        if amend and self.is_managed_branch() and \
+                self.format_commit("%B").strip() == "git-annex adjusted branch":
+            # We must not directly amend on an adjusted branch, but fix it
+            # up after the fact. That is if HEAD is a git-annex commit.
+            # Otherwise we still can amend-commit normally.
+            amend = False
+            adjust_amend = True
+        else:
+            adjust_amend = False
+
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
-            message, status, partial_commit)
+            message, status, partial_commit, amend, allow_empty=adjust_amend)
         # then sync potential managed branches
         self.localsync(managed_only=True)
+        if adjust_amend:
+            # We committed in an adjusted branch, but the goal is to amend in
+            # corresponding branch.
+
+            adjusted_branch = self.get_active_branch()
+            corresponding_branch = self.get_corresponding_branch()
+
+            org_commit_pointer = corresponding_branch + "~1"
+            author_name = self.format_commit("%an", org_commit_pointer)
+            author_email = self.format_commit("%ae", org_commit_pointer)
+            author_date = self.format_commit("%ad", org_commit_pointer)
+
+            new_env = (self._git_runner.env
+                       if self._git_runner.env else os.environ).copy()
+            # `message` might be empty - we need to take it from the to be
+            # amended commit in that case:
+            msg = message or self.format_commit("%B", org_commit_pointer)
+            new_env.update({
+                'GIT_AUTHOR_NAME': author_name,
+                'GIT_AUTHOR_EMAIL': author_email,
+                'GIT_AUTHOR_DATE': author_date
+            })
+            # TODO: What about fake_dates in this context?
+            #       ATM this is applied on top by _call_git().
+            out, _ = self._call_git(["commit-tree",
+                                     corresponding_branch + "^{tree}",
+                                     "-p", corresponding_branch + "~2",
+                                     "-m", msg],
+                                    env=new_env,
+                                    read_only=False)
+            new_sha = out.strip()
+
+            self.update_ref("refs/heads/" + corresponding_branch, new_sha)
+            self.update_ref("refs/basis/" + adjusted_branch, new_sha)
+            self.localsync(managed_only=True)
 
     def localsync(self, remote=None, managed_only=False):
         """Consolidate the local git-annex branch and/or managed branches.

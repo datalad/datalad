@@ -101,6 +101,10 @@ class Save(Interface):
         dict(text="Tag the most recent saved state of a dataset",
              code_py="save(version_tag='bestyet')",
              code_cmd="datalad save --version-tag 'bestyet'"),
+        dict(text="Save a specific change but integrate into last commit keeping "
+                  "the already recorded commit message",
+             code_py="save(path='myfile.txt', amend=True)",
+             code_cmd="datalad save myfile.txt --amend")
     ]
 
     _params_ = dict(
@@ -147,6 +151,18 @@ class Save(Interface):
             (see https://git-annex.branchable.com/tips/largefiles).
             """),
         jobs=jobs_opt,
+        amend=Parameter(
+            args=('--amend',),
+            action='store_true',
+            doc="""if set, changes are not recorded in a new, separate
+            commit, but are integrated with the changeset of the previous
+            commit, and both together are recorded by replacing that
+            previous commit. A commit message and authorship information
+            are re-used, if needed. Note, that the previous commits in all
+            subdatasets are amended if this is used recursively. Hence all
+            commit messages are changed if you amend recursively while also
+            passing a message.
+            """),
     )
 
     @staticmethod
@@ -159,6 +175,7 @@ class Save(Interface):
                  message_file=None,
                  to_git=None,
                  jobs=None,
+                 amend=False,
                  ):
         if message and message_file:
             raise ValueError(
@@ -267,6 +284,17 @@ class Save(Interface):
                             type='dataset')
                 paths_by_ds[superds] = superds_status
 
+        # We need to anticipate empty (amend) commits in subdatasets that
+        # currently appear to be clean. Change state of any subdataset to
+        # modified in order for it to be committed upwards after amending.
+        # Note, that at least a message is required in order to actually commit
+        # in a subdataset that otherwise is clean.
+        if amend and recursive and message:
+            for d in paths_by_ds:
+                for p in paths_by_ds[d]:
+                    if paths_by_ds[d][p]['type'] == 'dataset':
+                        paths_by_ds[d][p]['state'] = 'modified'
+
         def save_ds(args, version_tag=None):
             pdspath, paths = args
 
@@ -281,7 +309,8 @@ class Save(Interface):
                 pds_repo.pathobj / p.relative_to(pdspath): props
                 for p, props in paths.items()}
             start_commit = pds_repo.get_hexsha()
-            if not all(p['state'] == 'clean' for p in pds_status.values()):
+            if not all(p['state'] == 'clean' for p in pds_status.values()) or \
+                    (amend and message):
                 for res in pds_repo.save_(
                         message=message,
                         # make sure to have the `path` arg be None, as we want
@@ -294,7 +323,8 @@ class Save(Interface):
                         # we are supplying the full status already, do not
                         # detect anything else
                         untracked='no',
-                        _status=pds_status):
+                        _status=pds_status,
+                        amend=amend):
                     # TODO remove stringification when datalad-core can handle
                     # path objects, or when PY3.6 is the lowest supported
                     # version
