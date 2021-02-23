@@ -168,11 +168,6 @@ class Create(Interface):
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
         description=location_description,
-        no_annex=Parameter(
-            # hide this from the cmdline parser, replaced by `annex`
-            args=tuple(),
-            doc="""this option is deprecated, use `annex` instead""",
-            action='store_true'),
         annex=Parameter(
             args=("--no-annex",),
             dest='annex',
@@ -208,24 +203,10 @@ class Create(Interface):
             force=False,
             description=None,
             dataset=None,
-            no_annex=_NoAnnexDefault,
             annex=True,
             fake_dates=False,
             cfg_proc=None
     ):
-        # TODO: The current release of datalad-metalad (v0.2.1) still uses
-        # no_annex in its tests. Remove this compatibility kludge once a
-        # release is made, which will include 16a170e (2020-09-08).
-        if no_annex is not _NoAnnexDefault:
-            # the two mirror options do not agree and the deprecated one is
-            # not at default value
-            warnings.warn("datalad-create's `no_annex` option is deprecated "
-                          "and will be removed in a future release, "
-                          "use the reversed-sign `annex` option instead.",
-                          DeprecationWarning)
-            # honor the old option for now
-            annex = not no_annex
-
         # we only perform negative tests below
         no_annex = not annex
 
