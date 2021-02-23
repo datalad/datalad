@@ -81,6 +81,7 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     ok_git_config_not_empty,
+    on_travis,
     serve_path_via_http,
     set_annex_version,
     skip_if,
@@ -2262,7 +2263,15 @@ def check_commit_annex_commit_changed(unlock, path):
 
 
 def test_commit_annex_commit_changed():
+    def _raise_skip_(msg):
+        raise SkipTest(msg)
+
     for unlock in True, False:
+        if not unlock and on_travis and 'nfs' in os.getenv('TMPDIR', ''):
+            # TODO
+            # see https://github.com/datalad/datalad/pull/5400 for troubleshooting
+            yield _raise_skip_, "known to stall"
+            continue
         yield check_commit_annex_commit_changed, unlock
 
 
