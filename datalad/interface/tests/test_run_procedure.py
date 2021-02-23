@@ -39,7 +39,6 @@ from datalad.tests.utils import (
     on_windows,
     patch_config,
     skip_if,
-    skip_if_on_windows,
     with_tempfile,
     with_tree,
 )
@@ -346,7 +345,6 @@ def test_quoting(path):
                 protocol=KillOutput)
 
 
-@skip_if_on_windows
 @with_tree(tree={
     # "TEXT" ones
     'empty': '',  # we have special rule to treat empty ones as text
