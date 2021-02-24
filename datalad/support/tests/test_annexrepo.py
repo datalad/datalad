@@ -2194,6 +2194,10 @@ def test_annexjson_protocol(path):
     assert_not_in('errors from JSON records', str(e.exception))
 
 
+# see https://github.com/datalad/datalad/pull/5400 for troubleshooting
+# for stalling with unlock=False, and then with unlock=True it took >= 300 sec
+# https://github.com/datalad/datalad/pull/5433#issuecomment-784470028
+@skip_if(on_travis and 'nfs' in os.getenv('TMPDIR', ''))  # TODO. stalls
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
 @known_failure_githubci_win
@@ -2262,10 +2266,6 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'tobechanged-annex', annexed=True)
 
 
-# see https://github.com/datalad/datalad/pull/5400 for troubleshooting
-# for stalling with unlock=False, and then with unlock=True it took >= 300 sec
-# https://github.com/datalad/datalad/pull/5433#issuecomment-784470028
-@skip_if(on_travis and 'nfs' in os.getenv('TMPDIR', ''))  # TODO. stalls
 def test_commit_annex_commit_changed():
     for unlock in True, False:
         yield check_commit_annex_commit_changed, unlock
