@@ -2129,9 +2129,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         cmd = self._git_cmd_prefix + args
 
-        env = None
         if not read_only and self.fake_dates_enabled:
-            env = self.add_fake_dates(runner.env)
+            env = self.add_fake_dates(env if env else runner.env)
 
         protocol = StdOutErrCapture
         out = err = None
