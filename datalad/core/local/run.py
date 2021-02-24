@@ -72,6 +72,15 @@ def _format_cmd_shorty(cmd):
     return cmd_shorty
 
 
+assume_ready_opt = Parameter(
+    args=("--assume-ready",),
+    constraints=EnsureChoice(None, "inputs", "outputs", "both"),
+    doc="""Assume that inputs do not need to be retrieved and/or outputs do not
+    need to unlocked or removed before running the command. This option allows
+    you to avoid the expense of these preparation steps if you know that they
+    are unnecessary.""")
+
+
 @build_doc
 class Run(Interface):
     """Run an arbitrary shell command and record its impact on a dataset.
@@ -201,6 +210,7 @@ class Run(Interface):
             doc="""Expand globs when storing inputs and/or outputs in the
             commit message.""",
             constraints=EnsureChoice(None, "inputs", "outputs", "both")),
+        assume_ready=assume_ready_opt,
         explicit=Parameter(
             args=("--explicit",),
             action="store_true",
@@ -231,12 +241,14 @@ class Run(Interface):
             inputs=None,
             outputs=None,
             expand=None,
+            assume_ready=None,
             explicit=False,
             message=None,
             sidecar=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
+                             assume_ready=assume_ready,
                              explicit=explicit,
                              message=message,
                              sidecar=sidecar):
@@ -485,7 +497,7 @@ def _execute_command(command, pwd, expected_exit=None):
 
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                explicit=False, message=None, sidecar=None,
+                assume_ready=None, explicit=False, message=None, sidecar=None,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -573,18 +585,24 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # relative paths, and (3) happen within a chpwd(pwd) context.
     if not inject:
         with chpwd(pwd):
-            for res in prepare_inputs(ds_path, inputs, extra_inputs):
+            for res in prepare_inputs(
+                    ds_path,
+                    [] if assume_ready in ["inputs", "both"] else inputs,
+                    # Ignore --assume-ready for extra_inputs. It's an unexposed
+                    # implementation detail that lets wrappers sneak in inputs.
+                    extra_inputs):
                 yield res
 
-            if outputs:
-                for res in _install_and_reglob(ds_path, outputs):
-                    yield res
-                for res in _unlock_or_remove(ds_path, outputs.expand()):
-                    yield res
+            if assume_ready not in ["outputs", "both"]:
+                if outputs:
+                    for res in _install_and_reglob(ds_path, outputs):
+                        yield res
+                    for res in _unlock_or_remove(ds_path, outputs.expand()):
+                        yield res
 
-            if rerun_outputs is not None:
-                for res in _unlock_or_remove(ds_path, rerun_outputs):
-                    yield res
+                if rerun_outputs is not None:
+                    for res in _unlock_or_remove(ds_path, rerun_outputs):
+                        yield res
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.

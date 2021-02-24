@@ -49,6 +49,7 @@ from datalad.tests.utils import (
     assert_in,
     assert_in_results,
     assert_not_in,
+    assert_not_in_results,
     assert_raises,
     assert_repo_status,
     assert_result_count,
@@ -274,6 +275,73 @@ def test_run_from_subds_gh3551(path):
         # This check fails on Windows:
         # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
         ok_(subds.repo.file_has_content("f"))
+
+
+@with_tempfile(mkdir=True)
+def test_run_assume_ready(path):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    adjusted = repo.is_managed_branch()
+
+    # --assume-ready=inputs
+
+    (repo.pathobj / "f1").write_text("f1")
+    ds.save()
+
+    def cat_cmd(fname):
+        return [sys.executable, "-c",
+                "import sys; print(open(sys.argv[-1]).read())",
+                fname]
+
+    assert_in_results(
+        ds.run(cat_cmd("f1"), inputs=["f1"]),
+        action="get", type="file")
+    # Same thing, but without the get() call.
+    assert_not_in_results(
+        ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs"),
+        action="get", type="file")
+
+    ds.drop("f1", check=False)
+    if not adjusted:
+        # If the input is not actually ready, the command will fail.
+        with assert_raises(CommandError):
+            ds.run(cat_cmd("f1"), inputs=["f1"], assume_ready="inputs")
+
+    # --assume-ready=outputs
+
+    def unlink_and_write_cmd(fname):
+        # This command doesn't care whether the output file is unlocked because
+        # it removes it ahead of time anyway.
+        return [sys.executable, "-c",
+                "import sys; import os; import os.path as op; "
+                "f = sys.argv[-1]; op.lexists(f) and os.unlink(f); "
+                "open(f, mode='w').write(str(sys.argv))",
+                fname]
+
+    (repo.pathobj / "f2").write_text("f2")
+    ds.save()
+
+    res = ds.run(unlink_and_write_cmd("f2"), outputs=["f2"])
+    if not adjusted:
+        assert_in_results(res, action="unlock", type="file")
+    # Same thing, but without the unlock() call.
+    res = ds.run(unlink_and_write_cmd("f2"), outputs=["f2"],
+                 assume_ready="outputs")
+    assert_not_in_results(res, action="unlock", type="file")
+
+    # --assume-ready=both
+
+    res = ds.run(unlink_and_write_cmd("f2"),
+                 outputs=["f2"], inputs=["f2"])
+    assert_in_results(res, action="get", type="file")
+    if not adjusted:
+        assert_in_results(res, action="unlock", type="file")
+
+    res = ds.run(unlink_and_write_cmd("f2"),
+                 outputs=["f2"], inputs=["f2"],
+                 assume_ready="both")
+    assert_not_in_results(res, action="get", type="file")
+    assert_not_in_results(res, action="unlock", type="file")
 
 
 # unexpected content of state "modified", likely a more fundamental issue with the
