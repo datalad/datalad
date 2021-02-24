@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Procedure to apply YODA-compatible default setup to a dataset
 
 This procedure assumes a clean dataset that was just created by

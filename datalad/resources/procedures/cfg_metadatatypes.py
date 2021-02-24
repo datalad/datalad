@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Procedure to configure additional metadata types
 
 Additional arguments: <metadata type label> [...]
