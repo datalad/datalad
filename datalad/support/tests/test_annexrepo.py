@@ -2262,16 +2262,12 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'tobechanged-annex', annexed=True)
 
 
+# see https://github.com/datalad/datalad/pull/5400 for troubleshooting
+# for stalling with unlock=False, and then with unlock=True it took >= 300 sec
+# https://github.com/datalad/datalad/pull/5433#issuecomment-784470028
+@skip_if(on_travis and 'nfs' in os.getenv('TMPDIR', ''))  # TODO. stalls
 def test_commit_annex_commit_changed():
-    def _raise_skip_(msg):
-        raise SkipTest(msg)
-
     for unlock in True, False:
-        if not unlock and on_travis and 'nfs' in os.getenv('TMPDIR', ''):
-            # TODO
-            # see https://github.com/datalad/datalad/pull/5400 for troubleshooting
-            yield _raise_skip_, "known to stall"
-            continue
         yield check_commit_annex_commit_changed, unlock
 
 
