@@ -1385,6 +1385,7 @@ def assert_in_results(results, **kwargs):
     for r in ensure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
+            break
     if not found:
         raise AssertionError(
             "Desired result\n{}\nnot found among\n{}"
