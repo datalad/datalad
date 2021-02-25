@@ -57,7 +57,6 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
-    known_failure_appveyor,
     known_failure_githubci_win,
     known_failure_windows,
     neq_,
@@ -231,7 +230,6 @@ def test_run_save_deletion(path):
     assert_repo_status(ds.path)
 
 
-@known_failure_appveyor  # causes appveyor (only) to crash, reason unknown
 @with_tempfile(mkdir=True)
 def test_run_from_subds(path):
     subds = Dataset(path).create().create("sub")

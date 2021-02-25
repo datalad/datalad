@@ -891,20 +891,6 @@ def known_failure_windows(func):
     return func
 
 
-def known_failure_appveyor(func):
-    """Test decorator marking a test as known to fail on AppVeyor.
-    """
-    if 'APPVEYOR' in os.environ:
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_appveyor')
-        @attr('appveyor')
-        def dm_func(*args, **kwargs):
-            return func(*args, **kwargs)
-        return dm_func
-    return func
-
-
 def known_failure_githubci_win(func):
     """Test decorator for a known test failure on Github's Windows CI
     """
