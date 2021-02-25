@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Procedure to uninit Git-annex (if initialized), and create/save .noannex file to prevent annex initialization
 
 If there are git-annex'ed files already, git annex uninit and this procedure will fail.
