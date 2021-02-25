@@ -6,7 +6,8 @@ Support functionality for using DueCredit
 
 # Note Text was added/exposed only since DueCredit 0.6.5
 from .due import due, Doi, Url, Text
-from ..utils import never_fail
+from ..utils import never_fail, swallow_logs
+from ..dochelpers import exc_str
 
 import logging
 lgr = logging.getLogger('datalad.duecredit')
@@ -48,15 +49,20 @@ def duecredit_dataset(dataset):
     """
 
     try:
-        res = dataset.metadata(
-            reporton='datasets',  # Interested only in the dataset record
-            result_renderer=None,  # No need
-            return_type='item-or-list'  # Expecting a single record
-        )
+        # probably with metalad RFing we would gain better control
+        # over reporting of warnings etc, ATM the warnings are produced
+        # directly within get_ds_aggregate_db_locations down below and
+        # we have no other way but pacify all of them.
+        with swallow_logs(logging.ERROR) as cml:
+            res = dataset.metadata(
+                reporton='datasets',  # Interested only in the dataset record
+                result_renderer=None,  # No need
+                return_type='item-or-list'  # Expecting a single record
+            )
     except Exception as exc:
-        lgr.warning(
-            "Failed to obtain metadata for %s. Will not provide duecredit entry",
-            dataset
+        lgr.debug(
+            "Failed to obtain metadata for %s. Will not provide duecredit entry: %s",
+            dataset, exc_str(exc)
         )
         return
 

@@ -19,7 +19,7 @@ import gzip
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
-from ..cmd import Runner
+from ..cmd import WitlessRunner as Runner
 from ..log import is_interactive
 from ..utils import (
     getpwd,
@@ -40,7 +40,8 @@ class HelpAction(argparse.Action):
         # It is important since we do discover all subcommands from entry
         # points at run time and thus any static manpage would like be out of
         # date
-        if is_interactive() \
+        interactive = is_interactive()
+        if interactive \
                 and option_string == '--help' \
                 and ' ' in parser.prog:  # subcommand
             try:
@@ -104,17 +105,14 @@ class HelpAction(argparse.Action):
             pos_args_str = "*Arguments*"
         helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
         helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
-        # convert all headings to have the first character uppercase
-        headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
-        helpstr = re.subn(
-            headpat,
-            lambda match: r'{0}{1}:'.format(match.group(1).upper(),
-                                            match.group(2)),
-            helpstr)[0]
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
 
-        print(helpstr)
+        if interactive and option_string == '--help':
+            import pydoc
+            pydoc.pager(helpstr)
+        else:
+            print(helpstr)
         sys.exit(0)
 
 
@@ -219,7 +217,7 @@ def get_repo_instance(path=curdir, class_=None):
     """
 
     from os.path import ismount, exists, normpath, isabs
-    from git.exc import InvalidGitRepositoryError
+    from datalad.support.exceptions import InvalidGitRepositoryError
     from ..utils import expandpath
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo

@@ -11,8 +11,10 @@
 from simplejson import dumps
 from datalad.api import Dataset
 from datalad.metadata.extractors.frictionless_datapackage import MetadataExtractor
-from nose.tools import assert_true, assert_false, assert_equal
-from datalad.tests.utils import with_tree, with_tempfile
+from datalad.tests.utils import (
+    assert_equal,
+    with_tree,
+)
 
 
 # bits from examples and the specs

@@ -49,20 +49,23 @@ from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
-from datalad.utils import assure_bytes
-from datalad.utils import assure_unicode
-from datalad.utils import chpwd
-from datalad.utils import get_dataset_root
-from datalad.utils import getpwd
-from datalad.utils import SequenceFormatter
-from datalad.utils import quote_cmdlinearg
+from datalad.utils import (
+    chpwd,
+    ensure_bytes,
+    ensure_unicode,
+    get_dataset_root,
+    getpwd,
+    join_cmdline,
+    quote_cmdlinearg,
+    SequenceFormatter,
+)
 
 lgr = logging.getLogger('datalad.core.local.run')
 
 
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
-    cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
+    cmd_shorty = (join_cmdline(cmd) if isinstance(cmd, list) else cmd)
     cmd_shorty = u'{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
@@ -128,31 +131,34 @@ class Run(Interface):
     """
     _examples_ = [
         dict(text="Run an executable script and record the impact on a dataset",
-             code_py="ds.run(message='run my script', cmd='code/script.sh')",
+             code_py="run(message='run my script', cmd='code/script.sh')",
              code_cmd="datalad run -m 'run my script' 'code/script.sh'"),
-        dict(text="""Run a command and specify a directory as a dependency
-             for the run. The contents of the dependency will be retrieved
-             prior to running the script""",
-             code_cmd="datalad run -m 'run my script' --input 'data/*' "
+        dict(text="Run a command and specify a directory as a dependency "
+                  "for the run. The contents of the dependency will be retrieved "
+                  "prior to running the script",
+             code_cmd="datalad run -m 'run my script' -i 'data/*' "
              "'code/script.sh'",
-             code_py="ds.run(cmd='code/script.sh', message='run my script', "
-             "inputs='data/*')"),
-        dict(text="""Run an executable script and specify output files of the
-             script to be unlocked prior to running the script""",
-             code_py="ds.run(cmd='code/script.sh', message='run my script', "
-             "inputs='data/*', outputs='output_dir')",
-             code_cmd="datalad run -m 'run my script' --input 'data/*' "
-             "--output 'output_dir/*' 'code/script.sh'"),
+             code_py="""\
+             run(cmd='code/script.sh', message='run my script',
+                 inputs=['data/*'])"""),
+        dict(text="Run an executable script and specify output files of the "
+                  "script to be unlocked prior to running the script",
+             code_py="""\
+             run(cmd='code/script.sh', message='run my script',
+                 inputs=['data/*'], outputs=['output_dir'])""",
+             code_cmd="""\
+             datalad run -m 'run my script' -i 'data/*' \\
+             -o 'output_dir/*' 'code/script.sh'"""),
         dict(text="Specify multiple inputs and outputs",
              code_py="""\
-             ds.run(cmd='code/script.sh',
-                    message='run my script',
-                    inputs=['data/*', 'datafile.txt'],
-                    outputs=['output_dir', 'outfile.txt'])""",
+             run(cmd='code/script.sh',
+                 message='run my script',
+                 inputs=['data/*', 'datafile.txt'],
+                 outputs=['output_dir', 'outfile.txt'])""",
              code_cmd="""\
-             datalad run -m 'run my script' --input 'data/*'
-               --input 'datafile.txt' --output 'output_dir/*' --output
-               'outfile.txt' 'code/script.sh'""")
+             datalad run -m 'run my script' -i 'data/*' \\
+             -i 'datafile.txt' -o 'output_dir/*' -o \\
+             'outfile.txt' 'code/script.sh'""")
     ]
 
     _params_ = dict(
@@ -393,7 +399,7 @@ def normalize_command(command):
     """Convert `command` to the string representation.
     """
     if isinstance(command, list):
-        command = list(map(assure_unicode, command))
+        command = list(map(ensure_unicode, command))
         if len(command) == 1 and command[0] != "--":
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
@@ -410,9 +416,9 @@ def normalize_command(command):
                 # Strip disambiguation marker. Note: "running from Python API"
                 # FIXME from below applies to this too.
                 command = command[1:]
-            command = " ".join(quote_cmdlinearg(c) for c in command)
+            command = join_cmdline(command)
     else:
-        command = assure_unicode(command)
+        command = ensure_unicode(command)
     return command
 
 
@@ -448,24 +454,16 @@ def format_command(dset, command, **kwds):
 
 
 def _execute_command(command, pwd, expected_exit=None):
-    from datalad.cmd import Runner
+    from datalad.cmd import WitlessRunner
 
     exc = None
     cmd_exitcode = None
-    runner = Runner(cwd=pwd)
+    runner = WitlessRunner(cwd=pwd)
     try:
         lgr.info("== Command start (output follows) =====")
         runner.run(
-            command,
-            # immediate output
-            log_online=True,
-            # not yet sure what we should do with the command output
-            # IMHO `run` itself should be very silent and let the command talk
-            log_stdout=False,
-            log_stderr=False,
-            expect_stderr=True,
-            expect_fail=True,
-            # TODO stdin
+            # command is always a string
+            command
         )
     except CommandError as e:
         # strip our own info from the exception. The original command output
@@ -492,8 +490,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 rerun_info=None,
                 extra_inputs=None,
                 rerun_outputs=None,
-                inject=False,
-                saver=None):
+                inject=False):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -522,8 +519,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
-    saver : None
-        This is obsolete and ignored. It will be removed in a later release.
 
     Yields
     ------
@@ -532,10 +527,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not cmd:
         lgr.warning("No command given")
         return
-    if saver:
-        warnings.warn("`saver` argument is ignored "
-                      "and will be removed in a future release",
-                      DeprecationWarning)
 
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
@@ -649,11 +640,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     if sidecar is None:
         use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
-        # If ConfigManager gets the ability to say "return single value",
-        # update this code to use that.
-        if isinstance(use_sidecar, tuple):
-            # Use same precedence as 'git config'.
-            use_sidecar = use_sidecar[-1]
         use_sidecar = anything2bool(use_sidecar)
     else:
         use_sidecar = sidecar
@@ -683,13 +669,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record_id) if use_sidecar else record)
 
     outputs_to_save = outputs.expand() if explicit else None
+    if outputs_to_save is not None and use_sidecar:
+        outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
             msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
-                ofh.write(assure_bytes(msg))
+                ofh.write(ensure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -d . -r -F %s'",

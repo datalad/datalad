@@ -13,13 +13,14 @@ import logging
 import os
 import time
 
-from git.exc import InvalidGitRepositoryError
-
 from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.exceptions import (
+    InvalidGitRepositoryError,
+    MissingExternalDependency,
+)
 
 __docformat__ = "restructuredtext"
 

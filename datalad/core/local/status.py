@@ -17,9 +17,9 @@ import os.path as op
 from collections import OrderedDict
 
 from datalad.utils import (
-    assure_list,
-    assure_unicode,
     bytes2human,
+    ensure_list,
+    ensure_unicode,
     get_dataset_root,
 )
 from datalad.interface.base import (
@@ -87,7 +87,7 @@ _common_diffstatus_params = dict(
         metavar='MODE',
         constraints=EnsureChoice('no', 'normal', 'all'),
         doc="""If and how untracked content is reported when comparing
-        a revision to the state of the work tree. 'no': no untracked
+        a revision to the state of the working tree. 'no': no untracked
         content is reported; 'normal': untracked files and entire
         untracked directories are reported as such; 'all': report
         individual files even in fully untracked directories."""),
@@ -106,15 +106,16 @@ STATE_COLOR_MAP = {
 
 def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
                   eval_submodule_state, eval_filetype, cache):
-    # take the datase that went in first
+    # take the dataset that went in first
     repo = ds.repo
     repo_path = repo.pathobj
     lgr.debug('query %s.diffstatus() for paths: %s', repo, paths)
+    # recode paths with repo reference for low-level API
+    paths = [repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None
     status = repo.diffstatus(
         fr='HEAD' if repo.get_hexsha() else None,
         to=None,
-        # recode paths with repo reference for low-level API
-        paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
+        paths=paths,
         untracked=untracked,
         eval_submodule_state=eval_submodule_state,
         eval_file_type=eval_filetype,
@@ -123,7 +124,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
         lgr.debug('query %s.get_content_annexinfo() for paths: %s', repo, paths)
         # this will amend `status`
         repo.get_content_annexinfo(
-            paths=paths if paths else None,
+            paths=paths,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=None)
@@ -138,6 +139,12 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
         )
         queried.add(ds.pathobj)
         if recursion_limit and props.get('type', None) == 'dataset':
+            if cpath == ds.pathobj:
+                # ATM can happen if there is something wrong with this repository
+                # We will just skip it here and rely on some other exception to bubble up
+                # See https://github.com/datalad/datalad/pull/4526 for the usecase
+                lgr.debug("Got status for itself, which should not happen, skipping %s", path)
+                continue
             subds = Dataset(str(cpath))
             if subds.is_installed():
                 for r in _yield_status(
@@ -226,28 +233,28 @@ class Status(Interface):
     # does not yield meaningful output for this command
     result_renderer = 'tailored'
     _examples_ = [
-        dict(text="""Report on the state of a dataset""",
-             code_py="ds.status()",
+        dict(text="Report on the state of a dataset",
+             code_py="status()",
              code_cmd="datalad status"),
-        dict(text="""Report on the state of a dataset and all subdatasets""",
-             code_py="ds.status(recursive=True)",
-             code_cmd="datalad status --recursive"),
-        dict(text="""Address a subdataset record in a superdataset without
-             causing a status query for the state _within_ the subdataset
-             itself""",
-             code_py="ds.status(path='mysubdataset')",
-             code_cmd="datalad status --dataset . mysubdataset"),
-        dict(text="""Get a status query for the state within the subdataset
-             without causing a status query for the superdataset (using trailing
-             path separator in the query path):""",
-             code_py="ds.status(path='mysubdataset')",
-             code_cmd="datalad status --dataset . mysubdataset/"),
-        dict(text="""Report on the state of a subdataset in a superdataset and
-             on the state within the subdataset""",
-             code_py="ds.status(path=['mysubdataset', 'mysubdataset/'])",
-             code_cmd="datalad status --dataset . mysubdataset mysubdataset/"),
-        dict(text="""Report the file size of annexed content in a dataset""",
-             code_py="ds.status(annex=True)",
+        dict(text="Report on the state of a dataset and all subdatasets",
+             code_py="status(recursive=True)",
+             code_cmd="datalad status -r"),
+        dict(text="Address a subdataset record in a superdataset without "
+                  "causing a status query for the state _within_ the subdataset "
+                  "itself",
+             code_py="status(dataset='.', path='mysubdataset')",
+             code_cmd="datalad status -d . mysubdataset"),
+        dict(text="Get a status query for the state within the subdataset "
+                  "without causing a status query for the superdataset (using trailing "
+                  "path separator in the query path):",
+             code_py="status(dataset='.', path='mysubdataset/')",
+             code_cmd="datalad status -d . mysubdataset/"),
+        dict(text="Report on the state of a subdataset in a superdataset and "
+                  "on the state within the subdataset",
+             code_py="status(dataset='.', path=['mysubdataset', 'mysubdataset/'])",
+             code_cmd="datalad status -d . mysubdataset mysubdataset/"),
+        dict(text="Report the file size of annexed content in a dataset",
+             code_py="status(annex=True)",
              code_cmd="datalad status --annex")
     ]
 
@@ -320,7 +327,7 @@ class Status(Interface):
         paths_by_ds = OrderedDict()
         if path:
             # sort any path argument into the respective subdatasets
-            for p in sorted(map(assure_unicode, assure_list(path))):
+            for p in sorted(map(ensure_unicode, ensure_list(path))):
                 # it is important to capture the exact form of the
                 # given path argument, before any normalization happens
                 # for further decision logic below
@@ -473,3 +480,8 @@ class Status(Interface):
                         len(annexed),
                         single_or_plural('file', 'files', len(annexed)),
                         total_size))
+        if all(r.get('action', None) == 'status'
+               and r.get('state', None) == 'clean'
+               for r in results):
+            from datalad.ui import ui
+            ui.message("nothing to save, working tree clean")

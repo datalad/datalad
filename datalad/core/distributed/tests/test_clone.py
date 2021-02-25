@@ -9,67 +9,79 @@
 
 """
 
-
-from datalad.tests.utils import (
-    get_datasets_topdir,
-    integration,
-    slow
-)
-
 import logging
-import os
 import os.path as op
+import stat
 
 from unittest.mock import patch
 
 from datalad.config import ConfigManager
 from datalad import consts
 from datalad.api import (
-    create,
     clone,
+    create,
     remove,
 )
 from datalad.utils import (
     chpwd,
+    get_home_envvars,
     Path,
     on_windows,
+    rmtree
 )
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
+from datalad.cmd import (
+    GitWitlessRunner,
+    WitlessRunner as Runner,
+)
 from datalad.tests.utils import (
-    create_tree,
-    with_tempfile,
-    assert_in,
-    with_tree,
-    with_testrepos,
-    eq_,
-    neq_,
-    ok_,
     assert_false,
-    ok_file_has_content,
+    assert_in,
+    assert_in_results,
+    assert_message,
     assert_not_in,
     assert_raises,
-    assert_status,
-    assert_message,
+    assert_repo_status,
     assert_result_count,
     assert_result_values_equal,
-    ok_startswith,
-    assert_repo_status,
-    serve_path_via_http,
-    swallow_logs,
-    use_cassette,
-    skip_if_no_network,
-    skip_if,
-    with_sameas_remote,
+    assert_status,
+    create_tree,
+    DEFAULT_BRANCH,
+    eq_,
+    get_datasets_topdir,
+    integration,
     known_failure,
     known_failure_appveyor,
+    known_failure_githubci_win,
+    known_failure_windows,
+    neq_,
+    nok_,
+    ok_,
+    ok_file_has_content,
+    has_symlink_capability,
+    ok_startswith,
     patch_config,
+    set_date,
+    serve_path_via_http,
+    skip_if_adjusted_branch,
+    skip_if_no_network,
+    skip_if_on_windows,
+    skip_ssh,
+    slow,
+    swallow_logs,
+    use_cassette,
+    with_sameas_remote,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
+    SkipTest,
 )
+from datalad.support.network import get_local_file_url
 from datalad.core.distributed.clone import (
-    decode_source_spec,
     _get_installationpath_from_url,
+    decode_source_spec,
 )
 from datalad.distribution.dataset import Dataset
 
@@ -128,6 +140,7 @@ def test_clone_crcns(tdir, ds_path):
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
+@known_failure_appveyor
 @integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -186,6 +199,7 @@ def test_clone_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        ok_(uuid_before)  # make sure we actually have an uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
@@ -198,6 +212,9 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+
+# AssertionError: unexpected content of state "deleted": [WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/datalad_temp_gzegy3hf/testrepo--basic--r1/test-annex.dat')] != []
+@known_failure_githubci_win
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -225,7 +242,7 @@ def test_clone_dataladri(src, topurl, path):
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
-    Runner(cwd=gr.path)(['git', 'update-server-info'])
+    Runner(cwd=gr.path).run(['git', 'update-server-info'])
     # now install it somewhere else
     with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
@@ -234,10 +251,14 @@ def test_clone_dataladri(src, topurl, path):
     ok_file_has_content(ds.pathobj / 'test.txt', 'some')
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_clone_isnot_recursive(src, path_nr, path_r):
+@with_tempfile(mkdir=True)
+def test_clone_isnot_recursive(path_src, path_nr, path_r):
+    src = Dataset(path_src).create()
+    src.create('subm 1')
+    src.create('2')
+
     ds = clone(src, path_nr, result_xfm='datasets', return_type='item-or-list')
     ok_(ds.is_installed())
     # check nothin is unintentionally installed
@@ -248,15 +269,10 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
         {'subm 1', '2'})
 
 
-@slow  # 23.1478s
-@with_testrepos(flavors=['local'])
-# 'local-url', 'network'
-# TODO: Somehow annex gets confused while initializing installed ds, whose
-# .git/config show a submodule url "file:///aaa/bbb%20b/..."
-# this is delivered by with_testrepos as the url to clone
 @with_tempfile
-def test_clone_into_dataset(source, top_path):
-
+@with_tempfile
+def test_clone_into_dataset(source_path, top_path):
+    source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
 
@@ -269,6 +285,10 @@ def test_clone_into_dataset(source, top_path):
     assert_repo_status(subds.path, annex=None)
     # top is clean:
     assert_repo_status(ds.path, annex=None)
+    # source is recorded in .gitmodules:
+    sds = ds.subdatasets("sub")
+    assert_result_count(sds, 1, action='subdataset')
+    eq_(sds[0]['gitmodule_datalad-url'], source.path)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -281,9 +301,12 @@ def test_clone_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-def test_notclone_known_subdataset(src, path):
+@with_tempfile(mkdir=True)
+def test_notclone_known_subdataset(src_path, path):
+    src = Dataset(src_path).create()
+    sub = src.create('subm 1')
+    sub_id = sub.id
     # get the superdataset:
     ds = clone(src, path,
                result_xfm='datasets', return_type='item-or-list')
@@ -305,8 +328,7 @@ def test_notclone_known_subdataset(src, path):
     ok_(AnnexRepo.is_valid_repo(subds.path, allow_noninitialized=False))
     # Verify that it is the correct submodule installed and not
     # new repository initiated
-    eq_(set(subds.repo.get_indexed_files()),
-        {'test.dat', 'INFO.txt', 'test-annex.dat'})
+    eq_(subds.id, sub_id)
     assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
 
@@ -321,21 +343,106 @@ def test_failed_clone(dspath):
                    res)
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
+@with_tree(tree={
+    'ds': {'test.txt': 'some'},
+    })
+@with_tempfile
+def test_clone_missing_commit(source, clone):
+
+    from datalad.core.distributed.clone import clone_dataset
+
+    source = Path(source)
+    clone = Path(clone)
+
+    # Commit SHA from another repository - should never be recreated in a fresh
+    # dataset:
+    commit_sha = "c29691b37b05b78ffa76e5fdf0044e9df673e8f1"
+
+    origin = Dataset(source).create(force=True)
+    origin.save()
+
+    # clone origin but request commit_sha to be checked out:
+
+    results = [x for x in
+               clone_dataset(srcs=[source], destds=Dataset(clone),
+                             checkout_gitsha=commit_sha)
+               ]
+    # expected error result:
+    assert_result_count(results, 1)
+    assert_in_results(results, status='error', action='install',
+                      path=str(clone), type='dataset')
+    assert_in("Target commit c29691b3 does not exist in the clone",
+              results[0]['message'])
+    # failed attempt was removed:
+    assert_false(clone.exists())
+
+
 @with_tempfile(mkdir=True)
-def test_reckless(src, top_path):
-    ds = clone(src, top_path, reckless=True,
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def check_reckless(annex, src_path, top_path, sharedpath):
+    # super with or without annex
+    src = Dataset(src_path).create(annex=annex)
+    # sub always with annex
+    srcsub = src.create('sub')
+
+    # and for the actual test
+    ds = clone(src.path, top_path, reckless=True,
                result_xfm='datasets', return_type='item-or-list')
-    eq_(ds.config.get('annex.hardlink', None), 'true')
+
+    is_crippled = srcsub.repo.is_managed_branch()
+
+    if annex and not is_crippled:
+        eq_(ds.config.get('annex.hardlink', None), 'true')
+
     # actual value is 'auto', because True is a legacy value and we map it
     eq_(ds.config.get('datalad.clone.reckless', None), 'auto')
-    eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
+    if annex:
+        eq_(ds.repo.repo_info()['untrusted repositories'][0]['here'], True)
     # now, if we clone another repo into this one, it will inherit the setting
     # without having to provide it explicitly
-    sub = ds.clone(src, 'sub', result_xfm='datasets', return_type='item-or-list')
-    eq_(sub.config.get('datalad.clone.reckless', None), 'auto')
-    eq_(sub.config.get('annex.hardlink', None), 'true')
+    newsub = ds.clone(srcsub, 'newsub', result_xfm='datasets', return_type='item-or-list')
+    # and `get` the original subdataset
+    origsub = ds.get('sub', result_xfm='datasets', return_type='item-or-list')
+    for sds in (newsub, origsub):
+        eq_(sds.config.get('datalad.clone.reckless', None), 'auto')
+        if not is_crippled:
+            eq_(sds.config.get('annex.hardlink', None), 'true')
 
+    if is_crippled:
+        raise SkipTest("Remainder of test needs proper filesystem permissions")
+
+    if annex:
+        if ds.repo.git_annex_version < "8.20200908":
+            # TODO: Drop when GIT_ANNEX_MIN_VERSION is at least 8.20200908.
+
+            # the standard setup keeps the annex locks accessible to the user only
+            nok_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP)
+        else:
+            # umask might be such (e.g. 002) that group write permissions are inherited, so
+            # for the next test we should check if that is the case on some sample file
+            dltmp_path = ds.pathobj / '.git' / "dltmp"
+            dltmp_path.write_text('')
+            default_grp_write_perms = dltmp_path.stat().st_mode & stat.S_IWGRP
+            dltmp_path.unlink()
+            # the standard setup keeps the annex locks following umask inheritance
+            eq_((ds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+                 & stat.S_IWGRP, default_grp_write_perms)
+
+        # but we can set it up for group-shared access too
+        sharedds = clone(
+            src, sharedpath,
+            reckless='shared-group',
+            result_xfm='datasets',
+            return_type='item-or-list')
+        ok_((sharedds.pathobj / '.git' / 'annex' / 'index.lck').stat().st_mode \
+            & stat.S_IWGRP)
+
+
+def test_reckless():
+    yield check_reckless, True
+    yield check_reckless, False
 
 @with_tempfile
 @with_tempfile
@@ -365,7 +472,6 @@ def test_clone_isnt_a_smartass(origin_path, path):
     eq_(cloned.subdatasets(), [])
 
 
-@skip_if(on_windows or not os.geteuid(), "Will fail under super-user")
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
     pdir = Path(tdir) / 'protected'
@@ -373,6 +479,16 @@ def test_clone_report_permission_issue(tdir):
     # make it read-only
     pdir.chmod(0o555)
     with chpwd(pdir):
+        # first check the premise of the test. If we can write (strangely
+        # mounted/crippled file system, subsequent assumptions are violated
+        # and we can stop
+        probe = Path('probe')
+        try:
+            probe.write_text('should not work')
+            raise SkipTest
+        except PermissionError:
+            # we are indeed in a read-only situation
+            pass
         res = clone('///', result_xfm=None, return_type='list', on_failure='ignore')
         assert_status('error', res)
         assert_result_count(
@@ -456,7 +572,7 @@ def test_expanduser(srcpath, destpath):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
 
-    with chpwd(destpath), patch.dict('os.environ', {'HOME': srcpath}):
+    with chpwd(destpath), patch.dict('os.environ', get_home_envvars(srcpath)):
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
         assert_result_count(res, 1)
@@ -505,13 +621,13 @@ def test_cfg_originorigin(path):
     # Clone another level, this time with a relative path. Drop content from
     # lev2 so that origin is the only place that the file is available from.
     clone_lev2.drop("file1.txt")
-    with chpwd(path), swallow_logs(new_level=9) as cml:
+    with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*Running: \[('git', 'annex'|'git-annex'), "
+        cml.assert_logged(msg=r"[^[]*Async run \[('git', 'annex'|'git-annex'), "
                               r"'init'",
                           match=False,
-                          level='Level 9')
+                          level='DEBUG')
     assert_result_count(
         clone_lev3.get('file1.txt', on_failure='ignore'),
         1,
@@ -607,6 +723,19 @@ def test_decode_source_spec():
     # not a dataset UUID
     assert_raises(ValueError, decode_source_spec, 'ria+http://example.com#123')
 
+    # literal dataset name/location
+    eq_(decode_source_spec('ria+http://example.com#~rootds'),
+        {'source': 'ria+http://example.com#~rootds',
+         'version': None, 'type': 'ria',
+         'giturl': 'http://example.com/alias/rootds',
+         'default_destpath': 'rootds'})
+    # version etc still works
+    eq_(decode_source_spec('ria+http://example.com#~rootds@specialbranch'),
+        {'source': 'ria+http://example.com#~rootds@specialbranch',
+         'version': 'specialbranch', 'type': 'ria',
+         'giturl': 'http://example.com/alias/rootds',
+         'default_destpath': 'rootds'})
+
 
 def _move2store(storepath, d):
     # make a bare clone of it into a local that matches the organization
@@ -618,6 +747,7 @@ def _move2store(storepath, d):
     Runner(cwd=store_loc).run(['git', 'update-server-info'])
 
 
+@slow  # 12sec on Yarik's laptop
 @with_tree(tree={
     'ds': {
         'test.txt': 'some',
@@ -664,7 +794,7 @@ def test_ria_http(lcl, storepath, url):
             eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
         ok_(cloneds.config.get('remote.origin.url').startswith(url))
         eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
-        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-origin'),
+        eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-200origin'),
             'ria+%s#{id}' % url)
 
     # now advance the source dataset
@@ -717,10 +847,280 @@ def test_ria_http(lcl, storepath, url):
     # ... the clone candidates go with the label-based URL such that
     # future get() requests acknowlege a (system-wide) configuration
     # update
-    eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-origin'),
+    eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-200origin'),
         'ria+ssh://somelabel#{id}')
 
+    if not has_symlink_capability():
+        return
+    # place a symlink in the store to serve as a dataset alias
+    (storepath / 'alias').mkdir()
+    (storepath / 'alias' / 'myname').symlink_to(storeds_loc)
+    with chpwd(lcl):
+        cloned_by_alias = clone('ria+{}#~{}'.format(url, 'myname'))
+    # still get the same data
+    eq_(cloned_by_alias.id, ds.id)
+    # more sensible default install path
+    eq_(cloned_by_alias.pathobj.name, 'myname')
 
+
+@with_tempfile
+@with_tempfile
+def _test_ria_postclonecfg(url, dsid, clone_path, superds):
+    # Test cloning from RIA store while ORA special remote autoenabling failed
+    # due to an invalid URL from the POV of the cloner.
+    # Origin's git-config-file should contain the UUID to enable. This needs to
+    # work via HTTP, SSH and local cloning.
+
+    # Autoenabling should fail initially by git-annex-init and we would report
+    # on INFO level. Only postclone routine would deal with it.
+    with swallow_logs(new_level=logging.INFO) as cml:
+        # First, the super ds:
+        riaclone = clone('ria+{}#{}'.format(url, dsid), clone_path)
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
+
+    # However, we now can retrieve content since clone should have enabled the
+    # special remote with new URL (or origin in case of HTTP).
+    res = riaclone.get('test.txt')
+    assert_result_count(res, 1,
+                        status='ok',
+                        path=str(riaclone.pathobj / 'test.txt'),
+                        message="from {}...".format("origin"
+                                                    if url.startswith('http')
+                                                    else "store-storage"))
+
+    # same thing for the sub ds (we don't need a store-url and id - get should
+    # figure those itself):
+    with swallow_logs(new_level=logging.INFO) as cml:
+        riaclonesub = riaclone.get(
+            op.join('subdir', 'subds'), get_data=False,
+            result_xfm='datasets', return_type='item-or-list')
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
+    res = riaclonesub.get('testsub.txt')
+    assert_result_count(res, 1,
+                        status='ok',
+                        path=str(riaclonesub.pathobj / 'testsub.txt'),
+                        message="from {}...".format("origin"
+                                                    if url.startswith('http')
+                                                    else "store-storage"))
+
+    # finally get the plain git subdataset.
+    # Clone should figure to also clone it from a ria+ URL
+    # (subdataset-source-candidate), notice that there wasn't an autoenabled ORA
+    # remote, but shouldn't stumble upon it, since it's a plain git.
+    res = riaclone.get(op.join('subdir', 'subgit', 'testgit.txt'))
+    assert_result_count(res, 1, status='ok', type='dataset', action='install')
+    assert_result_count(res, 1, status='notneeded', type='file')
+    assert_result_count(res, 2)
+
+    # Now, test that if cloning into a dataset, ria-URL is preserved and
+    # post-clone configuration is triggered again, when we remove the subds and
+    # retrieve it again via `get`:
+    ds = Dataset(superds).create()
+    ria_url = 'ria+{}#{}'.format(url, dsid)
+    ds.clone(ria_url, 'sub')
+    sds = ds.subdatasets('sub')
+    eq_(len(sds), 1)
+    eq_(sds[0]['gitmodule_datalad-url'], ria_url)
+    assert_repo_status(ds.path)
+    ds.uninstall('sub', check=False)
+    assert_repo_status(ds.path)
+
+    # .gitmodules still there:
+    sds = ds.subdatasets('sub')
+    eq_(len(sds), 1)
+    eq_(sds[0]['gitmodule_datalad-url'], ria_url)
+    # get it again:
+
+    # Autoenabling should fail initially by git-annex-init and we would report
+    # on INFO level. Only postclone routine would deal with it.
+    with swallow_logs(new_level=logging.INFO) as cml:
+        ds.get('sub', get_data=False)
+        cml.assert_logged(msg="access to 1 dataset sibling store-storage not "
+                              "auto-enabled",
+                          level="INFO",
+                          regex=False)
+
+    subds = Dataset(ds.pathobj / 'sub')
+    # special remote is fine:
+    res = subds.get('test.txt')
+    assert_result_count(res, 1,
+                        status='ok',
+                        path=str(subds.pathobj / 'test.txt'),
+                        message="from {}...".format("origin"
+                                                    if url.startswith('http')
+                                                    else "store-storage"))
+
+
+@with_tempfile
+def _postclonetest_prepare(lcl, storepath, link):
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+        create_ds_in_store,
+        get_layout_locations
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+    create_tree(lcl,
+                tree={
+                        'ds': {
+                            'test.txt': 'some',
+                            'subdir': {
+                                'subds': {'testsub.txt': 'somemore'},
+                                'subgit': {'testgit.txt': 'even more'}
+                            },
+                        },
+                      })
+
+    # create a local dataset with a subdataset
+    lcl = Path(lcl)
+    storepath = Path(storepath)
+    link = Path(link)
+    link.symlink_to(storepath)
+    subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
+    subds.save()
+    # add a plain git dataset as well
+    subgit = Dataset(lcl / 'ds' / 'subdir' / 'subgit').create(force=True,
+                                                              annex=False)
+    subgit.save()
+    ds = Dataset(lcl / 'ds').create(force=True)
+    ds.save(version_tag='original')
+    assert_repo_status(ds.path)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+
+    # URL to use for upload. Point is, that this should be invalid for the clone
+    # so that autoenable would fail. Therefore let it be based on a to be
+    # deleted symlink
+    upl_url = "ria+{}".format(get_local_file_url(str(link)))
+
+    for d in (ds, subds, subgit):
+
+        # TODO: create-sibling-ria required for config! => adapt to RF'd
+        #       creation (missed on rebase?)
+        create_ds_in_store(io, storepath, d.id, '2', '1')
+        d.create_sibling_ria(upl_url, "store")
+
+        if d is not subgit:
+            # Now, simulate the problem by reconfiguring the special remote to
+            # not be autoenabled.
+            # Note, however, that the actual intention is a URL, that isn't
+            # valid from the point of view of the clone (doesn't resolve, no
+            # credentials, etc.) and therefore autoenabling on git-annex-init
+            # when datalad-cloning would fail to succeed.
+            Runner(cwd=d.path).run(['git', 'annex', 'enableremote',
+                                    'store-storage',
+                                    'autoenable=false'])
+        d.push('.', to='store')
+        store_loc, _, _ = get_layout_locations(1, storepath, d.id)
+        Runner(cwd=str(store_loc)).run(['git', 'update-server-info'])
+
+    link.unlink()
+    # We should now have a store with datasets that have an autoenabled ORA
+    # remote relying on an inaccessible URL.
+    # datalad-clone is supposed to reconfigure based on the URL we cloned from.
+    # Test this feature for cloning via HTTP, SSH and FILE URLs.
+
+    return ds.id
+
+
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5134
+@slow  # 14 sec on travis
+def test_ria_postclonecfg():
+
+    if not has_symlink_capability():
+        # This is needed to create an ORA remote using an URL for upload,
+        # that is then invalidated later on (delete the symlink it's based on).
+        raise SkipTest("Can't create symlinks")
+
+    from datalad.utils import make_tempfile
+    from datalad.tests.utils import HTTPPath
+
+    with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store:
+        id = _postclonetest_prepare(lcl, store)
+
+        # test cloning via ria+file://
+        yield _test_ria_postclonecfg, \
+              get_local_file_url(store, compatibility='git'), id
+
+        # Note: HTTP disabled for now. Requires proper implementation in ORA
+        #       remote. See
+        # https://github.com/datalad/datalad/pull/4203#discussion_r410284649
+
+        # # test cloning via ria+http://
+        # with HTTPPath(store) as url:
+        #     yield _test_ria_postclonecfg, url, id
+
+        # test cloning via ria+ssh://
+        yield skip_ssh(_test_ria_postclonecfg), \
+            "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+
+
+# fatal: Could not read from remote repository.
+@known_failure_githubci_win  # in datalad/git-annex as e.g. of 20201218
+@with_tempfile(mkdir=True)
+@with_tempfile
+@with_tempfile
+def test_ria_postclone_noannex(dspath, storepath, clonepath):
+
+    # Test for gh-5186: Cloning from local FS, shouldn't lead to annex
+    # initializing origin.
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    clonepath = Path(clonepath)
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+        create_ds_in_store,
+        get_layout_locations
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+
+
+    # First create a dataset in a RIA store the standard way
+    somefile = dspath / 'a_file.txt'
+    somefile.write_text('irrelevant')
+    ds = Dataset(dspath).create(force=True)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+    lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
+    create_ds_in_store(io, storepath, ds.id, '2', '1')
+    ds.create_sibling_ria(lcl_url, "store")
+    ds.push('.', to='store')
+
+
+    # now, remove annex/ tree from store in order to see, that clone
+    # doesn't cause annex to recreate it.
+    store_loc, _, _ = get_layout_locations(1, storepath, ds.id)
+    annex = store_loc / 'annex'
+    rmtree(str(annex))
+    assert_false(annex.exists())
+
+    clone_url = get_local_file_url(str(storepath), compatibility='git') + \
+                '#{}'.format(ds.id)
+    clone("ria+{}".format(clone_url), clonepath)
+
+    # no need to test the cloning itself - we do that over and over in here
+
+    # bare repo in store still has no local annex:
+    assert_false(annex.exists())
+
+
+@slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @serve_path_via_http
@@ -756,7 +1156,7 @@ def test_inherit_src_candidates(lcl, storepath, url):
     eq_(len(datasets), 2)
     for ds in datasets:
         eq_(ConfigManager(dataset=ds, source='dataset-local').get(
-            'datalad.get.subdataset-source-candidate-origin'),
+            'datalad.get.subdataset-source-candidate-200origin'),
             'ria+%s#{id}' % url)
 
 
@@ -769,6 +1169,100 @@ def test_ria_http_storedataladorg(path):
     eq_(ds.id, datalad_store_testds_id)
 
 
+@skip_if_on_windows  # see gh-4131
+# Ephemeral clones cannot use adjusted mode repos
+@skip_if_adjusted_branch
+@with_tree(tree={
+    'ds': {
+        'test.txt': 'some',
+        'subdir': {'testsub.txt': 'somemore'},
+    },
+})
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_ephemeral(origin_path, bare_path,
+                   clone1_path, clone2_path, clone3_path):
+
+    file_test = Path('ds') / 'test.txt'
+    file_testsub = Path('ds') / 'subdir' / 'testsub.txt'
+
+    origin = Dataset(origin_path).create(force=True)
+    origin.save()
+    # 1. clone via path
+    clone1 = clone(origin_path, clone1_path, reckless='ephemeral')
+
+    can_symlink = has_symlink_capability()
+
+    if can_symlink:
+        clone1_annex = (clone1.repo.dot_git / 'annex')
+        ok_(clone1_annex.is_symlink())
+        ok_(clone1_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+        if not clone1.repo.is_managed_branch():
+            # TODO: We can't properly handle adjusted branch yet
+            eq_((clone1.pathobj / file_test).read_text(), 'some')
+            eq_((clone1.pathobj / file_testsub).read_text(), 'somemore')
+
+    # 2. clone via file-scheme URL
+    clone2 = clone('file://' + Path(origin_path).as_posix(), clone2_path,
+                   reckless='ephemeral')
+
+    if can_symlink:
+        clone2_annex = (clone2.repo.dot_git / 'annex')
+        ok_(clone2_annex.is_symlink())
+        ok_(clone2_annex.resolve().samefile(origin.repo.dot_git / 'annex'))
+        if not clone2.repo.is_managed_branch():
+            # TODO: We can't properly handle adjusted branch yet
+            eq_((clone2.pathobj / file_test).read_text(), 'some')
+            eq_((clone2.pathobj / file_testsub).read_text(), 'somemore')
+
+    # 3. add something to clone1 and push back to origin availability from
+    # clone1 should not be propagated (we declared 'here' dead to that end)
+
+    (clone1.pathobj / 'addition.txt').write_text("even more")
+    clone1.save()
+    origin.config.set("receive.denyCurrentBranch", "updateInstead",
+                      where="local")
+    # Note, that the only thing to test is git-annex-dead here,
+    # if we couldn't symlink:
+    clone1.publish(to='origin', transfer_data='none' if can_symlink else 'auto')
+    if not origin.repo.is_managed_branch():
+        # test logic cannot handle adjusted branches
+        eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())
+    res = origin.repo.whereis("addition.txt")
+    if can_symlink:
+        # obv. present in origin, but this is not yet known to origin:
+        eq_(res, [])
+        res = origin.repo.fsck()
+        assert_result_count(res, 3, success=True)
+        # TODO: Double check whether annex reports POSIX paths o windows!
+        eq_({str(file_test), str(file_testsub), "addition.txt"},
+            {r['file'] for r in res})
+        # now origin knows:
+    res = origin.repo.whereis("addition.txt")
+    eq_(res, [origin.config.get("annex.uuid")])
+
+    # 4. ephemeral clone from a bare repo
+    runner = GitWitlessRunner()
+    runner.run(['git', 'clone', '--bare', origin_path, bare_path])
+    runner.run(['git', 'annex', 'init'], cwd=bare_path)
+
+    eph_from_bare = clone(bare_path, clone3_path, reckless='ephemeral')
+    can_symlink = has_symlink_capability()
+
+    if can_symlink:
+        # Bare repo uses dirhashlower by default, while a standard repo uses
+        # dirhashmixed. Symlinking different object trees doesn't really work.
+        # Don't test that here, since this is not a matter of the "ephemeral"
+        # option alone. We should have such a setup in the RIA tests and test
+        # for data access there.
+        # Here we only test for the correct linking.
+        eph_annex = eph_from_bare.repo.dot_git / 'annex'
+        ok_(eph_annex.is_symlink())
+        ok_(eph_annex.resolve().samefile(Path(bare_path) / 'annex'))
+
+
 @with_tempfile(mkdir=True)
 def test_clone_unborn_head(path):
     ds_origin = Dataset(op.join(path, "a")).create()
@@ -778,7 +1272,7 @@ def test_clone_unborn_head(path):
     # The setup below is involved, mostly because it's accounting for adjusted
     # branches. The scenario itself isn't so complicated, though:
     #
-    #   * a checked out master branch with no commits
+    #   * a checked out default branch with no commits
     #   * a (potentially adjusted) "abc" branch with commits.
     #   * a (potentially adjusted) "chooseme" branch whose tip commit has a
     #     more recent commit than any in "abc".
@@ -786,22 +1280,25 @@ def test_clone_unborn_head(path):
     ds_origin.save(message="foo")
     for res in repo.for_each_ref_(fields="refname"):
         ref = res["refname"]
-        if "master" in ref:
-            repo.update_ref(ref.replace("master", "abc"), ref)
+        if DEFAULT_BRANCH in ref:
+            repo.update_ref(ref.replace(DEFAULT_BRANCH, "abc"), ref)
             repo.call_git(["update-ref", "-d", ref])
     repo.update_ref("HEAD",
                     "refs/heads/{}".format(
                         "adjusted/abc(unlocked)" if managed else "abc"),
                     symbolic=True)
+    abc_ts = int(repo.format_commit("%ct"))
     repo.call_git(["checkout", "-b", "chooseme", "abc~1"])
     if managed:
         repo.adjust()
     (ds_origin.pathobj / "bar").write_text("bar content")
-    ds_origin.save(message="bar")
-    # Try to make the git-annex branch the most recently updated ref so that we
-    # test that it is skipped.
-    ds_origin.drop("bar", check=False)
-    ds_origin.repo.checkout("master", options=["--orphan"])
+    with set_date(abc_ts + 1):
+        ds_origin.save(message="bar")
+    # Make the git-annex branch the most recently updated ref so that we test
+    # that it is skipped.
+    with set_date(abc_ts + 2):
+        ds_origin.drop("bar", check=False)
+    ds_origin.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
     ds = clone(ds_origin.path, op.join(path, "b"))
     # We landed on the branch with the most recent commit, ignoring the
@@ -818,9 +1315,9 @@ def test_clone_unborn_head(path):
 
 @with_tempfile(mkdir=True)
 def test_clone_unborn_head_no_other_ref(path):
-    # TODO: On master, update to use annex=False.
-    ds_origin = Dataset(op.join(path, "a")).create(no_annex=True)
-    ds_origin.repo.call_git(["update-ref", "-d", "refs/heads/master"])
+    ds_origin = Dataset(op.join(path, "a")).create(annex=False)
+    ds_origin.repo.call_git(["update-ref", "-d",
+                             "refs/heads/" + DEFAULT_BRANCH])
     with swallow_logs(new_level=logging.WARNING) as cml:
         clone(source=ds_origin.path, path=op.join(path, "b"))
         assert_in("could not find a branch with commits", cml.out)
@@ -831,9 +1328,29 @@ def test_clone_unborn_head_sub(path):
     ds_origin = Dataset(op.join(path, "a")).create()
     ds_origin_sub = Dataset(op.join(path, "a", "sub")).create()
     managed = ds_origin_sub.repo.is_managed_branch()
-    ds_origin_sub.repo.call_git(["branch", "-m", "master", "other"])
+    ds_origin.save(message="foo")
+    sub_repo = ds_origin_sub.repo
+    # As with test_clone_unborn_head(), the setup below is complicated mostly
+    # because it's accounting for adjusted branches, but the scenario itself
+    # isn't too complicated:
+    #
+    #   * a submodule's HEAD points to a checked out branch with no commits
+    #     while a (potentially adjusted) "other" branch has commits
+    #
+    #   * the parent repo has the tip of "other" as the last recorded state
+    for res in sub_repo.for_each_ref_(fields="refname"):
+        ref = res["refname"]
+        if DEFAULT_BRANCH in ref:
+            sub_repo.update_ref(ref.replace(DEFAULT_BRANCH, "other"), ref)
+            sub_repo.call_git(["update-ref", "-d", ref])
+    sub_repo.update_ref(
+        "HEAD",
+        "refs/heads/{}".format(
+            "adjusted/other(unlocked)" if managed else "other"),
+        symbolic=True)
+    # END complicated handling for adjusted branches
     ds_origin.save()
-    ds_origin_sub.repo.checkout("master", options=["--orphan"])
+    ds_origin_sub.repo.checkout(DEFAULT_BRANCH, options=["--orphan"])
 
     ds_cloned = clone(source=ds_origin.path, path=op.join(path, "b"))
     ds_cloned_sub = ds_cloned.get(
@@ -845,3 +1362,88 @@ def test_clone_unborn_head_sub(path):
     # In the context of this test, the clone should be on an adjusted branch if
     # the source landed there initially because we're on the same file system.
     eq_(managed, ds_cloned_sub.repo.is_managed_branch())
+
+
+@skip_if_no_network
+@with_tempfile
+def test_gin_cloning(path):
+    # can we clone a public ds anoynmously from gin and retrieve content
+    ds = clone('https://gin.g-node.org/datalad/datalad-ci-target', path)
+    ok_(ds.is_installed())
+    annex_path = op.join('annex', 'two')
+    git_path = op.join('git', 'one')
+    eq_(ds.repo.file_has_content(annex_path), False)
+    eq_(ds.repo.is_under_annex(git_path), False)
+    result = ds.get(annex_path)
+    assert_result_count(result, 1)
+    assert_status('ok', result)
+    eq_(result[0]['path'], op.join(ds.path, annex_path))
+    ok_file_has_content(op.join(ds.path, annex_path), 'two\n')
+    ok_file_has_content(op.join(ds.path, git_path), 'one\n')
+
+
+# TODO: git-annex-init fails in the second clone call below when this is
+# executed under ./tools/eval_under_testloopfs.
+@skip_if_adjusted_branch
+@with_tree(tree={"special": {"f0": "0"}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_fetch_git_special_remote(url_path, url, path):
+    url_path = Path(url_path)
+    path = Path(path)
+    ds_special = Dataset(url_path / "special").create(force=True)
+    ds_special.save()
+    ds_special.repo.call_git(["update-server-info"])
+
+    clone_url = url + "special/.git"
+    ds_a = clone(clone_url, path / "a")
+    ds_a.repo.call_annex(
+        ["initremote", "special", "type=git", "autoenable=true",
+         "location=" + clone_url])
+
+    # Set up a situation where a file is present only on the special remote,
+    # and its existence is known only to the special remote's git-annex branch.
+    (ds_special.pathobj / "f1").write_text("1")
+    ds_special.save()
+    ds_special.repo.call_git(["update-server-info"])
+
+    ds_a.repo.fetch("origin")
+    ds_a.repo.merge("origin/" + DEFAULT_BRANCH)
+
+    ds_b = clone(ds_a.path, path / "other")
+    ds_b.get("f1")
+    ok_(ds_b.repo.file_has_content("f1"))
+
+
+@skip_if_adjusted_branch
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_nonuniform_adjusted_subdataset(path):
+    # https://github.com/datalad/datalad/issues/5107
+    topds = Dataset(Path(path) / "top").create()
+    subds_url = 'git://github.com/datalad/testrepo--basic--r1'
+    topds.clone(
+        source='git://github.com/datalad/testrepo--basic--r1',
+        path='subds')
+    eq_(topds.subdatasets(return_type='item-or-list')['gitmodule_url'],
+        subds_url)
+
+
+@with_tempfile
+def test_clone_recorded_subds_reset(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a")
+    ds_a_sub = ds_a.create("sub")
+    (ds_a_sub.pathobj / "foo").write_text("foo")
+    ds_a.save(recursive=True)
+    (ds_a_sub.pathobj / "bar").write_text("bar")
+    ds_a_sub.save()
+
+    ds_b = clone(ds_a.path, path / "ds_b")
+    ds_b.get("sub")
+    assert_repo_status(ds_b.path)
+    sub_repo = Dataset(path / "ds_b" / "sub").repo
+    branch = sub_repo.get_active_branch()
+    eq_(ds_b.subdatasets()[0]["gitshasum"],
+        sub_repo.get_hexsha(
+            sub_repo.get_corresponding_branch(branch) or branch))

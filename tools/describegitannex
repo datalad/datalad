@@ -1,0 +1,42 @@
+#!/bin/bash
+
+commit="$1"
+
+: ${GIT_ANNEX_SRCPATH:=~/proj/git-annex}
+: ${GIT_ANNEX_USER:=yarikoptic}
+
+function indent() {
+	sed -e 's,^,  ,g'
+}
+
+function pull() {
+	echo "I: pull --rebase"
+	git pull --rebase 2>&1 | indent
+}
+
+set -eu
+builtin cd "$GIT_ANNEX_SRCPATH"
+
+if [[ -z "$commit" ]]; then
+	pull
+	echo "I: Differences from Joey:"
+	git diff origin/master.. 2>&1 | indent
+	# life is too short to discover correct way
+	commit=$(git show | head -n1 | awk '{print $2;}')
+fi
+
+echo "I: Head of the last commit:"
+{ git show "$commit" | head -n 10 || { echo "not found; fetching"; pull; git show "$commit" | head -n 10; } } | indent
+
+desc=$(git describe "$commit")
+desc_contains=$(git describe --contains "$commit" 2>/dev/null || echo '')
+
+if [[ ! -z "$desc_contains" ]]; then
+	desc_contains=" AKA $desc_contains"
+fi
+
+md="[$desc$desc_contains](https://git.kitenet.net/index.cgi/git-annex.git/commit/?id=$commit)"
+echo
+echo "I: Markdown links to the commit"
+echo "  $md"
+echo "  > fixed in $md --[[$GIT_ANNEX_USER]]"

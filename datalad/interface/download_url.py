@@ -20,7 +20,7 @@ from ..interface.common_opts import nosave_opt
 from ..interface.common_opts import save_message_opt
 from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
-from ..utils import assure_list_from_str
+from ..utils import ensure_list_from_str
 from ..utils import Path
 from ..utils import PurePosixPath
 from ..distribution.dataset import Dataset
@@ -30,10 +30,13 @@ from ..distribution.dataset import path_under_rev_dataset
 from ..distribution.dataset import require_dataset
 from ..distribution.dataset import resolve_path
 from ..dochelpers import exc_str
-from ..support.annexrepo import AnnexRepo, AnnexBatchCommandError
+from ..support.annexrepo import AnnexRepo
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
-from ..support.exceptions import NoDatasetFound
+from ..support.exceptions import (
+    CommandError,
+    NoDatasetFound,
+)
 
 from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
@@ -46,10 +49,6 @@ class DownloadURL(Interface):
     It allows for a uniform download interface to various supported URL
     schemes, re-using or asking for authentication details maintained by
     datalad.
-
-    Examples:
-
-      $ datalad download-url http://example.com/file.dat s3://bucket/file2.dat
     """
 
     _params_ = dict(
@@ -91,6 +90,16 @@ class DownloadURL(Interface):
         message=save_message_opt
     )
 
+    _examples_ = [
+        dict(text="Download files from an http and S3 URL",
+             code_py="download_url(urls=['http://example.com/file.dat', 's3://bucket/file2.dat'])",
+             code_cmd="datalad download-url http://example.com/file.dat s3://bucket/file2.dat"),
+        dict(text="Download a file to a path and provide a commit message",
+             code_py="download_url(urls='s3://bucket/file2.dat', message='added a file', path='myfile.dat')",
+             code_cmd="""datalad download-url -m 'added a file' -O myfile.dat \\
+                         s3://bucket/file2.dat"""),
+    ]
+
     @staticmethod
     @datasetmethod(name="download_url")
     @eval_results
@@ -117,7 +126,7 @@ class DownloadURL(Interface):
             # resolve_path() doesn't preserve trailing separators. Add one for
             # the download() call.
             path = path + op.sep
-        urls = assure_list_from_str(urls)
+        urls = ensure_list_from_str(urls)
 
         if not dir_is_target:
             if len(urls) > 1:
@@ -173,6 +182,7 @@ class DownloadURL(Interface):
                     message=exc_str(e),
                     type="file",
                     path=path,
+                    exception=e,
                     **common_report)
             else:
                 downloaded_paths.append(downloaded_path)
@@ -237,7 +247,7 @@ URLs:
                                 batch=len(annex_paths) > 1,
                                 # bypass URL size check, we already have the file
                                 options=['--relaxed'])
-                        except AnnexBatchCommandError as exc:
+                        except CommandError as exc:
                             lgr.warning("Registering %s with %s failed: %s",
                                         path, url, exc_str(exc))
 

@@ -12,7 +12,11 @@ import sys
 from unittest.mock import patch
 from io import StringIO
 from tempfile import NamedTemporaryFile
-from nose.tools import assert_raises, assert_equal
+from datalad.tests.utils import (
+    assert_equal,
+    assert_raises,
+    skip_if_on_windows,
+)
 
 from .. import __main__, __version__
 from ..auto import AutomagicIO
@@ -33,7 +37,8 @@ def test_main_version(stdout):
     assert_equal(stdout.getvalue().rstrip(), "datalad %s" % __version__)
 
 
-@known_failure_githubci_win
+# automagic IO is not supported on windows
+@skip_if_on_windows
 @patch.object(AutomagicIO, 'activate')
 @patch('sys.stdout', new_callable=StringIO)
 def test_main_run_a_script(stdout, mock_activate):

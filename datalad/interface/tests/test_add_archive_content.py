@@ -12,42 +12,64 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
 import os
 from os import unlink
-from os.path import exists, join as opj, pardir, basename, lexists
+from os.path import (
+    basename,
+    exists,
+    join as opj,
+    lexists,
+    pardir,
+)
 from glob import glob
 
-from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
-    with_tempfile, assert_in
-from ...tests.utils import assert_equal, assert_not_equal
-from ...tests.utils import assert_false
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_true
-from ...tests.utils import ok_archives_caches
-from ...tests.utils import slow
-from ...tests.utils import assert_re_in
-from datalad.tests.utils import assert_result_values_cond
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_equal,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_result_values_cond,
+    assert_true,
+    create_tree,
+    eq_,
+    integration,
+    known_failure_windows,
+    ok_,
+    ok_archives_caches,
+    ok_file_under_git,
+    serve_path_via_http,
+    slow,
+    swallow_logs,
+    swallow_outputs,
+    with_tempfile,
+    with_tree,
+)
 
-from ...support.annexrepo import AnnexRepo
-from ...support.exceptions import FileNotInRepositoryError
-from ...support.exceptions import CommandError
-from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
-from ...tests.utils import swallow_logs
-from ...tests.utils import integration
-from ...utils import chpwd, getpwd, rmtemp
-from ...utils import find_files
-from ...utils import rmtree
-from ...utils import on_windows
-from datalad.log import lgr
-from ...api import add_archive_content, clean
-from datalad.support.external_versions import external_versions
-from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
-from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import (
+    CommandError,
+    FileNotInRepositoryError,
+)
+from datalad.utils import (
+    chpwd,
+    find_files,
+    getpwd,
+    on_windows,
+    rmtemp,
+)
+from datalad.api import (
+    add_archive_content,
+    clean,
+)
+from datalad.consts import (
+    ARCHIVES_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+)
 
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import ok_clean_git
 
 treeargs = dict(
     tree=(
@@ -72,7 +94,7 @@ treeargs = dict(
 )
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**treeargs)
 @serve_path_via_http()
@@ -99,10 +121,8 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                             use_current_dir=False,
                             exclude='.*__MACOSX.*')  # some junk penetrates
 
-        if external_versions['cmd:annex'] >= '6.20170208':
-            # should have fixed remotes
-            eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
-                '[%s]' % ARCHIVES_SPECIAL_REMOTE)
+        eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
+            '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
         all_files = sorted(find_files('.'))
         target_files = {
@@ -163,8 +183,7 @@ tree4uargs = dict(
 )
 
 
-@known_failure_githubci_win
-@slow  # 29.4293s
+@known_failure_windows
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
@@ -288,22 +307,21 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo.get(opj('1', '1 f.txt'))  # and should be able to get it again
 
     # bug was that dropping didn't work since archive was dropped first
-    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.call_annex(["drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
     repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
-    res = repo.drop(key_1tar, key=True)
-    assert_equal(res['success'], False)
-
-    assert_result_values_cond(
-        [res], 'note',
-        lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
-    )
+    with assert_raises(CommandError) as e:
+        repo.drop(key_1tar, key=True)
+        assert_equal(e.kwargs['stdout_json'][0]['success'], False)
+        assert_result_values_cond(
+            e.kwargs['stdout_json'], 'note',
+            lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
+        )
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
-@known_failure_githubci_win
 @integration
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
@@ -325,7 +343,6 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
         ok_archives_caches(repo.path, 0)
 
 
-@known_failure_githubci_win
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
 def test_add_archive_content_zip(repo_path):
@@ -340,7 +357,7 @@ def test_add_archive_content_zip(repo_path):
         ok_archives_caches(repo.path, 0)
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
                  "notds": {"2.tar.gz": {"bar": "def"}}})
 def test_add_archive_content_absolute_path(path):
@@ -360,7 +377,7 @@ def test_add_archive_content_absolute_path(path):
                             annex=repo)
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
@@ -400,6 +417,8 @@ def test_add_archive_use_archive_dir(repo_path):
 class TestAddArchiveOptions():
 
     # few tests bundled with a common setup/teardown to minimize boiler plate
+    # nothing here works on windows, no even teardown(), prevent failure at the origin
+    @known_failure_windows
     @with_tree(tree={'1.tar': {'file.txt': 'load',
                                '1.dat': 'load2'}},
                delete=False)
@@ -415,13 +434,13 @@ class TestAddArchiveOptions():
         self.annex.precommit()  # so we close any outstanding batch process etc
         rmtemp(self.annex.path)
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_delete(self):
         # To test that .tar gets removed
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete=True)
         assert_false(lexists(opj(self.annex.path, '1.tar')))
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_archive_leading_dir(self):
         import os
         os.mkdir(opj(self.annex.path, 'sub'))
@@ -438,7 +457,7 @@ class TestAddArchiveOptions():
         )
         ok_file_under_git(self.annex.path, opj('sub', '123', 'file.txt'), annexed=True)
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed
         # but that new stuff was added to annex repo.  We know the key since default
@@ -450,9 +469,9 @@ class TestAddArchiveOptions():
         with assert_raises(Exception), \
                 swallow_logs():
             self.annex.whereis(key1, key=True, output='full')
-        commits_prior = list(self.annex.get_branch_commits('git-annex'))
+        commits_prior = list(self.annex.get_branch_commits_('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
-        commits_after = list(self.annex.get_branch_commits('git-annex'))
+        commits_after = list(self.annex.get_branch_commits_('git-annex'))
         # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
         # If faking dates, there should be another +1 because
         # annex.alwayscommit isn't set to false.
@@ -474,7 +493,7 @@ class TestAddArchiveOptions():
         # there should be no .datalad temporary files hanging around
         self.assert_no_trash_left_behind()
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
         mv_out = self.annex.call_git(
@@ -484,15 +503,15 @@ class TestAddArchiveOptions():
         with chpwd(self.annex.path):
             # was failing since deleting without considering if tarball
             # was extracted in that tarball directory
-            commits_prior_master = list(self.annex.get_branch_commits())
-            commits_prior = list(self.annex.get_branch_commits('git-annex'))
+            commits_prior_master = list(self.annex.get_branch_commits_())
+            commits_prior = list(self.annex.get_branch_commits_('git-annex'))
             add_out = add_archive_content(
                 opj('subdir', '1.tar'),
                 delete_after=True,
                 drop_after=True)
-            ok_clean_git(self.annex.path)
-            commits_after_master = list(self.annex.get_branch_commits())
-            commits_after = list(self.annex.get_branch_commits('git-annex'))
+            assert_repo_status(self.annex.path)
+            commits_after_master = list(self.annex.get_branch_commits_())
+            commits_after = list(self.annex.get_branch_commits_('git-annex'))
             # There should be a single commit for all additions +1 to
             # initiate datalad-archives gh-1258.  If faking dates,
             # there should be another +1 because annex.alwayscommit
@@ -513,8 +532,8 @@ class TestAddArchiveOptions():
                 delete_after=True,
                 drop_after=True,
                 allow_dirty=True)
-            ok_clean_git(self.annex.path, untracked=['dummy.txt'])
-            assert_equal(len(list(self.annex.get_branch_commits())),
+            assert_repo_status(self.annex.path, untracked=['dummy.txt'])
+            assert_equal(len(list(self.annex.get_branch_commits_())),
                          len(commits_prior_master))
 
             # there should be no .datalad temporary files hanging around
@@ -526,7 +545,7 @@ class TestAddArchiveOptions():
             []
         )
 
-    @known_failure_githubci_win
+    @known_failure_windows
     def test_override_existing_under_git(self):
         create_tree(self.annex.path, {'1.dat': 'load2'})
         self.annex.add('1.dat', git=True)

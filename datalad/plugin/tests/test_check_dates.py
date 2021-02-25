@@ -16,9 +16,21 @@ from datalad.api import check_dates
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.tests.test_repodates import set_date
-from datalad.tests.utils import assert_dict_equal, assert_false, assert_in, \
-    assert_raises, eq_, ok_, skip_if_no_module, with_tree
-from datalad.utils import chpwd, swallow_logs, swallow_outputs
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_false,
+    assert_in,
+    assert_raises,
+    eq_,
+    ok_,
+    skip_if_no_module,
+    with_tree,
+)
+from datalad.utils import (
+    chpwd,
+    swallow_logs,
+    swallow_outputs,
+)
 
 call = partial(check_dates, result_renderer="disabled", return_type="list")
 

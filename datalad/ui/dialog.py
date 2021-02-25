@@ -71,12 +71,29 @@ class ConsoleLog(object):
         self.out = out
 
     def message(self, msg, cr='\n'):
-        self.out.write(msg)
+        from datalad.log import log_progress
+        log_progress(lgr.info, None, 'Clear progress bars', maint='clear',
+                     noninteractive_level=5)
+        try:
+            self.out.write(msg)
+        except UnicodeEncodeError as e:
+            # all unicode magic has failed and the receiving end cannot handle
+            # a particular unicode char. rather than crashing, we replace the
+            # offending chars to be able to message at least something, and we
+            # log that we did that
+            encoding = self.out.encoding
+            lgr.debug(
+                "Replacing unicode chars in message output for display: %s",
+                e)
+            self.out.write(
+                msg.encode(encoding, "replace").decode(encoding))
         if cr:
             self.out.write(cr)
+        log_progress(lgr.info, None, 'Refresh progress bars', maint='refresh',
+                     noninteractive_level=5)
 
     def error(self, error):
-        self.out.write("ERROR: %s\n" % error)
+        self.message("ERROR: %s" % error)
 
     def get_progressbar(self, *args, **kwargs):
         """Return a progressbar.  See e.g. `tqdmProgressBar` about the interface
@@ -117,6 +134,21 @@ class SilentConsoleLog(ConsoleLog):
     def get_progressbar(self, *args, **kwargs):
         from .progressbars import SilentProgressBar
         return SilentProgressBar(*args, **kwargs)
+
+    def question(self, text, title=None, **kwargs):
+        msg = "A non-interactive silent UI was asked for a response to a question: %s." % text
+        if title is not None:
+            msg += ' Title: %s.' % title
+        if not kwargs.get('hidden'):
+            kwargs_str = ', '.join(
+                ('%s=%r' % (k, v)
+                for k, v in kwargs.items()
+                if v is not None))
+            if kwargs_str:
+                msg += " Additional arguments: %s" % kwargs_str
+        else:
+            msg += " Additional arguments are not shown because 'hidden' is set."
+        raise RuntimeError(msg)
 
 
 @auto_repr

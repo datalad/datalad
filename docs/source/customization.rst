@@ -178,7 +178,7 @@ The following keys should exists if possible:
 Extension packages
 ^^^^^^^^^^^^^^^^^^
 
-As the name suggests, an extension package is a proper Python package.
+As the name suggests, a :term:`DataLad extension` package is a proper Python package.
 Consequently, there is a significant amount of boilerplate code involved in the
 creation of a new Datalad extension. However, this overhead enables a number of
 useful features for extension developers:
@@ -197,7 +197,7 @@ useful features for extension developers:
 Using an extension
 ==================
 
-A DataLad extension is a standard Python package. Beyond installation of the package there is
+A :term:`DataLad extension` is a standard Python package. Beyond installation of the package there is
 no additional setup required.
 
 

@@ -15,8 +15,8 @@ import logging
 import os.path as op
 from collections import OrderedDict
 from datalad.utils import (
-    assure_list,
-    assure_unicode,
+    ensure_list,
+    ensure_unicode,
     get_dataset_root,
 )
 from datalad.interface.base import (
@@ -38,7 +38,6 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.param import Parameter
-from datalad.consts import PRE_INIT_COMMIT_SHA
 
 from datalad.core.local.status import (
     Status,
@@ -55,10 +54,10 @@ lgr = logging.getLogger('datalad.core.local.diff')
 class Diff(Interface):
     """Report differences between two states of a dataset (hierarchy)
 
-    The two to-be-compared states are given via to --from and --to options.
+    The two to-be-compared states are given via the --from and --to options.
     These state identifiers are evaluated in the context of the (specified
-    or detected) dataset. In case of a recursive report on a dataset
-    hierarchy corresponding state pairs for any subdataset are determined
+    or detected) dataset. In the case of a recursive report on a dataset
+    hierarchy, corresponding state pairs for any subdataset are determined
     from the subdataset record in the respective superdataset. Only changes
     recorded in a subdataset between these two states are reported, and so on.
 
@@ -93,9 +92,28 @@ class Diff(Interface):
             metavar="REVISION",
             doc="""state to compare against the original state, as given by
             any identifier that Git understands. If none is specified,
-            the state of the worktree will be used compared.""",
+            the state of the working tree will be compared.""",
             constraints=EnsureStr() | EnsureNone()),
     )
+
+    _examples_ = [
+        dict(text="Show unsaved changes in a dataset",
+             code_py="diff()",
+             code_cmd="datalad diff"),
+        dict(text="Compare a previous dataset state identified by shasum "
+                  "against current worktree",
+             code_py="diff(fr='SHASUM')",
+             code_cmd="datalad diff --from <SHASUM>"),
+        dict(text="Compare two branches against each other",
+             code_py="diff(fr='branch1', to='branch2')",
+             code_cmd="datalad diff --from branch1 --to branch2"),
+        dict(text="Show unsaved changes in the dataset and potential subdatasets",
+             code_py="diff(recursive=True)",
+             code_cmd="datalad diff -r"),
+        dict(text="Show unsaved changes made to a particular file",
+             code_py="diff(path='path/to/file')",
+             code_cmd="datalad diff <path/to/file>"),
+    ]
 
     @staticmethod
     @datasetmethod(name='diff')
@@ -109,29 +127,23 @@ class Diff(Interface):
             untracked='normal',
             recursive=False,
             recursion_limit=None):
-        ds = require_dataset(
-            dataset, check_installed=True, purpose='difference reporting')
-
-        for r in _diff_cmd(
-                ds=ds,
-                dataset=dataset,
-                fr=assure_unicode(fr),
-                to=assure_unicode(to),
-                constant_refs=False,
-                path=path,
-                annex=annex,
-                untracked=untracked,
-                recursive=recursive,
-                recursion_limit=recursion_limit):
-            yield r
+        yield from diff_dataset(
+            dataset=dataset,
+            fr=ensure_unicode(fr),
+            to=ensure_unicode(to),
+            constant_refs=False,
+            path=path,
+            annex=annex,
+            untracked=untracked,
+            recursive=recursive,
+            recursion_limit=recursion_limit)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: more cover
         Status.custom_result_renderer(res, **kwargs)
 
 
-def _diff_cmd(
-        ds,
+def diff_dataset(
         dataset,
         fr,
         to,
@@ -141,8 +153,56 @@ def _diff_cmd(
         untracked='normal',
         recursive=False,
         recursion_limit=None,
-        eval_file_type=True):
-    """Internal helper to actually run the command"""
+        eval_file_type=True,
+        reporting_order='depth-first'):
+    """Internal helper to diff a dataset
+
+    Parameters
+    ----------
+    dataset : Dataset
+      Dataset to perform the diff on. `fr` and `to` parameters are interpreted
+      in the context of this dataset.
+    fr : str
+      Commit-ish to compare from.
+    to : str
+      Commit-ish to compare to.
+    constant_refs : bool
+      If True, `fr` and `to` will be passed on unmodified to diff operations
+      on subdatasets. This can be useful with symbolic references like tags
+      to report subdataset changes independent of superdataset changes.
+      If False, `fr` and `to` will be translated to the subdataset commit-ish
+      that match the given commit-ish in the superdataset.
+    path : Path-like, optional
+      Paths to constrain the diff to (see main diff() command).
+    annex : str, optional
+      Reporting mode for annex properties (see main diff() command).
+    untracked : str, optional
+      Reporting mode for untracked content (see main diff() command).
+    recursive : bool, optional
+      Flag to enable recursive operation (see main diff() command).
+    recursion_limit : int, optional
+      Recursion limit (see main diff() command).
+    eval_file_type : bool, optional
+      Whether to perform file type discrimination between real symlinks
+      and symlinks representing annex'ed files. This can be expensive
+      in datasets with many files.
+    reporting_order : {'depth-first', 'breadth-first'}, optional
+      By default, subdataset content records are reported after the record
+      on the subdataset's submodule in a superdataset (depth-first).
+      Alternatively, report all superdataset records first, before reporting
+      any subdataset content records (breadth-first).
+
+    Yields
+    ------
+    dict
+      DataLad result records.
+    """
+    if reporting_order not in ('depth-first', 'breadth-first'):
+        raise ValueError('Unknown reporting order: {}'.format(reporting_order))
+
+    ds = require_dataset(
+        dataset, check_installed=True, purpose='difference reporting')
+
     # we cannot really perform any sorting of paths into subdatasets
     # or rejecting paths based on the state of the filesystem, as
     # we need to be able to compare with states that are not represented
@@ -150,7 +210,7 @@ def _diff_cmd(
     if path:
         ps = []
         # sort any path argument into the respective subdatasets
-        for p in sorted(assure_list(path)):
+        for p in sorted(ensure_list(path)):
             # it is important to capture the exact form of the
             # given path argument, before any normalization happens
             # distinguish rsync-link syntax to identify
@@ -216,8 +276,9 @@ def _diff_cmd(
             origpaths=None if not path else OrderedDict(path),
             untracked=untracked,
             annexinfo=annex,
-            eval_file_type=True,
-            cache=content_info_cache):
+            eval_file_type=eval_file_type,
+            cache=content_info_cache,
+            order=reporting_order):
         res.update(
             refds=ds.path,
             logger=lgr,
@@ -227,7 +288,7 @@ def _diff_cmd(
 
 
 def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
-             annexinfo, eval_file_type, cache):
+             annexinfo, eval_file_type, cache, order='depth-first'):
     if not ds.is_installed():
         # asked to query a subdataset that is not available
         lgr.debug("Skip diff of unavailable subdataset: %s", ds)
@@ -244,13 +305,14 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
         )
     try:
-        lgr.debug("diff %s from '%s' to '%s'", ds, fr, to)
+        lgr.debug("Diff %s from '%s' to '%s'", ds, fr, to)
         diff_state = repo.diffstatus(
             fr,
             to,
             paths=None if not paths else [p for p in paths],
             untracked=untracked,
             eval_file_type=eval_file_type,
+            eval_submodule_state='full' if to is None else 'commit',
             _cache=cache)
     except InvalidGitReferenceError as e:
         yield dict(
@@ -261,13 +323,15 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         return
 
     if annexinfo and hasattr(repo, 'get_content_annexinfo'):
-        # this will ammend `status`
+        # this will ammend `diff_state`
         repo.get_content_annexinfo(
             paths=paths.keys() if paths is not None else paths,
             init=diff_state,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=to)
-        if fr != to:
+        # if `fr` is None, we compare against a preinit state, and
+        # a get_content_annexinfo on that state doesn't get us anything new
+        if fr and fr != to:
             repo.get_content_annexinfo(
                 paths=paths.keys() if paths is not None else paths,
                 init=diff_state,
@@ -275,6 +339,9 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                 ref=fr,
                 key_prefix="prev_")
 
+    # potentially collect subdataset diff call specs for the end
+    # (if order == 'breadth-first')
+    subds_diffcalls = []
     for path, props in diff_state.items():
         pathinds = str(ds.pathobj / path.relative_to(repo_path))
         yield dict(
@@ -285,10 +352,17 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             parentds=ds.path,
             status='ok',
         )
-        # if a dataset, and given in rsync-style 'ds/' or with sufficient
-        # recursion level left -> dive in
+        # for a dataset we need to decide whether to dive in, or not
         if props.get('type', None) == 'dataset' and (
-                (paths and paths.get(path, False)) or recursion_level != 0):
+                # subdataset path was given in rsync-style 'ds/'
+                (paths and paths.get(path, False))
+                # there is still sufficient recursion level left
+                or recursion_level != 0
+                # no recursion possible anymore, but one of the given
+                # path arguments is in this subdataset
+                or (recursion_level == 0
+                    and paths
+                    and any(path in p.parents for p in paths))):
             subds_state = props.get('state', None)
             if subds_state in ('clean', 'deleted'):
                 # no need to look into the subdataset
@@ -296,29 +370,42 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             elif subds_state in ('added', 'modified'):
                 # dive
                 subds = Dataset(pathinds)
-                for r in _diff_ds(
-                        subds,
-                        # from before time or from the reported state
-                        fr if constant_refs
-                        else PRE_INIT_COMMIT_SHA
-                        if subds_state == 'added'
-                        else props['prev_gitshasum'],
-                        # to the last recorded state, or the worktree
-                        None if to is None
-                        else to if constant_refs
-                        else props['gitshasum'],
-                        constant_refs,
-                        # subtract on level on the way down, unless the path
-                        # args instructed to go inside this subdataset
-                        recursion_level=recursion_level
-                        if paths and paths.get(path, False) else recursion_level - 1,
-                        origpaths=origpaths,
-                        untracked=untracked,
-                        annexinfo=annexinfo,
-                        eval_file_type=eval_file_type,
-                        cache=cache):
-                    yield r
+                call_args = (
+                    subds,
+                    # from before time or from the reported state
+                    fr if constant_refs
+                    else None
+                    if subds_state == 'added'
+                    else props['prev_gitshasum'],
+                    # to the last recorded state, or the worktree
+                    None if to is None
+                    else to if constant_refs
+                    else props['gitshasum'],
+                    constant_refs,
+                )
+                call_kwargs = dict(
+                    # subtract on level on the way down, unless the path
+                    # args instructed to go inside this subdataset
+                    recursion_level=recursion_level
+                    # protect against dropping below zero (would mean unconditional
+                    # recursion)
+                    if not recursion_level or (paths and paths.get(path, False))
+                    else recursion_level - 1,
+                    origpaths=origpaths,
+                    untracked=untracked,
+                    annexinfo=annexinfo,
+                    eval_file_type=eval_file_type,
+                    cache=cache,
+                    order=order,
+                )
+                if order == 'depth-first':
+                    yield from _diff_ds(*call_args, **call_kwargs)
+                else:
+                    subds_diffcalls.append((call_args, call_kwargs))
             else:
                 raise RuntimeError(
                     "Unexpected subdataset state '{}'. That sucks!".format(
                         subds_state))
+    # deal with staged subdataset diffs
+    for call_args, call_kwargs in subds_diffcalls:
+        yield from _diff_ds(*call_args, **call_kwargs)

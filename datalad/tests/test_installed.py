@@ -10,21 +10,32 @@
 """
 
 from unittest.mock import patch
-from .utils import ok_startswith, eq_, assert_cwd_unchanged
+from datalad.tests.utils import (
+    ok_startswith,
+    eq_,
+    assert_cwd_unchanged,
+)
 
-from datalad.cmd import Runner
+from datalad.cmd import (
+    StdOutErrCapture,
+    WitlessRunner,
+)
 from datalad.support.exceptions import CommandError
 
+
 def check_run_and_get_output(cmd):
-    runner = Runner()
+    runner = WitlessRunner()
     try:
         # suppress log output happen it was set to high values
         with patch.dict('os.environ', {'DATALAD_LOG_LEVEL': 'WARN'}):
-            output = runner.run(["datalad", "--help"])
+            output = runner.run(
+                ["datalad", "--help"],
+                protocol=StdOutErrCapture)
     except CommandError as e:
         raise AssertionError("'datalad --help' failed to start normally. "
                              "Exited with %d and output %s" % (e.code, (e.stdout, e.stderr)))
-    return output
+    return output['stdout'], output['stderr']
+
 
 @assert_cwd_unchanged
 def test_run_datalad_help():

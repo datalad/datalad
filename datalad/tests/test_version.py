@@ -11,16 +11,16 @@ import re
 from distutils.version import LooseVersion
 
 from ..version import (
-    __version__,
     __hardcoded_version__,
+    __version__,
 )
-from ..support import path as op
-from ..utils import assure_unicode
-from .utils import (
+from datalad.support import path as op
+from datalad.utils import ensure_unicode
+from datalad.tests.utils import (
     assert_equal,
     assert_greater,
-    assert_not_in,
     assert_in,
+    assert_not_in,
     SkipTest,
 )
 
@@ -44,7 +44,7 @@ def test__version__():
             if not line.startswith(b'## '):
                 # The first section header we hit, must be our changelog entry
                 continue
-            reg = regex.match(assure_unicode(line))
+            reg = regex.match(ensure_unicode(line))
             if not reg:  # first one at that level is the one
                 raise AssertionError(
                     "Following line must have matched our regex: %r" % line)

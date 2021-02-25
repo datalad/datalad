@@ -11,30 +11,71 @@
 
 import re
 from os import linesep
-
-
+from pprint import pformat
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
+
+    Note: Subclasses should override `to_str` rather than `__str__` because
+    `to_str` is called directly in datalad.cmdline.main.
     """
 
-    def __init__(self, cmd="", msg="", code=None, stdout="", stderr=""):
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr="", cwd=None,
+                 **kwargs):
         RuntimeError.__init__(self, msg)
         self.cmd = cmd
         self.msg = msg
         self.code = code
         self.stdout = stdout
         self.stderr = stderr
+        self.cwd = cwd
+        self.kwargs = kwargs
+
+    def to_str(self, include_output=True):
+        from datalad.utils import (
+            ensure_unicode,
+            join_cmdline,
+        )
+        to_str = "{}: ".format(self.__class__.__name__)
+        cmd = self.cmd
+        if cmd:
+            to_str += "'{}'".format(
+                # go for a compact, normal looking, properly quoted
+                # command rendering if the command is in list form
+                join_cmdline(cmd) if isinstance(cmd, list) else cmd
+            )
+        if self.code:
+            to_str += " failed with exitcode {}".format(self.code)
+        if self.cwd:
+            # only if not under standard PWD
+            to_str += " under {}".format(self.cwd)
+        if self.msg:
+            # typically a command error has no specific idea
+            to_str += " [{}]".format(ensure_unicode(self.msg))
+        if not include_output:
+            return to_str
+
+        if self.stdout:
+            to_str += " [out: '{}']".format(ensure_unicode(self.stdout).strip())
+        if self.stderr:
+            to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
+        if self.kwargs:
+            if 'stdout_json' in self.kwargs:
+                src_keys = ('note', 'error-messages')
+                from datalad.utils import unique
+                json_errors = unique(
+                    '; '.join(str(m[key]) for key in src_keys if m.get(key))
+                    for m in self.kwargs['stdout_json']
+                    if any(m.get(k) for k in src_keys)
+                )
+                if json_errors:
+                    to_str += " [errors from JSON records: {}]".format(json_errors)
+            to_str += " [info keys: {}]".format(
+                ', '.join(self.kwargs.keys()))
+        return to_str
 
     def __str__(self):
-        from datalad.utils import assure_unicode
-        to_str = "%s: " % self.__class__.__name__
-        if self.cmd:
-            to_str += "command '%s'" % (self.cmd,)
-        if self.code:
-            to_str += " failed with exitcode %d" % self.code
-        to_str += "\n%s" % assure_unicode(self.msg)
-        return to_str
+        return self.to_str()
 
 
 class MissingExternalDependency(RuntimeError):
@@ -96,7 +137,11 @@ class OutdatedExternalDependency(MissingExternalDependency):
 
     def __str__(self):
         to_str = super(OutdatedExternalDependency, self).__str__()
-        to_str += ". You have version %s" % self.ver_present \
+        # MissingExternalDependency ends with a period unless msg is
+        # given, in which case it's up to the msg and no callers in
+        # our code base currently give a msg ending with a period.
+        to_str += "." if self.msg else ""
+        to_str += " You have version %s" % self.ver_present \
             if self.ver_present else \
             " Some unknown version of dependency found."
         return to_str
@@ -122,8 +167,10 @@ class FileNotInAnnexError(IOError, CommandError):
         CommandError.__init__(self, cmd=cmd, msg=msg, code=code)
         IOError.__init__(self, code, "%s: %s" % (cmd, msg), filename)
 
-    def __str__(self):
-        return "%s\n%s" % (CommandError.__str__(self), IOError.__str__(self))
+    def to_str(self, include_output=True):
+        return "%s\n%s" % (
+            CommandError.to_str(self, include_output=include_output),
+            IOError.__str__(self))
 
 
 class FileInGitError(FileNotInAnnexError):
@@ -173,7 +220,8 @@ class GitIgnoreError(CommandError):
             cmd=cmd, msg=msg, code=code, stdout=stdout, stderr=stderr)
         self.paths = paths
 
-    def __str__(self):
+    def to_str(self, include_output=True):
+        # Override CommandError.to_str(), ignoring include_output.
         return self.msg
 
 
@@ -194,6 +242,14 @@ class PathKnownToRepositoryError(Exception):
     """Thrown if file/path is under Git control, and attempted operation
     must not be ran"""
     pass
+
+
+class GitError(Exception):
+    """ Base class for all package exceptions """
+
+
+class NoSuchPathError(GitError, OSError):
+    """ Thrown if a path could not be access by the system. """
 
 
 class MissingBranchError(Exception):
@@ -240,8 +296,9 @@ class OutOfSpaceError(CommandError):
         super(OutOfSpaceError, self).__init__(**kwargs)
         self.sizemore_msg = sizemore_msg
 
-    def __str__(self):
-        super_str = super(OutOfSpaceError, self).__str__().rstrip(linesep + '.')
+    def to_str(self, include_output=True):
+        super_str = super().to_str(
+            include_output=include_output).rstrip(linesep + '.')
         return "%s needs %s more" % (super_str, self.sizemore_msg)
 
 
@@ -251,16 +308,6 @@ class RemoteNotAvailableError(CommandError):
     Example is "annex get somefile --from=MyRemote",
     where 'MyRemote' doesn't exist.
     """
-
-    # TODO: Raise this from GitRepo. Currently depends on method:
-    # Either it's a direct git call
-    #   => CommandError and stderr:
-    #       fatal: 'notthere' does not appear to be a git repository
-    #       fatal: Could not read from remote repository.
-    # or it's a GitPython call
-    #   => ValueError "Remote named 'NotExistingRemote' didn't exist"
-    # and another one:
-    #   see GitRepo.remove_remote()
 
     def __init__(self, remote, **kwargs):
         """
@@ -275,8 +322,8 @@ class RemoteNotAvailableError(CommandError):
         super(RemoteNotAvailableError, self).__init__(**kwargs)
         self.remote = remote
 
-    def __str__(self):
-        super_str = super(RemoteNotAvailableError, self).__str__()
+    def to_str(self, include_output=True):
+        super_str = super().to_str(include_output=include_output)
         return "Remote '{0}' is not available. Command failed:{1}{2}" \
                "".format(self.remote, linesep, super_str)
 
@@ -288,6 +335,10 @@ class InvalidInstanceRequestError(RuntimeError):
         super(InvalidInstanceRequestError, self).__init__(msg)
         self.id = id_
         self.msg = msg
+
+
+class InvalidGitRepositoryError(GitError):
+    """ Thrown if the given repository appears to have an invalid format.  """
 
 
 class InvalidAnnexRepositoryError(RuntimeError):
@@ -320,8 +371,10 @@ class IncompleteResultsError(RuntimeError):
     # such results have been yielded already at the time this exception is
     # raised, little point in collecting them just for the sake of a possible
     # exception
-    # MIH: AnnexRepo is the last remaining user of this functionality, in a
-    # single context
+    # MIH+YOH: AnnexRepo.copy_to and @eval_results are the last
+    # remaining user of this functionality.
+    # General use (as in AnnexRepo) of it discouraged but use in @eval_results
+    # is warranted
     def __init__(self, results=None, failed=None, msg=None):
         super(IncompleteResultsError, self).__init__(msg)
         self.results = results
@@ -329,8 +382,14 @@ class IncompleteResultsError(RuntimeError):
 
     def __str__(self):
         super_str = super(IncompleteResultsError, self).__str__()
-        return "{} {}" \
-               "".format(super_str, self.failed)
+        return "{}{}{}".format(
+            super_str,
+            ". {} result(s)".format(len(self.results)) if self.results else "",
+            ". {} failed:{}{}".format(
+                len(self.failed),
+                linesep,
+                pformat(self.failed)) if self.failed else "")
+
 
 class InstallFailedError(CommandError):
     """Generic exception to raise whenever `install` command fails"""
@@ -368,6 +427,14 @@ class AccessDeniedError(DownloadError):
 
 
 class AnonymousAccessDeniedError(AccessDeniedError):
+    pass
+
+
+class AccessPermissionExpiredError(AccessDeniedError):
+    """To raise when there is a belief that it is due to expiration of a credential
+
+    which we might possibly be able to refresh, like in the case of CompositeCredential
+    """
     pass
 
 

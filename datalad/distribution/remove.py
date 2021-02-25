@@ -62,12 +62,6 @@ class Remove(Interface):
     file content is dropped. As these checks could lead to slow operation
     (network latencies, etc), they can be disabled.
 
-    Examples:
-
-      Permanently remove a subdataset from a dataset and wipe out the subdataset
-      association too::
-
-        ~/some/dataset$ datalad remove somesubdataset1
     """
     _action = 'remove'
 
@@ -85,6 +79,21 @@ class Remove(Interface):
         message=save_message_opt,
         if_dirty=if_dirty_opt,
     )
+
+    _examples_ = [
+        dict(text="Permanently remove a subdataset from a dataset and wipe out "
+                  "the subdataset association too",
+             code_py="remove(dataset='path/to/dataset', path='path/to/subds')",
+             code_cmd="datalad remove -d <path/to/dataset> <path/to/subds>"),
+        dict(text="Permanently remove a dataset and all subdatasets",
+             code_py="remove(dataset='path/to/dataset', recursive=True)",
+             code_cmd="datalad remove -d <path/to/dataset/> -r"),
+        dict(text="Permanently remove a dataset and all subdatasets even if there "
+                  "are fewer than the configured minimum number of (remote) sources "
+                  "for data",
+             code_py="remove(dataset='path/to/dataset', recursive=True, check=False)",
+             code_cmd="datalad remove -d <path/to/dataset/> -r --nocheck"),
+    ]
 
     @staticmethod
     @datasetmethod(name=_action)

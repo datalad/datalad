@@ -16,7 +16,7 @@ import string
 import time
 
 from os.path import exists, lexists, join as opj, abspath, isabs
-from os.path import curdir, isfile, islink, isdir, realpath
+from os.path import curdir, isfile, islink, isdir
 from os.path import relpath
 from os import lstat
 
@@ -27,6 +27,7 @@ from ..utils import auto_repr
 from .base import Interface
 from datalad.interface.base import build_doc
 from ..ui import ui
+from ..utils import Path
 from ..utils import safe_print
 from ..dochelpers import exc_str
 from ..support.param import Parameter
@@ -147,7 +148,7 @@ class Ls(Interface):
                 ds = Dataset(loc)
                 if ds.is_installed():
                     return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
-                    loc_type = False
+                    #loc_type = False
                 else:
                     loc_type = "dir"  # we know that so far for sure
                     # it might have been an uninstalled dataset within super-dataset
@@ -292,26 +293,26 @@ class FsModel(AnnexModel):
 
     def __init__(self, path, *args, **kwargs):
         super(FsModel, self).__init__(*args, **kwargs)
-        self._path = path
+        self._path = Path(path)
 
     @property
     def path(self):
-        return self._path
+        return str(self._path)
 
     @property
     def symlink(self):
         """if symlink returns path the symlink points to else returns None"""
-        if islink(self._path):                    # if symlink
-            target_path = realpath(self._path)    # find link target
+        if self._path.is_symlink():                    # if symlink
+            target_path = self._path.resolve()      # find link target
             # convert to absolute path if not
-            return target_path if exists(target_path) else None
+            return str(target_path) if target_path.exists() else None
         return None
 
     @property
     def date(self):
         """Date of last modification"""
         if self.type_ is not ['git', 'annex']:
-            return lstat(self._path).st_mtime
+            return self._path.lstat().st_mtime
         else:
             return super(self.__class__, self).date
 
@@ -327,20 +328,20 @@ class FsModel(AnnexModel):
 
         if type_ in ['file', 'link', 'link-broken']:
             # if node is under annex, ask annex for node size, ondisk_size
-            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(self._path):
-                size = self.repo.info(self._path, batch=True)['size']
+            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(str(self._path)):
+                size = self.repo.info(str(self._path), batch=True)['size']
                 ondisk_size = size \
-                    if self.repo.file_has_content(self._path) \
+                    if self.repo.file_has_content(str(self._path)) \
                     else 0
             # else ask fs for node size (= ondisk_size)
             else:
                 size = ondisk_size = 0 \
                     if type_ == 'link-broken' \
-                    else lstat(self.symlink or self._path).st_size
+                    else lstat(self.symlink or str(self._path)).st_size
 
             sizes.update({'total': size, 'ondisk': ondisk_size})
 
-        if self.repo.path == self._path:
+        if self.repo.pathobj == self._path:
             sizes.update({'git': self.git_local_size,
                           'annex': self.annex_local_size,
                           'annex_worktree': self.annex_worktree_size})
@@ -505,7 +506,6 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         # workaround for explosion of git cat-file --batch processes
         # https://github.com/datalad/datalad/issues/1888
         if dsm.repo is not None:
-            dsm.repo.repo.close()
             del dsm.repo
             dsm.repo = None
 

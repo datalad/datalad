@@ -9,8 +9,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test metadata extraction"""
 
-from os.path import join as opj
-from os.path import dirname
+from os.path import (
+    dirname,
+    join as opj,
+)
 
 from shutil import copy
 
@@ -18,14 +20,14 @@ from datalad.coreapi import Dataset
 from datalad.api import extract_metadata
 from datalad.utils import chpwd
 
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import known_failure_githubci_win
-
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    known_failure_githubci_win,
+    with_tempfile,
+)
 
 
 testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data', 'xmp.pdf')
@@ -50,7 +52,7 @@ def test_ds_extraction(path):
     ds = Dataset(path).create()
     copy(testpath, path)
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     res = extract_metadata(
         types=['xmp'],

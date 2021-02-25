@@ -13,12 +13,16 @@ Allows for connecting via ssh and keeping the connection open
 git calls to a ssh remote without the need to reauthenticate.
 """
 
+import fasteners
 import os
 import logging
 from socket import gethostname
 from hashlib import md5
 from subprocess import Popen
 import tempfile
+import threading
+
+
 # importing the quote function here so it can always be imported from this
 # module
 # this used to be shlex.quote(), but is now a cross-platform helper
@@ -36,10 +40,14 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
     Path,
-    assure_list,
+    ensure_list,
     on_windows,
 )
-from datalad.cmd import Runner
+from datalad.cmd import (
+    NoCapture,
+    StdOutErrCapture,
+    WitlessRunner,
+)
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
@@ -75,11 +83,10 @@ def get_connection_hash(hostname, port='', username='', identity_file='',
 
 
 @auto_repr
-class SSHConnection(object):
-    """Representation of a (shared) ssh connection.
+class BaseSSHConnection(object):
+    """Representation of an SSH connection.
     """
-
-    def __init__(self, ctrl_path, sshri, identity_file=None,
+    def __init__(self, sshri, identity_file=None,
                  use_remote_annex_bundle=True, force_ip=False):
         """Create a connection handler
 
@@ -87,8 +94,6 @@ class SSHConnection(object):
 
         Parameters
         ----------
-        ctrl_path: str
-          path to SSH controlmaster
         sshri: SSHRI
           SSH resource identifier (contains all connection-relevant info),
           or another resource identifier that can be converted into an SSHRI.
@@ -110,59 +115,37 @@ class SSHConnection(object):
                 "connections: {}".format(sshri))
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
-        # on windows cmd args lists are always converted into a string using appropriate
-        # quoting rules, on other platforms args lists are passed directly and we need
-        # to take care of quoting ourselves
-        ctrlpath_arg = "ControlPath={}".format(ctrl_path if on_windows else sh_quote(str(ctrl_path)))
-        self._ssh_args = ["-o", ctrlpath_arg]
-        self.ctrl_path = Path(ctrl_path)
-        if self.sshri.port:
-            self._ssh_args += ['-p', '{}'.format(self.sshri.port)]
-
+        # arguments only used for opening a connection
+        self._ssh_open_args = []
+        # arguments for annex ssh invocation
+        self._ssh_args = []
+        self._ssh_open_args.extend(
+            ['-p', '{}'.format(self.sshri.port)] if self.sshri.port else [])
         if force_ip:
-            self._ssh_args.append("-{}".format(force_ip))
-        self._identity_file = identity_file
-        self._use_remote_annex_bundle = use_remote_annex_bundle
+            self._ssh_open_args.append("-{}".format(force_ip))
+        if identity_file:
+            self._ssh_open_args.extend(["-i", identity_file])
 
+        self._use_remote_annex_bundle = use_remote_annex_bundle
         # essential properties of the remote system
         self._remote_props = {}
-        self._opened_by_us = False
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
-        """Executes a command on the remote.
+        raise NotImplementedError
 
-        It is the callers responsibility to properly quote commands
-        for remote execution (e.g. filename with spaces of other special
-        characters). Use the `sh_quote()` from the module for this purpose.
+    def open(self):
+        raise NotImplementedError
 
-        Parameters
-        ----------
-        cmd: str
-          command to run on the remote
-        options : list of str, optional
-          Additional options to pass to the `-o` flag of `ssh`. Note: Many
-          (probably most) of the available configuration options should not be
-          set here because they can critically change the properties of the
-          connection. This exists to allow options like SendEnv to be set.
+    def close(self):
+        raise NotImplementedError
 
-        Returns
-        -------
-        tuple of str
-          stdout, stderr of the command run.
-        """
+    @property
+    def runner(self):
+        if self._runner is None:
+            self._runner = WitlessRunner()
+        return self._runner
 
-        # XXX: check for open socket once
-        #      and provide roll back if fails to run and was not explicitly
-        #      checked first
-        # MIH: this would mean that we would have to distinguish failure
-        #      of a payload command from failure of SSH itself. SSH however,
-        #      only distinguishes success and failure of the entire operation
-        #      Increase in fragility from introspection makes a potential
-        #      performance benefit a questionable improvement.
-        # make sure we have an open connection, will test if action is needed
-        # by itself
-        self.open()
-
+    def _adjust_cmd_for_bundle_execution(self, cmd):
         # locate annex and set the bundled vs. system Git machinery in motion
         if self._use_remote_annex_bundle:
             remote_annex_installdir = self.get_annex_installdir()
@@ -171,144 +154,29 @@ class SSHConnection(object):
                 cmd = '{}; {}'.format(
                     'export "PATH={}:$PATH"'.format(remote_annex_installdir),
                     cmd)
+        return cmd
+
+    def _exec_ssh(self, ssh_cmd, cmd, options=None, stdin=None, log_output=True):
+        cmd = self._adjust_cmd_for_bundle_execution(cmd)
+
+        for opt in options or []:
+            ssh_cmd.extend(["-o", opt])
 
         # build SSH call, feed remote command as a single last argument
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
-        ssh_cmd = ["ssh"] + self._ssh_args
-        for opt in options or []:
-            ssh_cmd.extend(["-o", opt])
+        ssh_cmd += [self.sshri.as_str()] + [cmd]
 
-        ssh_cmd += [self.sshri.as_str()] \
-            + [cmd]
-
-        kwargs = dict(
-            log_stdout=log_output, log_stderr=log_output,
-            log_online=not log_output
-        )
+        lgr.debug("%s is used to run %s", self, ssh_cmd)
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
-        return self.runner.run(
+        out = self.runner.run(
             ssh_cmd,
-            expect_fail=True,
-            expect_stderr=True,
-            stdin=stdin,
-            **kwargs)
-
-    @property
-    def runner(self):
-        if self._runner is None:
-            self._runner = Runner()
-        return self._runner
-
-    def is_open(self):
-        if not self.ctrl_path.exists():
-            lgr.log(
-                5,
-                "Not opening %s for checking since %s does not exist",
-                self, self.ctrl_path
-            )
-            return False
-        # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
-        lgr.debug("Checking %s by calling %s" % (self, cmd))
-        try:
-            # expect_stderr since ssh would announce to stderr
-            # "Master is running" and that is normal, not worthy warning about
-            # etc -- we are doing the check here for successful operation
-            with tempfile.TemporaryFile() as tempf:
-                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
-            res = True
-        except CommandError as e:
-            if e.code != 255:
-                # this is not a normal SSH error, whine ...
-                raise e
-            # SSH died and left socket behind, or server closed connection
-            self.close()
-            res = False
-        lgr.debug(
-            "Check of %s has %s",
-            self,
-            {True: 'succeeded', False: 'failed'}[res])
-        return res
-
-    def open(self):
-        """Opens the connection.
-
-        In other words: Creates the SSH ControlMaster to be used by this
-        connection, if it is not there already.
-
-        Returns
-        -------
-        bool
-          True when SSH reports success opening the connection, False when
-          a ControlMaster for an open connection already exists.
-
-        Raises
-        ------
-        ConnectionOpenFailedError
-          When starting the SSH ControlMaster process failed.
-        """
-        # the socket should vanish almost instantly when the connection closes
-        # sending explicit 'check' commands to the control master is expensive
-        # (needs tempfile to shield stdin, Runner overhead, etc...)
-        # as we do not use any advanced features (forwarding, stop[ing the
-        # master without exiting) it should be relatively safe to just perform
-        # the much cheaper check of an existing control path
-        if self.ctrl_path.exists():
-            return False
-
-        # set control options
-        ctrl_options = ["-fN",
-                        "-o", "ControlMaster=auto",
-                        "-o", "ControlPersist=15m"] + self._ssh_args
-        if self._identity_file:
-            ctrl_options.extend(["-i", self._identity_file])
-        # create ssh control master command
-        cmd = ["ssh"] + ctrl_options + [self.sshri.as_str()]
-
-        # start control master:
-        lgr.debug("Opening %s by calling %s" % (self, cmd))
-        proc = Popen(cmd)
-        stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
-
-        # wait till the command exits, connection is conclusively
-        # open or not at this point
-        exit_code = proc.wait()
-
-        if exit_code != 0:
-            raise ConnectionOpenFailedError(
-                str(cmd),
-                'Failed to open SSH connection (could not start ControlMaster process)',
-                exit_code,
-                stdout,
-                stderr,
-            )
-        self._opened_by_us = True
-        return True
-
-    def close(self):
-        """Closes the connection.
-        """
-        if not self._opened_by_us:
-            lgr.debug("Not closing %s since was not opened by itself", self)
-            return
-        # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
-        lgr.debug("Closing %s by calling %s", self, cmd)
-        try:
-            self.runner.run(cmd, expect_stderr=True, expect_fail=True)
-        except CommandError as e:
-            lgr.debug("Failed to run close command")
-            if self.ctrl_path.exists():
-                lgr.debug("Removing existing control path %s", self.ctrl_path)
-                # socket need to go in any case
-                self.ctrl_path.unlink()
-            if e.code != 255:
-                # not a "normal" SSH error
-                raise e
+            protocol=StdOutErrCapture if log_output else NoCapture,
+            stdin=stdin)
+        return out['stdout'], out['stderr']
 
     def _get_scp_command_spec(self, recursive, preserve_attrs):
         """Internal helper for SCP interface methods"""
@@ -349,13 +217,14 @@ class SSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command
-        scp_cmd += assure_list(source)
+        scp_cmd += ensure_list(source)
         # add destination path
         scp_cmd += ['%s:%s' % (
             self.sshri.hostname,
             _quote_filename_for_scp(destination),
         )]
-        return self.runner.run(scp_cmd)
+        out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
@@ -388,10 +257,11 @@ class SSHConnection(object):
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
         scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
-                    for s in assure_list(source)]
+                    for s in ensure_list(source)]
         # add destination path
         scp_cmd += [destination]
-        return self.runner.run(scp_cmd)
+        out = self.runner.run(scp_cmd, protocol=StdOutErrCapture)
+        return out['stdout'], out['stderr']
 
     def get_annex_installdir(self):
         key = 'installdir:annex'
@@ -450,7 +320,351 @@ class SSHConnection(object):
 
 
 @auto_repr
-class SSHManager(object):
+class NoMultiplexSSHConnection(BaseSSHConnection):
+    """Representation of an SSH connection.
+
+    The connection is opened for execution of a single process, and closed
+    as soon as the process end.
+    """
+    def __init__(self, sshri, **kwargs):
+        """Create a connection handler
+
+        The actual opening of the connection is performed on-demand.
+
+        Parameters
+        ----------
+        sshri: SSHRI
+          SSH resource identifier (contains all connection-relevant info),
+          or another resource identifier that can be converted into an SSHRI.
+        **kwargs
+          Pass on to BaseSSHConnection
+        """
+        super().__init__(sshri, **kwargs)
+        self._ssh_open_args += [
+            # we presently do not support any interactive authentication
+            # at the time of process execution
+            '-o', 'PasswordAuthentication=no',
+            '-o', 'KbdInteractiveAuthentication=no',
+        ]
+
+    def __call__(self, cmd, options=None, stdin=None, log_output=True):
+        """Executes a command on the remote.
+
+        It is the callers responsibility to properly quote commands
+        for remote execution (e.g. filename with spaces of other special
+        characters). Use the `sh_quote()` from the module for this purpose.
+
+        Parameters
+        ----------
+        cmd: str
+          command to run on the remote
+        options : list of str, optional
+          Additional options to pass to the `-o` flag of `ssh`. Note: Many
+          (probably most) of the available configuration options should not be
+          set here because they can critically change the properties of the
+          connection. This exists to allow options like SendEnv to be set.
+
+        Returns
+        -------
+        tuple of str
+          stdout, stderr of the command run.
+        """
+        # there is no dedicated "open" step, put all args together
+        ssh_cmd = ["ssh"] + self._ssh_open_args + self._ssh_args
+        return self._exec_ssh(
+            ssh_cmd,
+            cmd,
+            options=options,
+            stdin=stdin,
+            log_output=log_output)
+
+    def is_open(self):
+        return False
+
+    def open(self):
+        return False
+
+    def close(self):
+        # we perform blocking execution, we should not return from __call__ until
+        # the connection is already closed
+        pass
+
+
+@auto_repr
+class MultiplexSSHConnection(BaseSSHConnection):
+    """Representation of a (shared) ssh connection.
+    """
+    def __init__(self, ctrl_path, sshri, **kwargs):
+        """Create a connection handler
+
+        The actual opening of the connection is performed on-demand.
+
+        Parameters
+        ----------
+        ctrl_path: str
+          path to SSH controlmaster
+        sshri: SSHRI
+          SSH resource identifier (contains all connection-relevant info),
+          or another resource identifier that can be converted into an SSHRI.
+        **kwargs
+          Pass on to BaseSSHConnection
+        """
+        super().__init__(sshri, **kwargs)
+
+        # on windows cmd args lists are always converted into a string using appropriate
+        # quoting rules, on other platforms args lists are passed directly and we need
+        # to take care of quoting ourselves
+        ctrlpath_arg = "ControlPath={}".format(ctrl_path if on_windows else sh_quote(str(ctrl_path)))
+        self._ssh_args += ["-o", ctrlpath_arg]
+        self._ssh_open_args += [
+            "-fN",
+            "-o", "ControlMaster=auto",
+            "-o", "ControlPersist=15m",
+        ]
+        self.ctrl_path = Path(ctrl_path)
+        self._opened_by_us = False
+        self._lock = threading.Lock()
+
+    def __call__(self, cmd, options=None, stdin=None, log_output=True):
+        """Executes a command on the remote.
+
+        It is the callers responsibility to properly quote commands
+        for remote execution (e.g. filename with spaces of other special
+        characters). Use the `sh_quote()` from the module for this purpose.
+
+        Parameters
+        ----------
+        cmd: str
+          command to run on the remote
+        options : list of str, optional
+          Additional options to pass to the `-o` flag of `ssh`. Note: Many
+          (probably most) of the available configuration options should not be
+          set here because they can critically change the properties of the
+          connection. This exists to allow options like SendEnv to be set.
+
+        Returns
+        -------
+        tuple of str
+          stdout, stderr of the command run.
+        """
+
+        # XXX: check for open socket once
+        #      and provide roll back if fails to run and was not explicitly
+        #      checked first
+        # MIH: this would mean that we would have to distinguish failure
+        #      of a payload command from failure of SSH itself. SSH however,
+        #      only distinguishes success and failure of the entire operation
+        #      Increase in fragility from introspection makes a potential
+        #      performance benefit a questionable improvement.
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
+
+        ssh_cmd = ["ssh"] + self._ssh_args
+        return self._exec_ssh(
+            ssh_cmd,
+            cmd,
+            options=options,
+            stdin=stdin,
+            log_output=log_output)
+
+    def is_open(self):
+        if not self.ctrl_path.exists():
+            lgr.log(
+                5,
+                "Not opening %s for checking since %s does not exist",
+                self, self.ctrl_path
+            )
+            return False
+        # check whether controlmaster is still running:
+        cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
+        lgr.debug("Checking %s by calling %s" % (self, cmd))
+        try:
+            # expect_stderr since ssh would announce to stderr
+            # "Master is running" and that is normal, not worthy warning about
+            # etc -- we are doing the check here for successful operation
+            with tempfile.TemporaryFile() as tempf:
+                self.runner.run(
+                    cmd,
+                    # do not leak output
+                    protocol=StdOutErrCapture,
+                    stdin=tempf)
+            res = True
+        except CommandError as e:
+            if e.code != 255:
+                # this is not a normal SSH error, whine ...
+                raise e
+            # SSH died and left socket behind, or server closed connection
+            self.close()
+            res = False
+        lgr.debug(
+            "Check of %s has %s",
+            self,
+            {True: 'succeeded', False: 'failed'}[res])
+        return res
+
+    @fasteners.locked
+    def open(self):
+        """Opens the connection.
+
+        In other words: Creates the SSH ControlMaster to be used by this
+        connection, if it is not there already.
+
+        Returns
+        -------
+        bool
+          True when SSH reports success opening the connection, False when
+          a ControlMaster for an open connection already exists.
+
+        Raises
+        ------
+        ConnectionOpenFailedError
+          When starting the SSH ControlMaster process failed.
+        """
+        # the socket should vanish almost instantly when the connection closes
+        # sending explicit 'check' commands to the control master is expensive
+        # (needs tempfile to shield stdin, Runner overhead, etc...)
+        # as we do not use any advanced features (forwarding, stop[ing the
+        # master without exiting) it should be relatively safe to just perform
+        # the much cheaper check of an existing control path
+        if self.ctrl_path.exists():
+            return False
+
+        # create ssh control master command
+        cmd = ["ssh"] + self._ssh_open_args + self._ssh_args + [self.sshri.as_str()]
+
+        # start control master:
+        lgr.debug("Opening %s by calling %s", self, cmd)
+        proc = Popen(cmd)
+        stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
+
+        # wait till the command exits, connection is conclusively
+        # open or not at this point
+        exit_code = proc.wait()
+
+        if exit_code != 0:
+            raise ConnectionOpenFailedError(
+                cmd,
+                'Failed to open SSH connection (could not start ControlMaster process)',
+                exit_code,
+                stdout,
+                stderr,
+            )
+        self._opened_by_us = True
+        return True
+
+    def close(self):
+        """Closes the connection.
+        """
+        if not self._opened_by_us:
+            lgr.debug("Not closing %s since was not opened by itself", self)
+            return
+        # stop controlmaster:
+        cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
+        lgr.debug("Closing %s by calling %s", self, cmd)
+        try:
+            self.runner.run(cmd, protocol=StdOutErrCapture)
+        except CommandError as e:
+            lgr.debug("Failed to run close command")
+            if self.ctrl_path.exists():
+                lgr.debug("Removing existing control path %s", self.ctrl_path)
+                # socket need to go in any case
+                self.ctrl_path.unlink()
+            if e.code != 255:
+                # not a "normal" SSH error
+                raise e
+
+
+@auto_repr
+class BaseSSHManager(object):
+    """Interface for an SSHManager
+    """
+    def ensure_initialized(self):
+        """Ensures that manager is initialized"""
+        pass
+
+    assure_initialized = ensure_initialized
+
+    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+        """Get an SSH connection handler
+
+        Parameters
+        ----------
+        url: str
+          ssh url
+        force_ip : {False, 4, 6}
+          Force the use of IPv4 or IPv6 addresses.
+
+        Returns
+        -------
+        BaseSSHConnection
+        """
+        raise NotImplementedError
+
+    def _prep_connection_args(self, url):
+        # parse url:
+        from datalad.support.network import RI, is_ssh
+        if isinstance(url, RI):
+            sshri = url
+        else:
+            if ':' not in url and '/' not in url:
+                # it is just a hostname
+                lgr.debug("Assuming %r is just a hostname for ssh connection",
+                          url)
+                url += ':'
+            sshri = RI(url)
+
+        if not is_ssh(sshri):
+            raise ValueError("Unsupported SSH URL: '{0}', use "
+                             "ssh://host/path or host:path syntax".format(url))
+
+        from datalad import cfg
+        identity_file = cfg.get("datalad.ssh.identityfile")
+        return sshri, identity_file
+
+    def close(self, allow_fail=True):
+        """Closes all connections, known to this instance.
+
+        Parameters
+        ----------
+        allow_fail: bool, optional
+          If True, swallow exceptions which might be thrown during
+          connection.close, and just log them at DEBUG level
+        """
+        pass
+
+
+@auto_repr
+class NoMultiplexSSHManager(BaseSSHManager):
+    """Does not "manage" and just returns a new connection
+    """
+
+    def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
+        """Get a singleton, representing a shared ssh connection to `url`
+
+        Parameters
+        ----------
+        url: str
+          ssh url
+        force_ip : {False, 4, 6}
+          Force the use of IPv4 or IPv6 addresses.
+
+        Returns
+        -------
+        SSHConnection
+        """
+        sshri, identity_file = self._prep_connection_args(url)
+
+        return NoMultiplexSSHConnection(
+            sshri,
+            identity_file=identity_file,
+            use_remote_annex_bundle=use_remote_annex_bundle,
+            force_ip=force_ip,
+        )
+
+
+@auto_repr
+class MultiplexSSHManager(BaseSSHManager):
     """Keeps ssh connections to share. Serves singleton representation
     per connection.
 
@@ -460,6 +674,7 @@ class SSHManager(object):
     """
 
     def __init__(self):
+        super().__init__()
         self._socket_dir = None
         self._connections = dict()
         # Initialization of prev_connections is happening during initial
@@ -467,25 +682,23 @@ class SSHManager(object):
         # to an empty list to fail if logic is violated
         self._prev_connections = None
         # and no explicit initialization in the constructor
-        # self.assure_initialized()
+        # self.ensure_initialized()
 
     @property
     def socket_dir(self):
         """Return socket_dir, and if was not defined before,
         and also pick up all previous connections (if any)
         """
-        self.assure_initialized()
+        self.ensure_initialized()
         return self._socket_dir
 
-    def assure_initialized(self):
+    def ensure_initialized(self):
         """Assures that manager is initialized - knows socket_dir, previous connections
         """
         if self._socket_dir is not None:
             return
-        from ..config import ConfigManager
-        cfg = ConfigManager()
-        self._socket_dir = \
-            Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
+        from datalad import cfg
+        self._socket_dir = Path(cfg.obtain('datalad.locations.sockets'))
         self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
             os.chmod(str(self._socket_dir), 0o700)
@@ -513,6 +726,7 @@ class SSHManager(object):
         lgr.log(5,
                 "Found %d previous connections",
                 len(self._prev_connections))
+    assure_initialized = ensure_initialized
 
     def get_connection(self, url, use_remote_annex_bundle=True, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
@@ -528,24 +742,7 @@ class SSHManager(object):
         -------
         SSHConnection
         """
-        # parse url:
-        from datalad.support.network import RI, is_ssh
-        if isinstance(url, RI):
-            sshri = url
-        else:
-            if ':' not in url and '/' not in url:
-                # it is just a hostname
-                lgr.debug("Assuming %r is just a hostname for ssh connection",
-                          url)
-                url += ':'
-            sshri = RI(url)
-
-        if not is_ssh(sshri):
-            raise ValueError("Unsupported SSH URL: '{0}', use "
-                             "ssh://host/path or host:path syntax".format(url))
-
-        from datalad import cfg
-        identity_file = cfg.get("datalad.ssh.identityfile")
+        sshri, identity_file = self._prep_connection_args(url)
 
         conhash = get_connection_hash(
             sshri.hostname,
@@ -562,7 +759,7 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(
+            c = MultiplexSSHConnection(
                 ctrl_path, sshri, identity_file=identity_file,
                 use_remote_annex_bundle=use_remote_annex_bundle,
                 force_ip=force_ip)
@@ -577,12 +774,11 @@ class SSHManager(object):
         allow_fail: bool, optional
           If True, swallow exceptions which might be thrown during
           connection.close, and just log them at DEBUG level
-        ctrl_path: str or list of str, optional
+        ctrl_path: str, Path, or list of str or Path, optional
           If specified, only the path(s) provided would be considered
         """
         if self._connections:
-            from datalad.utils import assure_list
-            ctrl_paths = assure_list(ctrl_path)
+            ctrl_paths = [Path(p) for p in ensure_list(ctrl_path)]
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
@@ -603,6 +799,17 @@ class SSHManager(object):
                         lgr.debug("Failed to close a connection: "
                                   "%s", exc_str(exc))
             self._connections = dict()
+
+
+# retain backward compat with 0.13.4 and earlier
+# should be ok since cfg already defined by the time this one is imported
+from .. import cfg
+if cfg.obtain('datalad.ssh.multiplex-connections'):
+    SSHManager = MultiplexSSHManager
+    SSHConnection = MultiplexSSHConnection
+else:
+    SSHManager = NoMultiplexSSHManager
+    SSHConnection = NoMultiplexSSHConnection
 
 
 def _quote_filename_for_scp(name):

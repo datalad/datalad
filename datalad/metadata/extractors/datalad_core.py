@@ -20,6 +20,7 @@ from os.path import exists
 from datalad.consts import (
     DATASET_METADATA_FILE,
     DATALAD_DOTDIR,
+    WEB_SPECIAL_REMOTE_UUID,
 )
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
@@ -120,7 +121,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             meta = {'url': whereis[remote].get('urls', [])
                     for remote in whereis
                     # "web" remote
-                    if remote == "00000000-0000-0000-0000-000000000001" and
+                    if remote == WEB_SPECIAL_REMOTE_UUID and
                     whereis[remote].get('urls', None)}
             yield (file, meta)
         log_progress(

@@ -12,13 +12,15 @@ import os.path as op
 import datalad.utils as ut
 
 from datalad.tests.utils import (
-    with_tempfile,
-    assert_equal,
     assert_dict_equal,
+    assert_equal,
+    assert_false,
     assert_in,
     assert_not_in,
     assert_raises,
     known_failure_githubci_win,
+    slow,
+    with_tempfile,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -29,6 +31,7 @@ from datalad.tests.utils import (
 )
 
 
+@slow  # 10sec on travis
 @known_failure_githubci_win
 @with_tempfile
 def test_get_content_info(path):
@@ -257,3 +260,23 @@ def test_annexinfo_init(path):
     assert_in(foo, cinfo_init_none)
     assert_in(bar, cinfo_init_none)
     assert_not_in("gitshasum", cinfo_init_none[foo])
+
+
+@with_tempfile
+def test_info_path_inside_submodule(path):
+    ds = Dataset(path).create()
+    subds = ds.create("submod")
+    foo = (subds.pathobj / "foo")
+    foo.write_text("foo")
+    ds.save(recursive=True)
+    cinfo = ds.repo.get_content_info(
+        ref="HEAD", paths=[foo.relative_to(ds.pathobj)])
+    assert_in("gitshasum", cinfo[subds.pathobj])
+
+
+@with_tempfile
+def test_get_content_info_dotgit(path):
+    ds = Dataset(path).create()
+    # Files in .git/ won't be reported, though this takes a kludge on our side
+    # before Git 2.25.
+    assert_false(ds.repo.get_content_info(paths=[op.join(".git", "config")]))

@@ -8,31 +8,42 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test logging facilities """
 
+import inspect
 import logging
-import re
 import os.path
 from os.path import exists
 
 from logging import makeLogRecord
-from nose.tools import assert_raises, assert_is_instance, assert_true
-from git.exc import GitCommandError
 
 from unittest.mock import patch
 
-from datalad.log import LoggerHelper
-from datalad.log import TraceBack
-from datalad.log import ColorFormatter
-from datalad import cfg
+from datalad.log import (
+    ColorFormatter,
+    LoggerHelper,
+    log_progress,
+    TraceBack,
+    with_progress,
+    with_result_progress,
+)
+from datalad import cfg as dl_cfg
 from datalad.support.constraints import EnsureBool
 from datalad.support import ansi_colors as colors
 
-from datalad.tests.utils import with_tempfile, ok_, assert_equal
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import ok_endswith
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    assert_equal,
+    assert_in,
+    assert_not_in,
+    assert_re_in,
+    known_failure_githubci_win,
+    ok_,
+    ok_endswith,
+    ok_generator,
+    swallow_logs,
+    with_tempfile,
+    SkipTest,
+)
+from datalad.utils import on_windows
+
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -58,9 +69,9 @@ def test_logging_to_a_file(dst):
     # so matching just with regexp
     # (...)? is added to swallow possible traceback logs
     regex = "\[ERROR\]"
-    if EnsureBool()(cfg.get('datalad.log.timestamp', False)):
+    if EnsureBool()(dl_cfg.get('datalad.log.timestamp', False)):
         regex = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} " + regex
-    if EnsureBool()(cfg.get('datalad.log.vmem', False)):
+    if EnsureBool()(dl_cfg.get('datalad.log.vmem', False)):
         regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
     regex += "(\s+\S+\s*)? " + msg
     assert_re_in(regex, line, match=True)
@@ -111,7 +122,8 @@ def check_filters(name):
         lgr3.info('log3')
         assert_in('log1', cml.out)
         assert_in('log2', cml.out)
-        assert 'log3' not in cml.out
+        assert_not_in('log3', cml.out)
+
 
 def test_filters():
     def _mock_names(self, v, d=None):
@@ -153,7 +165,71 @@ def test_color_formatter():
                  name='some name'))
 
         cf = ColorFormatter(use_color=use_color)
+        if on_windows:
+            raise SkipTest('Unclear under which conditions coloring should work')
         (assert_in if use_color else assert_not_in)(colors.RESET_SEQ, cf.format(rec))
 
 
 # TODO: somehow test is stdout/stderr get their stuff
+
+
+@patch("datalad.log.is_interactive", lambda: False)
+def test_log_progress_noninteractive_filter():
+    name = "dl-test"
+    lgr = LoggerHelper(name).get_initialized_logger()
+    pbar_id = "lp_test"
+    with swallow_logs(new_level=logging.INFO, name=name) as cml:
+        log_progress(lgr.info, pbar_id, "Start", label="testing", total=3)
+        log_progress(lgr.info, pbar_id, "THERE0", update=1)
+        log_progress(lgr.info, pbar_id, "NOT", update=1,
+                     noninteractive_level=logging.DEBUG)
+        log_progress(lgr.info, pbar_id, "THERE1", update=1,
+                     noninteractive_level=logging.INFO)
+        log_progress(lgr.info, pbar_id, "Done")
+        for present in ["Start", "THERE0", "THERE1", "Done"]:
+            assert_in(present, cml.out)
+        assert_not_in("NOT", cml.out)
+
+
+def test_with_result_progress_generator():
+    # Tests ability for the decorator to decorate a regular function
+    # or a generator function (then it returns a generator function)
+
+    @with_result_progress
+    def func(l):
+        return l
+
+    generated = []
+    @with_result_progress
+    def gen(l):
+        for i in l:
+            generated.append(i)
+            yield i
+
+    recs = [{'status': 'ok', 'unrelated': i} for i in range(2)]
+    # still works for a func and returns provided list
+    ok_(not inspect.isgeneratorfunction(func))
+    assert_equal(func(recs), recs)
+
+    # generator should still yield and next iteration should only happen
+    # when requested
+    ok_(inspect.isgeneratorfunction(gen))
+    g = gen(recs)
+
+    ok_generator(g)
+    assert_equal(generated, [])  # nothing yet
+    assert_equal(next(g), recs[0])
+    assert_equal(generated, recs[:1])
+    assert_equal(next(g), recs[1])
+    assert_equal(generated, recs)
+
+    # just to make sure all good to redo
+    assert_equal(list(gen(recs)), recs)
+
+
+def test_with_progress_generator():
+    # Well, we could also pass an iterable directly now and display
+    # progress iterative over it
+    g = with_progress(range(3))
+    ok_generator(g)
+    assert_equal(list(g), list(range(3)))

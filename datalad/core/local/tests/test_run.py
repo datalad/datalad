@@ -26,16 +26,16 @@ import sys
 from unittest.mock import patch
 
 from datalad.utils import (
-    assure_unicode,
     chpwd,
+    ensure_unicode,
     on_windows,
 )
 
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
-    NoDatasetFound,
     CommandError,
+    NoDatasetFound,
 )
 from datalad.api import (
     run,
@@ -45,30 +45,31 @@ from datalad.core.local.run import (
     run_command,
 )
 from datalad.tests.utils import (
-    assert_raises,
     assert_false,
-    assert_repo_status,
-    with_tempfile,
-    with_tree,
-    ok_,
-    ok_exists,
-    ok_file_has_content,
-    create_tree,
-    eq_,
-    neq_,
-    assert_status,
-    assert_result_count,
     assert_in,
     assert_in_results,
     assert_not_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    create_tree,
+    DEFAULT_BRANCH,
+    eq_,
+    known_failure_appveyor,
+    known_failure_githubci_win,
+    known_failure_windows,
+    neq_,
+    OBSCURE_FILENAME,
+    ok_,
+    ok_exists,
+    ok_file_has_content,
+    slow,
     swallow_logs,
     swallow_outputs,
-    known_failure_githubci_win,
-    known_failure_appveyor,
-    known_failure_windows,
-    slow,
+    with_tempfile,
     with_testrepos,
-    OBSCURE_FILENAME,
+    with_tree,
 )
 
 
@@ -83,6 +84,12 @@ def test_invalid_call(path):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
+def last_commit_msg(repo):
+    # ATTN: Pass branch explicitly so that this check works when we're on an
+    # adjusted branch too (e.g., when this test is executed under Windows).
+    return repo.format_commit("%B", DEFAULT_BRANCH)
+
+
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
@@ -94,8 +101,8 @@ def test_basics(path, nodspath):
         # provoke command failure
         with assert_raises(CommandError) as cme:
             ds.run('7i3amhmuch9invalid')
-            # let's not speculate that the exit code is always 127
-            ok_(cme.code > 0)
+        # let's not speculate that the exit code is always 127
+        ok_(cme.exception.code > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('cd .> empty', message='TEST')
@@ -105,9 +112,7 @@ def test_basics(path, nodspath):
         assert_result_count(res, 1, action='add',
                             path=op.join(ds.path, 'empty'), type='file')
         assert_result_count(res, 1, action='save', path=ds.path)
-        # ATTN: Use master explicitly so that this check works when we're on an
-        # adjusted branch too (e.g., when this test is executed under Windows).
-        commit_msg = ds.repo.format_commit("%B", "master")
+        commit_msg = last_commit_msg(ds.repo)
         ok_(commit_msg.startswith('[DATALAD RUNCMD] TEST'))
         # crude test that we have a record for the PWD
         assert_in('"pwd": "."', commit_msg)
@@ -154,7 +159,11 @@ def test_py2_unicode_command(path):
     assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ0.dat"))
 
-    if not on_windows:  # FIXME
+    # somewhat desperate attempt to detect our own Github CI tests on a
+    # crippled filesystem (VFAT) that is so crippled that it doesn't handle
+    # what is needed here. It just goes mad with encoded bytestrings:
+    # CommandError: ''python -c '"'"'import sys; open(sys.argv[1], '"'"'"'"'"'"'"'"'w'"'"'"'"'"'"'"'"').write('"'"'"'"'"'"'"'"''"'"'"'"'"'"'"'"')'"'"' '"'"' β1 '"'"''' failed with exitcode 1 under /crippledfs/
+    if not on_windows and os.environ.get('TMPDIR', None) != '/crippledfs':  # FIXME
         ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
         assert_repo_status(ds.path)
         ok_exists(op.join(path, u"bβ1.dat"))
@@ -187,23 +196,30 @@ def test_sidecar(path):
     ds.config.set("datalad.run.record-sidecar", "false", where="local")
     ds.run("cd .> dummy1", message="sidecar config")
 
-    def last_commit_msg():
-        # ATTN: Use master explicitly so that this check works when we're on an
-        # adjusted branch too (e.g., when this test is executed under Windows).
-        return ds.repo.format_commit("%B", "master")
-
-    assert_in('"cmd":', last_commit_msg())
+    assert_in('"cmd":', last_commit_msg(ds.repo))
 
     ds.config.set("datalad.run.record-sidecar", "true", where="local")
     ds.run("cd .> dummy2", message="sidecar config")
-    assert_not_in('"cmd":', last_commit_msg())
+    assert_not_in('"cmd":', last_commit_msg(ds.repo))
 
     # Don't break when config.get() returns multiple values. Here it's two
     # values in .gitconfig, but a more realistic scenario is a value in
     # $repo/.git/config that overrides a setting in ~/.config/git/config.
     ds.config.add("datalad.run.record-sidecar", "false", where="local")
     ds.run("cd .> dummy3", message="sidecar config")
-    assert_in('"cmd":', last_commit_msg())
+    assert_in('"cmd":', last_commit_msg(ds.repo))
+
+
+    # make sure sidecar file is committed when explicitly specifiying outputs
+    ds.run("cd .> dummy4",
+           outputs=["dummy4"],
+           sidecar=True,
+           explicit=True,
+           message="sidecar + specified outputs")
+    assert_not_in('"cmd":', last_commit_msg(ds.repo))
+    assert_repo_status(ds.path)
+
+
 
 
 @with_tree(tree={"to_remove": "abc"})
@@ -254,7 +270,7 @@ def test_run_from_subds_gh3551(path):
     assert_repo_status(ds.path)
     subds = Dataset(op.join(ds.path, subds_path))
     ok_exists(op.join(subds.path, "f"))
-    if not on_windows:  # FIXME
+    if not ds.repo.is_managed_branch():  # FIXME
         # This check fails on Windows:
         # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
         ok_(subds.repo.file_has_content("f"))
@@ -263,7 +279,6 @@ def test_run_from_subds_gh3551(path):
 # unexpected content of state "modified", likely a more fundamental issue with the
 # testrepo setup
 @known_failure_githubci_win
-@slow  # ~10s
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -333,7 +348,7 @@ def test_inputs_quotes_needed(path):
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
     with open(op.join(path, "out0")) as ifh:
-        eq_(assure_unicode(ifh.read()), expected)
+        eq_(ensure_unicode(ifh.read()), expected)
     # ... but the list form of a command does not. (Don't test this failure
     # with the obscure file name because we'd need to know its composition to
     # predict the failure.)
@@ -350,9 +365,7 @@ def test_inject(path):
                      dataset=ds,
                      inject=True,
                      extra_info={"custom_key": "custom_field"}))
-    # ATTN: Use master explicitly so that this check works when we're on an
-    # adjusted branch too (e.g., when this test is executed under Windows).
-    msg = ds.repo.format_commit("%B", "master")
+    msg = last_commit_msg(ds.repo)
     assert_in("custom_key", msg)
     assert_in("nonsense command", msg)
 

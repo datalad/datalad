@@ -9,8 +9,6 @@
 
 from os.path import join as opj
 
-from datalad import cfg
-
 # this must import ok with and without pygithub
 from datalad.api import (
     create_sibling_github,
@@ -18,7 +16,6 @@ from datalad.api import (
 )
 from datalad.utils import (
     ensure_list,
-    chpwd,
 )
 from datalad.tests.utils import (
     assert_equal,
@@ -117,31 +114,19 @@ def test_integration1_yarikoptic():
     # use case 1 - oauthtoken is known to git config, no 2FA (although irrelevant)
     check_integration1(
         'yarikoptic',
-        oauthtokens='does not matter - vcr has "token"'
+        oauthtokens='secret-token',
     )
-
-
-#@skip_if_no_network
-#@use_cassette('github_datalad_tester')
-#@with_testsui(responses=[
-#    'datalad-tester',
-#    'secret-password',
-#    'yes',      # Generate a GitHub token?
-#    '2FA code', # VCR tape has a real one
-#    'local',    # Where to store the token?
-#])
-#def test_integration1_datalad_tester():
-#    # use case 2 - nothing is known, 2FA, would generate 'DataLad token', and save it
-#    check_integration1('datalad-tester')
 
 
 @skip_if_no_network
 @use_cassette('github_datalad_tester_org')
 @with_testsui(responses=[
-     'secret-password',
-     'yes',      # Generate a GitHub token?
-     '2FA code', # VCR tape has a real one
-     'local',    # Where to store the token?
+    # place a real token here if regenerating the tape, and then
+    # sed -i \
+    # -e 's,21...................................11f,secret-token, g'\
+    # datalad/distribution/tests/vcr_cassettes/github_datalad_tester_org.yaml\
+    # datalad/distribution/tests/test_create_github.py
+      'secret-token',
 ])
 def test_integration1_datalad_tester_org():
     # similar to use case 2 but into another organization,

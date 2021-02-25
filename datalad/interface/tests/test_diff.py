@@ -13,26 +13,33 @@
 __docformat__ = 'restructuredtext'
 
 
-
 from os.path import join as opj
-from datalad.utils import chpwd
-
-from datalad.cmd import GitRunner
-
+from datalad.cmd import (
+    GitWitlessRunner,
+    StdOutCapture,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.api import diff
 from datalad.interface.diff import _parse_git_diff
 from datalad.consts import PRE_INIT_COMMIT_SHA
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import ok_
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    known_failure_windows,
+    with_tempfile,
+    with_tree,
+    create_tree,
+    ok_,
+    eq_,
+    assert_status,
+    assert_repo_status,
+    assert_result_count,
+    known_failure_githubci_win,
+    SkipTest,
+)
+from datalad.utils import on_windows
+
+
+if on_windows:
+    raise SkipTest('Deprecated code, will never work on Windows')
 
 
 @known_failure_windows
@@ -42,8 +49,10 @@ def test_magic_number():
     # commit
     # given the level of dark magic, we better test whether this stays
     # constant across Git versions (it should!)
-    out, err = GitRunner().run('git hash-object -t tree /dev/null')
-    eq_(out.strip(), PRE_INIT_COMMIT_SHA)
+    out = GitWitlessRunner().run(
+        ['git', 'hash-object', '-t', 'tree', '/dev/null'],
+        protocol=StdOutCapture)
+    eq_(out['stdout'].strip(), PRE_INIT_COMMIT_SHA)
 
 
 @known_failure_githubci_win
@@ -51,7 +60,7 @@ def test_magic_number():
 @with_tempfile(mkdir=True)
 def test_diff(path, norepo):
     ds = Dataset(path).create()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # reports stupid revision input
     assert_result_count(
         ds._diff(revision='WTF', on_failure='ignore'),
@@ -67,7 +76,7 @@ def test_diff(path, norepo):
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
     ds.save(to_git=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     res = ds._diff(revision='HEAD~1')
     assert_result_count(res, 1)
     assert_result_count(
@@ -100,7 +109,7 @@ def test_diff(path, norepo):
         ds._diff(revision='HEAD'), 1,
         action='diff', path=opj(ds.path, 'new'), state='modified')
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # untracked stuff
     create_tree(ds.path, {'deep': {'down': 'untracked', 'down2': 'tobeadded'}})
@@ -165,7 +174,7 @@ def test_diff_recursive(path):
     ds.save(sub.path)
     # save addition in parent
     ds.save()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # look at the last change, only one file was added
     res = ds._diff(revision='HEAD~1..HEAD')
     assert_result_count(res, 1)

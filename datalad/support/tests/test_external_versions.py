@@ -11,27 +11,35 @@ import logging
 
 from os import linesep
 
-from ... import __version__
-from ...dochelpers import exc_str
-from ...version import __version__
+from datalad import __version__
+from datalad.dochelpers import exc_str
+from datalad.version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
-from ..exceptions import CommandError
-from ..exceptions import OutdatedExternalDependency, MissingExternalDependency
-from ...support.annexrepo import AnnexRepo
-from ...tests.utils import (
-    with_tempfile,
+from datalad.support.exceptions import (
+    CommandError,
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.tests.utils import (
     create_tree,
     set_annex_version,
     swallow_logs,
+    patch,
+    with_tempfile,
 )
 
-from unittest.mock import patch
-from nose.tools import (
-    assert_true, assert_false,
-    assert_equal, assert_greater_equal, assert_greater,
-    assert_raises, assert_in
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_greater_equal,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_true,
 )
-from nose import SkipTest
+from datalad.tests.utils import SkipTest
 
 
 # just to ease testing
@@ -72,17 +80,17 @@ def test_external_versions_basic():
     assert_raises(TypeError, assert_greater, ev['os'], '0')
 
     return
-    # Code below is from original duecredit, and we don't care about
-    # testing this one
-    # And we can get versions based on modules themselves
-    from datalad.tests import mod
-    assert_equal(ev[mod], mod.__version__)
+    ## Code below is from original duecredit, and we don't care about
+    ## testing this one
+    ## And we can get versions based on modules themselves
+    #from datalad.tests import mod
+    #assert_equal(ev[mod], mod.__version__)
 
-    # Check that we can get a copy of the versions
-    versions_dict = ev.versions
-    versions_dict[our_module] = "0.0.1"
-    assert_equal(versions_dict[our_module], "0.0.1")
-    assert_equal(ev[our_module], __version__)
+    ## Check that we can get a copy of the versions
+    #versions_dict = ev.versions
+    #versions_dict[our_module] = "0.0.1"
+    #assert_equal(versions_dict[our_module], "0.0.1")
+    #assert_equal(ev[our_module], __version__)
 
 
 def test_external_version_contains():
@@ -156,10 +164,10 @@ def test_custom_versions():
 def test_ancient_annex():
 
     class _runner(object):
-        def run(self, cmd):
+        def run(self, cmd, *args, **kwargs):
             if '--raw' in cmd:
                 raise CommandError
-            return "git-annex version: 0.1", ""
+            return dict(stdout="git-annex version: 0.1", stderr="")
 
     ev = ExternalVersions()
     with patch('datalad.support.external_versions._runner', _runner()):
@@ -168,8 +176,8 @@ def test_ancient_annex():
 
 def _test_annex_version_comparison(v, cmp_):
     class _runner(object):
-        def run(self, cmd):
-            return v, ""
+        def run(self, cmd, *args, **kwargs):
+            return dict(stdout=v, stderr="")
 
     ev = ExternalVersions()
     with set_annex_version(None), \
@@ -229,8 +237,8 @@ def test_system_ssh_version():
         ev = ExternalVersions()
         # TODO: figure out leaner way
         class _runner(object):
-            def run(self, cmd, expect_fail, expect_stderr):
-                return "", s
+            def run(self, cmd, *args, **kwargs):
+                return dict(stdout="", stderr=s)
         with patch('datalad.support.external_versions._runner', _runner()):
             assert_equal(ev['cmd:system-ssh'], v)
 
@@ -255,3 +263,24 @@ def test_check():
 
     with assert_raises(OutdatedExternalDependency):
         ev.check('datalad', min_version="10000000")  # we will never get there!
+
+
+def test_add():
+    ev = ExternalVersions()
+    ev.add('custom1', lambda: "0.1.0")
+    assert_in("custom1=0.1.0", ev.dumps(query=True))
+    assert_not_in("numpy", ev.INTERESTING)  # we do not have it by default yet
+    assert_not_in("numpy=", ev.dumps(query=True))
+    ev.add('numpy')
+    try:
+        import numpy
+    except ImportError:
+        # no numpy, we do not have some bogus entry
+        assert_not_in("numpy=", ev.dumps(query=True))
+    else:
+        assert_in("numpy=%s" % numpy.__version__, ev.dumps(query=True))
+    assert_in("custom1=0.1.0", ev.dumps(query=True))  # we still have that one
+
+    # override with a new function will work
+    ev.add('custom1', lambda: "0.2.0")
+    assert_in("custom1=0.2.0", ev.dumps(query=True))

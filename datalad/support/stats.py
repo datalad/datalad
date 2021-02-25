@@ -185,8 +185,8 @@ class ActivityStats(object):
                 if o[0] != ' ':
                     out[i] = '  ' + o
             return ','.join(out).lstrip()
-            return "{files} files (git/annex: {add_git}/{add_annex}), " \
-                   "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(
-                       **entries)
+            #return "{files} files (git/annex: {add_git}/{add_annex}), " \
+            #       "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(
+            #           **entries)
         else:
             raise ValueError("Unknown mode %s" % mode)

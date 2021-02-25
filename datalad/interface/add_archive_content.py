@@ -18,7 +18,7 @@ import re
 import os
 import tempfile
 
-from os.path import join as opj, realpath, curdir, exists, lexists, relpath, basename
+from os.path import join as opj, curdir, exists, lexists, relpath, basename
 from os.path import commonprefix
 from os.path import sep as opsep
 from os.path import islink
@@ -34,12 +34,14 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 
 from ..support.annexrepo import AnnexRepo
+from datalad.support.exceptions import FileNotInRepositoryError
 from ..support.strings import apply_replacement_rules
 from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
-from ..utils import assure_tuple_or_list
+from ..utils import Path
+from ..utils import ensure_tuple_or_list
 from ..utils import get_dataset_root
 from ..utils import split_cmdline
 
@@ -204,9 +206,9 @@ class AddArchiveContent(Interface):
         annex
         """
         if exclude:
-            exclude = assure_tuple_or_list(exclude)
+            exclude = ensure_tuple_or_list(exclude)
         if rename:
-            rename = assure_tuple_or_list(rename)
+            rename = ensure_tuple_or_list(rename)
 
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex
@@ -216,7 +218,9 @@ class AddArchiveContent(Interface):
             annex = get_repo_instance(pwd, class_=AnnexRepo)
             if not isabs(archive):
                 # if not absolute -- relative to wd and thus
-                archive_path = normpath(opj(realpath(pwd), archive))
+                # normpath() use here is likely problematic (backtracks symlinks
+                # improperly)
+                archive_path = normpath(str(Path(pwd).resolve() / archive))
                 # abspath(archive) is not "good" since dereferences links in the path
                 # archive_path = abspath(archive)
         elif not isabs(archive):
@@ -225,12 +229,13 @@ class AddArchiveContent(Interface):
             archive_path = opj(annex.path, archive)
         annex_path = annex.path
 
+        # Use `get_dataset_root` to avoid resolving the leading path.
+        ds_root = get_dataset_root(archive_path)
+        if ds_root is None:
+            # no repo was found
+            raise FileNotInRepositoryError(archive_path)
         # _rpath below should depict paths relative to the top of the annex
-        archive_rpath = relpath(
-            archive_path,
-            # Use `get_dataset_root` to avoid resolving the leading path. If no
-            # repo is found, downstream code will raise FileNotInRepositoryError.
-            get_dataset_root(archive_path) or ".")
+        archive_rpath = relpath(archive_path, ds_root)
 
         if archive in annex.untracked_files:
             raise RuntimeError(
@@ -336,7 +341,7 @@ class AddArchiveContent(Interface):
                 extracted_path = opj(earchive.path, extracted_file)
 
                 if islink(extracted_path):
-                    link_path = realpath(extracted_path)
+                    link_path = str(Path(extracted_path).resolve())
                     if not exists(link_path):  # TODO: config  addarchive.symlink-broken='skip'
                         lgr.warning("Path %s points to non-existing file %s" % (extracted_path, link_path))
                         stats.skipped += 1

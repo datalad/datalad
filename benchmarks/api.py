@@ -9,13 +9,6 @@
 
 from os.path import join as opj
 
-try:
-    from datalad.api import rev_save
-    from datalad.api import rev_create
-except ImportError:
-    # If it is a version without revolution - those will not be benchmarked
-    pass
-
 from datalad.api import create
 from datalad.api import create_test_dataset
 from datalad.api import install
@@ -78,16 +71,9 @@ class supers(SampleSuperDatasetBenchmarks):
     def time_createadd(self):
         assert self.ds.create('newsubds')
 
-    def time_rev_createadd(self):
-        assert self.ds.rev_create('newsubds')
-
-    def time_rev_createadd_to_dataset(self):
-        subds = rev_create(opj(self.ds.path, 'newsubds'))
-        self.ds.rev_save(subds.path)
-
     def time_createadd_to_dataset(self):
         subds = create(opj(self.ds.path, 'newsubds'))
-        self.ds.add(subds.path)
+        self.ds.save(subds.path)
 
     def time_ls(self):
         ls(self.ds.path)
@@ -108,8 +94,8 @@ class supers(SampleSuperDatasetBenchmarks):
         next(self.ds.subdatasets(recursive=True, return_type='generator'))
 
     def time_uninstall(self):
-        for subm in self.ds.repo.get_submodules():
-            self.ds.uninstall(subm.path, recursive=True, check=False)
+        for subm in self.ds.repo.get_submodules_():
+            self.ds.uninstall(subm["path"], recursive=True, check=False)
 
     def time_remove(self):
         remove(self.ds.path, recursive=True)

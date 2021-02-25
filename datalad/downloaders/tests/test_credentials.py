@@ -9,18 +9,24 @@
 """Tests for credentials"""
 
 from unittest.mock import patch
-
-from datalad.tests.utils import with_testsui
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_true, assert_false
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import SkipTest
-from datalad.support.keyring_ import MemoryKeyring
-from datalad.support.keyring_ import Keyring
-from ..credentials import UserPassword
-from ..credentials import CompositeCredential
-from ..credentials import AWS_S3
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_in,
+    assert_raises,
+    assert_true,
+    SkipTest,
+    with_testsui,
+)
+from datalad.support.keyring_ import (
+    Keyring,
+    MemoryKeyring,
+)
+from ..credentials import (
+    AWS_S3,
+    CompositeCredential,
+    UserPassword,
+)
 
 
 @with_testsui(responses=[
@@ -105,10 +111,9 @@ def test_composite_credential1():
     cred.enter_new()
     assert_equal(keyring.get('name', 'user'), 'user2')
     assert_equal(keyring.get('name', 'password'), 'password2')
-    assert_equal(keyring.get('name:1', 'user'), None)
-    assert_equal(keyring.get('name:1', 'password'), None)
-    # which would get reevaluated if requested
-    assert_equal(keyring.entries, {'name:1': {}, 'name': {'user': 'user2', 'password': 'password2'}})
+    # we immediately refresh all credentials in the chain
+    assert_equal(keyring.get('name:1', 'user'), 'user2_1')
+    assert_equal(keyring.get('name:1', 'password'), 'password2_2')
     assert_equal(cred(), {'user': 'user2_1', 'password': 'password2_2'})
 
 

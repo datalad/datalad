@@ -10,17 +10,17 @@
 import os
 import os.path as op
 
-from .utils import (
+from datalad.utils import get_home_envvars
+
+from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
     chpwd,
     get_dataset_root,
-    with_tree,
-    swallow_logs,
-
-    assert_raises,
-    assert_equal,
-    assert_in,
     ok_file_has_content,
     SkipTest,
+    swallow_logs,
+    with_tree,
 )
 
 from unittest.mock import patch
@@ -74,7 +74,7 @@ def test_git_config_warning(path):
     if 'GIT_AUTHOR_NAME' in os.environ:
         raise SkipTest("Found existing explicit identity config")
     with chpwd(path), \
-            patch.dict('os.environ', {'HOME': path}), \
+            patch.dict('os.environ', get_home_envvars(path)), \
             swallow_logs(new_level=30) as cml:
         # no configs in that empty HOME
         from datalad.api import Dataset

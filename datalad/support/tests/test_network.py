@@ -10,6 +10,8 @@
 import logging
 
 import os
+import sys
+
 from os.path import (
     join as opj,
     isabs,
@@ -41,23 +43,24 @@ from datalad.tests.utils import (
 )
 
 from datalad.support.network import (
-    same_website,
-    dlurljoin,
-    get_tld,
-    get_url_straight_filename,
-    get_response_disposition_filename,
-    parse_url_opts,
+    DataLadRI,
+    GitTransportRI,
+    PathRI,
     RI,
     SSHRI,
-    PathRI,
-    DataLadRI,
     URL,
     _split_colon,
-    is_url,
-    is_datalad_compat_ri,
+    dlurljoin,
     get_local_file_url,
+    get_response_disposition_filename,
+    get_tld,
+    get_url_straight_filename,
+    is_datalad_compat_ri,
     is_ssh,
+    is_url,
     iso8601_to_epoch,
+    parse_url_opts,
+    same_website,
 )
 
 
@@ -175,6 +178,10 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         with assert_raises(ValueError):
             ri_.localpath
 
+    # This one does not have a path. TODO: either proxy path from its .RI or adjust
+    # hierarchy of classes to make it more explicit
+    if cls == GitTransportRI:
+        return
     # do changes in the path persist?
     old_str = str(ri_)
     ri_.path = newpath = opj(ri_.path, 'sub')
@@ -337,6 +344,18 @@ def test_url_samples():
     raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
 
 
+def test_git_transport_ri():
+    _check_ri("gcrypt::http://somewhere", GitTransportRI, RI='http://somewhere', transport='gcrypt')
+    # man git-push says
+    #  <transport>::<address>
+    #    where <address> may be a path, a server and path, or an arbitrary URL-like string...
+    # so full path to my.com/... should be ok?
+    _check_ri("http::/my.com/some/path", GitTransportRI, RI='/my.com/some/path', transport='http')
+    # some ssh server.  And we allow for some additional chars in transport.
+    # Git doesn't define since it does not care! we will then be flexible too
+    _check_ri("trans-port::server:path", GitTransportRI, RI='server:path', transport='trans-port')
+
+
 def _test_url_quote_path(cls, clskwargs, target_url):
     path = '/ "\';a&b&cd `| '
     if not (cls is PathRI):
@@ -439,13 +458,13 @@ def test_get_local_file_url():
     for path, url in (
                 # relpaths are special-cased below
                 ('test.txt', 'test.txt'),
+            ) + (
+                ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
+            ) if on_windows else (
                 # static copy of "most_obscore_name"
                 (' "\';a&b&cΔЙקم๗あ `| ',
                  # and translation by google chrome
                  "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
-            ) + (
-                ('C:\\Windows\\Notepad.exe', 'file://C/Windows/Notepad.exe'),
-            ) if on_windows else (
                 ('/a', 'file:///a'),
                 ('/a/b/c', 'file:///a/b/c'),
                 ('/a~', 'file:///a~'),
@@ -453,6 +472,16 @@ def test_get_local_file_url():
                 #('/a b/', 'file:///a%20b/'),
                 ('/a b/name', 'file:///a%20b/name'),
             ):
+        try:
+            # Yarik found no better way to trigger.  .decode() isn't enough
+            print("D: %s" % path)
+        except UnicodeEncodeError:
+            if sys.version_info < (3, 7):
+                # observed test failing on ubuntu 18.04 with python 3.6
+                # (reproduced in conda env locally with python 3.6.10 when LANG=C
+                # We will just skip this tricky one
+                continue
+            raise
         if isabs(path):
             eq_(get_local_file_url(path), url)
         else:
@@ -512,8 +541,8 @@ def test_is_ssh():
 def test_iso8601_to_epoch():
     epoch = 1467901515
     eq_(iso8601_to_epoch('2016-07-07T14:25:15+00:00'), epoch)
-    # zone information is actually not used
-    eq_(iso8601_to_epoch('2016-07-07T14:25:15+11:00'), epoch)
+    eq_(iso8601_to_epoch('2016-07-07T14:25:15+11:00'),
+        epoch - 11 * 60 * 60)
     eq_(iso8601_to_epoch('2016-07-07T14:25:15Z'), epoch)
     eq_(iso8601_to_epoch('2016-07-07T14:25:15'), epoch)
 

@@ -243,7 +243,7 @@ def test_providers_badre(path):
     """Test that a config with a bad regular expression doesn't crash
 
     Ensure that when a provider config has a bad url_re, there is no
-	exception thrown and a valid warning is provided.
+    exception thrown and a valid warning is provided.
     """
 
     providers = Providers.from_config_files(

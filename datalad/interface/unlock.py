@@ -32,7 +32,7 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.utils import Path
 
 from .base import Interface
@@ -63,6 +63,16 @@ class Unlock(Interface):
         recursion_limit=recursion_limit,
     )
 
+    _examples_ = [
+        dict(text="Unlock a single file",
+             code_py="unlock(path='path/to/file')",
+             code_cmd="datalad unlock <path/to/file>"),
+        dict(text="Unlock all contents in the dataset",
+             code_py="unlock('.')",
+             code_cmd="datalad unlock ."),
+    ]
+
+
     @staticmethod
     @datasetmethod(name='unlock')
     @eval_results
@@ -81,7 +91,7 @@ class Unlock(Interface):
         paths_nondir = set()
         paths_lexist = None
         if path:
-            path = resolve_path(assure_list(path), ds=dataset)
+            path = resolve_path(ensure_list(path), ds=dataset)
             paths_lexist = []
             for p in path:
                 if p.exists() or p.is_symlink():
@@ -145,8 +155,8 @@ class Unlock(Interface):
         # Do the actual unlocking.
         for ds_path, files in to_unlock.items():
             ds = Dataset(ds_path)
-            for r in ds.repo._run_annex_command_json(
-                    "unlock",
+            for r in ds.repo._call_annex_records(
+                    ["unlock"],
                     files=files):
                 yield get_status_dict(
                     path=op.join(ds.path, r['file']),

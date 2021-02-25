@@ -12,10 +12,10 @@ from datalad.utils import (
     on_windows,
 )
 from datalad.tests.utils import (
-    with_tempfile,
+    assert_result_count,
     eq_,
     ok_,
-    assert_result_count,
+    with_tempfile,
 )
 from datalad.api import (
     Dataset,
@@ -42,7 +42,7 @@ def test_basics(src, dst):
     clone.config.set(
         'datalad.result-hook.alwaysbids.call-json',
         # string substitutions based on the result record are supported
-        'run_procedure {{"dataset":"{path}","spec":"cfg_metadatatypes bids"}}',
+        'run_procedure {{"dataset":"{path}","spec":"cfg_metadatatypes bids dicom"}}',
         where='local',
     )
     # config on which kind of results this hook should operate
@@ -53,7 +53,9 @@ def test_basics(src, dst):
         where='local',
     )
     # a smoke test to see if a hook definition without any call args works too
-    clone.config.set('datalad.result-hook.wtf.call-json', 'wtf', where='local')
+    clone.config.set('datalad.result-hook.wtf.call-json',
+                     'wtf {{"result_renderer": "disabled"}}',
+                     where='local')
     clone.config.set(
         'datalad.result-hook.wtf.match-json',
         '{"type":"dataset","action":"install","status":["eq", "ok"]}',
@@ -91,23 +93,25 @@ def test_basics(src, dst):
     # setup done, now see if it works
     clone.get('subds')
     clone_sub = Dataset(clone.pathobj / 'subds')
-    eq_(clone_sub.config.get('datalad.metadata.nativetype'), 'bids')
+    eq_(clone_sub.config.get('datalad.metadata.nativetype', get_all=True),
+        ('bids', 'dicom'))
     # now the same thing with a result_xfm, should make no difference
     clone.get('subds2')
     clone_sub2 = Dataset(clone.pathobj / 'subds2')
-    eq_(clone_sub2.config.get('datalad.metadata.nativetype'), 'bids')
+    eq_(clone_sub2.config.get('datalad.metadata.nativetype', get_all=True),
+        ('bids', 'dicom'))
 
     # hook auto-unlocks the file
-    if not on_windows:
+    if not clone.repo.is_managed_branch():
         ok_((clone.pathobj / 'file1').is_symlink())
     res = clone.get('file1')
-    if not on_windows:
+    if not clone.repo.is_managed_branch():
         # we get to see the results from the hook too!
         assert_result_count(
             res, 1, action='unlock', path=str(clone.pathobj / 'file1'))
     ok_(not (clone.pathobj / 'file1').is_symlink())
 
-    if not on_windows:
+    if not clone.repo.is_managed_branch():
         # different hook places annoying file next to a file that was already present
         annoyed_file = clone.pathobj / 'file1_annoyed'
         ok_(not annoyed_file.exists())

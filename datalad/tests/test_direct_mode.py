@@ -10,34 +10,22 @@
 
 """
 
-
-
-import logging
-
-# Please do ignore possible unused marking.
-# This is used via Dataset class:
-import datalad.api
-from datalad import cfg
-
-from nose.tools import ok_
 from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.utils import swallow_logs
-from datalad.distribution.dataset import Dataset
 
-from ..support.exceptions import DirectModeNoLongerSupportedError
-from ..support import path as op
+from datalad.support.exceptions import (
+    CommandNotAvailableError,
+    DirectModeNoLongerSupportedError,
+)
+from datalad.support import path as op
 
-from .utils import with_tempfile
-from .utils import skip_if_no_network
-from .utils import with_testrepos
-from .utils import on_windows
-from .utils import SkipTest
-from .utils import assert_raises
-from .utils import assert_in
-from .utils import eq_
-
+from datalad.tests.utils import (
+    assert_in,
+    assert_raises,
+    SkipTest,
+    with_tempfile,
+)
 
 # if on_windows:
 #     raise SkipTest("Can't test direct mode switch, "
@@ -47,6 +35,42 @@ from .utils import eq_
 # if repo_version and int(repo_version) >= 6:
 #     raise SkipTest("Can't test direct mode switch, "
 #                    "if repository version 6 or later is enforced.")
+
+
+# originally lifted from AnnexRepo, kept here to simulate a repo
+# that is still in direct mode
+def _set_direct_mode(self, enable_direct_mode=True):
+    """Switch to direct or indirect mode
+
+    WARNING!  To be used only for internal development purposes.
+              We no longer support direct mode and thus setting it in a
+              repository would render it unusable for DataLad
+
+    Parameters
+    ----------
+    enable_direct_mode: bool
+        True means switch to direct mode,
+        False switches to indirect mode
+
+    Raises
+    ------
+    CommandNotAvailableError
+        in case you try to switch to indirect mode on a crippled filesystem
+    """
+    if self.is_crippled_fs() and not enable_direct_mode:
+        # TODO: ?? DIRECT - should we call git annex upgrade?
+        raise CommandNotAvailableError(
+            cmd="git-annex indirect",
+            msg="Can't switch to indirect mode on that filesystem.")
+
+    self.call_annex(['direct' if enable_direct_mode else 'indirect']),
+    self.config.reload()
+
+    # For paranoid we will just re-request
+    self._direct_mode = None
+    assert(self.is_direct_mode() == enable_direct_mode)
+
+    # All further workarounds were stripped - no direct mode is supported
 
 
 @with_tempfile
@@ -74,11 +98,14 @@ def test_direct_cfg(path1, path2):
         raise SkipTest(
             "Rest of test requires direct mode support in git-annex")
 
+    # TODO: Remove the rest of this test once GIT_ANNEX_MIN_VERSION is
+    # at least 7.20190912 (which dropped direct mode support).
+
     if ar.config.obtain("datalad.repo.version") >= 6:
         raise SkipTest("Created repo not v5, cannot test detection of direct mode repos")
     # and if repo existed before and was in direct mode, we fail too
     # Since direct= option was deprecated entirely, we use protected method now
-    ar._set_direct_mode(True)
+    _set_direct_mode(ar, True)
     assert ar.is_direct_mode()
     del ar  # but we would need to disable somehow the flywheel
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
@@ -94,15 +121,15 @@ def test_direct_cfg(path1, path2):
     ar2sub1 = AnnexRepo(op.join(path2, 'sub1'))
     # but now let's convert that sub1 to direct mode
     assert not ar2sub1.is_direct_mode()
-    ar2sub1._set_direct_mode(True)
+    _set_direct_mode(ar2sub1, True)
     assert ar2sub1.is_direct_mode()
     del ar2; del ar2sub1; AnnexRepo._unique_instances.clear()  # fight flyweight
 
     ar2 = AnnexRepo(path2)
-    ar2.get_submodules()
+    list(ar2.get_submodules_())
 
     # And what if we are trying to add pre-cloned repo in direct mode?
     ar2sub2 = AnnexRepo.clone(path1, op.join(path2, 'sub2'))
-    ar2sub2._set_direct_mode(True)
+    _set_direct_mode(ar2sub2, True)
     del ar2sub2; AnnexRepo._unique_instances.clear()  # fight flyweight
     ar2.add('sub2')

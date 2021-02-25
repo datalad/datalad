@@ -13,8 +13,10 @@ from .utils import *
 
 
 import datalad
-from datalad.support.network import get_url_response_stamp, is_url_quoted
-from datalad.utils import swallow_outputs
+from datalad.support.network import (
+    get_url_response_stamp,
+    is_url_quoted,
+)
 
 
 def test_is_url_quoted():

@@ -14,30 +14,28 @@ from os.path import (
     curdir,
     exists,
     join as opj,
-    normpath, isabs,
+    normpath,
     pardir,
-    realpath,
 )
 from weakref import WeakValueDictionary
 import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
-from datalad.dochelpers import exc_str
+from datalad.core.local.repo import repo_from_path
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
 # DueCredit
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
-from datalad.support.exceptions import NoDatasetFound
+from datalad.support.exceptions import (
+    NoDatasetFound,
+)
+from datalad.support.repo import path_based_str_repr
 from datalad.support.gitrepo import (
     GitRepo,
-    InvalidGitRepositoryError,
-    NoSuchPathError
 )
 from datalad.support.repo import PathBasedFlyweight
-from datalad.support.network import RI
-from datalad.support.exceptions import InvalidAnnexRepositoryError
 from datalad.support import path as op
 
 import datalad.utils as ut
@@ -50,7 +48,8 @@ from datalad.utils import (
     get_dataset_root as rev_get_dataset_root,
     Path,
     PurePath,
-    assure_list,
+    ensure_list,
+    quote_cmdlinearg,
 )
 
 
@@ -58,6 +57,7 @@ lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
 
 
+@path_based_str_repr
 class Dataset(object, metaclass=PathBasedFlyweight):
     """Representation of a DataLad dataset/repository
 
@@ -85,14 +85,19 @@ class Dataset(object, metaclass=PathBasedFlyweight):
     def _flyweight_preproc_path(cls, path):
         """Custom handling for few special abbreviations for datasets"""
         path_ = path
-        if path == '^':
-            # get the topmost dataset from current location. Note that 'zsh'
-            # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(get_dataset_root(curdir)).get_superdataset(
-                topmost=True).path
-        elif path == '^.':
-            # get the dataset containing current directory
-            path_ = get_dataset_root(curdir)
+        if path in ('^', '^.'):
+            dsroot = get_dataset_root(curdir)
+            if dsroot is None:
+                raise NoDatasetFound('No dataset contains path: {}'.format(
+                    str(Path.cwd())))
+            if path == '^':
+                # get the topmost dataset from current location. Note that 'zsh'
+                # might have its ideas on what to do with ^, so better use as -d^
+                path_ = Dataset(dsroot).get_superdataset(
+                    topmost=True).path
+            elif path == '^.':
+                # the dataset containing current directory
+                path_ = dsroot
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?
@@ -150,13 +155,28 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             self._pathobj = ut.Path(self._path)
         return self._pathobj
 
-    def __repr__(self):
-        return "<Dataset path=%s>" % self.path
-
     def __eq__(self, other):
-        if not hasattr(other, 'path'):
+        if not hasattr(other, 'pathobj'):
             return False
-        return realpath(self.path) == realpath(other.path)
+        # Ben: https://github.com/datalad/datalad/pull/4057#discussion_r370153586
+        # It's pointing to the same thing, while not being the same object
+        # (in opposition to the *Repo classes). So `ds1 == ds2`,
+        # `but ds1 is not ds2.` I thought that's a useful distinction. On the
+        # other hand, I don't think we use it anywhere outside tests yet.
+        me_exists = self.pathobj.exists()
+        other_exists = other.pathobj.exists()
+        if me_exists != other_exists:
+            # no chance this could be the same
+            return False
+        elif me_exists:
+            # check on filesystem
+            return self.pathobj.samefile(other.pathobj)
+        else:
+            # we can only do lexical comparison.
+            # this will fail to compare a long and a shortpath.
+            # on windows that could actually point to the same thing
+            # if it would exists, but this is how far we go with this.
+            return self.pathobj == other.pathobj
 
     def __getattr__(self, attr):
         # Assure that we are not just missing some late binding
@@ -232,7 +252,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # Also note, that this could be forged into a single big condition, but
         # that is hard to read and we should be well aware of the actual
         # criteria here:
-        if self._repo is not None and realpath(self.path) == self._repo.path:
+        if self._repo is not None and self.pathobj.resolve() == self._repo.pathobj:
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
@@ -265,34 +285,16 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # be the last reference, which would lead to those objects being
         # destroyed and therefore the constructor call would result in an
         # actually new instance. This is unnecessarily costly.
-        valid = False
-        for cls, ckw, kw in (
-                # Non-initialized is okay. We want to figure the correct instance to represent what's there - that's it.
-                (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
-                (GitRepo, {}, {})
-        ):
-            if cls.is_valid_repo(self._path, **ckw):
-                try:
-                    lgr.log(5, "Detected %s at %s", cls, self._path)
-                    self._repo = cls(self._path, create=False, **kw)
-                    valid = True
-                    break
-                except (InvalidGitRepositoryError, NoSuchPathError,
-                        InvalidAnnexRepositoryError) as exc:
-                    lgr.log(5,
-                            "Oops -- guess on repo type was wrong?: %s",
-                            exc_str(exc))
-
-        if not valid:
-            self._repo = None
-
-        if self._repo is None:
-            # Often .repo is requested to 'sense' if anything is installed
-            # under, and if so -- to proceed forward. Thus log here only
-            # at DEBUG level and if necessary "complaint upstairs"
+        try:
+            self._repo = repo_from_path(self._path)
+        except ValueError:
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
-        elif due.active:
-            # TODO: Figure out, when exactly this is needed. Don't think it makes sense to do this for every dataset,
+            self._repo = None
+            return
+
+        if due.active:
+            # TODO: Figure out, when exactly this is needed. Don't think it
+            #       makes sense to do this for every dataset,
             #       no matter what => we want .repo to be as cheap as it gets.
             # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
@@ -337,14 +339,15 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         -------
         ConfigManager
         """
-        repo = self.repo  # local binding
+        # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
+        repo = self.repo
         if repo is None:
             # if there's no repo (yet or anymore), we can't read/write config at
             # dataset level, but only at user/system level
             # However, if this was the case before as well, we don't want a new
             # instance of ConfigManager
             if self._cfg_bound in (True, None):
-                self._cfg = ConfigManager(dataset=None, dataset_only=False)
+                self._cfg = ConfigManager(dataset=None)
                 self._cfg_bound = False
 
         else:
@@ -585,7 +588,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 # New helpers, courtesy of datalad-revolution.
 
 
-def resolve_path(path, ds=None):
+def resolve_path(path, ds=None, ds_resolved=None):
     """Resolve a path specification (against a Dataset location)
 
     Any path is returned as an absolute path. If, and only if, a dataset
@@ -606,8 +609,11 @@ def resolve_path(path, ds=None):
     path : str or PathLike or list
       Platform-specific path specific path specification. Multiple path
       specifications can be given as a list
-    ds : Dataset or None
+    ds : Dataset or PathLike or None
       Dataset instance to resolve relative paths against.
+    ds_resolved : Dataset or None
+      A dataset instance that was created from `ds` outside can be provided
+      to avoid multiple instantiation on repeated calls.
 
     Returns
     -------
@@ -617,10 +623,10 @@ def resolve_path(path, ds=None):
     """
     got_ds_instance = isinstance(ds, Dataset)
     if ds is not None and not got_ds_instance:
-        ds = require_dataset(
+        ds = ds_resolved or require_dataset(
             ds, check_installed=False, purpose='path resolution')
     out = []
-    for p in assure_list(path):
+    for p in ensure_list(path):
         if ds is None or not got_ds_instance:
             # no dataset at all or no instance provided -> CWD is always the reference
             # nothing needs to be done here. Path-conversion and absolutification

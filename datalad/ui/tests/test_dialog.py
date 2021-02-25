@@ -17,13 +17,19 @@ from unittest.mock import (
     call,
     patch,
 )
-from ...tests.utils import eq_
-from ...tests.utils import assert_raises
-from ...tests.utils import assert_re_in
-from ...tests.utils import assert_in
-from ...tests.utils import ok_startswith
-from ...tests.utils import ok_endswith
+
+from datalad.utils import swallow_logs
+from ...tests.utils import (
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    eq_,
+    ok_endswith,
+    ok_startswith,
+)
 from ..dialog import (
+    ConsoleLog,
     DialogUI,
     IPythonUI,
 )
@@ -163,3 +169,44 @@ def test_IPythonUI():
     ui = IPythonUI()
     pbar = ui.get_progressbar(total=10)
     assert_in('notebook', str(pbar._tqdm))
+
+
+def test_silent_question():
+    # SilentConsoleLog must not be asked questions.
+    # If it is asked, RuntimeError would be thrown with details to help
+    # troubleshooting WTF is happening
+    from ..dialog import SilentConsoleLog
+    ui = SilentConsoleLog()
+    with assert_raises(RuntimeError) as cme:
+        ui.question("could you help me", title="Pretty please")
+    assert_in('question: could you help me. Title: Pretty please.', str(cme.exception))
+
+    with assert_raises(RuntimeError) as cme:
+        ui.question("could you help me", title="Pretty please", choices=['secret1'], hidden=True)
+    assert_in('question: could you help me. Title: Pretty please.', str(cme.exception))
+    assert_not_in('secret1', str(cme.exception))
+    assert_in('not shown', str(cme.exception))
+
+    # additional kwargs, no title, choices
+    with assert_raises(RuntimeError) as cme:
+        ui.question("q", choices=['secret1'])
+    assert_in('secret1', str(cme.exception))
+
+
+@patch("datalad.log.is_interactive", lambda: False)
+def test_message_pbar_state_logging_is_demoted():
+    from datalad.log import LoggerHelper
+
+    name = "dl-test"
+    lgr = LoggerHelper(name).get_initialized_logger()
+    ui = ConsoleLog()
+
+    with patch("datalad.ui.dialog.lgr", lgr):
+        with swallow_logs(name=name, new_level=20) as cml:
+            ui.message("testing 0")
+            assert_not_in("Clear progress bars", cml.out)
+            assert_not_in("Refresh progress bars", cml.out)
+        with swallow_logs(name=name, new_level=5) as cml:
+            ui.message("testing 1")
+            assert_in("Clear progress bars", cml.out)
+            assert_in("Refresh progress bars", cml.out)

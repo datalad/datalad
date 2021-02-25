@@ -15,35 +15,46 @@ import logging
 from copy import deepcopy
 
 import os
-from os.path import join as opj
-from os.path import basename
-from os.path import lexists
-from os.path import normpath
-from os.path import abspath
-
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import slow
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.tests.utils import assert_cwd_unchanged
-
-
+from os.path import (
+    join as opj,
+    basename,
+    lexists,
+    normpath,
+    abspath,
+)
+from datalad.tests.utils import (
+    with_tree,
+    with_tempfile,
+    eq_,
+    assert_repo_status,
+    assert_result_count,
+    assert_raises,
+    assert_not_in,
+    create_tree,
+    slow,
+    swallow_logs,
+    known_failure_githubci_win,
+    assert_cwd_unchanged,
+    SkipTest,
+)
 from datalad.distribution.dataset import Dataset
-from datalad.api import annotate_paths
-from datalad.api import install
-from datalad.interface.annotate_paths import get_modified_subpaths
-from datalad.interface.annotate_paths import _resolve_path
-from datalad.utils import chpwd
-from datalad.utils import getpwd
-
+from datalad.api import (
+    annotate_paths,
+    install,
+)
+from datalad.interface.annotate_paths import (
+    get_modified_subpaths,
+    _resolve_path,
+)
+from datalad.utils import (
+    chpwd,
+    getpwd,
+    on_windows,
+)
 from datalad.interface.tests.test_utils import make_demo_hierarchy_datasets
+
+if on_windows:
+    raise SkipTest('Deprecated code, will never work on Windows')
 
 
 __docformat__ = 'restructuredtext'
@@ -83,7 +94,7 @@ def test_annotate_paths(dspath, nodspath):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     with chpwd(dspath):
         # with and without an explicitly given path the result is almost the
@@ -237,7 +248,7 @@ def test_get_modified_subpaths(path):
     subb = ds.create('bb', force=True)
     subsub = ds.create(opj('bb', 'bba', 'bbaa'), force=True)
     ds.save(recursive=True)
-    ok_clean_git(path)
+    assert_repo_status(path)
 
     orig_base_commit = ds.repo.get_hexsha()
 
@@ -292,7 +303,7 @@ def test_get_modified_subpaths(path):
 
     # add/save everything, become clean
     ds.save(recursive=True)
-    ok_clean_git(path)
+    assert_repo_status(path)
     # nothing is reported as modified
     assert_result_count(
         get_modified_subpaths(
@@ -324,7 +335,7 @@ def test_get_modified_subpaths(path):
 
     # deal with removal (force insufiicient copies error)
     ds.remove(suba.path, check=False)
-    ok_clean_git(path)
+    assert_repo_status(path)
     res = list(get_modified_subpaths([dict(path=ds.path)], ds, 'HEAD~1..HEAD'))
     # removed submodule + .gitmodules update
     assert_result_count(res, 2)
@@ -346,7 +357,7 @@ def test_recurseinto(dspath, dest):
         set_property=[('datalad-recursiveinstall', 'skip')])
     assert_result_count(res, 1, path=opj(ds.path, 'b', 'bb'))
     ds.save('b', recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # recursive install, should skip the entire bb branch
     res = install(source=ds.path, path=dest, recursive=True,

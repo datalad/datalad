@@ -15,8 +15,6 @@ import re
 from collections import OrderedDict
 from os.path import join as opj
 
-from git.remote import PushInfo as PI
-
 from datalad import ssh_manager
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -38,7 +36,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
@@ -63,11 +61,17 @@ def _push(ds, remote, things2push, force=False):
             ds.repo.push(remote=remote, force=force))
     if not push_res:
         return 'notneeded', 'Git reported nothing was pushed'
-    errors = ['{} -> {} {}'.format(
-        pi.local_ref,
-        pi.remote_ref,
-        pi.summary.strip()) for pi in push_res if (pi.flags & PI.ERROR) == PI.ERROR]
-    successes = [pi.summary.strip() for pi in push_res if (pi.flags & PI.ERROR) != PI.ERROR]
+    errors = [
+        '{} -> {} {}'.format(
+            pi['from_ref'],
+            pi['to_ref'],
+            pi['note'])
+        for pi in push_res
+        if 'error' in pi['operations']]
+    successes = [
+        pi['note']
+        for pi in push_res
+        if 'error' not in pi['operations']]
     if errors:
         return 'error', \
                ('failed to push to %s: %s;%s',
@@ -263,7 +267,7 @@ def _check_and_update_remote_server_info(ds, remote):
 
 def _maybe_fetch(repo, remote):
     if repo.config.get("remote.{}.fetch".format(remote)):
-        repo.fetch(remote=remote)
+        repo.fetch(remote=remote, recurse_submodules="no")
     else:
         # Fetching would lead to "Couldn't find remote ref HEAD" if no
         # branch" error.  See gh-4199 for an example.
@@ -291,13 +295,13 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     depvar = 'remote.{}.datalad-publish-depends'.format(remote)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = assure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, []))
 
     # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # make sure we are up-to-date on this topic on all affected remotes, before
     # we start making decisions
     for r in publish_depends + [remote]:
-        if not ds.config.get('.'.join(('remote', remote, 'annex-uuid')), None):
+        if not ds.config.get('.'.join(('remote', r, 'annex-uuid')), None):
             lgr.debug("Obtain remote annex info from '%s'", r)
             _maybe_fetch(ds.repo, r)
             # in order to be able to use git's config to determine what to push,
@@ -307,7 +311,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # each fetch could give evidence that there is an annex
             # somewhere and replace the repo class...
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.merge_annex(r)
+                ds.repo.localsync(r)
     ds.config.reload()
 
     # anything that follows will not change the repo type anymore, cache
@@ -335,11 +339,11 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # changes
     if not diff and is_annex_repo:
         try:
-            git_annex_commit = next(ds.repo.get_branch_commits('git-annex'))
+            git_annex_commit = next(ds.repo.get_branch_commits_('git-annex'))
         except StopIteration:
             git_annex_commit = None
         #diff = _get_remote_diff(ds, [], git_annex_commit, remote, 'git-annex')
-        diff = _get_remote_diff(ds, git_annex_commit, remote, 'git-annex')
+        diff = _get_remote_diff(ds.repo, git_annex_commit, remote, 'git-annex')
         if diff:
             lgr.info("Will publish updated git-annex")
 
@@ -358,8 +362,15 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     if transfer_data != 'none' and isinstance(ds.repo, AnnexRepo):
         # publishing of `remote` might depend on publishing other
         # remote(s) first, so they need to receive the data first:
-        for d in publish_depends:
-            lgr.info("Transferring data to configured publication dependency: '%s'" % d)
+        for d, desc in [
+            (d, "configured publication dependency")
+            for d in publish_depends
+        ] + [
+            # no message the target remote as before
+            (remote, None)
+        ]:
+            if desc:
+                lgr.info("Transferring data to %s: '%s'", desc, d)
             # properly initialized remote annex -> publish data
             for r in _publish_data(
                     ds,
@@ -374,20 +385,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                         r.get('type', None) == 'file':
                     copied_data = True
                 yield r
-        # and for the main target
-        for r in _publish_data(
-                ds,
-                remote,
-                paths,
-                annex_copy_options,
-                force,
-                transfer_data,
-                **kwargs):
-            # note if we published any data, notify to sync annex branch below
-            if r['status'] == 'ok' and r['action'] == 'publish' and \
-                    r.get('type', None) == 'file':
-                copied_data = True
-            yield r
 
     #
     # publish dataset (git push)
@@ -432,7 +429,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         if is_annex_repo:
             lgr.debug("Obtain remote annex info from '%s'", remote)
             _maybe_fetch(ds.repo, remote)
-            ds.repo.merge_annex(remote)
+            ds.repo.localsync(remote)
 
         # Note: git's push.default is 'matching', which doesn't work for first
         # time publication (a branch, that doesn't exist on remote yet)
@@ -449,11 +446,6 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
             # TODO: this should become it own helper
             if is_annex_repo:
                 # annex could manage this branch
-                if current_branch.startswith('annex/direct') \
-                        and ds.config.getbool('annex', 'direct', default=False):
-                    # this is a "fake" annex direct mode branch
-                    # we want to publish the underlying branch
-                    current_branch = current_branch[12:]
                 match_adjusted = re.match(
                     r'adjusted/(.*)\([a-z]*\)',
                     current_branch)
@@ -500,13 +492,13 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             cand_remotes = [r for r in ds.repo.get_remotes()
                             if 'remote.{}.push'.format(r) in ds.config]
             if len(cand_remotes) > 1:
-                lgr.warning('Target sibling ambiguous, please specific via --to')
+                lgr.warning('Target sibling ambiguous, please specify via --to')
             elif len(cand_remotes) == 1:
                 track_remote = cand_remotes[0]
             else:
                 return ('impossible',
                         'No target sibling configured for default publication, '
-                        'please specific via --to')
+                        'please specify via --to')
         if track_remote:
             ds_remote_info[ds_path] = dict(zip(
                 ('remote', 'refspec'),
@@ -544,28 +536,16 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
         ds_remote_info[ds_path] = {'remote': to}
 
 
-
-def _get_remote_diff(ds, current_commit, remote, remote_branch_name):
-#def _get_remote_diff(ds, paths, current_commit, remote, remote_branch_name):
+def _get_remote_diff(repo, current_commit, remote, remote_branch_name):
     """Helper to check if remote has different state of the branch"""
-    if remote_branch_name in ds.repo.repo.remotes[remote].refs:
+    remote_ref = '/'.join((remote, remote_branch_name))
+    if remote_ref in repo.get_remote_branches():
         lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
                   remote_branch_name, remote)
         if current_commit is None:
-            current_commit = ds.repo.repo.commit()
-        remote_ref = ds.repo.repo.remotes[remote].refs[remote_branch_name]
-        # XXX: ATM nothing calls this function with a non-empty `paths` arg
-        #if paths:
-        #    # if there were custom paths, we will look at the diff
-        #    lgr.debug("Since paths provided, looking at diff")
-        #    diff = current_commit.diff(
-        #        remote_ref,
-        #        paths=paths
-        #    )
-        #else:
-        # if commits differ at all
-        lgr.debug("Since no paths provided, comparing commits")
-        diff = current_commit != remote_ref.commit
+            current_commit = repo.get_hexsha()
+        remote_ref = repo.get_hexsha(remote_ref)
+        diff = current_commit != remote_ref
     else:
         lgr.debug("Remote '%s' has no branch matching %r. Will publish",
                   remote, remote_branch_name)
@@ -603,6 +583,13 @@ class Publish(Interface):
       to publish a dataset. Publication targets are either configured remote
       Git repositories, or git-annex special remotes (if they support data
       upload).
+
+    .. note::
+      This command is deprecated. It will be removed from DataLad eventually,
+      but no earlier than the 0.15 release. The `push` command (new in 0.13.0)
+      provides an alternative interface. Critical differences are that `push`
+      transfers annexed data by default and does not handle sibling creation
+      (i.e. it does not have a `--missing` option).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
@@ -632,11 +619,11 @@ class Publish(Interface):
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
-            from which to look for changes
-            to decide whether updated publishing is necessary for this and which children.
-            If empty argument is provided, then we would take from the previously 
-            published to that remote/sibling state (for the current branch)"""),
+            doc="""specifies commit-ish (tag, shasum, etc.) from which to look for
+            changes to decide whether pushing is necessary.
+            If '^' is given, the last state of the current branch at the sibling
+            is taken as a starting point. An empty string ('') for the same effect is
+            still supported)."""),
         # since: commit => .gitmodules diff to head => submodules to publish
         missing=missing_sibling_opt,
         path=Parameter(
@@ -688,6 +675,10 @@ class Publish(Interface):
             jobs=None
     ):
 
+        import warnings
+        warnings.warn("`publish` is deprecated. Use `datalad push` instead.",
+                      DeprecationWarning)
+
         # if ever we get a mode, for "with-data" we would need this
         #if dataset and not path:
         #    # act on the whole dataset if nothing else was specified
@@ -698,18 +689,22 @@ class Publish(Interface):
             dataset = require_dataset(
                 dataset, check_installed=True, purpose='publishing')
 
-        if since and not dataset:
+        if (since and since != '^') and not dataset:
             raise InsufficientArgumentsError(
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
-        if dataset and since == '':
+        if dataset and since in ('', '^'):
             # only update since last update so we figure out what was the last update
             active_branch = dataset.repo.get_active_branch()
             if to:
                 # XXX here we assume one to one mapping of names from local branches
                 # to the remote
                 since = '%s/%s' % (to, active_branch)
+                # test if such branch already exists,
+                if since not in dataset.repo.get_remote_branches():
+                    lgr.debug("No remote branch %s yet, so since will not be used", since)
+                    since = None
             else:
                 # take tracking remote for the active branch
                 tracked_remote, tracked_refspec = dataset.repo.get_tracking_branch()
@@ -746,7 +741,7 @@ class Publish(Interface):
                 action='publish',
                 unavailable_path_status='impossible',
                 nondataset_path_status='error',
-                modified=since,
+                modified="%s..HEAD" % since if since else since,
                 return_type='generator',
                 on_failure='ignore',
                 force_no_revision_change_discovery=False, # we cannot publish what was not committed

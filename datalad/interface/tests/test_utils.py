@@ -10,35 +10,49 @@
 
 """
 
-
-import os
+from contextlib import contextmanager
 import logging
-from os.path import join as opj
-from os.path import exists
-from nose.tools import assert_raises, assert_equal
-from datalad.tests.utils import with_tempfile, assert_not_equal
-from datalad.tests.utils import assert_true
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_
-from datalad.tests.utils import slow
+from time import sleep
+from os.path import (
+    exists,
+    join as opj,
+)
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_equal,
+    assert_in,
+    assert_not_equal,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_true,
+    ok_,
+    slow,
+    with_tempfile,
+    with_tree,
+)
 from datalad.utils import swallow_logs
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import datasetmethod
-from datalad.distribution.dataset import EnsureDataset
+from datalad.utils import swallow_outputs
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    EnsureDataset,
+)
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureKeyChoice
-
+from datalad.support.constraints import (
+    EnsureKeyChoice,
+    EnsureNone,
+    EnsureStr,
+)
 from ..base import Interface
-from ..utils import eval_results
-from ..utils import discover_dataset_trace_to_targets
+from ..utils import (
+    discover_dataset_trace_to_targets,
+    eval_results,
+    handle_dirty_dataset,
+)
+from ..results import get_status_dict
 from datalad.interface.base import build_doc
-from ..utils import handle_dirty_dataset
 
 
 __docformat__ = 'restructuredtext'
@@ -93,7 +107,7 @@ def test_dirty(path):
     # not added to super on purpose!
     subds = ds.create('subds')
     _check_all_clean(subds, subds.repo.get_hexsha())
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # subdataset must be added as a submodule!
     assert_equal(ds.subdatasets(result_xfm='relpaths'), ['subds'])
 
@@ -140,7 +154,7 @@ def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
     ds_bbaa = Dataset(opj(ds_bba.path, 'bbaa'))
@@ -154,7 +168,7 @@ def test_save_hierarchy(path):
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
-        ok_clean_git(d.path)
+        assert_repo_status(d.path)
     ok_(ds.repo.dirty)
     # now with two modified repos
     d = Dataset(opj(ds.path, 'd'))
@@ -165,7 +179,7 @@ def test_save_hierarchy(path):
     # generator
     d.save(recursive=True)
     for d in (d, da, db):
-        ok_clean_git(d.path)
+        assert_repo_status(d.path)
     ok_(ds.repo.dirty)
     # and now with files all over the place and saving
     # all the way to the root
@@ -194,6 +208,9 @@ def test_save_hierarchy(path):
 class TestUtils(Interface):
     """TestUtil's fake command"""
 
+    result_renderer = 'tailored' # overrides None default
+    return_type = 'item-or-list' # overrides 'list'
+
     _params_ = dict(
         number=Parameter(
             args=("-n", "--number",),
@@ -204,17 +221,25 @@ class TestUtils(Interface):
             doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
-            constraints=EnsureDataset() | EnsureNone()),)
+            constraints=EnsureDataset() | EnsureNone()),
+        result_fn=Parameter(
+            args=tuple(),   # Hide this from the cmdline parser.
+            doc="""Generate the result records with this function
+            rather than using the default logic. `number` will be
+            passed as an argument."""),)
 
     @staticmethod
     @datasetmethod(name='fake_command')
     @eval_results
-    def __call__(number, dataset=None):
-
-        for i in range(number):
-            # this dict will need to have the minimum info required by
-            # eval_results
-            yield {'path': 'some', 'status': 'ok', 'somekey': i, 'action': 'off'}
+    def __call__(number, dataset=None, result_fn=None):
+        if result_fn:
+            yield from result_fn(number)
+        else:
+            for i in range(number):
+                # this dict will need to have the minimum info
+                # required by eval_results
+                yield {'path': 'some', 'status': 'ok', 'somekey': i,
+                       'action': 'off'}
 
 
 def test_eval_results_plus_build_doc():
@@ -234,6 +259,10 @@ def test_eval_results_plus_build_doc():
     assert_in("TestUtil's fake command", doc1)
     assert_in("Parameters", doc1)
     assert_in("It's a number", doc1)
+
+    # docstring shows correct override values of defaults in eval_params
+    assert_in("Default: 'tailored'", doc1)
+    assert_in("Default: 'item-or-list'", doc1)
 
     # docstring also contains eval_result's parameters:
     assert_in("result_filter", doc1)
@@ -263,8 +292,10 @@ def test_eval_results_plus_build_doc():
 
     # test signature:
     from datalad.utils import getargspec
-    assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
-    assert_equal(getargspec(TestUtils.__call__)[0], ['number', 'dataset'])
+    assert_equal(getargspec(Dataset.fake_command)[0],
+                 ['number', 'dataset', 'result_fn'])
+    assert_equal(getargspec(TestUtils.__call__)[0],
+                 ['number', 'dataset', 'result_fn'])
 
 
 def test_result_filter():
@@ -318,7 +349,7 @@ def test_discover_ds_trace(path, otherdir):
     # subject is also involved in this
     assert_true(exists(opj(db, 'file_db')))
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # now two datasets which are not available locally, but we
     # know about them (e.g. from metadata)
     dba = opj(db, 'sub', 'dba')
@@ -357,3 +388,125 @@ def test_discover_ds_trace(path, otherdir):
         spec = {}
         discover_dataset_trace_to_targets(ds.path, input, [], spec, includeds=eds)
         assert_dict_equal(spec, goal)
+
+
+@contextmanager
+def _swallow_outputs(isatty=True):
+    with swallow_outputs() as cmo:
+        stdout = cmo.handles[0]
+        stdout.isatty = lambda: isatty
+        yield cmo
+
+
+def test_utils_suppress_similar():
+    tu = TestUtils()
+
+    # Check suppression boundary for straight chain of similar
+    # messages.
+
+    # yield test results immediately to make test run fast
+    sleep_dur = 0.0
+
+    def n_foo(number):
+        for i in range(number):
+            yield dict(action="foo",
+                       status="ok",
+                       path="path{}".format(i))
+            sleep(sleep_dur)
+
+
+    with _swallow_outputs() as cmo:
+        cmo.isatty = lambda: True
+        list(tu(9, result_fn=n_foo, result_renderer="default"))
+        assert_in("path8", cmo.out)
+        assert_not_in("suppressed", cmo.out)
+
+    with _swallow_outputs() as cmo:
+        list(tu(10, result_fn=n_foo, result_renderer="default"))
+        assert_in("path9", cmo.out)
+        assert_not_in("suppressed", cmo.out)
+
+    with _swallow_outputs() as cmo:
+        list(tu(11, result_fn=n_foo, result_renderer="default"))
+        assert_not_in("path10", cmo.out)
+        assert_re_in(r"[^-0-9]1 .* suppressed", cmo.out, match=False)
+
+    with _swallow_outputs() as cmo:
+        # for this one test yield results slightly slower than 2Hz
+        # such that we can see each individual supression message
+        # and no get caught by the rate limiter
+        sleep_dur = 0.51
+        list(tu(13, result_fn=n_foo, result_renderer="default"))
+        assert_not_in("path10", cmo.out)
+        # We see an update for each result.
+        assert_re_in(r"1 .* suppressed", cmo.out, match=False)
+        assert_re_in(r"2 .* suppressed", cmo.out, match=False)
+        assert_re_in(r"3 .* suppressed", cmo.out, match=False)
+
+    # make tests run fast again
+    sleep_dur = 0.0
+
+    with _swallow_outputs(isatty=False) as cmo:
+        list(tu(11, result_fn=n_foo, result_renderer="default"))
+        assert_in("path10", cmo.out)
+
+    # Check a chain of similar messages, split in half by a distinct one.
+
+    def n_foo_split_by_a_bar(number):
+        half = number // 2 - 1
+        for i in range(number):
+            yield dict(action="foo",
+                       status="ok",
+                       path="path{}".format(i))
+            if i == half:
+                yield dict(action="bar",
+                           status="ok",
+                           path="path")
+
+    with _swallow_outputs() as cmo:
+        list(tu(20, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
+        assert_in("path10", cmo.out)
+        assert_in("path19", cmo.out)
+        assert_not_in("suppressed", cmo.out)
+
+    with _swallow_outputs() as cmo:
+        list(tu(21, result_fn=n_foo_split_by_a_bar, result_renderer="default"))
+        assert_in("path10", cmo.out)
+        assert_not_in("path20", cmo.out)
+        assert_re_in("[^-0-9]1 .* suppressed", cmo.out, match=False)
+
+
+class TestUtils2(Interface):
+    # result_renderer = custom_renderer
+    _params_ = dict(
+        number=Parameter(
+            args=("--path",),
+            constraints=EnsureStr() | EnsureNone()),
+    )
+    @staticmethod
+    @eval_results
+    def __call__(path=None):
+        def logger(msg, *args):
+            return msg % args
+        if path:
+            # we will be testing for path %s
+            message = ("all good %s", "my friend")
+        else:
+            message = ("kaboom %s %s", "greedy")
+        yield get_status_dict(
+            action="test",
+            status="ok",
+            message=message,
+            logger=logger,
+            path=path or ''
+        )
+
+
+def test_incorrect_msg_interpolation():
+    with assert_raises(TypeError) as cme:
+        TestUtils2().__call__()
+    # this must be our custom exception
+    assert_re_in("Failed to render.*kaboom.*not enough arguments", str(cme.exception))
+
+    # there should be no exception if reported in the record path contains %
+    TestUtils2().__call__("%eatthis")

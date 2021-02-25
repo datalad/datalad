@@ -13,8 +13,8 @@ import unittest.mock as mock
 
 import github as gh
 
-from ..exceptions import AccessDeniedError
-from ...tests.utils import (
+from datalad.support.exceptions import AccessDeniedError
+from datalad.tests.utils import (
     assert_equal,
     assert_greater,
     assert_in,
@@ -27,12 +27,13 @@ from ...tests.utils import (
 from ...consts import (
     CONFIG_HUB_TOKEN_FIELD,
 )
-from ...utils import swallow_logs
+from datalad.utils import swallow_logs
 
 from .. import github_
 from ..github_ import (
     _gen_github_entity,
     _get_github_cred,
+    _token_str,
     get_repo_url,
 )
 
@@ -55,7 +56,6 @@ def test_get_repo_url():
 
 def test__make_github_repos():
     github_login = 'test'
-    github_passwd = 'fake'
     github_organization = 'fakeorg'
     rinfo = [
         # (ds, reponame) pairs
@@ -64,14 +64,15 @@ def test__make_github_repos():
     ]
     existing = '???'
     access_protocol = '???'
+    private = False
     dryrun = False
     args = (
             github_login,
-            github_passwd,
             github_organization,
             rinfo,
             existing,
             access_protocol,
+            private,
             dryrun,
     )
 
@@ -92,19 +93,14 @@ def test__make_github_repos():
     assert(all(len(x) > 1 for x in res))  # there is more than just a dataset
 
     #
-    # Now test the logic whenever first credential fails and we need to get
+    # Now test the logic whenever first token fails and we need to get
     # to the next one
     #
-    class FakeCred:
-        def __init__(self, name):
-            self.name = name
-
     # Let's test not blowing up whenever first credential is not good enough
     def _gen_github_entity(*args):
         return [
-            ("entity1", FakeCred("cred1")),
-            ("entity2", FakeCred("cred2")),
-            ("entity3", FakeCred("cred3"))
+            ("entity%d" % i, _token_str("%dtokensomethinglong" % i))
+            for i in range(1, 4)
         ]
 
     def _make_github_repo(github_login, entity, reponame, *args):
@@ -116,7 +112,7 @@ def test__make_github_repos():
             mock.patch.object(github_, '_make_github_repo', _make_github_repo), \
             swallow_logs(new_level=logging.INFO) as cml:
         res = github_._make_github_repos(*args)
-        assert_in('Authentication failed using cred1', cml.out)
+        assert_in('Failed to create repository while using token 1to...: very bad status', cml.out)
         eq_(res, [('/fakeds1', 'fakeds1'), ('/fakeds2', 'fakeds2')])
 
     def _make_github_repo(github_login, entity, reponame, *args):
@@ -136,7 +132,7 @@ def test__gen_github_entity_organization():
     # to test effectiveness of the fix, we need to provide some
     # token which would not work
     with patch_config({CONFIG_HUB_TOKEN_FIELD: "ed51111111111111111111111111111111111111"}):
-        org_cred = next(_gen_github_entity(None, None, 'datalad-collection-1'))
+        org_cred = next(_gen_github_entity(None, 'datalad-collection-1'))
     assert len(org_cred) == 2, "we return organization and credential"
     org, _ = org_cred
     assert org

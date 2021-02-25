@@ -13,6 +13,7 @@ import os.path as op
 from os import linesep
 
 from distutils.version import LooseVersion
+from itertools import chain
 
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
@@ -41,24 +42,31 @@ class UnknownVersion:
 #
 # Custom handlers
 #
-from datalad.cmd import Runner
-from datalad.cmd import GitRunner
+from datalad.cmd import (
+    WitlessRunner,
+    GitWitlessRunner,
+    StdOutErrCapture,
+)
 from datalad.support.exceptions import (
     MissingExternalDependency,
     OutdatedExternalDependency,
 )
-_runner = Runner()
-_git_runner = GitRunner()
+_runner = WitlessRunner()
+_git_runner = GitWitlessRunner()
 
 
 def _get_annex_version():
     """Return version of available git-annex"""
     try:
-        return _runner.run('git annex version --raw'.split())[0]
+        return _runner.run(
+            'git annex version --raw'.split(),
+            protocol=StdOutErrCapture)['stdout']
     except CommandError:
         # fall back on method that could work with older installations
-        out, err = _runner.run(['git', 'annex', 'version'])
-        return out.split('\n')[0].split(':')[1].strip()
+        out = _runner.run(
+            ['git', 'annex', 'version'],
+            protocol=StdOutErrCapture)
+        return out['stdout'].splitlines()[0].split(':')[1].strip()
 
 
 def _get_git_version():
@@ -80,7 +88,9 @@ def _get_bundled_git_version():
     """
     path = _git_runner._get_bundled_path()
     if path:
-        out = _runner.run([op.join(path, "git"), "version"])[0]
+        out = _runner.run(
+            [op.join(path, "git"), "version"],
+            protocol=StdOutErrCapture)['stdout']
         # format: git version 2.22.0
         return out.split()[2]
 
@@ -91,30 +101,31 @@ def _get_system_ssh_version():
     Annex prior 20170302 was using bundled version, but now would use system one
     if installed
     """
-    out, err = _runner.run('ssh -V'.split(),
-                           expect_fail=True, expect_stderr=True)
+    out = _runner.run(
+        'ssh -V'.split(),
+        protocol=StdOutErrCapture)
     # apparently spits out to err but I wouldn't trust it blindly
-    if err.startswith('OpenSSH'):
-        out = err
-    assert out.startswith('OpenSSH')  # that is the only one we care about atm
-    return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
+    stdout = out['stdout']
+    if out['stderr'].startswith('OpenSSH'):
+        stdout = out['stderr']
+    assert stdout.startswith('OpenSSH')  # that is the only one we care about atm
+    return stdout.split(' ', 1)[0].rstrip(',.').split('_')[1]
 
 
 def _get_system_7z_version():
     """Return version of 7-Zip"""
-    out, err = _runner.run(
-        ['7z'], expect_fail=True, expect_stderr=True,
-    )
+    out = _runner.run(
+        ['7z'],
+        protocol=StdOutErrCapture)
     # reporting in variable order across platforms
     # Linux: 7-Zip [64] 16.02
     # Windows: 7-Zip 19.00 (x86)
-    pieces = out.strip().split(':', maxsplit=1)[0].strip().split()
+    pieces = out['stdout'].strip().split(':', maxsplit=1)[0].strip().split()
     for p in pieces:
         # the one with the dot is the version
         if '.' in p:
             return p
-    lgr.debug("Could not determine version of 7z from stdout. "
-              "stdout: %s, stderr: %s", out, err)
+    lgr.debug("Could not determine version of 7z from stdout. %s", out)
 
 
 class ExternalVersions(object):
@@ -133,7 +144,7 @@ class ExternalVersions(object):
 
     UNKNOWN = UnknownVersion()
 
-    CUSTOM = {
+    _CUSTOM = {
         'cmd:annex': _get_annex_version,
         'cmd:git': _get_git_version,
         'cmd:bundled-git': _get_bundled_git_version,
@@ -141,7 +152,8 @@ class ExternalVersions(object):
         'cmd:system-ssh': _get_system_ssh_version,
         'cmd:7z': _get_system_7z_version,
     }
-    INTERESTING = (
+    _INTERESTING = (
+        'annexremote',
         'appdirs',
         'boto',
         'exifread',
@@ -162,6 +174,8 @@ class ExternalVersions(object):
 
     def __init__(self):
         self._versions = {}
+        self.CUSTOM = self._CUSTOM.copy()
+        self.INTERESTING = list(self._INTERESTING)  # make mutable for `add`
 
     @classmethod
     def _deduce_version(klass, value):
@@ -245,12 +259,56 @@ class ExternalVersions(object):
 
         return self._versions.get(modname, self.UNKNOWN)
 
-    def keys(self):
-        """Return names of the known modules"""
+    def keys(self, query=False):
+        """Return names of the known modules
+
+        Parameters
+        ----------
+        query: bool, optional
+          If True, we will first query all CUSTOM and INTERESTING entries
+          to make sure we have them known.
+        """
+        if query:
+            [self[k] for k in chain(self.CUSTOM, self.INTERESTING)]
         return self._versions.keys()
 
     def __contains__(self, item):
         return bool(self[item])
+
+    def add(self, name, func=None):
+        """Add a version checker
+
+        This method allows third-party libraries to define additional checks.
+        It will not add `name` if already exists.  If `name` exists and `func`
+        is different - it will override with a new `func`.  Added entries will
+        be included in the output of `dumps(query=True)`.
+
+        Parameters
+        ----------
+        name: str
+          Name of the check (usually a name of the Python module, or an
+          external command prefixed with "cmd:")
+        func: callable, optional
+          Function to be called to obtain version information. This should be
+          defined when checking the version of something that is not a Python
+          module or when this class's method for determining the version of a
+          Python module isn't sufficient.
+        """
+        if func:
+            func_existing = self.CUSTOM.get(name, None)
+            was_known = False
+            if func_existing and func_existing is not func:
+                lgr.debug(
+                    "Adding a new custom version checker %s for %s, "
+                    "old one: %s", func, name, func_existing)
+                was_known = name in self._versions
+            self.CUSTOM[name] = func
+            if was_known:
+                # pop and query it again right away to possibly replace with a new value
+                self._versions.pop(name)
+                _ = self[name]
+        elif name not in self.INTERESTING:
+            self.INTERESTING.append(name)
 
     @property
     def versions(self):
@@ -271,11 +329,9 @@ class ExternalVersions(object):
           To query for versions of all "registered" custom externals, so to
           get those which weren't queried for yet
         """
-        if query:
-            [self[k] for k in tuple(self.CUSTOM) + self.INTERESTING]
         if indent and (indent is True):
             indent = ' '
-        items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]
+        items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self.keys(query=query))]
         out = "%s" % preamble if preamble else ''
         if indent is not None:
             if preamble:

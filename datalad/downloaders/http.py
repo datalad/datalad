@@ -12,6 +12,8 @@
 import re
 import requests
 import requests.auth
+from requests.utils import parse_dict_header
+
 # at some point was trying to be too specific about which exceptions to
 # catch for a retry of a download.
 # from urllib3.exceptions import MaxRetryError, NewConnectionError
@@ -19,7 +21,11 @@ import requests.auth
 import io
 from time import sleep
 
-from ..utils import assure_list_from_str, assure_dict_from_str
+from ..utils import (
+    ensure_list_from_str,
+    ensure_dict_from_str,
+    ensure_bytes,
+)
 from ..dochelpers import borrowkwargs
 
 from ..ui import ui
@@ -46,10 +52,11 @@ lgr = getLogger('datalad.http')
 
 try:
     import requests_ftp
+    _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
     lgr.debug("Failed to import requests_ftp, thus no ftp support: %s" % exc_str(e))
-    pass
+    _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:
     # Let's also enable requests etc debugging
@@ -137,9 +144,9 @@ class HTTPBaseAuthenticator(Authenticator):
         """
         super(HTTPBaseAuthenticator, self).__init__(**kwargs)
         self.url = url
-        self.failure_re = assure_list_from_str(failure_re)
-        self.success_re = assure_list_from_str(success_re)
-        self.session_cookies = assure_list_from_str(session_cookies)
+        self.failure_re = ensure_list_from_str(failure_re)
+        self.success_re = ensure_list_from_str(success_re)
+        self.session_cookies = ensure_list_from_str(session_cookies)
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
@@ -208,8 +215,16 @@ class HTTPBaseAuthenticator(Authenticator):
 
     def check_for_auth_failure(self, content, err_prefix=""):
         if self.failure_re:
+            content_is_bytes = isinstance(content, bytes)
             # verify that we actually logged in
             for failure_re in self.failure_re:
+                if content_is_bytes:
+                    # content could be not in utf-8. But I do not think that
+                    # it is worth ATM messing around with guessing encoding
+                    # of the content to figure out what to encode it into
+                    # since typically returned "auth failed" should be in
+                    # utf-8 or plain ascii
+                    failure_re = ensure_bytes(failure_re)
                 if re.search(failure_re, content):
                     raise AccessDeniedError(
                         err_prefix + "returned output which matches regular expression %s" % failure_re
@@ -254,7 +269,7 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
           Passed to super class HTTPBaseAuthenticator
         """
         super(HTMLFormAuthenticator, self).__init__(**kwargs)
-        self.fields = assure_dict_from_str(fields)
+        self.fields = ensure_dict_from_str(fields)
         self.tagid = tagid
 
     def _post_credential(self, credentials, post_url, session):
@@ -351,6 +366,44 @@ class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
 
 
 @auto_repr
+class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
+    """Retrieve token via 401 response and add Authorization: Bearer header.
+    """
+
+    allows_anonymous = True
+
+    def authenticate(self, url, credential, session, update=False):
+        if credential:
+            lgr.warning(
+                "Argument 'credential' specified, but it will be ignored: %s",
+                credential)
+        response = session.head(url)
+        status = response.status_code
+        if status == 200:
+            lgr.debug("No authorization needed for %s", url)
+            return
+        if status != 401:
+            raise DownloadError(
+                "Expected 200 or 401 but got {} from {}"
+                .format(status, url))
+
+        lgr.debug("Requesting authorization token for %s", url)
+        auth_parts = parse_dict_header(response.headers["www-authenticate"])
+        auth_url = ("{}?service={}&scope={}"
+                    .format(auth_parts["Bearer realm"],
+                            auth_parts["service"],
+                            auth_parts["scope"]))
+        auth_response = session.get(auth_url)
+        try:
+            auth_info = auth_response.json()
+        except ValueError as e:
+            raise DownloadError(
+                "Failed to get information from {}: {}"
+                .format(auth_url, exc_str(e)))
+        session.headers['Authorization'] = "Bearer " + auth_info["token"]
+
+
+@auto_repr
 class HTTPDownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None,  url=None, headers=None,
                  response=None, chunk_size=1024 ** 2):
@@ -383,7 +436,10 @@ class HTTPDownloaderSession(DownloaderSession):
         # which has no .stream, so let's do ducktyping and provide our custom stream
         # via BufferedReader for such cases, while maintaining the rest of code
         # intact.  TODO: figure it all out, since doesn't scale for any sizeable download
-        if not hasattr(response.raw, 'stream'):
+        # This code is tested by tests/test_http.py:test_download_ftp BUT
+        # it causes 503 on travis,  but not always so we allow to skip that test
+        # in such cases. That causes fluctuating coverage
+        if not hasattr(response.raw, 'stream'):  # pragma: no cover
             def _stream():
                 buf = io.BufferedReader(response.raw)
                 v = True
@@ -418,7 +474,7 @@ class HTTPDownloaderSession(DownloaderSession):
                 # TEMP
                 # see https://github.com/niltonvolpato/python-progressbar/pull/44
                 ui.out.flush()
-                if size is not None and total >= size:
+                if size is not None and total >= size:  # pragma: no cover
                     break  # we have done as much as we were asked
 
         if return_content:
@@ -500,10 +556,15 @@ class HTTPDownloader(BaseDownloader):
                 # so let's rest and try again
                 if retry >= nretries:
                     #import epdb; epdb.serve()
+                    if not _FTP_SUPPORT and url.startswith("ftp://"):
+                        msg_ftp = "For ftp:// support, install requests_ftp. "
+                    else:
+                        msg_ftp = ""
+
                     raise AccessFailedError(
-                        "Failed to establish a new session %d times. "
+                        "Failed to establish a new session %d times. %s"
                         "Last exception was: %s"
-                        % (nretries, exc_str(exc)))
+                        % (nretries, msg_ftp, exc_str(exc)))
                 lgr.warning(
                     "Caught exception %s. Will retry %d out of %d times",
                     exc_str(exc), retry+1, nretries)

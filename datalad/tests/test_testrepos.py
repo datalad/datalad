@@ -11,11 +11,16 @@
 import os
 
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import integration
 from datalad.tests.utils import usecase
-from .utils import eq_, ok_, with_testrepos, with_tempfile
-from datalad.cmd import Runner
-from .utils import local_testrepo_flavors
+from datalad.tests.utils import (
+    ok_,
+    with_testrepos,
+    with_tempfile,
+)
+from datalad.cmd import (
+    StdOutErrCapture,
+    WitlessRunner,
+)
 from .utils_testdatasets import make_studyforrest_mockup
 
 
@@ -40,8 +45,8 @@ def test_point_to_github(url):
 @with_tempfile
 def test_clone(src, tempdir):
     # Verify that all our repos are clonable
-    r = Runner()
-    output = r.run(["git" , "clone", src, tempdir], log_online=True)
+    r = WitlessRunner()
+    output = r.run(["git" , "clone", src, tempdir], protocol=StdOutErrCapture)
     #status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
     ok_(os.path.exists(os.path.join(tempdir, ".git")))
     # TODO: requires network for sure! ;)

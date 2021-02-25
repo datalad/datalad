@@ -31,7 +31,7 @@ from ..support.constraints import (
     EnsureStr,
 )
 from ..utils import (
-    assure_list,
+    ensure_list,
 )
 from ..distribution.dataset import (
     datasetmethod,
@@ -56,12 +56,16 @@ known_access_labels = ('http', 'ssh', 'ssh+http')
 class CreateSiblingGitlab(Interface):
     """Create dataset sibling at a GitLab site
 
-    A Git repository can be created at any location/path a given user has
-    appropriate permissions for. API access and authentication are implemented
-    via python-gitlab, and all its features are supported. A particular GitLab
-    site must be configured in a named section of a python-gitlab.cfg file
-    (see https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration
-    for details), such as::
+    An existing GitLab project, or a project created via the GitLab web
+    interface can be configured as a sibling with the :command:`siblings`
+    command. Alternativly, this command can create a GitLab project at any
+    location/path a given user has appropriate permissions for. This is
+    particulary helpful for recursive sibling creation for subdatasets. API
+    access and authentication are implemented via python-gitlab, and all its
+    features are supported. A particular GitLab site must be configured in a
+    named section of a python-gitlab.cfg file (see
+    https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration for
+    details), such as::
 
       [mygit]
       url = https://git.example.com
@@ -72,8 +76,7 @@ class CreateSiblingGitlab(Interface):
     above).
 
     (Recursive) sibling creation for all, or a selected subset of subdatasets
-    is supported. Three different project layouts for nested datasets are
-    supported (see --layout):
+    is supported with three different project layouts (see --layout):
 
     "hierarchy"
       Each dataset is placed into its own group, and the actual GitLab
@@ -216,7 +219,7 @@ class CreateSiblingGitlab(Interface):
             publish_depends=None,
             description=None,
             dryrun=False):
-        path = resolve_path(assure_list(path), ds=dataset) \
+        path = resolve_path(ensure_list(path), ds=dataset) \
             if path else None
 
         if project and (recursive or (path and len(path) > 1)):

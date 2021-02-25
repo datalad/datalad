@@ -73,7 +73,7 @@ from datalad.support.path import split_ext
 from datalad.utils import (
     path_is_subpath,
     all_same,
-    assure_list,
+    ensure_list,
 )
 
 lgr = logging.getLogger('datalad.metadata.aggregate')
@@ -270,10 +270,10 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         # hence hash would be same as for a plain GitRepo
         # and no, we cannot use the shasum of the annex branch,
         # because this will change even when no metadata has changed
-        timestamps, _ = aggfrom_ds.repo._run_annex_command(
+        timestamps, _ = aggfrom_ds.repo.call_annex_oneline([
             'metadata',
             '.',
-            '-g', 'lastchanged')
+            '-g', 'lastchanged'])
         objid += timestamps.strip()
 
     if not objid:
@@ -444,7 +444,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
     # paths to extract from
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
     # get extractors to engage from source dataset
-    nativetypes = ['datalad_core', 'annex'] + assure_list(get_metadata_type(aggfrom_ds))
+    nativetypes = ['datalad_core', 'annex'] + ensure_list(get_metadata_type(aggfrom_ds))
     # store esssential extraction config in dataset record
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
@@ -730,9 +730,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
 
     if objs2add:
         # they are added standard way, depending on the repo type
-        ds.add(
-            [op.join(agg_base_path, p) for p in objs2add],
-            save=False, result_renderer=None, return_type=list)
+        ds.repo.add([op.join(agg_base_path, p) for p in objs2add])
         # queue for save, and mark as staged
         to_save.extend(
             [dict(path=op.join(agg_base_path, p), type='file', staged=True)
@@ -742,8 +740,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
         return
 
     _store_agginfo_db(ds, ds_agginfos)
-    ds.add(agginfo_fpath, save=False, to_git=True,
-           result_renderer=None, return_type=list)
+    ds.repo.add(agginfo_fpath, git=True)
     # queue for save, and mark as staged
     to_save.append(
         dict(path=agginfo_fpath, type='file', staged=True))
@@ -917,7 +914,7 @@ class AggregateMetaData(Interface):
         # it really doesn't work without a dataset
         ds = require_dataset(
             dataset, check_installed=True, purpose='metadata aggregation')
-        path = assure_list(path)
+        path = ensure_list(path)
         if not path:
             # then current/reference dataset is "aggregated"
             # We should not add ds.path always since then --recursive would

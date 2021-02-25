@@ -12,48 +12,56 @@ import os
 import os.path as op
 
 from datalad.utils import (
-    on_windows,
-    assure_list,
+    ensure_list,
     Path,
+    on_windows,
     rmtree,
 )
 from datalad.tests.utils import (
-    assert_status,
-    assert_result_count,
     assert_in,
     assert_in_results,
     assert_not_in,
     assert_raises,
-    create_tree,
-    with_tempfile,
-    with_tree,
-    with_testrepos,
-    eq_,
-    ok_,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
     chpwd,
+    create_tree,
+    DEFAULT_BRANCH,
+    eq_,
+    known_failure,
     known_failure_appveyor,
     known_failure_windows,
-    swallow_outputs,
+    maybe_adjust_repo,
     OBSCURE_FILENAME,
+    ok_,
+    SkipTest,
+    skip_wo_symlink_capability,
+    swallow_outputs,
+    with_tempfile,
+    with_testrepos,
+    with_tree,
 )
-from datalad.distribution.tests.test_add import tree_arg
 
 import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
-from datalad.support.external_versions import external_versions
 from datalad.api import (
-    save,
     create,
     install,
+    save,
 )
 
-from datalad.tests.utils import (
-    assert_repo_status,
-    SkipTest,
-    skip_wo_symlink_capability,
-)
+
+tree_arg = dict(tree={'test.txt': 'some',
+                      'test_annex.txt': 'some annex',
+                      'test1.dat': 'test file 1',
+                      'test2.dat': 'test file 2',
+                      OBSCURE_FILENAME: 'blobert',
+                      'dir': {'testindir': 'someother',
+                              OBSCURE_FILENAME: 'none'},
+                      'dir2': {'testindir3': 'someother3'}})
 
 
 # https://ci.appveyor.com/project/mih/datalad/builds/29840270/job/oya0cs55nwtoga4p
@@ -148,16 +156,17 @@ def test_save_message_file(path):
                        "msg": "add foo"})
     ds.repo.add("foo")
     ds.save(message_file=op.join(ds.path, "msg"))
-    # ATTN: Use master explicitly so that this check works when we're on an
-    # adjusted branch too (e.g., when this test is executed under Windows).
-    eq_(ds.repo.format_commit("%s", "master"),
+    # ATTN: Consider corresponding branch so that this check works when we're
+    # on an adjusted branch too (e.g., when this test is executed under
+    # Windows).
+    eq_(ds.repo.format_commit("%s", DEFAULT_BRANCH),
         "add foo")
 
 
 def test_renamed_file():
     @with_tempfile()
-    def check_renamed_file(recursive, no_annex, path):
-        ds = Dataset(path).create(no_annex=no_annex)
+    def check_renamed_file(recursive, annex, path):
+        ds = Dataset(path).create(annex=annex)
         create_tree(path, {'old': ''})
         ds.repo.add('old')
         ds.repo.call_git(["mv"], files=["old", "new"])
@@ -165,8 +174,8 @@ def test_renamed_file():
         assert_repo_status(path)
 
     for recursive in False,:  #, True TODO when implemented
-        for no_annex in True, False:
-            yield check_renamed_file, recursive, no_annex
+        for annex in True, False:
+            yield check_renamed_file, recursive, annex
 
 
 @with_tempfile(mkdir=True)
@@ -200,6 +209,39 @@ def test_subdataset_save(path):
             "new2": "wanted2"}})
     sub.save('new2')
     assert_repo_status(parent.path, untracked=['untracked'], modified=['sub'])
+
+
+@with_tempfile(mkdir=True)
+def test_subsuperdataset_save(path):
+    # Verify that when invoked without recursion save does not
+    # cause querying of subdatasets of the subdataset
+    # see https://github.com/datalad/datalad/issues/4523
+    parent = Dataset(path).create()
+    # Create 3 levels of subdatasets so later to check operation
+    # with or without --dataset being specified
+    sub1 = parent.create('sub1')
+    sub2 = parent.create(sub1.pathobj / 'sub2')
+    sub3 = parent.create(sub2.pathobj / 'sub3')
+    assert_repo_status(path)
+    # now we will lobotomize that sub3 so git would fail if any query is performed.
+    (sub3.pathobj / '.git' / 'config').chmod(0o000)
+    try:
+        sub3.repo.call_git(['ls-files'], read_only=True)
+        raise SkipTest
+    except CommandError:
+        # desired outcome
+        pass
+    # the call should proceed fine since neither should care about sub3
+    # default is no recursion
+    parent.save('sub1')
+    sub1.save('sub2')
+    assert_raises(CommandError, parent.save, 'sub1', recursive=True)
+    # and should not fail in the top level superdataset
+    with chpwd(parent.path):
+        save('sub1')
+    # or in a subdataset above the problematic one
+    with chpwd(sub1.path):
+        save('sub2')
 
 
 @skip_wo_symlink_capability
@@ -296,7 +338,7 @@ def test_gh2043p1(path):
         ds.path,
         # on windows we are in an unlocked branch by default, hence
         # we would see no change
-        modified=[] if on_windows else ['1'],
+        modified=[] if ds.repo.is_managed_branch() else ['1'],
         untracked=['2', '3'])
     # save(.) should recommit unlocked file, and not touch anything else
     # this tests the second issue in #2043
@@ -362,10 +404,10 @@ def test_add_files(path):
             status = ds.repo.annexstatus(['dir'])
         else:
             result = ds.save(arg[0], to_git=arg[1])
-            for a in assure_list(arg[0]):
+            for a in ensure_list(arg[0]):
                 assert_result_count(result, 1, path=str(ds.pathobj / a))
             status = ds.repo.get_content_annexinfo(
-                ut.Path(p) for p in assure_list(arg[0]))
+                ut.Path(p) for p in ensure_list(arg[0]))
         for f, p in status.items():
             if arg[1]:
                 assert p.get('key', None) is None, f
@@ -534,7 +576,7 @@ def test_add_recursive(path):
 
     # recursive add should not even touch sub1, because
     # it knows that it is clean
-    res = parent.save(recursive=True)
+    res = parent.save(recursive=True, jobs=5)
     # the key action is done
     assert_result_count(
         res, 1, path=op.join(subsub.path, 'new'), action='add', status='ok')
@@ -676,7 +718,7 @@ def test_surprise_subds(path):
     # this test irrelevant because it is about the unborn branch edge case.
     adjusted = somerepo.is_managed_branch()
     # This edge case goes away with Git v2.22.0.
-    fixed_git = external_versions['cmd:git'] >= '2.22.0'
+    fixed_git = somerepo.git_version >= '2.22.0'
 
     # save non-recursive
     res = ds.save(recursive=False, on_failure='ignore')
@@ -798,3 +840,39 @@ def test_save_dotfiles():
     for git in [True, False, None]:
         for save_path in [None, "nodot-subdir"]:
             yield check_save_dotfiles, git, save_path
+
+
+@with_tempfile
+def test_save_nested_subs_explicit_paths(path):
+    ds = Dataset(path).create()
+    spaths = [Path("s1"), Path("s1", "s2"), Path("s1", "s2", "s3")]
+    for spath in spaths:
+        Dataset(ds.pathobj / spath).create()
+    ds.save(path=spaths)
+    eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
+        set(map(str, spaths)))
+
+
+@with_tempfile
+def test_save_gitrepo_annex_subds_adjusted(path):
+    ds = Dataset(path).create(annex=False)
+    subds = ds.create("sub")
+    maybe_adjust_repo(subds.repo)
+    (subds.pathobj / "foo").write_text("foo")
+    subds.save()
+    ds.save()
+    assert_repo_status(ds.path)
+
+
+@known_failure
+@with_tempfile
+def test_save_adjusted_partial(path):
+    ds = Dataset(path).create()
+    subds = ds.create("sub")
+    maybe_adjust_repo(subds.repo)
+    (subds.pathobj / "foo").write_text("foo")
+    subds.save()
+    (ds.pathobj / "other").write_text("staged, not for committing")
+    ds.repo.call_git(["add", "other"])
+    ds.save(path=["sub"])
+    assert_repo_status(ds.path, added=["other"])

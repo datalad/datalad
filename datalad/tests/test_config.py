@@ -17,30 +17,37 @@ from os.path import join as opj
 
 from unittest.mock import patch
 from datalad.tests.utils import (
-    assert_raises,
-    assert_false,
-    assert_true,
     assert_equal,
-    assert_not_equal,
+    assert_false,
     assert_in,
+    assert_not_equal,
     assert_not_in,
+    assert_raises,
+    assert_true,
+    chpwd,
     ok_file_has_content,
-    with_tree,
     with_tempfile,
     with_testsui,
-    chpwd,
+    with_tree,
 )
-from datalad.utils import swallow_logs
+from datalad.utils import (
+    get_home_envvars,
+    swallow_logs,
+    Path
+)
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
     ConfigManager,
     rewrite_url,
+    write_config_section,
 )
 from datalad.cmd import CommandError
 
-from datalad.support.external_versions import external_versions
+from datalad.support.gitrepo import GitRepo
+from datalad import cfg as dl_cfg
+
 
 # XXX tabs are intentional (part of the format)!
 # XXX put back! confuses pep8
@@ -68,7 +75,7 @@ def test_something(path, new_home):
     # will refuse to work on dataset without a dataset
     assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
     assert_equal(len(cfg), 5)
     assert_in('something.user', cfg)
     # multi-value
@@ -99,9 +106,12 @@ def test_something(path, new_home):
          ('something.novalue', None),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
 
-    # always get all values
+    # by default get last value only
     assert_equal(
-        cfg.get('something.user'),
+        cfg.get('something.user'), 'email=jd@example.com')
+    # but can get all values
+    assert_equal(
+        cfg.get('something.user', get_all=True),
         ('name=Jane Doe', 'email=jd@example.com'))
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
     assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
@@ -172,8 +182,9 @@ def test_something(path, new_home):
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
     # lame datalad unittest sections in his precious ~/.gitconfig
+    env = get_home_envvars(new_home)
     with patch.dict('os.environ',
-                    {'HOME': new_home, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
+                    dict(get_home_envvars(new_home), DATALAD_SNEAKY_ADDITION='ignore')):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
         globalcfg = ConfigManager()
@@ -197,11 +208,6 @@ def test_something(path, new_home):
         # but after we unset the only value -- that section is no longer listed
         assert (not globalcfg.has_section('datalad.unittest'))
         assert_not_in('datalad.unittest.youcan', globalcfg)
-        if external_versions['cmd:git'] < '2.18':
-            # older versions leave empty section behind in the file
-            ok_file_has_content(global_gitconfig, '[datalad "unittest"]', strip=True)
-            # remove_section to clean it up entirely
-            globalcfg.remove_section('datalad.unittest', where='global')
         ok_file_has_content(global_gitconfig, "")
 
     cfg = ConfigManager(
@@ -226,7 +232,7 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
+    cfg = ConfigManager(GitRepo(opj(path, 'ds'), create=True), source='dataset')
     assert_in('crazy.padry', cfg)
     # make sure crazy config is not read when in local mode
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
@@ -335,22 +341,24 @@ def test_obtain(path):
 def test_from_env():
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.cfg', cfg)
-    os.environ['DATALAD_CRAZY_CFG'] = 'impossibletoguess'
-    cfg.reload()
-    assert_in('datalad.crazy.cfg', cfg)
-    assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
-    # not in dataset-only mode
-    cfg = ConfigManager(Dataset('nowhere'), source='dataset')
-    assert_not_in('datalad.crazy.cfg', cfg)
+    with patch.dict('os.environ',
+                    {'DATALAD_CRAZY_CFG': 'impossibletoguess'}):
+        cfg.reload()
+        assert_in('datalad.crazy.cfg', cfg)
+        assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
+        # not in dataset-only mode
+        cfg = ConfigManager(Dataset('nowhere'), source='dataset')
+        assert_not_in('datalad.crazy.cfg', cfg)
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
     cfg.set('datalad.crazy.override', 'fromoverride', where='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
-    os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
-    cfg.reload()
-    assert_equal(cfg['datalad.crazy.override'], 'fromenv')
+    with patch.dict('os.environ',
+                    {'DATALAD_CRAZY_OVERRIDE': 'fromenv'}):
+        cfg.reload()
+        assert_equal(cfg['datalad.crazy.override'], 'fromenv')
 
 
 def test_overrides():
@@ -385,10 +393,8 @@ def test_overrides():
     from datalad.utils import Path
     assert_not_in(
         'ups.name', cfg,
-        (cfg._store,
+        (cfg._stores,
          cfg.overrides,
-         cfg._cfgfiles,
-         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
     ))
 
 
@@ -454,11 +460,15 @@ def test_no_leaks(path1, path2):
         assert_not_in('i.was.here', ds2.config.keys())
 
         # and that we do not track the wrong files
-        assert_not_in(opj(ds1.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_not_in(opj(ds1.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_not_in(ds1.pathobj / '.git' / 'config',
+                      ds2.config._stores['git']['files'])
+        assert_not_in(ds1.pathobj / '.datalad' / 'config',
+                      ds2.config._stores['dataset']['files'])
         # these are the right ones
-        assert_in(opj(ds2.path, '.git', 'config'), ds2.config._cfgfiles)
-        assert_in(opj(ds2.path, '.datalad', 'config'), ds2.config._cfgfiles)
+        assert_in(ds2.pathobj / '.git' / 'config',
+                  ds2.config._stores['git']['files'])
+        assert_in(ds2.pathobj / '.datalad' / 'config',
+                  ds2.config._stores['dataset']['files'])
 
 
 @with_tempfile()
@@ -503,3 +513,91 @@ def test_dataset_systemglobal_mode(path):
         assert_in('user.name', cfg)
         assert_not_in('datalad.dataset.id', cfg)
         assert_not_in('annex.version', cfg)
+
+
+def test_global_config():
+
+    # from within tests, global config should be read from faked $HOME (see
+    # setup_package)
+    glb_cfg_file = Path(os.path.expanduser('~')) / '.gitconfig'
+    assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._stores['git']['files'])
+    assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
+    assert_equal(dl_cfg.get("user.email"), "test@example.com")
+
+
+@with_tempfile()
+def test_bare(path):
+    # can we handle a bare repo?
+    gr = GitRepo(path, create=True, bare=True)
+    # do we read the correct local config?
+    assert_in(gr.pathobj / 'config', gr.config._stores['git']['files'])
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', gr.config)
+    # not set something that wasn't there
+    obscure_key = 'sec.reallyobscurename!@@.key'
+    assert_not_in(obscure_key, gr.config)
+    # to the local config, which is easily accessible
+    gr.config.set(obscure_key, 'myvalue', where='local')
+    assert_equal(gr.config.get(obscure_key), 'myvalue')
+    # now make sure the config is where we think it is
+    assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
+
+
+@with_tempfile()
+def test_write_config_section(path):
+    # can we handle a bare repo?
+    gr = GitRepo(path, create=True, bare=True)
+
+    # test cases
+    # first 3 args are write_config_section() parameters
+    # 4th arg is a list with key/value pairs that should end up in a
+    # ConfigManager after a reload
+    testcfg = [
+        ('submodule', 'sub', dict(active='true', url='http://example.com'), [
+            ('submodule.sub.active', 'true'),
+            ('submodule.sub.url', 'http://example.com'),
+        ]),
+        ('submodule', 'sub"quote', {"a-b": '"quoted"', 'c': 'with"quote'}, [
+            ('submodule.sub"quote.a-b', '"quoted"'),
+            ('submodule.sub"quote.c', 'with"quote'),
+        ]),
+        ('short', ' s p a c e ', {"a123": ' space all over '}, [
+            ('short. s p a c e .a123', ' space all over '),
+        ]),
+    ]
+
+    for tc in testcfg:
+        # using append mode to provoke potential interference by
+        # successive calls
+        with (gr.pathobj / 'config').open('a') as fobj:
+            write_config_section(fobj, tc[0], tc[1], tc[2])
+        gr.config.reload()
+        for testcase in tc[3]:
+            assert_in(testcase[0], gr.config)
+            assert_equal(testcase[1], gr.config[testcase[0]])
+
+
+@with_tempfile()
+def test_external_modification(path):
+    from datalad.cmd import WitlessRunner as Runner
+    runner = Runner(cwd=path)
+    repo = GitRepo(path, create=True)
+    config = repo.config
+
+    key = 'sec.sub.key'
+    assert_not_in(key, config)
+    config.set(key, '1', where='local')
+    assert_equal(config[key], '1')
+
+    # we pick up the case where we modified so size changed
+    runner.run(['git', 'config', '--local', '--replace-all', key, '10'])
+    # unfortunately we do not react for .get unless reload. But here
+    # we will test if reload is correctly decides to reload without force
+    config.reload()
+    assert_equal(config[key], '10')
+
+    # and no size change
+    runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
+    config.reload()
+    assert_equal(config[key], '11')
+

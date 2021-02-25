@@ -9,8 +9,10 @@
 
 from os.path import join as opj
 from ..digests import Digester
-from ...tests.utils import with_tree
-from ...tests.utils import assert_equal
+from datalad.tests.utils import (
+    assert_equal,
+    with_tree,
+)
 
 
 @with_tree(tree={'sample.txt': '123',

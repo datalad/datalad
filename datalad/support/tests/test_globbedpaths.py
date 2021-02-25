@@ -20,7 +20,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import known_failure_windows
 
 
 def test_globbedpaths_get_sub_patterns():
@@ -48,7 +48,7 @@ def test_globbedpaths_get_sub_patterns():
         eq_(gp._get_sub_patterns(pat), expected)
 
 
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",

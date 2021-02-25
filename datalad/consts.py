@@ -40,6 +40,7 @@ DATALAD_SPECIAL_REMOTES_UUIDS = {
     DATALAD_SPECIAL_REMOTE: 'cf13d535-b47c-5df6-8590-0793cb08a90a',
     ARCHIVES_SPECIAL_REMOTE: 'c04eb54b-4b4e-5755-8436-866b043170fa'
 }
+WEB_SPECIAL_REMOTE_UUID = '00000000-0000-0000-0000-000000000001'
 
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
@@ -70,6 +71,7 @@ PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # git/datalad configuration item to provide a token for github
 CONFIG_HUB_TOKEN_FIELD = 'hub.oauthtoken'
 GITHUB_LOGIN_URL = 'https://github.com/login'
+GITHUB_TOKENS_URL = 'https://github.com/settings/tokens'
 
 # format of git-annex adjusted branch names
 ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\(.*\)$')

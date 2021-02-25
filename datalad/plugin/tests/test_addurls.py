@@ -21,19 +21,39 @@ from unittest.mock import patch
 from io import StringIO
 
 from datalad.api import addurls, Dataset, subdatasets
+from datalad.cmd import WitlessRunner
+from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.tests.utils import chpwd, slow, swallow_logs
-from datalad.tests.utils import assert_false, assert_true, assert_raises
-from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import eq_, ok_exists
-from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.support.external_versions import external_versions
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_false,
+    assert_in,
+    assert_in_results,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_result_count,
+    assert_true,
+    chpwd,
+    create_tree,
+    eq_,
+    HTTPPath,
+    known_failure_githubci_win,
+    ok_exists,
+    ok_startswith,
+    skip_if,
+    SkipTest,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
+    on_windows,
+    DEFAULT_BRANCH,
+)
 from datalad.utils import get_tempfile_kwargs, rmtemp
+from datalad import cfg as dl_cfg
 
 
 def test_formatter():
@@ -236,19 +256,19 @@ def json_stream(data):
 @known_failure_githubci_win
 def test_extract():
     info, subpaths = au.extract(
-        json_stream(ST_DATA["rows"]), "json",
+        ST_DATA["rows"],
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv")
 
     eq_(subpaths,
-        ["adult", "kid", "adult/no", "adult/yes", "kid/no"])
+        ["adult", "kid", op.join("adult", "no"), op.join("adult", "yes"), op.join("kid", "no")])
 
     eq_([d["url"] for d in info],
         ["will_1.com", "bob_2.com", "scott_1.com", "max_2.com"])
 
     eq_([d["filename"] for d in info],
-        ["kid/no/will.csv", "adult/yes/bob.csv",
-         "adult/no/scott.csv", "kid/no/max.csv"])
+        [op.join("kid", "no", "will.csv"), op.join("adult", "yes", "bob.csv"),
+         op.join("adult", "no", "scott.csv"), op.join("kid", "no", "max.csv")])
 
     expects = [{"name": "will", "age_group": "kid", "debut_season": "1",
                 "now_dead": "no"},
@@ -262,12 +282,12 @@ def test_extract():
         assert_dict_equal(d["meta_args"], expect)
 
     eq_([d["subpath"] for d in info],
-        ["kid/no", "adult/yes", "adult/no", "kid/no"])
+        [op.join("kid", "no"), op.join("adult", "yes"), op.join("adult", "no"), op.join("kid", "no")])
 
 
 def test_extract_disable_autometa():
     info, _ = au.extract(
-        json_stream(ST_DATA["rows"]), "json",
+        ST_DATA["rows"],
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
         exclude_autometa="*",
@@ -280,7 +300,7 @@ def test_extract_disable_autometa():
 
 def test_extract_exclude_autometa_regexp():
     info, _ = au.extract(
-        json_stream(ST_DATA["rows"]), "json",
+        ST_DATA["rows"],
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
         exclude_autometa="ea")
@@ -293,30 +313,39 @@ def test_extract_exclude_autometa_regexp():
         assert_dict_equal(d["meta_args"], expect)
 
 
-def test_extract_csv_json_equal():
+def check_extract_csv_json_equal(input_type):
+    delim = "\t" if input_type == "tsv" else ","
+
     keys = ST_DATA["header"]
-    csv_rows = [",".join(keys)]
-    csv_rows.extend(",".join(str(row[k]) for k in keys)
+    csv_rows = [delim.join(keys)]
+    csv_rows.extend(delim.join(str(row[k]) for k in keys)
                     for row in ST_DATA["rows"])
 
     kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
                 url_format="{name}_{debut_season}.com",
                 meta=["group={age_group}"])
 
-    json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
-    csv_output = au.extract(csv_rows, "csv", **kwds)
+    json_output = au.extract(
+        *au._read(json_stream(ST_DATA["rows"]), "json"), **kwds)
+    csv_output = au.extract(
+        *au._read(csv_rows, input_type), **kwds)
 
     eq_(json_output, csv_output)
 
 
+def test_extract_csv_tsv_json_equal():
+    yield check_extract_csv_json_equal, "csv"
+    yield check_extract_csv_json_equal, "tsv"
+
+
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  au.extract, None, "not_csv_or_json")
+                  au._read, None, "invalid_input_type")
 
 
 @with_tempfile(mkdir=True)
 def test_addurls_nonannex_repo(path):
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).create(force=True, annex=False)
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
@@ -381,7 +410,12 @@ def test_addurls_dry_run(path):
                   cml.out)
 
 
-@slow  # ~9s
+OLD_EXAMINEKEY = external_versions["cmd:annex"] < "8.20201116"
+skip_key_tests = skip_if(
+    OLD_EXAMINEKEY,
+    "git-annex version does not support `examinekey --migrate-to-backend`")
+
+
 class TestAddurls(object):
 
     @classmethod
@@ -397,13 +431,24 @@ class TestAddurls(object):
         cls._hpath.start()
         cls.url = cls._hpath.url
 
+        cls.data = [{"url": cls.url + "udir/a.dat",
+                     "name": "a",
+                     "subdir": "foo",
+                     "md5sum": "3fb7c40c70b0ed19da713bd69ee12014",
+                     "size": "9"},
+                    {"url": cls.url + "udir/b.dat",
+                     "name": "b",
+                     "subdir": "bar",
+                     "md5sum": "",
+                     "size": ""},
+                    {"url": cls.url + "udir/c.dat",
+                     "name": "c",
+                     "subdir": "foo",
+                     "md5sum": "9b72648021b70b8c522642e4490d7ac3",
+                     "size": "9"}]
         cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
         with open(cls.json_file, "w") as jfh:
-            json.dump(
-                [{"url": cls.url + "udir/a.dat", "name": "a", "subdir": "foo"},
-                 {"url": cls.url + "udir/b.dat", "name": "b", "subdir": "bar"},
-                 {"url": cls.url + "udir/c.dat", "name": "c", "subdir": "foo"}],
-                jfh)
+            json.dump(cls.data, jfh)
 
     @classmethod
     def teardown_class(cls):
@@ -419,7 +464,15 @@ class TestAddurls(object):
 
         n_annex_commits = get_annex_commit_counts()
 
-        ds.addurls(self.json_file, "{url}", "{name}")
+        # Meanwhile also test that we can specify path relative
+        # to the top of the dataset, as we generally treat paths in
+        # Python API, and it will be the one saved in commit
+        # message record
+        json_file = op.relpath(self.json_file, ds.path)
+
+        ds.addurls(json_file, "{url}", "{name}",
+                   exclude_autometa="(md5sum|size)")
+        ok_startswith(ds.repo.format_commit('%b', DEFAULT_BRANCH), f"url_file='{json_file}'")
 
         filenames = ["a", "b", "c"]
         for fname in filenames:
@@ -432,7 +485,10 @@ class TestAddurls(object):
 
         # Ignore this check if we're faking dates because that disables
         # batch mode.
-        if not os.environ.get('DATALAD_FAKE__DATES'):
+        # Also ignore if on Windows as it seems as if a git-annex bug 
+        # leads to separate meta data commits: 
+        # https://github.com/datalad/datalad/pull/5202#discussion_r535429704
+        if not (dl_cfg.get('datalad.fake-dates') or on_windows):
             # We should have two new commits on the git-annex: one for the
             # added urls and one for the added metadata.
             eq_(n_annex_commits + 2, get_annex_commit_counts())
@@ -466,14 +522,12 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_unbound_dataset(self, path):
-        ds = Dataset(path).create(force=True)
-
-        def check(subpath, dataset_arg, url_file):
-            subdir = op.join(path, subpath)
+        def check(ds, dataset_arg, url_file, fname_format):
+            subdir = op.join(ds.path, "subdir")
             os.mkdir(subdir)
             with chpwd(subdir):
                 shutil.copy(self.json_file, "in.json")
-                addurls(dataset_arg, url_file, "{url}", "{name}")
+                addurls(dataset_arg, url_file, "{url}", fname_format)
                 # Files specified in the CSV file are always relative to the
                 # dataset.
                 for fname in ["a", "b", "c"]:
@@ -481,10 +535,16 @@ class TestAddurls(object):
 
         # The input file is relative to the current working directory, as
         # with other commands.
-        check("subdir0", None, "in.json")
+        ds0 = Dataset(op.join(path, "ds0")).create()
+        check(ds0, None, "in.json", "{name}")
         # Likewise the input file is relative to the current working directory
         # if a string dataset argument is given.
-        check("subdir1", ds.path, "in.json")
+        ds1 = Dataset(op.join(path, "ds1")).create()
+        check(ds1, ds1.path, "in.json", "{name}")
+        # A leading "./" doesn't confuse addurls() into downloading the file
+        # into the subdirectory.
+        ds2 = Dataset(op.join(path, "ds2")).create()
+        check(ds2, None, "in.json", "./{name}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
@@ -493,6 +553,13 @@ class TestAddurls(object):
                 cfg_proc=["yoda"])
         for fname in ["a", "b", "c", "code"]:
             ok_exists(os.path.join(dspath, fname))
+
+    @with_tempfile
+    def test_addurls_from_list(self, path):
+        ds = Dataset(path).create()
+        ds.addurls(self.data, "{url}", "{name}")
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(path, fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_subdataset(self, path):
@@ -517,8 +584,8 @@ class TestAddurls(object):
             if save:
                 assert_repo_status(path)
             else:
-                # The datasets are create and saved ...
-                assert_repo_status(path, modified=subdirs)
+                # The datasets are create but not saved (since asked not to)
+                assert_repo_status(path, untracked=subdirs)
                 # but the downloaded files aren't.
                 for subds, fnames in subdir_files.items():
                     assert_repo_status(subds, added=fnames)
@@ -616,7 +683,7 @@ class TestAddurls(object):
 
         whereis = ds.repo.whereis(names, output="full")
         for fname, info in whereis.items():
-            eq_(info[ds.repo.WEB_UUID]['urls'],
+            eq_(info[WEB_SPECIAL_REMOTE_UUID]['urls'],
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
 
     @with_tempfile(mkdir=True)
@@ -624,7 +691,8 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
         ds.addurls(
             self.json_file, "{url}",
-            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}")
+            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}",
+            jobs=3)
         eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
             {"foo",
              "bar",
@@ -639,19 +707,142 @@ class TestAddurls(object):
     def test_addurls_invalid_input(self, path):
         ds = Dataset(path).create(force=True)
         in_file = op.join(path, "in")
-        for in_type in ["csv", "json"]:
+        for in_type in au.INPUT_TYPES:
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
             assert_in("Failed to read", str(exc.exception))
 
     @with_tree({"in.csv": "url,name,subdir",
+                "in.tsv": "url\tname\tsubdir",
                 "in.json": "[]"})
     def test_addurls_no_rows(self, path):
         ds = Dataset(path).create(force=True)
-        for fname in ["in.csv", "in.json"]:
+        for fname in ["in.csv", "in.tsv", "in.json"]:
             with swallow_logs(new_level=logging.WARNING) as cml:
                 assert_in_results(
                     ds.addurls(fname, "{url}", "{name}"),
                     action="addurls",
                     status="notneeded")
                 cml.assert_logged("No rows", regex=False)
+
+    @with_tempfile(mkdir=True)
+    def check_addurls_stdin_input(self, input_text, input_type, path):
+        ds = Dataset(path).create(force=True)
+        with patch("sys.stdin", new=StringIO(input_text)):
+            ds.addurls("-", "{url}", "{name}", input_type=input_type)
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(ds.path, fname))
+
+    def test_addurls_stdin_input(self):
+        def make_test(text, input_type, description):
+            def fn():
+                self.check_addurls_stdin_input(json_text, "ext")
+            fn.description = description
+            return fn
+
+        with open(self.json_file) as jfh:
+            json_text = jfh.read()
+
+        yield make_test(json_text, "ext", "json,default input type")
+        yield make_test(json_text, "json", "json,json input type")
+
+        def make_delim_text(delim):
+            row = "{name}" + delim + "{url}"
+            return "\n".join(
+                [row.format(name="name", url="url")] +
+                [row.format(**rec) for rec in json.loads(json_text)])
+
+        yield make_test(make_delim_text(","), "csv", "csv,csv input type")
+        yield make_test(make_delim_text("\t"), "tsv", "tsv,tsv input type")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_stdin_input_command_line(self, path):
+        # The previous test checks all the cases, but it overrides sys.stdin.
+        # Do a simple check that's closer to a command line call.
+        Dataset(path).create(force=True)
+        runner = WitlessRunner(cwd=path)
+        with open(self.json_file) as jfh:
+            runner.run(["datalad", "addurls", '-', '{url}', '{name}'],
+                       stdin=jfh)
+        for fname in ["a", "b", "c"]:
+            ok_exists(op.join(path, fname))
+
+    @with_tempfile(mkdir=True)
+    def test_drop_after(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.repo.set_gitattributes([('a*', {'annex.largefiles': 'nothing'})])
+        # make some files go to git, so we could test that we do not blow
+        # while trying to drop what is in git not annex
+        res = ds.addurls(self.json_file, '{url}', '{name}', drop_after=True)
+
+        assert_result_count(res, 3, action='addurl', status='ok')  # a, b, c  even if a goes to git
+        assert_result_count(res, 2, action='drop', status='ok')  # b, c
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_from_key_invalid_format(self, path):
+        ds = Dataset(path).create(force=True)
+        for fmt in ["{name}-which-has-no-double-dash",
+                    # Invalid hash length.
+                    "MD5-s{size}--{md5sum}a",
+                    # Invalid hash content.
+                    "MD5-s{size}--" + 32 * "q"]:
+            with assert_raises(IncompleteResultsError):
+                ds.addurls(self.json_file, "{url}", "{name}",
+                           key=fmt, exclude_autometa="*")
+
+    @with_tempfile(mkdir=True)
+    def check_addurls_from_key(self, key_arg, expected_backend, fake_dates,
+                               path):
+        ds = Dataset(path).create(force=True, fake_dates=fake_dates)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
+        ds.addurls(self.json_file, "{url}", "{name}", exclude_autometa="*",
+                   key=key_arg)
+        repo = ds.repo
+        repo_path = ds.repo.pathobj
+        paths = [repo_path / x for x in "ac"]
+
+        annexinfo = repo.get_content_annexinfo(eval_availability=True)
+        for path in paths:
+            pstat = annexinfo[path]
+            eq_(pstat["backend"], expected_backend)
+            assert_false(pstat["has_content"])
+
+        get_res = ds.get(paths, result_renderer=None, on_failure="ignore")
+        assert_result_count(get_res, 2, action="get", status="ok")
+
+    def test_addurls_from_key(self):
+        fn = self.check_addurls_from_key
+        for case in [
+                (fn, "MD5-s{size}--{md5sum}", "MD5"),
+                (fn, "MD5E-s{size}--{md5sum}.dat", "MD5E"),
+                (skip_key_tests(fn), "et:MD5-s{size}--{md5sum}", "MD5E"),
+                (skip_key_tests(fn), "et:MD5E-s{size}--{md5sum}.dat", "MD5")]:
+            yield case + (False,)
+            yield case + (True,)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_row_missing_key_fields(self, path):
+        ds = Dataset(path).create(force=True)
+        if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
+            raise SkipTest("Adjusted branch functionality requires "
+                           "more recent `git annex examinekey`")
+        data = self.data.copy()
+        for row in data:
+            if row["name"] == "b":
+                del row["md5sum"]
+                break
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}", exclude_autometa="*",
+                       key="MD5-s{size}--{md5sum}")
+
+        repo = ds.repo
+        repo_path = ds.repo.pathobj
+        paths = [repo_path / x for x in "ac"]
+
+        annexinfo = repo.get_content_annexinfo(eval_availability=True)
+        for path in paths:
+            pstat = annexinfo[path]
+            eq_(pstat["backend"], "MD5")
+            assert_false(pstat["has_content"])

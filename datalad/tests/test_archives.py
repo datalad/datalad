@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     ok_generator,
     OBSCURE_FILENAME,
     SkipTest,
+    skip_if,
 )
 
 from datalad.dochelpers import exc_str
@@ -33,8 +34,9 @@ from datalad.support.archives import (
 )
 from datalad.support.archive_utils_patool import unixify_path
 from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.external_versions import external_versions
 from datalad.support import path as op
-
+from datalad import cfg as dl_cfg
 
 fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
@@ -122,6 +124,8 @@ def check_compress_dir(ext, path, name):
 def test_compress_dir():
     yield check_compress_dir, '.tar.xz'
     yield check_compress_dir, '.tar.gz'
+    yield check_compress_dir, '.tgz'
+    yield check_compress_dir, '.tbz2'
     yield check_compress_dir, '.tar'
     yield check_compress_dir, '.zip'
     yield check_compress_dir, '.7z'
@@ -131,6 +135,8 @@ def test_compress_dir():
 _filename = 'fi le.dat'
 
 
+@skip_if("cmd:7z" not in external_versions,
+         msg="Known to fail if p7zip is not installed")
 @with_tree(((_filename, 'content'),))
 @with_tempfile()
 def check_compress_file(ext, annex, path, name):
@@ -197,7 +203,7 @@ def test_ExtractedArchive(path):
         ]))
 
     earchive.clean()
-    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
+    if not dl_cfg.get('datalad.tests.temp.keep'):
         assert_false(op.exists(earchive.path))
 
 #@with_tree(**tree_simplearchive)

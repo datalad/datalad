@@ -18,7 +18,6 @@ from _datalad_build_support.setup import (
     # as part of the tests
     #BuildRSTExamplesFromScripts,
     BuildSchema,
-    setup_entry_points,
     findsome,
     datalad_setup,
 )
@@ -30,13 +29,13 @@ requires = {
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
-        'GitPython>=2.1.12',
         'iso8601',
         'humanize',
-        'fasteners',
+        'fasteners>=0.14',
         'patool>=1.7',
         'tqdm',
         'wrapt',
+        'annexremote',
     ],
     'downloaders': [
         'boto',
@@ -57,7 +56,7 @@ requires = {
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
-        'httpretty>=0.8.14',
+        'httpretty>=0.9.4',  # Introduced py 3.6 support
         'nose>=1.3.4',
         'vcrpy',
     ],
@@ -122,20 +121,17 @@ cmdclass = {
     # 'build_py': DataladBuild
 }
 
-#
-# Avoid using entry_points due to their hefty overhead
-#
-setup_kwargs = setup_entry_points(
-    {
-        'datalad': 'datalad.cmdline.main',
-        'git-annex-remote-datalad-archives': 'datalad.customremotes.archives',
-        'git-annex-remote-datalad': 'datalad.customremotes.datalad',
-    })
+setup_kwargs = {}
 
 # normal entrypoints for the rest
 # a bit of a dance needed, as on windows the situation is different
-entry_points = setup_kwargs.get('entry_points', {})
-entry_points.update({
+entry_points = {
+    'console_scripts': [
+        'datalad=datalad.cmdline.main:main',
+        'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
+        'git-annex-remote-datalad=datalad.customremotes.datalad:main',
+        'git-annex-remote-ora=datalad.distributed.ora_remote:main',
+    ],
     'datalad.metadata.extractors': [
         'annex=datalad.metadata.extractors.annex:MetadataExtractor',
         'audio=datalad.metadata.extractors.audio:MetadataExtractor',
@@ -146,7 +142,8 @@ entry_points.update({
         'frictionless_datapackage=datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor',
         'image=datalad.metadata.extractors.image:MetadataExtractor',
         'xmp=datalad.metadata.extractors.xmp:MetadataExtractor',
-    ]})
+    ]
+}
 setup_kwargs['entry_points'] = entry_points
 
 classifiers = [
@@ -179,7 +176,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={

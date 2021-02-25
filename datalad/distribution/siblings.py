@@ -64,7 +64,7 @@ from datalad.distribution.dataset import (
 )
 from datalad.distribution.update import Update
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     slash_join,
     Path,
 )
@@ -74,6 +74,8 @@ from .dataset import (
     EnsureDataset,
     datasetmethod,
 )
+import datalad.support.ansi_colors as ac
+
 
 lgr = logging.getLogger('datalad.distribution.siblings')
 
@@ -301,6 +303,14 @@ class Siblings(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+        # should we attempt to remove an unknown sibling, complain like Git does
+        if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
+            ui.message(
+                '{warn}: No sibling "{name}" in dataset {path}'.format(
+                    warn=ac.color_word('Warning', ac.LOG_LEVEL_COLORS['WARNING']),
+                    **res)
+            )
+            return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
             # logging complained about this already
             return
@@ -411,7 +421,7 @@ def _configure_remote(
     if name != 'here':
         # do all configure steps that are not meaningful for the 'here' sibling
         # AKA the local repo
-        if name not in known_remotes:
+        if name not in known_remotes and url:
             # this remote is fresh: make it known
             # just minimalistic name and URL, the rest is coming from `configure`
             ds.repo.add_remote(name, url)
@@ -435,7 +445,7 @@ def _configure_remote(
 
         if publish_depends:
             # Check if all `deps` remotes are known to the `repo`
-            unknown_deps = set(assure_list(publish_depends)).difference(
+            unknown_deps = set(ensure_list(publish_depends)).difference(
                 known_remotes)
             if unknown_deps:
                 result_props['status'] = 'error'
@@ -501,7 +511,7 @@ def _configure_remote(
                 # config vars are incremental, so make sure we start from
                 # scratch
                 ds.config.unset(depvar, where='local', reload=False)
-            for d in assure_list(publish_depends):
+            for d in ensure_list(publish_depends):
                 lgr.info(
                     'Configure additional publication dependency on "%s"',
                     d)
@@ -511,7 +521,7 @@ def _configure_remote(
         if publish_by_default:
             if dfltvar in ds.config:
                 ds.config.unset(dfltvar, where='local', reload=False)
-            for refspec in assure_list(publish_by_default):
+            for refspec in ensure_list(publish_by_default):
                 lgr.info(
                     'Configure additional default publication refspec "%s"',
                     refspec)
@@ -539,8 +549,9 @@ def _configure_remote(
                 # which starts to fail with AccessFailedError) if URL is bogus,
                 # so enableremote fails. E.g. as "tested" in test_siblings
                 lgr.info(
-                    "Failed to enable annex remote %s, could be a pure git "
-                    "or not accessible", name)
+                    "Could not enable annex remote %s. This is expected if %s "
+                    "is a pure Git remote, or happens if it is not accessible.",
+                    name, name)
                 lgr.debug("Exception was: %s" % exc_str(exc))
 
             if as_common_datasrc:
@@ -553,13 +564,12 @@ def _configure_remote(
                     # XXX except it is not enough
 
                     # make special remote of type=git (see #335)
-                    ds.repo._run_annex_command(
+                    ds.repo.call_annex([
                         'initremote',
-                        annex_options=[
-                            as_common_datasrc,
-                            'type=git',
-                            'location={}'.format(url),
-                            'autoenable=true'])
+                        as_common_datasrc,
+                        'type=git',
+                        'location={}'.format(url),
+                        'autoenable=true'])
                 else:
                     yield dict(
                         status='impossible',
@@ -585,7 +595,7 @@ def _configure_remote(
             result_props['message'] = 'cannot set description of a plain Git repository'
             yield result_props
             return
-        ds.repo._run_annex_command('describe', annex_options=[name, description])
+        ds.repo.call_annex(['describe', name, description])
 
     # report all we know at once
     info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]
@@ -671,13 +681,15 @@ def _query_remotes(
                     if groupwanted:
                         info['annex-groupwanted'] = groupwanted
                 except CommandError as exc:
-                    if 'cannot determine uuid' in str(exc):
+                    if 'cannot determine uuid' in exc.stderr:
                         # not an annex (or no connection), would be marked as
                         #  annex-ignore
-                        msg = "Failed to determine if %s carries annex." % remote
+                        msg = "Could not detect whether %s carries an annex. " \
+                              "If %s is a pure Git remote, this is expected. " %\
+                              (remote, remote)
                         ds.repo.config.reload()
                         if ds.repo.is_remote_annex_ignored(remote):
-                            msg += " Remote was marked by annex as annex-ignore.  " \
+                            msg += "Remote was marked by annex as annex-ignore. " \
                                    "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
                         lgr.warning(msg)
                         info['annex-ignore'] = True

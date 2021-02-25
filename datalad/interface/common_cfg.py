@@ -13,11 +13,15 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from os import environ
 from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureChoice
+from datalad.support.constraints import EnsureListOf
+from datalad.support.constraints import EnsureStr
+from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -36,6 +40,8 @@ definitions = {
                'title': 'NDA database server',
                'text': 'Hostname of the database server'}),
         'destination': 'global',
+        # Development one is https://development.nimhda.org
+        'default': 'https://nda.nih.gov/DataManager/dataManager',
     },
     'datalad.locations.cache': {
         'ui': ('question', {
@@ -51,6 +57,13 @@ definitions = {
                        'default dataset?'}),
         'destination': 'global',
         'default': opj(expanduser('~'), 'datalad'),
+    },
+    'datalad.locations.sockets': {
+        'ui': ('question', {
+               'title': 'Socket directory',
+               'text': 'Where should datalad store socket files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'sockets'),
     },
     'datalad.locations.system-plugins': {
         'ui': ('question', {
@@ -79,6 +92,12 @@ definitions = {
                'text': 'Where should datalad search for user procedures?'}),
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'procedures'),
+    },
+    'datalad.locations.extra-procedures': {
+        'ui': ('question', {
+            'title': 'Extra procedure directory',
+            'text': 'Where should datalad search for some additional procedures?'}),
+        'destination': 'global',
     },
     'datalad.locations.dataset-procedures': {
         'ui': ('question', {
@@ -126,12 +145,6 @@ definitions = {
                'title': 'Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set'}),
         'type': EnsureBool(),
     },
-    'datalad.tests.protocolremote': {
-        'ui': ('yesno', {
-            'title': 'Binary flag to specify whether to test protocol '
-                     'interactions of custom remote with annex'}),
-        'type': EnsureBool(),
-    },
     'datalad.tests.dataladremote': {
         'ui': ('yesno', {
                'title': 'Binary flag to specify whether each annex repository should get datalad special remote in every test repository'}),
@@ -159,9 +172,17 @@ definitions = {
         'type': EnsureBool(),
         'default': False,
     },
+    'datalad.tests.setup.testrepos': {
+        'ui': ('question', {
+            'title': 'Pre-creates repositories for @with_testrepos within setup_package'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
     'datalad.tests.temp.dir': {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
+        'type': EnsureStr(),
+        'default': environ.get('TMPDIR'),
     },
     'datalad.tests.temp.keep': {
         'ui': ('yesno', {
@@ -186,6 +207,13 @@ definitions = {
     'datalad.tests.usecassette': {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
+    },
+    'datalad.tests.cache': {
+        'ui': ('question', {
+            'title': 'Cache directory for tests',
+            'text': 'Where should datalad cache test files?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_cache_dir, 'tests')
     },
     'datalad.log.level': {
         'ui': ('question', {
@@ -234,19 +262,29 @@ definitions = {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
     },
-    'datalad.cmd.protocol': {
-        'ui': ('question', {
-               'title': 'Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. "externals-time" for ExecutionTimeExternalsProtocol, "time" for ExecutionTimeProtocol and "null" for NullProtocol. Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface'}),
-    },
-    'datalad.cmd.protocol.prefix': {
-        'ui': ('question', {
-               'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
-    },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
                'title': "If set, pass this file as ssh's -i option."}),
         'destination': 'global',
         'default': None,
+    },
+    'datalad.ssh.multiplex-connections': {
+        'ui': ('question', {
+               'title': "Whether to use a single shared connection for multiple SSH processes aiming at the same target."}),
+        'destination': 'global',
+        'default': not on_windows,
+        'type': EnsureBool(),
+    },
+    'datalad.annex.retry': {
+        'ui': ('question',
+               {'title': 'Value for annex.retry to use for git-annex calls',
+                'text': 'On transfer failure, annex.retry (sans "datalad.") '
+                        'controls the number of times that git-annex retries. '
+                        'DataLad will call git-annex with annex.retry set '
+                        'to the value here unless the annex.retry '
+                        'is explicitly configured'}),
+        'type': EnsureInt(),
+        'default': 3,
     },
     'datalad.repo.backend': {
         'ui': ('question', {
@@ -314,6 +352,15 @@ definitions = {
         'type': EnsureInt(),
         'default': 1,
     },
+    'datalad.runtime.max-jobs': {
+        'ui': ('question', {
+            'title': 'Maximum number of jobs DataLad can run in "parallel"',
+            'text': 'Set this value to enable parallel multi-threaded DataLad jobs that may speed up certain '
+                    'operations, in particular operation across multiple datasets (e.g., install multiple '
+                    'subdatasets, etc).'}),
+        'type': EnsureInt(),
+        'default': 1,
+    },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
                'title': 'Error behavior',
@@ -327,6 +374,15 @@ definitions = {
                'text': "If set (to other than 'all'), constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
         'type': EnsureChoice('all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
         'default': None,
+    },
+    'datalad.runtime.stalled-external': {
+        'ui': ('question', {
+            'title': 'Behavior for handing external processes',
+            'text': 'What to do with external processes if they do not finish in some minimal reasonable time. '
+                    'If "abandon", datalad would proceed without waiting for external process to exit. '
+                    'ATM applies only to batched git-annex processes. Should be changed with caution.'}),
+        'type': EnsureChoice('wait', 'abandon'),
+        'default': 'wait',
     },
     'datalad.search.indexercachesize': {
         'ui': ('question', {
@@ -348,6 +404,17 @@ definitions = {
             'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
+    },
+    'datalad.save.no-message': {
+        'ui': ('question', {
+            'title': 'Commit message handling',
+            'text': 'When no commit message was provided: '
+                    'attempt to obtain one interactively (interactive); '
+                    'or use a generic commit message (generic). '
+                    'NOTE: The interactive option is experimental. The '
+                    'behavior may change in backwards-incompatible ways.'}),
+        'default': 'generic',
+        'type': EnsureChoice('interactive', 'generic'),
     },
     'datalad.install.inherit-local-origin': {
         'ui': ('question', {

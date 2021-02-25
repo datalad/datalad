@@ -35,11 +35,6 @@ class NoAnnex(Interface):
 
     Note that the plugin works incrementally, hence any existing configuration
     (e.g. from a previous plugin run) is amended, not replaced.
-
-    Parameters
-    ----------
-    ref_dir : str, optional
-    makedirs : bool, optional
     """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
@@ -86,9 +81,9 @@ class NoAnnex(Interface):
         from os import makedirs as makedirsfx
         from datalad.distribution.dataset import require_dataset
         from datalad.support.annexrepo import AnnexRepo
-        from datalad.utils import assure_list
+        from datalad.utils import ensure_list
 
-        pattern = assure_list(pattern)
+        pattern = ensure_list(pattern)
         ds = require_dataset(dataset, check_installed=True,
                              purpose='no_annex configuration')
 

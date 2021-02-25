@@ -10,14 +10,16 @@
 
 """
 
-from ..support.network import URL
-from ..support.s3 import add_version_to_url, get_versioned_url
-from .utils import use_cassette
-from .utils import ok_startswith
-
-from nose.tools import eq_, assert_raises
-from datalad.tests.utils import skip_if_no_network
-from ..downloaders.tests.utils import get_test_providers
+from datalad.support.network import URL
+from datalad.support.s3 import add_version_to_url, get_versioned_url
+from datalad.tests.utils import (
+    assert_raises,
+    eq_,
+    ok_startswith,
+    skip_if_no_network,
+    use_cassette,
+)
+from datalad.downloaders.tests.utils import get_test_providers
 
 
 def test_add_version_to_url():
@@ -84,6 +86,16 @@ def test_get_versioned_url():
     eq_(get_versioned_url(url_3ver_input), url_3ver_input)
     eq_(get_versioned_url(url_3ver_input, update=True),
         url_3ver + "?versionId=Kvuind11HZh._dCPaDAb0OY9dRrQoTMn")
+
+
+@skip_if_no_network
+@use_cassette('s3_test_version_url_anon')
+def test_get_versioned_url_anon():
+    # The one without any authenticator, was crashing.
+    # Also it triggered another bug about having . in the bucket name
+    url_on = "http://openneuro.org.s3.amazonaws.com/ds000001/dataset_description.json"
+    url_on_versioned = get_versioned_url(url_on)
+    ok_startswith(url_on_versioned, url_on + "?versionId=")
 
 
 @skip_if_no_network

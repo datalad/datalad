@@ -19,7 +19,6 @@ from datalad.interface.common_opts import (
     recursion_limit,
     location_description,
     jobs_opt,
-    nosave_opt,
     reckless_opt,
 )
 from datalad.interface.results import (
@@ -39,7 +38,7 @@ from datalad.support.network import (
     RI,
     PathRI,
 )
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.dochelpers import exc_str
 
 from datalad.distribution.dataset import (
@@ -104,23 +103,26 @@ class Install(Interface):
              code_cmd="datalad install "
              "https://github.com/datalad-datasets/longnow-podcasts.git"),
         dict(text="Install a dataset as a subdataset into the current dataset",
-             code_py="install(dataset='.', "
-             "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
-             code_cmd="datalad install -d . "
-             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+             code_py="""\
+             install(dataset='.',
+                     source='https://github.com/datalad-datasets/longnow-podcasts.git')""",
+             code_cmd="""\
+             datalad install -d . \\
+             --source='https://github.com/datalad-datasets/longnow-podcasts.git'"""),
         dict(text="Install a dataset, and get all content right away",
-             code_py="install(source="
-             "'https://github.com/datalad-datasets/longnow-podcasts.git', "
-             "get_data=True')",
-             code_cmd="datalad install --get-data "
-             "--source https://github.com/datalad-datasets/longnow-podcasts.git"),
+             code_py="""\
+             install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
+                     get_data=True)""",
+             code_cmd="""\
+             datalad install --get-data \\
+             -s https://github.com/datalad-datasets/longnow-podcasts.git"""),
         dict(text="Install a dataset with all its subdatasets",
-             code_py="install("
-             "source='https://github.com/datalad-datasets/longnow-podcasts.git', "
-             "recursive=True)",
-             code_cmd="datalad install "
-             "https://github.com/datalad-datasets/longnow-podcasts.git "
-             "--recursive"),
+             code_py="""\
+             install(source='https://github.com/datalad-datasets/longnow-podcasts.git',
+                     recursive=True)""",
+             code_cmd="""\
+             datalad install -r \\
+             https://github.com/datalad-datasets/longnow-podcasts.git"""),
     ]
 
     _params_ = dict(
@@ -155,7 +157,6 @@ class Install(Interface):
         description=location_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        save=nosave_opt,
         reckless=reckless_opt,
         jobs=jobs_opt,
     )
@@ -171,13 +172,12 @@ class Install(Interface):
             description=None,
             recursive=False,
             recursion_limit=None,
-            save=True,
             reckless=None,
             jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
-        path = assure_list(path)
+        path = ensure_list(path)
 
         if not source and not path:
             raise InsufficientArgumentsError(
@@ -235,7 +235,6 @@ class Install(Interface):
                 for r in Install.__call__(
                         source=s,
                         description=description,
-                        save=save,
                         # we need to disable error handling in order to have it done at
                         # the very top, otherwise we are not able to order a global
                         # "ignore-and-keep-going"

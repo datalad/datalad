@@ -89,7 +89,7 @@ class study_forrest(SuprocBenchmarks):
             create_tree(
                 aligned.path,
                 {'modification{}.txt'.format(i): 'unique{}'.format(i)})
-            aligned.add('.')
+            aligned.save('.')
         # finally aggregate data
         aggregate = public.create('aggregate', description='aggregate data')
         aggregate.clone(source=aligned.path, path=opj('src', 'aligned'), reckless=True)

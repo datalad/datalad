@@ -9,14 +9,20 @@
 """Tests for dochelpers (largely copied from PyMVPA, the same copyright)
 """
 
-import os
 from unittest.mock import patch
 
-from ..dochelpers import single_or_plural, borrowdoc, borrowkwargs
-from ..dochelpers import exc_str
+from ..dochelpers import (
+    single_or_plural,
+    borrowdoc,
+    borrowkwargs,
+    exc_str,
+)
 
-from .utils import assert_equal, assert_true, assert_raises
-from .utils import assert_re_in
+from datalad.tests.utils import (
+    assert_equal,
+    assert_true,
+    assert_re_in,
+)
 
 
 def test_basic():
@@ -138,12 +144,15 @@ def test_borrow_kwargs():
     assert_true('B.met_nodockwargs' in B.met_nodockwargs.__doc__)
     assert_true('boguse' in B.met_excludes.__doc__)
 
+
 def test_exc_str():
     try:
         raise Exception("my bad")
     except Exception as e:
         estr = exc_str(e)
+        estr_tb_only = exc_str(e, include_str=False)
     assert_re_in("my bad \[test_dochelpers.py:test_exc_str:...\]", estr)
+    assert_re_in("^\[.*\]", estr_tb_only)  # only traceback
 
     def f():
         def f2():

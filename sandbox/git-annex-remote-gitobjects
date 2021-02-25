@@ -1,0 +1,182 @@
+#!/bin/bash
+#	bash - for string indexing
+#
+# git-annex external special remote prototype to test feasibility of
+# using regular git objects and refs to store content of files in remote
+# git objects store.
+#
+# Pros:
+#  - could work with any git repository hosting, even the one which does
+#    not support annex
+#
+# Cons:
+#  - at this point it is more of a "proof of concept"
+#  - longevity of those references on the remote is not guaranteed
+#  - it is quite slow, so should be used for relatively small load
+#
+# Discussion and possibly more ways it could be improved are available
+# from https://github.com/datalad/datalad/pull/3727
+#
+# Based on an example of git annex special remote, which is
+#  Copyright 2013 Joey Hess; licenced under the GNU GPL version 3 or higher.
+# Tuned for the gitobjects type remote by Yaroslav Halchenko, 2019-2020
+#
+
+set -e
+
+# This program speaks a line-based protocol on stdin and stdout.
+# When running any commands, their stdout should be redirected to stderr
+# (or /dev/null) to avoid messing up the protocol.
+runcmd () {
+	echo DEBUG "Running $@"
+	"$@" >/dev/null 2>&1 # &2
+}
+
+# Prevent any gc so we could avoid objects being packed before we get
+# rid of them
+rungitcmd () {
+	runcmd git -c gc.auto=0 "$@"
+}
+
+# Gets a value from the remote's configuration, and stores it in RET
+getconfig () {
+	ask GETCONFIG "$1"
+}
+
+# Stores a value in the remote's configuration.
+setconfig () {
+	echo SETCONFIG "$1" "$2"
+}
+
+# Sets ref to the reference to use to store a key.
+calcref () {
+	ref="refs/annex-gitobjects/$1"
+}
+
+calcobjfile () {
+	objfile="$gitdir/objects/${h:0:2}/${h:2}"
+	echo DEBUG "objfile=$objfile"
+}
+
+# Asks for some value, and stores it in RET
+ask () {
+	echo "$1" "$2"
+	read resp
+	# Tricky POSIX shell code to split first word of the resp,
+	# preserving all other whitespace
+	case "${resp%% *}" in
+		VALUE)
+			RET="$(echo "$resp" | sed 's/^VALUE \?//')"
+		;;
+		*)
+			RET=""
+		;;
+	esac
+}
+
+cleanup () {
+	# remove reference and object locally
+	rungitcmd update-ref -d "$ref"
+	if [ "$knownobj" = '' ]; then
+		rm -f "$objfile"
+	fi
+}
+
+gitdir=$(git rev-parse --git-dir)
+
+# This has to come first, to get the protocol started.
+echo VERSION 1
+
+while read line; do
+	set -- $line
+	case "$1" in
+		INITREMOTE)
+			# Nothing todo I think
+			echo INITREMOTE-SUCCESS
+		;;
+		PREPARE)
+			# TODO: should probably request remote url not already existing
+			# remote... think more, to speed things up, we use existing one
+			getconfig remote
+			remote="$RET"
+			# just to check that all is kosher
+			if git remote get-url "$remote" >/dev/null 2>&1; then
+				echo PREPARE-SUCCESS
+			else
+				echo PREPARE-FAILURE "$remote is either unknown or has no url"
+			fi
+		;;
+		TRANSFER)
+			op="$2"
+			key="$3"
+			shift 3
+			file="$@"
+
+			calcref "$key"
+			case "$op" in
+				STORE)
+					# Store the file to a location
+					# based on the key.
+					# We will need to do it twice ATM to make sure that we do
+					# not wipe out object which magically already exists
+					h=$(git -c gc.auto=0 hash-object --stdin < "$file")
+					calcobjfile "$h"
+					knownobj=$( [ -e "$objfile" ] && echo 1 || echo '' )
+					echo DEBUG knownobj=$knownobj
+					# now with -w
+					rungitcmd hash-object --stdin -w < "$file"
+					# create a reference for that object with the key in it
+					rungitcmd update-ref "$ref" "$h"
+					# push that reference (and corresponding object) to the remote
+					rungitcmd push "$remote" "$ref:$ref"
+					cleanup
+					echo TRANSFER-SUCCESS STORE "$key"
+					# TODO: chain to report TRANSFER-FAILURE
+				;;
+				RETRIEVE)
+					# TODO: we cannot know for sure if object existed prior!
+					#  since we don't know object hash. may be we should save
+					#  it into the STATE and use that to check first
+					knownobj=''
+					# TODO: interface progress reporting
+					rungitcmd fetch "$remote" "$ref:$ref"
+					echo DEBUG "getting git hexsha"
+					h=$(git -c gc.auto=0 show-ref -s "$ref")
+					calcobjfile "$h"
+					echo DEBUG "cat-file $ref into $file"
+					git -c gc.auto=0 cat-file -p "$ref" > "$file"
+					echo DEBUG done - you must have a file
+					cleanup
+					echo TRANSFER-SUCCESS RETRIEVE "$key"
+					# TODO: chain to report TRANSFER-FAILURE
+				;;
+			esac
+		;;
+		CHECKPRESENT)
+			# TODO: ATM expensive since probably fetching a reference
+			#  would fetch the object?
+			key="$2"
+			calcref "$key"
+			rungitcmd ls-remote --exit-code "$remote" "$ref" \
+				&& echo CHECKPRESENT-SUCCESS "$key" \
+				|| echo CHECKPRESENT-FAILURE "$key"
+			rm -f "$gitdir/$ref"
+		;;
+		REMOVE)
+			key="$2"
+			calcref "$key"
+			rungitcmd push "$remote" ":$ref" \
+			&& echo "REMOVE-SUCCESS $key" \
+			|| echo "REMOVE-FAILURE $key Who knows why?"
+		;;
+		GETINFO)
+			echo INFOFIELD "remote"
+			echo INFOVALUE "$remote"
+			echo INFOEND
+		;;
+
+		*)
+			echo UNSUPPORTED-REQUEST
+		;;
+	esac
+done

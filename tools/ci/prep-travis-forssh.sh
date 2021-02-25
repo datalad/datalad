@@ -1,20 +1,55 @@
 #!/bin/bash
+set -eu
 
-mkdir -p ~/.ssh
-echo -e "Host localhost\n\tStrictHostKeyChecking no\n\tIdentityFile /tmp/dl-test-ssh-id\n" >> ~/.ssh/config
-echo -e "Host datalad-test\n\tStrictHostKeyChecking no\n\tIdentityFile /tmp/dl-test-ssh-id\n" >> ~/.ssh/config
+mkdir -p "$HOME/.ssh"
+
+if command -V docker-machine &> /dev/null
+then docker_host="$(docker-machine inspect --format='{{.Driver.IPAddress}}' default)"
+else docker_host=localhost
+fi
+
+cat >>"$HOME/.ssh/config" <<EOF
+
+Host datalad-test
+HostName $docker_host
+Port 42241
+User dl
+StrictHostKeyChecking no
+IdentityFile /tmp/dl-test-ssh-id
+EOF
+
+cat >>"$HOME/.ssh/config" <<EOF
+
+Host datalad-test2
+HostName $docker_host
+Port 42242
+User dl
+StrictHostKeyChecking no
+IdentityFile /tmp/dl-test-ssh-id
+EOF
+
+ls -l "$HOME/.ssh"
+chmod go-rwx -R "$HOME/.ssh"
+ls -ld "$HOME/.ssh"
+ls -l "$HOME/.ssh"
+
 ssh-keygen -f /tmp/dl-test-ssh-id -N ""
-cat /tmp/dl-test-ssh-id.pub >> ~/.ssh/authorized_keys
-eval $(ssh-agent)
-ssh-add /tmp/dl-test-ssh-id
 
-echo "DEBUG: test connection to localhost ..."
-ssh -v localhost exit
-echo "DEBUG: test connection to datalad-test ..."
+curl -fSsL \
+     https://raw.githubusercontent.com/datalad-tester/docker-ssh-target/master/setup \
+     >setup-docker-ssh
+sh setup-docker-ssh --key=/tmp/dl-test-ssh-id.pub -2
+
+tries=60
+n=0
+while true
+do nc -vz "$docker_host" 42241 && nc -vz "$docker_host" 42242 && break
+   ((n++))
+   if [ "$n" -lt "$tries" ]
+   then sleep 1
+   else exit 1
+   fi
+done
+
 ssh -v datalad-test exit
-
-# tmp: don't run the actual tests:
-# exit 1
-
-
-
+ssh -v datalad-test2 exit

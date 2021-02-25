@@ -14,10 +14,14 @@ __docformat__ = 'restructuredtext'
 
 from datalad.interface.results import known_result_xfms
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureCallable
-
+from datalad.support.constraints import (
+    EnsureCallable,
+    EnsureChoice,
+    EnsureInt,
+    EnsureNone,
+    EnsureStr,
+    EnsureStrPrefix,
+)
 
 location_description = Parameter(
     args=("-D", "--description",),
@@ -131,15 +135,30 @@ reckless_opt = Parameter(
     const='auto',
     nargs='?',
     # boolean types only for backward compatibility
-    constraints=EnsureChoice(None, True, False, 'auto'),
-    doc="""Set up the dataset to be able to obtain content in the
-    cheapest/fastest possible way, even if this poses a potential
-    risk the data integrity (e.g. hardlink files from a local clone
-    of the dataset). Use with care, and limit to "read-only" use
-    cases. With this flag the installed dataset will be marked as
-    untrusted. The reckless mode is stored in a dataset's local
-    configuration under 'datalad.clone.reckless', and will be inherited
-    to any of its subdatasets.""")
+    constraints=
+    EnsureChoice(None, True, False, 'auto', 'ephemeral') | \
+    EnsureStrPrefix('shared-'),
+    metavar='auto|ephemeral|shared-...',
+    doc="""set up the dataset in a potentially unsafe way for performance,
+    or access reasons -- use with care, any dataset is marked as 'untrusted'.
+    The reckless mode is stored in a dataset's local configuration under
+    'datalad.clone.reckless', and will be inherited to any of its subdatasets.
+    Supported modes are:
+    ['auto']: hard-link files between local clones. In-place
+    modification in any clone will alter original annex content.
+    ['ephemeral']: symlink annex to origin's annex and discard local availability
+    info via git-annex-dead 'here'. Shares an annex between origin and clone
+    w/o git-annex being aware of it. In case of a change in origin you need to
+    update the clone before you're able to save new content on your end.
+    Alternative to 'auto' when hardlinks are not an option, or number of consumed
+    inodes needs to be minimized. Please note, that this is meant to be used
+    with either non-bare repositories or a RIA store as origin! Do not come up
+    with your own usecase unless you are absolutely sure you know your git-annex 
+    internals very well!
+    ['shared-<mode>']: set up repository and annex permission to enable multi-user
+    access. This disables the standard write protection of annex'ed files.
+    <mode> can be any value support by 'git init --shared=', such as 'group', or
+    'all'.""")
 
 jobs_opt = Parameter(
     args=("-J", "--jobs"),

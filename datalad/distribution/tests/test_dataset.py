@@ -11,34 +11,60 @@
 
 import os
 import os.path as op
-from os.path import join as opj, abspath, relpath
-
-
-from ..dataset import Dataset, EnsureDataset, require_dataset
-from ..dataset import resolve_path
-from datalad import cfg
-from datalad.api import create
-from datalad.api import get
+from os.path import (
+    abspath,
+    join as opj,
+    lexists,
+    relpath,
+)
+from ..dataset import (
+    Dataset,
+    EnsureDataset,
+    require_dataset,
+    resolve_path,
+)
+from datalad import cfg as dl_cfg
+from datalad.api import (
+    create,
+    get,
+)
 import datalad.utils as ut
-from datalad.utils import chpwd, rmtree
-from datalad.utils import _path_
-from datalad.utils import on_windows
-from datalad.utils import Path
+from datalad.utils import (
+    _path_,
+    chpwd,
+    on_windows,
+    Path,
+    rmtree,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, \
-    assert_is_instance, assert_is_none, assert_is_not, assert_is_not_none
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import with_tempfile, with_testrepos
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import assert_is
-from datalad.tests.utils import assert_not_equal
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import OBSCURE_FILENAME
-
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_is,
+    assert_is_instance,
+    assert_is_none,
+    assert_is_not,
+    assert_is_not_none,
+    assert_not_equal,
+    assert_not_in,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_true,
+    eq_,
+    known_failure_windows,
+    OBSCURE_FILENAME,
+    ok_,
+    SkipTest,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos,
+)
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
+)
 
 
 def test_EnsureDataset():
@@ -105,10 +131,13 @@ def test_is_installed(src, path):
 
 
 @with_tempfile(mkdir=True)
-def test_dataset_contructor(path):
+def test_dataset_constructor(path):
     # dataset needs a path
     assert_raises(TypeError, Dataset)
     assert_raises(ValueError, Dataset, None)
+    with chpwd(path):
+        assert_raises(NoDatasetFound, Dataset, '^.')
+        assert_raises(NoDatasetFound, Dataset, '^')
     dsabs = Dataset(path)
     # always abspath
     ok_(os.path.isabs(dsabs.path))
@@ -196,7 +225,7 @@ def test_subdatasets(path):
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path,
-            cfg.obtain('datalad.locations.default-dataset'))
+            dl_cfg.obtain('datalad.locations.default-dataset'))
 
     with chpwd(ds.path):
         dstop = Dataset('^')
@@ -269,6 +298,7 @@ def test_require_dataset():
 
 @with_tempfile(mkdir=True)
 def test_dataset_id(path):
+
     ds = Dataset(path)
     assert_equal(ds.id, None)
     ds.create()
@@ -276,50 +306,38 @@ def test_dataset_id(path):
     # ID is always a UUID
     assert_equal(ds.id.count('-'), 4)
     assert_equal(len(ds.id), 36)
+
+    # Ben: The following part of the test is concerned with creating new objects
+    #      and therefore used to reset the flyweight dict while keeping a ref to
+    #      the old object for comparison etc. This is ugly and in parts
+    #      retesting what is already tested in `test_Dataset_flyweight`. No need
+    #      for that. If we del the last ref to an instance and gc.collect(),
+    #      then we get a new instance on next request. This test should trust
+    #      the result of `test_Dataset_flyweight`.
+
     # creating a new object for the same path
     # yields the same ID
-
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
+    del ds
     newds = Dataset(path)
-    assert_false(ds is newds)
-    assert_equal(ds.id, newds.id)
+    assert_equal(dsorigid, newds.id)
+
     # recreating the dataset does NOT change the id
-    #
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
-    ds.create(no_annex=True, force=True)
+    del newds
+
+    ds = Dataset(path)
+    ds.create(annex=False, force=True)
     assert_equal(ds.id, dsorigid)
+
     # even adding an annex doesn't
-    #
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
-    AnnexRepo._unique_instances.clear()
+    del ds
+    ds = Dataset(path)
     ds.create(force=True)
     assert_equal(ds.id, dsorigid)
+
     # dataset ID and annex UUID have nothing to do with each other
     # if an ID was already generated
     assert_true(ds.repo.uuid != ds.id)
-    # creating a new object for the same dataset with an ID on record
-    # yields the same ID
-    #
-    # Note: Since we switched to singletons, a reset is required in order to
-    # make sure we get a new object
-    # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
-    # dict isn't a nice approach. May be create needs a fix/RF?
-    Dataset._unique_instances.clear()
-    newds = Dataset(path)
-    assert_false(ds is newds)
-    assert_equal(ds.id, newds.id)
+
     # even if we generate a dataset from scratch with an annex UUID right away,
     # this is also not the ID
     annexds = Dataset(opj(path, 'scratch')).create()
@@ -330,8 +348,30 @@ def test_dataset_id(path):
 @with_tempfile(mkdir=True)
 def test_Dataset_flyweight(path1, path2):
 
+    import gc
+    import sys
+
     ds1 = Dataset(path1)
     assert_is_instance(ds1, Dataset)
+    # Don't create circular references or anything similar
+    assert_equal(1, sys.getrefcount(ds1) - 1)
+
+    ds1.create()
+
+    # Due to issue 4862, we currently still require gc.collect() under unclear
+    # circumstances to get rid of an exception traceback when creating in an
+    # existing directory. That traceback references the respective function
+    # frames which in turn reference the repo instance (they are methods).
+    # Doesn't happen on all systems, though. Eventually we need to figure that
+    # out.
+    # However, still test for the refcount after gc.collect() to ensure we don't
+    # introduce new circular references and make the issue worse!
+    gc.collect()
+
+    # refcount still fine after repo creation:
+    assert_equal(1, sys.getrefcount(ds1) - 1)
+
+
     # instantiate again:
     ds2 = Dataset(path1)
     assert_is_instance(ds2, Dataset)
@@ -344,22 +384,60 @@ def test_Dataset_flyweight(path1, path2):
         ok_(ds1 == ds3)
         ok_(ds1 is ds3)
 
-    # on windows as symlink is not what you think it is
+    # gc knows one such object only:
+    eq_(1, len([o for o in gc.get_objects()
+                if isinstance(o, Dataset) and o.path == path1]))
+
+
+    # on windows a symlink is not what you think it is
     if not on_windows:
         # reference the same via symlink:
         with chpwd(path2):
             os.symlink(path1, 'linked')
-            ds3 = Dataset('linked')
-            ok_(ds3 == ds1)
-            ok_(ds3 is not ds1)
+            ds4 = Dataset('linked')
+            ds4_id = id(ds4)
+            ok_(ds4 == ds1)
+            ok_(ds4 is not ds1)
+
+        # underlying repo, however, IS the same:
+        ok_(ds4.repo is ds1.repo)
+
+    # deleting one reference has no effect on the other:
+    del ds1
+    gc.collect()  # TODO: see first comment above
+    ok_(ds2 is not None)
+    ok_(ds2.repo is ds3.repo)
+    if not on_windows:
+        ok_(ds2.repo is ds4.repo)
+
+    # deleting remaining references should lead to garbage collection
+    del ds2
+
+    with swallow_logs(new_level=1) as cml:
+        del ds3
+        gc.collect()  # TODO: see first comment above
+        # flyweight vanished:
+        assert_not_in(path1, Dataset._unique_instances.keys())
+        # no such instance known to gc anymore:
+        eq_([], [o for o in gc.get_objects()
+                 if isinstance(o, Dataset) and o.path == path1])
+        # underlying repo should only be cleaned up, if ds3 was the last
+        # reference to it. Otherwise the repo instance should live on
+        # (via symlinked ds4):
+        finalizer_log = "Finalizer called on: AnnexRepo(%s)" % path1
+        if on_windows:
+            cml.assert_logged(msg=finalizer_log,
+                              level="Level 1",
+                              regex=False)
+        else:
+            assert_not_in(finalizer_log, cml.out)
+            # symlinked is still there:
+            ok_(ds4 is not None)
+            eq_(ds4_id, id(ds4))
 
 
 @with_tempfile
 def test_property_reevaluation(repo1):
-
-    from os.path import lexists
-    from datalad.tests.utils import ok_clean_git
-
     ds = Dataset(repo1)
     assert_is_none(ds.repo)
     assert_is_not_none(ds.config)
@@ -368,7 +446,7 @@ def test_property_reevaluation(repo1):
     assert_is_none(ds.id)
 
     ds.create()
-    ok_clean_git(repo1)
+    assert_repo_status(repo1)
     # after creation, we have `repo`, and `config` was reevaluated to point
     # to the repo's config:
     assert_is_not_none(ds.repo)
@@ -392,7 +470,7 @@ def test_property_reevaluation(repo1):
     assert_is_none(ds.id)
 
     ds.create()
-    ok_clean_git(repo1)
+    assert_repo_status(repo1)
     # after recreation everything is sane again:
     assert_is_not_none(ds.repo)
     assert_is_not_none(ds.config)
@@ -465,7 +543,7 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
 @with_tempfile(mkdir=True)
 def test_resolve_path(path):
-    if op.realpath(path) != path:
+    if str(Path(path).resolve()) != path:
         raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
     opath = op.join(path, "origin")

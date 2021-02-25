@@ -15,32 +15,40 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 import sys
 
-from datalad.cmd import Runner
-from datalad.utils import chpwd
-from datalad.utils import quote_cmdlinearg
-from datalad.utils import swallow_outputs
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_repo_status
-from datalad.tests.utils import assert_true
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
-from datalad.tests.utils import skip_if
-from datalad.tests.utils import OBSCURE_FILENAME
-from datalad.tests.utils import on_windows
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import skip_if_on_windows
+from datalad.cmd import (
+    WitlessRunner,
+    KillOutput,
+)
+from datalad.utils import (
+    chpwd,
+    quote_cmdlinearg,
+    swallow_outputs,
+)
+from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    assert_false,
+    assert_in_results,
+    assert_not_in_results,
+    assert_raises,
+    assert_repo_status,
+    assert_result_count,
+    assert_true,
+    eq_,
+    known_failure_windows,
+    ok_file_has_content,
+    on_windows,
+    patch_config,
+    skip_if,
+    with_tempfile,
+    with_tree,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
     InsufficientArgumentsError,
 )
 from datalad.api import run_procedure
-from datalad import cfg
+from datalad import cfg as dl_cfg
 
 
 @with_tempfile(mkdir=True)
@@ -70,20 +78,22 @@ def test_dirty(path):
     assert_repo_status(ds.path)
 
 
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-""",
-             'testdir': {}
-
-             }})
+save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+"""},
+    'cfg_yoda.sh': """\
+#!/bin/bash
+echo "I am never to be ran but could be discovered"
+exit 1
+"""})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
     with chpwd(path):
@@ -93,17 +103,44 @@ def test_procedure_discovery(path, super_path):
         ps = run_procedure(discover=True)
         # there are a few procedures coming with datalad, needs to find them
         assert_true(len(ps) > 2)
-        # we get three essential properties
-        eq_(
-            sum(['procedure_type' in p and
-                 'procedure_callfmt' in p and
-                 'path' in p
-                 for p in ps]),
-            len(ps))
+        # we get essential properties
+        _check_procedure_properties(ps)
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
+    # extra check: must not pick up cfg_yoda.sh in top directory
     ds.run_procedure('cfg_yoda')
+
+    # path to a procedure which is not under any "standard" location but
+    # present in the dataset
+    code_dir_procedure_path = op.join(ds.path, 'code', 'datalad_test_proc.py')
+    top_dir_procedure_path = op.join(ds.path, 'cfg_yoda.sh')
+
+    # run discovery on the dataset:
+    ps = ds.run_procedure(discover=True)
+    # it should not be found magically by default
+    assert_not_in_results(ps, path=code_dir_procedure_path)
+    assert_not_in_results(ps, path=top_dir_procedure_path)
+
+    with patch_config({'datalad.locations.extra-procedures': op.join(ds.path, 'code')}):
+        # run discovery on the dataset:
+        ps = ds.run_procedure(discover=True)
+        # still needs to find procedures coming with datalad
+        assert_true(len(ps) > 3)
+        # and procedure under the path we specified
+        assert_result_count(ps, 1, path=code_dir_procedure_path)
+        assert_not_in_results(ps, path=top_dir_procedure_path)
+
+    # multiple extra locations
+    with patch_config({'datalad.locations.extra-procedures': [op.join(ds.path, 'code'), ds.path]}):
+        # run discovery on the dataset:
+        ps = ds.run_procedure(discover=True)
+        # still needs to find procedures coming with datalad
+        assert_true(len(ps) > 4)
+        # and procedure under the path we specified
+        assert_result_count(ps, 1, path=code_dir_procedure_path)
+        assert_result_count(ps, 1, path=top_dir_procedure_path)
+
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -117,14 +154,10 @@ def test_procedure_discovery(path, super_path):
     # still needs to find procedures coming with datalad
     assert_true(len(ps) > 2)
     # we get three essential properties
-    eq_(
-        sum(['procedure_type' in p and
-             'procedure_callfmt' in p and
-             'path' in p
-             for p in ps]),
-        len(ps))
+    _check_procedure_properties(ps)
     # dataset's procedure needs to be in the results
-    assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
+    # and only a single one
+    assert_result_count(ps, 1, path=code_dir_procedure_path)
     # a subdir shouldn't be considered a procedure just because it's "executable"
     assert_not_in_results(ps, path=op.join(ds.path, 'code', 'testdir'))
 
@@ -137,13 +170,7 @@ def test_procedure_discovery(path, super_path):
     ps = super.run_procedure(discover=True)
     # still needs to find procedures coming with datalad
     assert_true(len(ps) > 2)
-    # we get three essential properties
-    eq_(
-        sum(['procedure_type' in p and
-             'procedure_callfmt' in p and
-             'path' in p
-             for p in ps]),
-        len(ps))
+    _check_procedure_properties(ps)
     # dataset's procedure needs to be in the results
     assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                        'datalad_test_proc.py'))
@@ -173,7 +200,17 @@ def test_procedure_discovery(path, super_path):
             state='absent')
 
 
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+def _check_procedure_properties(ps):
+    """a common check that we get three essential properties"""
+    eq_(
+        sum(['procedure_type' in p and
+             'procedure_callfmt' in p and
+             'path' in p
+             for p in ps]),
+        len(ps))
+
+
+@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -255,11 +292,11 @@ def test_configs(path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], sys.argv[2]), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
+save(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
 """}})
 def test_spaces(path):
     """
@@ -298,14 +335,16 @@ def test_quoting(path):
         with assert_raises(CommandError):
             ds.run_procedure(spec=["just2args", "still-one arg"])
 
-        runner = Runner(cwd=ds.path)
+        runner = WitlessRunner(cwd=ds.path)
         runner.run(
-            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'")
+            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'",
+            protocol=KillOutput)
         with assert_raises(CommandError):
-            runner.run("datalad run-procedure just2args 'still-one arg'")
+            runner.run(
+                "datalad run-procedure just2args 'still-one arg'",
+                protocol=KillOutput)
 
 
-@skip_if_on_windows
 @with_tree(tree={
     # "TEXT" ones
     'empty': '',  # we have special rule to treat empty ones as text

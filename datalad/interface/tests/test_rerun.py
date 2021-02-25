@@ -13,8 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-
-import os
 import os.path as op
 from os import (
     remove,
@@ -26,6 +24,7 @@ from unittest.mock import patch
 from datalad.utils import (
     chpwd,
     on_windows,
+    Path,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -59,6 +58,7 @@ from datalad.tests.utils import (
     ok_file_has_content,
     ok_file_under_git,
     create_tree,
+    DEFAULT_BRANCH,
     eq_,
     neq_,
     assert_status,
@@ -67,12 +67,15 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
-    known_failure,
     known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
     slow,
+    skip_if_adjusted_branch,
+    SkipTest,
 )
+
+from datalad.core.local.tests.test_run import last_commit_msg
 
 
 @slow  # 17.1880s
@@ -101,7 +104,7 @@ def test_rerun(path, nodspath):
     eq_('xx\n', open(probe_path).read())
 
     # Rerunning from a subdataset skips the command.
-    _, sub_info = get_run_info(ds, sub.repo.format_commit("%B"))
+    _, sub_info = get_run_info(ds, last_commit_msg(sub.repo))
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
@@ -121,13 +124,13 @@ def test_rerun(path, nodspath):
         f.write("foo")
     ds.save("nonrun-file")
     # Now rerun the buried command.
-    ds.rerun(revision="HEAD~", message="rerun buried")
+    ds.rerun(revision=DEFAULT_BRANCH + "~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
-    eq_(ds.repo.format_commit("%B").splitlines()[0],
+    eq_(last_commit_msg(ds.repo).splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
-    ds.rerun(since="HEAD~3")
+    ds.rerun(since=DEFAULT_BRANCH + "~3")
     eq_('xxxxx\n', open(probe_path).read())
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
@@ -169,6 +172,11 @@ def test_rerun_empty_branch(path):
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(onto="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
+
     # Make sure we have more than one commit. The one commit case is checked
     # elsewhere.
     ds.repo.commit(msg="noop commit", options=["--allow-empty"])
@@ -197,7 +205,7 @@ def test_rerun_onto(path):
 
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     with swallow_outputs():
         ds.rerun(revision="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
@@ -209,33 +217,33 @@ def test_rerun_onto(path):
 
     # Unlike the static change, if we run the ever-growing change on
     # top of itself, we end up with a new commit.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     ds.rerun(onto="HEAD")
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.get_hexsha(),
-         ds.repo.get_hexsha("master"))
+         ds.repo.get_hexsha(DEFAULT_BRANCH))
 
     # An empty `onto` means use the parent of the first revision.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     with swallow_outputs():
         ds.rerun(since="static^", onto="")
     ok_(ds.repo.get_active_branch() is None)
-    for revrange in ["..master", "master.."]:
+    for revrange in [".." + DEFAULT_BRANCH, DEFAULT_BRANCH + ".."]:
         eq_(len(ds.repo.get_revisions(revrange)), 3)
 
     # An empty `onto` means use the parent of the first revision that
     # has a run command.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     with swallow_outputs():
         ds.rerun(since="", onto="", branch="from-base")
     eq_(ds.repo.get_active_branch(), "from-base")
     ok_(all(r["state"] == "clean"
-            for r in ds.diff(fr="master", to="from-base")))
+            for r in ds.diff(fr=DEFAULT_BRANCH, to="from-base")))
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
 
     # We abort when an explicitly specified `onto` doesn't exist.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     assert_result_count(
         ds.rerun(since="", onto="doesnotexist", branch="from-base",
                  on_failure="ignore"),
@@ -250,23 +258,27 @@ def test_rerun_chain(path):
 
     with swallow_outputs():
         ds.run('echo x$(cat grows) > grows')
-    ds.repo.tag("first-run")
+    ds.repo.tag("first-run", commit=DEFAULT_BRANCH)
 
     for _ in range(3):
-        commits.append(ds.repo.get_hexsha())
+        commits.append(ds.repo.get_hexsha(DEFAULT_BRANCH))
         ds.rerun()
-        _, info = get_run_info(ds, ds.repo.format_commit("%B"))
-        assert info["chain"] == commits
+        _, info = get_run_info(ds, last_commit_msg(ds.repo))
+        eq_(info["chain"], commits)
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds, ds.repo.format_commit("%B"))
-    assert info["chain"] == commits[:1]
+    _, info = get_run_info(ds, last_commit_msg(ds.repo))
+    eq_(info["chain"], commits[:1])
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
+
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo.call_git(["reset", "--hard"])
     ds.repo.config.reload()
@@ -339,10 +351,13 @@ def test_run_failure(path):
     assert_false(op.exists(msgfile))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_branch(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
 
     ds.repo.tag("prerun")
 
@@ -369,27 +384,27 @@ def test_rerun_branch(path):
     # commit.  Otherwise, all the metadata (e.g., author date) aside from the
     # parent commit that is used to generate the commit ID may be set when
     # running the tests, which would result in two commits rather than three.
-    for revrange in ["rerun..master", "master..rerun"]:
+    for revrange in ["rerun.." + DEFAULT_BRANCH, DEFAULT_BRANCH + "..rerun"]:
         eq_(len(ds.repo.get_revisions(revrange)), 3)
-    eq_(ds.repo.get_merge_base(["master", "rerun"]),
+    eq_(ds.repo.get_merge_base([DEFAULT_BRANCH, "rerun"]),
         ds.repo.get_hexsha("prerun"))
 
     # Start rerun branch at tip of current branch.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     ds.rerun(since="prerun", branch="rerun2")
     eq_(ds.repo.get_active_branch(), "rerun2")
     eq_('xxxx\n', open(outfile).read())
 
-    eq_(len(ds.repo.get_revisions("master..rerun2")), 2)
-    eq_(len(ds.repo.get_revisions("rerun2..master")), 0)
+    eq_(len(ds.repo.get_revisions(DEFAULT_BRANCH + "..rerun2")), 2)
+    eq_(len(ds.repo.get_revisions("rerun2.." + DEFAULT_BRANCH)), 0)
 
     # Using an existing branch name fails.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     assert_raises(IncompleteResultsError,
                   ds.rerun, since="prerun", branch="rerun2")
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
@@ -405,15 +420,15 @@ def test_rerun_cherry_pick(path):
         assert_in_results(results, status='ok', rerun_action=action)
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_invalid_merge_run_commit(path):
     ds = Dataset(path).create()
     ds.run("echo foo >>foo")
     ds.run("echo invalid >>invalid")
-    run_msg = ds.repo.format_commit("%B")
+    run_msg = last_commit_msg(ds.repo)
     run_hexsha = ds.repo.get_hexsha()
-    ds.repo.call_git(["reset", "--hard", "master~"])
+    ds.repo.call_git(["reset", "--hard", DEFAULT_BRANCH + "~"])
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
         nrfh.write("non-run")
     ds.save()
@@ -427,7 +442,7 @@ def test_rerun_invalid_merge_run_commit(path):
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.rerun(since="")
         assert_in("has run information but is a merge commit", cml.out)
-    eq_(len(ds.repo.get_revisions(hexsha_orig + "..master")), 1)
+    eq_(len(ds.repo.get_revisions(hexsha_orig + ".." + DEFAULT_BRANCH)), 1)
 
 
 @known_failure_windows
@@ -446,7 +461,7 @@ def test_rerun_outofdate_tree(path):
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
     with swallow_outputs():
-        assert_raises(CommandError, ds.rerun, revision="HEAD~")
+        assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
 
 
 @known_failure_windows
@@ -454,10 +469,10 @@ def test_rerun_outofdate_tree(path):
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
-    ds.repo.tag("ambig")
+    ds.repo.tag("ambig", commit=DEFAULT_BRANCH)
     # Don't fail when "ambig" refers to both a file and revision.
-    ds.rerun(since="", revision="ambig", branch="rerun")
-    eq_(len(ds.repo.get_revisions("rerun")),
+    ds.rerun(since="", revision="ambig")
+    eq_(len(ds.repo.get_revisions(DEFAULT_BRANCH)),
         len(ds.repo.get_revisions("ambig")))
 
 
@@ -476,11 +491,11 @@ def test_rerun_subdir(path):
     # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
     # in the TMPDIR="/var/tmp/sym link" test case. Temporarily call realpath.
     def ok_file_under_git_kludge(path, basename):
-        ok_file_under_git(op.join(op.realpath(path), basename), annexed=True)
+        ok_file_under_git(op.join(str(Path(path).resolve()), basename), annexed=True)
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
-    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
+    rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -496,7 +511,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     assert_repo_status(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
-    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
+    rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -512,7 +527,7 @@ def test_new_or_modified(path):
         return [op.relpath(ap["path"], path)
                 for ap in new_or_modified(diff_revision(*args, **kwargs))]
 
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).create(force=True, annex=False)
 
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
@@ -561,7 +576,7 @@ def test_rerun_script(path):
     # a run record sidecar file was added with the last commit
     assert(any(d['path'].startswith(op.join(ds.path, '.datalad', 'runinfo'))
                for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
-    bar_hexsha = ds.repo.get_hexsha()
+    bar_hexsha = ds.repo.get_hexsha(DEFAULT_BRANCH)
 
     script_file = op.join(path, "commands.sh")
 
@@ -665,7 +680,7 @@ def test_run_inputs_outputs(src, path):
         ds.run("cd .> dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
-        assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
+        assert_in(inputs_arg[0], last_commit_msg(ds.repo))
         ds.repo.drop(inputs, options=["--force"])
 
     # --input can be passed a subdirectory.
@@ -693,7 +708,7 @@ def test_run_inputs_outputs(src, path):
     ds.save()
     ds.repo.copy_to(["after-dot-run"], remote="origin")
     ds.repo.drop(["after-dot-run"], options=["--force"])
-    ds.rerun("HEAD^")
+    ds.rerun(DEFAULT_BRANCH + "^")
     ds.repo.file_has_content("after-dot-run")
 
     # --output will unlock files that are present.
@@ -711,12 +726,11 @@ def test_run_inputs_outputs(src, path):
             eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
-    ds.repo.call_git(["reset", "--hard", "HEAD~2"])
     ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
     if not on_windows:
         # MIH doesn't yet understand how to port this
         with open(op.join(path, "a.dat")) as fh:
-            eq_(fh.read(), "a.dat appended\n")
+            eq_(fh.read(), " appended\n appended\n")
 
     if not on_windows:
         # see datalad#2606
@@ -733,8 +747,8 @@ def test_run_inputs_outputs(src, path):
 
     # --input/--output globs can be stored in expanded form.
     ds.run("cd .> expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
-    assert_in("a.dat", ds.repo.format_commit("%B"))
-    assert_in("b.dat", ds.repo.format_commit("%B"))
+    assert_in("a.dat", last_commit_msg(ds.repo))
+    assert_in("b.dat", last_commit_msg(ds.repo))
 
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
@@ -762,14 +776,14 @@ def test_run_inputs_outputs(src, path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(no_annex=True)
+    ds = Dataset(path).create(annex=False)
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
     ds.rerun()
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tree(tree={"to_modify": "to_modify"})
 def test_rerun_explicit(path):
     ds = Dataset(path).create(force=True)
@@ -777,12 +791,12 @@ def test_rerun_explicit(path):
     ds.run("echo o >> foo", explicit=True, outputs=["foo"])
     with open(op.join(ds.path, "foo")) as ifh:
         orig_content = ifh.read()
-        orig_head = ds.repo.get_hexsha()
+        orig_head = ds.repo.get_hexsha(DEFAULT_BRANCH)
 
     # Explicit rerun is allowed in a dirty tree.
     ok_(ds.repo.dirty)
     ds.rerun(explicit=True)
-    eq_(orig_head, ds.repo.get_hexsha("master~1"))
+    eq_(orig_head, ds.repo.get_hexsha(DEFAULT_BRANCH + "~1"))
     with open(op.join(ds.path, "foo")) as ifh:
         eq_(orig_content * 2, ifh.read())
 
@@ -790,7 +804,7 @@ def test_rerun_explicit(path):
     ds.rerun(since="", explicit=True)
     eq_(orig_head,
         # Added two rerun commits.
-        ds.repo.get_hexsha("master~3"))
+        ds.repo.get_hexsha(DEFAULT_BRANCH + "~3"))
 
     # With just untracked changes, we can rerun with --onto.
     ds.rerun(since="", onto="", explicit=True)
@@ -799,7 +813,7 @@ def test_rerun_explicit(path):
         ds.repo.get_hexsha("HEAD~4"))
 
     # But checking out a new HEAD can fail when there are modifications.
-    ds.repo.checkout("master")
+    ds.repo.checkout(DEFAULT_BRANCH)
     ok_(ds.repo.dirty)
     ds.repo.add(["to_modify"], git=True)
     ds.save()
@@ -846,7 +860,7 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(op.join(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
-    eq_(get_run_info(ds, ds.repo.format_commit("%B"))[1]["pwd"],
+    eq_(get_run_info(ds, last_commit_msg(ds.repo))[1]["pwd"],
         "subdir")
 
     # Double brackets can be used to escape placeholders.

@@ -41,7 +41,7 @@ EOT"
 
 say "Note that this script uses the 'datalad get' command which automatically obtains the required files from their remote source -- we will see this in action shortly"
 say "We are saving this script in the dataset. This way we will know exactly which code was used for the analysis. Also, we track this code file with Git, so we can see more easily how it was edited over time."
-run "datalad add code -m \"Brain extraction script\" --to-git"
+run "datalad save code -m \"Brain extraction script\" --to-git"
 
 say "In addition, we will \"tag\" this state of the dataset. This is optional, but it can help to identify important milestones more easily"
 run "datalad save --version-tag setup_done"

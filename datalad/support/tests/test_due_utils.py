@@ -49,7 +49,7 @@ def test_duecredit_dataset(path):
     # TODO: possibly reconsider - may be our catch-all should be used there
     # as well
     with patch.object(due, 'cite') as mcite:
-        with swallow_logs(new_level=logging.WARNING) as cml:
+        with swallow_logs(new_level=logging.DEBUG) as cml:
             duecredit_dataset(dataset)  # should not crash or anything
             # since no metadata - we issue warning and return without citing
             # anything

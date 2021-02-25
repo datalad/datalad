@@ -17,29 +17,35 @@ import builtins
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
-from ..base import DownloadError
-from ..base import IncompleteDownloadError
-from ..base import BaseDownloader
-from ..base import NoneAuthenticator
-from ..credentials import UserPassword
-from ..credentials import Token
-from ..credentials import LORIS_Token
-from ..http import HTMLFormAuthenticator
-from ..http import HTTPDownloader
-from ..http import HTTPBearerTokenAuthenticator
-from ..http import process_www_authenticate
+from ..base import (
+    BaseDownloader,
+    DownloadError,
+    IncompleteDownloadError,
+    NoneAuthenticator,
+)
+from ..credentials import (
+    LORIS_Token,
+    Token,
+    UserPassword,
+)
+from ..http import (
+    HTMLFormAuthenticator,
+    HTTPBaseAuthenticator,
+    HTTPDownloader,
+    HTTPBearerTokenAuthenticator,
+    process_www_authenticate,
+)
 from ...support.exceptions import AccessFailedError
-from ...support.network import get_url_straight_filename
-from ...tests.utils import with_fake_cookies_db
-from ...tests.utils import skip_if_no_network
-from ...tests.utils import with_testsui
-from ...tests.utils import with_memory_keyring
-from ...tests.utils import known_failure_githubci_win
-from ...utils import ensure_unicode
+from datalad.support.network import (
+    download_url,
+    get_url_straight_filename,
+)
+from datalad.utils import (
+    ensure_unicode,
+)
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
-    raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
 except (ImportError, AttributeError):
     # Attribute Error happens with newer httpretty and older ssl module
@@ -50,25 +56,35 @@ except (ImportError, AttributeError):
     httpretty = NoHTTPPretty()
 
 from unittest.mock import patch
-from ...tests.utils import SkipTest
-from ...tests.utils import assert_in
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_greater
-from ...tests.utils import assert_false
-from ...tests.utils import assert_raises
-from ...tests.utils import ok_file_has_content
-from ...tests.utils import serve_path_via_http, with_tree
-from ...tests.utils import swallow_logs
-from ...tests.utils import swallow_outputs
-from ...tests.utils import with_tempfile
-from ...tests.utils import use_cassette
-from ...tests.utils import skip_if
-from ...tests.utils import without_http_proxy
-from ...support.exceptions import AccessDeniedError
-from ...support.exceptions import AnonymousAccessDeniedError
+from ...tests.utils import (
+    SkipTest,
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    known_failure_githubci_win,
+    ok_file_has_content,
+    serve_path_via_http, with_tree,
+    skip_if,
+    skip_if_no_network,
+    swallow_logs,
+    swallow_outputs,
+    use_cassette,
+    with_fake_cookies_db,
+    with_memory_keyring,
+    with_tempfile,
+    with_testsui,
+    without_http_proxy,
+)
+from ...support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+)
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
+from ...utils import read_file
 
 
 def test_docstring():
@@ -113,7 +129,6 @@ def test_process_www_authenticate():
                  [])
 
 
-@known_failure_githubci_win
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_HTTPDownloader_basic(toppath, topurl):
@@ -252,16 +267,22 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     provider = providers.get_provider(url)
     downloader = provider.get_downloader(url)
 
+    # we will load/fetch binary blobs
+    success_bytes, failed_bytes = None, None
+    if success_str is not None:
+        success_bytes = success_str.encode()
+    if failed_str is not None:
+        failed_bytes = failed_str.encode()
+
     # Download way
     with swallow_outputs() as cmo:
         downloaded_path = downloader.download(url, path=d)
     assert_equal(fpath, downloaded_path)
-    with open(fpath) as f:
-        content = f.read()
-        if success_str is not None:
-            assert_in(success_str, content)
-        if failed_str is not None:
-            assert_false(failed_str in content)
+    content = read_file(fpath, decode=False)
+    if success_bytes is not None:
+        assert_in(success_bytes, content)
+    if failed_str is not None:
+        assert_false(failed_bytes in content)
 
     # And if we specify size
     for s in [1, 2]:
@@ -269,22 +290,21 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
             downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
         # should not be affected
         assert_equal(downloaded_path, downloaded_path_)
-        with open(fpath) as f:
-            content_ = f.read()
+        content_ = read_file(fpath, decode=False)
         assert_equal(len(content_), s)
         assert_equal(content_, content[:s])
 
     # Fetch way
-    content = downloader.fetch(url)
-    if success_str is not None:
-        assert_in(success_str, content)
-    if failed_str is not None:
-        assert_false(failed_str in content)
+    content = downloader.fetch(url, decode=False)
+    if success_bytes is not None:
+        assert_in(success_bytes, content)
+    if failed_bytes is not None:
+        assert_false(failed_bytes in content)
 
     # And if we specify size
     for s in [1, 2]:
         with swallow_outputs() as cmo:
-            content_ = downloader.fetch(url, size=s)
+            content_ = downloader.fetch(url, size=s, decode=False)
         assert_equal(len(content_), s)
         assert_equal(content_, content[:s])
 
@@ -326,6 +346,28 @@ def test_authenticate_external_portals():
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
+@skip_if_no_network
+@use_cassette('test_detect_login_error1')
+def test_detect_login_error1():
+    # we had unicode decode issue: https://github.com/datalad/datalad/issues/4951
+    check_download_external_url(
+          "https://portal.nersc.gov/project/crcns/download/ac-5/docs/data_analysis_instructions.txt",
+          "<form action=",
+          "DMR stimulus")
+test_detect_login_error1.tags = ['external-portal', 'network']
+
+
+@skip_if_no_network
+@use_cassette('test_detect_login_error2')
+def test_detect_login_error2():
+    # a tiny binary file so we do fetch it but it cannot be decoded, we must not fail
+    check_download_external_url(
+          "https://portal.nersc.gov/project/crcns/download/mt-3/example_scripts.zip",
+          "<form action=",
+          None)
+test_detect_login_error2.tags = ['external-portal', 'network']
+
+
 @known_failure_githubci_win
 @skip_if_no_network
 def test_download_ftp():
@@ -339,7 +381,7 @@ def test_download_ftp():
                   None,
                   "This is ftp.gnu.org"
         )
-    except AccessFailedError as exc:
+    except AccessFailedError as exc:  # pragma: no cover
         if 'status code 503' in str(exc):
             raise SkipTest("ftp.gnu.org throws 503 when on travis (only?)")
         raise
@@ -439,7 +481,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
         return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        assert_equal(request.body, '')
+        assert_equal(request.body, b'')
         assert_in('Cookie', request.headers)
         assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
@@ -479,9 +521,8 @@ def test_HTMLFormAuthenticator_httpretty(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file(fpath)
+    assert_equal(content, "correct body")
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
@@ -549,6 +590,17 @@ def check_httpretty_authfail404(exp_called, d):
     assert_equal(was_called, exp_called)
 
 
+def test_auth_bytes_content():
+    # Our regexes are strings, but we can get content in bytes:
+    # I am not sure yet either we shouldn't just skip then testing for regex,
+    # but we definetely should not crash.
+    authenticator = HTTPBaseAuthenticator(failure_re="Failed")
+    authenticator.check_for_auth_failure(b"bytes")
+    # but ATM we do test bytes content, let's ENSURE that!
+    with assert_raises(AccessDeniedError):
+        authenticator.check_for_auth_failure(b"Failed")
+
+
 class FakeCredential2(UserPassword):
     """Credential to test scenarios."""
     _fixed_credentials = {'user': 'testlogin', 'password': 'testpassword'}
@@ -592,7 +644,7 @@ def test_scenario_2(d):
         return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        assert_equal(request.body, '')
+        assert_equal(request.body, b'')
         assert_in('Cookie', request.headers)
         assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
@@ -618,9 +670,8 @@ def test_scenario_2(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file(fpath)
+    assert_equal(content, "correct body")
 
 
 class FakeCredential3(Token):
@@ -662,13 +713,13 @@ def test_HTTPBearerTokenAuthenticator(d):
 
     # Perform assertions. See note above.
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file(fpath)
+    assert_equal(content, "correct body")
+
 
 class FakeLorisCredential(Token):
     """Credential to test scenarios."""
@@ -704,13 +755,13 @@ def test_HTTPLorisTokenAuthenticator(d):
 
     # Perform assertions. See note above.
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file(fpath)
+    assert_equal(content, "correct body")
+
 
 @skip_if(not httpretty, "no httpretty")
 @without_http_proxy
@@ -747,11 +798,28 @@ def test_lorisadapter(d, keyring):
     downloader.download(url, path=d)
 
     r = request_get_callback.req
-    assert_equal(r.body, '')
+    assert_equal(r.body, b'')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken33")
     # Verify credentials correctly set to test user:pass
 
-    with open(fpath) as f:
-        content = f.read()
-        assert_equal(content, "correct body")
+    content = read_file(fpath)
+    assert_equal(content, "correct body")
+
+
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+def test_download_url(toppath, topurl):
+    furl = "%sfile.dat" % topurl
+    # fails if URL is disfunctional
+    assert_raises(DownloadError, download_url, furl + 'magic', toppath)
+
+    # working download
+    tfpath = opj(toppath, "file-downloaded.dat")
+    download_url(furl, tfpath)
+    ok_file_has_content(tfpath, 'abc')
+
+    # fails if destfile exists
+    assert_raises(DownloadError, download_url, furl, tfpath)
+    # works when forced
+    download_url(furl, tfpath, overwrite=True)

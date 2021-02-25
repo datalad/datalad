@@ -25,44 +25,61 @@ from os.path import exists, join as opj, basename
 from urllib.request import urlopen
 
 from unittest.mock import patch
-from nose.tools import assert_in, assert_not_in, assert_true
-from nose import SkipTest
-
-from ..utils import getpwd, chpwd
-
-from . import utils
-from .utils import (
-    eq_, ok_, assert_false, ok_startswith, nok_startswith,
-    with_tempfile, with_testrepos, with_tree,
-    rmtemp,
-    OBSCURE_PREFIX, OBSCURE_FILENAMES,
-    get_most_obscure_supported_name,
-    swallow_outputs, swallow_logs,
-    on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http,
-    ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink,
-    ok_file_under_git,
-    known_failure_githubci_win,
+from datalad.utils import (
+    chpwd,
+    getpwd,
+    Path,
 )
-from .utils import ok_generator
-from .utils import assert_dict_equal
-from .utils import assert_str_equal
-from .utils import assert_re_in
-from .utils import local_testrepo_flavors
-from .utils import skip_if_no_network
-from .utils import skip_if_no_module
-from .utils import skip_if_on_windows
-from .utils import run_under_dir
-from .utils import skip_if
-from .utils import ok_file_has_content
-from .utils import without_http_proxy
-from .utils import with_testsui
-from .utils import skip_ssh
-from .utils import probe_known_failure
-from .utils import patch_config
-from .utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    assert_dict_equal,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_re_in,
+    assert_str_equal,
+    assert_true,
+    eq_,
+    get_most_obscure_supported_name,
+    ignore_nose_capturing_stdout,
+    known_failure_appveyor,
+    known_failure_githubci_win,
+    local_testrepo_flavors,
+    nok_startswith,
+    OBSCURE_FILENAMES,
+    OBSCURE_PREFIX,
+    ok_,
+    ok_broken_symlink,
+    ok_file_has_content,
+    ok_file_under_git,
+    ok_generator,
+    ok_good_symlink,
+    ok_startswith,
+    ok_symlink,
+    on_windows,
+    patch_config,
+    probe_known_failure,
+    rmtemp,
+    run_under_dir,
+    serve_path_via_http,
+    skip_if,
+    skip_if_no_module,
+    skip_if_no_network,
+    skip_if_on_windows,
+    skip_ssh,
+    SkipTest,
+    skip_wo_symlink_capability,
+    swallow_logs,
+    with_tempfile,
+    with_testrepos, with_tree,
+    with_testsui,
+    without_http_proxy,
+)
 
-from ..support.gitrepo import GitRepo
-from ..support import path as op
+from datalad.support.gitrepo import GitRepo
+from datalad.support import path as op
+from datalad import cfg as dl_cfg
 #
 # Test with_tempfile, especially nested invocations
 #
@@ -75,10 +92,10 @@ def _with_tempfile_decorated_dummy(path):
 def test_with_tempfile_dir_via_env_variable():
     target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
     assert_false(os.path.exists(target), "directory %s already exists." % target)
-    with patch.dict('os.environ', {'DATALAD_TESTS_TEMP_DIR': target}):
+
+    with patch_config({'datalad.tests.temp.dir': target}):
         filename = _with_tempfile_decorated_dummy()
         ok_startswith(filename, target)
-
 
 @with_tempfile
 @with_tempfile
@@ -140,7 +157,7 @@ def test_with_testrepos():
 
     eq_(len(repos),
         2 if on_windows  # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
-          else (15 if os.environ.get('DATALAD_TESTS_NONETWORK') else 16))  # local, local-url, clone, network
+          else (15 if dl_cfg.get('datalad.tests.nonetwork') else 16))  # local, local-url, clone, network
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
@@ -153,11 +170,11 @@ def test_with_testrepos():
 def test_get_resolved_values():
     from datalad.tests.utils import _get_resolved_flavors
     flavors = ['networkish', 'local']
-    eq_(([] if os.environ.get('DATALAD_TESTS_NONETWORK') else ['networkish'])
+    eq_(([] if dl_cfg.get('datalad.tests.nonetwork') else ['networkish'])
         + ['local'],
         _get_resolved_flavors(flavors))
 
-    with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+    with patch_config({'datalad.tests.nonetwork': '1'}):
         eq_(_get_resolved_flavors(flavors), ['local'])
 
         # and one more to see the exception being raised if nothing to teston
@@ -180,7 +197,7 @@ def test_with_tempfile_mkdir():
             f.write("TEST LOAD")
 
     check_mkdir()
-    if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
+    if not dl_cfg.get('datalad.tests.temp.keep'):
         ok_(not os.path.exists(dnames[0]))  # got removed
 
 
@@ -203,19 +220,18 @@ def test_with_tempfile_specified_prefix(d1):
     ok_('test_with_tempfile_specified_prefix' not in d1)
 
 
-@known_failure_githubci_win
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
-    if platform.system() in ('Linux', 'Darwin'):
-        eq_(n, OBSCURE_PREFIX + OBSCURE_FILENAMES[1])
-    else:
-        # ATM no one else is as good
-        ok_(n in OBSCURE_PREFIX + OBSCURE_FILENAMES[2:])
+    ok_startswith(n, OBSCURE_PREFIX)
+    ok_(len(OBSCURE_FILENAMES) > 1)
+    # from more complex to simpler ones
+    ok_(len(OBSCURE_FILENAMES[0]) > len(OBSCURE_FILENAMES[-1]))
+    print(repr(n))
 
 
 def test_keeptemp_via_env_variable():
 
-    if os.environ.get('DATALAD_TESTS_TEMP_KEEP'):  # pragma: no cover
+    if dl_cfg.get('datalad.tests.temp.keep'):  # pragma: no cover
         raise SkipTest("We have env variable set to preserve tempfiles")
 
     files = []
@@ -238,18 +254,16 @@ def test_keeptemp_via_env_variable():
     rmtemp(files[-1])
 
 
+@skip_wo_symlink_capability
 @with_tempfile
 def test_ok_symlink_helpers(tmpfile):
-
-    if on_windows:  # pragma: no cover
-        raise SkipTest("no sylmlinks on windows")
 
     assert_raises(AssertionError, ok_symlink, tmpfile)
     assert_raises(AssertionError, ok_good_symlink, tmpfile)
     assert_raises(AssertionError, ok_broken_symlink, tmpfile)
 
     tmpfile_symlink = tmpfile + '_symlink'
-    os.symlink(tmpfile, tmpfile_symlink)  
+    Path(tmpfile_symlink).symlink_to(Path(tmpfile))
 
     # broken symlink
     ok_symlink(tmpfile_symlink)
@@ -424,6 +438,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
 
 
 # just look at the path specs...
+@known_failure_appveyor
 @known_failure_githubci_win
 def test_serve_path_via_http():
     for test_fpath in ['test1.txt',
@@ -495,12 +510,12 @@ def test_skip_if_no_network():
         def somefunc(a1):
             return a1
         ok_(hasattr(somefunc, "network"))
-        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        with patch_config({'datalad.tests.nonetwork': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
         # and now if used as a function, not a decorator
-        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        with patch_config({'datalad.tests.nonetwork': '1'}):
             assert_raises(SkipTest, skip_if_no_network)
         with patch.dict('os.environ', {}):
             eq_(skip_if_no_network(), None)
@@ -638,7 +653,7 @@ def test_ignore_nose_capturing_stdout():
         ignore_nose_capturing_stdout(raise_exc)()
 
 
-@skip_if_on_windows  # no symlinks. may be skip if not hasattr(os, "symlink")
+@skip_wo_symlink_capability
 @with_tree(tree={'ingit': '', 'staged': 'staged', 'notingit': ''})
 def test_ok_file_under_git_symlinks(path):
     # Test that works correctly under symlinked path
@@ -647,7 +662,7 @@ def test_ok_file_under_git_symlinks(path):
     orepo.commit('msg')
     orepo.add('staged')
     lpath = path + "-symlink"  # will also be removed AFAIK by our tempfile handling
-    os.symlink(path, lpath)
+    Path(lpath).symlink_to(Path(path))
     ok_symlink(lpath)
     ok_file_under_git(op.join(path, 'ingit'))
     ok_file_under_git(op.join(lpath, 'ingit'))

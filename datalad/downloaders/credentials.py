@@ -21,11 +21,11 @@ https://github.com/omab/python-social-auth
 """
 
 import time
-import calendar
 
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
+from ..support.exceptions import AccessDeniedError
 from ..support.keyring_ import keyring as keyring_
 from ..ui import ui
 from ..utils import auto_repr
@@ -45,6 +45,7 @@ class Credential(object):
     _FIELDS = None
     _KNOWN_ATTRS = {
         'hidden',    # UI should not display the value
+        'repeat',    # UI should repeat entry or not. Set to False to override default logic
         'optional',  # Not mandatory thus not requested if not set
     }
 
@@ -81,9 +82,6 @@ class Credential(object):
     def _is_field_optional(self, f):
         return self._FIELDS[f].get('optional', False)
 
-    def _is_field_hidden(self, f):
-        return self._FIELDS[f].get('hidden', False)
-
     @property
     def is_known(self):
         """Return True if values for all fields of the credential are known"""
@@ -101,10 +99,17 @@ class Credential(object):
                   (" %s provides information on how to gain access"
                    % self.url if self.url else ''))
 
+        # provide custom options only if set for the field
+        f_props = self._FIELDS[f]
+        kwargs = {}
+        for p in ('hidden', 'repeat'):
+            if p in f_props:
+                kwargs[p] = f_props[p]
         return ui.question(
             f,
             title=msg,
-            hidden=self._is_field_hidden(f))
+            **kwargs
+        )
 
     def _ask_and_set(self, f, instructions=None):
         v = self._ask_field_value(f, instructions=instructions)
@@ -191,7 +196,7 @@ class UserPassword(Credential):
 class Token(Credential):
     """Simple type of a credential which provides a single token"""
 
-    _FIELDS = OrderedDict([('token', {'hidden': True})])
+    _FIELDS = OrderedDict([('token', {'hidden': True, 'repeat': False})])
 
     is_expired = False  # no expiration provisioned
 
@@ -199,8 +204,8 @@ class Token(Credential):
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
 
-    _FIELDS = OrderedDict([('key_id', {}),
-                           ('secret_id', {'hidden': True}),
+    _FIELDS = OrderedDict([('key_id', {'repeat': False}),
+                           ('secret_id', {'hidden': True, 'repeat': False}),
                            ('session', {'optional': True}),
                            ('expiration', {'optional': True}),
                            ])
@@ -209,9 +214,12 @@ class AWS_S3(Credential):
     def is_expired(self):
         exp = self.get('expiration', None)
         if not exp:
-            return True
+            return False
         exp_epoch = iso8601_to_epoch(exp)
-        expire_in = (exp_epoch - calendar.timegm(time.localtime())) / 3600.
+        # -2 to artificially shorten duration of the allotment to avoid
+        # possible race conditions between us checking either it has
+        # already expired before submitting a request.
+        expire_in = (exp_epoch - time.time() - 2) / 3600.
 
         lgr.debug(
             ("Credential %s has expired %.2fh ago"
@@ -258,8 +266,23 @@ class CompositeCredential(Credential):
     def enter_new(self):
         # should invalidate/remove all tail credentials to avoid failing attempts to login
         self._credentials[0].enter_new()
+        self.refresh()
+
+    def refresh(self):
+        """Re-establish "dependent" credentials
+
+        E.g. if code outside was reported that it expired somehow before known expiration datetime
+        """
         for c in self._credentials[1:]:
             c.delete()
+        # trigger re-establishing the chain
+        _ = self()
+        if self.is_expired:
+            raise RuntimeError("Credential %s expired right upon refresh: should have not happened")
+
+    @property
+    def is_expired(self):
+        return any(c.is_expired for c in self._credentials)
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
@@ -292,8 +315,20 @@ class CompositeCredential(Credential):
 
 def _nda_adapter(composite, user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
-    gen = NDATokenGenerator()
-    token = gen.generate_token(user, password)
+    from .. import cfg
+    nda_auth_url = cfg.obtain('datalad.externals.nda.dbserver')
+    gen = NDATokenGenerator(nda_auth_url)
+    lgr.debug("Generating token for NDA user %s using %s talking to %s",
+              user, gen, nda_auth_url)
+    try:
+        token = gen.generate_token(user, password)
+    except Exception as exc:  # it is really just an "Exception"
+        exc_str = str(exc).lower()
+        # ATM it is "Invalid username and/or password"
+        # but who knows what future would bring
+        if "invalid" in exc_str and ("user" in exc_str or "password" in exc_str):
+            raise AccessDeniedError(exc_str)
+        raise
     # There are also session and expiration we ignore... TODO anything about it?!!!
     # we could create a derived AWS_S3 which would also store session and expiration
     # and then may be Composite could use those????

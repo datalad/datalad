@@ -1,7 +1,10 @@
 .pybuild/
+# debian patch queue handling
+.pc/
 datalad.build/
 /.idea
 .coverage
+coverage.xml
 /venv*
 /cfgs
 /dist

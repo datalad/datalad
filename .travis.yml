@@ -1,10 +1,11 @@
 # vim ft=yaml
 # travis-ci.org definition for DataLad build
 language: python
+services:
+  - docker
 
 python:
-  - 3.5
-##1  - 3.6
+  - 3.6
 
 cache:
   - apt
@@ -14,18 +15,18 @@ env:
     # will be used in the matrix, where neither other variable is used
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
-    - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
+    - DATALAD_LOG_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
-    - NOSE_OPTS=-s
-    - NOSE_SELECTION="integration or usecase or slow"
+    # Should be an array, travis breaks on it, define/adjust in the "before_install"
+    #- NOSE_OPTS=( -v )
+    # Note, that there's "turtle" as well, which is always excluded from
+    # running on Travis.
+    - NOSE_SELECTION="integration or usecase or slow or network"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
-    # Special settings/helper for combined coverage from special remotes execution
-    - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
-    - _DL_DEVEL_ANNEX=1
-  matrix:
-##1    - DATALAD_REPO_VERSION=6
-    - DATALAD_REPO_VERSION=5
+    # How/which git-annex we install.  conda's build would be the fastest, but it must not
+    # get ahead in PATH to not shadow travis' python
+    - _DL_ANNEX_INSTALL_SCENARIO="neurodebian -e '--suffix=-devel -c devel' git-annex -m neurodebian"
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
 #    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
@@ -44,57 +45,65 @@ matrix:
     # To test https://github.com/datalad/datalad/pull/4342 fix.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LC_ALL=ru_RU.UTF-8
-  - python: 3.6
+  - python: 3.8
+    dist: bionic # Xenial doesn't have 3.8 pre-installed (only 3.8-dev).
+    env:
+    - NOSE_SELECTION=
+    - NOSE_SELECTION_OP=not
+  - if: type = cron
+    python: 3.6
     # Single run for Python 3.6
     env:
     # Run all tests in a single whoop here
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
-  - python: 3.5
+  - python: 3.6
     # Split runs for v6 since a single one is too long now
     env:
-    - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=not
-  - python: 3.5
+    - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=7.20190819 -m conda"
+  - python: 3.6
     env:
-    - DATALAD_REPO_VERSION=6
     - NOSE_SELECTION_OP=""
+    - DATALAD_SSH_MULTIPLEX__CONNECTIONS=0
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=7.20190819 -m conda"
     # To test https://github.com/datalad/datalad/pull/4342 fix in case of no "not" for NOSE.
     # From our testing in that PR seems to have no effect, but kept around since should not hurt.
     - LANG=bg_BG.UTF-8
-  - python: 3.5
+  - python: 3.6
     # Run slow etc tests under a single tricky scenario
     env:
-    - TMPDIR="/var/tmp/sym link"
+    - _DL_TMPDIR="/var/tmp/sym link"
     - NOSE_SELECTION_OP=""
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
-  - python: 3.5
+  - python: 3.6
     # A run loaded with various customizations to smoke test those functionalities
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
     env:
-    # eventually: - TMPDIR="/var/tmp/sym ссылка"
-    - TMPDIR="/var/tmp/sym link"
+    # eventually: - _DL_TMPDIR="/var/tmp/sym ссылка"
+    - _DL_TMPDIR="/var/tmp/sym link"
     # and obscure the names more a bit
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     # By default no logs will be output. This one is to test with log output at INFO level
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
     - DATALAD_LOG_VMEM=1
-  - python: 3.5
+  - python: 3.6
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
-    - DATALAD_LOG_CMD_CWD=1
-    - DATALAD_LOG_CMD_OUTPUTS=1
-    - DATALAD_LOG_CMD_ENV=1
-    - DATALAD_LOG_CMD_STDIN=1
+    - DATALAD_LOG_CWD=1
+    - DATALAD_LOG_OUTPUTS=1
+    - DATALAD_LOG_ENV=1
+    - DATALAD_LOG_STDIN=1
     - DATALAD_TESTS_UI_BACKEND=console
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_SEED=1
@@ -104,187 +113,172 @@ matrix:
     - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
-  - python: 3.5
+  - python: 3.6
     # Test some under NFS mount  (only selected sub-set)
     env:
-    - TMPDIR="/tmp/nfsmount"
+    # do not run SSH-based tests due to stall(s)
+    # https://github.com/datalad/datalad/pull/4172
+    - DATALAD_TESTS_SSH=0
+    - _DL_TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad.tests datalad.support"
-  #
+    #
   # The ones to run only on weekends against master.
   # They will not contribute to coverage etc, but might lead to failed status
   #
-  - python: 3.5
-    # By default no logs will be output. This one is to test with log output at INFO level
-    env:
-    - _DL_UPSTREAM_GITPYTHON=1
-    # It is not usable without setting locales env vars ATM
-    # see https://github.com/datalad/datalad/issues/3159
-    # - _DL_UPSTREAM_GITANNEX=1
-    # Just so we test if we did not screw up running under nose without -s as well
-    - NOSE_OPTS=
-    - _DL_CRON=1
   # run with minimal supported git-annex version as defined in AnnexRepo.GIT_ANNEX_MIN_VERSION
   # TODO: ATM we do not have that minimal version as a Debian package in
-  # snapshots! When we do match - add a unit-test to guarantee that if
-  # _DL_DEBURL_ANNEX is set, we are using that particular version
-  - python: 3.5
+  # snapshots!
+  - if: type = cron
+    python: 3.6
     env:
-    - _DL_DEBURL_ANNEX=http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb
-    - _DL_CRON=1
-  # run if git-annex version in neurodebian -devel differs
-  - python: 3.5
-    env:
-    - _DL_DEVEL_ANNEX=1
-    - _DL_CRON=1
-  # Run with latest git rather than the bundled one.
-  - python: 3.5
-    addons:
-      apt:
-        sources:
-          - sourceline: 'ppa:git-core/ppa'
+    - _DL_ANNEX_INSTALL_SCENARIO="git-annex -m deb-url --url http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb"
+  # Run with git's master branch rather the default one on the system.
+  - if: type = cron
+    python: 3.6
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
-    - _DL_CRON=1
-  - python: 3.5
+  # Run with our reported minimum Git version.
+  - if: type = cron
+    python: 3.6
+    env:
+    - DATALAD_USE_DEFAULT_GIT=1
+    - _DL_MIN_GIT=1
+    - PATH="$PWD/git-src/bin-wrappers/:$PATH"
+  - if: type = cron
+    python: 3.6
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
-    - _DL_CRON=1
-  - python: 3.5
+  - if: type = cron
+    python: 3.6
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
-    - _DL_CRON=1
-  - python: 3.5
-    env:
-    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
-    - _DL_CRON=1
-  - python: 3.5
+  - if: type = cron
+    python: 3.6
     # Test under NFS mount  (full, only in master)
     env:
-    - TMPDIR="/tmp/nfsmount"
-    - _DL_CRON=1
-#  - python: 3.5
+    - _DL_TMPDIR="/tmp/nfsmount"
+#  - if: type = cron
+#    python: 3.6
 #    # test whether known v6 failures still fail
 #    env:
 #    - DATALAD_REPO_VERSION=6
 #    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
-#    - _DL_CRON=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
-  - python: 3.5
+  - if: type = cron
+    python: 3.6
     env:
-    - TMPDIR="/tmp/nfsmount"
-    - _DL_CRON=1
+    - _DL_TMPDIR="/tmp/nfsmount"
 #  # test whether known v6 failures still fail
-#  - env:
+#  - if: type = cron
+#    env:
 #    - DATALAD_REPO_VERSION=6
 #    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
-#    - _DL_CRON=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
-#  - python: 3.5
+#  - python: 3.6
 #    # we would need to migrate to boto3 to test it fully, but SSH should work
 #    env:
 #    - DATALAD_TESTS_SSH=1
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - if [ ! -z "${_DL_CRON:-}" ]; then
-      if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
-        echo "Exiting since should only be ran on a weekly basis by cron!";
-        exit 0;
-      fi
+  - NOSE_OPTS=( -v )
+  # If we requested to run only not slow (typically <10sec) tests, fail if a test
+  # takes 3x more than that - it needs to get @slow or @turtle annotation
+  - if echo "$NOSE_SELECTION_OP($NOSE_SELECTION)" | grep -q "^not.*slow"; then
+      NOSE_OPTS=( "${NOSE_OPTS[@]}" --with-doctest --with-timer --timer-ok 5 --timer-warning 30 --timer-fail error --timer-filter warning,error );
+      export DATALAD_TESTS_SETUP_TESTREPOS=1;
     fi
-  # Life was so fast that we needed a slow down
-  # - sleep 60   # TEMP -- to spot diff
   # Just in case we need to check if nfs is there etc
   - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
-  - sudo eatmydata tools/ci/prep-travis-forssh-sudo.sh
   - tools/ci/prep-travis-forssh.sh
+  # Install nvm https://github.com/nvm-sh/nvm/blob/master/README.md
+  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
+  # Use install & use node v10 as grunt-contrib-qunit uses generic try catch <https://github.com/datalad/datalad/issues/4635#issue-640604347>
+  - nvm install 10 && nvm use 10
+  # Echo node and npm version for debug
+  - which node && node -v && which npm && npm -v
   # Install grunt-cli
-  - eatmydata npm install grunt-cli
-  # Install optionally upstream current development so we are sure that they break nothing important for us
-  - if [ ! -z "${_DL_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
-  - if [ ! -z "${_DL_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
-  # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
-  - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || { ex="$?"; if [ "$ex" -eq 99 ]; then exit 0; else exit "$ex"; fi; }; fi
-  - if [ ! -z "${_DL_DEBURL_ANNEX:-}" ]; then wget -O /tmp/git-annex.deb "${_DL_DEBURL_ANNEX}" && sudo dpkg -i /tmp/git-annex.deb; fi
-  # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
-  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
-      sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
-    fi
-
-install:
-  # Install standalone build of git-annex for the recent enough version
+  - eatmydata npm install -g grunt-cli
+  # Install various basic depedencies
   - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   # needed for tests of patool compression fall-back solution
   - travis_retry sudo eatmydata apt-get install xz-utils
   - travis_retry sudo eatmydata apt-get install shunit2
   # for metadata support
   - travis_retry sudo eatmydata apt-get install exempi
+  # Configure _DL_TMPDIR before trying install git-annex -- script might use it
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  # Install git-annex
+  - wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
+  - sudo python3 datalad_installer.py -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+  - source new.env && cat new.env >> ~/.bashrc
+  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
+  - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
+  - pip install --upgrade pip
+
+install:
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
-  # TMPDIRs
-  - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
-  - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
-  - if [[ "${TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR" "${TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  # git-annex workaround. TODO: remove - should not be needed
+  - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
-  - npm install grunt-contrib-qunit@>=3.0.1
+  - npm install grunt-contrib-qunit@^4.0.0
 
 script:
+  # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
+  - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
   - sudo pip install .
+  # Run javascript tests
+  - grunt test --verbose
+  # Report WTF information using system wide installed version
+  - datalad wtf
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
-      -v -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"
+    $NOSE_WRAPPER `which nosetests` "${NOSE_OPTS[@]}"
+      -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
       --with-cov --cover-package datalad
       --logging-level=INFO
       $TESTS_TO_PERFORM
-  # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  - if [ ${DATALAD_TESTS_SSH:-0} != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
-      echo "Testing examples is disabled by configuration";
-    else
-      $NOSE_WRAPPER ../tools/testing/run_doc_examples;
-    fi
   - cd ..
-  # Run javascript tests
-  - grunt test --verbose
-  # Report WTF information using system wide installed version
-  - datalad wtf
 
 after_success:
   # submit only what we have covered in the PRs
-  - if [ -z "${_DL_CRON:-}" ]; then
-      cp __testhome__/.coverage .;
+  - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
+      cd __testhome__;
       coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi

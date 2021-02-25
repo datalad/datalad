@@ -214,6 +214,33 @@ class EnsureStr(Constraint):
         return 'str'
 
 
+class EnsureStrPrefix(EnsureStr):
+    """Ensure an input is a string that starts with a given prefix.
+    """
+    def __init__(self, prefix):
+        """
+        Parameters
+        ----------
+        prefix : str
+           Mandatory prefix.
+        """
+        self._prefix = prefix
+        super().__init__()
+
+    def __call__(self, value):
+        super().__call__(value)
+        if not value.startswith(self._prefix):
+            raise ValueError("%r does not start with '%s'"
+                             % (value, self._prefix))
+        return value
+
+    def long_description(self):
+        return "value must start with '{}'".format(self._prefix)
+
+    def short_description(self):
+        return '{}...'.format(self._prefix)
+
+
 class EnsureNone(Constraint):
     """Ensure an input is of value `None`"""
     def __call__(self, value):

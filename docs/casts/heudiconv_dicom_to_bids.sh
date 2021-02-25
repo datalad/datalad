@@ -44,7 +44,7 @@ run "mkdir -p derivatives/preprocess1/sub-phantom1sid1/ses-localizer/anat/  # cr
 run "bet {,derivatives/preprocess1/}sub-phantom1sid1/ses-localizer/anat/sub-phantom1sid1_ses-localizer_T1w.nii.gz"
 
 say "To keep control over the versions of all data we work with, we add results of pre-processing under DataLad version control"
-run "datalad add -m 'added initial preprocessing (well -- BETing output)' derivatives/preprocess1/*"
+run "datalad save -m 'added initial preprocessing (well -- BETing output)' derivatives/preprocess1/*"
 say "and then also adjust meta-data templates heudiconv pre-generated for us:"
 run "sed -i -e 's,First1 Last1,Data Lad,g' -e '/TODO/d' dataset_description.json"
 say "We save all so far accumulated changes"

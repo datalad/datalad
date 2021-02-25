@@ -26,12 +26,17 @@ from .. import cfg
 from ..ui import ui
 from ..utils import (
     auto_repr,
+    ensure_unicode,
     unlink,
 )
 from ..dochelpers import exc_str
-from .credentials import CREDENTIAL_TYPES
+from .credentials import (
+    CREDENTIAL_TYPES,
+    CompositeCredential,
+)
 from ..support.exceptions import (
     AccessDeniedError,
+    AccessPermissionExpiredError,
     AnonymousAccessDeniedError,
     DownloadError,
     IncompleteDownloadError,
@@ -140,6 +145,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             needs_authentication = self.credential
         attempt, incomplete_attempt = 0, 0
         result = None
+        credential_was_refreshed = False
         while True:
             attempt += 1
             if attempt > 20:
@@ -150,6 +156,10 @@ class BaseDownloader(object, metaclass=ABCMeta):
             supported_auth_types = []
             used_old_session = False
             try:
+                lgr.debug("Acquiring a currently %s lock to establish download session. "
+                          "If stalls - check which process holds %s",
+                          "existing" if self._lock.exists() else "absent",
+                          self._lock.path)
                 with self._lock:
                     # Locking since it might desire to ask for credentials
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
@@ -187,10 +197,20 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # got it to return back
                 with try_lock(self._lock) as got_lock:
                     if got_lock:
-                        self._handle_authentication(url, needs_authentication, e,
-                                                    access_denied, msg_types,
-                                                    supported_auth_types,
-                                                    used_old_session)
+                        if isinstance(e, AccessPermissionExpiredError) \
+                                and not credential_was_refreshed \
+                                and self.credential \
+                                and isinstance(self.credential, CompositeCredential):
+                            lgr.debug("Requesting refresh of the credential (once)")
+                            self.credential.refresh()
+                            # to avoid a loop of refreshes without giving a chance to
+                            # enter a new one, we will allow only a single refresh
+                            credential_was_refreshed = True
+                        else:
+                            self._handle_authentication(url, needs_authentication, e,
+                                                        access_denied, msg_types,
+                                                        supported_auth_types,
+                                                        used_old_session)
                     else:
                         lgr.debug("The lock for downloader authentication was not available.")
                         # We will just wait for the lock to become available,
@@ -362,7 +382,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 % self.authenticator
 
             if file_:
-                with open(file_) as fp:
+                # just read bytes and pass to check_for_auth_failure which
+                # will then encode regex into bytes (assuming utf-8 though)
+                with open(file_, 'rb') as fp:
                     content = fp.read(self._DOWNLOAD_SIZE_TO_VERIFY_AUTH)
             else:
                 assert(content is not None)
@@ -453,7 +475,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 os.utime(temp_filepath, (time.time(), status.mtime))
 
             # place successfully downloaded over the filepath
-            os.rename(temp_filepath, filepath)
+            os.replace(temp_filepath, filepath)
 
             if stats:
                 stats.downloaded += 1
@@ -570,7 +592,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
             # now that we know size based on encoded content, let's decode into string type
             if isinstance(content, bytes) and decode:
-                content = content.decode()
+                content = ensure_unicode(content)
             # downloaded_size = os.stat(temp_filepath).st_size
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)

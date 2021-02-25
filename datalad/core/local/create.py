@@ -14,9 +14,9 @@ import os
 import logging
 import random
 import uuid
+import warnings
 from argparse import (
     REMAINDER,
-    ONE_OR_MORE,
 )
 
 from os import listdir
@@ -39,7 +39,7 @@ from datalad.support.constraints import (
 from datalad.support.param import Parameter
 from datalad.utils import (
     getpwd,
-    assure_list,
+    ensure_list,
     get_dataset_root,
 )
 
@@ -62,6 +62,12 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.core.local.create')
 
 
+# Used for handling the no_annex -> annex option transition
+# remove when done
+class _NoAnnexDefault(object):
+    pass
+
+
 @build_doc
 class Create(Interface):
     """Create a new dataset from scratch.
@@ -80,7 +86,7 @@ class Create(Interface):
     to it, even if the target directory already contains additional files or
     directories.
 
-    Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
+    Plain Git repositories can be created via [PY: `annex=False` PY][CMD: --no-annex CMD].
     However, the result will not be a full dataset, and, consequently,
     not all features are supported (e.g. a description).
 
@@ -106,21 +112,21 @@ class Create(Interface):
         EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _examples_ = [
-        dict(text="""Create a dataset 'mydataset' in the current directory""",
+        dict(text="Create a dataset 'mydataset' in the current directory",
              code_py="create(path='mydataset')",
              code_cmd="datalad create mydataset"),
-        dict(text="""Apply the text2git procedure upon creation of a dataset""",
+        dict(text="Apply the text2git procedure upon creation of a dataset",
              code_py="create(path='mydataset', cfg_proc='text2git')",
              code_cmd="datalad create -c text2git mydataset"),
-        dict(text="""Create a subdataset in the root of an existing dataset""",
+        dict(text="Create a subdataset in the root of an existing dataset",
              code_py="create(dataset='.', path='mysubdataset')",
              code_cmd="datalad create -d . mysubdataset"),
         dict(text="Create a dataset in an existing, non-empty directory",
-             code_py="create(force=True, path='.')",
+             code_py="create(force=True)",
              code_cmd="datalad create --force"),
         dict(text="Create a plain Git repository",
-             code_py="create(path='mydataset', no_annex=True)",
-             code_cmd="datalad create --no-annex"),
+             code_py="create(path='mydataset', annex=False)",
+             code_cmd="datalad create --no-annex mydataset"),
     ]
 
     _params_ = dict(
@@ -130,9 +136,11 @@ class Create(Interface):
             metavar='PATH',
             doc="""path where the dataset shall be created, directories
             will be created as necessary. If no location is provided, a dataset
-            will be created in the current working directory. Either way the
-            command will error if the target directory is not empty.
-            Use `force` to create a dataset in a non-empty directory.""",
+            will be created in the location specified by [PY: `dataset`
+            PY][CMD: --dataset CMD] (if given) or the current working
+            directory. Either way the command will error if the target
+            directory is not empty. Use [PY: `force` PY][CMD: --force CMD] to
+            create a dataset in a non-empty directory.""",
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
         initopts=Parameter(
@@ -145,12 +153,15 @@ class Create(Interface):
             destination path of the repository will be passed to git-init
             as-is CMD]. Note that not all options will lead to viable results.
             For example '--bare' will not yield a repository where DataLad
-            can adjust files in its worktree."""),
+            can adjust files in its working tree."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar='DATASET',
             doc="""specify the dataset to perform the create operation on. If
-            a dataset is given, a new subdataset will be created in it.""",
+            a dataset is given along with `path`, a new subdataset will be created
+            in it at the `path` provided to the create command. If a dataset is
+            given but `path` is unspecified, a new dataset will be created at the
+            location specified by this option.""",
             constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
@@ -158,10 +169,16 @@ class Create(Interface):
             action='store_true'),
         description=location_description,
         no_annex=Parameter(
-            args=("--no-annex",),
-            doc="""if set, a plain Git repository will be created without any
-            annex""",
+            # hide this from the cmdline parser, replaced by `annex`
+            args=tuple(),
+            doc="""this option is deprecated, use `annex` instead""",
             action='store_true'),
+        annex=Parameter(
+            args=("--no-annex",),
+            dest='annex',
+            doc="""if [CMD: set CMD][PY: disabled PY], a plain Git repository
+            will be created without any annex""",
+            action='store_false'),
         # TODO seems to only cause a config flag to be set, this could be done
         # in a procedure
         fake_dates=Parameter(
@@ -191,10 +208,27 @@ class Create(Interface):
             force=False,
             description=None,
             dataset=None,
-            no_annex=False,
+            no_annex=_NoAnnexDefault,
+            annex=True,
             fake_dates=False,
             cfg_proc=None
     ):
+        # TODO: The current release of datalad-metalad (v0.2.1) still uses
+        # no_annex in its tests. Remove this compatibility kludge once a
+        # release is made, which will include 16a170e (2020-09-08).
+        if no_annex is not _NoAnnexDefault:
+            # the two mirror options do not agree and the deprecated one is
+            # not at default value
+            warnings.warn("datalad-create's `no_annex` option is deprecated "
+                          "and will be removed in a future release, "
+                          "use the reversed-sign `annex` option instead.",
+                          DeprecationWarning)
+            # honor the old option for now
+            annex = not no_annex
+
+        # we only perform negative tests below
+        no_annex = not annex
+
         if dataset:
             if isinstance(dataset, Dataset):
                 ds = dataset
@@ -217,6 +251,14 @@ class Create(Interface):
                                  "description for annex repo and declaring "
                                  "no annex repo.")
 
+        if (isinstance(initopts, (list, tuple)) and '--bare' in initopts) or (
+                isinstance(initopts, dict) and 'bare' in initopts):
+            raise ValueError(
+                "Creation of bare repositories is not supported. Consider "
+                "one of the create-sibling commands, or use "
+                "Git to init a bare repository and push an existing dataset "
+                "into it.")
+
         if path:
             path = resolve_path(path, dataset)
 
@@ -228,7 +270,7 @@ class Create(Interface):
         assert(path is not None)
 
         # assure cfg_proc is a list (relevant if used via Python API)
-        cfg_proc = assure_list(cfg_proc)
+        cfg_proc = ensure_list(cfg_proc)
 
         # prep for yield
         res = dict(action='create', path=str(path),
@@ -329,12 +371,15 @@ class Create(Interface):
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
+        # Note for the code below:
+        # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
+        # Re-use tbrepo instance, do not use tbds.repo
+
         # create and configure desired repository
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
             tbrepo = GitRepo(
                 tbds.path,
-                url=None,
                 create=True,
                 create_sanity_checks=False,
                 git_opts=initopts,
@@ -350,7 +395,6 @@ class Create(Interface):
             lgr.info("Creating a new annex repo at %s", tbds.path)
             tbrepo = AnnexRepo(
                 tbds.path,
-                url=None,
                 create=True,
                 create_sanity_checks=False,
                 # do not set backend here, to avoid a dedicated commit
@@ -398,13 +442,16 @@ class Create(Interface):
                     'type': 'file',
                     'state': 'untracked'}
 
+        # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
+        # Note, must not happen earlier (before if) since "smart" it would not be
+        tbds_config = tbds.config
+
         # record an ID for this repo for the afterlife
         # to be able to track siblings and children
         id_var = 'datalad.dataset.id'
         # Note, that Dataset property `id` will change when we unset the
         # respective config. Therefore store it before:
         tbds_id = tbds.id
-        tbds_config = tbds.config
         if id_var in tbds_config:
             # make sure we reset this variable completely, in case of a
             # re-create
@@ -412,7 +459,8 @@ class Create(Interface):
 
         if _seed is None:
             # just the standard way
-            uuid_id = uuid.uuid1().urn.split(':')[-1]
+            # use a fully random identifier (i.e. UUID version 4)
+            uuid_id = str(uuid.uuid4())
         else:
             # Let's generate preseeded ones
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))

@@ -23,6 +23,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import (
     assert_repo_status,
     get_convoluted_situation,
+    slow,
 )
 
 
@@ -64,12 +65,14 @@ def _test_save_all(path, repocls):
     return ds
 
 
+@slow  # 11sec on travis
 @known_failure_githubci_win
 @with_tempfile
 def test_gitrepo_save_all(path):
     _test_save_all(path, GitRepo)
 
 
+@slow  # 11sec on travis
 @known_failure_githubci_win
 @with_tempfile
 def test_annexrepo_save_all(path):

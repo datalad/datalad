@@ -10,8 +10,10 @@
 
 import os
 from unittest.mock import patch
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import patch_config
+from datalad.tests.utils import (
+    assert_equal,
+    patch_config,
+)
 
 from datalad.support import ansi_colors as colors
 

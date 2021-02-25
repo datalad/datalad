@@ -14,11 +14,14 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from functools import partial
+
 from datalad.interface.base import (
     Interface,
     build_doc,
 )
 from datalad.interface.common_opts import (
+    jobs_opt,
     recursion_limit,
     recursion_flag,
     save_message_opt,
@@ -34,8 +37,12 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.exceptions import CommandError
+from datalad.support.parallel import (
+    no_subds_in_futures,
+    ProducerConsumerProgressLog,
+)
 from datalad.utils import (
-    assure_list,
+    ensure_list,
 )
 import datalad.utils as ut
 
@@ -74,26 +81,26 @@ class Save(Interface):
     _examples_ = [
         dict(text="""Save any content underneath the current directory, without
              altering any potential subdataset""",
-             code_py="ds.save()",
+             code_py="save(path='.')",
              code_cmd="datalad save ."),
         dict(text="""Save specific content in the dataset""",
-             code_py="ds.save(path='myfile.txt')",
+             code_py="save(path='myfile.txt')",
              code_cmd="datalad save myfile.txt"),
         dict(text="""Attach a commit message to save""",
-             code_py="ds.save(path='myfile.txt', message='add a file')",
+             code_py="save(path='myfile.txt', message='add file')",
              code_cmd="datalad save -m 'add file' myfile.txt"),
         dict(text="""Save any content underneath the current directory, and
              recurse into any potential subdatasets""",
-             code_py="ds.save(recursive=True)",
-             code_cmd="datalad save . --recursive"),
-        dict(text="""Save any modification of known dataset content in the
-             current directory, but leave untracked files (e.g. temporary files)
-             untouched""",
-             code_py="""ds.save(updated=True, path='.')""",
-             code_cmd="""datalad save -u -d ."""),
+             code_py="save(path='.', recursive=True)",
+             code_cmd="datalad save . -r"),
+        dict(text="Save any modification of known dataset content in the "
+                  "current directory, but leave untracked files (e.g. temporary files) "
+                  "untouched",
+             code_py="""save(path='.', updated=True)""",
+             code_cmd="""datalad save -u ."""),
         dict(text="Tag the most recent saved state of a dataset",
-             code_py="ds.save(version_tag='bestyet')",
-             code_cmd="datalad save -d . --version-tag 'bestyet'"),
+             code_py="save(version_tag='bestyet')",
+             code_cmd="datalad save --version-tag 'bestyet'"),
     ]
 
     _params_ = dict(
@@ -130,14 +137,16 @@ class Save(Interface):
             args=("--to-git",),
             action='store_true',
             doc="""flag whether to add data directly to Git, instead of
-            tracking data identity only.  Usually this is not desired,
-            as it inflates dataset sizes and impacts flexibility of data
-            transport. If not specified - it will be up to git-annex to
-            decide, possibly on .gitattributes options. Use this flag
-            with a simultaneous selection of paths to save. In general,
-            it is better to pre-configure a dataset to track particular paths,
+            tracking data identity only.  Use with caution, there is no
+            guarantee that a file put directly into Git like this will
+            not be annexed in a subsequent save operation.
+            If not specified, it will be up to git-annex to decide how
+            a file is tracked, based on a dataset's configuration
+            to track particular paths,
             file types, or file sizes with either Git or git-annex.
-            See https://git-annex.branchable.com/tips/largefiles/"""),
+            (see https://git-annex.branchable.com/tips/largefiles).
+            """),
+        jobs=jobs_opt,
     )
 
     @staticmethod
@@ -149,12 +158,13 @@ class Save(Interface):
                  updated=False,
                  message_file=None,
                  to_git=None,
+                 jobs=None,
                  ):
         if message and message_file:
             raise ValueError(
                 "Both a message and message file were specified for save()")
 
-        path = assure_list(path)
+        path = ensure_list(path)
 
         if message_file:
             with open(message_file) as mfh:
@@ -205,6 +215,8 @@ class Save(Interface):
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',
+                # for save without recursion only commit matters
+                eval_subdataset_state='full' if recursive else 'commit',
                 result_renderer='disabled'):
             if s['status'] == 'error':
                 # Downstream code can't do anything with these. Let the caller
@@ -241,20 +253,23 @@ class Save(Interface):
             for superds, subdss in edges.items():
                 superds_status = paths_by_ds.get(superds, {})
                 for subds in subdss:
-                    # TODO actually start from an entry that may already
-                    # exist in the status record
-                    superds_status[ut.Path(subds)] = dict(
-                        # shot from the hip, some status config
-                        # to trigger this specific super/sub
-                        # relation to be saved
-                        state='untracked',
-                        type='dataset')
+                    subds_path = ut.Path(subds)
+                    sub_status = superds_status.get(subds_path, {})
+                    if not (sub_status.get("state") == "clean" and
+                            sub_status.get("type") == "dataset"):
+                        # TODO actually start from an entry that may already
+                        # exist in the status record
+                        superds_status[subds_path] = dict(
+                            # shot from the hip, some status config
+                            # to trigger this specific super/sub
+                            # relation to be saved
+                            state='untracked',
+                            type='dataset')
                 paths_by_ds[superds] = superds_status
 
-        # TODO parallelize, whenever we have multiple subdataset of a single
-        # dataset they can all be processed simultaneously
-        # sort list of dataset to handle, starting with the ones deep down
-        for pdspath in sorted(paths_by_ds, reverse=True):
+        def save_ds(args, version_tag=None):
+            pdspath, paths = args
+
             pds = Dataset(pdspath)
             pds_repo = pds.repo
             # pop status for this dataset, we are not coming back to it
@@ -264,7 +279,7 @@ class Save(Interface):
                 # cumbersome symlink handling without context in the
                 # lower levels
                 pds_repo.pathobj / p.relative_to(pdspath): props
-                for p, props in paths_by_ds.pop(pdspath).items()}
+                for p, props in paths.items()}
             start_commit = pds_repo.get_hexsha()
             if not all(p['state'] == 'clean' for p in pds_status.values()):
                 for res in pds_repo.save_(
@@ -304,7 +319,7 @@ class Save(Interface):
             )
             if not version_tag:
                 yield dsres
-                continue
+                return
             try:
                 # method requires str
                 version_tag = str(version_tag)
@@ -316,9 +331,33 @@ class Save(Interface):
             except CommandError as e:
                 if dsres['status'] == 'ok':
                     # first we yield the result for the actual save
+                    # TODO: we will get duplicate dataset/save record obscuring
+                    # progress reporting.  yoh thought to decouple "tag" from "save"
+                    # messages but was worrying that original authors would disagree
                     yield dsres.copy()
                 # and now complain that tagging didn't work
                 dsres.update(
                     status='error',
                     message=('cannot tag this version: %s', e.stderr.strip()))
                 yield dsres
+
+        # TODO: in principle logging could be improved to go not by a dataset
+        # but by path(s) within subdatasets. That should provide a bit better ETA
+        # and more "dynamic" feedback than jumpy datasets count.
+        # See addurls where it is implemented that way by providing agg and another
+        # log_filter
+        yield from ProducerConsumerProgressLog(
+            sorted(paths_by_ds.items(), key=lambda v: v[0], reverse=True),
+            partial(save_ds, version_tag=version_tag),
+            safe_to_consume=no_subds_in_futures,
+            producer_future_key=lambda ds_items: ds_items[0],
+            jobs=jobs,
+            log_filter=_log_filter_save_dataset,
+            unit="datasets",
+            lgr=lgr,
+        )
+
+
+def _log_filter_save_dataset(res):
+    return res.get('type') == 'dataset' and res.get('action') == 'save'
+

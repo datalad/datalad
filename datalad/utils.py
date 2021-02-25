@@ -8,15 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+from collections.abc import Callable
 import hashlib
 import re
 import builtins
 import time
-
-try:
-    from collections.abc import Callable
-except ImportError:  # Python <= 3.3
-    from collections import Callable
 
 import logging
 import shutil
@@ -27,13 +23,17 @@ import platform
 import gc
 import glob
 import gzip
+import stat
 import string
 import warnings
 import wrapt
 
 from copy import copy as shallow_copy
 from contextlib import contextmanager
-from functools import wraps
+from functools import (
+    lru_cache,
+    wraps,
+)
 from time import sleep
 import inspect
 from itertools import tee
@@ -41,11 +41,10 @@ from itertools import tee
 import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix
-from os.path import curdir, basename, exists, realpath, islink, join as opj
+from os.path import curdir, basename, exists, islink, join as opj
 from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
 from os.path import isdir
 from os.path import relpath
-from os.path import stat
 from os.path import dirname
 from os.path import split as psplit
 import posixpath
@@ -77,6 +76,8 @@ on_msys_tainted_paths = on_windows \
                         and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 
 
+# Takes ~200msec, so should not be called at import time
+@lru_cache()  # output should not change through life time of datalad process
 def get_linux_distribution():
     """Compatibility wrapper for {platform,distro}.linux_distribution().
     """
@@ -91,16 +92,12 @@ def get_linux_distribution():
     return result
 
 
-try:
-    linux_distribution_name, linux_distribution_release \
-        = get_linux_distribution()[:2]
-    on_debian_wheezy = on_linux \
-                       and linux_distribution_name == 'debian' \
-                       and linux_distribution_release.startswith('7.')
-except:  # pragma: no cover
-    # MIH: IndexError?
-    on_debian_wheezy = False
-    linux_distribution_name = linux_distribution_release = None
+# TODO: deprecated, remove in 0.15
+# Wheezy EOLed 2 years ago, no new datalad builds from neurodebian
+on_debian_wheezy = False
+# Those weren't used for any critical decision making, thus we just set them to None
+# Use get_linux_distribution() directly where needed
+linux_distribution_name = linux_distribution_release = None
 
 # Maximal length of cmdline string
 # Query the system and use hardcoded "knowledge" if None
@@ -184,6 +181,27 @@ def not_supported_on_windows(msg=None):
     if on_windows:
         raise NotImplementedError("This functionality is not yet implemented for Windows OS"
                                   + (": %s" % msg if msg else ""))
+
+
+def get_home_envvars(new_home):
+    """Return dict with env variables to be adjusted for a new HOME
+
+    Only variables found in current os.environ are adjusted.
+
+    Parameters
+    ----------
+    new_home: str
+      New home path, in native to OS "schema"
+    """
+    environ = os.environ
+    out = {'HOME': new_home}
+    if on_windows:
+        # requires special handling, since it has a number of relevant variables
+        # and also Python changed its behavior and started to respect USERPROFILE only
+        # since python 3.8: https://bugs.python.org/issue36264
+        out['USERPROFILE'] = new_home
+        out['HOMEDRIVE'], out['HOMEPATH'] = op.splitdrive(new_home)
+    return {v: val for v, val in out.items() if v in os.environ}
 
 
 def shortened_repr(value, l=30):
@@ -280,6 +298,7 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
+# unused in -core
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
@@ -373,7 +392,6 @@ from pathlib import (
     PurePosixPath,
 )
 
-
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
 
@@ -435,6 +453,12 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
         return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
+        if on_windows:
+            # shutil fails to remove paths that exceed 260 characters on Windows machines
+            # that did not enable long path support. A workaround to remove long paths
+            # anyway is to preprend \\?\ to the path.
+            # https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file?redirectedfrom=MSDN#win32-file-namespaces
+            path = r'\\?\ '.strip() + path
         _rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
@@ -449,6 +473,8 @@ def rmdir(path, *args, **kwargs):
 
 def get_open_files(path, log_open=False):
     """Get open files under a path
+
+    Note: This function is very slow on Windows.
 
     Parameters
     ----------
@@ -468,7 +494,9 @@ def get_open_files(path, log_open=False):
     files = {}
     # since the ones returned by psutil would not be aware of symlinks in the
     # path we should also get realpath for path
-    path = realpath(path)
+    # do absolute() in addition to always get an absolute path
+    # even with non-existing paths on windows
+    path = str(Path(path).resolve().absolute())
     for proc in psutil.process_iter():
         try:
             open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
@@ -542,6 +570,7 @@ def file_basename(name, return_ext=False):
         return fbname
 
 
+# unused in -core
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
@@ -550,6 +579,7 @@ def escape_filename(filename):
     return filename
 
 
+# unused in -core
 def encode_filename(filename):
     """Encode unicode filename
     """
@@ -559,6 +589,7 @@ def encode_filename(filename):
         return filename
 
 
+# unused in -core
 def decode_input(s):
     """Given input string/bytes, decode according to stdin codepage (or UTF-8)
     if not defined
@@ -579,6 +610,7 @@ def decode_input(s):
             return s.decode(encoding, errors='replace')
 
 
+# unused in -core
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -592,19 +624,20 @@ else:
 
         Works only on linux and OSX ATM
         """
-        from .cmd import Runner
+        from .cmd import WitlessRunner
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
-        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
-        rfilepath = realpath(filepath)
-        if islink(filepath) and exists(rfilepath):
+        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        filepath = Path(filepath)
+        rfilepath = filepath.resolve()
+        if filepath.is_symlink() and rfilepath.exists():
             # trust noone - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
                     rfilepath, mtime)
-            os.utime(rfilepath, (time.time(), mtime))
+            os.utime(str(rfilepath), (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
@@ -754,6 +787,7 @@ def ensure_unicode(s, encoding=None, confidence=None):
                     "confidence. Highest confidence was %s for %s"
                     % (denc_confidence, denc)
                 )
+            lgr.log(5, "Auto-detected encoding to be %s", denc)
             return s.decode(denc)
         else:
             raise ValueError(
@@ -1038,7 +1072,7 @@ def get_tempfile_kwargs(tkwargs=None, prefix="", wrapped=None):
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped) else [wrapped.__name__]))
 
-    directory = os.environ.get('DATALAD_TESTS_TEMP_DIR')
+    directory = os.environ.get('TMPDIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
 
@@ -1053,15 +1087,16 @@ def line_profile(func):
     prof = line_profiler.LineProfiler()
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_line_profile(*args, **kwargs):
         try:
             pfunc = prof(func)
             return pfunc(*args, **kwargs)
         finally:
             prof.print_stats()
-    return newfunc
+    return  _wrap_line_profile
 
 
+# unused in -core
 @optional_args
 def collect_method_callstats(func):
     """Figure out methods which call the method repeatedly on the same instance
@@ -1089,7 +1124,7 @@ def collect_method_callstats(func):
     toppath = op.dirname(__file__) + op.sep
 
     @wraps(func)
-    def newfunc(*args, **kwargs):
+    def  _wrap_collect_method_callstats(*args, **kwargs):
         try:
             self = args[0]
             stack = traceback.extract_stack()
@@ -1126,7 +1161,7 @@ def collect_method_callstats(func):
     import atexit
     atexit.register(print_stats)
 
-    return newfunc
+    return  _wrap_collect_method_callstats
 
 
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
@@ -1157,6 +1192,7 @@ def never_fail(f):
 #
 
 
+# unused in -core
 @contextmanager
 def nothing_cm():
     """Just a dummy cm to programmically switch context managers"""
@@ -1211,6 +1247,16 @@ def swallow_outputs():
             self._err.close()
             out_name = self._out.name
             err_name = self._err.name
+            from datalad import cfg
+            if cfg.getbool('datalad.log', 'outputs', default=False) \
+                    and lgr.getEffectiveLevel() <= logging.DEBUG:
+                for s, sname in ((self.out, 'stdout'),
+                                 (self.err, 'stderr')):
+                    if s:
+                        pref = os.linesep + "| "
+                        lgr.debug("Swallowed %s:%s%s", sname, pref, s.replace(os.linesep, pref))
+                    else:
+                        lgr.debug("Nothing was swallowed for %s", sname)
             del self._out
             del self._err
             gc.collect()
@@ -1355,10 +1401,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
     # we want to log levelname so we could test against it
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
-    # Inherit filters
-    from datalad.log import ProgressHandler
-    swallow_handler.filters = sum([h.filters for h in old_handlers
-                                   if not isinstance(h, ProgressHandler)],
+    swallow_handler.filters = sum([h.filters for h in old_handlers],
                                   [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
@@ -1472,7 +1515,7 @@ _pwd_mode = None
 def _switch_to_getcwd(msg, *args):
     global _pwd_mode
     _pwd_mode = 'cwd'
-    lgr.warning(
+    lgr.debug(
         msg + ". From now on will be returning os.getcwd(). Directory"
                " symlinks in the paths will be resolved",
         *args
@@ -1534,7 +1577,9 @@ def getpwd():
                 raise
         try:
             pwd = os.environ['PWD']
-            pwd_real = op.realpath(pwd)
+            # do absolute() in addition to always get an absolute path
+            # even with non-existing paths on windows
+            pwd_real = str(Path(pwd).resolve().absolute())
             # This logic would fail to catch the case where chdir did happen
             # to the directory where current PWD is pointing to, e.g.
             # $> ls -ld $PWD
@@ -1574,8 +1619,6 @@ class chpwd(object):
     def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
-            # PY35 has no auto-conversion of Path to str
-            path = str(path)
             pwd = getpwd()
             self._prev_pwd = pwd
         else:
@@ -1591,7 +1634,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = path
+        os.environ['PWD'] = str(path)
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1746,11 +1789,15 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-    filename = realpath(filename)
+    filename = Path(filename).resolve()
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
-            f.write(content)
+        (filename.write_bytes
+         if isinstance(content, bytes)
+         else filename.write_text)(content)
+
+    # TODO globbing below can also be done with pathlib
+    filename = str(filename)
 
     if __debug__:
         # TODO mkdir
@@ -1798,6 +1845,7 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
+# unused in -core
 def get_logfilename(dspath, cmd='datalad'):
     """Return a filename to use for logging under a dataset/repository
 
@@ -1877,7 +1925,16 @@ def get_dataset_root(path):
     the root dataset containing its parent directory will be reported.
     If none can be found, at a symlink at `path` is pointing to a
     dataset, `path` itself will be reported as the root.
+
+    Parameters
+    ----------
+    path : Path-like
+
+    Returns
+    -------
+    str or None
     """
+    path = str(path)
     suffix = '.git'
     altered = None
     if op.islink(path) or not op.isdir(path):
@@ -1918,7 +1975,11 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
 
 
 @optional_args
-def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+def try_multiple_dec(
+        f, ntrials=None, duration=0.1, exceptions=None, increment_type=None,
+        exceptions_filter=None,
+        logger=None,
+):
     """Decorator to try function multiple times.
 
     Main purpose is to decorate functions dealing with removal of files/directories
@@ -1933,7 +1994,15 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     increment_type: {None, 'exponential'}
       Note that if it is exponential, duration should typically be > 1.0
       so it grows with higher power
-
+    exceptions: Exception or tuple of Exceptions, optional
+      Exception or a tuple of multiple exceptions, on which to retry
+    exceptions_filter: callable, optional
+      If provided, this function will be called with a caught exception
+      instance.  If function returns True - we will re-try, if False - exception
+      will be re-raised without retrying.
+    logger: callable, optional
+      Logger to log upon failure.  If not provided, will use stock logger
+      at the level of 5 (heavy debug).
     """
     from .dochelpers import exc_str
     if not exceptions:
@@ -1941,29 +2010,32 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
             if on_windows else OSError
     if not ntrials:
         # Life goes fast on proper systems, no need to delay it much
-        ntrials = 50 if on_windows else 3
-
+        ntrials = 100 if on_windows else 10
+    if logger is None:
+        def logger(*args, **kwargs):
+            return lgr.log(5, *args, **kwargs)
     assert increment_type in {None, 'exponential'}
 
     @wraps(f)
-    def wrapped(*args, **kwargs):
+    def _wrap_try_multiple_dec(*args, **kwargs):
         t = duration
         for trial in range(ntrials):
             try:
                 return f(*args, **kwargs)
             except exceptions as exc:
-                if increment_type == 'exponential':
-                    t = duration ** (trial + 1)
-                lgr.log(
-                    5,
-                    "Caught %s on trial #%d. Sleeping %f and retrying",
-                    exc_str(exc), trial, t)
+                if exceptions_filter and not exceptions_filter(exc):
+                    raise
                 if trial < ntrials - 1:
+                    if increment_type == 'exponential':
+                        t = duration ** (trial + 1)
+                    logger(
+                        "Caught %s on trial #%d. Sleeping %f and retrying",
+                        exc_str(exc), trial, t)
                     sleep(t)
                 else:
                     raise
 
-    return wrapped
+    return _wrap_try_multiple_dec
 
 
 @try_multiple_dec
@@ -2025,6 +2097,7 @@ def safe_print(s):
 # IO Helpers
 #
 
+# unused in -core
 def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
 
@@ -2048,6 +2121,19 @@ def open_r_encdetect(fname, readahead=1000):
               fname,
               enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_file(fname, decode=True):
+    """A helper to read file passing content via ensure_unicode
+
+    Parameters
+    ----------
+    decode: bool, optional
+      if False, no ensure_unicode and file content returned as bytes
+    """
+    with open(fname, 'rb') as f:
+        content = f.read()
+    return ensure_unicode(content) if decode else content
 
 
 def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
@@ -2397,6 +2483,22 @@ def quote_cmdlinearg(arg):
     ) if on_windows else shlex_quote(arg)
 
 
+def guard_for_format(arg):
+    """Replace { and } with {{ and }}
+
+    To be used in cases if arg is not expected to have provided
+    by user .format() placeholders, but 'arg' might become a part
+    of a composite passed to .format(), e.g. via 'Run'
+    """
+    return arg.replace('{', '{{').replace('}', '}}')
+
+
+def join_cmdline(args):
+    """Join command line args into a string using quote_cmdlinearg
+    """
+    return ' '.join(map(quote_cmdlinearg, args))
+
+
 def split_cmdline(s):
     """Perform platform-appropriate command line splitting.
 
@@ -2450,16 +2552,65 @@ def get_wrapped_class(wrapped):
     return _func_class
 
 
-# TODO whenever we feel ready for English kill the compat block below
-assure_tuple_or_list = ensure_tuple_or_list
-assure_iter = ensure_iter
-assure_list = ensure_list
-assure_list_from_str = ensure_list_from_str
-assure_dict_from_str = ensure_dict_from_str
-assure_bytes = ensure_bytes
-assure_unicode = ensure_unicode
-assure_bool = ensure_bool
-assure_dir = ensure_dir
+def _make_assure_kludge(fn):
+    old_name = fn.__name__.replace("ensure", "assure")
+
+    @wraps(fn)
+    def compat_fn(*args, **kwargs):
+        warnings.warn(
+            "{} is deprecated and will be removed in a future release. "
+            "Use {} instead."
+            .format(old_name, fn.__name__),
+            DeprecationWarning)
+        return fn(*args, **kwargs)
+
+    compat_fn.__doc__ = ("Note: This function is deprecated. Use {} instead."
+                         .format(fn.__name__))
+    return compat_fn
+
+
+assure_tuple_or_list = _make_assure_kludge(ensure_tuple_or_list)
+assure_iter = _make_assure_kludge(ensure_iter)
+assure_list = _make_assure_kludge(ensure_list)
+assure_list_from_str = _make_assure_kludge(ensure_list_from_str)
+assure_dict_from_str = _make_assure_kludge(ensure_dict_from_str)
+assure_bytes = _make_assure_kludge(ensure_bytes)
+assure_unicode = _make_assure_kludge(ensure_unicode)
+assure_bool = _make_assure_kludge(ensure_bool)
+assure_dir = _make_assure_kludge(ensure_dir)
 
 
 lgr.log(5, "Done importing datalad.utils")
+
+
+def check_symlink_capability(path, target):
+    """helper similar to datalad.tests.utils.has_symlink_capability
+
+    However, for use in a datalad command context, we shouldn't
+    assume to be able to write to tmpfile and also not import a whole lot from
+    datalad's test machinery. Finally, we want to know, whether we can create a
+    symlink at a specific location, not just somewhere. Therefore use
+    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    location can therefore be determined by high lever code.
+
+    Parameters
+    ----------
+    path: Path
+    target: Path
+
+    Returns
+    -------
+    bool
+    """
+
+    try:
+        target.touch()
+        path.symlink_to(target)
+        return True
+    except Exception:
+        return False
+    finally:
+        if path.exists():
+            path.unlink()
+        if target.exists():
+            target.unlink()

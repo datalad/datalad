@@ -22,7 +22,7 @@ class NDATokenGenerator(object):
         'data': 'http://gov/nih/ndar/ws/datamanager/server/bean/jaxb'
     }
 
-    def __init__(self, url='https://ndar.nih.gov/DataManager/dataManager'):
+    def __init__(self, url):
         assert url is not None
         self.url = url
         logging.debug('constructed with url %s' % url)

@@ -7,10 +7,13 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from functools import partial
+import inspect
 import logging
 import os
 import sys
 import platform
+import random
 import logging.handlers
 
 from os.path import basename, dirname
@@ -169,6 +172,9 @@ class ColorFormatter(logging.Formatter):
                 "%(message)s ")
 
     def format(self, record):
+        # safety guard if None was provided
+        if record.msg is None:
+            record.msg = ""
         if record.msg.startswith('| '):
             # If we already log smth which supposed to go without formatting, like
             # output for running a command, just return the message and be done
@@ -194,12 +200,23 @@ class ColorFormatter(logging.Formatter):
 class ProgressHandler(logging.Handler):
     from datalad.ui import ui
 
-    def __init__(self):
+    def __init__(self, other_handler=None):
         super(self.__class__, self).__init__()
+        self._other_handler = other_handler
         self.pbars = {}
 
     def emit(self, record):
         from datalad.ui import ui
+        if not hasattr(record, 'dlm_progress'):
+            self._clear_all()
+            self._other_handler.emit(record)
+            self._refresh_all()
+            return
+        maint = getattr(record, 'dlm_progress_maint', None)
+        if maint == 'clear':
+            return self._clear_all()
+        elif maint == 'refresh':
+            return self._refresh_all()
         pid = getattr(record, 'dlm_progress')
         update = getattr(record, 'dlm_progress_update', None)
         # would be an actual message, not used ATM here,
@@ -212,8 +229,9 @@ class ProgressHandler(logging.Handler):
             pbar = ui.get_progressbar(
                 label=getattr(record, 'dlm_progress_label', ''),
                 unit=getattr(record, 'dlm_progress_unit', ''),
-                total=getattr(record, 'dlm_progress_total', None))
-            pbar.start()
+                total=getattr(record, 'dlm_progress_total', None,),
+            )
+            pbar.start(initial=getattr(record, 'dlm_progress_initial', 0))
             self.pbars[pid] = pbar
         elif update is None:
             # not an update -> done
@@ -221,14 +239,24 @@ class ProgressHandler(logging.Handler):
             # we may want to actually "print" the completion message
             self.pbars.pop(pid).finish()
         else:
-            # an update
-            self.pbars[pid].update(
-                update,
-                increment=getattr(record, 'dlm_progress_increment', False))
             # Check for an updated label.
             label = getattr(record, 'dlm_progress_label', None)
             if label is not None:
                 self.pbars[pid].set_desc(label)
+            # an update
+            self.pbars[pid].update(
+                update,
+                increment=getattr(record, 'dlm_progress_increment', False),
+                total=getattr(record, 'dlm_progress_total', None))
+
+    def _refresh_all(self):
+        for pb in self.pbars.values():
+            pb.refresh()
+
+    def _clear_all(self):
+        # remove the progress bar
+        for pb in self.pbars.values():
+            pb.clear()
 
 
 class NoProgressLog(logging.Filter):
@@ -239,6 +267,11 @@ class NoProgressLog(logging.Filter):
 class OnlyProgressLog(logging.Filter):
     def filter(self, record):
         return hasattr(record, 'dlm_progress')
+
+
+def filter_noninteractive_progress(logger, record):
+    level = getattr(record, "dlm_progress_noninteractive_level", None)
+    return level is None or level >= logger.level
 
 
 def log_progress(lgrcall, pid, *args, **kwargs):
@@ -269,16 +302,29 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       To which quantity to advance the progress.
     increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
+    initial : int
+      If set, start value for progress bar
+    noninteractive_level : int, optional
+      When a level is specified here and progress is being logged
+      non-interactively (i.e. without progress bars), do not log the message if
+      logging is not enabled for the specified level. This is useful when you
+      want all calls to be "logged" via the progress bar, but non-interactively
+      showing a message at the `lgrcall` level for each step would be too much
+      noise. Note that the level here only determines if the record will be
+      dropped; it will still be logged at the level of `lgrcall`.
+    maint : {'clear', 'refresh'}
     """
     d = dict(
         {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
-         if v},
+         # initial progress might be zero, but not sending it further
+         # would signal to destroy the progress bar, hence test for 'not None'
+         if v is not None},
         dlm_progress=pid)
     lgrcall(*args, extra=d)
 
 
 @optional_args
-def with_result_progress(fn, label="Total", unit=" Files"):
+def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
     """Wrap a progress bar, with status counts, around a function.
 
     Parameters
@@ -288,6 +334,10 @@ def with_result_progress(fn, label="Total", unit=" Files"):
         positional argument and any number of keyword arguments.  After
         processing each item in the collection, it should yield a status
         dict.
+    log_filter : callable, optional
+        If defined, only result records for which callable evaluates to True will be
+        passed to log_progress
+
     label, unit : str
         Passed to log.log_progress.
 
@@ -307,38 +357,87 @@ def with_result_progress(fn, label="Total", unit=" Files"):
                 msg = colors.color_word(msg, colors.RED)
             return msg
 
-    pid = str(fn)
+
     base_label = label
 
-    def wrapped(items, **kwargs):
+    def _wrap_with_result_progress_(items, *args, **kwargs):
         counts = defaultdict(int)
+
+        pid = "%s:%s" % (fn, random.randint(0, 100000))
 
         label = base_label
         log_progress(lgr.info, pid,
                      "%s: starting", label,
-                     total=len(items), label=label, unit=unit)
+                     total=len(items), label=label, unit=unit,
+                     noninteractive_level=5)
 
-        results = []
-        for res in fn(items, **kwargs):
-            counts[res["status"]] += 1
-            count_strs = (count_str(*args)
-                          for args in [(counts["notneeded"], "skipped", False),
-                                       (counts["error"], "failed", True)])
-            if counts["notneeded"] or counts["error"]:
-                label = "{} ({})".format(
-                    base_label,
-                    ", ".join(filter(None, count_strs)))
+        for res in fn(items, *args, **kwargs):
+            if not (log_filter and not log_filter(res)):
+                counts[res["status"]] += 1
+                count_strs = (count_str(*args)
+                              for args in [(counts["notneeded"], "skipped", False),
+                                           (counts["error"], "failed", True)])
+                if counts["notneeded"] or counts["error"]:
+                    label = "{} ({})".format(
+                        base_label,
+                        ", ".join(filter(None, count_strs)))
 
-            log_progress(
-                lgr.error if res["status"] == "error" else lgr.info,
-                pid,
-                "%s: processed result%s", base_label,
-                " for " + res["path"] if "path" in res else "",
-                label=label, update=1, increment=True)
-            results.append(res)
-        log_progress(lgr.info, pid, "%s: done", base_label)
-        return results
-    return wrapped
+                log_progress(
+                    lgr.error if res["status"] == "error" else lgr.info,
+                    pid,
+                    "%s: processed result%s", base_label,
+                    " for " + res["path"] if "path" in res else "",
+                    label=label, update=1, increment=True,
+                    noninteractive_level=5)
+            yield res
+        log_progress(lgr.info, pid, "%s: done", base_label,
+                     noninteractive_level=5)
+
+    def _wrap_with_result_progress(items, *args, **kwargs):
+        return list(_wrap_with_result_progress_(items, *args, **kwargs))
+
+    return _wrap_with_result_progress_ \
+        if inspect.isgeneratorfunction(fn) \
+        else _wrap_with_result_progress
+
+
+def with_progress(items, lgrcall=None, label="Total", unit=" Files"):
+    """Wrap a progress bar, with status counts, around an iterable.
+
+    Parameters
+    ----------
+    items : some iterable
+    lgrcall: callable
+      Callable for logging. If not specified - lgr.info is used
+    label, unit : str
+        Passed to log.log_progress.
+
+    Yields
+    ------
+    Items of it while displaying the progress
+    """
+    pid = "with_progress-%d" % random.randint(0, 100000)
+    base_label = label
+    if lgrcall is None:
+        lgrcall = lgr.info
+
+    label = base_label
+    log_progress(lgrcall, pid,
+                 "%s: starting", label,
+                 total=len(items), label=label, unit=unit,
+                 noninteractive_level=5)
+
+    for item in items:
+        # Since we state "processed", and actual processing might be happening
+        # outside on the yielded value, we will yield before stating that
+        yield item
+        log_progress(
+            lgrcall,
+            pid,
+            "%s: processed", base_label,
+            label=label, update=1, increment=True,
+            noninteractive_level=5)
+    log_progress(lgr.info, pid, "%s: done", base_label, noninteractive_level=5)
 
 
 class LoggerHelper(object):
@@ -454,15 +553,14 @@ class LoggerHelper(object):
                            log_pid=self._get_config("pid", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
-        self.lgr.addHandler(loghandler)
-
         if is_interactive():
-            phandler = ProgressHandler()
-            # progress only when interactive
-            phandler.addFilter(OnlyProgressLog())
-            # no stream logs of progress messages when interactive
-            loghandler.addFilter(NoProgressLog())
+            phandler = ProgressHandler(other_handler=loghandler)
+            phandler.filters.extend(loghandler.filters)
             self.lgr.addHandler(phandler)
+        else:
+            loghandler.addFilter(partial(filter_noninteractive_progress,
+                                         self.lgr))
+            self.lgr.addHandler(loghandler)
 
         self.set_level()  # set default logging level
         return self.lgr

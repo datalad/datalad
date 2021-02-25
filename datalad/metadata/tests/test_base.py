@@ -11,40 +11,51 @@
 
 import logging
 
-from os.path import join as opj
-from os.path import relpath
+from os.path import (
+    join as opj,
+    relpath,
+)
 import os.path as op
 
-from datalad.api import Dataset
-from datalad.api import aggregate_metadata
-from datalad.api import install
-from datalad.api import metadata
+from datalad.api import (
+    aggregate_metadata,
+    Dataset,
+    install,
+    metadata,
+)
 from datalad.metadata.metadata import (
+    _get_containingds_from_agginfo,
     get_metadata_type,
     query_aggregated_metadata,
-    _get_containingds_from_agginfo,
 )
-from datalad.utils import chpwd
-from datalad.utils import assure_unicode
-from datalad.tests.utils import with_tree, with_tempfile
-from datalad.tests.utils import slow
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import ok_
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import known_failure_githubci_win
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import NoDatasetFound
+from datalad.utils import (
+    chpwd,
+    ensure_unicode,
+)
+from datalad.tests.utils import (
+    assert_dict_equal,
+    assert_equal,
+    assert_in,
+    assert_in_results,
+    assert_raises,
+    assert_re_in,
+    assert_repo_status,
+    assert_result_count,
+    assert_status,
+    assert_true,
+    eq_,
+    known_failure_githubci_win,
+    slow,
+    swallow_logs,
+    with_tempfile,
+    with_tree,
+)
+from datalad.support.exceptions import (
+    InsufficientArgumentsError,
+    NoDatasetFound,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-
-from nose.tools import assert_true, assert_equal, assert_raises
 
 
 _dataset_hierarchy_template = {
@@ -68,15 +79,20 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
-    Dataset(path).create()
+    ds = Dataset(path).create()
     # nothing set, nothing found
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    assert_equal(get_metadata_type(ds), [])
     # got section, but no setting
     open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata"]\n')
-    assert_equal(get_metadata_type(Dataset(path)), [])
+    # not relying on automagical pick up of changes done
+    # by external powers to the config
+    # see https://github.com/datalad/datalad/issues/4363 for more info
+    ds.config.reload()
+    assert_equal(get_metadata_type(ds), [])
     # minimal setting
     open(opj(path, '.datalad', 'config'), 'w+').write('[datalad "metadata"]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), 'mamboschwambo')
+    ds.config.reload()
+    assert_equal(get_metadata_type(ds), 'mamboschwambo')
 
 
 def _compare_metadata_helper(origres, compds):
@@ -117,17 +133,16 @@ def test_aggregation(path):
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                         where='dataset')
     ds.save(recursive=True)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
     res = ds.aggregate_metadata(recursive=True, update_mode='all')
     # we get success report for both subdatasets and the superdataset,
     # and they get saved
-    assert_result_count(res, 6)
     assert_result_count(res, 3, status='ok', action='aggregate_metadata')
-    assert_result_count(res, 3, status='ok', action='save')
+    assert_in_results(res, action='save', status="ok")
     # nice and tidy
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # quick test of aggregate report
     aggs = ds.metadata(get_aggregates=True)
@@ -148,7 +163,7 @@ def test_aggregation(path):
     for name in ('MOTHER_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(
             sum([s['metadata']['frictionless_datapackage']['name'] \
-                    == assure_unicode(name) for s in origres
+                    == ensure_unicode(name) for s in origres
                  if s['type'] == 'dataset']))
 
     # now clone the beast to simulate a new user installing an empty dataset

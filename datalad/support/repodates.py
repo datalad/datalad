@@ -43,7 +43,8 @@ def _cat_blob(repo, obj, bad_ok=False):
         kwds = {}
 
     try:
-        out_cat = repo.call_git(["cat-file", "blob", obj], **kwds)
+        out_cat = repo.call_git(["cat-file", "blob", obj], read_only=True,
+                                **kwds)
     except CommandError as exc:
         if bad_ok and "bad file" in exc.stderr:
             out_cat = None
@@ -68,7 +69,8 @@ def branch_blobs(repo, branch):
     """
     # Note: This might be nicer with rev-list's --filter and
     # --filter-print-omitted, but those aren't available until Git v2.16.
-    lines = repo.call_git_items_(["rev-list", "--objects"] + [branch])
+    lines = repo.call_git_items_(["rev-list", "--objects"] + [branch],
+                                 read_only=True)
     # Trees and blobs have an associated path printed.
     objects = (ln.split() for ln in lines)
     blob_trees = [obj for obj in objects if len(obj) == 2]
@@ -108,7 +110,7 @@ def branch_blobs_in_tree(repo, branch):
     """
     seen_blobs = set()
     lines = list(repo.call_git_items_(["ls-tree", "-z", "-r", branch],
-                                      sep="\0"))
+                                      sep="\0", read_only=True))
     if lines:
         num_lines = len(lines)
         log_progress(lgr.info,

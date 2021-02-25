@@ -25,6 +25,7 @@ from ...api import ls
 from ...utils import swallow_outputs, chpwd
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_in
+from ...tests.utils import DEFAULT_BRANCH
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import skip_if_no_network
@@ -70,7 +71,7 @@ def test_ls_repos(toppath):
                     assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
                     assert_in('[annex]', cmo.out)
                     assert_in('[git]', cmo.out)
-                    assert_in('master', cmo.out)
+                    assert_in(DEFAULT_BRANCH, cmo.out)
                     if "bogus" in args:
                         assert_in('unknown', cmo.out)
 

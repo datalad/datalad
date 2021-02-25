@@ -148,7 +148,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         help = re.sub(r'^    (\S.*)\n', '\\1\n', help, flags=re.MULTILINE)
         return '.SH OPTIONS\n' + help
 
-    def _format_action_invocation(self, action):
+    def _format_action_invocation(self, action, doubledash='--'):
         if not action.option_strings:
             metavar, = self._metavar_formatter(action, action.dest)(1)
             return metavar
@@ -171,7 +171,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                     parts.append('%s %s' % (self._bold(option_string),
                                             args_string))
 
-            return ', '.join(p.replace('--', '-\\\\-') for p in parts)
+            return ', '.join(p.replace('--', doubledash) for p in parts)
 
 
 class RSTManPageFormatter(ManPageFormatter):
@@ -251,7 +251,7 @@ class RSTManPageFormatter(ManPageFormatter):
 
     def _format_action(self, action):
         # determine the required width and the entry label
-        action_header = self._format_action_invocation(action)
+        action_header = self._format_action_invocation(action, doubledash='-\\\\-')
 
         if action.help:
             help_text = self._expand_help(action)

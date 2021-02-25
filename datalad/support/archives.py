@@ -27,7 +27,6 @@ from datalad.support.path import (
     relpath,
     pardir,
     isdir,
-    realpath,
     sep as opsep,
 )
 
@@ -44,6 +43,7 @@ from datalad.utils import (
     rmtree,
     get_tempfile_kwargs,
     on_windows,
+    Path,
 )
 from datalad import cfg
 from datalad.config import anything2bool
@@ -109,7 +109,7 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    archive_cached = hashlib.md5(ensure_bytes(realpath(archive))).hexdigest()[:10]
+    archive_cached = hashlib.md5(ensure_bytes(str(Path(archive).resolve()))).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
 
@@ -341,7 +341,7 @@ class ExtractedArchive(object):
 
         It does not actually extract any archive
         """
-        return opj(self.path, urlunquote(afile))
+        return opj(self.path, afile)
 
     def get_extracted_files(self):
         """Generator to provide filenames which are available under extracted archive
