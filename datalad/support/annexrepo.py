@@ -3350,6 +3350,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             adjusted_branch = self.get_active_branch()
             corresponding_branch = self.get_corresponding_branch()
+            old_sha = self.get_hexsha(corresponding_branch)
 
             org_commit_pointer = corresponding_branch + "~1"
             author_name = self.format_commit("%an", org_commit_pointer)
@@ -3376,8 +3377,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                                     read_only=False)
             new_sha = out.strip()
 
-            self.update_ref("refs/heads/" + corresponding_branch, new_sha)
-            self.update_ref("refs/basis/" + adjusted_branch, new_sha)
+            self.update_ref("refs/heads/" + corresponding_branch,
+                            new_sha, old_sha)
+            self.update_ref("refs/basis/" + adjusted_branch,
+                            new_sha, old_sha)
             self.localsync(managed_only=True)
 
     def localsync(self, remote=None, managed_only=False):

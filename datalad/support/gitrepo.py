@@ -3036,7 +3036,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 )
         # TODO: return value
 
-    def update_ref(self, ref, value, symbolic=False):
+    def update_ref(self, ref, value, oldvalue=None, symbolic=False):
         """Update the object name stored in a ref "safely".
 
         Just a shim for `git update-ref` call if not symbolic, and
@@ -3049,13 +3049,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         value : str
           Value to update to, e.g. hexsha of a commit when updating for a
           branch ref, or branch ref if updating HEAD
+        oldvalue: str
+          Value to update from. Safeguard to be verified by git. This is only
+          valid if `symbolic` is not True.
         symbolic : None
           To instruct if ref is symbolic, e.g. should be used in case of
           ref=HEAD
         """
-        self.call_git(
-            ['symbolic-ref' if symbolic else 'update-ref', ref, value]
-        )
+        if symbolic:
+            if oldvalue:
+                raise ValueError("oldvalue and symbolic must not be given both")
+            cmd = ['symbolic-ref', ref, value]
+        else:
+            cmd = ['update-ref', ref, value] + ([oldvalue] if oldvalue else [])
+        self.call_git(cmd)
 
     def tag(self, tag, message=None, commit=None, options=None):
         """Tag a commit
