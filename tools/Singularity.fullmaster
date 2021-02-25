@@ -49,11 +49,9 @@ From:neurodebian:latest
 
     eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3 rclone git-annex-remote-rclone p7zip-full
 
-    # just for scrapy
-    eatmydata apt-get -y install --no-install-recommends python3-twisted
-
     # little dance because pip cannot handle this url plus [full] in one go
     wget https://github.com/datalad/datalad/archive/master.zip
+    pip install --upgrade pip
     pip3 install --system master.zip[full]
     rm -f master.zip
 
