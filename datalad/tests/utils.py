@@ -1064,8 +1064,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     def  _wrap_with_testrepos(*arg, **kw):
         # addurls with our generated file:// URLs doesn't work on appveyor
         # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
-        if 'APPVEYOR' in os.environ:
-            raise SkipTest("Testrepo setup is broken on AppVeyor")
+        #if 'APPVEYOR' in os.environ:
+        #    raise SkipTest("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1682,12 +1682,12 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
 def get_convoluted_situation(path, repocls=AnnexRepo):
     from datalad.api import create
 
-    if 'APPVEYOR' in os.environ:
-        # issue only happens on appveyor, Python itself implodes
-        # cannot be reproduced on a real windows box
-        raise SkipTest(
-            'get_convoluted_situation() causes appveyor to crash, '
-            'reason unknown')
+    #if 'APPVEYOR' in os.environ:
+    #    # issue only happens on appveyor, Python itself implodes
+    #    # cannot be reproduced on a real windows box
+    #    raise SkipTest(
+    #        'get_convoluted_situation() causes appveyor to crash, '
+    #        'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
     ds = Dataset(path).create(force=True)
