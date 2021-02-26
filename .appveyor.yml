@@ -250,8 +250,8 @@ install:
   - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
-  - cmd: IF DEFINED INSTALL_GITANNEX python datalad_installer.py %INSTALL_GITANNEX%
-  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && python datalad_installer.py ${INSTALL_GITANNEX}"
+  - cmd: IF DEFINED INSTALL_GITANNEX python datalad_installer.py --sudo ok %INSTALL_GITANNEX%
+  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && python datalad_installer.py --sudo ok ${INSTALL_GITANNEX}"
   # TODO remove when datalad-installer can handle this
   - cmd: tools\ci\appveyor_install_git-annex.bat
 
