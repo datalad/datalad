@@ -292,7 +292,8 @@ class Save(Interface):
         if amend and recursive and message:
             for d in paths_by_ds:
                 for p in paths_by_ds[d]:
-                    if paths_by_ds[d][p]['type'] == 'dataset':
+                    if paths_by_ds[d][p]['type'] == 'dataset' and \
+                            paths_by_ds[d][p]['state'] == 'clean':
                         paths_by_ds[d][p]['state'] = 'modified'
 
         def save_ds(args, version_tag=None):
@@ -370,6 +371,22 @@ class Save(Interface):
                     status='error',
                     message=('cannot tag this version: %s', e.stderr.strip()))
                 yield dsres
+
+        if not paths_by_ds:
+            # Special case: empty repo. There's either an empty commit only or
+            # none at all. An empty one we can amend otherwise there's nothing
+            # to do.
+            if amend and ds.repo.get_hexsha():
+                yield from save_ds((ds.pathobj, dict()), version_tag=version_tag)
+
+            else:
+                yield dict(action='save',
+                           type='dataset',
+                           path=ds.path,
+                           refds=ds.path,
+                           status='notneeded',
+                           logger=lgr)
+            return
 
         # TODO: in principle logging could be improved to go not by a dataset
         # but by path(s) within subdatasets. That should provide a bit better ETA

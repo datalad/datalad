@@ -3327,13 +3327,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                     if 'error-messages' in r else None,
                     logger=lgr)
 
-    def _save_post(self, message, status, partial_commit, amend=False):
+    def _save_post(self, message, status, partial_commit,
+                   amend=False, allow_empty=False):
 
         if amend and self.is_managed_branch() and \
                 self.format_commit("%B").strip() == "git-annex adjusted branch":
             # We must not directly amend on an adjusted branch, but fix it
             # up after the fact. That is if HEAD is a git-annex commit.
             # Otherwise we still can amend-commit normally.
+            # Note, that this may involve creating an empty commit first.
             amend = False
             adjust_amend = True
         else:
@@ -3341,7 +3343,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
-            message, status, partial_commit, amend, allow_empty=adjust_amend)
+            message, status, partial_commit, amend,
+            allow_empty=allow_empty or adjust_amend)
         # then sync potential managed branches
         self.localsync(managed_only=True)
         if adjust_amend:

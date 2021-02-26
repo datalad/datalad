@@ -4135,7 +4135,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                 else tuple())}):
                 yield r
 
-        self._save_post(message, status, need_partial_commit, amend=amend)
+        # Note, that allow_empty is always ok when we amend. Required when we
+        # amend an empty commit while the amendment is empty, too (though
+        # possibly different message). If an empty commit was okay before, it's
+        # okay now.
+        self._save_post(message, status, need_partial_commit, amend=amend,
+                        allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
 

@@ -1036,16 +1036,33 @@ def test_save_amend(dspath):
     eq_(ds.repo.format_commit("%ce"), "hope.diff@example.com")
 
 
-    # amend commit with no parent:
-    rmtree(dspath)
-    ds = Dataset(dspath).create()
-    branch = ds.repo.get_corresponding_branch()
+    # edge case: amend empty commit with no parent:
+    rmtree(str(dspath))
+    # When adjusted branch is enforced by git-annex detecting a crippled FS,
+    # git-annex produces an empty commit before switching to adjusted branch:
+    # "commit before entering adjusted branch"
+    # The commit by `create` would be the second one already.
+    # Therefore go with plain annex repo and create an (empty) commit only when
+    # not on adjusted branch:
+    repo = AnnexRepo(dspath, create=True)
+    if not repo.is_managed_branch():
+        repo.commit(msg="initial", options=['--allow-empty'])
+    ds = Dataset(dspath)
+    branch = ds.repo.get_corresponding_branch() or ds.repo.get_active_branch()
     # test pointless if we start with more than one commit
     eq_(len(list(ds.repo.get_branch_commits_(branch))),
-        1)
+        1,
+        msg="More than on commit '{}': {}".format(
+            branch, ds.repo.call_git(['log', branch]))
+        )
     last_sha = ds.repo.get_hexsha(branch)
 
     ds.save(message="new initial commit", amend=True)
     assert_repo_status(ds.repo)
+    eq_(len(list(ds.repo.get_branch_commits_(branch))),
+        1,
+        msg="More than on commit '{}': {}".format(
+            branch, ds.repo.call_git(['log', branch]))
+        )
     assert_not_in(last_sha, ds.repo.get_branch_commits_(branch))
-    eq_(ds.repo.format_commit("%B").strip(), "new initial commit")
+    eq_(ds.repo.format_commit("%B", branch).strip(), "new initial commit")
