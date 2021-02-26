@@ -3356,7 +3356,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             author_name = self.format_commit("%an", org_commit_pointer)
             author_email = self.format_commit("%ae", org_commit_pointer)
             author_date = self.format_commit("%ad", org_commit_pointer)
-
+            old_parent = self.format_commit("%P", org_commit_pointer)
             new_env = (self._git_runner.env
                        if self._git_runner.env else os.environ).copy()
             # `message` might be empty - we need to take it from the to be
@@ -3369,12 +3369,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             })
             # TODO: What about fake_dates in this context?
             #       ATM this is applied on top by _call_git().
-            out, _ = self._call_git(["commit-tree",
-                                     corresponding_branch + "^{tree}",
-                                     "-p", corresponding_branch + "~2",
-                                     "-m", msg],
-                                    env=new_env,
-                                    read_only=False)
+            commit_cmd = ["commit-tree",
+                          corresponding_branch + "^{tree}",
+                          "-m", msg]
+            if old_parent:
+                commit_cmd.extend(["-p", old_parent])
+            out, _ = self._call_git(commit_cmd, env=new_env, read_only=False)
             new_sha = out.strip()
 
             self.update_ref("refs/heads/" + corresponding_branch,

@@ -1034,3 +1034,18 @@ def test_save_amend(dspath):
     # comitter changed:
     eq_(ds.repo.format_commit("%cn"), "Hopefully Different")
     eq_(ds.repo.format_commit("%ce"), "hope.diff@example.com")
+
+
+    # amend commit with no parent:
+    rmtree(dspath)
+    ds = Dataset(dspath).create()
+    branch = ds.repo.get_corresponding_branch()
+    # test pointless if we start with more than one commit
+    eq_(len(list(ds.repo.get_branch_commits_(branch))),
+        1)
+    last_sha = ds.repo.get_hexsha(branch)
+
+    ds.save(message="new initial commit", amend=True)
+    assert_repo_status(ds.repo)
+    assert_not_in(last_sha, ds.repo.get_branch_commits_(branch))
+    eq_(ds.repo.format_commit("%B").strip(), "new initial commit")
