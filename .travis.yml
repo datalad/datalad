@@ -232,7 +232,7 @@ before_install:
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # Install git-annex
   - wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
-  - python3 datalad_installer.py -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+  - eval python3 datalad_installer.py --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
   - source new.env && cat new.env >> ~/.bashrc
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
