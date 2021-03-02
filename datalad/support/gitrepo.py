@@ -792,7 +792,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
     # Could be used to e.g. disable automatic garbage and autopacking
     # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    _GIT_COMMON_OPTIONS = []
+    _GIT_COMMON_OPTIONS = ["-c", "diff.ignoreSubmodules=none"]
     _git_cmd_prefix = ["git"] + _GIT_COMMON_OPTIONS
 
     def _flyweight_invalid(self):
