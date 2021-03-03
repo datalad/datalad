@@ -1124,17 +1124,16 @@ def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
 
 @with_tempfile(mkdir=True)
 def test_annex_backends(path):
-    repo = AnnexRepo(path)
-    eq_(repo.default_backends, None)
+    path = Path(path)
+    repo_default = AnnexRepo(path / "r_default")
+    eq_(repo_default.default_backends, None)
 
-    rmtree(path)
-
-    repo = AnnexRepo(path, backend='MD5E')
-    eq_(repo.default_backends, ['MD5E'])
+    repo_kw = AnnexRepo(path / "repo_kw", backend='MD5E')
+    eq_(repo_kw.default_backends, ['MD5E'])
 
     # persists
-    repo = AnnexRepo(path)
-    eq_(repo.default_backends, ['MD5E'])
+    repo_kw = AnnexRepo(path / "repo_kw")
+    eq_(repo_kw.default_backends, ['MD5E'])
 
 
 @skip_nomultiplex_ssh  # too much of "multiplex" testing
