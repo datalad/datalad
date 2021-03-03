@@ -72,7 +72,6 @@ class Unlock(Interface):
              code_cmd="datalad unlock ."),
     ]
 
-
     @staticmethod
     @datasetmethod(name='unlock')
     @eval_results
@@ -88,20 +87,26 @@ class Unlock(Interface):
         #   * record explicitly specified non-directory paths so that we can
         #     decide whether to yield a result for reported paths
         #   * filter out and yield results for paths that don't exist
-        paths_nondir = set()
+        res_paths_nondir = set()
         paths_lexist = None
+        res_paths = list()
         if path:
-            path = resolve_path(ensure_list(path), ds=dataset)
+            # Note, that we need unresolved versions of the path input to be
+            # passed on to status. See gh-5456 for example.
+            path = ensure_list(path)
+            res_paths = resolve_path(path, ds=dataset)
             paths_lexist = []
-            for p in path:
-                if p.exists() or p.is_symlink():
+            res_paths_lexist = []
+            for p, p_r in zip(path, res_paths):
+                if p_r.exists() or p_r.is_symlink():
                     paths_lexist.append(p)
-                if not p.is_dir():
-                    paths_nondir.add(p)
+                    res_paths_lexist.append(p_r)
+                if not p_r.is_dir():
+                    res_paths_nondir.add(p_r)
 
         res_kwargs = dict(action='unlock', logger=lgr, refds=refds.path)
-        if path:
-            for p in set(path).difference(set(paths_lexist)):
+        if res_paths:
+            for p in set(res_paths).difference(set(res_paths_lexist)):
                 yield get_status_dict(
                     status="impossible",
                     path=str(p),
@@ -119,7 +124,7 @@ class Unlock(Interface):
                 # semantics between here and the status() call
                 dataset=dataset,
                 path=paths_lexist,
-                untracked="normal" if paths_nondir else "no",
+                untracked="normal" if res_paths_nondir else "no",
                 report_filetype=False,
                 annex="availability",
                 recursive=recursive,
@@ -133,7 +138,7 @@ class Unlock(Interface):
             if has_content:
                 parentds = res["parentds"]
                 to_unlock[parentds].append(op.relpath(res["path"], parentds))
-            elif paths_nondir and Path(res["path"]) in paths_nondir:
+            elif res_paths_nondir and Path(res["path"]) in res_paths_nondir:
                 if has_content is False:
                     msg = "no content present"
                     status = "impossible"
