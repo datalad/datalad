@@ -242,3 +242,11 @@ def test_unlock_cant_unlock(path):
             action="unlock",
             status=status,
             path=str(ds.pathobj / f))
+
+
+@with_tree(tree={'subdir': {'sub': {}}})
+def test_unlock_gh_5456(path):
+    path = Path(path)
+    unrelated_super = Dataset(path).create(annex=False, force=True)
+    ds = Dataset(path / 'subdir' / 'sub').create()
+    ds.unlock('.')
