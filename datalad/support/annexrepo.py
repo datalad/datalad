@@ -3370,8 +3370,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'GIT_AUTHOR_EMAIL': author_email,
                 'GIT_AUTHOR_DATE': author_date
             })
-            # TODO: What about fake_dates in this context?
-            #       ATM this is applied on top by _call_git().
             commit_cmd = ["commit-tree",
                           corresponding_branch + "^{tree}",
                           "-m", msg]
