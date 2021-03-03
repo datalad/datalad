@@ -876,3 +876,16 @@ def test_save_adjusted_partial(path):
     ds.repo.call_git(["add", "other"])
     ds.save(path=["sub"])
     assert_repo_status(ds.path, added=["other"])
+
+
+@with_tempfile
+def test_save_diff_ignore_submodules_config(path):
+    ds = Dataset(path).create()
+    subds = ds.create("sub")
+    (subds.pathobj / "foo").write_text("foo")
+    subds.save()
+    ds.repo.config.set("diff.ignoreSubmodules", "all",
+                       where="local", reload=True)
+    # Saving a subdataset doesn't fail when diff.ignoreSubmodules=all.
+    ds.save()
+    assert_repo_status(ds.path)

@@ -790,6 +790,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     GIT_MIN_VERSION = "2.19.1"
     git_version = None
 
+    # Could be used to e.g. disable automatic garbage and autopacking
+    # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+    _GIT_COMMON_OPTIONS = ["-c", "diff.ignoreSubmodules=none"]
+    _git_cmd_prefix = ["git"] + _GIT_COMMON_OPTIONS
+
     def _flyweight_invalid(self):
         return not self.is_valid_git()
 
@@ -920,10 +925,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
-
-        # Could be used to e.g. disable automatic garbage and autopacking
-        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-        self._GIT_COMMON_OPTIONS = []
 
         if git_opts is None:
             git_opts = {}
@@ -1083,6 +1084,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
 
+        cmd_base = cls._git_cmd_prefix + ['clone', '--progress']
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
@@ -1090,7 +1092,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
                 res = GitWitlessRunner().run(
-                        ['git', 'clone', '--progress', url, path] \
+                        cmd_base + [url, path] \
                         + (to_options(**clone_options)
                            if clone_options else []),
                         protocol=GitProgress,
@@ -1666,7 +1668,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self.precommit()
 
         # assemble commandline
-        cmd = ['git', 'commit']
+        cmd = self._git_cmd_prefix + ['commit']
         options = ensure_list(options)
 
         if date:
@@ -2114,7 +2116,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
 
-        cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
+        cmd = self._git_cmd_prefix + args
 
         env = None
         if not read_only and self.fake_dates_enabled:
@@ -2342,7 +2344,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `fetch`, but returns a generator"""
         yield from self._fetch_push_helper(
-            base_cmd=['git', 'fetch', '--verbose', '--progress'],
+            base_cmd=self._git_cmd_prefix + ['fetch', '--verbose', '--progress'],
             action='fetch',
             urlvars=('remote.{}.url', 'remote.{}.url'),
             protocol=GitProgress,
@@ -2376,7 +2378,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if kwargs:
             git_options.extend(to_options(**kwargs))
 
-        cmd = ['git', 'pull', '--progress'] + git_options
+        cmd = ['git'] + self._GIT_COMMON_OPTIONS
+        cmd.extend(['pull', '--progress'] + git_options)
 
         if remote is None:
             if refspec:
@@ -2446,7 +2449,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def push_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `push`, but returns a generator"""
         yield from self._fetch_push_helper(
-            base_cmd=['git', 'push', '--progress', '--porcelain'],
+            base_cmd=self._git_cmd_prefix + ['push', '--progress', '--porcelain'],
             action='push',
             urlvars=('remote.{}.pushurl', 'remote.{}.url'),
             protocol=StdOutCaptureWithGitProgress,
