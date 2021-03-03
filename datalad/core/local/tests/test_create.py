@@ -177,7 +177,10 @@ def test_create(probe, path):
     assert_repo_status(ds.path, annex=True)
 
     # check default backend
-    eq_(ds.config.get("annex.backend"), 'MD5E')
+    (ds.pathobj / "f1").write_text("1")
+    ds.save()
+    eq_(ds.repo.get_file_backend(["f1"]), ['MD5E'])
+
     if not ar.is_managed_branch():
         eq_(ds.config.get("core.sharedrepository"), '2')
     # check description in `info`
