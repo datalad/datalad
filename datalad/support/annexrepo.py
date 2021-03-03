@@ -331,7 +331,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
-                self.config.set('annex.backends', backend, where='local')
+                self.config.set('annex.backend', backend, where='local')
                 git_attributes_file = '.gitattributes'
                 self.set_gitattributes(
                     [('*', {'annex.backend': backend})],
@@ -345,7 +345,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     )
         else:
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
-            self.config.set('annex.backends', backend, where='local')
+            self.config.set('annex.backend', backend, where='local')
 
     @classmethod
     def _cleanup(cls, path, batched):
