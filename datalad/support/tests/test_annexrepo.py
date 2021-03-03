@@ -1135,6 +1135,10 @@ def test_annex_backends(path):
     repo_kw = AnnexRepo(path / "repo_kw")
     eq_(repo_kw.default_backends, ['MD5E'])
 
+    repo_compat = AnnexRepo(path / "repo_compat")
+    repo_compat.config.set("annex.backends", "MD5E WORM", reload=True)
+    eq_(repo_compat.default_backends, ["MD5E", "WORM"])
+
 
 @skip_nomultiplex_ssh  # too much of "multiplex" testing
 @with_tempfile(mkdir=True)
