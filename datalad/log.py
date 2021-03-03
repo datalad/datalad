@@ -175,6 +175,11 @@ class ColorFormatter(logging.Formatter):
         # safety guard if None was provided
         if record.msg is None:
             record.msg = ""
+        else:
+            # to avoid our logger puking on receiving exception instances etc.
+            # .getMessage, used to interpolate it, would cast it to str anyways
+            # and thus not puke
+            record.msg = str(record.msg)
         if record.msg.startswith('| '):
             # If we already log smth which supposed to go without formatting, like
             # output for running a command, just return the message and be done

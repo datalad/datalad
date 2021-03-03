@@ -75,6 +75,14 @@ def test_logging_to_a_file(dst):
         regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
     regex += "(\s+\S+\s*)? " + msg
     assert_re_in(regex, line, match=True)
+
+    # Python's logger is ok (although not documented as supported) to accept
+    # non-string messages, which could be str()'ed.  We should not puke
+    msg2 = "Kenny is alive"
+    lgr.error(RuntimeError(msg2))
+    with open(dst) as f:
+        assert_in(msg2, f.read())
+
     # Close all handlers so windows is happy -- apparently not closed fast enough
     for handler in lgr.handlers:
         handler.close()
