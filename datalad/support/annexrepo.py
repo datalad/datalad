@@ -323,9 +323,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           If persistent, would add/commit to .gitattributes. If not -- would
           set within .git/config
         """
-        # TODO: 'annex.backends' actually is a space separated list.
-        # Figure out, whether we want to allow for a list here or what to
-        # do, if there is sth in that setting already
         if persistent:
             # could be set in .gitattributes or $GIT_DIR/info/attributes
             if 'annex.backend' in self.get_gitattributes('.')['.']:
