@@ -3356,15 +3356,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             old_sha = self.get_hexsha(corresponding_branch)
 
             org_commit_pointer = corresponding_branch + "~1"
-            author_name = self.format_commit("%an", org_commit_pointer)
-            author_email = self.format_commit("%ae", org_commit_pointer)
-            author_date = self.format_commit("%ad", org_commit_pointer)
-            old_parent = self.format_commit("%P", org_commit_pointer)
+            author_name, author_email, author_date, \
+            old_parent, old_message = self.format_commit(
+                "%an%x00%ae%x00%ad%x00%P%x00%B", org_commit_pointer).split('\0')
             new_env = (self._git_runner.env
                        if self._git_runner.env else os.environ).copy()
             # `message` might be empty - we need to take it from the to be
             # amended commit in that case:
-            msg = message or self.format_commit("%B", org_commit_pointer)
+            msg = message or old_message
             new_env.update({
                 'GIT_AUTHOR_NAME': author_name,
                 'GIT_AUTHOR_EMAIL': author_email,
