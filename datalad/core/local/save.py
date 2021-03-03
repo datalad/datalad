@@ -157,11 +157,8 @@ class Save(Interface):
             doc="""if set, changes are not recorded in a new, separate
             commit, but are integrated with the changeset of the previous
             commit, and both together are recorded by replacing that
-            previous commit. A commit message and authorship information
-            are re-used, if needed. Note, that the previous commits in all
-            subdatasets are amended if this is used recursively. Hence all
-            commit messages are changed if you amend recursively while also
-            passing a message.
+            previous commit. This is mutually exclusive with recursive
+            operation.
             """),
     )
 
@@ -180,6 +177,9 @@ class Save(Interface):
         if message and message_file:
             raise ValueError(
                 "Both a message and message file were specified for save()")
+
+        if amend and recursive:
+            raise ValueError("Cannot amend a commit recursively.")
 
         path = ensure_list(path)
 
@@ -283,18 +283,6 @@ class Save(Interface):
                             state='untracked',
                             type='dataset')
                 paths_by_ds[superds] = superds_status
-
-        # We need to anticipate empty (amend) commits in subdatasets that
-        # currently appear to be clean. Change state of any subdataset to
-        # modified in order for it to be committed upwards after amending.
-        # Note, that at least a message is required in order to actually commit
-        # in a subdataset that otherwise is clean.
-        if amend and recursive and message:
-            for d in paths_by_ds:
-                for p in paths_by_ds[d]:
-                    if paths_by_ds[d][p]['type'] == 'dataset' and \
-                            paths_by_ds[d][p]['state'] == 'clean':
-                        paths_by_ds[d][p]['state'] = 'modified'
 
         def save_ds(args, version_tag=None):
             pdspath, paths = args
