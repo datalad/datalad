@@ -2689,6 +2689,19 @@ class AnnexRepo(GitRepo, RepoInterface):
     @property
     def default_backends(self):
         self.config.reload()
+        # TODO: Deprecate and remove this property? It's used in the tests and
+        # datalad-crawler.
+        #
+        # git-annex used to try the list of backends in annex.backends in
+        # order. Now it takes annex.backend if set, falling back to the first
+        # value of annex.backends. See 4c1e3210f (annex.backend is the new name
+        # for what was annex.backends, 2017-05-09).
+        backend = self.get_gitattributes('.')['.'].get(
+            'annex.backend',
+            self.config.get("annex.backend", default=None))
+        if backend:
+            return [backend]
+
         backends = self.config.get("annex.backends", default=None)
         if backends:
             return backends.split()
