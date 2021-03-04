@@ -1676,13 +1676,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         orig_msg = msg
         if not msg:
-            msg = 'Recorded changes'
-            _datalad_msg = True
+            if '--amend' in options:
+                if '--no-edit' not in options:
+                    # don't overwrite old commit message with our default
+                    # message by default, but re-use old one. In other words:
+                    # Make --no-edit the default:
+                    options += ["--no-edit"]
+            else:
+                msg = 'Recorded changes'
+                _datalad_msg = True
 
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
 
-        options += ["-m", msg]
+        if msg:
+            options += ["-m", msg]
         cmd.extend(options)
 
         # set up env for commit
@@ -1700,15 +1708,17 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         try:
             for i, chunk in enumerate(file_chunks):
-                cur_cmd = cmd + (
-                    # if this is an explicit dry-run, there is no point in
-                    # amending, because no commit was ever made
-                    # otherwise, amend the first commit, and prevent
-                    # leaving multiple commits behind
-                    ['--amend', '--no-edit']
-                    if i > 0 and '--dry-run' not in cmd
-                    else []
-                ) + ['--'] + chunk
+                cur_cmd = cmd.copy()
+                # if this is an explicit dry-run, there is no point in
+                # amending, because no commit was ever made
+                # otherwise, amend the first commit, and prevent
+                # leaving multiple commits behind
+                if i > 0 and '--dry-run' not in cmd:
+                    if '--amend' not in cmd:
+                        cur_cmd.append('--amend')
+                    if '--no-edit' not in cmd:
+                        cur_cmd.append('--no-edit')
+                cur_cmd += ['--'] + chunk
                 self._git_runner.run(
                     cur_cmd,
                     protocol=StdOutErrCapture,
@@ -1742,10 +1752,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if orig_msg \
                 or '--dry-run' in cmd \
                 or prev_sha == self.get_hexsha() \
+                or ('--amend' in cmd and '--no-edit' in cmd) \
                 or (not is_interactive()) \
                 or self.config.obtain('datalad.save.no-message') != 'interactive':
-            # we had a message given, or nothing was committed, or we are not
-            # connected to a terminal, or no interactive message input is desired:
+            # we had a message given, or nothing was committed, or prev. commit
+            # was amended, or we are not connected to a terminal, or no
+            # interactive message input is desired:
             # we can go home
             return
 
@@ -2118,9 +2130,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         cmd = self._git_cmd_prefix + args
 
-        env = None
         if not read_only and self.fake_dates_enabled:
-            env = self.add_fake_dates(runner.env)
+            env = self.add_fake_dates(env if env else runner.env)
 
         protocol = StdOutErrCapture
         out = err = None
@@ -3045,7 +3056,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 )
         # TODO: return value
 
-    def update_ref(self, ref, value, symbolic=False):
+    def update_ref(self, ref, value, oldvalue=None, symbolic=False):
         """Update the object name stored in a ref "safely".
 
         Just a shim for `git update-ref` call if not symbolic, and
@@ -3058,13 +3069,20 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         value : str
           Value to update to, e.g. hexsha of a commit when updating for a
           branch ref, or branch ref if updating HEAD
+        oldvalue: str
+          Value to update from. Safeguard to be verified by git. This is only
+          valid if `symbolic` is not True.
         symbolic : None
           To instruct if ref is symbolic, e.g. should be used in case of
           ref=HEAD
         """
-        self.call_git(
-            ['symbolic-ref' if symbolic else 'update-ref', ref, value]
-        )
+        if symbolic:
+            if oldvalue:
+                raise ValueError("oldvalue and symbolic must not be given both")
+            cmd = ['symbolic-ref', ref, value]
+        else:
+            cmd = ['update-ref', ref, value] + ([oldvalue] if oldvalue else [])
+        self.call_git(cmd)
 
     def tag(self, tag, message=None, commit=None, options=None):
         """Tag a commit
@@ -3940,7 +3958,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             lgr.debug(exc_str(e))
             return []
 
-    def _save_post(self, message, status, partial_commit):
+    def _save_post(self, message, status, partial_commit, amend=False,
+                   allow_empty=False):
         # helper to commit changes reported in status
 
         # TODO remove pathobj stringification when commit() can
@@ -3948,7 +3967,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         to_commit = [str(f.relative_to(self.pathobj))
                      for f, props in status.items()] \
                     if partial_commit else None
-        if not partial_commit or to_commit:
+        if not partial_commit or to_commit or allow_empty or \
+                (amend and message):
             # we directly call GitRepo.commit() to avoid a whole slew
             # if direct-mode safeguards and workarounds in the AnnexRepo
             # implementation (which also run an additional dry-run commit
@@ -3956,7 +3976,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 self,
                 files=to_commit,
                 msg=message,
-                options=None,
+                options=to_options(amend=amend, allow_empty=allow_empty),
                 # do not raise on empty commit
                 # it could be that the `add` in this save-cycle has already
                 # brought back a 'modified' file into a clean state
@@ -3991,6 +4011,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           - eval_submodule_state : {'full', 'commit', 'no'}
             passed to Repo.status()
           - untracked : {'no', 'normal', 'all'} - passed to Repo.status()
+          - amend : bool (passed to GitRepo.commit)
         """
         return list(
             self.save_(
@@ -4006,7 +4027,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         from datalad.interface.results import get_status_dict
 
         status = self._save_pre(paths, _status, **kwargs)
-        if not status:
+        amend = kwargs.get('amend', False)
+        if not status and not (message and amend):
             # all clean, nothing todo
             lgr.debug('Nothing to save in %r, exiting early', self)
             return
@@ -4132,7 +4154,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                                 else tuple())}):
                 yield r
 
-        self._save_post(message, status, need_partial_commit)
+        # Note, that allow_empty is always ok when we amend. Required when we
+        # amend an empty commit while the amendment is empty, too (though
+        # possibly different message). If an empty commit was okay before, it's
+        # okay now.
+        self._save_post(message, status, need_partial_commit, amend=amend,
+                        allow_empty=amend)
         # TODO yield result for commit, prev helper checked hexsha pre
         # and post...
 

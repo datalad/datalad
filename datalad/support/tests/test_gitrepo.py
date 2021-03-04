@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     assert_false,
     assert_in,
     assert_in_results,
+    assert_not_equal,
     assert_not_in,
     assert_raises,
     assert_repo_status,
@@ -315,6 +316,24 @@ def test_GitRepo_commit(path):
     # commit with empty message:
     gr.commit()
     assert_repo_status(gr)
+    assert_equal(gr.format_commit("%B").strip(), "[DATALAD] Recorded changes")
+
+    # amend commit:
+    assert_equal(len(list(gr.get_branch_commits_())), 2)
+    last_sha = gr.get_hexsha()
+    with open(op.join(path, filename), 'w') as f:
+        f.write("changed again")
+    gr.add(filename)
+    gr.commit("amend message", options=to_options(amend=True))
+    assert_repo_status(gr)
+    assert_equal(gr.format_commit("%B").strip(), "amend message")
+    assert_not_equal(last_sha, gr.get_hexsha())
+    assert_equal(len(list(gr.get_branch_commits_())), 2)
+    # amend w/o message maintains previous one:
+    gr.commit(options=to_options(amend=True))
+    assert_repo_status(gr)
+    assert_equal(len(list(gr.get_branch_commits_())), 2)
+    assert_equal(gr.format_commit("%B").strip(), "amend message")
 
     # nothing to commit doesn't raise by default:
     gr.commit()

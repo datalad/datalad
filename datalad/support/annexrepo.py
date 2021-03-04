@@ -3261,12 +3261,61 @@ class AnnexRepo(GitRepo, RepoInterface):
                     if 'error-messages' in r else None,
                     logger=lgr)
 
-    def _save_post(self, message, status, partial_commit):
+    def _save_post(self, message, status, partial_commit,
+                   amend=False, allow_empty=False):
+
+        if amend and self.is_managed_branch() and \
+                self.format_commit("%B").strip() == "git-annex adjusted branch":
+            # We must not directly amend on an adjusted branch, but fix it
+            # up after the fact. That is if HEAD is a git-annex commit.
+            # Otherwise we still can amend-commit normally.
+            # Note, that this may involve creating an empty commit first.
+            amend = False
+            adjust_amend = True
+        else:
+            adjust_amend = False
+
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
-            message, status, partial_commit)
+            message, status, partial_commit, amend,
+            allow_empty=allow_empty or adjust_amend)
         # then sync potential managed branches
         self.localsync(managed_only=True)
+        if adjust_amend:
+            # We committed in an adjusted branch, but the goal is to amend in
+            # corresponding branch.
+
+            adjusted_branch = self.get_active_branch()
+            corresponding_branch = self.get_corresponding_branch()
+            old_sha = self.get_hexsha(corresponding_branch)
+
+            org_commit_pointer = corresponding_branch + "~1"
+            author_name, author_email, author_date, \
+            old_parent, old_message = self.format_commit(
+                "%an%x00%ae%x00%ad%x00%P%x00%B", org_commit_pointer).split('\0')
+            new_env = (self._git_runner.env
+                       if self._git_runner.env else os.environ).copy()
+            # `message` might be empty - we need to take it from the to be
+            # amended commit in that case:
+            msg = message or old_message
+            new_env.update({
+                'GIT_AUTHOR_NAME': author_name,
+                'GIT_AUTHOR_EMAIL': author_email,
+                'GIT_AUTHOR_DATE': author_date
+            })
+            commit_cmd = ["commit-tree",
+                          corresponding_branch + "^{tree}",
+                          "-m", msg]
+            if old_parent:
+                commit_cmd.extend(["-p", old_parent])
+            out, _ = self._call_git(commit_cmd, env=new_env, read_only=False)
+            new_sha = out.strip()
+
+            self.update_ref("refs/heads/" + corresponding_branch,
+                            new_sha, old_sha)
+            self.update_ref("refs/basis/" + adjusted_branch,
+                            new_sha, old_sha)
+            self.localsync(managed_only=True)
 
     def localsync(self, remote=None, managed_only=False):
         """Consolidate the local git-annex branch and/or managed branches.

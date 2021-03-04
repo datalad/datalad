@@ -33,8 +33,10 @@ from datalad.tests.utils import (
     known_failure_appveyor,
     known_failure_windows,
     maybe_adjust_repo,
+    neq_,
     OBSCURE_FILENAME,
     ok_,
+    patch,
     SkipTest,
     skip_wo_symlink_capability,
     swallow_outputs,
@@ -889,3 +891,148 @@ def test_save_diff_ignore_submodules_config(path):
     # Saving a subdataset doesn't fail when diff.ignoreSubmodules=all.
     ds.save()
     assert_repo_status(ds.path)
+
+
+@with_tree(tree={'somefile': 'file content',
+                 'subds': {'file_in_sub': 'other'}})
+def test_save_amend(dspath):
+
+    dspath = Path(dspath)
+    file_in_super = dspath / 'somefile'
+    file_in_sub = dspath / 'subds' / 'file_in_sub'
+
+    # test on a hierarchy including a plain git repo:
+    ds = Dataset(dspath).create(force=True, no_annex=True)
+    subds = ds.create('subds', force=True)
+    ds.save(recursive=True)
+    assert_repo_status(ds.repo)
+
+    # recursive and amend are mutually exclusive:
+    for d in (ds, subds):
+        assert_raises(ValueError, d.save, recursive=True, amend=True)
+
+    # in an annex repo the branch we are interested in might not be the active
+    # branch (adjusted):
+    sub_branch = subds.repo.get_corresponding_branch()
+
+    # amend in subdataset w/ new message; otherwise empty amendment:
+    last_sha = subds.repo.get_hexsha(sub_branch)
+    subds.save(message="new message in sub", amend=True)
+    # we did in fact commit something:
+    neq_(last_sha, subds.repo.get_hexsha(sub_branch))
+    # repo is clean:
+    assert_repo_status(subds.repo)
+    # message is correct:
+    eq_(subds.repo.format_commit("%B", sub_branch).strip(),
+        "new message in sub")
+    # actually replaced the previous commit:
+    assert_not_in(last_sha, subds.repo.get_branch_commits_(sub_branch))
+
+    # amend modifications in subdataset w/o new message
+    if not subds.repo.is_managed_branch():
+        subds.unlock('file_in_sub')
+    file_in_sub.write_text("modified again")
+    last_sha = subds.repo.get_hexsha(sub_branch)
+    subds.save(amend=True)
+    neq_(last_sha, subds.repo.get_hexsha(sub_branch))
+    assert_repo_status(subds.repo)
+    # message unchanged:
+    eq_(subds.repo.format_commit("%B", sub_branch).strip(),
+        "new message in sub")
+    # actually replaced the previous commit:
+    assert_not_in(last_sha, subds.repo.get_branch_commits_(sub_branch))
+
+    # save --amend with nothing to amend with:
+    res = subds.save(amend=True)
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, status='notneeded', action='save')
+
+    # amend in superdataset w/ new message; otherwise empty amendment:
+    last_sha = ds.repo.get_hexsha()
+    ds.save(message="new message in super", amend=True)
+    neq_(last_sha, ds.repo.get_hexsha())
+    assert_repo_status(subds.repo)
+    eq_(ds.repo.format_commit("%B").strip(), "new message in super")
+    assert_not_in(last_sha, ds.repo.get_branch_commits_())
+
+    # amend modifications in superdataset w/o new message
+    file_in_super.write_text("changed content")
+    if not subds.repo.is_managed_branch():
+        subds.unlock('file_in_sub')
+    file_in_sub.write_text("modified once again")
+    last_sha = ds.repo.get_hexsha()
+    last_sha_sub = subds.repo.get_hexsha(sub_branch)
+    ds.save(amend=True)
+    neq_(last_sha, ds.repo.get_hexsha())
+    eq_(ds.repo.format_commit("%B").strip(), "new message in super")
+    assert_not_in(last_sha, ds.repo.get_branch_commits_())
+    # we didn't mess with the subds:
+    assert_repo_status(ds.repo, modified=["subds"])
+    eq_(last_sha_sub, subds.repo.get_hexsha(sub_branch))
+    eq_(subds.repo.format_commit("%B", sub_branch).strip(),
+        "new message in sub")
+
+    # save --amend with nothing to amend with:
+    last_sha = ds.repo.get_hexsha()
+    res = ds.save(amend=True)
+    assert_result_count(res, 1)
+    assert_result_count(res, 1, status='notneeded', action='save')
+    eq_(last_sha, ds.repo.get_hexsha())
+    # we didn't mess with the subds:
+    assert_repo_status(ds.repo, modified=["subds"])
+    eq_(last_sha_sub, subds.repo.get_hexsha(sub_branch))
+    eq_(subds.repo.format_commit("%B", sub_branch).strip(),
+        "new message in sub")
+
+    # amend with different identity:
+    orig_author = ds.repo.format_commit("%an")
+    orig_email = ds.repo.format_commit("%ae")
+    orig_date = ds.repo.format_commit("%ad")
+    orig_committer = ds.repo.format_commit("%cn")
+    orig_committer_mail = ds.repo.format_commit("%ce")
+    eq_(orig_author, orig_committer)
+    eq_(orig_email, orig_committer_mail)
+    with patch.dict('os.environ',
+                    {'GIT_COMMITTER_NAME': 'Hopefully Different',
+                     'GIT_COMMITTER_EMAIL': 'hope.diff@example.com'}):
+
+        ds.config.reload(force=True)
+        ds.save(amend=True, message="amend with hope")
+    # author was kept:
+    eq_(orig_author, ds.repo.format_commit("%an"))
+    eq_(orig_email, ds.repo.format_commit("%ae"))
+    eq_(orig_date, ds.repo.format_commit("%ad"))
+    # comitter changed:
+    eq_(ds.repo.format_commit("%cn"), "Hopefully Different")
+    eq_(ds.repo.format_commit("%ce"), "hope.diff@example.com")
+
+    # corner case: amend empty commit with no parent:
+    rmtree(str(dspath))
+    # When adjusted branch is enforced by git-annex detecting a crippled FS,
+    # git-annex produces an empty commit before switching to adjusted branch:
+    # "commit before entering adjusted branch"
+    # The commit by `create` would be the second one already.
+    # Therefore go with plain annex repo and create an (empty) commit only when
+    # not on adjusted branch:
+    repo = AnnexRepo(dspath, create=True)
+    if not repo.is_managed_branch():
+        repo.commit(msg="initial", options=['--allow-empty'])
+    ds = Dataset(dspath)
+    branch = ds.repo.get_corresponding_branch() or ds.repo.get_active_branch()
+    # test pointless if we start with more than one commit
+    eq_(len(list(ds.repo.get_branch_commits_(branch))),
+        1,
+        msg="More than on commit '{}': {}".format(
+            branch, ds.repo.call_git(['log', branch]))
+        )
+    last_sha = ds.repo.get_hexsha(branch)
+
+    ds.save(message="new initial commit", amend=True)
+    assert_repo_status(ds.repo)
+    eq_(len(list(ds.repo.get_branch_commits_(branch))),
+        1,
+        msg="More than on commit '{}': {}".format(
+            branch, ds.repo.call_git(['log', branch]))
+        )
+    assert_not_in(last_sha, ds.repo.get_branch_commits_(branch))
+    eq_(ds.repo.format_commit("%B", branch).strip(), "new initial commit")
