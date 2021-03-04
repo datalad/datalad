@@ -148,6 +148,11 @@ def setup_package():
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
 
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    compute_cfg_defaults()
+    # datalad.locations.sockets has likely changed. Discard any cached values.
+    ssh_manager._socket_dir = None
+
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
     # But then haskell libraries do not digest empty value nicely, so we just
@@ -250,6 +255,10 @@ def teardown_package():
     # needed. However, maintaining a consistent state seems a good thing
     # either way.
     cfg.reload(force=True)
+
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    compute_cfg_defaults()
+    ssh_manager._socket_dir = None
 
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 

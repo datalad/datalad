@@ -17,6 +17,7 @@ from functools import partial
 from glob import glob
 import os
 import re
+import sys
 from os import mkdir
 from os.path import (
     join as opj,
@@ -49,6 +50,7 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.utils import (
     chpwd,
     get_linux_distribution,
+    quote_cmdlinearg,
     rmtree,
     unlink,
     Path,
@@ -1166,10 +1168,6 @@ def test_annex_ssh(topdir):
     remote_1_path = rm1.path
     remote_2_path = rm2.path
 
-    # Clear instances so that __init__() is invoked and
-    # _set_shared_connection() the next time AnnexRepo is called.
-    AnnexRepo._unique_instances.clear()
-
     from datalad import ssh_manager
 
     # check whether we are the first to use these sockets:
@@ -1187,12 +1185,8 @@ def test_annex_ssh(topdir):
     gr.add_remote("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
 
     ar = AnnexRepo(repo_path, create=False)
-    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
-    ok_(all(hash_2 not in opt for opt in ar._annex_common_options))
 
-    # connection to 'datalad-test' should be known to ssh manager:
-    assert_in(socket_1, list(map(str, ssh_manager._connections)))
-    # but socket was not touched:
+    # socket was not touched:
     if datalad_test_was_open:
         ok_(exists(socket_1))
     else:
@@ -1200,20 +1194,23 @@ def test_annex_ssh(topdir):
 
     # remote interaction causes socket to be created:
     (ar.pathobj / "foo").write_text("foo")
+    (ar.pathobj / "bar").write_text("bar")
     ar.add("foo")
-    ar.commit("add foo")
+    ar.add("bar")
+    ar.commit("add files")
 
     ar.copy_to(["foo"], remote="ssh-remote-1")
+    # copy_to() opens it if needed.
+    #
+    # Note: This isn't racy because datalad-sshrun should not close this itself
+    # because the connection was either already open before this test or
+    # copy_to(), not the underlying git-annex/datalad-sshrun call, opens it.
     ok_(exists(socket_1))
 
     # add another remote:
     ar.add_remote('ssh-remote-2', "ssh://datalad-test2" + remote_2_path)
 
-    # now, this connection was requested:
-    assert_in(socket_2, list(map(str, ssh_manager._connections)))
-    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
-    ok_(any(hash_2 in opt for opt in ar._annex_common_options))
-    # but socket was not touched:
+    # socket was not touched:
     if datalad_test2_was_open:
         # FIXME: occasionally(?) fails in V6:
         if not ar.supports_unlocked_pointers:
@@ -1222,11 +1219,20 @@ def test_annex_ssh(topdir):
         ok_(not exists(socket_2))
 
     # copy to the new remote:
+    #
+    # Same racy note as the copy_to() call above.
     ar.copy_to(["foo"], remote="ssh-remote-2")
 
     if not exists(socket_2):  # pragma: no cover
         # @known_failure (marked for grep)
         raise SkipTest("test_annex_ssh hit known failure (gh-4781)")
+
+    # Check that git-annex is actually using datalad-sshrun.
+    fail_cmd = quote_cmdlinearg(sys.executable) + "-c 'assert 0'"
+    with patch.dict('os.environ', {'GIT_SSH_COMMAND': fail_cmd}):
+        with assert_raises(CommandError):
+            ar.copy_to(["bar"], remote="ssh-remote-2")
+    ar.copy_to(["bar"], remote="ssh-remote-2")
 
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
