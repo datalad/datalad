@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     with_tempfile,
     eq_,
     known_failure_githubci_win,
+    known_failure_windows,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -66,14 +67,14 @@ def _test_save_all(path, repocls):
 
 
 @slow  # 11sec on travis
-@known_failure_githubci_win
+@known_failure_windows  # see gh-5462
 @with_tempfile
 def test_gitrepo_save_all(path):
     _test_save_all(path, GitRepo)
 
 
 @slow  # 11sec on travis
-@known_failure_githubci_win
+@known_failure_windows  # see gh-5462
 @with_tempfile
 def test_annexrepo_save_all(path):
     _test_save_all(path, AnnexRepo)
