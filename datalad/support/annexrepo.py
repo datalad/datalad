@@ -1972,7 +1972,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def sync(self, remotes=None, push=True, pull=True, commit=True,
              content=False, all=False, fast=False):
-        """Synchronize local repository with remotes
+        """This method is deprecated, use call_annex(['sync', ...]) instead.
+
+        Synchronize local repository with remotes
 
         Use  this  command  when you want to synchronize the local repository
         with one or more of its remotes. You can specify the remotes (or
