@@ -10,8 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
-
 import logging
 from functools import partial
 from glob import glob
