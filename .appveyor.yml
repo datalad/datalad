@@ -120,38 +120,40 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PY: 39-x64
 
-    - ID: MacP38a1
-      # ~45min
-      DTS: >
-          datalad.cmdline
-          datalad.customremotes
-          datalad.distribution
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-    - ID: MacP38a2
-      # ~25min
-      DTS: >
-          datalad.downloaders
-          datalad.interface
-          datalad.plugin
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
-    - ID: MacP38a3
-      # ~35min
-      DTS: >
-          datalad.local
-          datalad.distributed
-          datalad.support
-          datalad.tests
-          datalad.ui
-      APPVEYOR_BUILD_WORKER_IMAGE: macOS
-      PY: 3.8
-      INSTALL_GITANNEX: git-annex
-      DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    # Fail to even get instantiated and no logs - impossible to figure out a reason
+    # ref: https://github.com/datalad/datalad/issues/5467
+    #- ID: MacP38a1
+    #  # ~45min
+    #  DTS: >
+    #      datalad.cmdline
+    #      datalad.customremotes
+    #      datalad.distribution
+    #  APPVEYOR_BUILD_WORKER_IMAGE: macOS
+    #  PY: 3.8
+    #  INSTALL_GITANNEX: git-annex
+    #  DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    #- ID: MacP38a2
+    #  # ~25min
+    #  DTS: >
+    #      datalad.downloaders
+    #      datalad.interface
+    #      datalad.plugin
+    #  APPVEYOR_BUILD_WORKER_IMAGE: macOS
+    #  PY: 3.8
+    #  INSTALL_GITANNEX: git-annex
+    #  DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
+    #- ID: MacP38a3
+    #  # ~35min
+    #  DTS: >
+    #      datalad.local
+    #      datalad.distributed
+    #      datalad.support
+    #      datalad.tests
+    #      datalad.ui
+    #  APPVEYOR_BUILD_WORKER_IMAGE: macOS
+    #  PY: 3.8
+    #  INSTALL_GITANNEX: git-annex
+    #  DATALAD_LOCATIONS_SOCKETS: /Users/appveyor/DLTMP/sockets
 
     # Test alternative Python versions
     - ID: Ubu20P36
