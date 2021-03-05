@@ -323,9 +323,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           If persistent, would add/commit to .gitattributes. If not -- would
           set within .git/config
         """
-        # TODO: 'annex.backends' actually is a space separated list.
-        # Figure out, whether we want to allow for a list here or what to
-        # do, if there is sth in that setting already
         if persistent:
             # could be set in .gitattributes or $GIT_DIR/info/attributes
             if 'annex.backend' in self.get_gitattributes('.')['.']:
@@ -334,7 +331,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
-                self.config.set('annex.backends', backend, where='local')
                 git_attributes_file = '.gitattributes'
                 self.set_gitattributes(
                     [('*', {'annex.backend': backend})],
@@ -348,7 +344,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     )
         else:
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
-            self.config.set('annex.backends', backend, where='local')
+            self.config.set('annex.backend', backend, where='local')
 
     @classmethod
     def _cleanup(cls, path, batched):
@@ -2692,6 +2688,19 @@ class AnnexRepo(GitRepo, RepoInterface):
     @property
     def default_backends(self):
         self.config.reload()
+        # TODO: Deprecate and remove this property? It's used in the tests and
+        # datalad-crawler.
+        #
+        # git-annex used to try the list of backends in annex.backends in
+        # order. Now it takes annex.backend if set, falling back to the first
+        # value of annex.backends. See 4c1e3210f (annex.backend is the new name
+        # for what was annex.backends, 2017-05-09).
+        backend = self.get_gitattributes('.')['.'].get(
+            'annex.backend',
+            self.config.get("annex.backend", default=None))
+        if backend:
+            return [backend]
+
         backends = self.config.get("annex.backends", default=None)
         if backends:
             return backends.split()
