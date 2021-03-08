@@ -119,15 +119,17 @@ class Update(Interface):
             fast-forwards."""),
         follow=Parameter(
             args=("--follow",),
-            constraints=EnsureChoice("sibling", "parentds"),
+            constraints=EnsureChoice("sibling", "parentds", "parentds-lazy"),
             doc="""source of updates for subdatasets. For 'sibling', the update
             will be done by merging in a branch from the (specified or
             inferred) sibling. The branch brought in will either be the current
             branch's configured branch, if it points to a branch that belongs
             to the sibling, or a sibling branch with a name that matches the
             current branch. For 'parentds', the revision registered in the
-            parent dataset of the subdataset is merged in. Note that the
-            current dataset is always updated according to 'sibling'. This
+            parent dataset of the subdataset is merged in. 'parentds-lazy' is
+            like 'parentds', but prevents fetching from a subdataset's sibling
+            if the registered revision is present in the subdataset. Note that
+            the current dataset is always updated according to 'sibling'. This
             option has no effect unless a merge is requested and [CMD:
             --recursive CMD][PY: recursive=True PY] is specified.""", ),
         recursive=recursion_flag,
@@ -181,6 +183,18 @@ class Update(Interface):
             is_annex = isinstance(repo, AnnexRepo)
             # prepare return value
             res = get_status_dict('update', ds=ds, logger=lgr, refds=refds.path)
+
+            follow_parent = revision and follow.startswith("parentds")
+            follow_parent_lazy = revision and follow == "parentds-lazy"
+            if follow_parent_lazy and \
+               repo.get_hexsha(repo.get_corresponding_branch()) == revision:
+                res["message"] = (
+                    "Dataset already at commit registered in parent: %s",
+                    repo.path)
+                res["status"] = "notneeded"
+                yield res
+                continue
+
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
@@ -225,12 +239,12 @@ class Update(Interface):
                 # were removed in the origin clone
                 recurse_submodules="no",
                 prune=True)  # prune to not accumulate a mess over time
-            repo.fetch(**fetch_kwargs)
+            if not (follow_parent_lazy and repo.commit_exists(revision)):
+                repo.fetch(**fetch_kwargs)
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
             repo = ds.repo
 
-            follow_parent = revision and follow == "parentds"
             if follow_parent and not repo.commit_exists(revision):
                 if sibling_:
                     try:
