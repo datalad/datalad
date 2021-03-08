@@ -1073,7 +1073,7 @@ class RIARemote(SpecialRemote):
             raise RIARemoteError("Remote is treated as read-only. "
                                  "Set 'ora-remote.<name>.force-write=true' to "
                                  "overrule this.")
-        if isinstance(self.io, HTTPRemoteIO):
+        if isinstance(self.push_io, HTTPRemoteIO):
             raise RIARemoteError("Write access via HTTP not implemented")
 
     @property
