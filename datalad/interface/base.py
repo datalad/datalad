@@ -765,7 +765,7 @@ class Interface(object):
             # allow commands to override the default, unless something other than
             # default is requested
             kwargs['result_renderer'] = \
-                args.common_output_format if args.common_output_format != 'default' \
+                args.common_output_format if args.common_output_format != 'tailored' \
                 else getattr(cls, 'result_renderer', args.common_output_format)
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
