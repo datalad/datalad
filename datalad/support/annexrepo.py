@@ -2004,6 +2004,11 @@ class AnnexRepo(GitRepo, RepoInterface):
           Only sync with the remotes with the lowest annex-cost value
           configured
         """
+        import warnings
+        warnings.warn(
+            "AnnexRepo.sync() is deprecated, use call_annex(['sync', ...]) "
+            "instead.",
+            DeprecationWarning)
         args = []
         args.extend(to_options(push=push, no_push=not push,
                                # means: '--push' if push else '--no-push'
