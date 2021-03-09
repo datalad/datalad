@@ -30,7 +30,6 @@ from datalad.tests.utils import (
     DEFAULT_BRANCH,
     eq_,
     known_failure,
-    known_failure_appveyor,
     known_failure_windows,
     maybe_adjust_repo,
     neq_,
@@ -66,9 +65,6 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'dir2': {'testindir3': 'someother3'}})
 
 
-# https://ci.appveyor.com/project/mih/datalad/builds/29840270/job/oya0cs55nwtoga4p
-# # (The system cannot find the path specified.)
-@known_failure_appveyor
 @with_testrepos('.*git.*', flavors=['clone'])
 def test_save(path):
 
@@ -495,9 +491,6 @@ def test_add_mimetypes(path):
             assert_not_in('key', annexinfo[p], p)
 
 
-@known_failure_appveyor
-# ^ Issue only happens on appveyor, Python itself implodes. Cannot be
-#   reproduced on a real windows box.
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
     ds = Dataset(path).create()

@@ -69,7 +69,6 @@ from datalad.tests.utils import (
     assert_not_in_results,
     swallow_logs,
     swallow_outputs,
-    known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
     slow,
@@ -608,10 +607,12 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
-@known_failure_githubci_win
-@known_failure_appveyor
+@known_failure_windows
 # ^ Issue only happens on appveyor, Python itself implodes. Cannot be
 #   reproduced on a real win7 box
+# Comment above looks outdated. Last trial on Appveyor failed, but seems related
+# to unresolved globs:
+# https://ci.appveyor.com/project/mih/datalad/builds/37951288/job/yxx47i3vtola2wek
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",

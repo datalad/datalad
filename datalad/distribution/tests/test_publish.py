@@ -46,7 +46,6 @@ from datalad.tests.utils import (
     create_tree,
     DEFAULT_BRANCH,
     eq_,
-    known_failure_appveyor,
     known_failure_windows,
     neq_,
     ok_,

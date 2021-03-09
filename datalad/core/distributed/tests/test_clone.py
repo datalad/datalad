@@ -54,7 +54,6 @@ from datalad.tests.utils import (
     get_datasets_topdir,
     integration,
     known_failure,
-    known_failure_appveyor,
     known_failure_githubci_win,
     known_failure_windows,
     neq_,
@@ -141,7 +140,6 @@ def test_clone_crcns(tdir, ds_path):
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
-@known_failure_appveyor
 @integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -499,8 +497,6 @@ def test_clone_report_permission_issue(tdir):
         )
 
 
-# Started to hang on appveyor.
-@known_failure_appveyor  #FIXME - hangs
 @skip_if_no_network
 @with_tempfile
 def test_autoenabled_remote_msg(path):
