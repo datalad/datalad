@@ -401,7 +401,9 @@ def _annex_plain_merge(repo, _, target, merge_opts=None):
 
 
 def _annex_sync(repo, remote, _target, merge_opts=None):
-    repo.sync(remotes=remote, push=False, pull=True, commit=False)
+    repo.call_annex(
+        ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote]
+    )
     return []
 
 
