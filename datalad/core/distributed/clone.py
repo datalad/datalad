@@ -308,6 +308,10 @@ class Clone(Interface):
             # -> make submodule
             for r in ds.save(
                     path,
+                    # Note, that here we know we don't save anything but a new
+                    # subdataset. Hence, don't go with default commit message,
+                    # but be more specific.
+                    message="[DATALAD] Added subdataset",
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
