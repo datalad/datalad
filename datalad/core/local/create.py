@@ -516,13 +516,3 @@ class Create(Interface):
 
         res.update({'status': 'ok'})
         yield res
-
-    @staticmethod
-    def custom_result_renderer(res, **kwargs):  # pragma: more cover
-        from datalad.ui import ui
-        if res.get('action', None) == 'create' and \
-                res.get('status', None) == 'ok' and \
-                res.get('type', None) == 'dataset':
-            ui.message("Created dataset at {}.".format(res['path']))
-        else:
-            ui.message("Nothing was created")
