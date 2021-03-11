@@ -288,12 +288,14 @@ test_script:
 
 
 after_test:
-  # prepare coverage.xml in a separate invocation.
-  # if invoked directly with nose - do not include test_ files themselves
-  - python -m coverage xml
-  - cmd: powershell Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
-  - cmd: "set PATH=C:\\msys64\\usr\\bin;%PATH%"
-  - cmd: bash codecov.sh -f "coverage.xml" -U "-s" -A "-s" 
+  # move coverage into the project dir to make default handling applicable
+  - cmd: move .coverage ..
+  - sh: mv .coverage ..
+  - cd ..
+  # use windows codecov uploader package
+  - cmd: choco install codecov
+  - cmd: python -m coverage xml
+  - cmd: codecov -f coverage.xml
   - sh: bash <(curl -sfS https://codecov.io/bash)
 
 
