@@ -48,7 +48,7 @@ class Keyring(object):
     def get(self, name, field):
         # consult environment, might be provided there and should take precedence
         env_var = ('DATALAD_%s_%s' % (name, field)).replace('-', '_')
-        lgr.log(5, 'Credentials lookup attempt %s', env_var)
+        lgr.log(5, 'Credentials lookup attempt via env var %s', env_var)
         if env_var in os.environ:
             return os.environ[env_var]
         return self._keyring.get_password(self._get_service_name(name), field)
