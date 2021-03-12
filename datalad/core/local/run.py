@@ -395,6 +395,9 @@ def _unlock_or_remove(dset_path, paths):
 
     if existing:
         remove = Remove()
+        # Note: If Unlock() is given a directory (including a subdataset) as a
+        # path, files without content present won't be reported, so those cases
+        # aren't being covered by the "remove if not present" logic below.
         for res in Unlock()(dataset=dset_path, path=existing,
                             on_failure="ignore"):
             if res["status"] == "impossible":
