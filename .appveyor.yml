@@ -70,7 +70,7 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -160,14 +160,14 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     - ID: Ubu20P37
       PY: 3.7
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
 
 matrix:
   allow_failures:
