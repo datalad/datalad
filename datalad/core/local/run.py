@@ -412,10 +412,10 @@ def _unlock_or_remove(dset_path, paths):
             try:
                 os.unlink(res["path"])
             except OSError as exc:
-                yield dict(res, action="run-remove", status="error",
+                yield dict(res, action="run.remove", status="error",
                            message=("Removing file failed: %s", exc_str(exc)))
             else:
-                yield dict(res, action="run-remove", status="ok",
+                yield dict(res, action="run.remove", status="ok",
                            message="Removed file")
 
 

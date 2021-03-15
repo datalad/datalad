@@ -566,7 +566,7 @@ def test_run_remove_keeps_leading_directory(path):
     assert_in_results(
         ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
                result_renderer=None),
-        action="run-remove", status="ok")
+        action="run.remove", status="ok")
 
     assert_repo_status(ds.path)
 
@@ -576,5 +576,5 @@ def test_run_remove_keeps_leading_directory(path):
     assert_in_results(
         ds.run("cd .> something-else", outputs=[output_rel],
                result_renderer=None),
-        action="run-remove", status="ok")
+        action="run.remove", status="ok")
     assert_repo_status(ds.path)
