@@ -423,7 +423,11 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ]
         self.ctrl_path = Path(ctrl_path)
         self._opened_by_us = False
-        self._lock = threading.Lock()
+        # used by @fasteners.locked
+        self._lock = [
+            threading.Lock(),
+            fasteners.process_lock.InterProcessLock(self.ctrl_path.with_suffix('.lck'))
+        ]
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
@@ -520,12 +524,6 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ------
         ConnectionOpenFailedError
           When starting the SSH ControlMaster process failed.
-        """
-        with fasteners.process_lock.InterProcessLock(self.ctrl_path.with_suffix('.lck')):
-            return self._open()
-
-    def _open(self):
-        """The actual body of 'open' but without any locking primitives
         """
         # the socket should vanish almost instantly when the connection closes
         # sending explicit 'check' commands to the control master is expensive
