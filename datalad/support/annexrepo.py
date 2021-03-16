@@ -3460,7 +3460,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                         break
                     # TODO turn this into an error result, or put the exception
                     # onto the result future -- needs more thought
-                    lgr.error('Received undecodable JSON output: %s', data)
+                    lgr.error('Received undecodable JSON output: %s', line)
                 continue
             self._proc_json_record(j)
 
