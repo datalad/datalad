@@ -16,6 +16,7 @@ import json
 import warnings
 
 from argparse import REMAINDER
+import os
 import os.path as op
 from os.path import join as opj
 from os.path import normpath
@@ -25,7 +26,7 @@ from tempfile import mkdtemp
 from datalad.core.local.save import Save
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
-from datalad.distribution.remove import Remove
+from datalad.dochelpers import exc_str
 from datalad.interface.unlock import Unlock
 
 from datalad.interface.base import Interface
@@ -394,17 +395,28 @@ def _unlock_or_remove(dset_path, paths):
             lgr.debug("Filtered out non-existing path: %s", path)
 
     if existing:
-        remove = Remove()
+        notpresent_results = []
+        # Note: If Unlock() is given a directory (including a subdataset) as a
+        # path, files without content present won't be reported, so those cases
+        # aren't being covered by the "remove if not present" logic below.
         for res in Unlock()(dataset=dset_path, path=existing,
                             on_failure="ignore"):
-            if res["status"] == "impossible":
-                if "cannot unlock" in res["message"]:
-                    for rem_res in remove(dataset=dset_path,
-                                          path=res["path"],
-                                          check=False, save=False):
-                        yield rem_res
-                    continue
+            if res["status"] == "impossible" and res["type"] == "file" \
+               and "cannot unlock" in res["message"]:
+                notpresent_results.append(res)
+                continue
             yield res
+        # Avoid `datalad remove` because it calls git-rm underneath, which will
+        # remove leading directories if no other files remain. See gh-5486.
+        for res in notpresent_results:
+            try:
+                os.unlink(res["path"])
+            except OSError as exc:
+                yield dict(res, action="run.remove", status="error",
+                           message=("Removing file failed: %s", exc_str(exc)))
+            else:
+                yield dict(res, action="run.remove", status="ok",
+                           message="Removed file")
 
 
 def normalize_command(command):

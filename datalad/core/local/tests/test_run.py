@@ -548,3 +548,33 @@ def test_run_path_semantics(path):
         run("cd .> five", dataset=ds0)
     ok_exists(op.join(ds0.path, "five"))
     assert_repo_status(ds0.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_remove_keeps_leading_directory(path):
+    ds = Dataset(op.join(path, "ds")).create()
+    repo = ds.repo
+
+    (ds.pathobj / "d").mkdir()
+    output = (ds.pathobj / "d" / "foo")
+    output.write_text("foo")
+    ds.save()
+
+    output_rel = str(output.relative_to(ds.pathobj))
+    repo.drop(output_rel, options=["--force"])
+
+    assert_in_results(
+        ds.run("cd .> {}".format(output_rel), outputs=[output_rel],
+               result_renderer=None),
+        action="run.remove", status="ok")
+
+    assert_repo_status(ds.path)
+
+    # Remove still gets saved() if command doesn't generate the output (just as
+    # it would if git-rm were used instead of unlink).
+    repo.drop(output_rel, options=["--force"])
+    assert_in_results(
+        ds.run("cd .> something-else", outputs=[output_rel],
+               result_renderer=None),
+        action="run.remove", status="ok")
+    assert_repo_status(ds.path)
