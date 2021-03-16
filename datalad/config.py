@@ -11,6 +11,7 @@
 
 from collections import namedtuple
 
+import json
 import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
@@ -121,11 +122,19 @@ def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
 
 
 def _update_from_env(store):
+    overrides = {}
     dct = {}
     for k in os.environ:
-        if not k.startswith('DATALAD_'):
-            continue
-        dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
+        if k == "DATALAD_CONFIG_OVERRIDES":
+            try:
+                overrides = json.loads(os.environ[k])
+            except json.decoder.JSONDecodeError as exc:
+                lgr.warning("Failed to load DATALAD_CONFIG_OVERRIDES: %s",
+                            exc)
+        elif k.startswith('DATALAD_'):
+            dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
+    if overrides:
+        store.update(overrides)
     store.update(dct)
 
 

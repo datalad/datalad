@@ -25,6 +25,12 @@ replacing any ``__`` (two underscores) with a hyphen, then any ``_``
 lower case. Values from environment variables take precedence over
 configuration file settings.
 
+In addition, the ``DATALAD_CONFIG_OVERRIDES`` environment variable can
+be set to a JSON record with configuration values.  This is
+particularly useful for options that aren't accessible through the
+naming scheme described above (e.g., an option name that includes an
+underscore).
+
 The following sections provide a (non-exhaustive) list of settings honored
 by datalad. They are categorized according to the scope they are typically
 associated with.
