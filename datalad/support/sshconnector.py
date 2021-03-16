@@ -423,7 +423,11 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ]
         self.ctrl_path = Path(ctrl_path)
         self._opened_by_us = False
-        self._lock = threading.Lock()
+        # used by @fasteners.locked
+        self._lock = [
+            threading.Lock(),
+            fasteners.process_lock.InterProcessLock(self.ctrl_path.with_suffix('.lck'))
+        ]
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
