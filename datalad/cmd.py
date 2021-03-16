@@ -81,8 +81,6 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
       The nature of the return value is determined by the given
       protocol class.
     """
-    lgr.debug('Async run %s', cmd)
-
     if protocol_kwargs is None:
         protocol_kwargs = {}
     cmd_done = asyncio.Future(loop=loop)
@@ -376,6 +374,7 @@ class WitlessRunner(object):
             event_loop = self._get_new_event_loop()
             new_loop = True
         try:
+            lgr.debug('Async run:\n cwd=%s\n cmd=%s', cwd, cmd)
             # include the subprocess manager in the asyncio event loop
             results = event_loop.run_until_complete(
                 run_async_cmd(
