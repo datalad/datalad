@@ -10,13 +10,16 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
-
+import gc
+import json
 import logging
+import os
+import random
+import re
+import sys
+
 from functools import partial
 from glob import glob
-import os
-import re
 from os import mkdir
 from os.path import (
     join as opj,
@@ -27,14 +30,16 @@ from os.path import (
     exists,
 )
 from shutil import copyfile
-from datalad.tests.utils import assert_not_is_instance
-
 
 from urllib.parse import urljoin
 from urllib.parse import urlsplit
 
 from unittest.mock import patch
-import gc
+
+from datalad import (
+    cfg as dl_cfg,
+    _seed,
+)
 
 from datalad.cmd import (
     GitWitlessRunner,
@@ -62,6 +67,7 @@ from datalad.tests.utils import (
     assert_is_instance,
     assert_not_equal,
     assert_not_in,
+    assert_not_is_instance,
     assert_raises,
     assert_re_in,
     assert_repo_status,
@@ -114,7 +120,6 @@ from datalad.support.exceptions import (
 )
 
 from datalad.support.gitrepo import GitRepo
-from datalad import cfg as dl_cfg
 
 # imports from same module:
 from datalad.support.annexrepo import (
@@ -2193,6 +2198,60 @@ def test_annexjson_protocol(path):
     # hence also no pointless statement in the str()
     assert_not_in('errors from JSON records', str(e.exception))
 
+
+@with_tempfile
+def test_annexjson_protocol_long(path):
+    # Inform about the seed here and use dedicated RNG so we are not
+    # effected by any other use of random before this test
+    seed = _seed if _seed is not None else random.randint(0, 1000)
+    # Inform for ease of debugging.
+    # TODO: if other test like this appears, craft @with_rng helper
+    print("RNG seed: %s" % seed)
+    rng = random.Random(seed)
+    records = [
+        {('field%d' % f): ("a" * rng.randint(0, 5000))
+             for f in range(rng.randint(1, 100))
+         }
+        for i in range(10)
+    ]
+    with open(path, 'w') as f:
+        for record in records:
+            print("print(%r);" % json.dumps(record), file=f)
+    runner = GitWitlessRunner()
+    res = runner.run(
+        [sys.executable, path],
+        protocol=AnnexJsonProtocol
+    )
+    eq_(res['stdout'], '')
+    eq_(res['stderr'], '')
+    eq_(res['stdout_json'], records)
+
+
+def test_annexjson_protocol_incorrect():
+    yield check_annexjson_protocol_incorrect, ''
+    yield check_annexjson_protocol_incorrect, ', end=""'
+
+
+@with_tempfile
+def check_annexjson_protocol_incorrect(print_opt, path):
+    # Test that we still log some incorrectly formed JSON record
+    bad_json = '{"I": "am wrong,}'
+    with open(path, 'w') as f:
+        print("print(%r%s);" % (bad_json, print_opt), file=f)
+    runner = GitWitlessRunner()
+    with swallow_logs(new_level=logging.ERROR) as cml:
+        res = runner.run(
+            [sys.executable, path],
+            protocol=AnnexJsonProtocol
+        )
+        cml.assert_logged(
+            msg=".*[rR]eceived undecodable JSON output",
+            level="ERROR",
+            regex=True)
+    # only error logged and nothing returned
+    eq_(res['stdout'], '')
+    eq_(res['stderr'], '')
+    eq_(res['stdout_json'], [])
 
 # see https://github.com/datalad/datalad/pull/5400 for troubleshooting
 # for stalling with unlock=False, and then with unlock=True it took >= 300 sec
