@@ -3410,7 +3410,7 @@ class AnnexJsonProtocol(WitlessProtocol):
         super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
-        self._remainder = None
+        self._unprocessed = None
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -3436,9 +3436,9 @@ class AnnexJsonProtocol(WitlessProtocol):
             # let the base class decide what to do with it
             super().pipe_data_received(fd, data)
             return
-        if self._remainder:
-            data = self._remainder + data
-            self._remainder = None
+        if self._unprocessed:
+            data = self._unprocessed + data
+            self._unprocessed = None
         # this is where the JSON records come in
         # json_loads() is already logging any error, which is OK, because
         # under no circumstances we would expect broken JSON
@@ -3456,7 +3456,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                         # to happen that it was not a complete line and that buffer
                         # got filled up/provided before the end of line.
                         # So - memoize it and pass to the next call
-                        self._remainder = line
+                        self._unprocessed = line
                         break
                     # TODO turn this into an error result, or put the exception
                     # onto the result future -- needs more thought
@@ -3594,10 +3594,10 @@ class AnnexJsonProtocol(WitlessProtocol):
                 'Finished',
                 noninteractive_level=5,
             )
-        if self._remainder:
+        if self._unprocessed:
             lgr.error(
                 "%d bytes of received undecodable JSON output remain: %s",
-                len(self._remainder), self._remainder
+                len(self._unprocessed), self._unprocessed
             )
         super().process_exited()
 
