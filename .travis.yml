@@ -131,7 +131,7 @@ matrix:
   - if: type = cron
     python: 3.6
     env:
-    - _DL_ANNEX_INSTALL_SCENARIO="git-annex -m deb-url --url http://snapshot-neuro.debian.net/archive/neurodebian/20190710T050502Z/pool/main/g/git-annex/git-annex-standalone_7.20190708%2Bgit9-gfa3524b95-1~ndall%2B1_amd64.deb"
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20200309 -m conda"
   # Run with git's master branch rather the default one on the system.
   - if: type = cron
     python: 3.6
