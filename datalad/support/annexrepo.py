@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import warnings
 
 from itertools import chain
 from os import linesep
@@ -503,9 +504,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         bool
         """
         if cls.supports_direct_mode is None:
-            if cls.git_annex_version is None:
-                cls._check_git_annex_version()
-            cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
+            warnings.warn(
+                "DataLad's minimum git-annex version is above 7.20190912, "
+                "the last version to support direct mode. "
+                "The check_direct_mode_support method "
+                "and supports_direct_mode attribute will be removed "
+                "in an upcoming release.",
+                DeprecationWarning)
+            cls.supports_direct_mode = False
         return cls.supports_direct_mode
 
     @classmethod
