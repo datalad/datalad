@@ -3455,7 +3455,7 @@ class AnnexJsonProtocol(WitlessProtocol):
                         # it is the last line and fails to parse -- it can/likely
                         # to happen that it was not a complete line and that buffer
                         # got filled up/provided before the end of line.
-                        # So - memoize it and pass to the next call
+                        # Store it so that it can be prepended to data in the next call.
                         self._unprocessed = line
                         break
                     # TODO turn this into an error result, or put the exception
