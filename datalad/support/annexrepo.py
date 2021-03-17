@@ -1282,8 +1282,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self.config.getint("annex", "version") >= 6
         except KeyError:
             # If annex.version isn't set (e.g., an uninitialized repo), assume
-            # that unlocked pointers aren't supported.
-            return False
+            # that unlocked pointers are supported given that they are with the
+            # minimum git-annex version.
+            return True
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
