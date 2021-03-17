@@ -324,7 +324,7 @@ def test_AnnexRepo_file_has_content(batch, src, annex_path):
 
     ar.unlock(["test-annex.dat"])
     eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-        [ar.supports_unlocked_pointers])
+        [True])
     with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
         ofh.write("more")
     eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
@@ -362,7 +362,7 @@ def test_AnnexRepo_is_under_annex(batch, src, annex_path):
 
     ar.unlock(["test-annex.dat"])
     eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-        [ar.supports_unlocked_pointers])
+        [True])
     with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
         ofh.write("more")
     eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
@@ -1218,8 +1218,8 @@ def test_annex_ssh(topdir):
     # socket was not touched:
     if datalad_test2_was_open:
         # FIXME: occasionally(?) fails in V6:
-        if not ar.supports_unlocked_pointers:
-            ok_(exists(socket_2))
+        # ok_(exists(socket_2))
+        pass
     else:
         ok_(not exists(socket_2))
 
@@ -2037,13 +2037,12 @@ def test_AnnexRepo_get_corresponding_branch(src_path, path):
         ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
-    if ar.supports_unlocked_pointers:
-        ar.adjust()
-        # as above, we still want to get the default branch, while being on
-        # 'adjusted/<default branch>(unlocked)'
-        eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
-            ar.get_active_branch())
-        eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
+    ar.adjust()
+    # as above, we still want to get the default branch, while being on
+    # 'adjusted/<default branch>(unlocked)'
+    eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
+        ar.get_active_branch())
+    eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
 @with_tempfile
@@ -2066,9 +2065,8 @@ def test_AnnexRepo_is_managed_branch(path):
     (ar.pathobj / 'test-annex.dat').write_text("content")
     ar.save('some')
 
-    if ar.supports_unlocked_pointers:
-        ar.adjust()
-        ok_(ar.is_managed_branch())
+    ar.adjust()
+    ok_(ar.is_managed_branch())
 
 
 @with_tempfile(mkdir=True)

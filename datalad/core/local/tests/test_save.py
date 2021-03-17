@@ -664,15 +664,8 @@ def test_save_partial_commit_shrinking_annex(path):
     # with git-annex's partial index error, but save (or more specifically
     # GitRepo.save_) drops the pathspec if there are no staged changes.
     ds.repo.add("staged", git=True)
-    if ds.repo.supports_unlocked_pointers:
-        ds.save(path="foo")
-        assert_repo_status(ds.path, added=["staged"])
-    else:
-        # Unlike the obsolete interface.save, save doesn't handle a partial
-        # commit if there were other staged changes.
-        with assert_raises(CommandError) as cm:
-            ds.save(path="foo")
-        assert_in("partial commit", str(cm.exception))
+    ds.save(path="foo")
+    assert_repo_status(ds.path, added=["staged"])
 
 
 @with_tempfile()
