@@ -1836,8 +1836,7 @@ def test_AnnexRepo_dirty(path):
     # modify to be the same
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    if not repo.supports_unlocked_pointers:
-        ok_(not repo.dirty)
+    ok_(not repo.dirty)
     # modified file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('something else')
