@@ -552,13 +552,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         if cls.git_annex_version is None:
             cls._check_git_annex_version()
 
-        ver = cls.git_annex_version
-        if ver >= "7.20200202.7":
-            kludges["force-large"] = ["--force-large"]
-        else:
-            kludges["force-large"] = ["-c", "annex.largefiles=anything"]
-
-        kludges["has-include-dotfiles"] = ver < "8"
+        # NOTE: All the kludges that were here have been removed with the
+        # latest GIT_ANNEX_MIN_VERSION increase. This method is being kept
+        # around for future kludges, but it's safe to drop.
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -1569,7 +1565,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # if None -- leave it to annex to decide
         if git is False:
-            options.extend(self._check_version_kludges("force-large"))
+            options.append("--force-large")
 
         if git:
             # explicitly use git-add with --update instead of git-annex-add
@@ -3232,11 +3228,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Annex repos to decide on the behavior on a case-by-case
         # basis
         options = []
-        if self._check_version_kludges("has-include-dotfiles"):
-            options.append('--include-dotfiles')
         # if None -- leave it to annex to decide
         if git is False:
-            options.extend(self._check_version_kludges("force-large"))
+            options.append("--force-large")
         if on_windows:
             # git-annex ignores symlinks on windows
             # https://github.com/datalad/datalad/issues/2955
