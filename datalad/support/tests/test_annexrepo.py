@@ -2201,18 +2201,15 @@ def test_annexjson_protocol(path):
 
 @with_tempfile
 def test_annexjson_protocol_long(path):
-    # Inform about the seed here and use dedicated RNG so we are not
-    # effected by any other use of random before this test
-    seed = _seed if _seed is not None else random.randint(0, 1000)
-    # Inform for ease of debugging.
-    # TODO: if other test like this appears, craft @with_rng helper
-    print("RNG seed: %s" % seed)
-    rng = random.Random(seed)
     records = [
-        {('field%d' % f): ("a" * rng.randint(0, 5000))
-             for f in range(rng.randint(1, 100))
-         }
-        for i in range(10)
+        {"k": "v" * 20},
+        # Value based off of
+        # Lib.asyncio.unix_events._UnixReadPipeTransport.max_size.
+        {"k": "v" * 256 * 1024},
+        # and tiny ones in between should not be lost
+        {"k": "v"},
+        # even a much larger one - we should handle as well
+        {"k": "v" * 256 * 1024 * 5},
     ]
     with open(path, 'w') as f:
         for record in records:
