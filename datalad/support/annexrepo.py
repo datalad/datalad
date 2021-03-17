@@ -3410,6 +3410,7 @@ class AnnexJsonProtocol(WitlessProtocol):
         super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
+        self._unprocessed = None
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -3435,18 +3436,31 @@ class AnnexJsonProtocol(WitlessProtocol):
             # let the base class decide what to do with it
             super().pipe_data_received(fd, data)
             return
+        if self._unprocessed:
+            data = self._unprocessed + data
+            self._unprocessed = None
         # this is where the JSON records come in
         # json_loads() is already logging any error, which is OK, because
         # under no circumstances we would expect broken JSON
-        for line in data.splitlines():
+        lines = data.splitlines()
+        for iline, line in enumerate(lines):
             try:
                 j = json_loads(line)
-            except Exception:
-                # TODO turn this into an error result, or put the exception
-                # onto the result future -- needs more thought
+            except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
-                    lgr.error('Received undecodable JSON output: %s', data)
+                    if iline == len(lines) - 1 and not data.endswith(os.linesep.encode()):
+                        lgr.debug("Caught %s while trying to parse JSON line %s which might "
+                                  "be not yet a full line", exc, line)
+                        # it is the last line and fails to parse -- it can/likely
+                        # to happen that it was not a complete line and that buffer
+                        # got filled up/provided before the end of line.
+                        # Store it so that it can be prepended to data in the next call.
+                        self._unprocessed = line
+                        break
+                    # TODO turn this into an error result, or put the exception
+                    # onto the result future -- needs more thought
+                    lgr.error('Received undecodable JSON output: %s', line)
                 continue
             self._proc_json_record(j)
 
@@ -3579,6 +3593,11 @@ class AnnexJsonProtocol(WitlessProtocol):
                 pbar_id,
                 'Finished',
                 noninteractive_level=5,
+            )
+        if self._unprocessed:
+            lgr.error(
+                "%d bytes of received undecodable JSON output remain: %s",
+                len(self._unprocessed), self._unprocessed
             )
         super().process_exited()
 
