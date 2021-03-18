@@ -1801,8 +1801,10 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     filename = str(filename)
 
     if __debug__:
-        # TODO mkdir
-        lgr.debug('Created temporary thing named %s"', filename)
+        lgr.debug(
+            'Created temporary %s named %s',
+            'directory' if mkdir else 'file',
+            filename)
     try:
         yield filename
     finally:
