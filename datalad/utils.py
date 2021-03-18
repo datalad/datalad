@@ -19,6 +19,7 @@ import shutil
 import os
 import sys
 import tempfile
+from tempfile import NamedTemporaryFile
 import platform
 import gc
 import glob
@@ -1219,8 +1220,8 @@ def swallow_outputs():
         def __init__(self):
             kw = get_tempfile_kwargs({}, prefix="outputs")
 
-            self._out = open(tempfile.mktemp(**kw), 'w')
-            self._err = open(tempfile.mktemp(**kw), 'w')
+            self._out = NamedTemporaryFile(delete=False, mode='w', **kw)
+            self._err = NamedTemporaryFile(delete=False, mode='w', **kw)
 
         def _read(self, h):
             with open(h.name) as f:
