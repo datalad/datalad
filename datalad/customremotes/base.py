@@ -375,10 +375,10 @@ class AnnexCustomRemote(object):
     def req_CLAIMURL(self, url):
         scheme = urlparse(url).scheme
         if scheme in self.SUPPORTED_SCHEMES:
-            self.debug("Claiming url %r", url)
+            self.debug("Claiming url %r" % url)
             self.send("CLAIMURL-SUCCESS")
         else:
-            self.debug("Not claiming url %s", url)
+            self.debug("Not claiming url %s" % url)
             self.send("CLAIMURL-FAILURE")
 
     # TODO: we should unify what to be overriden and some will provide CHECKURL
@@ -390,7 +390,7 @@ class AnnexCustomRemote(object):
                 self._transfer(cmd, key, file)
             except Exception as exc:
                 self.send(
-                    "TRANSFER-FAILURE %s %s %s", cmd, key, exc_str(exc)
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc_str(exc))
                 )
         else:
             self.send_unsupported(
