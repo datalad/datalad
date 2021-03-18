@@ -43,6 +43,7 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.parallel import (
+    ProducerConsumer,
     ProducerConsumerProgressLog,
     no_parentds_in_futures,
     no_subds_in_futures,
@@ -235,21 +236,22 @@ class ForEach(Interface):
                 status_rec['message'] = exc_str(exc)
             yield status_rec
 
-        yield from ProducerConsumerProgressLog(
-            datasets_it,
-            run_cmd,
+        if passthrough:
+            pc_class = ProducerConsumer
+            pc_kw = {}
+        else:
+            pc_class = ProducerConsumerProgressLog
+            pc_kw = dict(lgr=lgr, label="foreach", unit="datasets")
+
+        yield from pc_class(
+            producer=datasets_it,
+            consumer=run_cmd,
             # probably not needed
             # It is ok to start with subdatasets since top dataset already exists
             safe_to_consume=no_subds_in_futures if bottomup else no_parentds_in_futures,
             # or vise versa
-            label="foreach",
-            unit="datasets",
             jobs=jobs,
-            # TODO: regardless of either we provide lgr or not, we get progress bar.
-            # But in "passthrough" mode output is likely to interfere.  So ideally we should
-            # completely disable progress logging, and for that we should improve
-            # ProducerConsumerProgressLog to allow for that
-            lgr=lgr
+            **pc_kw
         )
 
 
