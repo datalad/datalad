@@ -105,8 +105,15 @@ def test_parse_gitconfig_dump():
     parsed, files = parse_gitconfig_dump(gitcfg_dump_w_origin, cwd='ROOT')
     assert_equal(
         files,
+        # the 'command line:' origin is ignored
         set((Path('ROOT/.git/config'), Path('/home/me/.gitconfig'))))
-    # important
+    assert_equal(gitcfg_parsetarget, parsed)
+
+    # now contaminate the output with a prepended error message
+    # https://github.com/datalad/datalad/issues/5502
+    # must work, but really needs the trailing newline
+    parsed, files = parse_gitconfig_dump(
+        "unfortunate stdout\non more lines\n" + gitcfg_dump_w_origin)
     assert_equal(gitcfg_parsetarget, parsed)
 
 
