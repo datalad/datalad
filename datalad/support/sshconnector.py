@@ -482,7 +482,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             return False
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
-        lgr.debug("Checking %s by calling %s" % (self, cmd))
+        lgr.debug("Checking %s by calling %s", self, cmd)
         try:
             # expect_stderr since ssh would announce to stderr
             # "Master is running" and that is normal, not worthy warning about
@@ -791,7 +791,7 @@ class MultiplexSSHManager(BaseSSHManager):
                         and (not ctrl_paths
                              or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
-                lgr.debug("Closing %d SSH connections..." % len(to_close))
+                lgr.debug("Closing %d SSH connections...", len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:

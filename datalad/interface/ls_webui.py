@@ -314,7 +314,7 @@ def fs_traverse(path, repo, parent=None,
         fs['nodes'] = children          # add children info to main fs dictionary
         if render:                      # render directory node at location(path)
             fs_render(fs, json=json, ds_path=basepath or path)
-            lgr.info('Directory: %s' % path)
+            lgr.info('Directory: %s', path)
 
     return fs
 
@@ -374,7 +374,7 @@ def ds_traverse(rootds, parent=None, json=None,
         time.localtime(getmtime(index_file))) if exists(index_file) else ''
 
     # render current dataset
-    lgr.info('Dataset: %s' % rootds.path)
+    lgr.info('Dataset: %s', rootds.path)
     fs_render(fs, json=json, ds_path=rootds.path)
     return fs
 

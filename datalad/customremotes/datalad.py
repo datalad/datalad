@@ -71,7 +71,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             resp = ["CHECKURL-CONTENTS", size] \
                 + ([status.filename] if status.filename else [])
         except Exception as exc:
-            self.debug("Failed to check url %s: %s" % (url, exc_str(exc)))
+            self.debug("Failed to check url %s: %s", url, exc_str(exc))
             resp = ["CHECKURL-FAILURE"]
         self.send(*resp)
 
@@ -90,7 +90,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             Indicates that it is not currently possible to verify if the key is
             present in the remote. (Perhaps the remote cannot be contacted.)
         """
-        lgr.debug("VERIFYING key %s" % key)
+        lgr.debug("VERIFYING key %s", key)
         resp = None
         for url in self.gen_URLS(key):
             # somewhat duplicate of CHECKURL
@@ -103,14 +103,14 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 # we can connect to that server but that specific url is N/A,
                 # probably check the connection etc
             except TargetFileAbsent as exc:
-                self.debug("Target url %s file seems to be missing: %s" % (url, exc_str(exc)))
+                self.debug("Target url %s file seems to be missing: %s", url, exc_str(exc))
                 if not resp:
                     # if it is already marked as UNKNOWN -- let it stay that way
                     # but if not -- we might as well say that we can no longer access it
                     resp = "CHECKPRESENT-FAILURE"
             except Exception as exc:
                 resp = "CHECKPRESENT-UNKNOWN"
-                self.debug("Failed to check status of url %s: %s" % (url, exc_str(exc)))
+                self.debug("Failed to check status of url %s: %s", url, exc_str(exc))
         if resp is None:
             resp = "CHECKPRESENT-UNKNOWN"
         self.send(resp, key)
@@ -152,7 +152,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 downloaded_path = self._providers.download(
                     url, path=path, overwrite=True
                 )
-                lgr.info("Successfully downloaded %s into %s" % (url, downloaded_path))
+                lgr.info("Successfully downloaded %s into %s", url, downloaded_path)
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:

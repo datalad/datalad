@@ -595,7 +595,7 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         if self._silent:
             return
-        lgr.debug("HTTP: " + format % args)
+        lgr.debug("HTTP: " + format, *args)
 
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
@@ -1100,7 +1100,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 break
             ntested += 1
             if __debug__:
-                lgr.debug('Running %s on %s' % (t.__name__, uri))
+                lgr.debug('Running %s on %s', t.__name__, uri)
             try:
                 t(*(arg + (uri,)), **kw)
             finally:

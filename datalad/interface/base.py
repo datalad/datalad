@@ -155,7 +155,7 @@ def load_interface(spec):
     if isinstance(spec[1], dict):
         intf = _load_plugin(spec[1]['file'], fail=False)
     else:
-        lgr.log(5, "Importing module %s " % spec[0])
+        lgr.log(5, "Importing module %s ", spec[0])
         try:
             mod = import_module(spec[0], package='datalad')
         except Exception as e:

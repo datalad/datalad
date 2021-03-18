@@ -545,16 +545,16 @@ def rmtemp(f, *args, **kwargs):
     """
     if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         if not os.path.lexists(f):
-            lgr.debug("Path %s does not exist, so can't be removed" % f)
+            lgr.debug("Path %s does not exist, so can't be removed", f)
             return
-        lgr.log(5, "Removing temp file: %s" % f)
+        lgr.log(5, "Removing temp file: %s", f)
         # Can also be a directory
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
             unlink(f)
     else:
-        lgr.info("Keeping temp file: %s" % f)
+        lgr.info("Keeping temp file: %s", f)
 
 
 def file_basename(name, return_ext=False):
@@ -1801,7 +1801,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     if __debug__:
         # TODO mkdir
-        lgr.debug('Created temporary thing named %s"' % filename)
+        lgr.debug('Created temporary thing named %s"', filename)
     try:
         yield filename
     finally:

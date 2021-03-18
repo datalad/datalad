@@ -334,7 +334,7 @@ def _guess_ri_cls(ri):
     # We assume that it is a URL and parse it. Depending on the result
     # we might decide that it was something else ;)
     fields = URL._pr_to_fields(urlparse(ri))
-    lgr.log(5, "Parsed ri %s into fields %s" % (ri, fields))
+    lgr.log(5, "Parsed ri %s into fields %s", ri, fields)
     type_ = 'url'
     # Special treatments
     # file:///path should stay file:
@@ -347,7 +347,7 @@ def _guess_ri_cls(ri):
         # dl+archive:... or just for ssh   hostname:path/p1
         elif '+' not in fields['scheme']:
             type_ = 'ssh'
-            lgr.log(5, "Assuming ssh style ri, adjusted: %s" % (fields,))
+            lgr.log(5, "Assuming ssh style ri, adjusted: %s", (fields,))
 
     if not fields['scheme'] and not fields['hostname']:
         parts = _split_colon(ri)
@@ -374,7 +374,7 @@ def _guess_ri_cls(ri):
 
     cls = TYPES[type_]
     # just parse the ri according to regex matchint ssh "ri" specs
-    lgr.log(5, "Detected %s ri" % type_)
+    lgr.log(5, "Detected %s ri", type_)
     return cls
 
 

@@ -1452,7 +1452,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # confirmed?
             # What's best in case of a list of files?
         except OSError as e:
-            lgr.error("add: %s" % e)
+            lgr.error("add: %s", e)
             raise
 
         # Make sure return value from GitRepo is consistent with AnnexRepo
@@ -1691,7 +1691,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if index_file:
             env['GIT_INDEX_FILE'] = index_file
 
-        lgr.debug("Committing via direct call of git: %s" % cmd)
+        lgr.debug("Committing via direct call of git: %s", cmd)
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
 
@@ -4146,7 +4146,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if 'error-messages' in r else None,
                     logger=lgr)
         except OSError as e:
-            lgr.error("add: %s" % e)
+            lgr.error("add: %s", e)
             raise
 
     def _save_add_submodules(self, paths):

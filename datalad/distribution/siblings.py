@@ -552,7 +552,7 @@ def _configure_remote(
                     "Could not enable annex remote %s. This is expected if %s "
                     "is a pure Git remote, or happens if it is not accessible.",
                     name, name)
-                lgr.debug("Exception was: %s" % exc_str(exc))
+                lgr.debug("Exception was: %s", exc_str(exc))
 
             if as_common_datasrc:
                 ri = RI(url)
