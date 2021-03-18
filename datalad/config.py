@@ -31,7 +31,7 @@ from pathlib import Path
 import logging
 lgr = logging.getLogger('datalad.config')
 
-cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
+cfg_kv_regex = re.compile(r'(^[^\n]*)\n(.*)$', flags=re.MULTILINE | re.DOTALL)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
