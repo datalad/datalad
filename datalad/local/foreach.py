@@ -51,6 +51,7 @@ from datalad.support.param import Parameter
 from datalad.utils import (
     SequenceFormatter,
     getpwd,
+    shortened_repr,
 )
 
 lgr = logging.getLogger('datalad.local.foreach')
@@ -222,6 +223,9 @@ class ForEach(Interface):
                     out = ds.repo._git_runner.run(cmd_expanded, protocol=protocol)
                     if not passthrough:
                         status_rec.update(out)
+                        # provide some feedback to user in default rendering
+                        if any(out.values()):
+                            status_rec['message'] = shortened_repr(out, 100)
                 status_rec['status'] = 'ok'
             except Exception as exc:
                 # TODO: option to not swallow but reraise!
