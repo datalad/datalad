@@ -12,45 +12,39 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import os
-import re
 
 from argparse import REMAINDER
+from itertools import chain
 
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.support.constraints import (
-    EnsureBool,
-    EnsureStr,
-    EnsureNone,
+from datalad.cmd import NoCapture, StdOutErrCapture
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
 )
-from datalad.support.param import Parameter
-from datalad.support.exceptions import CommandError
+from datalad.dochelpers import exc_str
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.interface.common_opts import (
     jobs_opt,
     recursion_flag,
     recursion_limit,
 )
-from datalad.distribution.dataset import (
-    Dataset,
-    require_dataset,
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import eval_results
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureNone,
 )
-from datalad.support.gitrepo import GitRepo
-from datalad.dochelpers import exc_str
-from datalad.utils import (
-    ensure_list,
-    getpwd,
-    partition,
-    Path,
+from datalad.support.parallel import (
+    ProducerConsumerProgressLog,
+    no_parentds_in_futures,
+    no_subds_in_futures,
 )
-
-from datalad.distribution.dataset import (
-    EnsureDataset,
-    datasetmethod,
-    resolve_path,
-)
+from datalad.support.param import Parameter
 
 lgr = logging.getLogger('datalad.local.foreach')
 
@@ -102,7 +96,6 @@ class ForEach(Interface):
             constraints=EnsureBool() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        #TODO: passthrough - to instruct to not catch/yield outputs but rather just run as `run`
         # does without any outputs handling
         # Not sure yet if worth supporting here
         # contains=Parameter(
@@ -116,13 +109,21 @@ class ForEach(Interface):
         #     multiple paths PY], in which case datasets will be reported that
         #     contain any of the given paths.""",
         #     constraints=EnsureStr() | EnsureNone()),
+        # TODO: --diff  to provide `diff` record so any arbitrary  git reset --hard etc desire could be fulfilled
         bottomup=Parameter(
             args=("--bottomup",),
             action="store_true",
             doc="""whether to report subdatasets in bottom-up order along
             each branch in the dataset tree, and not top-down."""),
         # Extra options
+        passthrough=Parameter(  # TODO  could be of use for `run` as well
+            args=("-p", "--passthrough"),
+            action="store_true",
+            doc="""For command line commands, pass-through their output to 
+            the screen instead of capturing/returning as part of the result records."""),
         jobs=jobs_opt,
+        # TODO: might want explicit option to either worry about 'safe_to_consume' setting for parallel
+        # For now - always safe
     )
 
     @staticmethod
@@ -137,6 +138,7 @@ class ForEach(Interface):
             recursion_limit=None,
             # contains=None,
             bottomup=False,
+            passthrough=False,
             jobs=None
             ):
         if not cmd:
@@ -151,10 +153,18 @@ class ForEach(Interface):
         subdatasets_it = ds.subdatasets(
             fulfilled=fulfilled, recursive=recursive, recursion_limit=recursion_limit,
             bottomup=bottomup,
+            result_xfm='paths'
         )
-        # TODO: chain with ds
-        for ds_rec in subdatasets_it:
-            ds_ = Dataset(ds_rec['path'])
+        if bottomup:
+            datasets_it = chain(subdatasets_it, [ds.path])
+        else:
+            datasets_it = chain([ds.path], subdatasets_it)
+
+        if not python:
+            protocol = NoCapture if passthrough else StdOutErrCapture
+
+        def run_cmd(dspath):
+            ds_ = Dataset(dspath)
             status_rec = get_status_dict(
                 'foreach',
                 ds=ds_,
@@ -181,8 +191,9 @@ class ForEach(Interface):
                     else:
                         # TODO: provide .format()ing of `run`
                         # TODO: avoid use of _git_runner
-                        out = ds_.repo._git_runner.run(cmd)
-                        status_rec.update(out)
+                        out = ds_.repo._git_runner.run(cmd, protocol=protocol)
+                        if not passthrough:
+                            status_rec.update(out)
                     status_rec['status'] = 'ok'
                 except Exception as exc:
                     # TODO: option to not swallow but reraise!
@@ -192,13 +203,19 @@ class ForEach(Interface):
                     status_rec['message'] = exc_str(exc)
             yield status_rec
 
-        """
         yield from ProducerConsumerProgressLog(
-            subdatasets_gen,  # chain with current one depending on topdown
-            action,
+            datasets_it,
+            run_cmd,
             # probably not needed
             # It is ok to start with subdatasets since top dataset already exists
-            safe_to_consume=no_parentds_in_futures if topdown else no_subds_in_futures, # or vise versa
-            jobs=jobs
-       )
-       """
+            safe_to_consume=no_subds_in_futures if bottomup else no_parentds_in_futures,
+            # or vise versa
+            label="foreach",
+            unit="datasets",
+            jobs=jobs,
+            # TODO: regardless of either we provide lgr or not, we get progress bar.
+            # But in "passthrough" mode output is likely to interfer.  So ideally we should
+            # completely disable progress logging, and for that we should improve
+            # ProducerConsumerProgressLog to allow for that
+            lgr=lgr
+        )
