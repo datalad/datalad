@@ -1321,11 +1321,11 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         def __init__(self):
             if file_ is None:
                 kw = get_tempfile_kwargs({}, prefix="logs")
-                out_file = tempfile.mktemp(**kw)
+                self._out = NamedTemporaryFile(mode='a', delete=False, **kw)
             else:
                 out_file = file_
-            # PY3 requires clearly one or another.  race condition possible
-            self._out = open(out_file, 'a')
+                # PY3 requires clearly one or another.  race condition possible
+                self._out = open(out_file, 'a')
             self._final_out = None
 
         def _read(self, h):
