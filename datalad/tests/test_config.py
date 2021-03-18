@@ -40,6 +40,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
     ConfigManager,
+    parse_gitconfig_dump,
     rewrite_url,
     write_config_section,
 )
@@ -63,10 +64,33 @@ myint = 3
 findme = 5.0
 """
 
+gitcfg_dump = """\
+core.withdot
+true\0just.a.key\0annex.version
+8\0filter.with2dots.some
+long\ntext with\nnewlines\0annex.something
+abcdef\0"""
+
+gitcfg_parsetarget = {
+    'core.withdot': 'true',
+    'just.a.key': None,
+    'annex.version': '8',
+    'filter.with2dots.some': 'long\ntext with\nnewlines',
+    'annex.something': 'abcdef',
+}
+
+
 _dataset_config_template = {
     'ds': {
         '.datalad': {
             'config': _config_file_content}}}
+
+
+def test_parse_gitconfig_dump():
+    # simple case, no origin info, clean output
+    parsed, files = parse_gitconfig_dump(gitcfg_dump)
+    assert_equal(files, set())
+    assert_equal(gitcfg_parsetarget, parsed)
 
 
 @with_tree(tree=_dataset_config_template)

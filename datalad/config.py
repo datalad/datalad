@@ -71,8 +71,7 @@ def _where_reload(obj):
     return obj
 
 
-# TODO document and make "public" (used in GitRepo too)
-def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
+def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     """Parse a dump-string from `git config -z --list`
 
     Parameters
@@ -86,6 +85,10 @@ def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
       If True, report values from multiple specifications of the
       same key as a tuple of values assigned to this key. Otherwise,
       the last configuration is reported.
+
+    Returns:
+    --------
+    dict, set
     """
     dct = {}
     fileset = set()
@@ -118,6 +121,9 @@ def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
             else:
                 dct[k] = (present_v, v)
     return dct, fileset
+
+# keep alias with previous name for now
+_parse_gitconfig_dump = parse_gitconfig_dump
 
 
 def _update_from_env(store):
