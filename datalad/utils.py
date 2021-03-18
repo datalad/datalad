@@ -1790,6 +1790,9 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    # MIH: not clear to me why we need to perform this (possibly expensive)
+    # resolve. It was already part of the original implementation
+    # 008d9ab8cc3e0170c0a9b8479e80dee9ffe6eb7f
     filename = Path(filename).resolve()
 
     if content:
@@ -1811,6 +1814,8 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         # glob here for all files with the same name (-suffix)
         # would be useful whenever we requested .img filename,
         # and function creates .hdr as well
+        # MIH: this is undocumented behavior, and undesired in the general
+        # case. it should be made conditional and explicit
         lsuffix = len(tkwargs_.get('suffix', ''))
         filename_ = lsuffix and filename[:-lsuffix] or filename
         filenames = glob.glob(filename_ + '*')
