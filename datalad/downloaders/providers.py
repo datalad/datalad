@@ -31,7 +31,7 @@ from .http import (
 )
 from .s3 import S3Authenticator, S3Downloader
 from .shub import SHubDownloader
-from ..support.configparserinc import SafeConfigParserWithIncludes
+from configparser import ConfigParser as SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..support.network import RI
 from ..support import path

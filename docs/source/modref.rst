@@ -128,7 +128,6 @@ Support functionality
    support.gitrepo
    support.annexrepo
    support.archives
-   support.configparserinc
    customremotes.main
    customremotes.base
    customremotes.archives

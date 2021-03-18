@@ -527,7 +527,7 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
     from boto.s3.prefix import Prefix
     from boto.s3.connection import OrdinaryCallingFormat
     from boto.exception import S3ResponseError
-    from ..support.configparserinc import SafeConfigParser  # provides PY2,3 imports
+    from configparser import ConfigParser as SafeConfigParser
 
     if '/' in bucket_prefix:
         bucket_name, prefix = bucket_prefix.split('/', 1)
