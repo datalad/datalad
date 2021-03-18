@@ -148,7 +148,7 @@ class ArchivesCache(object):
             # TODO: begging for a race condition
             if not exists(path):
                 lgr.debug("Initiating clean cache for the archives under %s",
-                          self.path)
+                          path)
                 try:
                     self._made_path = True
                     os.makedirs(path)
@@ -159,7 +159,7 @@ class ArchivesCache(object):
             else:
                 lgr.debug(
                     "Not initiating existing cache for the archives under %s",
-                    self.path)
+                    path)
                 self._made_path = False
         else:
             if persistent:
