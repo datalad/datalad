@@ -71,6 +71,16 @@ true\0just.a.key\0annex.version
 long\ntext with\nnewlines\0annex.something
 abcdef\0"""
 
+
+# include a "command line" origin
+gitcfg_dump_w_origin = """\
+file:.git/config\0core.withdot
+true\0file:.git/config\0just.a.key\0file:/home/me/.gitconfig\0annex.version
+8\0file:.git/config\0filter.with2dots.some
+long\ntext with\nnewlines\0file:.git/config\0command line:\0annex.something
+abcdef\0"""
+
+
 gitcfg_parsetarget = {
     'core.withdot': 'true',
     'just.a.key': None,
@@ -90,6 +100,13 @@ def test_parse_gitconfig_dump():
     # simple case, no origin info, clean output
     parsed, files = parse_gitconfig_dump(gitcfg_dump)
     assert_equal(files, set())
+    assert_equal(gitcfg_parsetarget, parsed)
+    # now with origin information in the dump
+    parsed, files = parse_gitconfig_dump(gitcfg_dump_w_origin, cwd='ROOT')
+    assert_equal(
+        files,
+        set((Path('ROOT/.git/config'), Path('/home/me/.gitconfig'))))
+    # important
     assert_equal(gitcfg_parsetarget, parsed)
 
 

@@ -79,8 +79,9 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     dump : str
       Null-byte separated output
     cwd : path-like, optional
-      Use this path to convert relative paths for origin reports
-      into absolute paths
+      Use this absolute path to convert relative paths for origin reports
+      into absolute paths. By default, the process working directory
+      PWD is used.
     multi_value : bool, optional
       If True, report values from multiple specifications of the
       same key as a tuple of values assigned to this key. Otherwise,
@@ -89,6 +90,10 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     Returns:
     --------
     dict, set
+      Configuration items are returned as key/value pairs in a dictionary.
+      The second tuple-item will be a set of path objects comprising all
+      source files, if origin information was included in the dump
+      (--show-origin). An empty set is returned otherwise.
     """
     dct = {}
     fileset = set()
