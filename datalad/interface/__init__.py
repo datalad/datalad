@@ -92,6 +92,7 @@ _group_plumbing = (
         ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
         ('datalad.local.subdatasets', 'Subdatasets', 'subdatasets'),
+        ('datalad.local.foreach', 'ForEach', 'foreach'),
     ])
 
 
