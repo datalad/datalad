@@ -347,7 +347,7 @@ def _guess_ri_cls(ri):
         # dl+archive:... or just for ssh   hostname:path/p1
         elif '+' not in fields['scheme']:
             type_ = 'ssh'
-            lgr.log(5, "Assuming ssh style ri, adjusted: %s", (fields,))
+            lgr.log(5, "Assuming ssh style ri, adjusted: %s", fields)
 
     if not fields['scheme'] and not fields['hostname']:
         parts = _split_colon(ri)
