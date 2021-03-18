@@ -425,7 +425,7 @@ class ConfigManager(object):
             encoding='utf-8',
         )
         store = {}
-        store['cfg'], store['files'] = _parse_gitconfig_dump(
+        store['cfg'], store['files'] = parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
         # update stats of config files, they have just been discovered
