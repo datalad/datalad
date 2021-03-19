@@ -422,12 +422,13 @@ class TestAddurls(object):
     def setup_class(cls):
         mktmp_kws = get_tempfile_kwargs()
         path = tempfile.mkdtemp(**mktmp_kws)
-        create_tree(path,
+        http_root = op.join(path, "srv")
+        create_tree(http_root,
                     {"udir": {x + ".dat" + ver: x + " content"
                               for x in "abcd"
                               for ver in ["", ".v1"]}})
 
-        cls._hpath = HTTPPath(path)
+        cls._hpath = HTTPPath(http_root)
         cls._hpath.start()
         cls.url = cls._hpath.url
 
@@ -446,14 +447,16 @@ class TestAddurls(object):
                      "subdir": "foo",
                      "md5sum": "9b72648021b70b8c522642e4490d7ac3",
                      "size": "9"}]
-        cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
+        cls.json_file = op.join(path, "test_addurls.json")
         with open(cls.json_file, "w") as jfh:
             json.dump(cls.data, jfh)
+
+        cls.temp_dir = path
 
     @classmethod
     def teardown_class(cls):
         cls._hpath.stop()
-        rmtemp(cls._hpath.path)
+        rmtemp(cls.temp_dir)
 
     @with_tempfile(mkdir=True)
     def test_addurls(self, path):
