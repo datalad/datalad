@@ -303,7 +303,7 @@ class AutomagicIO(object):
             # wrong or being undesired. Nested invokation could happen
             # caused by independent pieces of code, e.g. user code
             # that invokes our own metadata handling.
-            lgr.debug("%s already active. No action taken" % self)
+            lgr.debug("%s already active. No action taken", self)
             return
         # overloads
         builtins.open = self._proxy_open

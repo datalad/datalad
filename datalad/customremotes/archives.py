@@ -247,7 +247,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         #  might be way too many?
         #  only if just archive portion of url is given or the one pointing
         #  to specific file?
-        lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
+        lgr.debug("Current directory: %s, url: %s", os.getcwd(), url)
         akey, afile, attrs = self._parse_url(url)
         size = attrs.get('size', None)
 
@@ -299,7 +299,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # we could even store the filename within archive
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
-        lgr.debug("VERIFYING key %s" % key)
+        lgr.debug("VERIFYING key %s", key)
         # The same content could be available from multiple locations within the same
         # archive, so let's not ask it twice since here we don't care about "afile"
         for akey, _ in self._gen_akey_afiles(key, unique_akeys=True):

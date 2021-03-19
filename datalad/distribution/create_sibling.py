@@ -797,7 +797,7 @@ class CreateSibling(Interface):
 
             # publish web-interface to root dataset on publication server
             if current_ds.path == refds_path and ui:
-                lgr.info("Uploading web interface to %s" % path)
+                lgr.info("Uploading web interface to %s", path)
                 try:
                     CreateSibling.upload_web_interface(path, shell, shared, ui)
                 except CommandError as e:

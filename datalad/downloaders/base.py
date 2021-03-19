@@ -165,7 +165,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
-                lgr.log(5, "Calling out into %s for %s" % (method, url))
+                lgr.log(5, "Calling out into %s for %s", method, url)
                 result = method(url, **kwargs)
                 # assume success if no puke etc
                 break

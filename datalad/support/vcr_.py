@@ -54,7 +54,7 @@ try:
           implementation but the one below)
         """
         path = _get_cassette_path(path)
-        lgr.debug("Using cassette %s" % path)
+        lgr.debug("Using cassette %s", path)
         if return_body is not None:
             my_vcr = _VCR(
                 before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))

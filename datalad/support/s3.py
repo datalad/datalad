@@ -234,7 +234,7 @@ def prune_and_delete_bucket(bucket):
     #for key in b.list_versions(''):
     #    b.delete_key(key)
     bucket.delete()
-    lgr.info("Bucket %s was removed" % bucket.name)
+    lgr.info("Bucket %s was removed", bucket.name)
 
 
 def set_bucket_public_access_policy(bucket):
@@ -257,7 +257,7 @@ def gen_test_bucket(bucket_name):
     # assure we have none
     try:
         bucket = conn.get_bucket(bucket_name)
-        lgr.info("Deleting existing bucket %s" % bucket.name)
+        lgr.info("Deleting existing bucket %s", bucket.name)
         prune_and_delete_bucket(bucket)
     except:  # MIH: MemoryError?
         # so nothing to worry about
@@ -304,7 +304,7 @@ def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
     bucket.delete_key(files(f))
     files.reset_version(f)
     files(f)
-    lgr.info("Bucket %s was generated and populated" % bucket_name)
+    lgr.info("Bucket %s was generated and populated", bucket_name)
 
     return bucket
 

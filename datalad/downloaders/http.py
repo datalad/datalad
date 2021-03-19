@@ -55,7 +55,7 @@ try:
     _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
-    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s" % exc_str(e))
+    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s", exc_str(e))
     _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:

@@ -130,5 +130,5 @@ def main(args=None, backend=None):
         try:
             _main(args, backend)
         except Exception as exc:
-            lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
+            lgr.error('%s (%s)', str(exc), exc.__class__.__name__)
             sys.exit(1)

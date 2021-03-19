@@ -245,7 +245,7 @@ class ExternalVersions(object):
                         try:
                             module = __import__(modname)
                         except ImportError:
-                            lgr.debug("Module %s seems to be not present" % modname)
+                            lgr.debug("Module %s seems to be not present", modname)
                             return None
                         except Exception as exc:
                             lgr.warning("Failed to import module %s due to %s",

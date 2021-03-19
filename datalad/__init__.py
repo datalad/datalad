@@ -22,8 +22,9 @@ if not __debug__:
 # For reproducible demos/tests
 import os
 _seed = os.environ.get('DATALAD_SEED', None)
-if _seed:
+if _seed is not None:
     import random
+    _seed = int(_seed)
     random.seed(_seed)
 
 import atexit

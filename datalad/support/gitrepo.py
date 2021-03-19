@@ -53,7 +53,7 @@ from datalad.cmd import (
 )
 from datalad.config import (
     ConfigManager,
-    _parse_gitconfig_dump,
+    parse_gitconfig_dump,
     write_config_section,
 )
 
@@ -1452,7 +1452,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # confirmed?
             # What's best in case of a list of files?
         except OSError as e:
-            lgr.error("add: %s" % e)
+            lgr.error("add: %s", e)
             raise
 
         # Make sure return value from GitRepo is consistent with AnnexRepo
@@ -1699,7 +1699,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if index_file:
             env['GIT_INDEX_FILE'] = index_file
 
-        lgr.debug("Committing via direct call of git: %s" % cmd)
+        lgr.debug("Committing via direct call of git: %s", cmd)
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
 
@@ -2790,7 +2790,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # anyways, and they should not appear in a normal .gitmodules file
         # but could easily appear when duplicates are included. In this case,
         # we better not crash
-        db, _ = _parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
+        db, _ = parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
@@ -4192,7 +4192,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if 'error-messages' in r else None,
                     logger=lgr)
         except OSError as e:
-            lgr.error("add: %s" % e)
+            lgr.error("add: %s", e)
             raise
 
     def _save_add_submodules(self, paths):
