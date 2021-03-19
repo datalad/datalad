@@ -131,16 +131,9 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
                 break
             # try getting key/value pair from the present chunk
             k, v = _gitcfg_rec_to_keyvalue(line)
-            if v or cfg_k_regex.match(k):
-                # if we have a value, we also must have a good key
-                # otherwise check the key
+            if k is not None:
                 # we are done with this chunk when there is a good key
                 break
-            else:
-                # no value, no good key, this chunk is not usable as is
-                # reset the key to cleanly discard the entire chunk
-                # should it not contain anything usable
-                k = None
             # discard the first line and start over
             ignore, line = line.split('\n', maxsplit=1)
             lgr.debug('Non-standard git-config output, ignoring: %s', ignore)
@@ -174,15 +167,19 @@ def _gitcfg_rec_to_keyvalue(rec):
     Returns
     -------
     str, str
-      Parsed key and value. Value could be None.
+      Parsed key and value. Key and/or value could be None
+      if not snytax-compliant (former) or absent (latter).
     """
     kv_match = cfg_kv_regex.match(rec)
     if kv_match:
         k, v = kv_match.groups()
-    else:
+    elif cfg_k_regex.match(rec):
         # could be just a key without = value, which git treats as True
         # if asked for a bool
         k, v = rec, None
+    else:
+        # no value, no good key
+        k = v = None
     return k, v
 
 
