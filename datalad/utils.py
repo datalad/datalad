@@ -1789,7 +1789,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-    filename = Path(filename).resolve()
+    filename = Path(filename)
 
     if content:
         (filename.write_bytes
