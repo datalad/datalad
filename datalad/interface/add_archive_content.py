@@ -432,7 +432,7 @@ class AddArchiveContent(Interface):
                             target_file_path_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
                             if not lexists(target_file_path_new):
                                 break
-                            lgr.debug("File %s already exists" % target_file_path_new)
+                            lgr.debug("File %s already exists", target_file_path_new)
                             i += 1
                             suf = '.%d' % i
                         target_file_path = target_file_path_new
@@ -496,7 +496,7 @@ class AddArchiveContent(Interface):
                 # force=True since some times might still be staged and fail
                 annex.remove(archive_rpath, force=True)
 
-            lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
+            lgr.info("Finished adding %s: %s", archive, stats.as_str(mode='line'))
 
             if outside_stats:
                 outside_stats += stats

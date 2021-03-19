@@ -503,7 +503,7 @@ def main(args=None):
                 ret = cmdlineargs.func(cmdlineargs)
             except InsufficientArgumentsError as exc:
                 # if the func reports inappropriate usage, give help output
-                lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+                lgr.error('%s (%s)', exc_str(exc), exc.__class__.__name__)
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
@@ -534,7 +534,7 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
-                lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+                lgr.error('%s (%s)', exc_str(exc), exc.__class__.__name__)
                 sys.exit(1)
     else:
         # just let argparser spit out its error, since there is smth wrong

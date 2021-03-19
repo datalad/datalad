@@ -112,7 +112,7 @@ class SafeConfigParserWithIncludes(SafeConfigParser):
                     else:
                             parser.read(resource)
             except UnicodeDecodeError as e:
-                    logSys.error("Error decoding config file '%s': %s" % (resource, e))
+                    logSys.error("Error decoding config file '%s': %s", resource, e)
                     return []
 
             resourceDir = os.path.dirname(resource)
@@ -143,7 +143,7 @@ class SafeConfigParserWithIncludes(SafeConfigParser):
                     filenames = [ filenames ]
             for filename in filenames:
                     fileNamesFull += SafeConfigParserWithIncludes.getIncludes(filename)
-            logSys.debug("Reading files: %s" % fileNamesFull)
+            logSys.debug("Reading files: %s", fileNamesFull)
             if sys.version_info >= (3,2):  # pragma: no cover
                     return SafeConfigParser.read(self, fileNamesFull, encoding='utf-8')
             else:

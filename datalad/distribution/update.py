@@ -210,7 +210,7 @@ class Update(Interface):
                 yield res
                 continue
             if not sibling_ and len(remotes) > 1 and merge:
-                lgr.debug("Found multiple siblings:\n%s" % remotes)
+                lgr.debug("Found multiple siblings:\n%s", remotes)
                 res['status'] = 'impossible'
                 res['message'] = "Multiple siblings, please specify from which to update."
                 yield res

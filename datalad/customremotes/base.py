@@ -204,7 +204,7 @@ class AnnexCustomRemote(object):
             self.fout.write(msg + "\n")  # .encode())
             self.fout.flush()
         except IOError as exc:
-            lgr.debug("Failed to send due to %s" % str(exc))
+            lgr.debug("Failed to send due to %s", exc)
             if exc.errno == errno.EPIPE:
                 self.stop()
             else:
@@ -323,7 +323,7 @@ class AnnexCustomRemote(object):
                 self.error("Problem processing %r with parameters %r: %r"
                            % (req, req_load, exc_str(e)))
                 from traceback import format_exc
-                lgr.error("Caught exception detail: %s" % format_exc())
+                lgr.error("Caught exception detail: %s", format_exc())
 
     def req_INITREMOTE(self, *args):
         """Initialize this remote. Provides high level abstraction.
@@ -385,7 +385,7 @@ class AnnexCustomRemote(object):
 
     def req_TRANSFER(self, cmd, key, file):
         if cmd in ("RETRIEVE",):
-            lgr.debug("%s key %s into/from %s" % (cmd, key, file))  # was INFO level
+            lgr.debug("%s key %s into/from %s", cmd, key, file)  # was INFO level
             try:
                 self._transfer(cmd, key, file)
             except Exception as exc:
@@ -543,7 +543,7 @@ def generate_uuids():
 def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]):
     """Initialize datalad special remote"""
     from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
-    lgr.info("Initiating special remote %s" % remote)
+    lgr.info("Initiating special remote %s", remote)
     remote_opts = [
         'encryption=%s' % str(encryption).lower(),
         'type=external',

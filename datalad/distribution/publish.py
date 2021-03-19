@@ -396,7 +396,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # publishing of `remote` might depend on publishing other
         # remote(s) first:
         for d in publish_depends:
-            lgr.info("Publishing to configured dependency: '%s'" % d)
+            lgr.info("Publishing to configured dependency: '%s'", d)
             # call this again to take care of the dependency first,
             # but keep the paths the same, as the goal is to publish those
             # to the primary remote, and not anything elase to a dependency

@@ -188,7 +188,7 @@ queue
 """ % locals())
         f.close()
         Runner().run(['condor_submit', f.name])
-        lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
+        lgr.info("Scheduled execution via %s.  Logs will be stored under %s", pbs, logs)
     finally:
         unlink(f.name)
 

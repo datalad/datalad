@@ -209,7 +209,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                               ' Initializing ...' % self.path)
                     do_init = True
             elif create:
-                lgr.debug('Initializing annex repository at %s...' % self.path)
+                lgr.debug('Initializing annex repository at %s...', self.path)
                 do_init = True
             else:
                 raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
@@ -3673,14 +3673,14 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
     """Read stdout until line ends with ok or failed"""
     out = ''
     i = 0
-    lgr.log(3, "Trying to receive from %s" % stdout)
+    lgr.log(3, "Trying to receive from %s", stdout)
     while not stdout.closed:
         i += 1
         if maxlines > 0 and i > maxlines:
             raise IOError("Expected no more than %d lines. So far received: %r" % (maxlines, out))
         lgr.log(2, "Expecting a line")
         line = stdout.readline()
-        lgr.log(2, "Received line %r" % line)
+        lgr.log(2, "Received line %r", line)
         out += line
         if re.match(r'^.*\b(failed|ok)$', line.rstrip()):
             break
