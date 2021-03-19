@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import warnings
 
 from itertools import chain
 from os import linesep
@@ -125,7 +126,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180913 -- annex fixes all known to us issues for v6
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
     # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
-    GIT_ANNEX_MIN_VERSION = '7.20190503'
+    GIT_ANNEX_MIN_VERSION = '8.20200309'
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None
@@ -503,9 +504,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         bool
         """
         if cls.supports_direct_mode is None:
-            if cls.git_annex_version is None:
-                cls._check_git_annex_version()
-            cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
+            warnings.warn(
+                "DataLad's minimum git-annex version is above 7.20190912, "
+                "the last version to support direct mode. "
+                "The check_direct_mode_support method "
+                "and supports_direct_mode attribute will be removed "
+                "in an upcoming release.",
+                DeprecationWarning)
+            cls.supports_direct_mode = False
         return cls.supports_direct_mode
 
     @classmethod
@@ -546,13 +552,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         if cls.git_annex_version is None:
             cls._check_git_annex_version()
 
-        ver = cls.git_annex_version
-        if ver >= "7.20200202.7":
-            kludges["force-large"] = ["--force-large"]
-        else:
-            kludges["force-large"] = ["-c", "annex.largefiles=anything"]
-
-        kludges["has-include-dotfiles"] = ver < "8"
+        # NOTE: All the kludges that were here have been removed with the
+        # latest GIT_ANNEX_MIN_VERSION increase. This method is being kept
+        # around for future kludges, but it's safe to drop.
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -1280,8 +1282,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self.config.getint("annex", "version") >= 6
         except KeyError:
             # If annex.version isn't set (e.g., an uninitialized repo), assume
-            # that unlocked pointers aren't supported.
-            return False
+            # that unlocked pointers are supported given that they are with the
+            # minimum git-annex version.
+            return True
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
@@ -1563,7 +1566,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # if None -- leave it to annex to decide
         if git is False:
-            options.extend(self._check_version_kludges("force-large"))
+            options.append("--force-large")
 
         if git:
             # explicitly use git-add with --update instead of git-annex-add
@@ -3226,11 +3229,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Annex repos to decide on the behavior on a case-by-case
         # basis
         options = []
-        if self._check_version_kludges("has-include-dotfiles"):
-            options.append('--include-dotfiles')
         # if None -- leave it to annex to decide
         if git is False:
-            options.extend(self._check_version_kludges("force-large"))
+            options.append("--force-large")
         if on_windows:
             # git-annex ignores symlinks on windows
             # https://github.com/datalad/datalad/issues/2955

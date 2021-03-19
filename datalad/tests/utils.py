@@ -1143,14 +1143,7 @@ def with_sameas_remote(func, autoenabled=False):
         if autoenabled:
             options.append("autoenable=true")
         options.append("--sameas=r_dir")
-
-        try:
-            repo.init_remote("r_rsync", options=options)
-        except CommandError:
-            if repo.git_annex_version < "7.20191017":
-                raise SkipTest("git-annex lacks --sameas support")
-            # This should have --sameas support.
-            raise
+        repo.init_remote("r_rsync", options=options)
         return func(*(fn_args + (repo,)), **kwargs)
     return  _wrap_with_sameas_remote
 
@@ -1904,11 +1897,8 @@ def maybe_adjust_repo(repo):
     """Put repo into an adjusted branch if it is not already.
     """
     if not repo.is_managed_branch():
-        # The next condition can be removed once GIT_ANNEX_MIN_VERSION is at
-        # least 7.20190912.
-        if not repo.supports_unlocked_pointers:
-            repo.call_annex(["upgrade"])
-            repo.config.reload(force=True)
+        repo.call_annex(["upgrade"])
+        repo.config.reload(force=True)
         repo.adjust()
 
 

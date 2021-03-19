@@ -664,15 +664,8 @@ def test_save_partial_commit_shrinking_annex(path):
     # with git-annex's partial index error, but save (or more specifically
     # GitRepo.save_) drops the pathspec if there are no staged changes.
     ds.repo.add("staged", git=True)
-    if ds.repo.supports_unlocked_pointers:
-        ds.save(path="foo")
-        assert_repo_status(ds.path, added=["staged"])
-    else:
-        # Unlike the obsolete interface.save, save doesn't handle a partial
-        # commit if there were other staged changes.
-        with assert_raises(CommandError) as cm:
-            ds.save(path="foo")
-        assert_in("partial commit", str(cm.exception))
+    ds.save(path="foo")
+    assert_repo_status(ds.path, added=["staged"])
 
 
 @with_tempfile()
@@ -800,17 +793,6 @@ def check_save_dotfiles(to_git, save_path, path):
              for fname in fnames]
     ok_(paths)
     ds = Dataset(path).create(force=True)
-    if not to_git and ds.repo.is_managed_branch():
-        ver = ds.repo.git_annex_version
-        if "8" < ver < "8.20200309":
-            # git-annex's 1978a2420 (2020-03-09) fixed a bug where
-            # annexed dotfiles could switch when annex.dotfiles=true
-            # was not set in .git/config or git-annex:config.log.
-            ds.repo.config.set("annex.dotfiles", "true",
-                               where="local", reload=True)
-        elif ver < "8" and save_path is None:
-            raise SkipTest("Fails with annex version below v8.*")
-
     ds.save(save_path, to_git=to_git)
     if save_path is None:
         assert_repo_status(ds.path)

@@ -182,13 +182,6 @@ def test_py2_unicode_command(path):
 @with_tempfile(mkdir=True)
 def test_sidecar(path):
     ds = Dataset(path).create()
-    if ds.repo.is_managed_branch():
-        if "8" < ds.repo.git_annex_version < "8.20200309":
-            # git-annex's 1978a2420 (2020-03-09) fixed a bug where
-            # annexed dotfiles could switch when annex.dotfiles=true
-            # was not set in .git/config or git-annex:config.log.
-            ds.repo.config.set("annex.dotfiles", "true",
-                               where="local", reload=True)
     # Simple sidecar message checks.
     ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
