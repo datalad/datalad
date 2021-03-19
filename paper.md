@@ -46,7 +46,7 @@ Figure 1
 ![DataLad: overview of available commands for various parts of the data management process \label{fig:one}](figures/datalad_process.png)
 
 Based on built-in mechanism of Git submodules, DataLad embraces and simplifies modular composition of smaller datasets into a larger (super)datasets.
-With this simple paradigm, DataLad fulfills YODA principles (\citep{TODO}) and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results.
+With this simple paradigm, DataLad fulfills YODA principles (TODO) and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results.
 As a testament of scalability, http://datasets.datalad.org provides a DataLad (super)dataset encapsulating thousands of datasets and providing a unified access to over 250 TBs of primarily neural data from a wide range of hosting portals. 
 
 ## Extensions
