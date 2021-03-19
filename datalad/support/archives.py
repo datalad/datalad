@@ -137,7 +137,6 @@ class ArchivesCache(object):
     # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
     #       all up
     def __init__(self, toppath=None, persistent=False):
-
         self._toppath = toppath
         if toppath:
             path = opj(toppath, ARCHIVES_TEMP_DIR)
@@ -146,10 +145,30 @@ class ArchivesCache(object):
                 lgr.debug("For non-persistent archives using %s suffix for path %s",
                           tempsuffix, path)
                 path += tempsuffix
+            # TODO: begging for a race condition
+            if not exists(path):
+                lgr.debug("Initiating clean cache for the archives under %s",
+                          path)
+                try:
+                    self._made_path = True
+                    os.makedirs(path)
+                    lgr.debug("Cache initialized")
+                except Exception:
+                    lgr.error("Failed to initialize cached under %s", path)
+                    raise
+            else:
+                lgr.debug(
+                    "Not initiating existing cache for the archives under %s",
+                    path)
+                self._made_path = False
         else:
             if persistent:
-                raise ValueError("%s cannot be persistent since no toppath was provided" % self)
-            path = tempfile.mktemp(**get_tempfile_kwargs())
+                raise ValueError(
+                    "%s cannot be persistent, because no toppath was provided"
+                    % self)
+            path = tempfile.mkdtemp(**get_tempfile_kwargs())
+            self._made_path = True
+
         self._path = path
         self.persistent = persistent
         # TODO?  ensure that it is absent or we should allow for it to persist a bit?

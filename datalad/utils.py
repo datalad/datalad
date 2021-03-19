@@ -19,6 +19,7 @@ import shutil
 import os
 import sys
 import tempfile
+from tempfile import NamedTemporaryFile
 import platform
 import gc
 import glob
@@ -1219,8 +1220,8 @@ def swallow_outputs():
         def __init__(self):
             kw = get_tempfile_kwargs({}, prefix="outputs")
 
-            self._out = open(tempfile.mktemp(**kw), 'w')
-            self._err = open(tempfile.mktemp(**kw), 'w')
+            self._out = NamedTemporaryFile(delete=False, mode='w', **kw)
+            self._err = NamedTemporaryFile(delete=False, mode='w', **kw)
 
         def _read(self, h):
             with open(h.name) as f:
@@ -1320,11 +1321,11 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         def __init__(self):
             if file_ is None:
                 kw = get_tempfile_kwargs({}, prefix="logs")
-                out_file = tempfile.mktemp(**kw)
+                self._out = NamedTemporaryFile(mode='a', delete=False, **kw)
             else:
                 out_file = file_
-            # PY3 requires clearly one or another.  race condition possible
-            self._out = open(out_file, 'a')
+                # PY3 requires clearly one or another.  race condition possible
+                self._out = open(out_file, 'a')
             self._final_out = None
 
         def _read(self, h):
@@ -1789,6 +1790,9 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    # MIH: not clear to me why we need to perform this (possibly expensive)
+    # resolve. It was already part of the original implementation
+    # 008d9ab8cc3e0170c0a9b8479e80dee9ffe6eb7f
     filename = Path(filename).resolve()
 
     if content:
@@ -1800,14 +1804,18 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     filename = str(filename)
 
     if __debug__:
-        # TODO mkdir
-        lgr.debug('Created temporary thing named %s"', filename)
+        lgr.debug(
+            'Created temporary %s named %s',
+            'directory' if mkdir else 'file',
+            filename)
     try:
         yield filename
     finally:
         # glob here for all files with the same name (-suffix)
         # would be useful whenever we requested .img filename,
         # and function creates .hdr as well
+        # MIH: this is undocumented behavior, and undesired in the general
+        # case. it should be made conditional and explicit
         lsuffix = len(tkwargs_.get('suffix', ''))
         filename_ = lsuffix and filename[:-lsuffix] or filename
         filenames = glob.glob(filename_ + '*')
