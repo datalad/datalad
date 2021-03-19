@@ -2416,10 +2416,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
              all_=False, git_options=None, **kwargs):
         """Push changes to a remote (or all remotes).
 
-        If remote is specified but lacks any branches and refspec contains
-        multiple entries, we will first push the first refspec separately
-        to possibly ensure that the first refspec is chosen by remote as the
-        "default branch".  See https://github.com/datalad/datalad/issues/4997
+        If remote and refspec are specified, and remote has
+        `remote.{remote}.datalad-push-default-first` configuration variable
+        set (e.g. by `create-sibling-github`), we will first push the first
+        refspec separately to possibly ensure that the first refspec is chosen
+        by remote as the "default branch".
+        See https://github.com/datalad/datalad/issues/4997
+        Upon succesfull push if this variable was set in the local git config,
+        we unset it, so subsequent pushes would proceed normally.
 
         Parameters
         ----------
@@ -2444,12 +2448,13 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             all_ = True
 
         push_refspecs = [refspec]
-        if remote and refspec:
+        cfg = self.config  # shortcut
+        cfg_push_var = "remote.{}.datalad-push-default-first".format(remote)
+        if remote and refspec and cfg.obtain(cfg_push_var, default=False, valtype=bool):
             refspec = ensure_list(refspec)
-            if not any(b.startswith(remote + "/") for b in self.get_remote_branches()):
-                lgr.debug("No branches on remote %s yet, push first refspec %s separately first",
-                          remote, refspec[0])
-                push_refspecs = [[refspec[0]], refspec[1:]]
+            lgr.debug("As indicated by %s pushing first refspec %s separately first",
+                      cfg_push_var, refspec[0])
+            push_refspecs = [[refspec[0]], refspec[1:]]
 
         push_res = []
         for refspecs in push_refspecs:
@@ -2461,6 +2466,10 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     git_options=git_options,
                 )
             )
+        # note: above push_ should raise exception if errors out
+        if cfg.get_from_source('local', cfg_push_var) is not None:
+            lgr.debug("Removing %s variable from local git config after succesfull push", cfg_push_var)
+            cfg.unset(cfg_push_var, 'local')
         return push_res
 
     def push_(self, remote=None, refspec=None, all_=False, git_options=None):
