@@ -14,7 +14,6 @@ import gc
 import json
 import logging
 import os
-import random
 import re
 import sys
 
@@ -38,7 +37,6 @@ from unittest.mock import patch
 
 from datalad import (
     cfg as dl_cfg,
-    _seed,
 )
 
 from datalad.cmd import (
