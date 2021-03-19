@@ -9,12 +9,12 @@ authors:
  - name: Yaroslav O. Halchenko
    orcid: 0000-0003-3456-2493
    affiliation: 1
- - name: Michael Hanke
-   affiliation: "2, 3"
  - name: Adina Wagner
    orcid: 0000-0003-2917-3450
    affiliation: 2
- # - Kyle, Ben, John, ... are we adding all contributors?
+ - name: Michael Hanke
+   orcid: 0000-0001-6398-6370
+   affiliation: "2, 3"
 affiliations:
  - name: Dartmouth College, Hanover, NH, United States
    index: 1
