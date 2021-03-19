@@ -923,7 +923,6 @@ def test_AnnexRepo_get(src, dst):
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
 
-@skip_if(external_versions['cmd:annex'] < '7.20190717', "Needs freshier git-annex")
 @with_tree(tree={'file.dat': 'content'})
 @with_tempfile
 def test_v7_detached_get(opath, path):
@@ -1152,13 +1151,7 @@ def test_annex_ssh(topdir):
     # older openssh version. See
     # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
     if external_versions['cmd:system-ssh'] < '7.4' and \
-       '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
-        raise SkipTest("Test known to hang")
-    # And, since the switch to the Docker SSH target, our cron build with
-    # 7.20190708 stalls. 7.20190819 is the first known good version, but do a
-    # minimal skip up until the next release because we don't know that
-    # 7.20190730 stalls.
-    if external_versions['cmd:annex'] < '7.20190730':
+       external_versions['cmd:annex'] <= '8.20200720.1':
         raise SkipTest("Test known to hang")
 
     topdir = Path(topdir)
@@ -1841,14 +1834,7 @@ def test_AnnexRepo_dirty(path):
     # commit
     repo.commit("file2.txt annexed")
 
-    try:
-        ok_(not repo.dirty)
-    except AssertionError:
-        if "7.20191024" <= external_versions['cmd:annex'] < "7.20191230":
-            raise SkipTest(
-                "Test known to trigger git-to-annex content conversion "
-                "with this git-annex version (see gh-3890)")
-        raise
+    ok_(not repo.dirty)
 
     repo.unlock("file2.txt")
     # Unlocking the file is seen as a modification when we're not already in an
@@ -2244,10 +2230,7 @@ def check_commit_annex_commit_changed(unlock, path):
         , untracked=['untracked']
     )
     ok_file_under_git(path, 'alwaysbig', annexed=True)
-    # 7.20191009 included a fix to evaluate current filesize not old one.
-    # So if size got short - it will get committed to git
-    ok_file_under_git(path, 'willgetshort',
-                      annexed=external_versions['cmd:annex']<'7.20191009')
+    ok_file_under_git(path, 'willgetshort', annexed=False)
 
     ar.save("message2", untracked='no') # commit all changed
     assert_repo_status(
