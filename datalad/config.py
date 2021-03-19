@@ -31,7 +31,15 @@ from pathlib import Path
 import logging
 lgr = logging.getLogger('datalad.config')
 
-cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
+# git-config key syntax with a section and a subsection
+# see git-config(1) for syntax details
+cfg_k_regex = re.compile(r'([a-zA-Z0-9-.]+\.[^\0\n]+)$', flags=re.MULTILINE)
+# identical to the key regex, but with an additional group for a
+# value in a null-delimited git-config dump
+cfg_kv_regex = re.compile(
+    r'([a-zA-Z0-9-.]+\.[^\0\n]+)\n(.*)$',
+    flags=re.MULTILINE | re.DOTALL
+)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
@@ -71,44 +79,68 @@ def _where_reload(obj):
     return obj
 
 
-# TODO document and make "public" (used in GitRepo too)
-def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
+def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
     """Parse a dump-string from `git config -z --list`
+
+    This parser has limited support for discarding unrelated output
+    that may contaminate the given dump. It does so performing a
+    relatively strict matching of configuration key syntax, and discarding
+    lines in the output that are not valid git-config keys.
+
+    There is also built-in support for parsing outputs generated
+    with --show-origin (see return value).
 
     Parameters
     ----------
     dump : str
       Null-byte separated output
     cwd : path-like, optional
-      Use this path to convert relative paths for origin reports
-      into absolute paths
+      Use this absolute path to convert relative paths for origin reports
+      into absolute paths. By default, the process working directory
+      PWD is used.
     multi_value : bool, optional
       If True, report values from multiple specifications of the
       same key as a tuple of values assigned to this key. Otherwise,
       the last configuration is reported.
+
+    Returns:
+    --------
+    dict, set
+      Configuration items are returned as key/value pairs in a dictionary.
+      The second tuple-item will be a set of path objects comprising all
+      source files, if origin information was included in the dump
+      (--show-origin). An empty set is returned otherwise.
     """
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
-        if not line:
+        # line is a null-delimited chunk
+        k = None
+        # in anticipation of output contamination, process within a loop
+        # where we can reject non syntax compliant pieces
+        while line:
+            if line.startswith('file:'):
+                # origin line
+                fname = Path(line[5:])
+                if not fname.is_absolute():
+                    fname = Path(cwd) / fname if cwd else Path.cwd() / fname
+                fileset.add(fname)
+                break
+            if line.startswith('command line:'):
+                # no origin that we could as a pathobj
+                break
+            # try getting key/value pair from the present chunk
+            k, v = _gitcfg_rec_to_keyvalue(line)
+            if k is not None:
+                # we are done with this chunk when there is a good key
+                break
+            # discard the first line and start over
+            ignore, line = line.split('\n', maxsplit=1)
+            lgr.debug('Non-standard git-config output, ignoring: %s', ignore)
+        if not k:
+            # nothing else to log, all ignored dump was reported before
             continue
-        if line.startswith('file:'):
-            # origin line
-            fname = Path(line[5:])
-            if not fname.is_absolute():
-                fname = Path(cwd) / fname if cwd else Path.cwd() / fname
-            fileset.add(fname)
-            continue
-        if line.startswith('command line:'):
-            # nothing we could handle
-            continue
-        kv_match = cfg_kv_regex.match(line)
-        if kv_match:
-            k, v = kv_match.groups()
-        else:
-            # could be just a key without = value, which git treats as True
-            # if asked for a bool
-            k, v = line, None
+        # multi-value reporting
         present_v = dct.get(k, None)
         if present_v is None or not multi_value:
             dct[k] = v
@@ -118,6 +150,37 @@ def _parse_gitconfig_dump(dump, cwd=None, multi_value=True):
             else:
                 dct[k] = (present_v, v)
     return dct, fileset
+
+
+# keep alias with previous name for now
+_parse_gitconfig_dump = parse_gitconfig_dump
+
+
+def _gitcfg_rec_to_keyvalue(rec):
+    """Helper for parse_gitconfig_dump()
+
+    Parameters
+    ----------
+    rec: str
+      Key/value specification string
+
+    Returns
+    -------
+    str, str
+      Parsed key and value. Key and/or value could be None
+      if not snytax-compliant (former) or absent (latter).
+    """
+    kv_match = cfg_kv_regex.match(rec)
+    if kv_match:
+        k, v = kv_match.groups()
+    elif cfg_k_regex.match(rec):
+        # could be just a key without = value, which git treats as True
+        # if asked for a bool
+        k, v = rec, None
+    else:
+        # no value, no good key
+        k = v = None
+    return k, v
 
 
 def _update_from_env(store):
@@ -359,7 +422,7 @@ class ConfigManager(object):
             encoding='utf-8',
         )
         store = {}
-        store['cfg'], store['files'] = _parse_gitconfig_dump(
+        store['cfg'], store['files'] = parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
         # update stats of config files, they have just been discovered

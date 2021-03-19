@@ -53,7 +53,7 @@ from datalad.cmd import (
 )
 from datalad.config import (
     ConfigManager,
-    _parse_gitconfig_dump,
+    parse_gitconfig_dump,
     write_config_section,
 )
 
@@ -2760,7 +2760,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # anyways, and they should not appear in a normal .gitmodules file
         # but could easily appear when duplicates are included. In this case,
         # we better not crash
-        db, _ = _parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
+        db, _ = parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):

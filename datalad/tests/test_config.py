@@ -40,6 +40,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
     ConfigManager,
+    parse_gitconfig_dump,
     rewrite_url,
     write_config_section,
 )
@@ -63,10 +64,57 @@ myint = 3
 findme = 5.0
 """
 
+gitcfg_dump = """\
+core.withdot
+true\0just.a.key\0annex.version
+8\0filter.with2dots.some
+long\ntext with\nnewlines\0annex.something
+abcdef\0"""
+
+
+# include a "command line" origin
+gitcfg_dump_w_origin = """\
+file:.git/config\0core.withdot
+true\0file:.git/config\0just.a.key\0file:/home/me/.gitconfig\0annex.version
+8\0file:.git/config\0filter.with2dots.some
+long\ntext with\nnewlines\0file:.git/config\0command line:\0annex.something
+abcdef\0"""
+
+
+gitcfg_parsetarget = {
+    'core.withdot': 'true',
+    'just.a.key': None,
+    'annex.version': '8',
+    'filter.with2dots.some': 'long\ntext with\nnewlines',
+    'annex.something': 'abcdef',
+}
+
+
 _dataset_config_template = {
     'ds': {
         '.datalad': {
             'config': _config_file_content}}}
+
+
+def test_parse_gitconfig_dump():
+    # simple case, no origin info, clean output
+    parsed, files = parse_gitconfig_dump(gitcfg_dump)
+    assert_equal(files, set())
+    assert_equal(gitcfg_parsetarget, parsed)
+    # now with origin information in the dump
+    parsed, files = parse_gitconfig_dump(gitcfg_dump_w_origin, cwd='ROOT')
+    assert_equal(
+        files,
+        # the 'command line:' origin is ignored
+        set((Path('ROOT/.git/config'), Path('/home/me/.gitconfig'))))
+    assert_equal(gitcfg_parsetarget, parsed)
+
+    # now contaminate the output with a prepended error message
+    # https://github.com/datalad/datalad/issues/5502
+    # must work, but really needs the trailing newline
+    parsed, files = parse_gitconfig_dump(
+        "unfortunate stdout\non more lines\n" + gitcfg_dump_w_origin)
+    assert_equal(gitcfg_parsetarget, parsed)
 
 
 @with_tree(tree=_dataset_config_template)
