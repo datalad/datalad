@@ -63,7 +63,7 @@ class ForEach(Interface):
     r"""Run a command on the dataset and/or each of its sub-datasets.
 
     Each dataset's repo runner is reused to execute the commands, so they
-    are are executed in the top directory of a corresponding dataset.
+    are executed in the top directory of a corresponding dataset.
     In contrast, Python commands (expressions) are evaluated without changing directory.
     TODO: unify via explicit --chdir? but not sure if worth it
 
@@ -84,7 +84,7 @@ class ForEach(Interface):
             args=("--python",),
             action="store_true",
             doc="""if given, must be a boolean flag indicating whether
-            the `cmd` is Python expressions to be evaluated, instead of
+            the `cmd` is a Python expression to be evaluated, instead of
             an external command to be executed"""),
         # Following options are taken from subdatasets
         dataset=Parameter(
