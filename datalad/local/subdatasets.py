@@ -20,13 +20,14 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.constraints import (
-    EnsureBool,
     EnsureStr,
     EnsureNone,
 )
 from datalad.support.param import Parameter
 from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import (
+    contains,
+    fulfilled,
     recursion_flag,
     recursion_limit,
 )
@@ -156,26 +157,10 @@ class Subdatasets(Interface):
             a dataset method PY].""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
-        fulfilled=Parameter(
-            args=("--fulfilled",),
-            doc="""if given, must be a boolean flag indicating whether
-            to report either only locally present or absent datasets.
-            By default subdatasets are reported regardless of their
-            status""",
-            constraints=EnsureBool() | EnsureNone()),
+        fulfilled=fulfilled,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        contains=Parameter(
-            args=('--contains',),
-            metavar='PATH',
-            action='append',
-            doc="""limit report to the subdatasets containing the
-            given path. If a root path of a subdataset is given the last
-            reported dataset will be the subdataset itself.[CMD:  This
-            option can be given multiple times CMD][PY:  Can be a list with
-            multiple paths PY], in which case datasets will be reported that
-            contain any of the given paths.""",
-            constraints=EnsureStr() | EnsureNone()),
+        contains=contains,
         bottomup=Parameter(
             args=("--bottomup",),
             action="store_true",
