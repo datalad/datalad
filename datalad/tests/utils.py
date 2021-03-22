@@ -1821,20 +1821,20 @@ def get_deeply_nested_structure(path):
     """ Here is what this does (assuming UNIX, locked):
     |  .
     |  ├── directory_untracked
-    |  │   └── link2dir -> ../subdir
+    |  │  └── link2dir -> ../subdir
     |  ├── OBSCURE_FILENAME_file_modified
     |  ├── link2dir -> subdir
     |  ├── link2subdsdir -> subds_modified/subdir
     |  ├── link2subdsroot -> subds_modified
     |  ├── subdir
-    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
-    |  │   ├── file_modified
-    |  │   ├── git_file.txt
-    |  │   └── link2annex_files.txt -> annexed_file.txt
+    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
+    |  │   ├── file_modified
+    |  │   ├── git_file.txt
+    |  │   └── link2annex_files.txt -> annexed_file.txt
     |  └── subds_modified
     |      ├── link2superdsdir -> ../subdir
     |      ├── subdir
-    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
+    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
     |      └── subds_lvl1_modified
     |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
