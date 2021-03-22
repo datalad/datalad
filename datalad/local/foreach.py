@@ -32,6 +32,8 @@ from datalad.interface.base import (
     build_doc,
 )
 from datalad.interface.common_opts import (
+    contains,
+    fulfilled,
     jobs_opt,
     recursion_flag,
     recursion_limit,
@@ -39,7 +41,7 @@ from datalad.interface.common_opts import (
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.support.constraints import (
-    EnsureBool,
+    EnsureChoice,
     EnsureNone,
 )
 from datalad.support.parallel import (
@@ -51,25 +53,32 @@ from datalad.support.parallel import (
 from datalad.support.param import Parameter
 from datalad.utils import (
     SequenceFormatter,
+    chpwd,
     getpwd,
     shortened_repr,
+    swallow_outputs,
 )
 
 lgr = logging.getLogger('datalad.local.foreach')
 
 
+_PYTHON_CMDS = {
+    'exec': exec,
+    'eval': eval
+}
+
+
 @build_doc
 class ForEach(Interface):
-    r"""Run a command on the dataset and/or each of its sub-datasets.
+    r"""Run a command or Python code on the dataset and/or each of its sub-datasets.
 
-    Each dataset's repo runner is reused to execute the commands, so they
-    are executed in the top directory of a corresponding dataset.
-    In contrast, Python commands (expressions) are evaluated without changing directory.
-    TODO: unify via explicit --chdir? but not sure if worth it
+    This command provides a convenience for the cases were no dedicated DataLad command
+    is provided to operate across the hierarchy of datasets. It is very similar to
+    `git submodule foreach` command with the following major differences
 
-    WARNING: Python expressions are `eval`ed within the scope of this process
-    and provided existing objects.
-
+    - by default (unless [CMD: --subdatasets-only][PY: `subdatasets_only=True`]) it would
+      include operation on the original dataset as well
+    - can be
     """
     # TODO:     _examples_ = [], # see e.g. run
 
@@ -78,14 +87,19 @@ class ForEach(Interface):
             args=("cmd",),
             nargs=REMAINDER,
             metavar='COMMAND',
-            doc="""command for execution. A leading '--' can be used to
-            disambiguate this command from the preceding options to DataLad."""),
-        python=Parameter(
-            args=("--python",),
-            action="store_true",
-            doc="""if given, must be a boolean flag indicating whether
-            the `cmd` is a Python expression to be evaluated, instead of
-            an external command to be executed"""),
+            doc="""command for execution. [CMD: A leading '--' can be used to
+            disambiguate this command from the preceding options to DataLad.
+            For --cmd-type exec or eval only a single
+            command argument (Python code) is supported. CMD]
+            [PY: For `cmd_type='exec'` or `cmd_type='eval'` (Python code) should
+            be either a string or a list with only a single item. PY]
+            """),
+        cmd_type=Parameter(
+            args=("--cmd-type",),
+            constraints=EnsureChoice('external', 'exec', 'eval'),
+            doc="""type of the command. `external`: to be run in a child process using dataset's runner;
+            'exec': Python source code to execute using 'exec(), no value returned;
+            'eval': Python source code to evaluate using 'eval()', return value is placed into 'result' field."""),
         # Following options are taken from subdatasets
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -96,45 +110,29 @@ class ForEach(Interface):
         # TODO: assume True since in 99% of use cases we just want to operate
         #  on present subdatasets?  but having it explicit could be good to
         #  "not miss any".  But `--fulfilled true` is getting on my nerves
-        fulfilled=Parameter(
-            args=("--fulfilled",),
-            doc="""if given, must be a boolean flag indicating whether
-            to report either only locally present or absent datasets.
-            By default subdatasets are reported regardless of their
-            status""",
-            constraints=EnsureBool() | EnsureNone()),
+        # But not clear how to specify `None` from CLI if I default it to True
+        fulfilled=fulfilled,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        # does without any outputs handling
-        # Not sure yet if worth supporting here
-        # contains=Parameter(
-        #     args=('--contains',),
-        #     metavar='PATH',
-        #     action='append',
-        #     doc="""limit report to the subdatasets containing the
-        #     given path. If a root path of a subdataset is given the last
-        #     reported dataset will be the subdataset itself.[CMD:  This
-        #     option can be given multiple times CMD][PY:  Can be a list with
-        #     multiple paths PY], in which case datasets will be reported that
-        #     contain any of the given paths.""",
-        #     constraints=EnsureStr() | EnsureNone()),
-        # TODO: --diff  to provide `diff` record so any arbitrary  git reset --hard etc desire could be fulfilled
+        contains=contains,
         bottomup=Parameter(
             args=("--bottomup",),
             action="store_true",
             doc="""whether to report subdatasets in bottom-up order along
             each branch in the dataset tree, and not top-down."""),
         # Extra options
+        # TODO: --diff  to provide `diff` record so any arbitrary  git reset --hard etc desire could be fulfilled
         # TODO: should we just introduce --lower-recursion-limit aka --mindepth of find?
         subdatasets_only=Parameter(
             args=("-s", "--subdatasets-only"),
             action="store_true",
-            doc="""whether to exclude top level dataset."""),
-        passthrough=Parameter(  # TODO  could be of use for `run` as well
-            args=("-p", "--passthrough"),
-            action="store_true",
-            doc="""For command line commands, pass-through their output to 
-            the screen instead of capturing/returning as part of the result records."""),
+            doc="""whether to exclude top level dataset.  It is implied if a non-empty
+            `contains` is used"""),
+        standard_outputs=Parameter(  # TODO  could be of use for `run` as well
+            args=("--standard-outputs", "--s-o"),
+            constraints=EnsureChoice('capture', 'pass-through'),
+            doc="""whether to capture and return outputs from 'cmd' in the record ('stdout', 'stderr') or
+            just 'pass-through' to the screen (and thus absent from returned record)."""),
         jobs=jobs_opt,
         # TODO: might want explicit option to either worry about 'safe_to_consume' setting for parallel
         # For now - always safe
@@ -145,34 +143,50 @@ class ForEach(Interface):
     @eval_results
     def __call__(
             cmd=None,
-            python=False,
+            cmd_type="external",
             dataset=None,
             fulfilled=None,
             recursive=False,
             recursion_limit=None,
-            # contains=None,
+            contains=None,
             bottomup=False,
             subdatasets_only=False,
-            passthrough=False,
+            standard_outputs='capture',
             jobs=None
             ):
         if not cmd:
             lgr.warning("No command given")
             return
-        if python and len(cmd) > 1:
+        python = cmd_type in _PYTHON_CMDS
+        if python:
             # yoh decided to avoid unnecessary complication/inhomogeneity with support
-            # of multiple Python commands for now
-            raise ValueError(f"Please provide a single Python expression. Got {len(cmd)}: {cmd!r}")
+            # of multiple Python commands for now; and also allow for a single string command
+            # in Python interface
+            if isinstance(cmd, (list, tuple)):
+                if len(cmd) > 1:
+                    raise ValueError(f"Please provide a single Python expression. Got {len(cmd)}: {cmd!r}")
+                cmd = cmd[0]
+            if not isinstance(cmd, str):
+                raise ValueError(f"Please provide a single Python expression. Got {cmd!r}")
+        else:
+            protocol = NoCapture if standard_outputs == 'pass-through' else StdOutErrCapture
+
         refds = require_dataset(
             dataset, check_installed=True, purpose='foreach execution')
         pwd = getpwd()  # Note: 'run' has some more elaborate logic for this
+
+        #
+        # Producer -- datasets to act on
+        #
         subdatasets_it = refds.subdatasets(
-            fulfilled=fulfilled, recursive=recursive, recursion_limit=recursion_limit,
+            fulfilled=fulfilled,
+            recursive=recursive, recursion_limit=recursion_limit,
+            contains=contains,
             bottomup=bottomup,
             result_xfm='paths'
         )
 
-        if subdatasets_only:
+        if subdatasets_only or contains:
             datasets_it = subdatasets_it
         else:
             if bottomup:
@@ -180,9 +194,9 @@ class ForEach(Interface):
             else:
                 datasets_it = chain([refds.path], subdatasets_it)
 
-        if not python:
-            protocol = NoCapture if passthrough else StdOutErrCapture
-
+        #
+        # Consumer - one for all cmd_type's
+        #
         def run_cmd(dspath):
             ds = Dataset(dspath)
             status_rec = get_status_dict(
@@ -202,15 +216,33 @@ class ForEach(Interface):
             # But for Python command we provide actual ds and refds not paths
             placeholders = dict(
                 pwd=pwd,
-                ds=ds if python else ds.path,
-                refds=refds if python else refds.path,
+                # pass actual instances so .format could access attributes even for external commands
+                ds=ds,  # if python else ds.path,
+                refds=refds,  # if python else refds.path,
                 # Check if the command contains "tmpdir" to avoid creating an
                 # unnecessary temporary directory in most but not all cases.
                 # Note: different from 'run' - not wrapping match within {} and doing str
                 tmpdir=mkdtemp(prefix="datalad-run-") if "tmpdir" in str(cmd) else "")
             try:
                 if python:
-                    status_rec['results'] = eval(cmd[0], placeholders)
+                    python_cmd = _PYTHON_CMDS[cmd_type]
+                    with chpwd(ds.path):
+                        if standard_outputs == 'pass-through':
+                            res = python_cmd(cmd, placeholders)
+                            out = {}
+                        elif standard_outputs == 'capture':
+                            with swallow_outputs() as cmo:
+                                res = python_cmd(cmd, placeholders)
+                                out = {
+                                    'stdout': cmo.out,
+                                    'stderr': cmo.err,
+                                }
+                        else:
+                            raise RuntimeError(standard_outputs)
+                        if cmd_type == 'eval':
+                            status_rec['result'] = res
+                        else:
+                            assert res is None
                 else:
                     try:
                         cmd_expanded = format_command(cmd, **placeholders)
@@ -222,11 +254,11 @@ class ForEach(Interface):
                         return
                     # TODO: avoid use of _git_runner
                     out = ds.repo._git_runner.run(cmd_expanded, protocol=protocol)
-                    if not passthrough:
-                        status_rec.update(out)
-                        # provide some feedback to user in default rendering
-                        if any(out.values()):
-                            status_rec['message'] = shortened_repr(out, 100)
+                if standard_outputs == 'capture':
+                    status_rec.update(out)
+                    # provide some feedback to user in default rendering
+                    if any(out.values()):
+                        status_rec['message'] = shortened_repr(out, 100)
                 status_rec['status'] = 'ok'
             except Exception as exc:
                 # TODO: option to not swallow but reraise!
@@ -236,7 +268,7 @@ class ForEach(Interface):
                 status_rec['message'] = exc_str(exc)
             yield status_rec
 
-        if passthrough:
+        if standard_outputs == 'pass-through':
             pc_class = ProducerConsumer
             pc_kw = {}
         else:
