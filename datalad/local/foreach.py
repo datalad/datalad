@@ -26,7 +26,6 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.dochelpers import exc_str
 from datalad.interface.base import (
     Interface,
     build_doc,
@@ -44,6 +43,7 @@ from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
 )
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.parallel import (
     ProducerConsumer,
     ProducerConsumerProgressLog,
@@ -155,8 +155,7 @@ class ForEach(Interface):
             jobs=None
             ):
         if not cmd:
-            lgr.warning("No command given")
-            return
+            raise InsufficientArgumentsError("No command given")
         python = cmd_type in _PYTHON_CMDS
         if python:
             # yoh decided to avoid unnecessary complication/inhomogeneity with support
@@ -260,13 +259,18 @@ class ForEach(Interface):
                     if any(out.values()):
                         status_rec['message'] = shortened_repr(out, 100)
                 status_rec['status'] = 'ok'
+                yield status_rec
             except Exception as exc:
-                # TODO: option to not swallow but reraise!
-                status_rec['status'] = 'error'
-                # TODO: there must be a better place for it since this one is not
-                # output by -f json_pp ... a feature or a bug???
-                status_rec['message'] = exc_str(exc)
-            yield status_rec
+                # get a better version with exception handling redoing the whole
+                # status dict from scratch
+                yield get_status_dict(
+                    'foreach',
+                    ds=ds,
+                    path=ds.path,
+                    command=cmd,
+                    exception=exc,
+                    status='error',
+                    message=str(exc))
 
         if standard_outputs == 'pass-through':
             pc_class = ProducerConsumer
