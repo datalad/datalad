@@ -1716,3 +1716,52 @@ def test_protocols():
     # http is well tested already
     for proto in 'git', 'https':
         yield _test_protocols, proto
+
+
+@with_tempfile
+def test_gitrepo_push_default_first_kludge(path):
+    path = Path(path)
+    repo_a = GitRepo(path / "a", bare=True)
+    repo_b = GitRepo.clone(repo_a.path, str(path / "b"))
+
+    (repo_b.pathobj / "foo").write_text("foo")
+    repo_b.save()
+
+    # push() usually pushes all refspecs in one go.
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res_oneshot = repo_b.push(remote="origin",
+                                  refspec=[DEFAULT_BRANCH + ":b-oneshot",
+                                           DEFAULT_BRANCH + ":a-oneshot",
+                                           DEFAULT_BRANCH + ":c-oneshot"])
+    cmds_oneshot = [ln for ln in cml.out.splitlines()
+                    if "cmd" in ln and "push" in ln and DEFAULT_BRANCH in ln]
+    eq_(len(cmds_oneshot), 1)
+    assert_in(":a-oneshot", cmds_oneshot[0])
+    assert_in(":b-oneshot", cmds_oneshot[0])
+    assert_in(":c-oneshot", cmds_oneshot[0])
+    eq_(len(res_oneshot), 3)
+
+    # But if datalad-push-default-first is set...
+    cfg_var = "remote.origin.datalad-push-default-first"
+    repo_b.config.set(cfg_var, "true", where="local")
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        res_twoshot = repo_b.push(remote="origin",
+                                  refspec=[DEFAULT_BRANCH + ":b-twoshot",
+                                           DEFAULT_BRANCH + ":a-twoshot",
+                                           DEFAULT_BRANCH + ":c-twoshot"])
+    cmds_twoshot = [ln for ln in cml.out.splitlines()
+                    if "cmd" in ln and "push" in ln and DEFAULT_BRANCH in ln]
+    # ... there are instead two git-push calls.
+    eq_(len(cmds_twoshot), 2)
+    # The first is for the first item of the refspec.
+    assert_in(":b-twoshot", cmds_twoshot[0])
+    assert_not_in(":b-twoshot", cmds_twoshot[1])
+    # The remaining items are in the second call.
+    assert_in(":a-twoshot", cmds_twoshot[1])
+    assert_in(":c-twoshot", cmds_twoshot[1])
+    assert_not_in(":c-twoshot", cmds_twoshot[0])
+    assert_not_in(":a-twoshot", cmds_twoshot[0])
+    # The result returned by push() has the same number of records, though.
+    eq_(len(res_twoshot), 3)
+    # The configuration variable is removed afterward.
+    assert_false(repo_b.config.get(cfg_var))
