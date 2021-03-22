@@ -8,6 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Core interface to Git repositories
 
+At the moment the GitRepo class provided here is not meant to be used
+directly, but is primarily a vehicle for a slow refactoring process.
+
+While is could be used directly in some cases, note that the singleton
+handling implemented here will not allow switching between this
+implementation and the old-standard from datalad.support.gitrepo for the
+lifetime of a singleton.
 """
 
 __all__ = ['GitRepo']
