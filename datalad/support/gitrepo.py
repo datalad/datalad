@@ -2422,7 +2422,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         refspec separately to possibly ensure that the first refspec is chosen
         by remote as the "default branch".
         See https://github.com/datalad/datalad/issues/4997
-        Upon succesfull push if this variable was set in the local git config,
+        Upon successful push if this variable was set in the local git config,
         we unset it, so subsequent pushes would proceed normally.
 
         Parameters
@@ -2468,7 +2468,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             )
         # note: above push_ should raise exception if errors out
         if cfg.get_from_source('local', cfg_push_var) is not None:
-            lgr.debug("Removing %s variable from local git config after succesfull push", cfg_push_var)
+            lgr.debug("Removing %s variable from local git config after successful push", cfg_push_var)
             cfg.unset(cfg_push_var, 'local')
         return push_res
 
