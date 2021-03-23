@@ -41,6 +41,10 @@ def _args(**kwargs):
     return Namespace(
         # ATM duplicates definitions done by cmdline.main and
         # required by code logic to be defined. (should they?)
+        #
+        # TODO: The common options are now added by
+        # cmdline.helpers.parser_add_common_options(), which can be reused by
+        # tests.
         **updated(
             dict(
                 common_output_format="default"
