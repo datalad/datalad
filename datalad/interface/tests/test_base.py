@@ -32,6 +32,7 @@ from ..base import (
     nadict,
     nagen,
     NA_STRING,
+    update_docstring_with_parameters,
 )
 from argparse import Namespace
 
@@ -190,3 +191,19 @@ def test_status_custom_summary_no_repeats(path):
         protocol=StdOutCapture)
     out_lines = out['stdout'].splitlines()
     eq_(len(out_lines), len(set(out_lines)))
+
+
+def test_update_docstring_with_parameters_no_kwds():
+    from datalad.support.param import Parameter
+
+    def fn(pos0):
+        "fn doc"
+
+    assert_not_in("3", fn.__doc__)
+    # Call doesn't crash when there are no keyword arguments.
+    update_docstring_with_parameters(
+        fn,
+        dict(pos0=Parameter(doc="pos0 param doc"),
+             pos1=Parameter(doc="pos1 param doc")),
+        add_args={"pos1": 3})
+    assert_in("3", fn.__doc__)

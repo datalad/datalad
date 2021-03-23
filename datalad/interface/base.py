@@ -354,12 +354,12 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     # get the signature
     ndefaults = 0
     args, varargs, varkw, defaults = getargspec(func)
+    defaults = defaults or tuple()
     if add_args:
         add_argnames = sorted(add_args.keys())
         args.extend(add_argnames)
         defaults = defaults + tuple(add_args[k] for k in add_argnames)
-    if defaults is not None:
-        ndefaults = len(defaults)
+    ndefaults = len(defaults)
     # start documentation with what the callable brings with it
     doc = prefix if prefix else u''
     if len(args) > 1:
