@@ -13,7 +13,6 @@
 import unittest.mock as mock
 from datalad.tests.utils import *
 from datalad.utils import (
-    swallow_outputs,
     updated,
 )
 from datalad.cmd import (
