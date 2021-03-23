@@ -1027,7 +1027,7 @@ class Addurls(Interface):
             it ends with ".tsv". Otherwise, treat it as a CSV file.""",
             constraints=EnsureChoice(*INPUT_TYPES)),
         exclude_autometa=Parameter(
-            args=("-x", "--exclude_autometa"),
+            args=("-x", "--exclude-autometa"),
             metavar="REGEXP",
             doc="""By default, metadata field=value pairs are constructed with
             each column in `URL-FILE`, excluding any single column that is
