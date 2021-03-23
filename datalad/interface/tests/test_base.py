@@ -11,7 +11,14 @@
 """
 
 import unittest.mock as mock
-from datalad.tests.utils import *
+from datalad.tests.utils import (
+    assert_in,
+    assert_not_in,
+    eq_,
+    ok_,
+    patch_config,
+    with_tempfile,
+)
 from datalad.utils import (
     updated,
 )
