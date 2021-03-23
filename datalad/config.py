@@ -475,7 +475,7 @@ class ConfigManager(object):
           `text`.
         """
         # do local import, as this module is import prominently and the
-        # could theroetically import all kind of weired things for type
+        # could theoretically import all kind of weired things for type
         # conversion
         from datalad.interface.common_cfg import definitions as cfg_defs
         # fetch what we know about this variable
