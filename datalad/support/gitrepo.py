@@ -1982,6 +1982,15 @@ class GitRepo(CoreGitRepo):
              all_=False, git_options=None, **kwargs):
         """Push changes to a remote (or all remotes).
 
+        If remote and refspec are specified, and remote has
+        `remote.{remote}.datalad-push-default-first` configuration variable
+        set (e.g. by `create-sibling-github`), we will first push the first
+        refspec separately to possibly ensure that the first refspec is chosen
+        by remote as the "default branch".
+        See https://github.com/datalad/datalad/issues/4997
+        Upon successful push if this variable was set in the local git config,
+        we unset it, so subsequent pushes would proceed normally.
+
         Parameters
         ----------
         remote : str, optional
@@ -2003,14 +2012,31 @@ class GitRepo(CoreGitRepo):
         if all_remotes:
             # be nice to the elderly
             all_ = True
-        return list(
-            self.push_(
-                remote=remote,
-                refspec=refspec,
-                all_=all_,
-                git_options=git_options,
+
+        push_refspecs = [refspec]
+        cfg = self.config  # shortcut
+        cfg_push_var = "remote.{}.datalad-push-default-first".format(remote)
+        if remote and refspec and cfg.obtain(cfg_push_var, default=False, valtype=bool):
+            refspec = ensure_list(refspec)
+            lgr.debug("As indicated by %s pushing first refspec %s separately first",
+                      cfg_push_var, refspec[0])
+            push_refspecs = [[refspec[0]], refspec[1:]]
+
+        push_res = []
+        for refspecs in push_refspecs:
+            push_res.extend(
+                self.push_(
+                    remote=remote,
+                    refspec=refspecs,
+                    all_=all_,
+                    git_options=git_options,
+                )
             )
-        )
+        # note: above push_ should raise exception if errors out
+        if cfg.get_from_source('local', cfg_push_var) is not None:
+            lgr.debug("Removing %s variable from local git config after successful push", cfg_push_var)
+            cfg.unset(cfg_push_var, 'local')
+        return push_res
 
     def push_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `push`, but returns a generator"""
