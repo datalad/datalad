@@ -664,11 +664,12 @@ class Interface(object):
         args, varargs, varkw, defaults = getargspec(cls.__call__)
         if defaults is not None:
             ndefaults = len(defaults)
+        default_offset = ndefaults - len(args)
         for i, arg in enumerate(args):
             if not is_api_arg(arg):
                 continue
             param = cls._params_[arg]
-            defaults_idx = ndefaults - len(args) + i
+            defaults_idx = default_offset + i
             cmd_args = param.cmd_args
             if cmd_args == tuple():
                 # explicitly provided an empty sequence of argument names
