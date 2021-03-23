@@ -90,12 +90,12 @@ from .network import (
     is_ssh
 )
 from .path import get_parent_paths
-from .repo import (
-    PathBasedFlyweight,
-    RepoInterface,
+from datalad.core.local.repo import repo_from_path
+from datalad.dataset.gitrepo import (
+    GitRepo as CoreGitRepo,
+    _get_dot_git,
     path_based_str_repr,
 )
-from datalad.core.local.repo import repo_from_path
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -775,7 +775,7 @@ class PushInfo(dict):
 
 
 @path_based_str_repr
-class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
+class GitRepo(CoreGitRepo):
     """Representation of a git repository
 
     """
@@ -783,42 +783,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     # should do it once
     _config_checked = False
 
-    # Begin Flyweight:
-
-    _unique_instances = WeakValueDictionary()
-
     GIT_MIN_VERSION = "2.19.1"
     git_version = None
-
-    # Could be used to e.g. disable automatic garbage and autopacking
-    # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    _GIT_COMMON_OPTIONS = ["-c", "diff.ignoreSubmodules=none"]
-    _git_cmd_prefix = ["git"] + _GIT_COMMON_OPTIONS
-
-    def _flyweight_invalid(self):
-        return not self.is_valid_git()
-
-    @classmethod
-    def _flyweight_reject(cls, id_, *args, **kwargs):
-        # TODO:
-        # This is a temporary approach. See PR # ...
-        # create = kwargs.pop('create', None)
-        # kwargs.pop('path', None)
-        # if create and kwargs:
-        #     # we have `create` plus options other than `path`
-        #     return "Call to {0}() with args {1} and kwargs {2} conflicts " \
-        #            "with existing instance {3}." \
-        #            "This is likely to be caused by inconsistent logic in " \
-        #            "your code." \
-        #            "".format(cls, args, kwargs, cls._unique_instances[id_])
-        pass
-
-    # End Flyweight
-
-    def __hash__(self):
-        # the flyweight key is already determining unique instances
-        # add the class name to distinguish from strings of a path
-        return hash((self.__class__.__name__, self.__weakref__.key))
 
     @classmethod
     def _check_git_version(cls):
@@ -876,8 +842,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
           C='/my/path'   => -C /my/path
 
         """
-        # A lock to prevent multiple threads performing write operations in parallel
-        self._write_lock = threading.Lock()
+        # this will set up .pathobj and .dot_git
+        super().__init__(path)
 
         if self.git_version is None:
             self._check_git_version()
@@ -894,9 +860,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # therefore are stored for performance. Path object creation comes with
         # a cost. Most notably, this is used for validity checking of the
         # repository.
-        self.pathobj = ut.Path(self.path)
-        self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
-        self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
         do_create = False
@@ -932,15 +895,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             git_opts.update(kwargs)
 
         self._cfg = None
-        self._git_runner = GitWitlessRunner(cwd=self.path)
 
         if do_create:  # we figured it out earlier
-            # we briefly need a runner to create the repo, and cannot
-            # use the config manager runner yet, as it would try to
-            # access the repo config which didn't materialize yet
-            self._create_empty_repo(path, create_sanity_checks, **git_opts)
-            # after creation we need to reconsider .git path
-            self.dot_git = self._get_dot_git(self.pathobj, ok_missing=True)
+            self.init(
+                sanity_checks=create_sanity_checks,
+                init_options=to_options(**git_opts),
+            )
 
         # with DryRunProtocol path might still not exist
         if exists(self.path):
@@ -950,17 +910,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         if fake_dates:
             self.configure_fake_dates()
-        # Set by fake_dates_enabled to cache config value across this instance.
-        self._fake_dates_enabled = None
-
-        # Finally, register a finalizer (instead of having a __del__ method).
-        # This will be called by garbage collection as well as "atexit". By
-        # keeping the reference here, we can also call it explicitly.
-        # Note, that we can pass required attributes to the finalizer, but not
-        # `self` itself. This would create an additional reference to the object
-        # and thereby preventing it from being collected at all.
-        self._finalizer = finalize(self, GitRepo._cleanup, self.path)
-
 
     @property
     def bare(self):
@@ -974,48 +923,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             raise InvalidGitRepositoryError("GitRepo contains inconsistent hints"
                                             " on whether or not it is a bare "
                                             "repository.")
-
-    def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
-        if not op.lexists(path):
-            os.makedirs(path)
-        elif sanity_checks:
-            # Verify that we are not trying to initialize a new git repository
-            # under a directory some files of which are already tracked by git
-            # use case: https://github.com/datalad/datalad/issues/3068
-            try:
-                stdout, _ = self._call_git(
-                    ['-C', path, 'ls-files'],
-                    expect_fail=True,
-                    read_only=True,
-                )
-                if stdout:
-                    raise PathKnownToRepositoryError(
-                        "Failing to initialize new repository under %s where "
-                        "following files are known to a repository above: %s"
-                        % (path, stdout)
-                    )
-            except CommandError:
-                # assume that all is good -- we are not under any repo
-                pass
-
-        cmd = ['-C', path, 'init']
-        cmd.extend(kwargs.pop('_from_cmdline_', []))
-        cmd.extend(to_options(**kwargs))
-        lgr.debug(
-            "Initialize empty Git repository at '%s'%s",
-            path,
-            ' %s' % cmd[3:] if cmd[3:] else '')
-
-        try:
-            stdout, stderr = self._call_git(
-                cmd,
-                # we don't want it to scream on stdout
-                expect_fail=True,
-                # there is no commit, and none will be made
-                read_only=True)
-        except CommandError as exc:
-            lgr.error(exc_str(exc))
-            raise
 
     @classmethod
     def clone(cls, url, path, *args, clone_options=None, **kwargs):
@@ -1152,21 +1059,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     #     # stalls etc
     #     self._cfg = None
 
-    @classmethod
-    def _cleanup(cls, path):
-        # Ben: I think in case of GitRepo there's nothing to do ATM. Statements
-        #      like the one in the out commented __del__ above, don't make sense
-        #      with python's GC, IMO, except for manually resolving cyclic
-        #      references (not the case w/ ConfigManager ATM).
-        lgr.log(1, "Finalizer called on: GitRepo(%s)", path)
-
-    def __eq__(self, obj):
-        """Decides whether or not two instances of this class are equal.
-
-        This is done by comparing the base repository path.
-        """
-        return self.path == obj.path
-
     def is_valid_git(self):
         """Returns whether the underlying repository appears to be still valid
 
@@ -1182,91 +1074,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         which in turn is called by the subclasses' __init__. Using an overwrite
         would lead to the wrong thing being called.
         """
-
-        return self.dot_git.exists() and (
-                not self.dot_git.is_dir() or self._valid_git_test_path.exists()
-        )
+        return self.is_valid()
 
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        if not isinstance(path, Path):
-            path = Path(path)
-        dot_git_path = path / '.git'
-
-        # the aim here is to have this test as cheap as possible, because
-        # it is performed a lot
-        # recognize two things as good-enough indicators of a present
-        # repo: 1) a non-empty .git directory (#3473)
-        #          NOTE: It's actually faster (and more accurate) to test for
-        #                existence of a particular subpath.
-        #                This should be something that's there right after
-        #                git-init. Going for .git/HEAD ATM.
-        #
-        #                In [11]: %timeit path.exists() and (not path.is_dir()
-        #                          or head_path.exists())
-        #                4.93 µs ± 34.8 ns per loop
-        #                (mean ± std. dev. of 7 runs, 100000 loops each)
-        #                In [12]: %timeit path.exists() and (not path.is_dir()
-        #                          or any(path.iterdir()))
-        #                12.8 µs ± 150 ns per loop
-        #                (mean ± std. dev. of 7 runs, 100000 loops each)
-        #
-        #       2) a pointer file or symlink
-        #       3) path itself looks like a .git -> bare repo
-
-        return (dot_git_path.exists() and (
-            not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
-        )) or (path / 'HEAD').exists()
-
-    @staticmethod
-    def _get_dot_git(pathobj, *, ok_missing=False, maybe_relative=False):
-        """Given a pathobj to a repository return path to .git/ directory
-
-        Parameters
-        ----------
-        pathobj: Path
-        ok_missing: bool, optional
-          Allow for .git to be missing (useful while sensing before repo is
-          initialized)
-        maybe_relative: bool, optional
-          Return path relative to pathobj
-
-        Raises
-        ------
-        RuntimeError
-          When ok_missing is False and .git path does not exist
-
-        Returns
-        -------
-        Path
-          Absolute (unless maybe_relative=True) path to resolved .git/ directory
-        """
-        dot_git = pathobj / '.git'
-        if dot_git.is_file():
-            with dot_git.open() as f:
-                line = f.readline()
-                if line.startswith("gitdir: "):
-                    dot_git = pathobj / line[7:].strip()
-                else:
-                    raise InvalidGitRepositoryError("Invalid .git file")
-        elif dot_git.is_symlink():
-            dot_git = dot_git.resolve()
-        elif not dot_git.exists() and \
-                (pathobj / 'HEAD').exists() and \
-                (pathobj / 'config').exists():
-                # looks like a bare repo
-                dot_git = pathobj
-        elif not (ok_missing or dot_git.exists()):
-            raise RuntimeError("Missing .git in %s." % pathobj)
-        # Primarily a compat kludge for get_git_dir, remove when it is deprecated
-        if maybe_relative:
-            try:
-                dot_git = dot_git.relative_to(pathobj)
-            except ValueError:
-                # is not a subpath, return as is
-                lgr.debug("Path %r is not subpath of %r", dot_git, pathobj)
-        return dot_git
+        return cls.is_valid(path)
 
     @staticmethod
     def get_git_dir(repo):
@@ -1294,24 +1107,19 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         """
         if isinstance(repo, GitRepo):
             return str(repo.dot_git)
-        return str(GitRepo._get_dot_git(Path(repo), ok_missing=False, maybe_relative=True))
+        pathobj = Path(repo)
+        dot_git = _get_dot_git(pathobj, ok_missing=False)
+        try:
+            dot_git = dot_git.relative_to(pathobj)
+        except ValueError:
+            # is not a subpath, return as is
+            lgr.debug("Path %r is not subpath of %r", dot_git, pathobj)
+        return str(dot_git)
 
     @property
     def config(self):
-        """Get an instance of the parser for the persistent repository
-        configuration.
-
-        Note: This allows to also read/write .datalad/config,
-        not just .git/config
-
-        Returns
-        -------
-        ConfigManager
-        """
-        if self._cfg is None:
-            # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, source='any')
-        return self._cfg
+        # just proxy the core repo APIs property for backward-compatibility
+        return self.cfg
 
     def is_with_annex(self):
         """Report if GitRepo (assumed) has (remotes with) a git-annex branch
@@ -1512,77 +1320,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
-    def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
-                      pattern=None, points_at=None, sort=None, count=None,
-                      contains=None):
-        """Wrapper for `git for-each-ref`
-
-        Please see manual page git-for-each-ref(1) for a complete overview
-        of its functionality. Only a subset of it is supported by this
-        wrapper.
-
-        Parameters
-        ----------
-        fields : iterable or str
-          Used to compose a NULL-delimited specification for for-each-ref's
-          --format option. The default field list reflects the standard
-          behavior of for-each-ref when the --format option is not given.
-        pattern : list or str, optional
-          If provided, report only refs that match at least one of the given
-          patterns.
-        points_at : str, optional
-          Only list refs which points at the given object.
-        sort : list or str, optional
-          Field name(s) to sort-by. If multiple fields are given, the last one
-          becomes the primary key. Prefix any field name with '-' to sort in
-          descending order.
-        count : int, optional
-          Stop iteration after the given number of matches.
-        contains : str, optional
-          Only list refs which contain the specified commit.
-
-        Yields
-        ------
-        dict with items matching the given `fields`
-
-        Raises
-        ------
-        ValueError
-          if no `fields` are given
-
-        RuntimeError
-          if `git for-each-ref` returns a record where the number of
-          properties does not match the number of `fields`
-        """
-        if not fields:
-            raise ValueError('no `fields` provided, refuse to proceed')
-        fields = ensure_list(fields)
-        cmd = [
-            "for-each-ref",
-            "--format={}".format(
-                '%00'.join(
-                    '%({})'.format(f) for f in fields)),
-        ]
-        if points_at:
-            cmd.append('--points-at={}'.format(points_at))
-        if contains:
-            cmd.append('--contains={}'.format(contains))
-        if sort:
-            for k in ensure_list(sort):
-                cmd.append('--sort={}'.format(k))
-        if pattern:
-            cmd += ensure_list(pattern)
-        if count:
-            cmd.append('--count={:d}'.format(count))
-
-        for line in self.call_git_items_(cmd, read_only=True):
-            props = line.split('\0')
-            if len(fields) != len(props):
-                raise RuntimeError(
-                    'expected fields {} from git-for-each-ref, but got: {}'.format(
-                        fields, props))
-            yield dict(zip(fields, props))
-
     def configure_fake_dates(self):
         """Configure repository to use fake dates.
         """
@@ -1593,53 +1330,12 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def fake_dates_enabled(self):
         """Is the repository configured to use fake dates?
         """
-        if self._fake_dates_enabled is None:
-            self._fake_dates_enabled = \
-                self.config.getbool('datalad', 'fake-dates', default=False)
+        # this turned into a private property of the CoreGitRepo
         return self._fake_dates_enabled
 
     def add_fake_dates(self, env):
-        """Add fake dates to `env`.
-
-        Parameters
-        ----------
-        env : dict or None
-            Environment variables.
-
-        Returns
-        -------
-        A dict (copied from env), with date-related environment
-        variables for git and git-annex set.
-        """
-        env = (env if env is not None else os.environ).copy()
-        # Note: Use _git_custom_command here rather than repo.git.for_each_ref
-        # so that we use annex-proxy in direct mode.
-        last_date = list(self.for_each_ref_(
-            fields='committerdate:raw',
-            count=1,
-            pattern='refs/heads',
-            sort="-committerdate",
-        ))
-
-        if last_date:
-            # Drop the "contextual" timezone, leaving the unix timestamp.  We
-            # avoid :unix above because it wasn't introduced until Git v2.9.4.
-            last_date = last_date[0]['committerdate:raw'].split()[0]
-            seconds = int(last_date)
-        else:
-            seconds = self.config.obtain("datalad.fake-dates-start")
-        seconds_new = seconds + 1
-        date = "@{} +0000".format(seconds_new)
-
-        lgr.debug("Setting date to %s",
-                  time.strftime("%a %d %b %Y %H:%M:%S +0000",
-                                time.gmtime(seconds_new)))
-
-        env["GIT_AUTHOR_DATE"] = date
-        env["GIT_COMMITTER_DATE"] = date
-        env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
-
-        return env
+        # was renamed in CoreGitRepo
+        return self.add_fake_dates_to_env(env)
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None, index_file=None):
@@ -2112,166 +1808,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             for p in self.get_content_info(
                 paths=None, ref=branch, untracked='no', eval_file_type=False)
             ]
-
-    # Convenience wrappers for one-off git calls that don't require further
-    # processing or error handling.
-
-    def _call_git(self, args, files=None, expect_stderr=False, expect_fail=False,
-                  env=None, read_only=False):
-        """Allows for calling arbitrary commands.
-
-        Internal helper to the call_git*() methods.
-
-        The parameters, return value, and raised exceptions match those
-        documented for `call_git`.
-        """
-        runner = self._git_runner
-        stderr_log_level = {True: 5, False: 11}[expect_stderr]
-
-        cmd = self._git_cmd_prefix + args
-
-        if not read_only and self.fake_dates_enabled:
-            env = self.add_fake_dates(env if env else runner.env)
-
-        protocol = StdOutErrCapture
-        out = err = None
-        try:
-            if not read_only:
-                self._write_lock.acquire()
-            if files:
-                # only call the wrapper if needed (adds distraction logs
-                # otherwise, and also maintains the possibility to connect
-                # stdin in the future)
-                res = runner.run_on_filelist_chunks(
-                    cmd,
-                    files,
-                    protocol=protocol,
-                    env=env)
-            else:
-                res = runner.run(
-                    cmd,
-                    protocol=protocol,
-                    env=env)
-        except CommandError as e:
-            ignored = re.search(GitIgnoreError.pattern, e.stderr)
-            if ignored:
-                raise GitIgnoreError(cmd=e.cmd, msg=e.stderr,
-                                     code=e.code, stdout=e.stdout,
-                                     stderr=e.stderr,
-                                     paths=ignored.groups()[0].splitlines())
-            lgr.log(5 if expect_fail else 11, str(e))
-            raise
-        finally:
-            if not read_only:
-                self._write_lock.release()
-
-        out = res['stdout']
-        err = res['stderr']
-        if err:
-            for line in err.splitlines():
-                lgr.log(stderr_log_level,
-                        "stderr| " + line.rstrip('\n'))
-        return out, err
-
-    def call_git(self, args, files=None,
-                 expect_stderr=False, expect_fail=False, read_only=False):
-        """Call git and return standard output.
-
-        Parameters
-        ----------
-        args : list of str
-          Arguments to pass to `git`.
-        files : list of str, optional
-          File arguments to pass to `git`. The advantage of passing these here
-          rather than as part of `args` is that the call will be split into
-          multiple calls to avoid exceeding the maximum command line length.
-        expect_stderr : bool, optional
-          Standard error is expected and should not be elevated above the DEBUG
-          level.
-        expect_fail : bool, optional
-          A non-zero exit is expected and should not be elevated above the
-          DEBUG level.
-        read_only : bool, optional
-          By setting this to True, the caller indicates that the command does
-          not write to the repository, which lets this function skip some
-          operations that are necessary only for commands the modify the
-          repository. Beware that even commands that are conceptually
-          read-only, such as `git-status` and `git-diff`, may refresh and write
-          the index.
-
-        Returns
-        -------
-        standard output (str)
-
-        Raises
-        ------
-        CommandError if the call exits with a non-zero status.
-        """
-        out, _ = self._call_git(args, files,
-                                expect_stderr=expect_stderr,
-                                expect_fail=expect_fail,
-                                read_only=read_only)
-        return out
-
-    def call_git_items_(self, args, files=None, expect_stderr=False, sep=None,
-                        read_only=False):
-        """Call git, splitting output on `sep`.
-
-        Parameters
-        ----------
-        sep : str, optional
-          Split the output by `str.split(sep)` rather than `str.splitlines`.
-
-        All other parameters match those described for `call_git`.
-
-        Returns
-        -------
-        Generator that yields output items.
-
-        Raises
-        ------
-        CommandError if the call exits with a non-zero status.
-        """
-        out, _ = self._call_git(args, files, expect_stderr=expect_stderr,
-                                read_only=read_only)
-        yield from (out.split(sep) if sep else out.splitlines())
-
-    def call_git_oneline(self, args, files=None, expect_stderr=False, read_only=False):
-        """Call git for a single line of output.
-
-        All other parameters match those described for `call_git`.
-
-        Raises
-        ------
-        CommandError if the call exits with a non-zero status.
-        AssertionError if there is more than one line of output.
-        """
-        lines = list(self.call_git_items_(args, files=files,
-                                          expect_stderr=expect_stderr,
-                                          read_only=read_only))
-        if len(lines) > 1:
-            raise AssertionError(
-                "Expected {} to return single line, but it returned {}"
-                .format(["git"] + args, lines))
-        return lines[0]
-
-    def call_git_success(self, args, files=None, expect_stderr=False, read_only=False):
-        """Call git and return true if the call exit code of 0.
-
-        All parameters match those described for `call_git`.
-
-        Returns
-        -------
-        bool
-        """
-        try:
-            self._call_git(
-                args, files, expect_fail=True, expect_stderr=expect_stderr,
-                read_only=read_only)
-
-        except CommandError:
-            return False
-        return True
 
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
