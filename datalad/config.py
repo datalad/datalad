@@ -125,11 +125,11 @@ def _update_from_env(store):
     overrides = {}
     dct = {}
     for k in os.environ:
-        if k == "DATALAD_CONFIG_OVERRIDES":
+        if k == "DATALAD_CONFIG_OVERRIDES_JSON":
             try:
                 overrides = json.loads(os.environ[k])
             except json.decoder.JSONDecodeError as exc:
-                lgr.warning("Failed to load DATALAD_CONFIG_OVERRIDES: %s",
+                lgr.warning("Failed to load DATALAD_CONFIG_OVERRIDES_JSON: %s",
                             exc)
         elif k.startswith('DATALAD_'):
             dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]

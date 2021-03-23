@@ -373,29 +373,29 @@ def test_from_env_overrides():
         assert_not_in("datalad.FoO", cfg)
         assert_equal(cfg["datalad.foo"], "val")
 
-    # But they can be handled via DATALAD_CONFIG_OVERRIDES.
+    # But they can be handled via DATALAD_CONFIG_OVERRIDES_JSON.
     with patch.dict("os.environ",
-                    {"DATALAD_CONFIG_OVERRIDES": '{"datalad.FoO": "val"}'}):
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"datalad.FoO": "val"}'}):
         cfg.reload()
         assert_equal(cfg["datalad.FoO"], "val")
 
-    # DATALAD_CONFIG_OVERRIDES isn't limited to datalad variables.
+    # DATALAD_CONFIG_OVERRIDES_JSON isn't limited to datalad variables.
     with patch.dict("os.environ",
-                    {"DATALAD_CONFIG_OVERRIDES": '{"a.b.c": "val"}'}):
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"a.b.c": "val"}'}):
         cfg.reload()
         assert_equal(cfg["a.b.c"], "val")
 
     # Explicitly provided DATALAD_ variables take precedence over those in
-    # DATALAD_CONFIG_OVERRIDES.
+    # DATALAD_CONFIG_OVERRIDES_JSON.
     with patch.dict("os.environ",
-                    {"DATALAD_CONFIG_OVERRIDES": '{"datalad.foo": "val"}',
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"datalad.foo": "val"}',
                      "DATALAD_FOO": "val-direct"}):
         cfg.reload()
         assert_equal(cfg["datalad.foo"], "val-direct")
 
     # JSON decode errors don't lead to crash.
     with patch.dict("os.environ",
-                    {"DATALAD_CONFIG_OVERRIDES": '{'}):
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{'}):
         with swallow_logs(logging.WARNING) as cml:
             cfg.reload()
         assert_in("Failed to load DATALAD_CONFIG_OVERRIDE", cml.out)
@@ -640,4 +640,3 @@ def test_external_modification(path):
     runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
     config.reload()
     assert_equal(config[key], '11')
-

@@ -409,9 +409,9 @@ def test_name_with_underscore(path):
         with assert_raises(ValueError):
             ds.run_procedure(spec=["print_args"])
 
-    # But it can be set via DATALAD_CONFIG_OVERRIDES.
+    # But it can be set via DATALAD_CONFIG_OVERRIDES_JSON.
     with patch.dict("os.environ",
-                    {"DATALAD_CONFIG_OVERRIDES":
+                    {"DATALAD_CONFIG_OVERRIDES_JSON":
                      '{"datalad.procedures.print_args.call-format": '
                      '"python {script}"}'}):
         ds.config.reload()
