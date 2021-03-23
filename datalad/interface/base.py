@@ -662,7 +662,7 @@ class Interface(object):
         # get the signature
         ndefaults = 0
         args, varargs, varkw, defaults = getargspec(cls.__call__)
-        if not defaults is None:
+        if defaults is not None:
             ndefaults = len(defaults)
         for i, arg in enumerate(args):
             if not is_api_arg(arg):
