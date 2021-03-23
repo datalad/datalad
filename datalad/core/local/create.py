@@ -498,7 +498,7 @@ def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
                       description=None):
     """Create and configure a repository at `path`
 
-    This includes a default setup which files to never annex.
+    This includes a default setup of annex.largefiles.
 
     Parameters
     ----------
