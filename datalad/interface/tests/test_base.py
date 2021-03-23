@@ -10,6 +10,7 @@
 
 """
 
+import argparse
 import unittest.mock as mock
 from datalad.tests.utils import (
     assert_in,
@@ -211,3 +212,36 @@ def test_update_docstring_with_parameters_no_kwds():
              pos1=Parameter(doc="pos1 param doc")),
         add_args={"pos1": 3})
     assert_in("3", fn.__doc__)
+
+
+def check_call_from_parser_pos_arg_underscore(how):
+    from datalad.cmdline.helpers import parser_add_common_options
+    from datalad.support.param import Parameter
+
+    kwds = {"doc": "pos_arg doc"}
+    if how == "dest":
+        kwds["dest"] = "pos_arg"
+    elif how == "args":
+        kwds["args"] = ("pos_arg",)
+    elif how != "bare":
+        raise AssertionError("Unrecognized how: {}".format(how))
+
+    class Cmd(Interface):
+
+        _params_ = dict(
+            pos_arg=Parameter(**kwds))
+
+        def __call__(pos_arg, **kwargs):
+            return pos_arg
+
+    parser = argparse.ArgumentParser()
+    parser_add_common_options(parser, version="v1")
+    Cmd.setup_parser(parser)
+    args = parser.parse_args(["val"])
+    eq_(Cmd.call_from_parser(args),
+        "val")
+
+
+def test_call_from_parser_pos_arg_underscore():
+    for how in "bare", "dest", "args":
+        yield check_call_from_parser_pos_arg_underscore, how
