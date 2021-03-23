@@ -365,9 +365,6 @@ class Create(Interface):
             yield res
             return
 
-        # stuff that we create and want to have tracked with git (not annex)
-        add_to_git = {}
-
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
@@ -376,12 +373,12 @@ class Create(Interface):
         # Re-use tbrepo instance, do not use tbds.repo
 
         # create and configure desired repository
+        # also provides inital set of content to be tracked with git (not annex)
         if no_annex:
-            tbrepo = _setup_git_repo(
-                path, add_to_git, initopts, fake_dates)
+            tbrepo, add_to_git = _setup_git_repo(path, initopts, fake_dates)
         else:
-            tbrepo = _setup_annex_repo(
-                path, add_to_git, initopts, fake_dates, description)
+            tbrepo, add_to_git = _setup_annex_repo(
+                path, initopts, fake_dates, description)
 
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
         # Note, must not happen earlier (before if) since "smart" it would not be
@@ -459,16 +456,13 @@ class Create(Interface):
         yield res
 
 
-def _setup_git_repo(path, add_to_git, initopts=None, fake_dates=False):
+def _setup_git_repo(path, initopts=None, fake_dates=False):
     """Create and configure a repository at `path`
 
     Parameters
     ----------
     path: str or Path
       Path of the repository
-    add_to_git: dict
-      To add records for any repo component that needs to be passed
-      to git-add as a result of the setup procedure.
     initopts: list, optional
       Git options to be passed to the GitRepo constructor
     fake_dates: bool, optional
@@ -476,7 +470,9 @@ def _setup_git_repo(path, add_to_git, initopts=None, fake_dates=False):
 
     Returns
     -------
-    GitRepo
+    GitRepo, dict
+      Created repository and records for any repo component that needs to be
+      passed to git-add as a result of the setup procedure.
     """
     lgr.info("Creating a new git repo at %s", path)
     tbrepo = GitRepo(
@@ -488,13 +484,16 @@ def _setup_git_repo(path, add_to_git, initopts=None, fake_dates=False):
     # place a .noannex file to indicate annex to leave this repo alone
     stamp_path = Path(tbrepo.path) / '.noannex'
     stamp_path.touch()
-    add_to_git[stamp_path] = {
-        'type': 'file',
-        'state': 'untracked'}
-    return tbrepo
+    add_to_git = {
+        stamp_path: {
+            'type': 'file',
+            'state': 'untracked',
+        }
+    }
+    return tbrepo, add_to_git
 
 
-def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
+def _setup_annex_repo(path, initopts=None, fake_dates=False,
                       description=None):
     """Create and configure a repository at `path`
 
@@ -504,9 +503,6 @@ def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
     ----------
     path: str or Path
       Path of the repository
-    add_to_git: dict
-      To add records for any repo component that needs to be passed
-      to git-add as a result of the setup procedure.
     initopts: list, optional
       Git options to be passed to the AnnexRepo constructor
     fake_dates: bool, optional
@@ -516,7 +512,9 @@ def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
 
     Returns
     -------
-    AnnexRepo
+    AnnexRepo, dict
+      Created repository and records for any repo component that needs to be
+      passed to git-add as a result of the setup procedure.
     """
     # always come with annex when created from scratch
     lgr.info("Creating a new annex repo at %s", path)
@@ -536,9 +534,12 @@ def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
     tbrepo.set_default_backend(
         cfg.obtain('datalad.repo.backend'),
         persistent=True, commit=False)
-    add_to_git[tbrepo.pathobj / '.gitattributes'] = {
-        'type': 'file',
-        'state': 'added'}
+    add_to_git = {
+        tbrepo.pathobj / '.gitattributes': {
+            'type': 'file',
+            'state': 'added',
+        }
+    }
     # make sure that v6 annex repos never commit content under .datalad
     attrs_cfg = (
         ('config', 'annex.largefiles', 'nothing'),
@@ -568,4 +569,4 @@ def _setup_annex_repo(path, add_to_git, initopts=None, fake_dates=False,
         add_to_git[tbrepo.pathobj / '.gitattributes'] = {
             'type': 'file',
             'state': 'untracked'}
-    return tbrepo
+    return tbrepo, add_to_git
