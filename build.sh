@@ -4,6 +4,9 @@
 #
 # Adopted from http://github.com/lzkelley/kalepy/
 #
+# But styling is different from JOSS which is also
+# rendered by github action
+#
 # Dependencies
 #  sudo apt-get install pandoc-citeproc pandoc
 # -------------------------------------------------------------------------------------------------
