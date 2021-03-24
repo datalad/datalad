@@ -1027,7 +1027,7 @@ class Addurls(Interface):
             it ends with ".tsv". Otherwise, treat it as a CSV file.""",
             constraints=EnsureChoice(*INPUT_TYPES)),
         exclude_autometa=Parameter(
-            args=("-x", "--exclude_autometa"),
+            args=("-x", "--exclude-autometa"),
             metavar="REGEXP",
             doc="""By default, metadata field=value pairs are constructed with
             each column in `URL-FILE`, excluding any single column that is
@@ -1123,7 +1123,9 @@ class Addurls(Interface):
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
                  cfg_proc=None, jobs=None, drop_after=False):
-        # Temporarily work around gh-2269.
+        # This was to work around gh-2269. That's fixed, but changing the
+        # positional argument names now would cause breakage for any callers
+        # that used these arguments as keyword arguments.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
 
