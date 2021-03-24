@@ -10,10 +10,17 @@
 
 """
 
+import argparse
 import unittest.mock as mock
-from datalad.tests.utils import *
+from datalad.tests.utils import (
+    assert_in,
+    assert_not_in,
+    eq_,
+    ok_,
+    patch_config,
+    with_tempfile,
+)
 from datalad.utils import (
-    swallow_outputs,
     updated,
 )
 from datalad.cmd import (
@@ -26,6 +33,7 @@ from ..base import (
     nadict,
     nagen,
     NA_STRING,
+    update_docstring_with_parameters,
 )
 from argparse import Namespace
 
@@ -34,6 +42,10 @@ def _args(**kwargs):
     return Namespace(
         # ATM duplicates definitions done by cmdline.main and
         # required by code logic to be defined. (should they?)
+        #
+        # TODO: The common options are now added by
+        # cmdline.helpers.parser_add_common_options(), which can be reused by
+        # tests.
         **updated(
             dict(
                 common_output_format="default"
@@ -184,3 +196,52 @@ def test_status_custom_summary_no_repeats(path):
         protocol=StdOutCapture)
     out_lines = out['stdout'].splitlines()
     eq_(len(out_lines), len(set(out_lines)))
+
+
+def test_update_docstring_with_parameters_no_kwds():
+    from datalad.support.param import Parameter
+
+    def fn(pos0):
+        "fn doc"
+
+    assert_not_in("3", fn.__doc__)
+    # Call doesn't crash when there are no keyword arguments.
+    update_docstring_with_parameters(
+        fn,
+        dict(pos0=Parameter(doc="pos0 param doc"),
+             pos1=Parameter(doc="pos1 param doc")),
+        add_args={"pos1": 3})
+    assert_in("3", fn.__doc__)
+
+
+def check_call_from_parser_pos_arg_underscore(how):
+    from datalad.cmdline.helpers import parser_add_common_options
+    from datalad.support.param import Parameter
+
+    kwds = {"doc": "pos_arg doc"}
+    if how == "dest":
+        kwds["dest"] = "pos_arg"
+    elif how == "args":
+        kwds["args"] = ("pos_arg",)
+    elif how != "bare":
+        raise AssertionError("Unrecognized how: {}".format(how))
+
+    class Cmd(Interface):
+
+        _params_ = dict(
+            pos_arg=Parameter(**kwds))
+
+        def __call__(pos_arg, **kwargs):
+            return pos_arg
+
+    parser = argparse.ArgumentParser()
+    parser_add_common_options(parser, version="v1")
+    Cmd.setup_parser(parser)
+    args = parser.parse_args(["val"])
+    eq_(Cmd.call_from_parser(args),
+        "val")
+
+
+def test_call_from_parser_pos_arg_underscore():
+    for how in "bare", "dest", "args":
+        yield check_call_from_parser_pos_arg_underscore, how
