@@ -100,8 +100,10 @@ As a testament of scalability, http://datasets.datalad.org provides a DataLad (s
 
 Similarly to git and git-annex, DataLad core strives to provide a generic, not encumbered by a specific field of science platform.
 To harmoniously extend its functionality, DataLad provides mechanism for providing domain or technology specific extensions.
-Exemplar extensions at the moment are
+Exemplar extensions:
+
 - [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments;
+- [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] the functionality which initiated the DataLad project - support for creating and updating DataLad datasets from external resources;
 - [datalad-neuroimaging](https://github.com/datalad/datalad-neuroimaging) [@datalad-neuroimaging:zenodo] to provide neuroimaging specific procedures and metadata extractors
 - [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF).
 
