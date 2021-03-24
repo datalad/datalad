@@ -27,16 +27,44 @@ bibliography: paper.bib
 
 ---
 
+# Summary
+
+The DataLad project (http://datalad.org) adapted the models of open-source software development and distribution to address technical limitations of today's data management, sharing, and provenance collection.
+Born of idea to provide a unified data distribution for neuroscience, taking a versatile system for data logistics 
+(git-annex, https://git-annex.branchable.com) built on top of the most popular distributed version control system 
+(git, https://git-scm.com), and adopting ideas and procedures from software distributions, DataLad delivers a completely open, pioneering platform for flexible distributed research data management (dRDM) [@Hanke_2021].
+
 # Statement of Need
 
 Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
 While code management and sharing is streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data has remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles postulating demands on public data hosting portals and the big callout for Data Science.
 Disconnected FAIR data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and shared data provenance is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
 
-# Summary
+## Why git and git-annex
 
-The DataLad project (http://datalad.org) adapted the models of open-source software development and distribution to address technical limitations of today's data management, sharing, and provenance collection.
-Born of idea to provide a unified data distribution for neuroscience, taking a versatile system for data logistics (git-annex (TODO: reference)) built on top of the most popular distributed version control system (git (TODO: reference)), and adopting ideas and procedures from software distributions, DataLad delivers a completely open, pioneering platform for flexible distributed research data management (dRDM).
+Git is an excellent distributed content management system geared toward management and collaboration on text files, and as such cannot handle large or binary files well.
+Moreover, any data committed to git becomes available to all clones of that repository, thus making it hard or impossible to provide distributed storage of managed data, or revocation of individual files from distribution.  
+Git-annex takes advantage of git for management of textual information to overcome git's limitation in management of individual files (be it a large data file or a sensitive data) content.
+A file managed by git-annex is replaced with a symbolic link pointing to the content of the file as identified by its content checksum, and only such light-weight link is directly committed into git.
+Git-annex then manages files availability information in any local repository, or other git remotes or external resources, e.g. web urls.
+Such simple approach allows git-annex to scale to manage virtually arbitrarily large files, and "link" files in a git repository to vast data resources available online. 
+
+## Why git and git-annex alone are not enough
+
+Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
+Many research datasets contain millions of files, and that precludes placing such datasets in their entirety within a single git repository even if files are tiny in their size.
+Such datasets should be partitioned into smaller subdatasets (e.g., a subdataset per each subject in the dataset comprising thousands of participants).
+Such modularization allows for not only scalable management, but also for efficient reuse of a selected subset of datasets.
+DataLad uses standard "git submodules" mechanism to unambigously link individual datasets into larger super-datasets, and further simplifies working with such hierarchies of datasets.
+DataLad makes it trivial to operate on individual files deep in the hierachy or entire sub-trees of datasets. 
+
+A typical step of any empirical study requires two major components: input data (obtained from external resources or obtained from prior step) and processing code (ideally accompanied with an entire computational environment).
+Given data and processing, it produces output results which in turn might become input to another step. 
+
+
+# DataLad ecosystem
+
+## DataLad core
 
 `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases in any field of science.
 Its API (see \autoref{fig:one}) operates on DataLad datasets which are just git (with optional git-annex for data) repositories with additional metadata and configuration.
@@ -65,7 +93,6 @@ DataLad can be used as an independent tool, or as a core technology behind a lar
 [CONP-PCNO](https://github.com/CONP-PCNO/) adopts aforementioned modular composition to deliver a rich collection of datasets with public or restricted access to data.
 [ReproMan](http://reproman.repronim.org) integrates with DataLad to provide version control and data logistics 
 
-TODO: site dRDM paper
 
 ## Datasets
 
@@ -86,17 +113,13 @@ Through its lifetime, DataLad project have been supporting development of `git-a
 
 ## Contributing
 
+# Author Contributions
 
-# Citations
+if desired/needed -- or drop altogether.
 
-Citations to entries in paper.bib should be in
-[rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
-format.
+# Conflicts of interest
 
-For a quick reference, the following citation commands can be used:
-- `@author:2001`  ->  "Author et al. (2001)"
-- `[@author:2001]` -> "(Author et al., 2001)"
-- `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
+There are no conflicts to declare.
 
 # Acknowledgements
 
