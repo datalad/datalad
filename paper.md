@@ -138,7 +138,8 @@ DataLad releases are distributed through PyPI, Debian, NeuroDebian, brew, conda-
 
 ## Development
 
-DataLad is being developed openly in a public https://github.com/datalad/datalad repository.
+DataLad is being developed openly in a public https://github.com/datalad/datalad repository since its inception in 2013.
+Since then `datalad` core repository amassed over 13.5k commits, 2.5k merged PRs, 2.3k closed (+700 open) issues from over 30 contributors.
 Issue tracker, labels, milestones, and pull requests (from personal forks) are used to coordinate development.
 DataLad heavily relies on versatility and stability of the underlying core tools - `git` and `git-annex`.
 To avoid reimplementing the wheel and to benefit `git-annex` users community at large, many aspects of the desired functionality are implemented directly in `git-annex` through the years of collaboration with the `git-annex` developer Joey Hess (see https://git-annex.branchable.com/projects/datalad). 
