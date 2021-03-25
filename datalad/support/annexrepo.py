@@ -2325,9 +2325,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
         """
-        if batch:
-            lgr.warning("TODO: --batch mode for whereis.  Operating serially")
-
         OUTPUTS = {'descriptions', 'uuids', 'full'}
         if output not in OUTPUTS:
             raise ValueError(
@@ -2336,23 +2333,30 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
 
         options = ensure_list(options, copy=True)
-        cmd = ['whereis'] + options
-        files_arg = None
-        if key:
-            cmd = cmd + ["--key"] + files
+        if batch:
+            if key:
+                raise ValueError("batch=True is incompatible with `key`")
+            bcmd = self._batched.get('whereis', annex_options=options,
+                                     json=True, path=self.path)
+            json_objects = bcmd(files)
         else:
-            files_arg = files
+            cmd = ['whereis'] + options
+            files_arg = None
+            if key:
+                cmd = cmd + ["--key"] + files
+            else:
+                files_arg = files
 
-        try:
-            json_objects = self.call_annex_records(cmd, files=files_arg)
-        except CommandError as e:
-            if e.stderr.startswith('Invalid'):
-                # would happen when git-annex is called with incompatible options
-                raise
-            # whereis may exit non-zero when there are too few known copies
-            # callers of whereis are interested in exactly that information,
-            # which we deliver via result, not via exception
-            json_objects = e.kwargs.get('stdout_json', [])
+            try:
+                json_objects = self.call_annex_records(cmd, files=files_arg)
+            except CommandError as e:
+                if e.stderr.startswith('Invalid'):
+                    # would happen when git-annex is called with incompatible options
+                    raise
+                # whereis may exit non-zero when there are too few known copies
+                # callers of whereis are interested in exactly that information,
+                # which we deliver via result, not via exception
+                json_objects = e.kwargs.get('stdout_json', [])
 
         if output in {'descriptions', 'uuids'}:
             return [

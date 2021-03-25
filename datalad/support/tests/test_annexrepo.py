@@ -2531,3 +2531,28 @@ def test_whereis_zero_copies(path):
             assert_equal(res["foo"], {})
         else:
             assert_equal(res, [[]])
+
+
+@with_tempfile(mkdir=True)
+def test_whereis_batch_eqv(path):
+    path = Path(path)
+
+    repo_a = AnnexRepo(path / "a", create=True)
+    (repo_a.pathobj / "foo").write_text("foo")
+    (repo_a.pathobj / "bar").write_text("bar")
+    (repo_a.pathobj / "baz").write_text("baz")
+    repo_a.save()
+
+    repo_b = repo_a.clone(repo_a.path, str(path / "b"))
+    repo_b.drop(["bar"])
+    repo_b.drop(["baz"])
+    repo_b.drop(["baz"], options=["--from=origin", "--force"])
+
+    files = ["foo", "bar", "baz"]
+    for output in "full", "uuids", "descriptions":
+        assert_equal(repo_b.whereis(files=files, batch=False, output=output),
+                     repo_b.whereis(files=files, batch=True, output=output))
+
+    # --key= and --batch are incompatible.
+    with assert_raises(ValueError):
+        repo_b.whereis(files=files, batch=True, key=True)
