@@ -24,6 +24,7 @@ from datalad.tests.utils import (
     chpwd,
     eq_,
     known_failure_githubci_win,
+    ok_exists,
     skip_if_on_windows,
     skip_ssh,
     slow,
@@ -114,7 +115,7 @@ def _test_create_store(host, base_path, ds_path, clone_path):
 
     # check bare repo:
     git_config = Path(base_path) / ds.id[:3] / ds.id[3:] / 'config'
-    assert git_config.exists()
+    ok_exists(git_config)
     content = git_config.read_text()
     assert_in("[datalad \"ora-remote\"]", content)
     super_uuid = ds.config.get("remote.{}.annex-uuid".format('datastore-storage'))
