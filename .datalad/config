@@ -2,4 +2,4 @@
 	id = a496f0ce-1f4a-4720-b599-3c1ce3aacaf7
 [datalad "containers.openjournals-paperdraft"]
 	image = .datalad/environments/openjournals-paperdraft/image
-	cmdexec = python -m datalad_container.adapters.docker run {img} {cmd}
+	cmdexec = python -m datalad_container.adapters.docker run {img}
