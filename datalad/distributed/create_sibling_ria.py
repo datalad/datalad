@@ -643,13 +643,12 @@ def _create_sibling_ria(
             disabled_hook.rename(enabled_hook)
         if group:
             # TODO; do we need a cwd here?
-            subprocess.run(chgrp_cmd, cwd=quote_cmdlinearg(ds.path))
+            subprocess.run(chgrp_cmd, cwd=ds.path)
         # finally update server
         if post_update_hook:
             # Conditional on post_update_hook, since one w/o the other doesn't
             # seem to make much sense.
-            subprocess.run("git update-server-info",
-                           cwd=quote_cmdlinearg(ds.path))
+            gr.call_git(["update-server-info"])
 
     # add a git remote to the bare repository
     # Note: needs annex-ignore! Otherwise we might push into dirhash
