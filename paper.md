@@ -93,7 +93,7 @@ Its API (see \autoref{fig:one}) operates on DataLad datasets which are just git 
  
 ![DataLad: overview of available commands for various parts of the data management process \label{fig:one}](figures/datalad_process.png)
 
-Based git's submodules mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
+Using git's submodules mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
 With this simple paradigm, DataLad fulfills the YODA principles for reproducible science [@yoda:myyoda] and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results  (see Figure 2).
 
 ![DataLad datasets all the way down: from publication to raw data](figures/datalad-nesting-access.png)
@@ -139,7 +139,7 @@ Any reported dataset could be immediately installed using `datalad install` comm
 
 The DataLad Handbook provides [installation instructions](http://handbook.datalad.org/en/latest/intro/installation.html) for all operating systems.
 DataLad releases are distributed through PyPI, Debian, NeuroDebian, brew, conda-forge.
-The [datalad-installer](https://github.com/datalad/datalad-installer/) (also available from PyPI) can be used to streamline the installation of `git-annex`, which cannot be installed via `pip` and thus may need a separate installation, across operating systems.
+The [datalad-installer](https://github.com/datalad/datalad-installer/) (also available from PyPI) can be used to streamline the installation of `git-annex`, which cannot be installed via `pip` and thus may need a separate installation on some operating systems.
 
 ## Development
 
