@@ -98,7 +98,8 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     assert_repo_status(ds.path)
 
     # don't specify special remote. By default should be git-remote + "-storage"
-    res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore")
+    res = ds.create_sibling_ria("ria+ssh://test-store:", "datastore",
+                                post_update_hook=True)
     assert_result_count(res, 1, status='ok', action='create-sibling-ria')
     eq_(len(res), 1)
 
@@ -111,10 +112,16 @@ def _test_create_store(host, base_path, ds_path, clone_path):
     sub2_siblings = subds2.siblings(result_renderer=None)
     eq_({'here'}, {s['name'] for s in sub2_siblings})
 
-    # TODO: post-update hook was enabled
-
     # check bare repo:
-    git_config = Path(base_path) / ds.id[:3] / ds.id[3:] / 'config'
+    git_dir = Path(base_path) / ds.id[:3] / ds.id[3:]
+
+    # The post-update hook was enabled.
+    ok_exists(git_dir / "hooks" / "post-update")
+    # And create_sibling_ria took care of an initial call to
+    # git-update-server-info.
+    ok_exists(git_dir / "info" / "refs")
+
+    git_config = git_dir / 'config'
     ok_exists(git_config)
     content = git_config.read_text()
     assert_in("[datalad \"ora-remote\"]", content)
