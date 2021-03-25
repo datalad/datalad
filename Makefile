@@ -1,2 +1,2 @@
 paper.pdf: paper.md paper.bib
-	./build.sh
+	datalad containers-run --explicit openjournals-paperdraft
