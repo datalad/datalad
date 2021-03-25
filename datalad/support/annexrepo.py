@@ -2283,7 +2283,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         remotes = {remote['uuid']: {x: remote.get(x, None)
                                     for x in ('description', 'here', 'urls')
                                     }
-                   for remote in j.get('whereis')}
+                   for remote in j['whereis']}
         return remotes
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
