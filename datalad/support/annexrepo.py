@@ -2279,7 +2279,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _whereis_json_to_dict(self, j):
         """Convert json record returned by annex whereis --json to our dict representation for it
         """
-        assert (j.get('success', True) is True)
         # process 'whereis' containing list of remotes
         remotes = {remote['uuid']: {x: remote.get(x, None)
                                     for x in ('description', 'here', 'urls')

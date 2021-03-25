@@ -466,9 +466,8 @@ class TestAddArchiveOptions():
 
         # previous state of things:
         prev_files = list(find_files('.*', self.annex.path))
-        with assert_raises(Exception), \
-                swallow_logs():
-            self.annex.whereis(key1, key=True, output='full')
+        assert_equal(self.annex.whereis(key1, key=True, output='full'), {})
+
         commits_prior = list(self.annex.get_branch_commits_('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
         commits_after = list(self.annex.get_branch_commits_('git-annex'))

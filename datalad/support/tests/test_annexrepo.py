@@ -2515,3 +2515,18 @@ def test_call_annex(path):
         ar._call_annex(['not-an-annex-command'])
     except CommandError as e:
         assert_in('Invalid argument', e.stderr)
+
+
+@with_tempfile
+def test_whereis_zero_copies(path):
+    repo = AnnexRepo(path, create=True)
+    (repo.pathobj / "foo").write_text("foo")
+    repo.save()
+    repo.drop(["foo"], options=["--force"])
+
+    for output in "full", "uuids", "descriptions":
+        res = repo.whereis(files=["foo"], output=output)
+        if output == "full":
+            assert_equal(res["foo"], {})
+        else:
+            assert_equal(res, [[]])
