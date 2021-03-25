@@ -2284,8 +2284,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                                     for x in ('description', 'here', 'urls')
                                     }
                    for remote in j.get('whereis')}
-        if WEB_SPECIAL_REMOTE_UUID in remotes:
-            assert(remotes[WEB_SPECIAL_REMOTE_UUID]['description'] == 'web')
         return remotes
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
