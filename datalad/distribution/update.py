@@ -56,6 +56,34 @@ class YieldDatasetAndRevision(YieldDatasets):
         return ds, res.get("gitshasum")
 
 
+def _process_how_args(merge, how, how_subds):
+    """Resolve how-related arguments into `how` and `how_subds` values.
+    """
+    # Translate old --merge value onto --how
+    if merge and (how or how_subds):
+        raise ValueError("`merge` is incompatible with `how` and `how_subds`")
+    elif merge == "ff-only":
+        how = merge
+    elif merge:
+        how = "merge"
+
+    if how == "fetch":
+        how = None
+
+    # Map "fetch" to None for easier conditions.
+    if how_subds == "fetch":
+        how_subds = None
+    elif how_subds is None:
+        # Subdatasets are updated according to --how unless --how-subds is
+        # given.
+        how_subds = how
+    return how, how_subds
+
+
+_how_constraints = EnsureNone() | EnsureChoice(
+    "fetch", "merge", "ff-only")
+
+
 @build_doc
 class Update(Interface):
     """Update a dataset from a sibling.
@@ -71,14 +99,14 @@ class Update(Interface):
         dict(text="Update from a particular sibling and merge the changes "
                   "from a configured or matching branch from the sibling "
                   "(see [CMD: --follow CMD][PY: `follow` PY] for details)",
-             code_py="update(sibling='siblingname', merge=True)",
-             code_cmd="datalad update --merge -s <siblingname>"),
+             code_py="update(sibling='siblingname', how='merge')",
+             code_cmd="datalad update --how=merge -s <siblingname>"),
         dict(text="Update from the sibling 'origin', traversing into "
                   "subdatasets. For subdatasets, merge the revision "
                   "registered in the parent dataset into the current branch",
-             code_py="update(sibling='origin', merge=True, "
+             code_py="update(sibling='origin', how='merge', "
                      "follow='parentds', recursive=True)",
-             code_cmd="datalad update -s origin --merge "
+             code_cmd="datalad update -s origin --how=merge "
                       "--follow=parentds -r"),
     ]
 
@@ -95,9 +123,9 @@ class Update(Interface):
             doc="""name of the sibling to update from. When unspecified,
             updates from all siblings are fetched. If there is more than one
             sibling and changes will be brought into the working tree (as
-            requested via [CMD: --merge CMD][PY: `merge` PY]), a sibling will
-            be chosen based on the configured remote for the current
-            branch.""",
+            requested via [CMD: --merge, --how, or --how-subds CMD][PY:
+            `merge`, `how`, or `how_subds` PY]), a sibling will be chosen based
+            on the configured remote for the current branch.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -112,12 +140,33 @@ class Update(Interface):
             const="any",
             nargs="?",
             constraints=EnsureBool() | EnsureChoice("any", "ff-only"),
-            doc="""merge obtained changes from the sibling. By default, changes
-            are fetched from the sibling but not merged into the current
-            branch. With [CMD: --merge or --merge=any CMD][PY: merge=True or
-            merge="any" PY], the changes will be merged into the current
-            branch. A value of 'ff-only' restricts the allowed merges to
-            fast-forwards."""),
+            # TODO: Decide whether this should be removed eventually.
+            doc="""merge obtained changes from the sibling. This is a subset of
+            the functionality that can be achieved via the newer [CMD: --how
+            CMD][PY: `how` PY]. [CMD: --merge or --merge=any CMD][PY:
+            merge=True or merge="any" PY] is equivalent to [CMD: --how=merge
+            CMD][PY: how="merge" PY]. [CMD: --merge=ff-only CMD][PY:
+            merge="ff-only" PY] is equivalent to [CMD: --how=ff-only CMD][PY:
+            how="ff-only" PY]."""),
+        how=Parameter(
+            args=("--how",),
+            metavar="ACTION",
+            nargs="?",
+            constraints=_how_constraints,
+            doc="""how to update the dataset. The default ("fetch") simply
+            fetches the changes from the sibling but doesn't incorporate them
+            into the working tree. A value of "merge" or "ff-only" merges in
+            changes, with the latter restricting the allowed merges to
+            fast-forwards. When [CMD: --recursive CMD][PY: recursive=True PY]
+            is specified, this action will also apply to subdatasets unless
+            overridden by [CMD: --how-subds CMD][PY: `how_subds` PY]."""),
+        how_subds=Parameter(
+            args=("--how-subds",),
+            metavar="ACTION",
+            nargs="?",
+            constraints=_how_constraints,
+            doc="""Override the behavior of [CMD: --how CMD][PY: `how` PY] in
+            subdatasets."""),
         follow=Parameter(
             args=("--follow",),
             constraints=EnsureChoice("sibling", "parentds", "parentds-lazy"),
@@ -153,6 +202,8 @@ class Update(Interface):
             path=None,
             sibling=None,
             merge=False,
+            how=None,
+            how_subds=None,
             follow="sibling",
             dataset=None,
             recursive=False,
@@ -164,6 +215,11 @@ class Update(Interface):
         if path and not recursive:
             lgr.warning('path constraints for subdataset updates ignored, '
                         'because `recursive` option was not given')
+
+        how, how_subds = _process_how_args(merge, how, how_subds)
+        # `merge` should be considered through `how` and `how_subds` only.
+        # Unbind `merge` to ensure that downstream code doesn't look at it.
+        del merge
 
         refds = require_dataset(dataset, check_installed=True, purpose='updating')
 
@@ -196,6 +252,7 @@ class Update(Interface):
                 yield res
                 continue
 
+            how_curr = how_subds if revision else how
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
@@ -224,7 +281,7 @@ class Update(Interface):
                 res['status'] = 'impossible'
                 yield res
                 continue
-            if not sibling_ and len(remotes) > 1 and merge:
+            if not sibling_ and len(remotes) > 1 and how_curr:
                 lgr.debug("Found multiple siblings:\n%s", remotes)
                 res['status'] = 'impossible'
                 res['message'] = "Multiple siblings, please specify from which to update."
@@ -270,7 +327,7 @@ class Update(Interface):
                     continue
 
             saw_update_failure = False
-            if merge:
+            if how_curr:
                 if follow_parent:
                     target = revision
                 else:
@@ -286,20 +343,21 @@ class Update(Interface):
                             message=("follow='parentds' is incompatible "
                                      "with adjusted branches"))
                         continue
-
-                    if merge == "ff-only":
+                    if how_curr != "merge":
                         yield dict(
                             res, status="impossible",
-                            message=("ff-only is incompatible "
-                                     "with adjusted branches"))
+                            message=("Updating via '%s' is incompatible "
+                                     "with adjusted branches",
+                                     how_curr))
                         continue
 
                 update_fn = _choose_update_fn(
                     repo,
+                    how_curr,
                     is_annex=is_annex,
                     adjusted=adjusted)
 
-                fn_opts = ["--ff-only"] if merge == "ff-only" else None
+                fn_opts = ["--ff-only"] if how_curr == "ff-only" else None
                 if update_fn is not _annex_sync:
                     if target is None:
                         yield dict(res,
@@ -325,7 +383,7 @@ class Update(Interface):
             yield res
         # we need to save updated states only if merge was requested -- otherwise
         # it was a pure fetch
-        if merge and recursive:
+        if how_curr and recursive:
             if path and not saw_subds:
                 lgr.warning(
                     'path constraints did not match an installed subdataset: %s',
@@ -350,6 +408,9 @@ class Update(Interface):
 
 def _choose_update_target(repo, branch, remote, cfg_remote):
     """Select a target to update `repo` from.
+
+    Note: This function is not concerned with _how_ the update is done (e.g.,
+    merge, reset, ...).
 
     Parameters
     ----------
@@ -388,18 +449,25 @@ def _choose_update_target(repo, branch, remote, cfg_remote):
 #  Update functions
 
 
-def _choose_update_fn(repo, is_annex=False, adjusted=False):
-    if adjusted and is_annex:
-        # For adjusted repos, blindly sync.
-        fn = _annex_sync
-    elif is_annex:
-        fn = _annex_plain_merge
-    elif adjusted:
+def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
+    if adjusted and how != "merge":
         raise RuntimeError(
-            "bug: Upstream checks should make it impossible for "
-            "adjusted=True, is_annex=False")
+            "bug: Upstream checks should abort if adjusted is used "
+            "with action other than 'merge'")
+    elif how in ["merge", "ff-only"]:
+        if adjusted and is_annex:
+            # For adjusted repos, blindly sync.
+            fn = _annex_sync
+        elif is_annex:
+            fn = _annex_plain_merge
+        elif adjusted:
+            raise RuntimeError(
+                "bug: Upstream checks should make it impossible for "
+                "adjusted=True, is_annex=False")
+        else:
+            fn = _plain_merge
     else:
-        fn = _plain_merge
+        raise ValueError(f"Unrecognized value for `how`: {how}")
     return fn
 
 

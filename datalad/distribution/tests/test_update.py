@@ -24,6 +24,9 @@ from datalad.api import (
     update,
     remove,
 )
+from datalad.distribution.update import (
+    _process_how_args,
+)
 from datalad.utils import (
     knows_annex,
     rmtree,
@@ -47,6 +50,7 @@ from datalad.tests.utils import (
     maybe_adjust_repo,
     ok_file_has_content,
     assert_status,
+    assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_in_results,
@@ -924,3 +928,34 @@ def test_update_adjusted_incompatible_with_ff_only(path):
     assert_in_results(
         ds_clone.update(on_failure="ignore"),
         action="update", status="ok")
+
+
+def test_process_how_args():
+    # --merge maps onto --how values. It has no equivalent of --how-subds,
+    # --which just gets set to --how's value when unspecified.
+    eq_(_process_how_args(merge=False, how=None, how_subds=None),
+        (None, None))
+    eq_(_process_how_args(merge=True, how=None, how_subds=None),
+        ("merge", "merge"))
+    eq_(_process_how_args(merge="any", how=None, how_subds=None),
+        ("merge", "merge"))
+    eq_(_process_how_args(merge="ff-only", how=None, how_subds=None),
+        ("ff-only", "ff-only"))
+
+    # Values other than the default --merge=False can not be mixed with
+    # non-default how values.
+    with assert_raises(ValueError):
+        _process_how_args(merge=True, how="merge", how_subds=None)
+    with assert_raises(ValueError):
+        _process_how_args(merge=True, how=None, how_subds="merge")
+
+    # --how-subds inherits the value of --how...
+    eq_(_process_how_args(merge=False, how="fetch", how_subds=None),
+        (None, None))
+    eq_(_process_how_args(merge=False, how="merge", how_subds=None),
+        ("merge", "merge"))
+    eq_(_process_how_args(merge=False, how="ff-only", how_subds=None),
+        ("ff-only", "ff-only"))
+    # ... unless --how-subds is explicitly specified.
+    eq_(_process_how_args(merge=False, how="merge", how_subds="fetch"),
+        ("merge", None))
