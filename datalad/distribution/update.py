@@ -92,8 +92,12 @@ class Update(Interface):
             constraints=EnsureStr() | EnsureNone()),
         sibling=Parameter(
             args=("-s", "--sibling",),
-            doc="""name of the sibling to update from. If no sibling
-            is given, updates from all siblings are obtained.""",
+            doc="""name of the sibling to update from. When unspecified,
+            updates from all siblings are fetched. If there is more than one
+            sibling and changes will be brought into the working tree (as
+            requested via [CMD: --merge CMD][PY: `merge` PY]), a sibling will
+            be chosen based on the configured remote for the current
+            branch.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -108,12 +112,9 @@ class Update(Interface):
             const="any",
             nargs="?",
             constraints=EnsureBool() | EnsureChoice("any", "ff-only"),
-            doc="""merge obtained changes from the sibling. If a sibling is not
-            explicitly given and there is only a single known sibling, that
-            sibling is used. Otherwise, an unspecified sibling defaults to the
-            configured remote for the current branch. By default, changes are
-            fetched from the sibling but not merged into the current branch.
-            With [CMD: --merge or --merge=any CMD][PY: merge=True or
+            doc="""merge obtained changes from the sibling. By default, changes
+            are fetched from the sibling but not merged into the current
+            branch. With [CMD: --merge or --merge=any CMD][PY: merge=True or
             merge="any" PY], the changes will be merged into the current
             branch. A value of 'ff-only' restricts the allowed merges to
             fast-forwards."""),
