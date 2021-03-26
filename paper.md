@@ -134,6 +134,7 @@ A comprehensive [DataLad Handbook](http://handbook.datalad.org) [@datalad-handbo
 
 The simplest "prototypical" example is `datalad search haxby` which would install the http://datasets.datalad.org superdataset, and search for datasets mentioning `haxby` anywhere in their metadata records.
 Any reported dataset could be immediately installed using `datalad install` command, and data files of interest obtained using `datalad get`.
+More use-case driven examples could be found in [@datalad-handbook:use-cases].
 
 ## Installation
 
