@@ -59,6 +59,7 @@ from datalad.tests.utils import (
     SkipTest,
     slow,
     known_failure_windows,
+    neq_,
 )
 from datalad import cfg as dl_cfg
 
@@ -928,6 +929,100 @@ def test_update_adjusted_incompatible_with_ff_only(path):
     assert_in_results(
         ds_clone.update(on_failure="ignore"),
         action="update", status="ok")
+
+
+@slow  # ~10s
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def check_update_how_subds_different(follow, path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    ds_src_sub = ds_src.create("sub")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    (ds_clone.pathobj / "foo").write_text("foo")
+    ds_clone.save()
+    ds_clone_sub = Dataset(ds_clone.pathobj / "sub")
+
+    (ds_src_sub.pathobj / "bar").write_text("bar")
+    ds_src.save(recursive=True)
+
+    # Add unrecorded state to make --follow=sibling/parentds differ.
+    (ds_src_sub.pathobj / "baz").write_text("baz")
+    ds_src_sub.save()
+
+    ds_clone_repo = ds_clone.repo
+    ds_clone_hexsha_pre = ds_clone_repo.get_hexsha()
+
+    ds_clone_sub_repo = ds_clone_sub.repo
+    ds_clone_sub_branch_pre = ds_clone_sub_repo.get_active_branch()
+
+    res = ds_clone.update(follow=follow, how="merge", how_subds="reset",
+                          recursive=True)
+
+    assert_result_count(res, 1, action="merge", status="ok",
+                        path=ds_clone.path)
+    assert_result_count(res, 1, action="update.reset", status="ok",
+                        path=ds_clone_sub.path)
+
+    ds_clone_hexsha_post = ds_clone_repo.get_hexsha()
+    neq_(ds_clone_hexsha_pre, ds_clone_hexsha_post)
+    neq_(ds_src.repo.get_hexsha(), ds_clone_hexsha_post)
+    ok_(ds_clone_repo.is_ancestor(ds_clone_hexsha_pre, ds_clone_hexsha_post))
+
+    eq_(ds_clone_sub.repo.get_hexsha(),
+        ds_src_sub.repo.get_hexsha(None if follow == "sibling" else "HEAD~"))
+    ds_clone_sub_branch_post = ds_clone_sub_repo.get_active_branch()
+    eq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
+
+
+def test_update_how_subds_different():
+    yield check_update_how_subds_different, "sibling"
+    yield check_update_how_subds_different, "parentds"
+
+
+@slow  # ~15s
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def test_update_reset_dirty(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    ds_src_s1 = ds_src.create("s1")
+    ds_src_s2 = ds_src.create("s2")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+
+    (ds_src_s1.pathobj / "foo").write_text("foo")
+    (ds_src_s2.pathobj / "bar").write_text("bar")
+    ds_src.save(recursive=True)
+
+    ds_clone_s1 = Dataset(ds_clone.pathobj / "s1")
+    ds_clone_s2 = Dataset(ds_clone.pathobj / "s2")
+    (ds_clone_s1.pathobj / "dirt").write_text("")
+
+    res = ds_clone.update(follow="sibling", how="reset", recursive=True,
+                          on_failure="ignore")
+
+    assert_result_count(res, 1, path=ds_clone.path,
+                        action=f"update.reset", status="error")
+    assert_result_count(res, 1, path=ds_clone_s1.path,
+                        action=f"update.reset", status="error")
+    assert_result_count(res, 1, path=ds_clone_s2.path,
+                        action=f"update.reset", status="ok")
+
+    # s2 was reset...
+    eq_(ds_src_s2.repo.get_hexsha(), ds_clone_s2.repo.get_hexsha())
+    # ... but s1 and the top-level dataset stayed behind due to the dirty tree.
+    eq_(ds_src.repo.get_hexsha("HEAD~"), ds_clone.repo.get_hexsha())
+    eq_(ds_src_s1.repo.get_hexsha("HEAD~"), ds_clone_s1.repo.get_hexsha())
+
+    assert_repo_status(ds_clone.path,
+                       modified=[ds_clone_s1.repo.path,
+                                 ds_clone_s2.repo.path])
 
 
 def test_process_how_args():

@@ -81,7 +81,7 @@ def _process_how_args(merge, how, how_subds):
 
 
 _how_constraints = EnsureNone() | EnsureChoice(
-    "fetch", "merge", "ff-only")
+    "fetch", "merge", "ff-only", "reset")
 
 
 @build_doc
@@ -108,6 +108,15 @@ class Update(Interface):
                      "follow='parentds', recursive=True)",
              code_cmd="datalad update -s origin --how=merge "
                       "--follow=parentds -r"),
+        dict(text="Fetch and merge the remote tracking branch "
+                  "into the current dataset. Then update each subdataset "
+                  "by resetting its current branch to the revision "
+                  "registered in the parent dataset, fetching only if "
+                  "the revision isn't already present",
+             code_py="update(how='merge', how_subds='reset', "
+                     "follow='parentds-lazy', recursive=True)",
+             code_cmd="datalad update --how=merge --how-subds=reset"
+                      "--follow=parentds-lazy -r"),
     ]
 
     _params_ = dict(
@@ -157,9 +166,12 @@ class Update(Interface):
             fetches the changes from the sibling but doesn't incorporate them
             into the working tree. A value of "merge" or "ff-only" merges in
             changes, with the latter restricting the allowed merges to
-            fast-forwards. When [CMD: --recursive CMD][PY: recursive=True PY]
-            is specified, this action will also apply to subdatasets unless
-            overridden by [CMD: --how-subds CMD][PY: `how_subds` PY]."""),
+            fast-forwards. "reset" incorporates the changes with 'git reset
+            --hard <target>', staying on the current branch but discarding any
+            changes that aren't shared with the target. When [CMD: --recursive
+            CMD][PY: recursive=True PY] is specified, this action will also
+            apply to subdatasets unless overridden by [CMD: --how-subds
+            CMD][PY: `how_subds` PY]."""),
         how_subds=Parameter(
             args=("--how-subds",),
             metavar="ACTION",
@@ -369,7 +381,12 @@ class Update(Interface):
                     update_fn = _reobtain(ds, update_fn)
 
                 for ures in update_fn(repo, sibling_, target, opts=fn_opts):
-                    if ures["action"] == "merge" and ures["status"] != "ok":
+                    # NOTE: Ideally the "merge" action would also be prefixed
+                    # with "update.", but a plain "merge" is used for backward
+                    # compatibility.
+                    if ures["status"] != "ok" and (
+                            ures["action"] == "merge" or
+                            ures["action"].startswith("update.")):
                         saw_update_failure = True
                     yield dict(res, **ures)
 
@@ -466,6 +483,8 @@ def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
                 "adjusted=True, is_annex=False")
         else:
             fn = _plain_merge
+    elif how == "reset":
+        fn = _reset_hard
     else:
         raise ValueError(f"Unrecognized value for `how`: {how}")
     return fn
@@ -515,6 +534,18 @@ def _annex_sync(repo, remote, _target, opts=None):
         {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
         repo.call_annex,
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
+
+
+def _reset_hard(repo, _, target, opts=None):
+    if repo.dirty:
+        yield {"action": "update.reset",
+               "status": "error",
+               "message": "Refusing to reset dirty working tree"}
+    else:
+        yield _try_command(
+            {"action": "update.reset", "message": ("Reset to %s", target)},
+            repo.call_git,
+            ["reset", "--hard", target])
 
 
 def _reobtain(ds, update_fn):
