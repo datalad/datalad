@@ -81,7 +81,7 @@ def _process_how_args(merge, how, how_subds):
 
 
 _how_constraints = EnsureNone() | EnsureChoice(
-    "fetch", "merge", "ff-only", "reset")
+    "fetch", "merge", "ff-only", "reset", "checkout")
 
 
 @build_doc
@@ -168,10 +168,12 @@ class Update(Interface):
             changes, with the latter restricting the allowed merges to
             fast-forwards. "reset" incorporates the changes with 'git reset
             --hard <target>', staying on the current branch but discarding any
-            changes that aren't shared with the target. When [CMD: --recursive
-            CMD][PY: recursive=True PY] is specified, this action will also
-            apply to subdatasets unless overridden by [CMD: --how-subds
-            CMD][PY: `how_subds` PY]."""),
+            changes that aren't shared with the target. "checkout", on the
+            other hand, runs 'git checkout <target>', switching from the
+            current branch to a detached state. When [CMD: --recursive CMD][PY:
+            recursive=True PY] is specified, this action will also apply to
+            subdatasets unless overridden by [CMD: --how-subds CMD][PY:
+            `how_subds` PY]."""),
         how_subds=Parameter(
             args=("--how-subds",),
             metavar="ACTION",
@@ -485,6 +487,8 @@ def _choose_update_fn(repo, how, is_annex=False, adjusted=False):
             fn = _plain_merge
     elif how == "reset":
         fn = _reset_hard
+    elif how == "checkout":
+        fn = _checkout
     else:
         raise ValueError(f"Unrecognized value for `how`: {how}")
     return fn
@@ -546,6 +550,13 @@ def _reset_hard(repo, _, target, opts=None):
             {"action": "update.reset", "message": ("Reset to %s", target)},
             repo.call_git,
             ["reset", "--hard", target])
+
+
+def _checkout(repo, _, target, opts=None):
+    yield _try_command(
+        {"action": "update.checkout", "message": ("Checkout %s", target)},
+        repo.call_git,
+        ["checkout", target])
 
 
 def _reobtain(ds, update_fn):

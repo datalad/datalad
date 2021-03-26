@@ -934,7 +934,7 @@ def test_update_adjusted_incompatible_with_ff_only(path):
 @slow  # ~10s
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
-def check_update_how_subds_different(follow, path):
+def check_update_how_subds_different(follow, action, path):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
     ds_src_sub = ds_src.create("sub")
@@ -959,12 +959,12 @@ def check_update_how_subds_different(follow, path):
     ds_clone_sub_repo = ds_clone_sub.repo
     ds_clone_sub_branch_pre = ds_clone_sub_repo.get_active_branch()
 
-    res = ds_clone.update(follow=follow, how="merge", how_subds="reset",
+    res = ds_clone.update(follow=follow, how="merge", how_subds=action,
                           recursive=True)
 
     assert_result_count(res, 1, action="merge", status="ok",
                         path=ds_clone.path)
-    assert_result_count(res, 1, action="update.reset", status="ok",
+    assert_result_count(res, 1, action=f"update.{action}", status="ok",
                         path=ds_clone_sub.path)
 
     ds_clone_hexsha_post = ds_clone_repo.get_hexsha()
@@ -975,12 +975,18 @@ def check_update_how_subds_different(follow, path):
     eq_(ds_clone_sub.repo.get_hexsha(),
         ds_src_sub.repo.get_hexsha(None if follow == "sibling" else "HEAD~"))
     ds_clone_sub_branch_post = ds_clone_sub_repo.get_active_branch()
-    eq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
+
+    if action == "checkout":
+        neq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
+        assert_false(ds_clone_sub_branch_post)
+    else:
+        eq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
 
 
 def test_update_how_subds_different():
-    yield check_update_how_subds_different, "sibling"
-    yield check_update_how_subds_different, "parentds"
+    # Ideally each combination would be checked, but this test is a bit slow.
+    yield check_update_how_subds_different, "parentds", "reset"
+    yield check_update_how_subds_different, "sibling", "checkout"
 
 
 @slow  # ~15s
