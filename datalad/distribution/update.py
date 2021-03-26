@@ -168,7 +168,7 @@ class Update(Interface):
         refds = require_dataset(dataset, check_installed=True, purpose='updating')
 
         save_paths = []
-        merge_failures = set()
+        update_failures = set()
         saw_subds = False
         for ds, revision in itertools.chain([(refds, None)], refds.subdatasets(
                 path=path,
@@ -269,12 +269,12 @@ class Update(Interface):
                                         revision))
                     continue
 
-            saw_merge_failure = False
+            saw_update_failure = False
             if merge:
                 if follow_parent:
-                    merge_target = revision
+                    target = revision
                 else:
-                    merge_target = _choose_merge_target(
+                    target = _choose_update_target(
                         repo, curr_branch,
                         sibling_, tracking_remote)
 
@@ -294,32 +294,31 @@ class Update(Interface):
                                      "with adjusted branches"))
                         continue
 
-                merge_fn = _choose_merge_fn(
+                update_fn = _choose_update_fn(
                     repo,
                     is_annex=is_annex,
                     adjusted=adjusted)
 
-                merge_opts = ["--ff-only"] if merge == "ff-only" else None
-                if merge_fn is not _annex_sync:
-                    if merge_target is None:
+                fn_opts = ["--ff-only"] if merge == "ff-only" else None
+                if update_fn is not _annex_sync:
+                    if target is None:
                         yield dict(res,
                                    status="impossible",
-                                   message="Could not determine merge target")
+                                   message="Could not determine update target")
                         continue
 
                 if is_annex and reobtain_data:
-                    merge_fn = _reobtain(ds, merge_fn)
+                    update_fn = _reobtain(ds, update_fn)
 
-                for mres in merge_fn(repo, sibling_, merge_target,
-                                     merge_opts=merge_opts):
-                    if mres["action"] == "merge" and mres["status"] != "ok":
-                        saw_merge_failure = True
-                    yield dict(res, **mres)
+                for ures in update_fn(repo, sibling_, target, opts=fn_opts):
+                    if ures["action"] == "merge" and ures["status"] != "ok":
+                        saw_update_failure = True
+                    yield dict(res, **ures)
 
-            if saw_merge_failure:
-                merge_failures.add(ds)
+            if saw_update_failure:
+                update_failures.add(ds)
                 res['status'] = 'error'
-                res['message'] = ("Merge of %s failed", merge_target)
+                res['message'] = ("Update of %s failed", target)
             else:
                 res['status'] = 'ok'
                 save_paths.append(ds.path)
@@ -331,9 +330,9 @@ class Update(Interface):
                 lgr.warning(
                     'path constraints did not match an installed subdataset: %s',
                     path)
-            if refds in merge_failures:
+            if refds in update_failures:
                 lgr.warning("Not saving because top-level dataset %s "
-                            "had a merge failure",
+                            "had a update failure in subdataset",
                             refds.path)
             else:
                 save_paths = [p for p in save_paths if p != refds.path]
@@ -349,8 +348,8 @@ class Update(Interface):
                     yield r
 
 
-def _choose_merge_target(repo, branch, remote, cfg_remote):
-    """Select a merge target for the update to `repo`.
+def _choose_update_target(repo, branch, remote, cfg_remote):
+    """Select a target to update `repo` from.
 
     Parameters
     ----------
@@ -364,49 +363,49 @@ def _choose_merge_target(repo, branch, remote, cfg_remote):
 
     Returns
     -------
-    str (the merge target) or None if a choice wasn't made.
+    str (the target) or None if a choice wasn't made.
     """
-    merge_target = None
+    target = None
     if cfg_remote and remote == cfg_remote:
-        # Use the configured cfg_remote branch as the merge target.
+        # Use the configured cfg_remote branch as the target.
         #
-        # In this scenario, it's tempting to use FETCH_HEAD as the merge
-        # target. That would be the equivalent of 'git pull REMOTE'. But doing
+        # In this scenario, it's tempting to use FETCH_HEAD as the target. For
+        # a merge, that would be the equivalent of 'git pull REMOTE'. But doing
         # so would be problematic when the GitRepo.fetch() call was passed
         # all_=True. Given we can't use FETCH_HEAD, it's tempting to use the
         # branch.*.merge value, but that assumes a value for remote.*.fetch.
-        merge_target = repo.call_git_oneline(
+        target = repo.call_git_oneline(
             ["rev-parse", "--symbolic-full-name", "--abbrev-ref=strict",
              "@{upstream}"],
             read_only=True)
     elif branch:
         remote_branch = "{}/{}".format(remote, branch)
         if repo.commit_exists(remote_branch):
-            merge_target = remote_branch
-    return merge_target
+            target = remote_branch
+    return target
 
 
-#  Merge functions
+#  Update functions
 
 
-def _choose_merge_fn(repo, is_annex=False, adjusted=False):
+def _choose_update_fn(repo, is_annex=False, adjusted=False):
     if adjusted and is_annex:
         # For adjusted repos, blindly sync.
-        merge_fn = _annex_sync
+        fn = _annex_sync
     elif is_annex:
-        merge_fn = _annex_plain_merge
+        fn = _annex_plain_merge
     elif adjusted:
         raise RuntimeError(
             "bug: Upstream checks should make it impossible for "
             "adjusted=True, is_annex=False")
     else:
-        merge_fn = _plain_merge
-    return merge_fn
+        fn = _plain_merge
+    return fn
 
 
-def _plain_merge(repo, _, target, merge_opts=None):
+def _plain_merge(repo, _, target, opts=None):
     try:
-        repo.merge(name=target, options=merge_opts,
+        repo.merge(name=target, options=opts,
                    expect_fail=True, expect_stderr=True)
     except CommandError as exc:
         yield {"action": "merge", "status": "error",
@@ -416,21 +415,21 @@ def _plain_merge(repo, _, target, merge_opts=None):
                "message": ("Merged %s", target)}
 
 
-def _annex_plain_merge(repo, _, target, merge_opts=None):
-    yield from _plain_merge(repo, _, target, merge_opts=merge_opts)
+def _annex_plain_merge(repo, _, target, opts=None):
+    yield from _plain_merge(repo, _, target, opts=opts)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
     repo.call_annex(["merge"])
 
 
-def _annex_sync(repo, remote, _target, merge_opts=None):
+def _annex_sync(repo, remote, _target, opts=None):
     repo.call_annex(
         ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote]
     )
     return []
 
 
-def _reobtain(ds, merge_fn):
+def _reobtain(ds, update_fn):
     def wrapped(*args, **kwargs):
         repo = ds.repo
         repo_pathobj = repo.pathobj
@@ -445,7 +444,7 @@ def _reobtain(ds, merge_fn):
         present_files = [str(ds.pathobj / f.relative_to(repo_pathobj))
                          for f, st in ainfo.items() if st["has_content"]]
 
-        yield from merge_fn(*args, **kwargs)
+        yield from update_fn(*args, **kwargs)
 
         present_files = [p for p in present_files if lexists(p)]
         if present_files:
