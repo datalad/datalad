@@ -647,6 +647,14 @@ def _create_sibling_ria(
             # created for it, set its group to a desired one if was
             # provided with the same chgrp
             ssh(chgrp_cmd)
+
+        # finally update server
+        if post_update_hook:
+            # Conditional on post_update_hook, since one w/o the other doesn't
+            # seem to make much sense.
+            ssh('cd {rootdir} && git update-server-info'.format(
+                rootdir=quote_cmdlinearg(str(repo_path))
+            ))
     else:
         gr = GitRepo(repo_path, create=True, bare=True,
                      shared=shared if shared else None)
@@ -660,7 +668,12 @@ def _create_sibling_ria(
             disabled_hook.rename(enabled_hook)
         if group:
             # TODO; do we need a cwd here?
-            subprocess.run(chgrp_cmd, cwd=quote_cmdlinearg(ds.path))
+            subprocess.run(chgrp_cmd, cwd=ds.path)
+        # finally update server
+        if post_update_hook:
+            # Conditional on post_update_hook, since one w/o the other doesn't
+            # seem to make much sense.
+            gr.call_git(["update-server-info"])
 
     # add a git remote to the bare repository
     # Note: needs annex-ignore! Otherwise we might push into dirhash
