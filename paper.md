@@ -166,7 +166,7 @@ There are no conflicts to declare.
 
 # Acknowledgements
 
-DataLad development was made possible thanks to support by 
+DataLad development was facilitated by a senior adviser Dr. James V. Haxby (Dartmouth College), and made possible thanks to support by
 NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
 [1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
 (PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
