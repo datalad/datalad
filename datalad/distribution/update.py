@@ -278,26 +278,34 @@ class Update(Interface):
                         repo, curr_branch,
                         sibling_, tracking_remote)
 
-                merge_fn = _choose_merge_fn(
-                    repo,
-                    is_annex=is_annex,
-                    adjusted=is_annex and repo.is_managed_branch(curr_branch))
-
-                merge_opts = None
-                if merge_fn is _annex_sync:
+                adjusted = is_annex and repo.is_managed_branch(curr_branch)
+                if adjusted:
                     if follow_parent:
                         yield dict(
                             res, status="impossible",
                             message=("follow='parentds' is incompatible "
                                      "with adjusted branches"))
                         continue
-                elif merge_target is None:
-                    yield dict(res,
-                               status="impossible",
-                               message="Could not determine merge target")
-                    continue
-                elif merge == "ff-only":
-                    merge_opts = ["--ff-only"]
+
+                    if merge == "ff-only":
+                        yield dict(
+                            res, status="impossible",
+                            message=("ff-only is incompatible "
+                                     "with adjusted branches"))
+                        continue
+
+                merge_fn = _choose_merge_fn(
+                    repo,
+                    is_annex=is_annex,
+                    adjusted=adjusted)
+
+                merge_opts = ["--ff-only"] if merge == "ff-only" else None
+                if merge_fn is not _annex_sync:
+                    if merge_target is None:
+                        yield dict(res,
+                                   status="impossible",
+                                   message="Could not determine merge target")
+                        continue
 
                 if is_annex and reobtain_data:
                     merge_fn = _reobtain(ds, merge_fn)

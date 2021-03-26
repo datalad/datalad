@@ -907,3 +907,20 @@ def test_update_follow_parentds_lazy_other_branch(path):
         ds_clone.update(follow="parentds-lazy", merge="ff-only",
                         recursive=True)
         ok_(op.lexists(str(ds_clone.pathobj / "sub" / "foo")))
+
+
+@with_tempfile(mkdir=True)
+def test_update_adjusted_incompatible_with_ff_only(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+
+    assert_in_results(
+        ds_clone.update(merge="ff-only", on_failure="ignore"),
+        action="update", status="impossible")
+    assert_in_results(
+        ds_clone.update(on_failure="ignore"),
+        action="update", status="ok")
