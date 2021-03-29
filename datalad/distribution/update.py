@@ -403,16 +403,34 @@ def _choose_update_fn(repo, is_annex=False, adjusted=False):
     return fn
 
 
-def _plain_merge(repo, _, target, opts=None):
+def _try_command(record, fn, *args, **kwargs):
+    """Call `fn`, catching a `CommandError`.
+
+    Parameters
+    ----------
+    record : dict
+        A partial result record. It should at least have 'action' and 'message'
+        fields. A 'status' value of 'ok' or 'error' will be added based on
+        whether calling `fn` raises a `CommandError`.
+
+    Returns
+    -------
+    A new record with a 'status' field.
+    """
     try:
-        repo.merge(name=target, options=opts,
-                   expect_fail=True, expect_stderr=True)
+        fn(*args, **kwargs)
     except CommandError as exc:
-        yield {"action": "merge", "status": "error",
-               "message": exc_str(exc)}
+        return dict(record, status="error", message=exc_str(exc))
     else:
-        yield {"action": "merge", "status": "ok",
-               "message": ("Merged %s", target)}
+        return dict(record, status="ok")
+
+
+def _plain_merge(repo, _, target, opts=None):
+    yield _try_command(
+        {"action": "merge", "message": ("Merged %s", target)},
+        repo.merge,
+        name=target, options=opts,
+        expect_fail=True, expect_stderr=True)
 
 
 def _annex_plain_merge(repo, _, target, opts=None):
