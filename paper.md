@@ -40,25 +40,26 @@ Born from the idea to provide a unified data distribution for neuroscience, taki
 # Statement of Need
 
 Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
-While code management<!-- maybe "software development" to use a more intuitive term--> and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles postulating demands on public data hosting portals and the big callout for Data Science.
+While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles postulating demands on public data hosting portals and the big callout for Data Science.
 <!-- citation needed, no idea what the big callout is, or how/where FAIR calls for
 public data hosting -->
 Disconnected FAIR<!-- the use of FAIR here confuses, it comes across as a blame--> data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and shared data provenance <!-- what is "shared data provenance"? -->is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
 <!-- MIH summary: inconvenient access, version/provenenance information unavailable -->
-DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing a simplified core API for Git and git-annex operations, and by providing additional features for reproducible science such as command execution <!-- Maybe "execution provenance capture", datalad does not bring "command execution" --> and automatic recomputation based on complete process provenance.
+DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing a simplified core API for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capture and automatic recomputation based on complete process provenance.
 As it is interoperable with a large variety of scientific and commercial hosting services and available for all operating systems.
 DataLad can be integrated into established systems with minimal adjustments.
 
 ## Why Git and git-annex
 
-Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files <!-- citation needed, does not match self-description -->, but as such it cannot handle large <!-- what is large? --> or binary files well <!-- how come? I have hundreds of repos with binary files in them, works just fine -->.
+Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files <!-- citation needed, does not match self-description -->, but it is not designed to handle large (e.g., over a gigabyte) or binary files efficiently.
 Moreover, any data committed to Git becomes available to all clones of that repository. In the context of scientific data, this makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? -->, or revoke individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
 Git-annex takes advantage of Git's ability to manage textual information to overcome Git's limitation in managing individual file content that is either large or sensitive.
-File content managed by git-annex is placed into an annex, and in its place, git-annex commits a symbolic link <!-- platform-dependent implementation details, "pointer" could be a term to illustrate the concept and add the "symbolic link" as an example implmentation --> pointing to the content of the file into Git.
+File content managed by git-annex is placed into an annex, and in its place, git-annex commits a link (a symbolic link or a git link) pointing to the content of the file into Git.
 The content representation is based on a checksum of the file's content.
 As such, while only a light-weight link <!-- pointer --> is directly committed into Git, this committed information contains the content identity of annexed files.
-Git-annex then manages files availability information in any local repository, other Git remotes, or external resources, e.g. web urls. <!-- git annex also takes care of transport logistics and provides the abstraction and implementations of a special remote -->
-Such simple approach allows git-annex to scale to manage virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online. <!-- possibly state that number of files/objects remains limit imposed by Git -->
+Git-annex then manages files availability information in any local repository, other Git remotes, or external resources, e.g. web urls.
+Having that information, git-annex takes care of all transport logistics to exchange data upon user request.
+Such simple approach allows git-annex to scale to manage virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
 
 ## Why Git and git-annex alone are not enough
 
@@ -67,11 +68,11 @@ Such simple approach allows git-annex to scale to manage virtually arbitrarily l
 
 **They are generic and might lack support for domain specific solutions.** 
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
-Interaction with non git-aware portals should then be implemented via custom Git transfer protocols, as it e.g. was done in git-remote-rclone [TODOREF] <!-- this is a largely incomplete/draft implementation, better ref OSF variant -->.
-Git-annex provides access to a wide range of external data storage resources via various protocols, but cannot implement all idiosyncracies of any individual data portal. <!-- not clear why that would be true. likely only due to lack of interest -->
+Interaction with non git-aware portals should then be implemented via custom Git transfer protocols, as it e.g. was done in datalad-osf [TODOREF].
+Git-annex provides access to a wide range of external data storage resources via various protocols, but cannot implement all idiosyncracies of any individual data portal.
 In particular, scientific data is frequently stored in compressed archives to reduce its storage demands, or on specialized servers, such as XNAT (www.xnat.org).
-To address these demands, git-annex implemented support for external special remotes [@git-annex:special_remotes_protocol].
-This allowed DataLad and many other projects to access and provide git-annex special remotes to facilitate access to an ever growing collection of resources [@git-annex:special_remotes] and to overcome technological limitations (e.g., maximal file sizes, or file system inodes limits). <!-- maybe phrase as "git-annex delegates..." or use the term "plugin" to make clear that a special remote hooks directly into git-annex and is a standardization of some arbitrary 3rd-party protocol -->
+To address these demands, git-annex implemented support for external special remotes by establishing a protocol [@git-annex:special_remotes_protocol] through which external tools can provide custom transport functionality transparently to the user.
+This allowed DataLad and many other projects to facilitate access to an ever growing collection of resources [@git-annex:special_remotes] and to overcome technological limitations (e.g., maximal file sizes, or file system inodes limits).
 
 **They require a layer above to establish a *distribution*.**
 The DataLad project's initial goal was to provide a data distribution with unified access to the already available public data archives in neuroscience, such as http://crcns.org or http://openfmri.org.
@@ -81,7 +82,7 @@ http://datasets.datalad.org became an example of such a data distribution curate
 
 **Modularization is needed to scale.**
 Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
-Many research datasets contain millions of files, and that precludes placing such datasets in their entirety within a single Git repository even if individual files are tiny in their size. <!-- also Git technical limitation -->
+Many research datasets contain millions of files, and that precludes placing such datasets in their entirety within a single Git repository even if individual files are tiny in their size.
 Such datasets should be partitioned into smaller subdatasets (e.g., a subdataset per each subject in the dataset comprising thousands of participants).
 This modularization allows for not only scalable management <!-- unclear how management of 10k small pieces becomes more scalable than one piece with 10k parts -->, but also for the efficient reuse of a selected subset of datasets.
 DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
