@@ -437,14 +437,16 @@ def _annex_plain_merge(repo, _, target, opts=None):
     yield from _plain_merge(repo, _, target, opts=opts)
     # Note: Avoid repo.merge_annex() so we don't needlessly create synced/
     # branches.
-    repo.call_annex(["merge"])
+    yield _try_command(
+        {"action": "update.annex_merge", "message": "Merged annex branch"},
+        repo.call_annex, ["merge"])
 
 
 def _annex_sync(repo, remote, _target, opts=None):
-    repo.call_annex(
-        ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote]
-    )
-    return []
+    yield _try_command(
+        {"action": "update.annex_sync", "message": "Ran git-annex-sync"},
+        repo.call_annex,
+        ['sync', '--no-push', '--pull', '--no-commit', '--no-content', remote])
 
 
 def _reobtain(ds, update_fn):
