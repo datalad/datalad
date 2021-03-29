@@ -56,7 +56,7 @@ Moreover, any data committed to Git becomes available to all clones of that repo
 Git-annex takes advantage of Git's ability to manage textual information to overcome Git's limitation in managing individual file content that is either large or sensitive.
 File content managed by git-annex is placed into an annex, and in its place, git-annex commits a link (a symbolic link or a git link) pointing to the content of the file into Git.
 The content representation is based on a checksum of the file's content.
-As such, while only a light-weight link <!-- pointer --> is directly committed into Git, this committed information contains the content identity of annexed files.
+As such, while only a light-weight link is directly committed into Git, this committed information contains the content identity of annexed files.
 Git-annex then manages files availability information in any local repository, other Git remotes, or external resources, e.g. web urls.
 Having that information, git-annex takes care of all transport logistics to exchange data upon user request.
 Such simple approach allows git-annex to scale to manage virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
