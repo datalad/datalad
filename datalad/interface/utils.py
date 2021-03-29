@@ -635,7 +635,7 @@ def _process_results(
                  if k not in ('message', 'logger')},
                 sort_keys=True,
                 indent=2 if result_renderer.endswith('_pp') else None,
-                default=lambda x: str(x)))
+                default=str))
         elif result_renderer in ('tailored', 'default'):
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **allkwargs)
