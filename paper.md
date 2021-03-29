@@ -166,13 +166,13 @@ There are no conflicts to declare.
 
 # Acknowledgements
 
-DataLad development was made possible thanks to support by 
+DataLad development was facilitated by a senior adviser Dr. James V. Haxby (Dartmouth College), and made possible thanks to support by
 NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
 [1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
 (PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
 through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
 It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects. ... .
-
+We would also like to express our gratitude to [TODOADD: contributors not among co-authors]... for the contributions to the codebase, and [TODOADD: notable contributors to issues] for filing bug reports and recommendations.
 
 
 # References
