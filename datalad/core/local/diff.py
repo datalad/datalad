@@ -341,10 +341,11 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
 
     # potentially collect subdataset diff call specs for the end
     # (if order == 'breadth-first')
+    ds_diffs = []
     subds_diffcalls = []
     for path, props in diff_state.items():
         pathinds = str(ds.pathobj / path.relative_to(repo_path))
-        yield dict(
+        path_rec = dict(
             props,
             path=pathinds,
             # report the dataset path rather than the repo path to avoid
@@ -352,6 +353,12 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             parentds=ds.path,
             status='ok',
         )
+        if order == 'depth-first':
+            ds_diffs.append(path_rec)
+        elif order == 'breadth-first':
+            yield path_rec
+        else:
+            raise ValueError(order)
         # for a dataset we need to decide whether to dive in, or not
         if props.get('type', None) == 'dataset' and (
                 # subdataset path was given in rsync-style 'ds/'
@@ -400,12 +407,17 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                 )
                 if order == 'depth-first':
                     yield from _diff_ds(*call_args, **call_kwargs)
-                else:
+                elif order == 'breadth-first':
                     subds_diffcalls.append((call_args, call_kwargs))
+                else:
+                    raise ValueError(order)
             else:
                 raise RuntimeError(
                     "Unexpected subdataset state '{}'. That sucks!".format(
                         subds_state))
-    # deal with staged subdataset diffs
+    # deal with staged ds diffs (for depth-first)
+    for rec in ds_diffs:
+        yield rec
+    # deal with staged subdataset diffs (for breadth-first)
     for call_args, call_kwargs in subds_diffcalls:
         yield from _diff_ds(*call_args, **call_kwargs)
