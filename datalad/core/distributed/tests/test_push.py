@@ -19,6 +19,7 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
 from datalad.tests.utils import (
+    assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
@@ -45,8 +46,9 @@ from datalad.tests.utils import (
     SkipTest,
 )
 from datalad.utils import (
-    chpwd,
     Path,
+    chpwd,
+    path_startswith,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -245,6 +247,28 @@ def test_push():
     yield check_push, True
 
 
+def check_datasets_order(res, order='depth-first'):
+    """Check that all type=dataset records not violating the expected order
+
+    it is somewhat weak test, i.e. records could be produced so we
+    do not detect that order is violated, e.g. a/b c/d would satisfy
+    either although they might be neither depth nor breadth wise.  But
+    this test would allow to catch obvious violations like a, a/b, a
+    """
+    prev = None
+    for r in res:
+        if r.get('type') != 'dataset':
+            continue
+        if prev and r['path'] != prev:
+            if order == 'depth-first':
+                assert_false(path_startswith(r['path'], prev))
+            elif order == 'breadth-first':
+                assert_false(path_startswith(prev, r['path']))
+            else:
+                raise ValueError(order)
+        prev = r['path']
+
+
 @slow  # 33sec on Yarik's laptop
 @with_tempfile
 @with_tempfile(mkdir=True)
@@ -272,6 +296,7 @@ def test_push_recursive(
     target_top = mk_push_target(top, 'target', dst_top, annex=True)
     # subdatasets have no remote yet, so recursive publishing should fail:
     res = top.push(to="target", recursive=True, on_failure='ignore')
+    check_datasets_order(res)
     assert_in_results(
         res, path=top.path, type='dataset',
         refspec=DEFAULT_REFSPEC,
@@ -290,6 +315,7 @@ def test_push_recursive(
 
     # and same push call as above
     res = top.push(to="target", recursive=True)
+    check_datasets_order(res)
     # topds skipped
     assert_in_results(
         res, path=top.path, type='dataset',
@@ -311,6 +337,7 @@ def test_push_recursive(
 
     # rerun should not result in further pushes of the default branch
     res = top.push(to="target", recursive=True)
+    check_datasets_order(res)
     assert_not_in_results(
         res, status='ok', refspec=DEFAULT_REFSPEC)
     assert_in_results(
@@ -326,6 +353,7 @@ def test_push_recursive(
     assert_repo_status(top.path)
     # publish straight up, should be smart by default
     res = top.push(to="target", recursive=True)
+    check_datasets_order(res)
     # we see 3 out of 4 datasets pushed (sub noannex was left unchanged)
     for d in (top, sub, subsub):
         assert_in_results(
