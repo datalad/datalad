@@ -644,26 +644,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      exc))
         return
 
-    if not inject:
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
-
-
-    # Re-glob to capture any new outputs.
-    #
-    # TODO: If a warning or error is desired when an --output pattern doesn't
-    # have a match, this would be the spot to do it.
-    if explicit or expand in ["outputs", "both"]:
-        outputs.expand(refresh=True)
-
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
     # - exit code of the command
     run_info = {
         'cmd': cmd,
-        'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
         'extra_inputs': extra_inputs.paths,
@@ -676,6 +662,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info["dsid"] = ds.id
     if extra_info:
         run_info.update(extra_info)
+
+    if not inject:
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+        run_info['exit'] = cmd_exitcode
+
+    # Re-glob to capture any new outputs.
+    #
+    # TODO: If a warning or error is desired when an --output pattern doesn't
+    # have a match, this would be the spot to do it.
+    if explicit or expand in ["outputs", "both"]:
+        outputs.expand(refresh=True)
+        run_info["outputs"] = outputs.paths
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
