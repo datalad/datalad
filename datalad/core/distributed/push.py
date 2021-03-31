@@ -317,7 +317,7 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             # TODO?: expose order as an option for diff and push
             # since in some cases breadth-first would be sufficient
             # and result in "taking action faster"
-            # reporting_order='breadth-first'
+            reporting_order='bottom-up'
     ):
         if res.get('action', None) != 'diff':
             # we don't care right now

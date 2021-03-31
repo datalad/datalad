@@ -186,18 +186,21 @@ def diff_dataset(
       Whether to perform file type discrimination between real symlinks
       and symlinks representing annex'ed files. This can be expensive
       in datasets with many files.
-    reporting_order : {'depth-first', 'breadth-first'}, optional
+    reporting_order : {'depth-first', 'breadth-first', 'bottom-up'}, optional
       By default, subdataset content records are reported after the record
       on the subdataset's submodule in a superdataset (depth-first).
       Alternatively, report all superdataset records first, before reporting
-      any subdataset content records (breadth-first).
+      any subdataset content records (breadth-first). Both 'depth-first'
+      and 'breadth-first' both report dataset content before considering
+      subdatasets. Alternative 'bottom-up' mode is similar to 'depth-first'
+      but dataset content is reported after reporting on subdatasets.
 
     Yields
     ------
     dict
       DataLad result records.
     """
-    if reporting_order not in ('depth-first', 'breadth-first'):
+    if reporting_order not in ('depth-first', 'breadth-first', 'bottom-up'):
         raise ValueError('Unknown reporting order: {}'.format(reporting_order))
 
     ds = require_dataset(
@@ -353,10 +356,10 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             parentds=ds.path,
             status='ok',
         )
-        if order == 'depth-first':
-            ds_diffs.append(path_rec)
-        elif order == 'breadth-first':
+        if order in ('breadth-first', 'depth-first'):
             yield path_rec
+        elif order == 'bottom-up':
+            ds_diffs.append(path_rec)
         else:
             raise ValueError(order)
         # for a dataset we need to decide whether to dive in, or not
@@ -405,7 +408,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                     cache=cache,
                     order=order,
                 )
-                if order == 'depth-first':
+                if order in ('depth-first', 'bottom-up'):
                     yield from _diff_ds(*call_args, **call_kwargs)
                 elif order == 'breadth-first':
                     subds_diffcalls.append((call_args, call_kwargs))
@@ -415,7 +418,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                 raise RuntimeError(
                     "Unexpected subdataset state '{}'. That sucks!".format(
                         subds_state))
-    # deal with staged ds diffs (for depth-first)
+    # deal with staged ds diffs (for bottom-up)
     for rec in ds_diffs:
         yield rec
     # deal with staged subdataset diffs (for breadth-first)

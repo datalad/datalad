@@ -247,7 +247,7 @@ def test_push():
     yield check_push, True
 
 
-def check_datasets_order(res, order='depth-first'):
+def check_datasets_order(res, order='bottom-up'):
     """Check that all type=dataset records not violating the expected order
 
     it is somewhat weak test, i.e. records could be produced so we
@@ -260,9 +260,9 @@ def check_datasets_order(res, order='depth-first'):
         if r.get('type') != 'dataset':
             continue
         if prev and r['path'] != prev:
-            if order == 'depth-first':
+            if order == 'bottom-up':
                 assert_false(path_startswith(r['path'], prev))
-            elif order == 'breadth-first':
+            elif order == 'top-down':
                 assert_false(path_startswith(prev, r['path']))
             else:
                 raise ValueError(order)
