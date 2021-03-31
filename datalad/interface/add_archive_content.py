@@ -240,7 +240,7 @@ class AddArchiveContent(Interface):
         if archive in annex.untracked_files:
             raise RuntimeError(
                 "The archive is not under annex yet. You should run 'datalad "
-                "add {}' first".format(archive))
+                "save {}' first".format(archive))
 
         if not allow_dirty and annex.dirty:
             # already saved me once ;)
