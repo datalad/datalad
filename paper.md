@@ -43,23 +43,27 @@ Code, data, and computing environments are at the core of scientific practice, a
 While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles postulating demands on public data hosting portals and the big callout for Data Science.
 <!-- citation needed, no idea what the big callout is, or how/where FAIR calls for
 public data hosting -->
-Disconnected FAIR<!-- the use of FAIR here confuses, it comes across as a blame--> data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and shared data provenance <!-- what is "shared data provenance"? -->is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
+Disconnected FAIR<!-- the use of FAIR here confuses, it comes across as a blame--> data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and shared data provenance <!-- what is "shared data provenance"? --><!-- BEN: may be: data provenance - if shared at all - is often not ... --> is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
 <!-- MIH summary: inconvenient access, version/provenenance information unavailable -->
-DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing a simplified core API for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capture and automatic recomputation based on complete process provenance.
-As it is interoperable with a large variety of scientific and commercial hosting services and available for all operating systems.
+DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing a simplified core API <!--BEN: s/core API/interface/ while I don't mind using "API" internally I don't think it's appropriate in a publication. It's just an interface, not really an application programming interface. --> for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and automatic recomputation based on complete process provenance.
+Since it is interoperable with a large variety of scientific and commercial hosting services and available for all operating systems,
 DataLad can be integrated into established systems with minimal adjustments.
 
 ## Why Git and git-annex
 
 Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files <!-- citation needed, does not match self-description -->, but it is not designed to handle large (e.g., over a gigabyte) or binary files efficiently.
-Moreover, any data committed to Git becomes available to all clones of that repository. In the context of scientific data, this makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? -->, or revoke individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
+Moreover, any data committed to Git becomes available to all clones of that repository. In the context of scientific data, this makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? -->, or revoke individual files <!-- this somewhat suggests, that with datalad one can easily revoke, which at least requires a clarification of that does and doesn't mean -->, such as accidentally stored personal data or data from participants that withdrew from a study.
 Git-annex takes advantage of Git's ability to manage textual information to overcome Git's limitation in managing individual file content that is either large or sensitive.
 File content managed by git-annex is placed into an annex, and in its place, git-annex commits a link (a symbolic link or a git link) pointing to the content of the file into Git.
 The content representation is based on a checksum of the file's content.
 As such, while only a light-weight link is directly committed into Git, this committed information contains the content identity of annexed files.
 Git-annex then manages files availability information in any local repository, other Git remotes, or external resources, e.g. web urls.
 Having that information, git-annex takes care of all transport logistics to exchange data upon user request.
-Such simple approach allows git-annex to scale to manage virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
+Such simple approach allows git-annex to scale to manage and version control virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
+<!-- BEN thinks we need to make explicit the idea, that by means of how annex
+works, the content and access control to it is separated from the version
+control (and metadata). ATM this follows implicitly but may be much less obvious
+to someone who didn't dive into it yet -->
 
 ## Why Git and git-annex alone are not enough
 
@@ -79,6 +83,11 @@ The DataLad project's initial goal was to provide a data distribution with unifi
 Git and git-annex are just "client tools" and do not provide aggregation of different resources into a unified distribution on their own.
 http://datasets.datalad.org became an example of such a data distribution curated by the DataLad team, which at the moment provides streamlined access to over 250 TBs of data across wide range of projects and archives.
 <!-- MIH thinks this needs a clarification of terms. If datasets.d.o is a distribution than datalad is "just a client tool" too. I think this is probably aimed at the nesting feature, and if so, we should use the term, because people can read about it in the handbook. This technical feature is then what is used to build a "unified data distribution"-->
+<!-- BEN adds to MIH: below we call ds.dl.org a testament of scalability, and
+this is what I think it is. A showcase, not somehow a central or special part of
+DataLad itself. Therefore I'd present it as the conclusion of what that
+modularization allows for. Overall the "additional layer" the headline talks
+about is not clear to me.-->
 
 **Modularization is needed to scale.**
 Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
@@ -86,6 +95,9 @@ Many research datasets contain millions of files, and that precludes placing suc
 Such datasets should be partitioned into smaller subdatasets (e.g., a subdataset per each subject in the dataset comprising thousands of participants).
 This modularization allows for not only scalable management <!-- unclear how management of 10k small pieces becomes more scalable than one piece with 10k parts -->, but also for the efficient reuse of a selected subset of datasets.
 DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
+<!-- BEN: There are more aspect of modularization than reuse and large-scale.
+Most importantly, that's the notions of dependencies and a derivative
+relationsship that can be expressed that way, I think. --> 
 With this, DataLad makes it trivial to operate on individual files deep in the hierarchy or entire sub-trees of datasets, providing a "mono-repo"-like user experience in datasets nested arbitrarily deep.
 <!-- modularization is presented as #2, but it seems to be just #1 (nesting) described from a different angle -->
 
@@ -93,7 +105,7 @@ With this, DataLad makes it trivial to operate on individual files deep in the h
 Git and git-annex, being generic tools, come with rich interfaces and allow for a wide range of workflows.
 DataLad strives to provide a higher level interface to more efficiently cover typical use cases encountered in the scientific practice than the direct invocation of individual Git and git-annex commands, and to encourage efficient computation and reproducible workflows.
 To this end, DataLad is also accompanied by rich documentation [@datalad-handbook:zenodo] to guide a scientist of any technological competency level, and agnostic of the field of science.
-<!-- key point thinks MIH: to some degree the handbook also "just" shows how to use git/git-annex to implement concrete processes that are of relevance for science. In some what "figuring out how to do it with git/git-annex is a major contribution, some of it implementated in code (simplified/alternative API), but otherwise written up in English -->
+<!-- key point thinks MIH: to some degree the handbook also "just" shows how to use git/git-annex to implement concrete processes that are of relevance for science. In some what "figuring out how to do it with git/git-annex is a major contribution, some of it implemented in code (simplified/alternative API), but otherwise written up in English -->
 
 # Overview of the DataLad and its ecosystem
 
