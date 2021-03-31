@@ -619,3 +619,40 @@ def test_run_empty_repo(path):
     assert_status("ok", ds.run(cmd, inputs=["."]))
     assert_repo_status(ds.path)
     ok_exists(str(ds.pathobj / "foo"))
+
+
+@with_tree(tree={"foo": "f", "bar": "b"})
+def test_dry_run(path):
+    ds = Dataset(path).create(force=True)
+
+    # The dataset is reported as dirty, and the custom result render relays
+    # that to the default renderer.
+    with swallow_outputs() as cmo:
+        with assert_raises(IncompleteResultsError):
+            ds.run("blah ", dry_run=True)
+        assert_in("run(impossible)", cmo.out)
+        assert_not_in("blah", cmo.out)
+
+    ds.save()
+
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run=True)
+        assert_in("Dry run", cmo.out)
+        assert_in("location", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("expanded inputs", cmo.out)
+        assert_not_in("expanded outputs", cmo.out)
+
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs} {outputs}", dry_run=True,
+               inputs=["fo*"], outputs=["b*r"])
+        assert_in(
+            'blah "foo" "bar"' if on_windows else "blah foo bar",
+            cmo.out)
+        assert_in("expanded inputs", cmo.out)
+        assert_in("['foo']", cmo.out)
+        assert_in("expanded outputs", cmo.out)
+        assert_in("['bar']", cmo.out)
+
+    # The output file wasn't unlocked.
+    assert_repo_status(ds.path)
