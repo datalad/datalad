@@ -66,7 +66,6 @@ from datalad.tests.utils import (
     ok_,
     ok_exists,
     ok_file_has_content,
-    slow,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
