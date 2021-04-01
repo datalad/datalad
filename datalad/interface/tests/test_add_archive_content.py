@@ -389,9 +389,9 @@ def test_add_archive_use_archive_dir(repo_path):
         with assert_raises(RuntimeError) as cmr:
             add_archive_content(archive_path)
         assert_re_in(
-            "You should run ['\"]datalad add 4u\\\\1\\.tar\\.gz['\"] first"
+            "You should run ['\"]datalad save 4u\\\\1\\.tar\\.gz['\"] first"
             if on_windows else
-            "You should run ['\"]datalad add 4u/1\\.tar\\.gz['\"] first",
+            "You should run ['\"]datalad save 4u/1\\.tar\\.gz['\"] first",
             str(cmr.exception), match=False
         )
         with swallow_outputs():
