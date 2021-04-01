@@ -1,0 +1,82 @@
+Update 0.14.0-1-g9ed902a1d9:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    9ed902a1d94babd688986867e9c2b53945bc222f..d064ce69bf276a2c9c3f83f89c369764c76a98aa
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #5401 from kyleam/appveyor-better-curl-error
+   8e03c2fbb4^-1
+-  Merge pull request #5404 from yarikoptic/bf-auto-threadlocking
+   8e860076ce^-1
+-  Merge pull request #5406 from kyleam/docker-blob-cron
+   6cf8c155eb^-1
+-  Merge pull request #5407 from kyleam/log-filter-failure
+   9997e97bff^-1
+-  Merge pull request #5417 from jwodder/support-docker-machine
+   528e1990d8^-1
+-  Merge pull request #5432 from yarikoptic/enh-nowindows-skip
+   7c26a7d020^-1
++  Merge pull request #5421 from kyleam/progress-bar-interference
+   31fbf698e6^-1
+-  Merge pull request #5433 from yarikoptic/rf-no-stallnfs-test
+   de805edd23^-1
++  Merge pull request #5436 from mattcieslak/exec_text2git
+   8eaf2cf567^-1
+-  Merge pull request #5437 from kyleam/assert-not-in-better-msg
+   09488745ad^-1
++  Merge pull request #5438 from yarikoptic/enh-pbar-total-ux
+   2fd098bd28^-1
+-  Merge pull request #5445 from yarikoptic/enh-installer
+   03d0fd3051^-1
++  Merge pull request #5453 from kyleam/diff-ignore-submodules
+   ad30e70f0f^-1
+-  Merge pull request #5454 from yarikoptic/bf-log-exc
+   d51b909146^-1
++  Merge pull request #5458 from bpoldrack/fix-gh-5456
+   56dd5dc6ab^-1
+-  Merge pull request #5479 from mih/tst-nometalad
+   628fe52181^-1
+-  Merge pull request #5485 from mih/tst-coverage
+   6e8aa0f471^-1
+-  Merge pull request #5484 from bpoldrack/test-hirni
+   15de1fb7fd^-1
++  Merge pull request #5488 from mih/bf-5396
+   8d247738b5^-1
+-  Merge pull request #5491 from mih/credlog
+   a8c2c57192^-1
+-  Merge pull request #5494 from yarikoptic/bf-deburl
+   ae53c0418f^-1
++  Merge pull request #5466 from yarikoptic/bf-ssh-locking
+   0e243d8d5d^-1
+-  Merge pull request #5501 from kyleam/runner-cwd
+   44db12a97d^-1
++  Merge pull request #5506 from yarikoptic/bf-json-long
+   d429a907d0^-1
+-  Merge pull request #5515 from mih/rf-logformat
+   7da202dc73^-1
++  Merge pull request #5509 from mih/bf-gitcfg
+   789a5a5bcc^-1
+-  Merge pull request #5511 from mih/rf-mktemp
+   f19ecbf632^-1
+-  MNT: test_annexrepo: Drop recently added and unused imports
+   90e3028d2f^-1
+-  Merge pull request #5520 from kyleam/test-addurls-avoid-mktemp
+   ef05457b1f^-1
++  Merge pull request #5010 from yarikoptic/bf-branch-order
+   36c679e7f5^-1
++  Merge pull request #5505 from kyleam/cfg-env-override
+   0762df07a4^-1
+?  Merge pull request #5525 from kyleam/posarg-underscore
+   bc80aba835^-1
+-  Merge pull request #5532 from kyleam/download-url-improve-slash-doc
+   442dccc8f1^-1
++  Merge pull request #5531 from bpoldrack/bf-gh-5530
+   2b3468ac7d^-1
+-  Merge pull request #5540 from kyleam/doc-leftover-add-commands
+   d064ce69bf^-1
