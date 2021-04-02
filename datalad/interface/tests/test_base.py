@@ -235,7 +235,7 @@ def check_call_from_parser_pos_arg_underscore(how):
             return pos_arg
 
     parser = argparse.ArgumentParser()
-    parser_add_common_options(parser, version="v1")
+    parser_add_common_options(parser)
     Cmd.setup_parser(parser)
     args = parser.parse_args(["val"])
     eq_(Cmd.call_from_parser(args),

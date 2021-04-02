@@ -99,7 +99,7 @@ def setup_parser(
         formatter_class=formatter_class,
         add_help=False)
     # common options
-    helpers.parser_add_common_options(parser, datalad.__version__)
+    helpers.parser_add_common_options(parser)
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
     # log-level is set via common_opts ATM
@@ -122,6 +122,9 @@ def setup_parser(
     try:
         parsed_args, unparsed_args = parser._parse_known_args(
             cmdlineargs[1:], argparse.Namespace())
+        # before anything handle possible datalad --version
+        if not unparsed_args and getattr(parsed_args, 'version', None):
+            parsed_args.version()  # will exit with 0
         if not (completing or unparsed_args):
             fail_handler(parser, msg="too few arguments", exit_code=2)
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
@@ -220,6 +223,10 @@ def setup_parser(
             helpers.parser_add_common_opt(subparser, 'help')
             # let module configure the parser
             _intf.setup_parser(subparser)
+
+            # and we would add custom handler for --version
+            helpers.parser_add_version_opt(subparser, _intf.__module__.split('.', 1)[0], include_name=True)
+
             # logger for command
 
             # configure 'run' function for this command
