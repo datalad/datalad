@@ -241,11 +241,14 @@ class Run(Interface):
             # Leave out common -n short flag to avoid confusion with
             # `containers-run [-n|--container-name]`.
             args=("--dry-run",),
-            action="store_true",
             doc="""Do not run the command; just display details about the
-            command execution. Note that input and output globs underneath an
+            command execution. A value of "basic" reports a few important
+            details about the execution, including the expanded command and
+            expanded inputs and outputs. "command" displays the expanded
+            command only. Note that input and output globs underneath an
             uninstalled dataset will be left unexpanded because no subdatasets
-            will be installed for a dry run."""),
+            will be installed for a dry run.""",
+            constraints=EnsureChoice(None, "basic", "command")),
     )
 
     @staticmethod
@@ -261,7 +264,7 @@ class Run(Interface):
             explicit=False,
             message=None,
             sidecar=None,
-            dry_run=False):
+            dry_run=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
@@ -274,39 +277,49 @@ class Run(Interface):
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
-        if kwargs.get("dry_run") and "dry_run_info" in res:
-            ui.message(ac.color_word("Dry run information", ac.MAGENTA))
-
-            def fmt_line(key, value, multiline=False):
-                return (" {key}:{sep}{value}"
-                        .format(key=ac.color_word(key, ac.BOLD),
-                                sep=os.linesep + "  " if multiline else " ",
-                                value=value))
-
-            dry_run_info = res["dry_run_info"]
-            lines = [fmt_line("location", dry_run_info["pwd_full"])]
-
-            # TODO: Inputs and outputs could be pretty long. These may be worth
-            # truncating.
-            inputs = dry_run_info["inputs"]
-            if inputs:
-                lines.append(fmt_line("expanded inputs", inputs,
-                                      multiline=True))
-            outputs = dry_run_info["outputs"]
-            if outputs:
-                lines.append(fmt_line("expanded outputs", outputs,
-                                      multiline=True))
-
-            cmd = res["run_info"]["cmd"]
-            cmd_expanded = dry_run_info["cmd_expanded"]
-            lines.append(fmt_line("command", cmd, multiline=True))
-            if cmd != cmd_expanded:
-                lines.append(fmt_line("expanded command", cmd_expanded,
-                                      multiline=True))
-
-            ui.message(os.linesep.join(lines))
+        dry_run = kwargs.get("dry_run")
+        if dry_run and "dry_run_info" in res:
+            if dry_run == "basic":
+                _display_basic(res)
+            elif dry_run == "command":
+                ui.message(res["dry_run_info"]["cmd_expanded"])
+            else:
+                raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
         else:
             default_result_renderer(res)
+
+
+def _display_basic(res):
+    ui.message(ac.color_word("Dry run information", ac.MAGENTA))
+
+    def fmt_line(key, value, multiline=False):
+        return (" {key}:{sep}{value}"
+                .format(key=ac.color_word(key, ac.BOLD),
+                        sep=os.linesep + "  " if multiline else " ",
+                        value=value))
+
+    dry_run_info = res["dry_run_info"]
+    lines = [fmt_line("location", dry_run_info["pwd_full"])]
+
+    # TODO: Inputs and outputs could be pretty long. These may be worth
+    # truncating.
+    inputs = dry_run_info["inputs"]
+    if inputs:
+        lines.append(fmt_line("expanded inputs", inputs,
+                              multiline=True))
+    outputs = dry_run_info["outputs"]
+    if outputs:
+        lines.append(fmt_line("expanded outputs", outputs,
+                              multiline=True))
+
+    cmd = res["run_info"]["cmd"]
+    cmd_expanded = dry_run_info["cmd_expanded"]
+    lines.append(fmt_line("command", cmd, multiline=True))
+    if cmd != cmd_expanded:
+        lines.append(fmt_line("expanded command", cmd_expanded,
+                              multiline=True))
+
+    ui.message(os.linesep.join(lines))
 
 
 def get_command_pwds(dataset):

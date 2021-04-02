@@ -629,14 +629,14 @@ def test_dry_run(path):
     # that to the default renderer.
     with swallow_outputs() as cmo:
         with assert_raises(IncompleteResultsError):
-            ds.run("blah ", dry_run=True)
+            ds.run("blah ", dry_run="basic")
         assert_in("run(impossible)", cmo.out)
         assert_not_in("blah", cmo.out)
 
     ds.save()
 
     with swallow_outputs() as cmo:
-        ds.run("blah ", dry_run=True)
+        ds.run("blah ", dry_run="basic")
         assert_in("Dry run", cmo.out)
         assert_in("location", cmo.out)
         assert_in("blah", cmo.out)
@@ -644,7 +644,7 @@ def test_dry_run(path):
         assert_not_in("expanded outputs", cmo.out)
 
     with swallow_outputs() as cmo:
-        ds.run("blah {inputs} {outputs}", dry_run=True,
+        ds.run("blah {inputs} {outputs}", dry_run="basic",
                inputs=["fo*"], outputs=["b*r"])
         assert_in(
             'blah "foo" "bar"' if on_windows else "blah foo bar",
@@ -653,6 +653,13 @@ def test_dry_run(path):
         assert_in("['foo']", cmo.out)
         assert_in("expanded outputs", cmo.out)
         assert_in("['bar']", cmo.out)
+
+    # Just the command.
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="command")
+        assert_not_in("Dry run", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("inputs", cmo.out)
 
     # The output file wasn't unlocked.
     assert_repo_status(ds.path)
@@ -665,7 +672,7 @@ def test_dry_run(path):
 
     # If a subdataset is installed, it works as usual.
     with swallow_outputs() as cmo:
-        ds.run("blah {inputs}", dry_run=True, inputs=["sub/b*"])
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
         assert_in(
             'blah "sub\\baz"' if on_windows else 'blah sub/baz',
             cmo.out)
@@ -673,6 +680,6 @@ def test_dry_run(path):
     # However, a dry run will not do the install/reglob procedure.
     ds.uninstall("sub", check=False)
     with swallow_outputs() as cmo:
-        ds.run("blah {inputs}", dry_run=True, inputs=["sub/b*"])
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
         assert_in("sub/b*", cmo.out)
         assert_not_in("baz", cmo.out)
