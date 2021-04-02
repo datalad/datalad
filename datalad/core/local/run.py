@@ -243,7 +243,9 @@ class Run(Interface):
             args=("--dry-run",),
             action="store_true",
             doc="""Do not run the command; just display details about the
-            command execution."""),
+            command execution. Note that input and output globs underneath an
+            uninstalled dataset will be left unexpanded because no subdatasets
+            will be installed for a dry run."""),
     )
 
     @staticmethod

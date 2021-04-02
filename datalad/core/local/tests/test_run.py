@@ -656,3 +656,23 @@ def test_dry_run(path):
 
     # The output file wasn't unlocked.
     assert_repo_status(ds.path)
+
+    # Subdaset handling
+
+    subds = ds.create("sub")
+    (subds.pathobj / "baz").write_text("z")
+    ds.save(recursive=True)
+
+    # If a subdataset is installed, it works as usual.
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run=True, inputs=["sub/b*"])
+        assert_in(
+            'blah "sub\\baz"' if on_windows else 'blah sub/baz',
+            cmo.out)
+
+    # However, a dry run will not do the install/reglob procedure.
+    ds.uninstall("sub", check=False)
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run=True, inputs=["sub/b*"])
+        assert_in("sub/b*", cmo.out)
+        assert_not_in("baz", cmo.out)
