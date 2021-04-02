@@ -40,10 +40,8 @@ Born from the idea to provide a unified data distribution for neuroscience, taki
 # Statement of Need
 
 Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
-While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles postulating demands on public data hosting portals and the big callout for Data Science.
-<!-- citation needed, no idea what the big callout is, or how/where FAIR calls for
-public data hosting -->
-Disconnected FAIR<!-- the use of FAIR here confuses, it comes across as a blame--> data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and shared data provenance <!-- what is "shared data provenance"? --><!-- BEN: may be: data provenance - if shared at all - is often not ... --> is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
+While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles [@FAIR2016] postulating demands on public data hosting portals and the big callout for Data Science.
+Disconnected data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and shared data provenance <!-- what is "shared data provenance"? --><!-- BEN: may be: data provenance - if shared at all - is often not ... --> is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
 <!-- MIH summary: inconvenient access, version/provenenance information unavailable -->
 DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing a simplified core API <!--BEN: s/core API/interface/ while I don't mind using "API" internally I don't think it's appropriate in a publication. It's just an interface, not really an application programming interface. --> for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and automatic recomputation based on complete process provenance.
 Since it is interoperable with a large variety of scientific and commercial hosting services and available for all operating systems,
@@ -72,7 +70,7 @@ to someone who didn't dive into it yet -->
 
 **They are generic and might lack support for domain specific solutions.** 
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
-Interaction with non git-aware portals should then be implemented via custom Git transfer protocols, as it e.g. was done in datalad-osf [TODOREF].
+Interaction with non git-aware portals should then be implemented via custom Git transfer protocols, as it e.g. was done in datalad-osf [@datalad-osf:zenodo].
 Git-annex provides access to a wide range of external data storage resources via various protocols, but cannot implement all idiosyncracies of any individual data portal.
 In particular, scientific data is frequently stored in compressed archives to reduce its storage demands, or on specialized servers, such as XNAT (www.xnat.org).
 To address these demands, git-annex implemented support for external special remotes by establishing a protocol [@git-annex:special_remotes_protocol] through which external tools can provide custom transport functionality transparently to the user.
