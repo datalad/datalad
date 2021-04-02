@@ -1,0 +1,27 @@
+To: {email}
+From: DataLad Team <team@datalad.org>
+Subject: An invitation to "participate" in the DataLad JOSS paper
+
+Dear {name},
+
+Thank you for your (as in code, issues, feedback) contribution to DataLad (https://github.com/datalad/datalad).
+We are working on a manuscript to be submitted to JOSS (https://joss.theoj.org) to describe DataLad, and would like to
+acknowledge your contribution(s).  We are inviting your to co-author the paper, or at least give us a chance to
+Thank you in the Acknowledgements section of the paper.
+
+If you would like to co-author the paper, please submit a Pull Request with your details (name, ORCID, affiliation)
+added to the header of the https://github.com/datalad/datalad-paper-joss/blob/master/paper.md file after the
+
+# Add additional authors here
+
+If you would like to just be acknowledged, please either reply to this email stating that, or submit a PR with
+your name appropriately listed in the Acknowledgements section of the https://github
+.com/datalad/datalad-paper-joss/blob/master/paper.md .
+
+If you would like to neither be listed among co-authors, nor acknowledged, we would appreciate if you reply and
+let us know about that.
+
+Thank you for your contribution to DataLad
+
+Sincerely,
+DataLad Team
