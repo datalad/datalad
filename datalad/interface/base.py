@@ -651,7 +651,7 @@ class Interface(object):
 
     _OLDSTYLE_COMMANDS = (
         'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-        'CreateTestDataset', 'Export', 'Ls', 'SSHRun', 'Test')
+        'CreateTestDataset', 'Export', 'Ls', 'SSHRun', 'ShellCompletion', 'Test')
 
     @classmethod
     def setup_parser(cls, parser):
