@@ -25,6 +25,7 @@ import sys
 
 from unittest.mock import patch
 
+from datalad import __version__
 from datalad.utils import (
     chpwd,
     ensure_unicode,
@@ -464,28 +465,17 @@ def test_run_cmdline_disambiguation(path):
                 '"--message"' if on_windows else "--message",
                 path, expected_exit=None)
 
-        # And a twist on above: Our parser mishandles --version (gh-3067),
+        # Our parser used to mishandle --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
-        version_stream = "out"
-        with swallow_outputs() as cmo:
-            with assert_raises(SystemExit) as cm:
-                main(["datalad", "run", "echo", "--version"])
-            eq_(cm.exception.code, 0)
-            out = getattr(cmo, version_stream)
-        with swallow_outputs() as cmo:
-            with assert_raises(SystemExit):
-                main(["datalad", "--version"])
-            version_out = getattr(cmo, version_stream)
-        ok_(version_out)
-        eq_(version_out, out)
-        # We can work around that (i.e., make "--version" get passed as
-        # command) with "--".
-        with patch("datalad.core.local.run._execute_command") as exec_cmd:
-            with assert_raises(SystemExit):
-                main(["datalad", "run", "--", "echo", "--version"])
-            exec_cmd.assert_called_once_with(
-                '"echo" "--version"' if on_windows else "echo --version",
-                path, expected_exit=None)
+        # but that is no longer the case and echo --version should work with or
+        # without explicit "--" separator
+        for sep in [[], ['--']]:
+            with patch("datalad.core.local.run._execute_command") as exec_cmd:
+                with assert_raises(SystemExit):
+                    main(["datalad", "run"] + sep + ["echo", "--version"])
+                exec_cmd.assert_called_once_with(
+                    '"echo" "--version"' if on_windows else "echo --version",
+                    path, expected_exit=None)
 
 
 @with_tempfile(mkdir=True)
