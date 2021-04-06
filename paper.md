@@ -118,14 +118,14 @@ As for #2 "reproducible execution" - I think we missed such subsection entirely,
 --> 
 
 **Annotation of changes is not "re-executable".**
-Git commit message is a freeform text intended to be used to provide a human-readable description of introduced changes.
-Changes themselves are typically represented by a patch (an exact difference between two versions) which could be re-used and applied to another version of the text file(s). 
-Such changes annotation is not sufficient to introduce such changes following the description if they cannot be completely represented by such a patch.
+Git commit message is a freeform text intended to provide a human-readable description of introduced changes.
+Changes themselves are typically represented by a patch (an exact difference between two versions) which could be applied to another version of the text file(s).
+Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch.
 <!-- YOH: may be strip above sentence away... I am just trying to lead somehow into "semantic" description of the change.
   E.g. that if author was very good with the description of change, some smart AI could have redone it following the description
   and not the patch.  The simplest analog could be "replaced word X with Y" where the patch would contain exact difference, but
   either will not be applicable or just would miss some Xs if applied to a vastly different version -->
-Unlike changes to text documents or source code typically done "manually", data manipulations are most often performed by software.
+Unlike changes to text documents or source code, which are typically done "manually", data manipulations are most often performed by software.
 DataLad exploits this fact and enables automated annotation of changes which result from running an external command.
 DataLad creates a commit message which does not only include a human-readable summary, but also a human and machine-readable record of the command invocation which introduced the changes.
 This allows for the data "change" to be re-executed to either verify that results reproduce, or to apply such a "change" to a completely different state. 
