@@ -198,7 +198,8 @@ def parser_add_common_options(parser, version=None):
     parser_add_common_opt(parser, 'pbs_runner')
     parser_add_common_opt(parser, 'change_path')
     if version is not None:
-        warnings.warn("Passing 'version' to parser_add_common_options is deprecated "
+        warnings.warn("Passing 'version' to parser_add_common_options "
+                      "no longer has an effect "
                       "and will be removed in a future release.",
                       DeprecationWarning)
     parser_add_version_opt(parser, 'datalad', include_name=False, delay=True)
