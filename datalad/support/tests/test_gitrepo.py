@@ -1673,7 +1673,8 @@ def test_GitRepo_get_revisions(path):
     eq_(gr.get_revisions(DEFAULT_BRANCH + ".."), [])
 
 
-@with_tree({"foo": "foo"})
+@with_tree({"foo": "foo",
+            ".gitattributes": "* annex.largefiles=anything"})
 def test_gitrepo_add_to_git_with_annex_v7(path):
     from datalad.support.annexrepo import AnnexRepo
     ar = AnnexRepo(path, create=True, version=7)
