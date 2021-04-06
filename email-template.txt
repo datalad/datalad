@@ -15,8 +15,8 @@ added to the header of the https://github.com/datalad/datalad-paper-joss/blob/ma
 # Add additional authors here
 
 If you would like to just be acknowledged, please either reply to this email stating that, or submit a PR with
-your name appropriately listed in the Acknowledgements section of the https://github
-.com/datalad/datalad-paper-joss/blob/master/paper.md .
+your name appropriately listed in the Acknowledgements section of the 
+https://github.com/datalad/datalad-paper-joss/blob/master/paper.md .
 
 If you would like to neither be listed among co-authors, nor acknowledged, we would appreciate if you reply and
 let us know about that.
