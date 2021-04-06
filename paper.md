@@ -171,7 +171,7 @@ The same mechanism of extensions is used for rapid development of new functional
 
 [comment1]: <> (TODO: probably here cite some examples of scientific papers in the wild which used DataLad)
 
-DataLad can be used as an independent tool as it used by scientists to access and/or manage data (see e.g. @Wittkuhn_2021),
+DataLad can be used as an independent tool as it used by scientists to access and/or manage data (see e.g. @Wittkuhn_2021, @datasets:LAAC-LSCP),
 or as a core technology behind another tool or a larger platform.
 [TemplateFlow](http://templateflow.github.io/) [@Ciric_2021] uses DataLad for the management of existing and orchestration of new submissions of neuroimaging templates.
 [OpenNeuro](http://openneuro.org) uses DataLad for data logistics with data deposition to a public S3 bucket.
