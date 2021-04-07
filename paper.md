@@ -9,21 +9,145 @@ tags:
   - data provenance
   - reproducibility
 authors:
- - name: Yaroslav O. Halchenko
+ - name: Yaroslav O. Halchenko  # 4655 commits, issues: opened 1399 participated in 649
    orcid: 0000-0003-3456-2493
    affiliation: 1
- - name: Adina Wagner
+ - name: Kyle Meyer  # 2152 commits, issues: opened 85 participated in 398
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Benjamin Poldrack  # 1898 commits, issues: opened 82 participated in 461
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Gergana Alteva  # 187 commits, issues: opened 4 participated in 6
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Adina Wagner  # 98 commits, issues: opened 36 participated in 45
    orcid: 0000-0003-2917-3450
    affiliation: 2
- - name: Vanessa Sochat
+ - name: Joey Hess  # 0 commits, issues: opened 4 participated in 80
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: John T. Wodder II  # 57 commits, issues: opened 0 participated in 11
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Vanessa Sochat  # 16 commits, issues: opened 8 participated in 4
    orcid: 0000-0002-4387-3819
    affiliation: 4
-#
-# Add additional authors here
-#
-# and leave M.Hanke to be the senior
-#
- - name: Michael Hanke
+ - name: Satrajit Ghosh  # 0 commits, issues: opened 7 participated in 13
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Andy Connolly  # 12 commits, issues: opened 0 participated in 2
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Matteo Visconti dOC  # 1 commits, issues: opened 9 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Nolan Nichols  # 5 commits, issues: opened 3 participated in 2
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: John Lee  # 0 commits, issues: opened 7 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Chris Gorgolewski  # 0 commits, issues: opened 5 participated in 3
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Simon Dube  # 0 commits, issues: opened 6 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Basile Pinsard  # 0 commits, issues: opened 5 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Dorota Jarecka  # 0 commits, issues: opened 5 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Joey Zhou  # 0 commits, issues: opened 5 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Anisha Keshavan  # 3 commits, issues: opened 1 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Arvind Sharma  # 0 commits, issues: opened 4 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Matt Cieslak  # 2 commits, issues: opened 2 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Joerg Stadler  # 0 commits, issues: opened 2 participated in 2
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Elizabeth DuPre  # 1 commits, issues: opened 1 participated in 2
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Horea Christian  # 1 commits, issues: opened 3 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Timo Dickscheid  # 0 commits, issues: opened 2 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Satya Ortiz-Gagne  # 0 commits, issues: opened 3 participated in 0
+   orcid: 
+   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Michael Hanke  # 4158 commits, issues: opened 1097 participated in 780
    orcid: 0000-0001-6398-6370
    affiliation: "2, 3"
 affiliations:
