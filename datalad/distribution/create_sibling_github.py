@@ -17,30 +17,30 @@ import re
 
 from os.path import relpath
 
-from ..interface.base import (
+from datalad.interface.base import (
     build_doc,
     Interface,
 )
-from ..interface.common_opts import (
+from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
     publish_depends,
 )
-from ..support.param import Parameter
-from ..support.constraints import (
+from datalad.support.param import Parameter
+from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from ..utils import (
+from datalad.utils import (
     ensure_list,
 )
-from .dataset import (
+from datalad.distribution.dataset import (
     datasetmethod,
     EnsureDataset,
     require_dataset,
 )
-from .siblings import Siblings
+from datalad.distribution.siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
