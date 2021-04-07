@@ -9,8 +9,8 @@ We are working on a manuscript to be submitted to JOSS (https://joss.theoj.org) 
 acknowledge your contribution(s).  We are inviting you to co-author the paper, or, alternatively, give us permission to
 thank you in the Acknowledgements section of the paper.
 
-If you would like to co-author the paper, please submit a Pull Request with your details (name, ORCID, affiliation)
-added to the header of the https://github.com/datalad/datalad-paper-joss/blob/master/paper.md file after the
+If you would like to co-author the paper, please review the authorship criteria of JOSS at https://joss.readthedocs.io/en/latest/submitting.html#authorship and pay particular attention to potential implications of the "co-authors agree to be accountable for all aspects of the work" rule. If you personally consider a co-authorship appropriate under these conditions, please submit a Pull Request with your details (name, ORCID, affiliation)
+added to the header of the https://github.com/datalad/datalad-paper-joss/blob/master/paper.md file after
 
 # Add additional authors here
 
