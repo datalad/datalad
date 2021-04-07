@@ -202,7 +202,7 @@ def parser_add_common_options(parser, version=None):
                       "no longer has an effect "
                       "and will be removed in a future release.",
                       DeprecationWarning)
-    parser_add_version_opt(parser, 'datalad', include_name=False, delay=True)
+    parser_add_version_opt(parser, 'datalad', include_name=True, delay=True)
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',

@@ -89,7 +89,7 @@ def run_main(args, exit_code=0, expect_stderr=False):
 def test_version():
     # we just get a version if not asking for a version of some command
     stdout, stderr = run_main(['--version'], expect_stderr=True)
-    eq_(stdout.rstrip(), datalad.__version__)
+    eq_(stdout.rstrip(), "datalad %s" % datalad.__version__)
 
     stdout, stderr = run_main(['clone', '--version'], expect_stderr=True)
     ok_startswith(stdout, 'datalad %s\n' % datalad.__version__)
@@ -224,12 +224,8 @@ def test_script_shims():
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)
         version = out['stdout'].rstrip()
-        if script != 'datalad':
-            # datalad --version  would return only version now, but all the `datalad CMD` and
-            # other entry points will still announce their origin, so we would need to strip
-            # it away
-            mod, version = version.split(' ', 1)
-            assert_equal(mod, 'datalad')
+        mod, version = version.split(' ', 1)
+        assert_equal(mod, 'datalad')
         # we can get git and non git .dev version... so for now
         # relax
         get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
