@@ -17,7 +17,7 @@ If you would like to just be acknowledged, please either reply to this email sta
 
 If you would like to neither be listed among co-authors, nor acknowledged, we would appreciate if you reply and let us know about that.
 
-We are planing to submit manuscript next week (on/after April 12), and will appreciate if you act on this invitation by the end of this week.
+We are planing to submit the manuscript next week (on/after April 12), and will appreciate if you act on this invitation by the end of this week.
 Co-author records which would remain commented out will be removed before submission.
 
 Thank you again for your contribution to DataLad!
