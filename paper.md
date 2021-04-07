@@ -9,7 +9,7 @@ tags:
   - data provenance
   - reproducibility
 authors:
- - name: Yaroslav O. Halchenko  # 4655 commits, issues: opened 1399 participated in 649
+ - name: Yaroslav O. Halchenko^[co-first author]  # 4655 commits, issues: opened 1399 participated in 649
    orcid: 0000-0003-3456-2493
    affiliation: 1
  - name: Kyle Meyer  # 2152 commits, issues: opened 85 participated in 398
@@ -147,7 +147,7 @@ authors:
  - name: Satya Ortiz-Gagne  # 0 commits, issues: opened 3 participated in 0
    orcid: 
    affiliation:  # add full names if not yet listed, or indexes if already are
- - name: Michael Hanke  # 4158 commits, issues: opened 1097 participated in 780
+ - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
    orcid: 0000-0001-6398-6370
    affiliation: "2, 3"
 affiliations:
