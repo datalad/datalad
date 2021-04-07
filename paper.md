@@ -15,6 +15,9 @@ authors:
  - name: Adina Wagner
    orcid: 0000-0003-2917-3450
    affiliation: 2
+ - name: Vanessa Sochat
+   orcid: 0000-0002-4387-3819
+   affiliation: 4
 #
 # Add additional authors here
 #
@@ -30,6 +33,8 @@ affiliations:
    index: 2
  - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
    index: 3
+ - name: Lawrence Livermore National Lab, Livermore, CA, United States
+   index: 4
 date: 24 March 2021
 bibliography: paper.bib
 
