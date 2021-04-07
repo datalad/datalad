@@ -13,7 +13,7 @@ If you would like to co-author the paper, please review the authorship criteria 
 - uncomment (remove leading #) your record
 - add your details (name, ORCID, affiliation) and/or adjust your name (if needed).
 
-If you would like to just be acknowledged, please either reply to this email stating that, or submit a PR with your name appropriately listed in the Acknowledgements section of the https://github.com/datalad/datalad-paper-joss/blob/master/paper.md and instead remove pre-created for you record in the header.
+If you would like to just be acknowledged, please either reply to this email stating that, or submit a PR with your name appropriately listed in the Acknowledgements section of https://github.com/datalad/datalad-paper-joss/blob/master/paper.md and remove the pre-created record with your name from the header.
 
 If you would like to neither be listed among co-authors, nor acknowledged, we would appreciate if you reply and let us know about that.
 
