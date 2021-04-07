@@ -1230,9 +1230,9 @@ class GitRepo(CoreGitRepo):
         try:
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._call_git(
-                # Set annex.largefiles to prevent storing files in
+                # Set annex.gitaddtoannex to prevent storing files in
                 # annex with a v6+ annex repo.
-                ['-c', 'annex.largefiles=nothing', 'add'] +
+                ['-c', 'annex.gitaddtoannex=false', 'add'] +
                 ensure_list(git_options) +
                 to_options(update=update) + ['--verbose'],
                 files=files,
