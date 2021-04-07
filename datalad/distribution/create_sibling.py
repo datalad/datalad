@@ -636,7 +636,7 @@ class CreateSibling(Interface):
 
         if not name:
             name = sibling_ri.hostname if ssh_sibling else "local"
-            lgr.debug(
+            lgr.info(
                 "No sibling name given. Using %s'%s' as sibling name",
                 "URL hostname " if ssh_sibling else "",
                 name)
@@ -708,6 +708,7 @@ class CreateSibling(Interface):
             if name in checkds_remotes and existing in ('error', 'skip'):
                 yield dict(
                     res,
+                    sibling_name=name,
                     status='error' if existing == 'error' else 'notneeded',
                     message=(
                         "sibling '%s' already configured (specify alternative "
@@ -785,6 +786,7 @@ class CreateSibling(Interface):
                 annex_groupwanted,
                 inherit
             )
+            currentds_ap["sibling_name"] = name
             if not path:
                 # nothing new was created
                 # TODO is 'notneeded' appropriate in this case?
