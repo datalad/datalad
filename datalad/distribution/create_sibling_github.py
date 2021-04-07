@@ -44,9 +44,11 @@ from datalad.distribution.siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
-# presently only implemented method to turn subdataset paths into Github
-# compliant repository name suffixes
-template_fx = lambda x: re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', x))
+
+def template_fx(path):
+    """Turn subdataset paths into Github compliant repository name suffixes
+    """
+    return re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', path))
 
 
 @build_doc
