@@ -140,13 +140,18 @@ class CreateSiblingGithub(Interface):
             will be marked as private and only visible to those granted 
             access or by membership of a team/organization/etc.
             """),
-        dryrun=Parameter(
-            args=("--dryrun",),
+        dry_run=Parameter(
+            args=("--dry-run",),
             action="store_true",
             doc="""If this flag is set, no communication with GitHub is
             performed, and no repositories will be created. Instead
             would-be repository names are reported for all relevant datasets
             """),
+        dryrun=Parameter(
+            args=("--dryrun",),
+            action="store_true",
+            doc="""Deprecated. Use the renamed
+            [CMD: --dry-run CMD][PY: `dry_run` PY] parameter"""),
     )
 
     @staticmethod
@@ -164,7 +169,8 @@ class CreateSiblingGithub(Interface):
             access_protocol='https',
             publish_depends=None,
             private=False,
-            dryrun=False):
+            dryrun=False,
+            dry_run=False):
         # this is an absolute leaf package, import locally to avoid
         # unnecessary dependencies
         from datalad.support.github_ import _make_github_repos_
