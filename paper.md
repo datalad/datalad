@@ -51,9 +51,9 @@ authors:
 # - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
+   orcid: 0000-0002-6533-164X
+   affiliation: Stanford University, Stanford, CA, United States
 # - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
