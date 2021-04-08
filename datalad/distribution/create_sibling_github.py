@@ -174,7 +174,8 @@ class CreateSiblingGithub(Interface):
             dataset, check_installed=True, purpose='create GitHub sibling')
 
         res_kwargs = dict(
-            action='create_sibling_github',
+            action='create_sibling_github [dry-run]' if dryrun else
+            'create_sibling_github',
             logger=lgr,
             refds=ds.path,
         )
@@ -249,7 +250,6 @@ class CreateSiblingGithub(Interface):
                 status='ok',
                 url=url,
                 preexisted=existed,
-                dry_run=dryrun,
                 **res_kwargs)
 
         # TODO let submodule URLs point to GitHub (optional)
