@@ -409,7 +409,7 @@ class Update(Interface):
                     path)
             if refds in update_failures:
                 lgr.warning("Not saving because top-level dataset %s "
-                            "had a update failure in subdataset",
+                            "had an update failure in subdataset",
                             refds.path)
             else:
                 save_paths = [p for p in save_paths if p != refds.path]
