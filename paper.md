@@ -15,9 +15,9 @@ authors:
 # - name: Kyle Meyer  # 2152 commits, issues: opened 85 participated in 398
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Benjamin Poldrack  # 1898 commits, issues: opened 82 participated in 461
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Benjamin Poldrack  # 1898 commits, issues: opened 82 participated in 461
+   orcid: 0000-0001-7628-0801
+   affiliation: 2
 # - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
