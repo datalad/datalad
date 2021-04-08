@@ -221,6 +221,14 @@ class CreateSiblingGithub(Interface):
         for d, url, existed in _make_github_repos_(
                 github_login, github_organization, filtered,
                 existing, access_protocol, private, dryrun):
+            # report that we have created the project on github
+            yield get_status_dict(
+                ds=d,
+                status='ok',
+                url=url,
+                message=("project at %s", url),
+                preexisted=existed,
+                **res_kwargs)
             # lastly configure the local datasets
             if not dryrun:
                 extra_remote_vars = {
@@ -238,20 +246,14 @@ class CreateSiblingGithub(Interface):
                     var = 'remote.{}.{}'.format(name, var_name)
                     if var not in d.config:
                         d.config.add(var, var_value, where='local')
-                Siblings()(
+                yield from Siblings()(
                     'configure',
                     dataset=d,
                     name=name,
                     url=url,
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
-                    publish_depends=publish_depends)
-            yield get_status_dict(
-                ds=d,
-                status='ok',
-                url=url,
-                message=("project at %s", url),
-                preexisted=existed,
-                **res_kwargs)
+                    publish_depends=publish_depends,
+                    result_renderer='disabled')
 
         # TODO let submodule URLs point to GitHub (optional)
