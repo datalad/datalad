@@ -26,6 +26,8 @@ help = (
                  the use of a pager for displaying the help message""")
 )
 
+# note: no longer used by the main `datalad` entry point, but could still
+# be used by downstream software, so was left in place
 version = (
     'version', ('--version',),
     dict(action='version',
