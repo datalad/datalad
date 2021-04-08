@@ -218,17 +218,20 @@ class CreateSiblingGithub(Interface):
             return
 
         # actually make it happen on GitHub
-        for d, url, existed in _make_github_repos_(
+        for res in _make_github_repos_(
                 github_login, github_organization, filtered,
                 existing, access_protocol, private, dryrun):
-            # report that we have created the project on github
-            yield get_status_dict(
-                ds=d,
-                status='ok',
-                url=url,
-                message=("project at %s", url),
-                preexisted=existed,
+            # blend reported results with standard properties
+            res = dict(
+                res,
                 **res_kwargs)
+            if 'message' not in res:
+                res['message'] = ("project at %s", res['url'])
+            # report to caller
+            yield get_status_dict(**res)
+            if res['status'] not in ('ok', 'notneeded'):
+                # something went wrong, do not proceed
+                continue
             # lastly configure the local datasets
             if not dryrun:
                 extra_remote_vars = {
@@ -250,7 +253,7 @@ class CreateSiblingGithub(Interface):
                     'configure',
                     dataset=d,
                     name=name,
-                    url=url,
+                    url=res['url'],
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
                     publish_depends=publish_depends,
