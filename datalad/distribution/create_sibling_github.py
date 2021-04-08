@@ -250,6 +250,7 @@ class CreateSiblingGithub(Interface):
                 ds=d,
                 status='ok',
                 url=url,
+                message=("project at %s", url),
                 preexisted=existed,
                 **res_kwargs)
 

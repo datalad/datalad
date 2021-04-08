@@ -267,8 +267,10 @@ def _make_github_repos_(
 def _make_github_repo(github_login, entity, reponame, existing,
                       access_protocol, private, dryrun):
     repo = None
+    access_url = None
     try:
         repo = entity.get_repo(reponame)
+        access_url = get_repo_url(repo, access_protocol, github_login)
     except gh.GithubException as e:
         if e.status != 404:
             # this is not a not found message, raise
@@ -279,7 +281,6 @@ def _make_github_repo(github_login, entity, reponame, existing,
 
     if repo is not None:
         if existing in ('skip', 'reconfigure'):
-            access_url = get_repo_url(repo, access_protocol, github_login)
             return access_url, existing == 'skip'
         elif existing == 'error':
             msg = 'repository "{}" already exists on Github'.format(reponame)
@@ -346,7 +347,15 @@ def _make_github_repo(github_login, entity, reponame, existing,
             'something went wrong, we got no Github repository')
 
     if dryrun:
-        return '{}:github/.../{}'.format(access_protocol, reponame), False
+        # use the reported access URL if we have it, if not
+        # handcraft one
+        return access_url or '{}github.com{}{}/{}.git'.format(
+            'https://' if access_protocol == 'https' else 'git@',
+            '/' if access_protocol == 'https' else ':',
+            # this will be the org, in case the repo will go under an org
+            entity.login,
+            reponame,
+        ), False
     else:
         # report URL for given access protocol
         return get_repo_url(repo, access_protocol, github_login), False
