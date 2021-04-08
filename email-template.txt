@@ -1,0 +1,28 @@
+To: {name} <{email}>
+From: DataLad Team <team@datalad.org>
+Subject: Invitation to co-author a DataLad paper for JOSS
+
+Dear {name},
+
+Thank you for your previous contribution to DataLad (https://github.com/datalad/datalad), by code, issues, or feedback.
+
+We are working on a manuscript to be submitted to the Journal of Open Source Software (https://joss.theoj.org) to describe DataLad, and would like to acknowledge your contribution(s).  We are inviting you to co-author the paper, or, alternatively, give us permission to thank you in the Acknowledgements section of the paper.
+
+If you would like to co-author the paper, please review the authorship criteria of JOSS at https://joss.readthedocs.io/en/latest/submitting.html#authorship and pay particular attention to potential implications of the "co-authors agree to be accountable for all aspects of the work" rule. If you personally consider a co-authorship appropriate under these conditions, please
+
+- submit a Pull Request with changes to http://github.com/datalad/datalad-paper-joss/blob/master/paper.md in which you
+  - uncomment (remove leading #) your record
+  - add your details (name, ORCID, affiliation) and/or adjust your name (if needed).
+- vote on your choice of title on https://github.com/datalad/datalad-paper-joss/issues/9
+
+If you would like to just be acknowledged, please either reply to this email stating that, or submit a PR with your name appropriately listed in the Acknowledgements section of https://github.com/datalad/datalad-paper-joss/blob/master/paper.md and remove the pre-created record with your name from the header.
+
+If you would like to neither be listed among co-authors, nor acknowledged, we would appreciate if you reply and let us know about that.
+
+We are planing to submit the manuscript next week (on/after April 12), and will appreciate if you act on this invitation by the end of this week.
+Co-author records which would remain commented out will be removed before submission.
+
+Thank you again for your contribution to DataLad!
+
+Sincerely,
+DataLad Team
