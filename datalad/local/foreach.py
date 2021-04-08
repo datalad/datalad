@@ -128,8 +128,8 @@ class ForEach(Interface):
             action="store_true",
             doc="""whether to exclude top level dataset.  It is implied if a non-empty
             `contains` is used"""),
-        standard_outputs=Parameter(  # TODO  could be of use for `run` as well
-            args=("--standard-outputs", "--s-o"),
+        output_streams=Parameter(  # TODO  could be of use for `run` as well
+            args=("--output-streams", "--o-s"),
             constraints=EnsureChoice('capture', 'pass-through'),
             doc="""whether to capture and return outputs from 'cmd' in the record ('stdout', 'stderr') or
             just 'pass-through' to the screen (and thus absent from returned record)."""),
@@ -151,7 +151,7 @@ class ForEach(Interface):
             contains=None,
             bottomup=False,
             subdatasets_only=False,
-            standard_outputs='capture',
+            output_streams='capture',
             jobs=None
             ):
         if not cmd:
@@ -168,7 +168,7 @@ class ForEach(Interface):
             if not isinstance(cmd, str):
                 raise ValueError(f"Please provide a single Python expression. Got {cmd!r}")
         else:
-            protocol = NoCapture if standard_outputs == 'pass-through' else StdOutErrCapture
+            protocol = NoCapture if output_streams == 'pass-through' else StdOutErrCapture
 
         refds = require_dataset(
             dataset, check_installed=True, purpose='foreach execution')
@@ -226,10 +226,10 @@ class ForEach(Interface):
                 if python:
                     python_cmd = _PYTHON_CMDS[cmd_type]
                     with chpwd(ds.path):
-                        if standard_outputs == 'pass-through':
+                        if output_streams == 'pass-through':
                             res = python_cmd(cmd, placeholders)
                             out = {}
-                        elif standard_outputs == 'capture':
+                        elif output_streams == 'capture':
                             with swallow_outputs() as cmo:
                                 res = python_cmd(cmd, placeholders)
                                 out = {
@@ -237,7 +237,7 @@ class ForEach(Interface):
                                     'stderr': cmo.err,
                                 }
                         else:
-                            raise RuntimeError(standard_outputs)
+                            raise RuntimeError(output_streams)
                         if cmd_type == 'eval':
                             status_rec['result'] = res
                         else:
@@ -253,7 +253,7 @@ class ForEach(Interface):
                         return
                     # TODO: avoid use of _git_runner
                     out = ds.repo._git_runner.run(cmd_expanded, protocol=protocol)
-                if standard_outputs == 'capture':
+                if output_streams == 'capture':
                     status_rec.update(out)
                     # provide some feedback to user in default rendering
                     if any(out.values()):
@@ -272,7 +272,7 @@ class ForEach(Interface):
                     status='error',
                     message=str(exc))
 
-        if standard_outputs == 'pass-through':
+        if output_streams == 'pass-through':
             pc_class = ProducerConsumer
             pc_kw = {}
         else:
