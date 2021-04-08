@@ -44,8 +44,8 @@ from datalad.distribution.siblings import Siblings
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
 
-def template_fx(path):
-    """Turn subdataset paths into Github compliant repository name suffixes
+def normalize_reponame(path):
+    """Turn name (e.g. path) into a Github compliant repository name
     """
     return re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', path))
 
@@ -169,6 +169,10 @@ class CreateSiblingGithub(Interface):
         # unnecessary dependencies
         from datalad.support.github_ import _make_github_repos_
 
+        if reponame != normalize_reponame(reponame):
+            raise ValueError('Invalid name for a GitHub project: {}'.format(
+                reponame))
+
         # what to operate on
         ds = require_dataset(
             dataset, check_installed=True, purpose='create GitHub sibling')
@@ -206,7 +210,7 @@ class CreateSiblingGithub(Interface):
             gh_reponame = reponame if d == ds else \
                 '{}-{}'.format(
                     reponame,
-                    template_fx(str(d.pathobj.relative_to(ds.pathobj))))
+                    normalize_reponame(str(d.pathobj.relative_to(ds.pathobj))))
             filtered.append((d, gh_reponame))
 
         if not filtered:
