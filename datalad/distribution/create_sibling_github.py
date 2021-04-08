@@ -197,15 +197,12 @@ class CreateSiblingGithub(Interface):
         filtered = []
         for d, mp in toprocess:
             if name in d.repo.get_remotes():
-                if existing == 'error':
-                    msg = '{} already has a configured sibling "{}"'.format(
-                        d, name)
-                    if dryrun:
-                        lgr.error(msg)
-                    else:
-                        raise ValueError(msg)
-                elif existing == 'skip':
-                    continue
+                yield get_status_dict(
+                    ds=d,
+                    status='error' if existing == 'error' else 'notneeded',
+                    message=('already has a configured sibling "%s"', name),
+                    **res_kwargs)
+                continue
             gh_reponame = '{}{}{}'.format(
                 reponame,
                 '-' if mp else '',
