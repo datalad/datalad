@@ -181,7 +181,7 @@ class CreateSiblingGithub(Interface):
         )
         # gather datasets and essential info
         # dataset instance and mountpoint relative to the top
-        toprocess = [(ds, '')]
+        toprocess = [ds]
         if recursive:
             for sub in ds.subdatasets(
                     fulfilled=None,  # we want to report on missing dataset in here
@@ -191,11 +191,11 @@ class CreateSiblingGithub(Interface):
                 if not sub.is_installed():
                     lgr.info('Ignoring unavailable subdataset %s', sub)
                     continue
-                toprocess.append((sub, relpath(sub.path, start=ds.path)))
+                toprocess.append(sub)
 
         # check for existing remote configuration
         filtered = []
-        for d, mp in toprocess:
+        for d in toprocess:
             if name in d.repo.get_remotes():
                 yield get_status_dict(
                     ds=d,
@@ -203,10 +203,10 @@ class CreateSiblingGithub(Interface):
                     message=('already has a configured sibling "%s"', name),
                     **res_kwargs)
                 continue
-            gh_reponame = '{}{}{}'.format(
-                reponame,
-                '-' if mp else '',
-                template_fx(mp))
+            gh_reponame = reponame if d == ds else \
+                '{}-{}'.format(
+                    reponame,
+                    template_fx(str(d.pathobj.relative_to(ds.pathobj))))
             filtered.append((d, gh_reponame))
 
         if not filtered:
