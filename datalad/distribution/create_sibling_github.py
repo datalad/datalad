@@ -143,10 +143,10 @@ class CreateSiblingGithub(Interface):
         dry_run=Parameter(
             args=("--dry-run",),
             action="store_true",
-            doc="""If this flag is set, no communication with GitHub is
-            performed, and no repositories will be created. Instead
-            would-be repository names are reported for all relevant datasets
-            """),
+            doc="""If this flag is set, no repositories will be created.
+            Instead tests for name collisions with existing projects will be
+            performed, and would-be repository names are reported for all
+            relevant datasets"""),
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
