@@ -77,8 +77,24 @@ class ForEach(Interface):
     `git submodule foreach` command with the following major differences
 
     - by default (unless [CMD: --subdatasets-only][PY: `subdatasets_only=True`]) it would
-      include operation on the original dataset as well
-    - can be
+      include operation on the original dataset as well,
+    - subdatasets could be traversed in bottom-up order,
+    - can execute commands in parallel (see `jobs` option), but would account for the order,
+      e.g. in bottom-up order command is executed in super-dataset only after it is executed
+      in all subdatasets.
+
+    *Command format*
+
+    || REFLOW >>
+    [CMD: --cmd-type external CMD][PY: cmd_type='external' PY]: A few placeholders are
+    supported in the command via Python format
+    specification. "{pwd}" will be replaced with the full path of the current
+    working directory. "{ds}" and "{refds}" will provide instances of the dataset currently opreplaced with the full
+    path
+    of the
+    dataset that run is invoked on. "{tmpdir}" will be replaced with the full
+    path of a temporary directory.
+    << REFLOW ||
     """
     # TODO:     _examples_ = [], # see e.g. run
 
