@@ -185,13 +185,19 @@ def _gen_github_entity(
             yield ses.get_user(), token_str
 
 
-def _make_github_repos(
+def _make_github_repos_(
         github_login, github_organization, rinfo, existing,
         access_protocol, private, dryrun):
-    res = []
-    if not rinfo:
-        return res  # no need to even try!
+    """Create a series of GitHub projects
 
+    Yields
+    ------
+    tuple (Dataset instance, URL, bool)
+    """
+    if not rinfo:
+        return  # no need to even try!
+
+    success = False
     ncredattempts = 0
     # determine the entity under which to create the repos.  It might be that
     # we would need to check a few credentials
@@ -213,7 +219,8 @@ def _make_github_repos(
                     dryrun)
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
-                res.append((ds,) + ensure_tuple_or_list(res_))
+                yield (ds,) + ensure_tuple_or_list(res_)
+                success = True
             except (gh.BadCredentialsException, gh.GithubException) as e:
                 hint = None
                 if (isinstance(e, gh.BadCredentialsException) and e.status != 403):
@@ -233,7 +240,7 @@ def _make_github_repos(
                             exc_str(e),
                             (" Hint: %s" % hint) if hint else "")
 
-                if res:
+                if success:
                     # so we have succeeded with at least one repo already -
                     # we should not try any other credential.
                     # TODO: may be it would make sense to have/use different
@@ -242,8 +249,9 @@ def _make_github_repos(
                     # IMHO (-- yoh)
                     raise e
                 break  # go to the next attempt to authenticate
-        if res:
-            return res
+
+        if success:
+            return
 
     # External loop should stop querying for the next possible way when it succeeds,
     # so we should never get here if everything worked out

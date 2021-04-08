@@ -26,14 +26,13 @@ from datalad.interface.common_opts import (
     recursion_limit,
     publish_depends,
 )
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import eval_results
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
-)
-from datalad.utils import (
-    ensure_list,
 )
 from datalad.distribution.dataset import (
     datasetmethod,
@@ -81,9 +80,6 @@ class CreateSiblingGithub(Interface):
     *hub.oauthtoken*, and store/check the token in credential store as associated
     with that specific login name.
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
-
     _params_ = dict(
         dataset=Parameter(
             args=("--dataset", "-d",),
@@ -155,6 +151,7 @@ class CreateSiblingGithub(Interface):
 
     @staticmethod
     @datasetmethod(name='create_sibling_github')
+    @eval_results
     def __call__(
             reponame,
             dataset=None,
@@ -170,11 +167,17 @@ class CreateSiblingGithub(Interface):
             dryrun=False):
         # this is an absolute leaf package, import locally to avoid
         # unnecessary dependencies
-        from datalad.support.github_ import _make_github_repos
+        from datalad.support.github_ import _make_github_repos_
 
         # what to operate on
         ds = require_dataset(
             dataset, check_installed=True, purpose='create GitHub sibling')
+
+        res_kwargs = dict(
+            action='create_sibling_github',
+            logger=lgr,
+            refds=ds.path,
+        )
         # gather datasets and essential info
         # dataset instance and mountpoint relative to the top
         toprocess = [(ds, '')]
@@ -210,15 +213,13 @@ class CreateSiblingGithub(Interface):
 
         if not filtered:
             # all skipped
-            return []
+            return
 
         # actually make it happen on GitHub
-        rinfo = _make_github_repos(
-            github_login, github_organization, filtered,
-            existing, access_protocol, private, dryrun)
-
-        # lastly configure the local datasets
-        for d, url, existed in rinfo:
+        for d, url, existed in _make_github_repos_(
+                github_login, github_organization, filtered,
+                existing, access_protocol, private, dryrun):
+            # lastly configure the local datasets
             if not dryrun:
                 extra_remote_vars = {
                     # first make sure that annex doesn't touch this one
@@ -243,23 +244,12 @@ class CreateSiblingGithub(Interface):
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
                     publish_depends=publish_depends)
+            yield get_status_dict(
+                ds=d,
+                status='ok',
+                url=url,
+                preexisted=existed,
+                dry_run=dryrun,
+                **res_kwargs)
 
         # TODO let submodule URLs point to GitHub (optional)
-        return rinfo
-
-    @staticmethod
-    def result_renderer_cmdline(res, args):
-        from datalad.ui import ui
-        res = ensure_list(res)
-        if args.dryrun:
-            ui.message('DRYRUN -- Anticipated results:')
-        if not len(res):
-            ui.message("Nothing done")
-        else:
-            for d, url, existed in res:
-                ui.message(
-                    "'{}'{} configured as sibling '{}' for {}".format(
-                        url,
-                        " (existing repository)" if existed else '',
-                        args.name,
-                        d))
