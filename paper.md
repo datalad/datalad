@@ -72,8 +72,9 @@ authors:
 # - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
-#   orcid: 
+ - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
+   orcid: 0000-0002-0936-317X
+   affiliation: "2, 3"
 #   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Nolan Nichols  # 5 commits, issues: opened 3 participated in 2
 #   orcid: 
