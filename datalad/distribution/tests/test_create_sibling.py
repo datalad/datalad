@@ -37,6 +37,7 @@ from datalad.tests.utils import (
     assert_dict_equal,
     assert_false,
     assert_in,
+    assert_in_results,
     assert_no_errors_logged,
     assert_not_equal,
     assert_not_in,
@@ -542,7 +543,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
     try:
-        ds.create_sibling(url, ui=True)
+        res = ds.create_sibling(url, ui=True)
     except UnicodeDecodeError:
         if sys.version_info < (3, 7):
             # observed test failing on ubuntu 18.04 with python 3.6
@@ -550,7 +551,7 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
             # We will just skip this tricky one
             raise SkipTest("Known failure")
         raise
-
+    assert_in_results(res, action="create_sibling", sibling_name=sibname)
     published = ds.publish(to=sibname, transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr
