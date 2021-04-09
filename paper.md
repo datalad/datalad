@@ -30,9 +30,6 @@ authors:
 # - name: Joey Hess  # 0 commits, issues: opened 4 participated in 80
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: John T. Wodder II  # 57 commits, issues: opened 0 participated in 11
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -353,6 +350,7 @@ It received significant contributions from ReproNim [1P41EB019936-01A1](https://
 We would also like to express our gratitude to 
 Joey Zhou,
 Matteo Visconti di Oleggio Castello,
+John T. Wodder II,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, and recommendations.
 
