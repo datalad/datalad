@@ -121,9 +121,6 @@ authors:
 # - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Joerg Stadler  # 0 commits, issues: opened 2 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Elizabeth DuPre  # 1 commits, issues: opened 1 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -134,9 +131,6 @@ authors:
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Satya Ortiz-Gagne  # 0 commits, issues: opened 3 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
@@ -351,6 +345,8 @@ We would also like to express our gratitude to
 Joey Zhou,
 Matteo Visconti di Oleggio Castello,
 John T. Wodder II,
+Satya Ortiz-Gagné,
+Jörg Stadler,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, and recommendations.
 
