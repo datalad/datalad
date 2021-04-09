@@ -69,6 +69,7 @@ _group_misc = (
         ('datalad.local.wtf', 'WTF'),
         ('datalad.local.no_annex', 'NoAnnex'),
         ('datalad.local.add_readme', 'AddReadme'),
+        ('datalad.local.addurls', 'Addurls'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
