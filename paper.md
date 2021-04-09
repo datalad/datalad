@@ -63,9 +63,9 @@ authors:
 # - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
+   orcid: 0000-0002-8402-6173
+   affiliation: 2
 # - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
