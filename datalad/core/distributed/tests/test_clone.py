@@ -569,6 +569,13 @@ def test_expanduser(srcpath, destpath):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
 
+    # We switch away from home set up in datalad.setup_package(), so make sure
+    # we have a valid identity.
+    with open(op.join(srcpath, ".gitconfig"), "w") as fh:
+        fh.write("[user]\n"
+                 "name = DataLad oooooTester\n"
+                 "email = test@example.com\n")
+
     with chpwd(destpath), patch.dict('os.environ', get_home_envvars(srcpath)):
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
