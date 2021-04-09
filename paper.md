@@ -54,9 +54,9 @@ authors:
  - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
    orcid: 0000-0002-6533-164X
    affiliation: Stanford University, Stanford, CA, United States
-# - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
+   orcid: 0000-0003-2213-7465
+   affiliation: 2
 # - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
