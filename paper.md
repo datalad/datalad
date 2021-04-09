@@ -192,7 +192,7 @@ to someone who didn't dive into it yet -->
 **They are generic and might lack support for domain specific solutions.** 
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
 Interaction with non git-aware portals should then be implemented via custom Git transfer protocols, as e.g. it was done in datalad-osf [@datalad-osf:zenodo].
-Git-annex provides access to a wide range of external data storage resources via various protocols, but cannot implement all idiosyncracies of any individual data portal.
+Git-annex provides access to a wide range of external data storage resources via various protocols, but cannot implement all idiosyncrasies of any individual data portal.
 In particular, scientific data is frequently stored in compressed archives to reduce its storage demands, and/or on specialized servers, such as XNAT ([www.xnat.org](http://www.xnat.org)).
 To address these demands, git-annex established a protocol [@git-annex:special_remotes_protocol] through which external tools can provide custom transport functionality transparently to the git-annex user.
 This allowed DataLad and many other projects to facilitate access to an ever growing collection of resources [@git-annex:special_remotes] and to overcome technological limitations (e.g., maximal file sizes, or file system inodes limits).
@@ -245,7 +245,7 @@ DataLad exploits this fact and enables automated annotation of changes which res
 DataLad creates a commit message which does not only include a human-readable summary, but also a human and machine-readable record of the command invocation which introduced the changes.
 This allows for the data "change" to be re-executed to either verify that results reproduce, or to apply such a "change" to a completely different state. 
 
-**Git and it-annex do not necessarily facilitate the best scientific workflow.**
+**Git and git-annex do not necessarily facilitate the best scientific workflow.**
 Git and git-annex, being generic tools, come with rich interfaces and allow for a wide range of workflows.
 DataLad strives to provide a higher level interface to more efficiently cover typical use cases encountered in the scientific practice than the direct invocation of individual Git and git-annex commands, and to encourage efficient computation and reproducible workflows.
 To this end, DataLad is also accompanied by rich documentation [@datalad-handbook:zenodo] to guide a scientist of any technological competency level, and agnostic of the field of science.
@@ -279,7 +279,7 @@ Some exemplar extensions include:
 - [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF).
 
 The same mechanism of extensions is used for rapid development of new functionality to later be moved into the main DataLad codebase (e.g., [datalad-metalad](https://github.com/datalad/datalad-metalad/)).
-[datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and contineous integration testing of their released versions against released and development versions of the DataLad core. 
+[datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and continuous integration testing of their released versions against released and development versions of the DataLad core. 
 [datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used for creating new DataLad extensions.
 
 ## External uses and integrations
