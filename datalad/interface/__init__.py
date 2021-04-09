@@ -70,6 +70,7 @@ _group_misc = (
         ('datalad.local.no_annex', 'NoAnnex'),
         ('datalad.local.add_readme', 'AddReadme'),
         ('datalad.local.addurls', 'Addurls'),
+        ('datalad.local.check_dates', 'CheckDates'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
