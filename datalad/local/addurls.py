@@ -48,7 +48,7 @@ from datalad.utils import (
     unlink,
 )
 
-lgr = logging.getLogger("datalad.plugin.addurls")
+lgr = logging.getLogger("datalad.local.addurls")
 
 __docformat__ = "restructuredtext"
 
@@ -1134,7 +1134,7 @@ class Addurls(Interface):
         from datalad.distribution.dataset import Dataset, require_dataset
         from datalad.support.annexrepo import AnnexRepo
 
-        lgr = logging.getLogger("datalad.plugin.addurls")
+        lgr = logging.getLogger("datalad.local.addurls")
 
         ds = require_dataset(dataset, check_installed=False)
         repo = ds.repo

@@ -15,7 +15,7 @@ from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
 import logging
-lgr = logging.getLogger('datalad.export_to_figshare')
+lgr = logging.getLogger('datalad.distributed.export_to_figshare')
 
 
 class FigshareRESTLaison(object):

@@ -34,7 +34,7 @@ from datalad.support.exceptions import (
 )
 from datalad.version import __version__, __full_version__
 
-lgr = logging.getLogger('datalad.plugin.wtf')
+lgr = logging.getLogger('datalad.local.wtf')
 
 
 # wording to use for items which were considered sensitive and thus not shown

@@ -24,7 +24,7 @@ from datalad.support.exceptions import (
 
 __docformat__ = "restructuredtext"
 
-lgr = logging.getLogger("datalad.plugin.check_dates")
+lgr = logging.getLogger("datalad.local.check_dates")
 
 
 def _git_repos(paths):

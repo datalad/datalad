@@ -86,7 +86,7 @@ class ExportArchive(Interface):
         from datalad.dochelpers import exc_str
 
         import logging
-        lgr = logging.getLogger('datalad.plugin.export_archive')
+        lgr = logging.getLogger('datalad.local.export_archive')
 
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='export archive')

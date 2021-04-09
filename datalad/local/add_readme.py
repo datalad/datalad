@@ -61,7 +61,7 @@ class AddReadme(Interface):
         from os.path import join as opj
         from io import open
         import logging
-        lgr = logging.getLogger('datalad.plugin.add_readme')
+        lgr = logging.getLogger('datalad.local.add_readme')
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import ensure_list
