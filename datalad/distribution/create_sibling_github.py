@@ -14,8 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
-
-from os.path import relpath
+import warnings
 
 from datalad.interface.base import (
     build_doc,
@@ -171,6 +170,15 @@ class CreateSiblingGithub(Interface):
             private=False,
             dryrun=False,
             dry_run=False):
+        if dryrun and not dry_run:
+            # the old one is used, and not in agreement with the new one
+            warnings.warn(
+                "datalad-create-sibling-github's `dryrun` option is "
+                "deprecated and will be removed in a future release, "
+                "use the renamed `dry_run/--dry-run` option instead.",
+                DeprecationWarning)
+            dry_run = dryrun
+
         # this is an absolute leaf package, import locally to avoid
         # unnecessary dependencies
         from datalad.support.github_ import _make_github_repos_
@@ -184,7 +192,7 @@ class CreateSiblingGithub(Interface):
             dataset, check_installed=True, purpose='create GitHub sibling')
 
         res_kwargs = dict(
-            action='create_sibling_github [dry-run]' if dryrun else
+            action='create_sibling_github [dry-run]' if dry_run else
             'create_sibling_github',
             logger=lgr,
             refds=ds.path,
@@ -226,7 +234,7 @@ class CreateSiblingGithub(Interface):
         # actually make it happen on GitHub
         for res in _make_github_repos_(
                 github_login, github_organization, filtered,
-                existing, access_protocol, private, dryrun):
+                existing, access_protocol, private, dry_run):
             # blend reported results with standard properties
             res = dict(
                 res,
@@ -239,7 +247,7 @@ class CreateSiblingGithub(Interface):
                 # something went wrong, do not proceed
                 continue
             # lastly configure the local datasets
-            if not dryrun:
+            if not dry_run:
                 extra_remote_vars = {
                     # first make sure that annex doesn't touch this one
                     # but respect any existing config
