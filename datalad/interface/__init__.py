@@ -72,6 +72,7 @@ _group_misc = (
         ('datalad.local.addurls', 'Addurls'),
         ('datalad.local.check_dates', 'CheckDates'),
         ('datalad.local.export_archive', 'ExportArchive'),
+        ('datalad.distributed.export_to_figshare', 'ExportToFigshare'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
