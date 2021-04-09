@@ -57,9 +57,6 @@ authors:
 # - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Andy Connolly  # 12 commits, issues: opened 0 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -347,6 +344,7 @@ Matteo Visconti di Oleggio Castello,
 John T. Wodder II,
 Satya Ortiz-Gagné,
 Jörg Stadler,
+Andrew Connolly,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, and recommendations.
 
