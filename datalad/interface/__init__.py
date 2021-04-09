@@ -71,6 +71,7 @@ _group_misc = (
         ('datalad.local.add_readme', 'AddReadme'),
         ('datalad.local.addurls', 'Addurls'),
         ('datalad.local.check_dates', 'CheckDates'),
+        ('datalad.local.export_archive', 'ExportArchive'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
