@@ -67,6 +67,7 @@ _group_misc = (
     'Miscellaneous commands',
     [
         ('datalad.local.wtf', 'WTF'),
+        ('datalad.local.no_annex', 'NoAnnex'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
