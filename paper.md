@@ -12,9 +12,8 @@ authors:
  - name: Yaroslav O. Halchenko^[co-first author]  # 4655 commits, issues: opened 1399 participated in 649
    orcid: 0000-0003-3456-2493
    affiliation: 1
-# - name: Kyle Meyer  # 2152 commits, issues: opened 85 participated in 398
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Kyle Meyer  # 2152 commits, issues: opened 85 participated in 398
+   affiliation: 1
  - name: Benjamin Poldrack  # 1898 commits, issues: opened 82 participated in 461
    orcid: 0000-0001-7628-0801
    affiliation: 2
