@@ -171,7 +171,7 @@ Since it is interoperable with a large variety of scientific and commercial host
 Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files <!-- citation needed, does not match self-description -->, but it is not designed to handle large (e.g., over a gigabyte) or binary files efficiently [see e.g. @opensource:git-binary].
 <!-- YOH: I do not think we need citation to support ever statement, especially for which there would be no scholary articly "deeply investigating" it.  Added a citation to some first hit on google -->
 Moreover, any data committed to Git becomes available to all clones of that repository.
-This makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? YOH: "distributed storage" != "distribution". Removed "scientic data" preamble and otherwise I think this statement is ok otherwise-->, or stop providing some individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
+This makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? YOH: "distributed storage" != "distribution". Removed "scientic data" preamble and otherwise I think this statement is ok otherwise--> or to stop providing some individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
 Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome Git's limitation in managing individual file content that is either large or sensitive.
 File content managed by git-annex is placed into an annex, and in its place, git-annex commits a link (a symbolic link or a git link) pointing to the content of the file.
 The content representation is based on a checksum of the file's content.
@@ -260,7 +260,7 @@ DataLad (see \autoref{fig:one}) operates on DataLad datasets which are just Git 
  
 ![DataLad: overview of available commands for various parts of the data management process \label{fig:one}](figures/datalad_process.png)
 
-Using Git's submodules mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
+Using Git's submodule mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
 With this simple paradigm, DataLad fulfills the YODA principles for reproducible science [@yoda:myyoda] and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results  (see \autoref{fig:two}).
 
 ![DataLad datasets all the way down: from publication to raw data \label{fig:two}](figures/datalad-nesting-access.png)
@@ -269,7 +269,7 @@ As a testament of scalability, [datasets.datalad.org](http://datasets.datalad.or
 
 ## Extensions
 
-Similarly to Git and git-annex, DataLad core strives to provide a generic tool, not encumbered by a specific field of science or domain.
+Like Git and git-annex, DataLad core strives to provide a generic tool, not encumbered by a specific field of science or domain.
 To harmoniously extend its functionality, DataLad provides mechanism for providing domain or technology specific extensions.
 Some exemplar extensions include:
 
@@ -317,7 +317,7 @@ At the time of this publication, the repository amassed over 13.5k commits, 2.5k
 Issue tracker, labels, milestones, and pull requests (from personal forks) are used to coordinate development.
 DataLad heavily relies on the versatility and stability of the underlying core tools - Git and git-annex.
 To avoid reimplementing the wheel and to benefit the git-annex user community at large, many aspects of the desired functionality are and have been implemented directly in git-annex through collaboration with the git-annex developer Joey Hess [@git-annex:projects-datalad].
-To guarantee robust operation across various deployments DataLad heavily utilizes continuous integration platforms (Appveyor, GitHub actions, and Travis CI) for testing DataLad core, building and testing git-annex (in a dedicated [github.com/datalad/git-annex](https://github.com/datalad/git-annex)), and integration testing 
+To guarantee robust operation across various deployments, DataLad heavily utilizes continuous integration platforms (Appveyor, GitHub actions, and Travis CI) for testing DataLad core, building and testing git-annex (in a dedicated [github.com/datalad/git-annex](https://github.com/datalad/git-annex)), and integration testing 
 with DataLad extensions ([datalad-extensions](https://github.com/datalad/datalad-extensions/)).
 
 ## Contributions
