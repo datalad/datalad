@@ -126,9 +126,8 @@ authors:
 # - name: Timo Dickscheid  # 0 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
+   orcid: 0000-0003-1952-5459
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
    orcid: 0000-0001-6398-6370
    affiliation: "2, 3"
