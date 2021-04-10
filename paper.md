@@ -78,9 +78,6 @@ authors:
 # - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: John Lee  # 0 commits, issues: opened 7 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Chris Gorgolewski  # 0 commits, issues: opened 5 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -343,6 +340,7 @@ John T. Wodder II,
 Satya Ortiz-Gagné,
 Jörg Stadler,
 Andrew Connolly,
+John Lee,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, and recommendations.
 
