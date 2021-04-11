@@ -35,9 +35,9 @@ authors:
 # - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
+   orcid: 0000-0002-2834-7220
+   affiliation:  CHDI Management/CHDI Foundation, Princeton, NJ, USA
  - name: Vanessa Sochat  # 16 commits, issues: opened 8 participated in 4
    orcid: 0000-0002-4387-3819
    affiliation: 4
