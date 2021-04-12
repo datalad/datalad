@@ -1,6 +1,7 @@
 To: {name} <{email}>
 From: Yaroslav Halchenko <yoh@onerussian.com>
 Reply-To: DataLad Team <team@datalad.org>
+BCC: yoh@onerussian.com
 Subject: Re-Invitation to co-author a DataLad paper for JOSS
 
 Dear {name},

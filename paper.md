@@ -65,10 +65,6 @@ authors:
  - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
    orcid: 0000-0002-0936-317X
    affiliation: "2, 3"
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Nolan Nichols  # 5 commits, issues: opened 3 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
    orcid: 0000-0002-9794-749X 
    affiliation: 5
@@ -352,6 +348,7 @@ Satya Ortiz-Gagné,
 Jörg Stadler,
 Andrew Connolly,
 John Lee,
+Nolan Nichols,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, and recommendations.
 
