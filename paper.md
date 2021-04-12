@@ -117,9 +117,9 @@ authors:
 # - name: Elizabeth DuPre  # 1 commits, issues: opened 1 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Horea Christian  # 1 commits, issues: opened 3 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Horea-Ioan Ioanas  # 1 commits, issues: opened 3 participated in 0
+   orcid: 0000-0001-7037-2449
+   affiliation: "6"
 # - name: Timo Dickscheid  # 0 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -139,6 +139,8 @@ affiliations:
    index: 4
  - name: McGill University, Faculty of Medicine and Health Sciences, McConnell Brain Imaging Centre, Montreal, Canada
    index: 5
+ - name: Department of Biological Engineering, Massachusetts Institute of Technology, Cambridge, United States of America
+   index: 6
 date: 24 March 2021
 bibliography: paper.bib
 
