@@ -171,7 +171,7 @@ Since it is interoperable with a large variety of scientific and commercial host
 
 ## Why Git and git-annex
 
-Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files <!-- citation needed, does not match self-description -->, but it is not designed to handle large (e.g., over a gigabyte) or binary files efficiently [see, e.g., @opensource:git-binary].
+Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files,<!-- citation needed, does not match self-description --> but it is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
 <!-- YOH: I do not think we need citation to support ever statement, especially for which there would be no scholary articly "deeply investigating" it.  Added a citation to some first hit on google -->
 Moreover, any data committed to Git becomes available to all clones of that repository.
 This makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? YOH: "distributed storage" != "distribution". Removed "scientic data" preamble and otherwise I think this statement is ok otherwise--> or to stop providing some individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
@@ -202,8 +202,8 @@ This allowed DataLad and many other projects to facilitate access to an ever-gro
 
 **They require a layer above to establish a *distribution*.**
 The DataLad project's initial goal was to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
-On their own, Git and git-annex do not provide user interfaces for search across available repositories or for convenient manipulation of individual components of a data distribution. 
-[datasets.datalad.org](http://datasets.datalad.org) became an example of such a data distribution curated by the DataLad team, which at the moment provides streamlined access to over 250 TBs of data across wide range of projects and archives.
+On their own, Git and git-annex do not provide user interfaces for searching across available repositories or for convenient manipulation of individual components of a data distribution. 
+[datasets.datalad.org](http://datasets.datalad.org) became an example of such a data distribution curated by the DataLad team, which at the moment provides streamlined access to over 250 TBs of data across a wide range of projects and archives.
 <!-- MIH thinks this needs a clarification of terms. If datasets.d.o is a distribution than datalad is "just a client tool" too. I think this is probably aimed at the nesting feature, and if so, we should use the term, because people can read about it in the handbook. This technical feature is then what is used to build a "unified data distribution" -->
 <!-- YOH: good point, after all every distribution relies on client tools.  I have tried to address it above by removing the notion of "just a client tool".
  I do not think we can escape "metadata" completely -->
@@ -236,7 +236,7 @@ As for #2 "reproducible execution" - I think we missed such subsection entirely,
 --> 
 
 **Annotation of changes is not "re-executable".**
-Git commit message is a freeform text intended to provide a human-readable description of introduced changes.
+A Git commit message is a freeform text intended to provide a human-readable description of introduced changes.
 Changes themselves are typically represented by a patch (an exact difference between two versions) which could be applied to another version of the text file(s).
 Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch.
 <!-- YOH: may be strip above sentence away... I am just trying to lead somehow into "semantic" description of the change.
@@ -245,7 +245,7 @@ Such annotation is not sufficient to introduce changes by following the descript
   either will not be applicable or just would miss some Xs if applied to a vastly different version -->
 Unlike changes to text documents or source code, which are typically done "manually", data manipulations are most often performed by software.
 DataLad exploits this fact and enables automated annotation of changes which result from running an external command.
-DataLad creates a commit message which does not only include a human-readable summary, but also a human and machine-readable record of the command invocation which introduced the changes.
+DataLad creates a commit message which does not only include a human-readable summary, but also a human- and machine-readable record of the command invocation which introduced the changes.
 This allows for the data "change" to be re-executed to either verify that results reproduce, or to apply such a "change" to a completely different state. 
 
 **Git and git-annex do not necessarily facilitate the best scientific workflow.**
@@ -282,8 +282,8 @@ Some exemplar extensions include:
 - [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF).
 
 The same mechanism of extensions is used for rapid development of new functionality to later be moved into the main DataLad codebase (e.g., [datalad-metalad](https://github.com/datalad/datalad-metalad/)).
-[datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and continuous integration testing of their released versions against released and development versions of the DataLad core. 
-[datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used for creating new DataLad extensions.
+The [datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and continuous integration testing of their released versions against released and development versions of the DataLad core. 
+The [datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used for creating new DataLad extensions.
 
 ## External uses and integrations
 
@@ -315,7 +315,7 @@ The [datalad-installer](https://github.com/datalad/datalad-installer/) (also ava
 
 ## Development
 
-DataLad is being developed openly in a public repository ([github.com/datalad/datalad](https://github.com/datalad/datalad)) since its inception in 2013.
+DataLad has been developed openly in a public repository ([github.com/datalad/datalad](https://github.com/datalad/datalad)) since its inception in 2013.
 At the time of this publication, the repository amassed over 13.5k commits, 2.5k merged PRs, and 2.3k closed (+700 open) issues from over 30 contributors.
 Issue tracker, labels, milestones, and pull requests (from personal forks) are used to coordinate development.
 DataLad heavily relies on the versatility and stability of the underlying core tools---Git and git-annex.
