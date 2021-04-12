@@ -1,10 +1,13 @@
 To: {name} <{email}>
-From: DataLad Team <team@datalad.org>
-Subject: Invitation to co-author a DataLad paper for JOSS
+From: Yaroslav Halchenko <yoh@onerussian.com>
+Reply-To: DataLad Team <team@datalad.org>
+Subject: Re-Invitation to co-author a DataLad paper for JOSS
 
 Dear {name},
 
 Thank you for your previous contribution to DataLad (https://github.com/datalad/datalad), by code, issues, or feedback.
+We have sent out an initial invitation a few days back, but were reported that some emails did not receive notification,
+ so we are resending it now slightly differently.
 
 We are working on a manuscript to be submitted to the Journal of Open Source Software (https://joss.theoj.org) to describe DataLad, and would like to acknowledge your contribution(s).  We are inviting you to co-author the paper, or, alternatively, give us permission to thank you in the Acknowledgements section of the paper.
 
