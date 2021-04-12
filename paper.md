@@ -74,7 +74,7 @@ authors:
 #   affiliation:  # add full names if not yet listed, or indexes if already are
 - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
   orcid: 0000-0002-9794-749X 
-  affiliation: "5"
+  affiliation: 5
 # - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
