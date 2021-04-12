@@ -26,9 +26,6 @@ authors:
  - name: Adina Wagner  # 98 commits, issues: opened 36 participated in 45
    orcid: 0000-0003-2917-3450
    affiliation: 2
-# - name: Joey Hess  # 0 commits, issues: opened 4 participated in 80
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -346,7 +343,7 @@ NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999),
 (PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
 through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
 It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects. ... .
-
+We express our gratitude to Joey Hess for the development and maintenance of git-annex, and for years of productive collaboration with the DataLad team.
 We would also like to express our gratitude to 
 Joey Zhou,
 Matteo Visconti di Oleggio Castello,
