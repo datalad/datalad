@@ -38,9 +38,9 @@ authors:
  - name: Vanessa Sochat  # 16 commits, issues: opened 8 participated in 4
    orcid: 0000-0002-4387-3819
    affiliation: 4
-# - name: Satrajit Ghosh  # 0 commits, issues: opened 7 participated in 13
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Satrajit S. Ghosh  # 0 commits, issues: opened 7 participated in 13
+   orcid: 0000-0002-5312-6729
+   affiliation:  11
 # - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
