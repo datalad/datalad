@@ -33,7 +33,7 @@ class NoAnnex(Interface):
 
       code/**
 
-    Note that the plugin works incrementally, hence any existing configuration
+    Note that this command works incrementally, hence any existing configuration
     (e.g. from a previous plugin run) is amended, not replaced.
     """
     from datalad.support.param import Parameter
