@@ -271,8 +271,8 @@ As a testament of scalability, [datasets.datalad.org](http://datasets.datalad.or
 
 ## Extensions
 
-Like Git and git-annex, DataLad core strives to provide a generic tool, not encumbered by a specific field of science or domain.
-To harmoniously extend its functionality, DataLad provides mechanism for providing domain or technology specific extensions.
+Like Git and git-annex, DataLad core not only provides a generic tool not encumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of.
+DataLad extensions mechanism allows to harmoniously extend DataLad's with a domain or technology specific functionality.
 Some exemplar extensions include:
 
 - [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments;
