@@ -26,6 +26,7 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
+import warnings
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -38,8 +39,6 @@ from datalad.support.constraints import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.plugin import _get_plugins
-from datalad.plugin import _load_plugin
 
 
 default_logchannels = {
@@ -72,16 +71,13 @@ def get_cmdline_command_name(intfspec):
 def get_interface_groups(include_plugins=False):
     """Return a list of command groups.
 
-    Parameters
-    ----------
-    include_plugins : bool, optional
-        Whether to include a group named 'plugins' that has a list of
-        discovered plugin commands.
-
     Returns
     -------
     A list of tuples with the form (GROUP_NAME, GROUP_DESCRIPTION, COMMANDS).
     """
+    if include_plugins:
+        warnings.warn("Plugins are no longer supported.", DeprecationWarning)
+
     from .. import interface as _interfaces
 
     grps = []
@@ -93,13 +89,6 @@ def get_interface_groups(include_plugins=False):
         grp_name = _item[7:]
         grp = getattr(_interfaces, _item)
         grps.append((grp_name,) + grp)
-    # TODO(yoh): see if we could retain "generator" for plugins
-    # ATM we need to make it explicit so we could check the command(s) below
-    # It could at least follow the same destiny as extensions so we would
-    # just do more iterative "load ups"
-
-    if include_plugins:
-        grps.append(('plugins', 'Plugins', list(_get_plugins())))
     return grps
 
 
@@ -145,25 +134,21 @@ def load_interface(spec):
     ----------
     spec : tuple
         For a standard interface, the first item is the datalad source module
-        and the second object name for the interface. For a plugin, the second
-        item should be a dictionary that maps 'file' to the path the of module.
+        and the second object name for the interface.
 
     Returns
     -------
     The interface class or, if importing the module fails, None.
     """
-    if isinstance(spec[1], dict):
-        intf = _load_plugin(spec[1]['file'], fail=False)
+    lgr.log(5, "Importing module %s ", spec[0])
+    try:
+        mod = import_module(spec[0], package='datalad')
+    except Exception as e:
+        lgr.error("Internal error, cannot import interface '%s': %s",
+                  spec[0], exc_str(e))
+        intf = None
     else:
-        lgr.log(5, "Importing module %s ", spec[0])
-        try:
-            mod = import_module(spec[0], package='datalad')
-        except Exception as e:
-            lgr.error("Internal error, cannot import interface '%s': %s",
-                      spec[0], exc_str(e))
-            intf = None
-        else:
-            intf = getattr(mod, spec[1])
+        intf = getattr(mod, spec[1])
     return intf
 
 

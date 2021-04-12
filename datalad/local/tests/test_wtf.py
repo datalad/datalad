@@ -7,66 +7,36 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test plugin interface mechanics"""
-
+"""Test wtf"""
 
 
 from os.path import join as opj
 
-from datalad.api import create
-from datalad.coreapi import Dataset
 from datalad.dochelpers import exc_str
 from datalad.api import (
-    no_annex,
+    create,
     wtf,
 )
-from datalad.plugin.wtf import _HIDDEN
+from datalad.local.wtf import (
+    _HIDDEN,
+    SECTION_CALLABLES,
+)
 from datalad.version import __version__
-
-from ..wtf import SECTION_CALLABLES
-from ...utils import Path
 
 from datalad.utils import ensure_unicode
 from datalad.tests.utils import (
     assert_greater,
     assert_in,
     assert_not_in,
-    assert_repo_status,
-    assert_status,
     chpwd,
-    create_tree,
     eq_,
-    known_failure_githubci_win,
     OBSCURE_FILENAME,
     ok_startswith,
     skip_if_no_module,
     SkipTest,
     swallow_outputs,
-    with_tempfile,
     with_tree,
 )
-
-broken_plugin = """garbage"""
-
-nodocs_plugin = """\
-def dlplugin():
-    yield
-"""
-
-# functioning plugin dummy
-dummy_plugin = '''\
-"""real dummy"""
-
-def dlplugin(dataset, noval, withval='test'):
-    "mydocstring"
-    yield dict(
-        status='ok',
-        action='dummy',
-        args=dict(
-            dataset=dataset,
-            noval=noval,
-            withval=withval))
-'''
 
 
 @with_tree({OBSCURE_FILENAME: {}})
@@ -175,83 +145,3 @@ def test_wtf(topdir):
         assert_not_in('user.name', pyperclip.paste())
         assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
         assert_in("cmd:annex:", pyperclip.paste())  # but the content is there
-
-
-@known_failure_githubci_win
-@with_tempfile(mkdir=True)
-def test_no_annex(path):
-    ds = create(path)
-    assert_repo_status(ds.path)
-    create_tree(
-        ds.path,
-        {'code': {
-            'inannex': 'content',
-            'notinannex': 'othercontent'},
-         'README': 'please'})
-    # add inannex pre configuration
-    ds.save(opj('code', 'inannex'))
-    no_annex(pattern=['code/**', 'README'], dataset=ds.path)
-    # add inannex and README post configuration
-    ds.save([opj('code', 'notinannex'), 'README'])
-    assert_repo_status(ds.path)
-    # one is annex'ed, the other is not, despite no change in add call
-    # importantly, also .gitattribute is not annexed
-    eq_([opj('code', 'inannex')],
-        [str(Path(p)) for p in ds.repo.get_annexed_files()])
-
-
-_ds_template = {
-    '.datalad': {
-        'config': '''\
-[datalad "metadata"]
-        nativetype = frictionless_datapackage
-'''},
-    'datapackage.json': '''\
-{
-    "title": "demo_ds",
-    "description": "this is for play",
-    "license": "PDDL",
-    "author": [
-        "Betty",
-        "Tom"
-    ]
-}
-'''}
-
-
-@known_failure_githubci_win  # fails since upgrade to 8.20200226-g2d3ef2c07
-@with_tree(_ds_template)
-def test_add_readme(path):
-    ds = Dataset(path).create(force=True)
-    ds.save()
-    ds.aggregate_metadata()
-    assert_repo_status(ds.path)
-    assert_status('ok', ds.add_readme())
-    # should use default name
-    eq_(
-        open(opj(path, 'README.md')).read(),
-        """\
-# Dataset "demo_ds"
-
-this is for play
-
-### Authors
-
-- Betty
-- Tom
-
-### License
-
-PDDL
-
-## General information
-
-This is a DataLad dataset (id: {id}).
-
-For more information on DataLad and on how to work with its datasets,
-see the DataLad documentation at: http://handbook.datalad.org
-""".format(
-    id=ds.id))
-
-    # should skip on re-run
-    assert_status('notneeded', ds.add_readme())

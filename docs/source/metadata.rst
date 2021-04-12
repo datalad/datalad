@@ -41,7 +41,7 @@ Supported metadata sources
 
 This following sections provide an overview of included metadata extractors for
 particular types of data structures and file formats. Note that :ref:`DataLad
-extension packages <sec_extension_packages>`, such as the `neuroimaging extension
+extension packages <chap_customization>`, such as the `neuroimaging extension
 <https://github.com/datalad/datalad-neuroimaging>`_, can provide additional
 extractors for particular domains and formats.
 
