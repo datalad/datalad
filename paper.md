@@ -17,9 +17,9 @@ authors:
  - name: Benjamin Poldrack  # 1898 commits, issues: opened 82 participated in 461
    orcid: 0000-0001-7628-0801
    affiliation: 2
-# - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+- name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
+  orcid: 0000-0002-0774-6564
+  affiliation: 1
 # - name: Gergana Alteva  # 187 commits, issues: opened 4 participated in 6
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
