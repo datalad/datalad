@@ -56,9 +56,9 @@ authors:
 # - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
+   orcid: 0000-0001-9062-3778
+   affiliation:  10
  - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
    orcid: 0000-0002-8402-6173
    affiliation: 2
@@ -147,6 +147,8 @@ affiliations:
    index: 8
  - name: Stanford University, Stanford, CA, United States
    index: 9
+ - name: The University of Austin at Austin, Austin, Tx, United States.
+   index: 10
 date: 24 March 2021
 bibliography: paper.bib
 
