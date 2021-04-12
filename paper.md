@@ -72,9 +72,9 @@ authors:
 # - name: Nolan Nichols  # 5 commits, issues: opened 3 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+- name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
+  orcid: 0000-0002-9794-749X 
+  affiliation: 5
 # - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -137,6 +137,8 @@ affiliations:
    index: 3
  - name: Lawrence Livermore National Lab, Livermore, CA, United States
    index: 4
+ - name: McGill University, Faculty of Medicine and Health Sciences, McConnell Brain Imaging Centre, Montreal, Canada
+   index: 5
 date: 24 March 2021
 bibliography: paper.bib
 
