@@ -17,9 +17,9 @@ authors:
  - name: Benjamin Poldrack  # 1898 commits, issues: opened 82 participated in 461
    orcid: 0000-0001-7628-0801
    affiliation: 2
-- name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
-  orcid: 0000-0002-0774-6564
-  affiliation: 1
+ - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
+   orcid: 0000-0002-0774-6564
+   affiliation: 1
 # - name: Gergana Alteva  # 187 commits, issues: opened 4 participated in 6
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -37,7 +37,7 @@ authors:
 #   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
    orcid: 0000-0002-2834-7220
-   affiliation:  CHDI Management/CHDI Foundation, Princeton, NJ, USA
+   affiliation: 7
  - name: Vanessa Sochat  # 16 commits, issues: opened 8 participated in 4
    orcid: 0000-0002-4387-3819
    affiliation: 4
@@ -49,7 +49,7 @@ authors:
 #   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
    orcid: 0000-0002-6533-164X
-   affiliation: Stanford University, Stanford, CA, United States
+   affiliation: 9
  - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
    orcid: 0000-0003-2213-7465
    affiliation: 2
@@ -72,9 +72,9 @@ authors:
 # - name: Nolan Nichols  # 5 commits, issues: opened 3 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-- name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
-  orcid: 0000-0002-9794-749X 
-  affiliation: 5
+ - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
+   orcid: 0000-0002-9794-749X 
+   affiliation: 5
 # - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -90,9 +90,9 @@ authors:
 # - name: Basile Pinsard  # 0 commits, issues: opened 5 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-- name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
-- orcid: 0000-0001-7460-1157
-  affiliation: University of Oslo
+ - name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
+   orcid: 0000-0001-7460-1157
+   affiliation: 8
 # - name: Dorota Jarecka  # 0 commits, issues: opened 5 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -141,6 +141,12 @@ affiliations:
    index: 5
  - name: Department of Biological Engineering, Massachusetts Institute of Technology, Cambridge, United States of America
    index: 6
+ - name: CHDI Management/CHDI Foundation, Princeton, NJ, USA
+   index: 7
+ - name: University of Oslo
+   index: 8
+ - name: Stanford University, Stanford, CA, United States
+   index: 9
 date: 24 March 2021
 bibliography: paper.bib
 
