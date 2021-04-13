@@ -59,9 +59,9 @@ authors:
  - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
    orcid: 0000-0002-8402-6173
    affiliation: 2
-# - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
+   orcid: 0000-0003-3641-3491
+   affiliation:  13
  - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
    orcid: 0000-0002-0936-317X
    affiliation: "2, 3"
@@ -146,6 +146,8 @@ affiliations:
    index: 11
  - name: Department of Biological Psychology, Otto-von-Guericke-University Magdeburg, Magdeburg, Germany
    index: 12
+ - name: Indiana University
+   index: 13
 date: 24 March 2021
 bibliography: paper.bib
 
