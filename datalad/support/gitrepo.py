@@ -39,6 +39,7 @@ from weakref import (
     finalize,
     WeakValueDictionary
 )
+import warnings
 
 from datalad.log import log_progress
 from datalad.support.due import due, Doi
@@ -2462,6 +2463,12 @@ class GitRepo(CoreGitRepo):
           must exist in the remote repository, and will be checked out locally
           as a tracking branch. If `None`, remote HEAD will be checked out.
         """
+        warnings.warn(
+            'GitRepo.add_submodule() is deprecated and will be removed in '
+            'a future release. Use the Dataset method save() instead.',
+            DeprecationWarning
+        )
+
         if name is None:
             name = Path(path).as_posix()
         cmd = ['submodule', 'add', '--name', name]
@@ -2513,6 +2520,11 @@ class GitRepo(CoreGitRepo):
         kwargs:
             see `__init__`
         """
+        warnings.warn(
+            'GitRepo.deinit_submodule() is deprecated and will be removed in '
+            'a future release. Use call_git() instead.',
+            DeprecationWarning
+        )
 
         self.call_git(['submodule', 'deinit'] + to_options(**kwargs),
                       files=[path])
@@ -2546,6 +2558,11 @@ class GitRepo(CoreGitRepo):
           since would result in not so annex-friendly .git symlinks/references
           instead of full featured .git/ directories in the submodules
         """
+        warnings.warn(
+            'GitRepo.update_submodule() is deprecated and will be removed in '
+            'a future release. Use the dataset method update() instead.',
+            DeprecationWarning
+        )
         if GitRepo.is_valid_repo(self.pathobj / path):
             subrepo = GitRepo(self.pathobj / path, create=False)
             subbranch = subrepo.get_active_branch() if subrepo else None
