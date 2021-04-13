@@ -80,9 +80,6 @@ authors:
 # - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Basile Pinsard  # 0 commits, issues: opened 5 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-7460-1157
    affiliation: 8
