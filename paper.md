@@ -104,9 +104,9 @@ authors:
 # - name: Matt Cieslak  # 2 commits, issues: opened 2 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-- name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
-  orcid: 0000-0001-8432-5459
-  affiliation: 12
+ - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
+   orcid: 0000-0001-8432-5459
+   affiliation: 12
 # - name: Elizabeth DuPre  # 1 commits, issues: opened 1 participated in 2
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
