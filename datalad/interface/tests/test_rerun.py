@@ -815,8 +815,7 @@ def test_rerun_explicit(path):
     # But checking out a new HEAD can fail when there are modifications.
     ds.repo.checkout(DEFAULT_BRANCH)
     ok_(ds.repo.dirty)
-    ds.repo.add(["to_modify"], git=True)
-    ds.save()
+    ds.save(path=["to_modify"], to_git=True)
     assert_false(ds.repo.dirty)
     with open(op.join(ds.path, "to_modify"), "a") as ofh:
         ofh.write("more")
