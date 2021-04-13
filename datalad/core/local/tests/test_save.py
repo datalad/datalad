@@ -907,3 +907,23 @@ def test_save_git_mv_fixup(path):
         "foocontent")
     # all clean
     assert_repo_status(ds.path)
+
+
+@with_tempfile
+def test_save_staged_nonannex_goes_to_annex(path):
+    # Due to the `git mv` workaround above, staged paths are reset, so `datalad
+    # save` will send a file to the annex despite an explicit `git add` before.
+    ds = Dataset(path).create()
+    repo = ds.repo
+    foo = (ds.pathobj / "foo")
+    foo.write_text("content")
+    repo.call_git(["add", "foo"])
+    assert_repo_status(ds.path, added=[foo])
+
+    assert_not_in("backend",
+                  repo.get_content_annexinfo(paths=[foo])[foo])
+
+    ds.save()
+    assert_repo_status(ds.path)
+    assert_in("backend",
+              repo.get_content_annexinfo(paths=[foo])[foo])
