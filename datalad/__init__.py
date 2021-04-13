@@ -147,21 +147,6 @@ def setup_package():
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
-    # in order to avoid having to fiddle with rather uncommon
-    # file:// URLs in the tests, have a standard HTTP server
-    # that serves an 'httpserve' directory in the test HOME
-    # the URL will be available from datalad.test_http_server.url
-    from datalad.tests.utils import HTTPPath
-    import tempfile
-    global test_http_server
-    serve_path = tempfile.mkdtemp(
-        dir=cfg.get("datalad.tests.temp.dir"),
-        prefix='httpserve',
-    )
-    test_http_server = HTTPPath(serve_path)
-    test_http_server.start()
-    _TEMP_PATHS_GENERATED.append(serve_path)
-
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
@@ -224,6 +209,21 @@ def setup_package():
         lgr.debug("Pre-populating testrepos")
         from datalad.tests.utils import with_testrepos
         with_testrepos()(lambda repo: 1)()
+
+    # in order to avoid having to fiddle with rather uncommon
+    # file:// URLs in the tests, have a standard HTTP server
+    # that serves an 'httpserve' directory in the test HOME
+    # the URL will be available from datalad.test_http_server.url
+    from datalad.tests.utils import HTTPPath
+    import tempfile
+    global test_http_server
+    serve_path = tempfile.mkdtemp(
+        dir=cfg.get("datalad.tests.temp.dir"),
+        prefix='httpserve',
+    )
+    test_http_server = HTTPPath(serve_path)
+    test_http_server.start()
+    _TEMP_PATHS_GENERATED.append(serve_path)
 
 
 def teardown_package():
