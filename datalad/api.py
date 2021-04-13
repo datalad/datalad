@@ -21,7 +21,7 @@ def _command_summary():
     from datalad.interface.base import get_interface_groups
     from datalad.interface.base import load_interface
 
-    groups = get_interface_groups(include_plugins=True)
+    groups = get_interface_groups()
     grp_short_descriptions = defaultdict(list)
     for group, _, specs in sorted(groups, key=lambda x: x[1]):
         for spec in specs:

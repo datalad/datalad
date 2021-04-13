@@ -65,20 +65,6 @@ definitions = {
         'destination': 'global',
         'default_fn': lambda: opj(dirs.user_cache_dir, 'sockets'),
     },
-    'datalad.locations.system-plugins': {
-        'ui': ('question', {
-               'title': 'System plugin directory',
-               'text': 'Where should datalad search for system plugins?'}),
-        'destination': 'global',
-        'default_fn': lambda: opj(dirs.site_config_dir, 'plugins'),
-    },
-    'datalad.locations.user-plugins': {
-        'ui': ('question', {
-               'title': 'User plugin directory',
-               'text': 'Where should datalad search for user plugins?'}),
-        'destination': 'global',
-        'default_fn': lambda: opj(dirs.user_config_dir, 'plugins'),
-    },
     'datalad.locations.system-procedures': {
         'ui': ('question', {
                'title': 'System procedure directory',
