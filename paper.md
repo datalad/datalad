@@ -29,9 +29,9 @@ authors:
 # - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
+- name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
 #   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+    affiliation: 14 # add full names if not yet listed, or indexes if already are
  - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
    orcid: 0000-0002-2834-7220
    affiliation: 7
@@ -148,6 +148,8 @@ affiliations:
    index: 12
  - name: Indiana University
    index: 13
+ - name: McGill Centre for Integrative Neuroscience
+   index: 14
 date: 24 March 2021
 bibliography: paper.bib
 
