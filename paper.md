@@ -92,9 +92,9 @@ authors:
 # - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
+   orcid: 0000-0002-1927-666X
+   affiliation:  Montreal Neurological Institute, McGill University
 # - name: Anisha Keshavan  # 3 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
