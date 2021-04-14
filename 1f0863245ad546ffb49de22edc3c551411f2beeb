@@ -1,0 +1,18 @@
+Update 0.14.1-1-geda1f77838:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    eda1f778383f18752df1ec96b56f06cc10039a79..e8386b653e4975abd01f7365199ee4cbcbd68787
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
++  Merge pull request #5416 from yarikoptic/rf-push-depthfirst
+   b01be3f5b7^-1
+-  Merge pull request #5542 from kyleam/test-expanduser-setup-ident
+   3297929ad7^-1
++  Merge pull request #5552 from bpoldrack/fix-5549
+   e8386b653e^-1
