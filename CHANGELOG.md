@@ -26,6 +26,17 @@ bet we will fix some bugs and make a world even a better place.
 ?
 
 
+## 0.14.2 (April 14, 2021) -- .
+
+### Fixes
+
+- [push][] now works bottom-up, pushing submodules first so that hooks
+  on the remote can aggregate updated subdataset information. ([#5416][])
+
+- [run-procedure][] didn't ensure that the configuration of
+  subdatasets was reloaded.  ([#5552][])
+
+
 ## 0.14.1 (April 01, 2021) -- .
 
 ### Fixes
@@ -3656,6 +3667,7 @@ publishing
 [#5350]: https://github.com/datalad/datalad/issues/5350
 [#5367]: https://github.com/datalad/datalad/issues/5367
 [#5391]: https://github.com/datalad/datalad/issues/5391
+[#5416]: https://github.com/datalad/datalad/issues/5416
 [#5421]: https://github.com/datalad/datalad/issues/5421
 [#5436]: https://github.com/datalad/datalad/issues/5436
 [#5438]: https://github.com/datalad/datalad/issues/5438
@@ -3667,3 +3679,4 @@ publishing
 [#5509]: https://github.com/datalad/datalad/issues/5509
 [#5525]: https://github.com/datalad/datalad/issues/5525
 [#5531]: https://github.com/datalad/datalad/issues/5531
+[#5552]: https://github.com/datalad/datalad/issues/5552
