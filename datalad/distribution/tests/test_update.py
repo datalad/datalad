@@ -32,6 +32,7 @@ from datalad.support.gitrepo import (
     GitRepo,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     with_tempfile,
     assert_in,
@@ -691,6 +692,12 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
+    if on_adjusted and DEFAULT_REMOTE != "origin" and \
+       external_versions['cmd:annex'] <= "8.20210330":
+        raise SkipTest(
+            "'git annex init' with adjusted branch currently fails "
+            "due to hard-coded 'origin'")
+
     # Note: For the adjusted case, this is not much more than a smoke test that
     # on an adjusted branch we fail sensibly. The resulting state is not easy
     # to reason about nor desirable.
