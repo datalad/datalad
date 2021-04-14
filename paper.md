@@ -76,9 +76,9 @@ authors:
 # - name: Simon Dube  # 0 commits, issues: opened 6 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
+   orcid: 0000-0002-0152-3490
+   affiliation: 2
  - name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-7460-1157
    affiliation: 8
