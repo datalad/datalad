@@ -116,6 +116,8 @@ if external_versions["cmd:git"] >= "2.28":
 else:
     DEFAULT_BRANCH = "master"
 
+DEFAULT_REMOTE = "origin"
+
 # additional shortcuts
 neq_ = assert_not_equal
 nok_ = assert_false

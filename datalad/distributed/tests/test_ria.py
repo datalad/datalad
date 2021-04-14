@@ -9,6 +9,7 @@ from datalad.tests.utils import (
     assert_equal,
     assert_result_count,
     assert_true,
+    DEFAULT_REMOTE,
     has_symlink_capability,
     skip_if,
     skip_if_on_windows,
@@ -70,7 +71,7 @@ def test_ephemeral(ds_path, store_path, clone_path):
         assert_result_count(res, 1, success=True, file=file_testsub.as_posix())
 
         # push back git history
-        eph_clone.publish(to="origin", transfer_data="none")
+        eph_clone.publish(to=DEFAULT_REMOTE, transfer_data="none")
 
         # get an update in origin
         ds.update(merge=True, reobtain_data=True)

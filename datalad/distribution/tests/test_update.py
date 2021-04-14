@@ -49,6 +49,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_in_results,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     skip_if_adjusted_branch,
     SkipTest,
     slow,
@@ -69,7 +70,7 @@ def test_update_simple(origin, src_path, dst_path):
     source = install(src_path, source=origin, recursive=True)
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
-    source.repo.remove_remote("origin")
+    source.repo.remove_remote(DEFAULT_REMOTE)
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())
@@ -101,7 +102,8 @@ def test_update_simple(origin, src_path, dst_path):
     assert_not_in("update.txt",
                   dest.repo.get_files(dest.repo.get_active_branch()))
     # modification is known to branch origin/<default branch>
-    assert_in("update.txt", dest.repo.get_files("origin/" + DEFAULT_BRANCH))
+    assert_in("update.txt",
+              dest.repo.get_files(DEFAULT_REMOTE + "/" + DEFAULT_BRANCH))
 
     # merge:
     assert_status('ok', dest.update(merge=True))
@@ -273,7 +275,7 @@ def test_newthings_coming_down(originpath, destpath):
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
     assert_is_instance(ds.repo, GitRepo)
-    assert_in('origin', ds.repo.get_remotes())
+    assert_in(DEFAULT_REMOTE, ds.repo.get_remotes())
     # turn origin into an annex
     origin = AnnexRepo(originpath, create=True)
     # clone doesn't know yet
