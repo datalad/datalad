@@ -9,13 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.14.2 (??? ??, 2021) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+## 0.14.2 (April 14, 2021) -- .
 
 ### Fixes
 
@@ -24,10 +18,6 @@ bet we will fix some bugs and make a world even a better place.
 
 - [run-procedure][] didn't ensure that the configuration of
   subdatasets was reloaded.  ([#5552][])
-
-### Enhancements and new features
-
-?
 
 
 ## 0.14.1 (April 01, 2021) -- .
