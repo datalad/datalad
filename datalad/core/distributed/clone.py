@@ -535,8 +535,22 @@ def clone_dataset(
         return
 
     dest_repo = destds.repo
+
+    remotes = dest_repo.get_remotes(with_urls_only=True)
+    nremotes = len(remotes)
+    if nremotes == 1:
+        remote = remotes[0]
+        lgr.debug("Determined %s to be remote of %s", remote, destds)
+    elif remotes > 1:
+        lgr.warning(
+            "Fresh clone %s unexpected has multiple remotes: %s. Using %s",
+            destds.path, remotes, remotes[0])
+        remote = remotes[0]
+    else:
+        raise RuntimeError("bug: fresh clone has zero remotes")
+
     if not cand.get("version"):
-        postclone_check_head(destds)
+        postclone_check_head(destds, remote=remote)
 
     # act on --reckless=shared-...
     # must happen prior git-annex-init, where we can cheaply alter the repo
@@ -547,17 +561,19 @@ def clone_dataset(
 
     # In case of RIA stores we need to prepare *before* annex is called at all
     if result_props['source']['type'] == 'ria':
-        postclone_preannex_cfg_ria(destds)
+        postclone_preannex_cfg_ria(destds, remote=remote)
 
     yield from postclonecfg_annexdataset(
         destds,
         reckless,
-        description)
+        description,
+        remote=remote)
 
     if checkout_gitsha and \
        dest_repo.get_hexsha(dest_repo.get_corresponding_branch()) != checkout_gitsha:
         try:
-            postclone_checkout_commit(dest_repo, checkout_gitsha)
+            postclone_checkout_commit(dest_repo, checkout_gitsha,
+                                      remote=remote)
         except Exception as e:
             yield get_status_dict(
                 status='error',
@@ -578,7 +594,8 @@ def clone_dataset(
     # perform any post-processing that needs to know details of the clone
     # source
     if result_props['source']['type'] == 'ria':
-        yield from postclonecfg_ria(destds, result_props['source'])
+        yield from postclonecfg_ria(destds, result_props['source'],
+                                    remote=remote)
 
     if reckless:
         # store the reckless setting in the dataset to make it
@@ -600,7 +617,7 @@ def clone_dataset(
     yield get_status_dict(status='ok', **result_props)
 
 
-def postclone_checkout_commit(repo, target_commit):
+def postclone_checkout_commit(repo, target_commit, remote="origin"):
     """Helper to check out a specific target commit in a fresh clone.
 
     Will not check (again) if current commit and target commit are already
@@ -618,7 +635,7 @@ def postclone_checkout_commit(repo, target_commit):
     # local check
     if not repo.commit_exists(target_commit):
         try:
-            repo.fetch(remote='origin', refspec=target_commit)
+            repo.fetch(remote=remote, refspec=target_commit)
         except CommandError:
             pass
         # instead of inspecting the fetch results for possible ways
@@ -632,7 +649,7 @@ def postclone_checkout_commit(repo, target_commit):
             # and not another blind attempt
             raise ValueError(
                 'Target commit %s does not exist in the clone, and '
-                'a fetch that commit from origin failed'
+                'a fetch that commit from remote failed'
                 % target_commit[:8])
     # checkout the desired commit
     repo.call_git(['checkout', target_commit])
@@ -666,7 +683,7 @@ def postclone_checkout_commit(repo, target_commit):
                 repo, target_commit[:8], repo_orig_branch)
 
 
-def postclone_check_head(ds):
+def postclone_check_head(ds, remote="origin"):
     repo = ds.repo
     if not repo.commit_exists("HEAD"):
         # HEAD points to an unborn branch. A likely cause of this is that the
@@ -682,16 +699,17 @@ def postclone_check_head(ds):
         remote_branches = (
             b["refname:strip=2"] for b in repo.for_each_ref_(
                 fields="refname:strip=2", sort="-committerdate",
-                pattern="refs/remotes/origin"))
+                pattern="refs/remotes/" + remote))
         for rbranch in remote_branches:
-            if rbranch in ["origin/git-annex", "HEAD"]:
+            if rbranch in [remote + "/git-annex", "HEAD"]:
                 continue
-            if rbranch.startswith("origin/adjusted/"):
+            if rbranch.startswith(remote + "/adjusted/"):
                 # If necessary for this file system, a downstream
                 # git-annex-init call will handle moving into an
                 # adjusted state.
                 continue
-            repo.call_git(["checkout", "-b", rbranch[7:],  # drop "origin/"
+            repo.call_git(["checkout", "-b",
+                           rbranch[len(remote) + 1:],  # drop "<remote>/"
                            "--track", rbranch])
             lgr.debug("Checked out local branch from %s", rbranch)
             return
@@ -699,7 +717,7 @@ def postclone_check_head(ds):
                     "with commits", ds.path)
 
 
-def postclone_preannex_cfg_ria(ds):
+def postclone_preannex_cfg_ria(ds, remote="origin"):
 
     # We need to annex-ignore origin before annex-init is called on the clone,
     # due to issues 5186 and 5253 (and we would have done it afterwards anyway).
@@ -715,13 +733,12 @@ def postclone_preannex_cfg_ria(ds):
     # store could also hold simple standard annexes w/o an intended ORA remote.
     # This needs the introduction of a new version label in RIA datasets, making
     # the following call conditional.
-    ds.config.set('remote.origin.annex-ignore', 'true', where='local')
+    ds.config.set(f'remote.{remote}.annex-ignore', 'true', where='local')
 
 
-def postclonecfg_ria(ds, props):
+def postclonecfg_ria(ds, props, remote="origin"):
     """Configure a dataset freshly cloned from a RIA store"""
     repo = ds.repo
-    RIA_REMOTE_NAME = 'origin'  # don't hardcode everywhere
 
     def get_uuid_from_store(store_url):
         # First figure whether we cloned via SSH, HTTP or local path and then
@@ -782,7 +799,7 @@ def postclonecfg_ria(ds, props):
                 except CommandError as e:
                     # doesn't contain what we are looking for
                     lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", RIA_REMOTE_NAME, exc_str(e))
+                              "'%s' (%s)", remote, exc_str(e))
 
         return uuid
 
@@ -858,7 +875,7 @@ def postclonecfg_ria(ds, props):
                               exc_str(e))
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
-                          RIA_REMOTE_NAME, org_uuid)
+                          remote, org_uuid)
 
     # Set publication dependency for origin on the respective ORA remote:
     if ora_remotes:
@@ -870,7 +887,7 @@ def postclonecfg_ria(ds, props):
             # cloning (includes previously reconfigured remote).
             # Set publication dependency:
             yield from ds.siblings('configure',
-                                   name=RIA_REMOTE_NAME,
+                                   name=remote,
                                    publish_depends=url_matching_remotes[0]['name'],
                                    result_filter=None,
                                    result_renderer='disabled')
@@ -890,31 +907,35 @@ def postclonecfg_ria(ds, props):
                 if len(uuid_matching_remotes) == 1:
                     yield from ds.siblings(
                         'configure',
-                        name=RIA_REMOTE_NAME,
+                        name=remote,
                         publish_depends=uuid_matching_remotes[0]['name'],
                         result_filter=None,
                         result_renderer='disabled')
                 else:
                     lgr.warning(
                         "Found multiple matching ORA remotes. Couldn't decide "
-                        "which one publishing to 'origin' should depend on: %s."
+                        "which one publishing to '%s' should depend on: %s."
                         " Consider running 'datalad siblings configure -s "
-                        "origin --publish-depends ORAREMOTENAME' to set "
+                        "%s --publish-depends ORAREMOTENAME' to set "
                         "publication dependency manually.",
-                        [r['name'] for r in uuid_matching_remotes])
+                        remote,
+                        [r['name'] for r in uuid_matching_remotes],
+                        remote)
 
         else:
             # We have multiple ORA remotes with the same store URL we cloned
             # from.
             lgr.warning("Found multiple matching ORA remotes. Couldn't decide "
-                        "which one publishing to 'origin' should depend on: %s."
+                        "which one publishing to '%s' should depend on: %s."
                         " Consider running 'datalad siblings configure -s "
-                        "origin --publish-depends ORAREMOTENAME' to set "
+                        "%s --publish-depends ORAREMOTENAME' to set "
                         "publication dependency manually.",
-                        [r['name'] for r in url_matching_remotes])
+                        remote,
+                        [r['name'] for r in url_matching_remotes],
+                        remote)
 
 
-def postclonecfg_annexdataset(ds, reckless, description=None):
+def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
     """If ds "knows annex" -- annex init it, set into reckless etc
 
     Provides additional tune up to a possibly an annex repo, e.g.
@@ -962,7 +983,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
         # we don't want annex copy-to origin
         ds.config.set(
-            'remote.origin.annex-ignore', 'true',
+            f'remote.{remote}.annex-ignore', 'true',
             where='local')
 
         ds.repo.set_remote_dead('here')
@@ -971,7 +992,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                                     ds.repo.dot_git / 'dl_target_test'):
             # symlink the annex to avoid needless copies in an ephemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
-            origin_annex_url = ds.config.get("remote.origin.url", None)
+            origin_annex_url = ds.config.get(f"remote.{remote}.url", None)
             origin_git_path = None
             if origin_annex_url:
                 try:
@@ -994,9 +1015,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # symlinking .git/annex. It might still make sense to
                     # have an ephemeral clone that doesn't propagate its avail.
                     # info. Therefore don't fail altogether.
-                    lgr.warning("reckless=ephemeral mode: origin doesn't seem "
+                    lgr.warning("reckless=ephemeral mode: %s doesn't seem "
                                 "local: %s\nno symlinks being used",
-                                origin_annex_url)
+                                remote, origin_annex_url)
             if origin_git_path:
                 # TODO make sure that we do not delete any unique data
                 rmtree(str(annex_dir)) \
@@ -1086,32 +1107,34 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
 
     # we have just cloned the repo, so it has 'origin', configure any
     # reachable origin of origins
-    yield from configure_origins(ds, ds)
+    yield from configure_origins(ds, ds, remote=remote)
 
 
 _handle_possible_annex_dataset = postclonecfg_annexdataset
 
 
-def configure_origins(cfgds, probeds, label=None):
-    """Configure any discoverable local dataset 'origin' sibling as a remote
+def configure_origins(cfgds, probeds, label=None, remote="origin"):
+    """Configure any discoverable local dataset sibling as a remote
 
     Parameters
     ----------
     cfgds : Dataset
       Dataset to receive the remote configurations
     probeds : Dataset
-      Dataset to start looking for 'origin' remotes. May be identical with
+      Dataset to start looking for `remote` remotes. May be identical with
       `cfgds`.
     label : int, optional
       Each discovered 'origin' will be configured as a remote under the name
-      'origin-<label>'. If no label is given, '2' will be used by default,
+      '<remote>-<label>'. If no label is given, '2' will be used by default,
       given that there is typically a 'origin' remote already.
+    remote : str, optional
+      Name of the default remote on clone.
     """
     if label is None:
         label = 1
     # let's look at the URL for that remote and see if it is a local
     # dataset
-    origin_url = probeds.config.get('remote.origin.url')
+    origin_url = probeds.config.get(f'remote.{remote}.url')
     if not origin_url:
         # no origin, nothing to do
         return
@@ -1137,7 +1160,7 @@ def configure_origins(cfgds, probeds, label=None):
                 'configure',
                 # no chance for conflict, can only be the second configured
                 # remote
-                name='origin-{}'.format(label),
+                name='{}-{}'.format(remote, label),
                 url=origin_url,
                 # fetch to get all annex info
                 fetch=True,
@@ -1151,7 +1174,8 @@ def configure_origins(cfgds, probeds, label=None):
     yield from configure_origins(
         cfgds,
         Dataset(probeds.pathobj / origin_url),
-        label=label + 1)
+        label=label + 1,
+        remote=remote)
 
 
 def _get_tracking_source(ds):
