@@ -299,14 +299,6 @@ def md5sum(filename):
     return Digester(digests=['md5'])(filename)['md5']
 
 
-# unused in -core
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
-    """
-    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
-                       for r, d, files in os.walk(dout)
-                       if not '.git' in r], []))
-
 _encoded_dirsep = r'\\'  if on_windows else r'/'
 _VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (
     _encoded_dirsep, _encoded_dirsep)
@@ -569,78 +561,6 @@ def file_basename(name, return_ext=False):
         return fbname, bname[len(fbname) + 1:]
     else:
         return fbname
-
-
-# unused in -core
-def escape_filename(filename):
-    """Surround filename in "" and escape " in the filename
-    """
-    filename = filename.replace('"', r'\"').replace('`', r'\`')
-    filename = '"%s"' % filename
-    return filename
-
-
-# unused in -core
-def encode_filename(filename):
-    """Encode unicode filename
-    """
-    if isinstance(filename, str):
-        return filename.encode(sys.getfilesystemencoding())
-    else:
-        return filename
-
-
-# unused in -core
-def decode_input(s):
-    """Given input string/bytes, decode according to stdin codepage (or UTF-8)
-    if not defined
-
-    If fails -- issue warning and decode allowing for errors
-    being replaced
-    """
-    if isinstance(s, str):
-        return s
-    else:
-        encoding = sys.stdin.encoding or 'UTF-8'
-        try:
-            return s.decode(encoding)
-        except UnicodeDecodeError as exc:
-            lgr.warning(
-                "Failed to decode input string using %s encoding. "
-                "Decoding allowing for errors", encoding)
-            return s.decode(encoding, errors='replace')
-
-
-# unused in -core
-if on_windows:
-    def lmtime(filepath, mtime):
-        """Set mtime for files.  On Windows a merely adapter to os.utime
-        """
-        os.utime(filepath, (time.time(), mtime))
-else:
-    def lmtime(filepath, mtime):
-        """Set mtime for files, while not de-referencing symlinks.
-
-        To overcome absence of os.lutime
-
-        Works only on linux and OSX ATM
-        """
-        from .cmd import WitlessRunner
-        # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
-        smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
-        lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
-        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
-        filepath = Path(filepath)
-        rfilepath = filepath.resolve()
-        if filepath.is_symlink() and rfilepath.exists():
-            # trust noone - adjust also of the target file
-            # since it seemed like downloading under OSX (was it using curl?)
-            # didn't bother with timestamps
-            lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
-                    rfilepath, mtime)
-            os.utime(str(rfilepath), (time.time(), mtime))
-        # doesn't work on OSX
-        # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
 def ensure_tuple_or_list(obj):
@@ -984,30 +904,6 @@ def generate_file_chunks(files, cmd=None):
 
 
 #
-# Generators helpers
-#
-
-def saved_generator(gen):
-    """Given a generator returns two generators, where 2nd one just replays
-
-    So the first one would be going through the generated items and 2nd one
-    would be yielding saved items
-    """
-    saved = []
-
-    def gen1():
-        for x in gen:  # iterating over original generator
-            saved.append(x)
-            yield x
-
-    def gen2():
-        for x in saved:  # yielding saved entries
-            yield x
-
-    return gen1(), gen2()
-
-
-#
 # Decorators
 #
 def better_wraps(to_be_wrapped):
@@ -1097,74 +993,6 @@ def line_profile(func):
     return  _wrap_line_profile
 
 
-# unused in -core
-@optional_args
-def collect_method_callstats(func):
-    """Figure out methods which call the method repeatedly on the same instance
-
-    Use case(s):
-      - .repo is expensive since does all kinds of checks.
-      - .config is expensive transitively since it calls .repo each time
-
-
-    TODO:
-    - fancy one could look through the stack for the same id(self) to see if
-      that location is already in memo.  That would hint to the cases where object
-      is not passed into underlying functions, causing them to redo the same work
-      over and over again
-    - ATM might flood with all "1 lines" calls which are not that informative.
-      The underlying possibly suboptimal use might be coming from their callers.
-      It might or not relate to the previous TODO
-    """
-    from collections import defaultdict
-    import traceback
-    from time import time
-    memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
-    # gross timing
-    times = []
-    toppath = op.dirname(__file__) + op.sep
-
-    @wraps(func)
-    def  _wrap_collect_method_callstats(*args, **kwargs):
-        try:
-            self = args[0]
-            stack = traceback.extract_stack()
-            caller = stack[-2]
-            stack_sig = \
-                "{relpath}:{s.name}".format(
-                    s=caller, relpath=op.relpath(caller.filename, toppath))
-            sig = (id(self), stack_sig)
-            # we will count based on id(self) + wherefrom
-            memo[sig][caller.lineno] += 1
-            t0 = time()
-            return func(*args, **kwargs)
-        finally:
-            times.append(time() - t0)
-            pass
-
-    def print_stats():
-        print("The cost of property {}:".format(func.__name__))
-        if not memo:
-            print("None since no calls")
-            return
-        # total count
-        counts = {k: sum(v.values()) for k,v in memo.items()}
-        total = sum(counts.values())
-        ids = {self_id for (self_id, _) in memo}
-        print(" Total: {} calls from {} objects with {} contexts taking {:.2f} sec"
-              .format(total, len(ids), len(memo), sum(times)))
-        # now we need to sort by value
-        for (self_id, caller), count in sorted(counts.items(), key=lambda x: x[1], reverse=True):
-            print("  {} {}: {} from {} lines"
-                  .format(self_id, caller, count, len(memo[(self_id, caller)])))
-
-    # Upon total exit we print the stats
-    import atexit
-    atexit.register(print_stats)
-
-    return  _wrap_collect_method_callstats
-
-
 # Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
 def never_fail(f):
     """Assure that function never fails -- all exceptions are caught
@@ -1191,13 +1019,6 @@ def never_fail(f):
 #
 # Context Managers
 #
-
-
-# unused in -core
-@contextmanager
-def nothing_cm():
-    """Just a dummy cm to programmically switch context managers"""
-    yield
 
 
 @contextmanager
@@ -1853,19 +1674,6 @@ def get_timestamp_suffix(time_=None, prefix='-'):
     return time.strftime(prefix + TIMESTAMP_FMT, *args)
 
 
-# unused in -core
-def get_logfilename(dspath, cmd='datalad'):
-    """Return a filename to use for logging under a dataset/repository
-
-    directory would be created if doesn't exist, but dspath must exist
-    and be a directory
-    """
-    assert(exists(dspath))
-    assert(isdir(dspath))
-    ds_logdir = ensure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
-    return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
-
-
 def get_trace(edges, start, end, trace=None):
     """Return the trace/path to reach a node in a tree.
 
@@ -2104,31 +1912,6 @@ def safe_print(s):
 #
 # IO Helpers
 #
-
-# unused in -core
-def open_r_encdetect(fname, readahead=1000):
-    """Return a file object in read mode with auto-detected encoding
-
-    This is helpful when dealing with files of unknown encoding.
-
-    Parameters
-    ----------
-    readahead: int, optional
-      How many bytes to read for guessing the encoding type.  If
-      negative - full file will be read
-    """
-    from chardet import detect
-    import io
-    # read some bytes from the file
-    with open(fname, 'rb') as f:
-        head = f.read(readahead)
-    enc = detect(head)
-    denc = enc.get('encoding', None)
-    lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
-              denc,
-              fname,
-              enc.get('confidence', 'unknown'))
-    return io.open(fname, encoding=denc)
 
 
 def read_file(fname, decode=True):
