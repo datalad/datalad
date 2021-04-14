@@ -90,7 +90,7 @@ authors:
 #   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0002-1927-666X
-   affiliation:  Montreal Neurological Institute, McGill University
+   affiliation:  15
 # - name: Anisha Keshavan  # 3 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -99,7 +99,7 @@ authors:
 #   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Matt Cieslak  # 2 commits, issues: opened 2 participated in 0
    orcid: 0000-0002-1931-4734
-   affiliation:  University of Pennsylvania, Philadelphia, PA
+   affiliation:  16
  - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
    orcid: 0000-0001-8432-5459
    affiliation: 12
@@ -133,7 +133,7 @@ affiliations:
    index: 8
  - name: Stanford University, Stanford, CA, United States
    index: 9
- - name: The University of Austin at Austin, Austin, Tx, United States.
+ - name: The University of Austin at Austin, Austin, TX, United States
    index: 10
  - name: Massachusetts Institute of Technology, Cambridge, MA, United States
    index: 11
@@ -141,8 +141,12 @@ affiliations:
    index: 12
  - name: Indiana University
    index: 13
- - name: McGill Centre for Integrative Neuroscience
+ - name: McGill Centre for Integrative Neuroscience, Montreal, Canada
    index: 14
+ - name: Montreal Neurological Institute, McGill University, Montreal, Canada
+   index: 15
+ - name: University of Pennsylvania, Philadelphia, PA
+   index: 16
 date: 24 March 2021
 bibliography: paper.bib
 
