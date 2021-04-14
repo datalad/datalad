@@ -211,14 +211,6 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - tools/ci/prep-travis-forssh.sh
-  # Install nvm https://github.com/nvm-sh/nvm/blob/master/README.md
-  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
-  # Use install & use node v10 as grunt-contrib-qunit uses generic try catch <https://github.com/datalad/datalad/issues/4635#issue-640604347>
-  - nvm install 10 && nvm use 10
-  # Echo node and npm version for debug
-  - which node && node -v && which npm && npm -v
-  # Install grunt-cli
-  - eatmydata npm install -g grunt-cli
   # Install various basic depedencies
   - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   # needed for tests of patool compression fall-back solution
@@ -249,17 +241,12 @@ install:
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
   # S3
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
-  # Install grunt to test run javascript frontend tests
-  - npm install grunt
-  - npm install grunt-contrib-qunit@^4.0.0
 
 script:
   # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
   - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
   - sudo pip install .
-  # Run javascript tests
-  - grunt test --verbose
   # Report WTF information using system wide installed version
   - datalad wtf
   - mkdir -p __testhome__
