@@ -256,12 +256,12 @@ To this end, DataLad is also accompanied by rich documentation [@datalad-handboo
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
 DataLad (see \autoref{fig:one}) operates on DataLad datasets which are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
  
-![DataLad: overview of available commands for various parts of the data management process \label{fig:one}](figures/datalad_process.png)
+![DataLad: a schematic overview of a dataset, datasets nesting, and selected DataLad commands for content and datasets management. DataLad Cheatsheet [@datalad-handbook:cheatsheet] provides a broader, yet still concise overview of these and other available commands. \label{fig:one}](figures/fig1.png)
 
 Using Git's submodule mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
 With this simple paradigm, DataLad fulfills the YODA principles for reproducible science [@yoda:myyoda] and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results  (see \autoref{fig:two}).
 
-![DataLad datasets all the way down: from publication to raw data \label{fig:two}](figures/datalad-nesting-access.png)
+![DataLad datasets are reusable modular components, which could be nested to establish a complete provenance trail all the way from from a publication to the raw data. Various access schemes to datasets and data could be implemented.\label{fig:two}](figures/datalad-nesting-access.png)
 
 As a testament of scalability, [datasets.datalad.org](http://datasets.datalad.org) provides a DataLad (super)dataset encapsulating thousands of datasets with unified access to over 250 TBs of primarily neural data from a wide range of hosting portals.
 
