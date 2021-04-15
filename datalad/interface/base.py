@@ -501,8 +501,8 @@ def build_doc(cls, **kwargs):
     spec = getattr(cls, '_params_', dict())
 
 
-    # update class attributes that may override defaults 
-    if hasattr(cls, '_no_eval_results'):
+    # update class attributes that may override defaults
+    if not _has_eval_results_call(cls):
         add_args = None
     else:
         add_args = {k: getattr(cls, k, v) for k, v in eval_defaults.items()}
@@ -634,10 +634,6 @@ class Interface(object):
     # mode would fall into the debugger
     _interrupted_exit_code = 1
 
-    _OLDSTYLE_COMMANDS = (
-        'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-        'CreateTestDataset', 'Export', 'Ls', 'SSHRun', 'Test')
-
     @classmethod
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
@@ -758,7 +754,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ not in Interface._OLDSTYLE_COMMANDS:
+        if _has_eval_results_call(cls):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -854,3 +850,9 @@ def get_allargs_as_kwargs(call, args, kwargs):
     # from their signature...
     #assert (nargs == len(kwargs_))
     return kwargs_
+
+
+def _has_eval_results_call(cls):
+    """Return True if cls has a __call__ decorated with @eval_results
+    """
+    return getattr(getattr(cls, '__call__', None), '_eval_results', False)

@@ -129,8 +129,6 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
 class CreateTestDataset(Interface):
     """Create test (meta-)dataset.
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         path=Parameter(

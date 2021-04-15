@@ -54,8 +54,6 @@ class Ls(Interface):
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
       $ datalad ls                               # to list current dataset
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     # TODO: during big RF refactor this one away since it must not be instance's
     # attribute.  For now introduced to make `datalad ls` be relatively usable

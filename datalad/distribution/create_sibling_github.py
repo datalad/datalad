@@ -79,8 +79,6 @@ class CreateSiblingGithub(Interface):
     *hub.oauthtoken*, and store/check the token in credential store as associated
     with that specific login name.
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(
