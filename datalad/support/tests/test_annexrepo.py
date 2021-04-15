@@ -2413,8 +2413,12 @@ def test_ro_operations(path):
         # but should succeed if we disallow merges
         repo2.repo_info(merge_annex_branches=False)
         # and ultimately the ls which uses it
-        from datalad.interface.ls import Ls
-        Ls.__call__(repo2.path, all_=True, long_=True)
+        try:
+            from datalad.api import ls
+            ls(repo2.path, all_=True, long_=True)
+        except ImportError:
+            raise SkipTest(
+                "No `ls` command available (provided by -deprecated extension)")
     finally:
         sudochown(['-R', str(os.geteuid()), repo2.path])
 
