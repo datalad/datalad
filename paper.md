@@ -83,9 +83,9 @@ authors:
  - name: Dorota Jarecka  # 0 commits, issues: opened 5 participated in 1
    orcid: 0000-0001-8282-2988
    affiliation: 11
-# - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
+   orcid: 0000-0002-9377-0797
+   affiliation:  17
  - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0002-1927-666X
    affiliation:  15
@@ -145,6 +145,8 @@ affiliations:
    index: 15
  - name: University of Pennsylvania, Philadelphia, PA
    index: 16
+ - name: University of Massachusetts Medical School, Worcester, MA, United States
+   index: 17
 date: 24 March 2021
 bibliography: paper.bib
 
