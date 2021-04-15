@@ -47,7 +47,6 @@ requires = {
         'requests_ftp',
     ],
     'publish': [
-        'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
     ],
     'misc': [
