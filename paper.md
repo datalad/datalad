@@ -351,6 +351,7 @@ Andrew Connolly,
 John Lee,
 Nolan Nichols,
 Elizabeth DuPre,
+Cécile Madjar
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, and recommendations.
 
