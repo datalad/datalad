@@ -162,7 +162,7 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote(DEFAULT_REMOTE)
 
@@ -221,7 +221,7 @@ def test_publish_plain_git(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote(DEFAULT_REMOTE)
 

@@ -719,10 +719,10 @@ def postclone_check_head(ds, remote="origin"):
 
 def postclone_preannex_cfg_ria(ds, remote="origin"):
 
-    # We need to annex-ignore origin before annex-init is called on the clone,
+    # We need to annex-ignore the remote before annex-init is called on the clone,
     # due to issues 5186 and 5253 (and we would have done it afterwards anyway).
     # annex/objects in RIA stores is special for several reasons.
-    # 1. 'origin' doesn't know about it (no actual local annex for origin)
+    # 1. the remote doesn't know about it (no actual local annex for the remote)
     # 2. RIA may use hashdir mixed, copying data to it via git-annex (if cloned
     #    via ssh or local) would make it see a bare repo and establish a
     #    hashdir lower annex object tree.
@@ -758,7 +758,7 @@ def postclonecfg_ria(ds, props, remote="origin"):
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
             # changed with command abstractions). So we need to get that part to
-            # have a valid path to origin's config file:
+            # have a valid path to the remote's config file:
             cfg_path = PurePosixPath(URL(store_url).path) / 'config'
             op = SSHRemoteIO(store_url)
             try:
@@ -838,7 +838,7 @@ def postclonecfg_ria(ds, props, remote="origin"):
                 for r in ora_remotes):
         # No ORA remote autoenabled, but configuration known about at least one,
         # or enabled ORA remotes seem to not match clone URL.
-        # Let's check origin's config for datalad.ora-remote.uuid as stored by
+        # Let's check the remote's config for datalad.ora-remote.uuid as stored by
         # create-sibling-ria and enable try enabling that one.
         lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
                   "up in source config ...")
@@ -877,7 +877,7 @@ def postclonecfg_ria(ds, props, remote="origin"):
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
                           remote, org_uuid)
 
-    # Set publication dependency for origin on the respective ORA remote:
+    # Set publication dependency for `remote` on the respective ORA remote:
     if ora_remotes:
         url_matching_remotes = [r for r in ora_remotes
                                 if srs[r['annex-uuid']]['url'] == ria_store_url]
@@ -903,7 +903,7 @@ def postclonecfg_ria(ds, props, remote="origin"):
             if uuid_matching_remotes:
                 # Multiple uuid matches are actually possible via same-as.
                 # However, in that case we can't decide which one is supposed to
-                # be used with publishing to origin.
+                # be used with publishing to `remote`.
                 if len(uuid_matching_remotes) == 1:
                     yield from ds.siblings(
                         'configure',
@@ -970,9 +970,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
 
     elif reckless == 'ephemeral':
         # with ephemeral we declare 'here' as 'dead' right away, whenever
-        # we symlink origin's annex, since availability from 'here' should
+        # we symlink the remote's annex, since availability from 'here' should
         # not be propagated for an ephemeral clone when we publish back to
-        # origin.
+        # the remote.
         # This will cause stuff like this for a locally present annexed file:
         # % git annex whereis d1
         # whereis d1 (0 copies) failed
@@ -981,7 +981,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
         # % git annex find . --in here
         # d1
 
-        # we don't want annex copy-to origin
+        # we don't want annex copy-to <remote>
         ds.config.set(
             f'remote.{remote}.annex-ignore', 'true',
             where='local')
@@ -1105,7 +1105,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
 
-    # we have just cloned the repo, so it has 'origin', configure any
+    # we have just cloned the repo, so it has a remote `remote`, configure any
     # reachable origin of origins
     yield from configure_origins(ds, ds, remote=remote)
 
@@ -1124,9 +1124,9 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
       Dataset to start looking for `remote` remotes. May be identical with
       `cfgds`.
     label : int, optional
-      Each discovered 'origin' will be configured as a remote under the name
+      Each discovered remote will be configured as a remote under the name
       '<remote>-<label>'. If no label is given, '2' will be used by default,
-      given that there is typically a 'origin' remote already.
+      given that there is typically a remote named `remote` already.
     remote : str, optional
       Name of the default remote on clone.
     """
@@ -1136,7 +1136,7 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
     # dataset
     origin_url = probeds.config.get(f'remote.{remote}.url')
     if not origin_url:
-        # no origin, nothing to do
+        # no remote with default name, nothing to do
         return
     if not cfgds.config.obtain(
             'datalad.install.inherit-local-origin',
@@ -1147,7 +1147,7 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
         # not local path
         return
 
-    # no need to reconfigure original/direct origin again
+    # no need to reconfigure original/direct remote again
     if cfgds != probeds:
         # prevent duplicates
         known_remote_urls = set(
@@ -1169,7 +1169,7 @@ def configure_origins(cfgds, probeds, label=None, remote="origin"):
             )
     # and dive deeper
     # given the clone source is a local dataset, we can have a
-    # cheap look at it, and configure its own 'origin' as a remote
+    # cheap look at it, and configure its own `remote` as a remote
     # (if there is any), and benefit from additional annex availability
     yield from configure_origins(
         cfgds,

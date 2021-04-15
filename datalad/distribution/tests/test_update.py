@@ -69,7 +69,7 @@ def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote(DEFAULT_REMOTE)
 
@@ -91,7 +91,7 @@ def test_update_simple(origin, src_path, dst_path):
     assert_status('ok', dest.update())
     assert_repo_status(dst_path)
 
-    # modify origin:
+    # modify remote:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
     source.save(path="update.txt", message="Added update.txt")
@@ -102,7 +102,7 @@ def test_update_simple(origin, src_path, dst_path):
     # modification is not known to active branch:
     assert_not_in("update.txt",
                   dest.repo.get_files(dest.repo.get_active_branch()))
-    # modification is known to branch origin/<default branch>
+    # modification is known to branch <default remote>/<default branch>
     assert_in("update.txt",
               dest.repo.get_files(DEFAULT_REMOTE + "/" + DEFAULT_BRANCH))
 
