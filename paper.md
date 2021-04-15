@@ -166,7 +166,7 @@ While software development and sharing are streamlined with the advance of softw
 Disconnected data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and data provenance---if shared at all---is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
 <!-- MIH summary: inconvenient access, version/provenenance information unavailable -->
 DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing simplified core interfaces for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and making re-execution possible.
-Since it is interoperable with a large variety of scientific and commercial hosting services and available for all operating systems, DataLad can be integrated into established systems with minimal adjustments.
+Since it is interoperable with a large variety of scientific and commercial hosting services and available for all major operating systems, DataLad can be integrated into established systems with minimal adjustments.
 
 ## Why Git and git-annex
 
