@@ -178,7 +178,7 @@ The content representation is based on a checksum of the file's content.
 As such, while only a lightweight link is directly committed into Git, this committed information contains the content identity of annexed files.
 Git-annex then manages content availability information in any local repository, other Git remotes, or external resources such as web urls.
 Having that information, git-annex takes care of all transport logistics to exchange content upon user request.
-This simple approach allows git-annex to manage and version control virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
+This simple approach allows git-annex to manage and version control arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
 <!-- BEN thinks we need to make explicit the idea, that by means of how annex
 works, the content and access control to it is separated from the version
 control (and metadata). ATM this follows implicitly but may be much less obvious
