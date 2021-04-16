@@ -35,9 +35,9 @@ authors:
 # - name: Satrajit Ghosh  # 0 commits, issues: opened 7 participated in 13
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
+   orcid: 0000-0002-3092-0612
+   affiliation:  2
  - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
    orcid: 0000-0002-6533-164X
    affiliation: 9
@@ -163,7 +163,7 @@ Born from the idea to provide a unified data distribution for neuroscience, taki
 Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
 While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles [@FAIR2016] postulating demands on public data hosting portals and the big callout for Data Science.
 Disconnected data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and data provenance---if shared at all---is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
-<!-- MIH summary: inconvenient access, version/provenenance information unavailable -->
+<!-- MIH summary: inconvenient access, version/provenance information unavailable -->
 DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing simplified core interfaces for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and making re-execution possible.
 Since it is interoperable with a large variety of scientific and commercial hosting services and available for all major operating systems, DataLad can be integrated into established systems with minimal adjustments.
 
