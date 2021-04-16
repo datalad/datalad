@@ -20,18 +20,12 @@ authors:
  - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
    orcid: 0000-0002-0774-6564
    affiliation: 1
-# - name: Gergana Alteva  # 187 commits, issues: opened 4 participated in 6
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Adina Wagner  # 98 commits, issues: opened 36 participated in 45
    orcid: 0000-0003-2917-3450
    affiliation: 2
-# - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
+ - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
+   affiliation: 14 # add full names if not yet listed, or indexes if already are
  - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
    orcid: 0000-0002-2834-7220
    affiliation: 7
@@ -41,27 +35,27 @@ authors:
  - name: Satrajit S. Ghosh  # 0 commits, issues: opened 7 participated in 13
    orcid: 0000-0002-5312-6729
    affiliation:  11
-# - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
+   orcid: 0000-0002-3092-0612
+   affiliation:  2
  - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
    orcid: 0000-0002-6533-164X
    affiliation: 9
  - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
    orcid: 0000-0003-2213-7465
    affiliation: 2
-# - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
+   orcid: 0000-0002-9854-5118
+   affiliation: 18
  - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
    orcid: 0000-0001-9062-3778
    affiliation:  10
  - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
    orcid: 0000-0002-8402-6173
    affiliation: 2
-# - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
+   orcid: 0000-0003-3641-3491
+   affiliation:  13
  - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
    orcid: 0000-0002-0936-317X
    affiliation: "2, 3"
@@ -77,45 +71,36 @@ authors:
 # - name: Simon Dube  # 0 commits, issues: opened 6 participated in 1
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Basile Pinsard  # 0 commits, issues: opened 5 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
+   orcid: 0000-0002-0152-3490
+   affiliation: 2
  - name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-7460-1157
    affiliation: 8
  - name: Dorota Jarecka  # 0 commits, issues: opened 5 participated in 1
    orcid: 0000-0001-8282-2988
    affiliation: 11
-# - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
+   orcid: 0000-0002-9377-0797
+   affiliation:  17
+ - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
+   orcid: 0000-0002-1927-666X
+   affiliation:  15
 # - name: Anisha Keshavan  # 3 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
 # - name: Arvind Sharma  # 0 commits, issues: opened 4 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Matt Cieslak  # 2 commits, issues: opened 2 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Elizabeth DuPre  # 1 commits, issues: opened 1 participated in 2
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Matt Cieslak  # 2 commits, issues: opened 2 participated in 0
+   orcid: 0000-0002-1931-4734
+   affiliation:  16
+ - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
+   orcid: 0000-0001-8432-5459
+   affiliation: 12
  - name: Horea-Ioan Ioanas  # 1 commits, issues: opened 3 participated in 0
    orcid: 0000-0001-7037-2449
    affiliation: "6"
-# - name: Timo Dickscheid  # 0 commits, issues: opened 2 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
@@ -140,10 +125,24 @@ affiliations:
    index: 8
  - name: Stanford University, Stanford, CA, United States
    index: 9
- - name: The University of Austin at Austin, Austin, Tx, United States.
+ - name: The University of Austin at Austin, Austin, TX, United States
    index: 10
  - name: Massachusetts Institute of Technology, Cambridge, MA, United States
    index: 11
+ - name: Department of Biological Psychology, Otto-von-Guericke-University Magdeburg, Magdeburg, Germany
+   index: 12
+ - name: Indiana University
+   index: 13
+ - name: McGill Centre for Integrative Neuroscience, Montreal, Canada
+   index: 14
+ - name: Montreal Neurological Institute, McGill University, Montreal, Canada
+   index: 15
+ - name: University of Pennsylvania, Philadelphia, PA
+   index: 16
+ - name: University of Massachusetts Medical School, Worcester, MA, United States
+   index: 17
+ - name: Quest Diagnostics, Marlborough, MA, United States
+   index: 18
 date: 24 March 2021
 bibliography: paper.bib
 
@@ -161,9 +160,9 @@ Born from the idea to provide a unified data distribution for neuroscience, taki
 Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
 While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles [@FAIR2016] postulating demands on public data hosting portals and the big callout for Data Science.
 Disconnected data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and data provenance---if shared at all---is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
-<!-- MIH summary: inconvenient access, version/provenenance information unavailable -->
+<!-- MIH summary: inconvenient access, version/provenance information unavailable -->
 DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing simplified core interfaces for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and making re-execution possible.
-Since it is interoperable with a large variety of scientific and commercial hosting services and available for all operating systems, DataLad can be integrated into established systems with minimal adjustments.
+Since it is interoperable with a large variety of scientific and commercial hosting services and available for all major operating systems, DataLad can be integrated into established systems with minimal adjustments.
 
 ## Why Git and git-annex
 
@@ -177,7 +176,7 @@ The content representation is based on a checksum of the file's content.
 As such, while only a lightweight link is directly committed into Git, this committed information contains the content identity of annexed files.
 Git-annex then manages content availability information in any local repository, other Git remotes, or external resources such as web urls.
 Having that information, git-annex takes care of all transport logistics to exchange content upon user request.
-This simple approach allows git-annex to manage and version control virtually arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
+This simple approach allows git-annex to manage and version control arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
 <!-- BEN thinks we need to make explicit the idea, that by means of how annex
 works, the content and access control to it is separated from the version
 control (and metadata). ATM this follows implicitly but may be much less obvious
@@ -257,12 +256,12 @@ To this end, DataLad is also accompanied by rich documentation [@datalad-handboo
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
 DataLad (see \autoref{fig:one}) operates on DataLad datasets which are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
  
-![DataLad: overview of available commands for various parts of the data management process \label{fig:one}](figures/datalad_process.png)
+![DataLad: a schematic overview of a dataset, datasets nesting, and selected DataLad commands for content and datasets management. DataLad Cheatsheet [@datalad-handbook:cheatsheet] provides a broader, yet still concise overview of these and other available commands. \label{fig:one}](figures/fig1.png)
 
 Using Git's submodule mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
 With this simple paradigm, DataLad fulfills the YODA principles for reproducible science [@yoda:myyoda] and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results  (see \autoref{fig:two}).
 
-![DataLad datasets all the way down: from publication to raw data \label{fig:two}](figures/datalad-nesting-access.png)
+![DataLad datasets are reusable modular components, which could be nested to establish a complete provenance trail all the way from from a publication to the raw data. Various access schemes to datasets and data could be implemented.\label{fig:two}](figures/datalad-nesting-access.png)
 
 As a testament of scalability, [datasets.datalad.org](http://datasets.datalad.org) provides a DataLad (super)dataset encapsulating thousands of datasets with unified access to over 250 TBs of primarily neural data from a wide range of hosting portals.
 
@@ -349,8 +348,12 @@ Jörg Stadler,
 Andrew Connolly,
 John Lee,
 Nolan Nichols,
+Elizabeth DuPre,
+Cécile Madjar,
+Gergana Alteva,
+Timo Dickscheid,
 [TODOADD: notable contributors]
-for notable contributions to the codebase, bug reports, and recommendations.
+for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
 
 
 # References
