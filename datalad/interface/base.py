@@ -635,7 +635,7 @@ class Interface(object):
     _interrupted_exit_code = 1
 
     _OLDSTYLE_COMMANDS = (
-        'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
+        'AddArchiveContent', 'CrawlInit', 'Crawl',
         'CreateTestDataset', 'Export', 'Ls', 'SSHRun', 'Test')
 
     @classmethod
