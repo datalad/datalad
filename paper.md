@@ -334,6 +334,7 @@ NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999),
 (PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
 through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
 It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects. ... .
+It also received contributions from the Canadian Open Neuroscience Platform and the NeuroHub projects thanks in part to funding from a Brain Canada Platform Support Grant Competition Award in addition to funds and in-kind support from sponsor organizations, and from the Canada First Research Excellence Fund, awarded through the Healthy Brains, Healthy Lives initiative at McGill University, and the Brain Canada Foundation with support from Health Canada. JBP was partially funded by NIH-NIBIB P41 EB019936 (ReproNim) NIH-NIMH R01 MH083320 (CANDIShare) and NIH RF1 MH120021.
 
 We would also like to express our gratitude to 
 Joey Zhou,
