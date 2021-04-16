@@ -43,7 +43,11 @@ from datalad.cmd import (
     GitWitlessRunner,
     WitlessRunner as Runner,
 )
-from datalad.consts import WEB_SPECIAL_REMOTE_UUID
+from datalad.consts import (
+    DATALAD_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+    WEB_SPECIAL_REMOTE_UUID,
+)
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
 
@@ -1502,22 +1506,34 @@ def test_is_available(batch, p):
 
     # known remote but doesn't have it
     assert is_available(fname, remote='origin') is False
+
+    # If the 'datalad' special remote is present, it will claim fname's URL.
+    if DATALAD_SPECIAL_REMOTE in annex.get_remotes():
+        remote = DATALAD_SPECIAL_REMOTE
+        uuid = DATALAD_SPECIAL_REMOTES_UUIDS[DATALAD_SPECIAL_REMOTE]
+    else:
+        remote = "web"
+        uuid = WEB_SPECIAL_REMOTE_UUID
+
     # it is on the 'web'
-    assert is_available(fname, remote='web') is True
+    assert is_available(fname, remote=remote) is True
     # not effective somehow :-/  may be the process already running or smth
     # with swallow_logs(), swallow_outputs():  # it will complain!
     assert is_available(fname, remote='unknown') is False
     assert_false(is_available("boguskey", key=True))
 
     # remove url
-    urls = annex.get_urls(fname) #, **bkw)
+    urls = annex.whereis(fname, output="full").get(uuid, {}).get("urls", [])
+
     assert(len(urls) == 1)
-    eq_(urls, annex.get_urls(annex.get_file_key(fname), key=True))
+    eq_(urls,
+        annex.whereis(annex.get_file_key(fname), key=True, output="full")
+        .get(uuid, {}).get("urls"))
     annex.rm_url(fname, urls[0])
 
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
-    assert is_available(fname, remote='web') is False
+    assert is_available(fname, remote=remote) is False
 
 
 @with_tempfile(mkdir=True)

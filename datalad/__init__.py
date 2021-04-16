@@ -205,11 +205,6 @@ def setup_package():
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
 
-    if cfg.obtain('datalad.tests.setup.testrepos'):
-        lgr.debug("Pre-populating testrepos")
-        from datalad.tests.utils import with_testrepos
-        with_testrepos()(lambda repo: 1)()
-
     # in order to avoid having to fiddle with rather uncommon
     # file:// URLs in the tests, have a standard HTTP server
     # that serves an 'httpserve' directory in the test HOME
@@ -224,6 +219,11 @@ def setup_package():
     test_http_server = HTTPPath(serve_path)
     test_http_server.start()
     _TEMP_PATHS_GENERATED.append(serve_path)
+
+    if cfg.obtain('datalad.tests.setup.testrepos'):
+        lgr.debug("Pre-populating testrepos")
+        from datalad.tests.utils import with_testrepos
+        with_testrepos()(lambda repo: 1)()
 
 
 def teardown_package():
