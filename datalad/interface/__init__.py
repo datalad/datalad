@@ -74,7 +74,6 @@ _group_misc = (
         ('datalad.local.export_archive', 'ExportArchive'),
         ('datalad.distributed.export_to_figshare', 'ExportToFigshare'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),

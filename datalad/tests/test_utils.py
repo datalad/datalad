@@ -18,7 +18,6 @@ import sys
 import time
 import logging
 from unittest.mock import patch
-import builtins
 
 from operator import itemgetter
 from os.path import (
@@ -74,7 +73,6 @@ from datalad.utils import (
     path_is_subpath,
     path_startswith,
     rotree,
-    safe_print,
     setup_exceptionhook,
     split_cmdline,
     swallow_logs,
@@ -105,7 +103,6 @@ from .utils import (
     has_symlink_capability,
     known_failure,
     known_failure_v6,
-    known_failure_windows,
     nok_,
     OBSCURE_FILENAME,
     ok_,
@@ -900,22 +897,6 @@ def test_path_is_subpath():
     # must not mix relative and abs
     assert_raises(ValueError, path_is_subpath, 'a/b', '/a')
     assert_raises(ValueError, path_is_subpath, '/a/b', 'a')
-
-
-def test_safe_print():
-    """Just to test that we are getting two attempts to print"""
-
-    called = [0]
-
-    def _print(s):
-        assert_equal(s, "bua")
-        called[0] += 1
-        if called[0] == 1:
-            raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
-
-    with patch.object(builtins, 'print', _print):
-        safe_print("bua")
-    assert_equal(called[0], 2)
 
 
 def test_probe_known_failure():
