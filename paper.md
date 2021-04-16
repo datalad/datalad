@@ -101,9 +101,6 @@ authors:
  - name: Horea-Ioan Ioanas  # 1 commits, issues: opened 3 participated in 0
    orcid: 0000-0001-7037-2449
    affiliation: "6"
-# - name: Timo Dickscheid  # 0 commits, issues: opened 2 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
@@ -354,6 +351,7 @@ Nolan Nichols,
 Elizabeth DuPre,
 Cécile Madjar,
 Gergana Alteva,
+Timo Dickscheid,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
 
