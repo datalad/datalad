@@ -123,7 +123,7 @@ def test_help_np():
               'General information',
               'Global options',
               'Plumbing commands',
-              'Plugins'}:
+              }:
         assert_in(s, sections)
 
     if not get_terminal_size()[0] or 0:

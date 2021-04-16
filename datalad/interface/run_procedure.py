@@ -78,6 +78,11 @@ def _get_proc_config(name, ds=None):
     """
     # figure what ConfigManager to ask
     cm = cfg if ds is None else ds.config
+    # ConfigManager may not be up-to-date, particularly if we are in a
+    # subdataset due to recursion in `_get_procedure_implementation` where
+    # outside caller operates (and reloads) on superdataset only. With
+    # force=False, this shouldn't be expensive.
+    cm.reload()
     # ConfigManager might return a tuple for different reasons.
     # The config might have been defined multiple times in the same location
     # (within .datalad/config for example) or there are multiple values for

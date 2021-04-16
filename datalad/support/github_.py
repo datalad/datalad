@@ -185,13 +185,19 @@ def _gen_github_entity(
             yield ses.get_user(), token_str
 
 
-def _make_github_repos(
+def _make_github_repos_(
         github_login, github_organization, rinfo, existing,
         access_protocol, private, dryrun):
-    res = []
-    if not rinfo:
-        return res  # no need to even try!
+    """Create a series of GitHub projects
 
+    Yields
+    ------
+    tuple (Dataset instance, URL, bool)
+    """
+    if not rinfo:
+        return  # no need to even try!
+
+    auth_success = False
     ncredattempts = 0
     # determine the entity under which to create the repos.  It might be that
     # we would need to check a few credentials
@@ -213,7 +219,15 @@ def _make_github_repos(
                     dryrun)
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
-                res.append((ds,) + ensure_tuple_or_list(res_))
+                res_['ds'] = ds
+                yield res_
+                # track (through the keyhole of the backdoor) if we had luck
+                # with the github credential set
+                # which worked, whenever we have a good result, or where able to
+                # determined, if a project already exists
+                auth_success = auth_success or \
+                    res_['status'] in ('ok', 'notneeded') or \
+                    res_['preexisted']
             except (gh.BadCredentialsException, gh.GithubException) as e:
                 hint = None
                 if (isinstance(e, gh.BadCredentialsException) and e.status != 403):
@@ -224,7 +238,7 @@ def _make_github_repos(
                     # github hides away if repository might already be existing
                     # if token does not have sufficient credentials
                     hint = "Likely the token lacks sufficient permissions to "\
-                            "assess if repository already exists or not"
+                           "assess if repository already exists or not"
                 else:
                     # Those above we process, the rest - re-raise
                     raise
@@ -233,7 +247,7 @@ def _make_github_repos(
                             exc_str(e),
                             (" Hint: %s" % hint) if hint else "")
 
-                if res:
+                if auth_success:
                     # so we have succeeded with at least one repo already -
                     # we should not try any other credential.
                     # TODO: may be it would make sense to have/use different
@@ -242,8 +256,9 @@ def _make_github_repos(
                     # IMHO (-- yoh)
                     raise e
                 break  # go to the next attempt to authenticate
-        if res:
-            return res
+
+        if auth_success:
+            return
 
     # External loop should stop querying for the next possible way when it succeeds,
     # so we should never get here if everything worked out
@@ -258,9 +273,24 @@ def _make_github_repos(
 
 def _make_github_repo(github_login, entity, reponame, existing,
                       access_protocol, private, dryrun):
+    """Create a GitHub project
+
+    Returns
+    -------
+    dict
+      Keys/values are 'status' (str), 'url' (str), 'preexisted' (bool),
+      'message' (str).
+
+    Raises
+    ------
+    BadCredentialsException,
+    GithubException
+    """
     repo = None
+    access_url = None
     try:
         repo = entity.get_repo(reponame)
+        access_url = get_repo_url(repo, access_protocol, github_login)
     except gh.GithubException as e:
         if e.status != 404:
             # this is not a not found message, raise
@@ -270,37 +300,50 @@ def _make_github_repo(github_login, entity, reponame, existing,
             reponame)
 
     if repo is not None:
+        res = dict(
+            url=access_url,
+            preexisted=True,
+        )
         if existing in ('skip', 'reconfigure'):
-            access_url = get_repo_url(repo, access_protocol, github_login)
-            return access_url, existing == 'skip'
+            return dict(
+                res,
+                status='notneeded',
+                preexisted=existing == 'skip',
+            )
         elif existing == 'error':
-            msg = 'repository "{}" already exists on Github'.format(reponame)
-            if dryrun:
-                lgr.error(msg)
-            else:
-                raise ValueError(msg)
+            return dict(
+                res,
+                status='error',
+                message=('repository "%s" already exists on Github', reponame),
+            )
         elif existing == 'replace':
-            _msg = 'repository "%s" already exists on GitHub.' % reponame
-            if dryrun:
-                lgr.info(_msg + " Deleting (dry)")
+            _msg = ('repository "%s" already exists on GitHub.', reponame)
+            # Since we are running in the loop trying different tokens,
+            # this message might appear twice. TODO: avoid
+            if ui.is_interactive:
+                remove = ui.yesno(
+                    "Do you really want to remove it?",
+                    title=_msg[0] % _msg[1],
+                    default=False
+                )
             else:
-                # Since we are running in the loop trying different tokens,
-                # this message might appear twice. TODO: avoid
-                if ui.is_interactive:
-                    remove = ui.yesno(
-                        "Do you really want to remove it?",
-                        title=_msg,
-                        default=False
-                    )
-                else:
-                    raise RuntimeError(
-                        _msg +
-                        " Remove it manually first on GitHub or rerun datalad in "
-                        "interactive shell to confirm this action.")
-                if not remove:
-                    raise RuntimeError(_msg)
-                repo.delete()
-                repo = None
+                return dict(
+                    res,
+                    status='impossible',
+                    message=(
+                        _msg[0] + " Remove it manually first on GitHub or "
+                        "rerun datalad in an interactive shell to confirm "
+                        "this action.",
+                        _msg[1]),
+                )
+            if not remove:
+                return dict(
+                    res,
+                    status='impossible',
+                    message=_msg,
+                )
+            repo.delete()
+            repo = None
         else:
             RuntimeError('must not happen')
 
@@ -331,14 +374,30 @@ def _make_github_repo(github_login, entity, reponame, existing,
                             for err in e.data.get('errors', [])
                             if 'message' in err
                         ]))
-            raise RuntimeError(msg)
+            return dict(
+                res,
+                status='error',
+                message=msg,
+            )
 
     if repo is None and not dryrun:
         raise RuntimeError(
             'something went wrong, we got no Github repository')
 
-    if dryrun:
-        return '{}:github/.../{}'.format(access_protocol, reponame), False
-    else:
-        # report URL for given access protocol
-        return get_repo_url(repo, access_protocol, github_login), False
+    # get definitive URL:
+    # - use previously determined one
+    # - or query a newly created project
+    # - or craft one in dryrun mode
+    access_url = access_url or '{}github.com{}{}/{}.git'.format(
+        'https://' if access_protocol == 'https' else 'git@',
+        '/' if access_protocol == 'https' else ':',
+        # this will be the org, in case the repo will go under an org
+        entity.login,
+        reponame,
+    ) if dryrun else get_repo_url(repo, access_protocol, github_login)
+
+    return dict(
+        status='ok',
+        url=access_url,
+        preexisted=False,
+    )

@@ -190,7 +190,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             from datalad.interface.base import (
                 get_interface_groups, get_api_name, load_interface
             )
-            groups = get_interface_groups(True)
+            groups = get_interface_groups()
             for group, _, interfaces in groups:
                 for intfspec in interfaces:
                     # lgr.log(5, "Considering interface %s", intfspec)

@@ -66,9 +66,14 @@ _group_metadata = (
 _group_misc = (
     'Miscellaneous commands',
     [
-        ('datalad.plugin.wtf', 'WTF'),
+        ('datalad.local.wtf', 'WTF'),
+        ('datalad.local.no_annex', 'NoAnnex'),
+        ('datalad.local.add_readme', 'AddReadme'),
+        ('datalad.local.addurls', 'Addurls'),
+        ('datalad.local.check_dates', 'CheckDates'),
+        ('datalad.local.export_archive', 'ExportArchive'),
+        ('datalad.distributed.export_to_figshare', 'ExportToFigshare'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),

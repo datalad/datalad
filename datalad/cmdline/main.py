@@ -134,7 +134,7 @@ def setup_parser(
         need_single_subparser = False
         unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
 
-    interface_groups = get_interface_groups(include_plugins=True)
+    interface_groups = get_interface_groups()
 
     # First unparsed could be either unknown option to top level "datalad"
     # or a command. Among unknown could be --help/--help-np which would

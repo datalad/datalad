@@ -416,3 +416,18 @@ def test_name_with_underscore(path):
                      '"python {script}"}'}):
         ds.config.reload()
         ds.run_procedure(spec=["print_args"])
+
+
+@with_tempfile
+def test_call_fmt_from_env_requires_reload(path):
+    ds = Dataset(path).create()
+    subds = ds.create("sub")
+    (subds.pathobj / ".datalad" / "procedures").mkdir(
+        parents=True, exist_ok=True)
+    script = subds.pathobj / ".datalad" / "procedures" / "p"
+    script.write_text("import sys; assert len(sys.argv) == 1")
+    with patch.dict("os.environ",
+                    {"DATALAD_PROCEDURES_P_CALL__FORMAT":
+                     f"{sys.executable} {{script}}"}):
+        # This will fail if the above environment variable isn't in effect.
+        ds.run_procedure("p")
