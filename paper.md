@@ -47,9 +47,9 @@ authors:
  - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
    orcid: 0000-0003-2213-7465
    affiliation: 2
-# - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
+ - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
+   orcid: 0000-0002-9854-5118
+   affiliation: 18
  - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
    orcid: 0000-0001-9062-3778
    affiliation:  10
@@ -147,6 +147,8 @@ affiliations:
    index: 16
  - name: University of Massachusetts Medical School, Worcester, MA, United States
    index: 17
+ - name: Quest Diagnostics, Marlborough, MA, United States
+   index: 18
 date: 24 March 2021
 bibliography: paper.bib
 
