@@ -20,9 +20,6 @@ authors:
  - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
    orcid: 0000-0002-0774-6564
    affiliation: 1
-# - name: Gergana Alteva  # 187 commits, issues: opened 4 participated in 6
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Adina Wagner  # 98 commits, issues: opened 36 participated in 45
    orcid: 0000-0003-2917-3450
    affiliation: 2
@@ -356,6 +353,7 @@ John Lee,
 Nolan Nichols,
 Elizabeth DuPre,
 Cécile Madjar,
+Gergana Alteva,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
 
