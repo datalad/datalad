@@ -1,5 +1,5 @@
 ---
-title: 'DataLad: decentralized research data management system'
+title: 'DataLad: distributed system for joint management of code, data, and their relationship'
 tags:
   - Python
   - command line
