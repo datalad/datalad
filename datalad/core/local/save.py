@@ -43,6 +43,7 @@ from datalad.support.parallel import (
 )
 from datalad.utils import (
     ensure_list,
+    path_startswith,
 )
 import datalad.utils as ut
 
@@ -222,9 +223,9 @@ class Save(Interface):
         # use status() to do all discovery and annotation of paths
         paths_by_ds = {}
         for s in Status()(
-                # ATTN: it is vital to pass the `dataset` argument as it,
-                # and not a dataset instance in order to maintain the path
-                # semantics between here and the status() call
+                # ATTN: it is vital to pass the `dataset` argument as is,
+                # and not cast to a dataset instance in order to maintain the
+                # path semantics between here and the status() call
                 dataset=dataset,
                 path=path,
                 untracked=untracked_mode,
@@ -269,13 +270,72 @@ class Save(Interface):
                 rootds, children, [], edges, includeds=children)
             for superds, subdss in edges.items():
                 superds_status = paths_by_ds.get(superds, {})
+                # First collect all subdss for which we do not have status known within
+                # their respective superds
+                subds_unknown_status = [
+                    subds
+                    for subds in subdss
+                    if ut.Path(subds) not in superds_status
+                ]
+                # and request their status in the same way as above but with different
+                # dataset and paths to these
+                # But it seems that path=[] runs full status, so we need to condition:
+                if subds_unknown_status:
+                    for s in Status()(
+                        dataset=superds,
+                        path=subds_unknown_status,
+                        untracked=untracked_mode,
+                        report_filetype=False,
+                        recursive=False, #? recursive,
+                        #recursion_limit=recursion_limit,
+                        on_failure='ignore',
+                        # for save without recursion only commit matters
+                        eval_subdataset_state='commit',  #?'full' if recursive else 'commit',
+                        result_renderer='disabled'):
+                        if s['path'] in superds_status:
+                            lgr.warning("Odd -- was not expecting to receive status for %s. Skipping", s['path'])
+                            continue
+                        if s['path'] not in subds_unknown_status:
+                            import pdb; pdb.set_trace()
+                            # TODO: what is a proper way to ask Status politely to not care about
+                            # "looking too deep" (we do not care about files within those subdatasets!
+                            # it is a waste of cycles to ask)
+                            print("XXX Skipping %s since we do not care" % s['path'])
+                            continue
+                        # TODO: most likely need to do the same dance with filtering keys as above
+                        # import pdb; pdb.set_trace()
+                        # print("XXX adding %s" % str(s))
+                        # it might say "clean" but it is to check based on known information in the children
+                        if s['state'] == 'clean':
+                            s['state'] = 'maybe-clean'
+                        superds_status[ut.Path(s['path'])] = s
+                # if 'sub3' in str(path):
+                #     import pdb; pdb.set_trace()
                 for subds in subdss:
                     subds_path = ut.Path(subds)
                     sub_status = superds_status.get(subds_path, {})
+                    if sub_status["state"] == 'maybe-clean':
+                        # check what is known in the paths_by_ds
+                        state = 'clean'
+                        # TODO: chain more pythonically and/or think how to OPT
+                        # these nested loops - should not be needed
+                        for x_dspath, x_dss in paths_by_ds.items():
+                            if not path_startswith(x_dspath, subds):
+                                continue
+                            for s in x_dss.values():
+                                if s['state'] != 'clean':
+                                    # YOH: we need to work on it,
+                                    # but should it really be marked "untracked"?
+                                    state = 'untracked'
+                                    break
+                            if state != 'clean':
+                                break
+                        sub_status["state"] = state
                     if not (sub_status.get("state") == "clean" and
                             sub_status.get("type") == "dataset"):
                         # TODO actually start from an entry that may already
                         # exist in the status record
+                        # import pdb; pdb.set_trace()
                         superds_status[subds_path] = dict(
                             # shot from the hip, some status config
                             # to trigger this specific super/sub
