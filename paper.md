@@ -151,40 +151,42 @@ bibliography: paper.bib
 # Summary
 
 The DataLad project ([datalad.org](http://datalad.org)) adapted the models of open-source software development and distribution to address technical limitations of today's data management, sharing, and provenance collection.
-Born from the idea to provide a unified data distribution for neuroscience, taking a versatile system for data logistics
-([git-annex](https://git-annex.branchable.com)) built on top of the most popular distributed version control system 
-([Git](https://git-scm.com)), and adopting ideas and procedures from software distributions, DataLad delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
+Born from the idea to provide a unified data distribution for neuroscience that takes a versatile system for data logistics
+([git-annex](https://git-annex.branchable.com)), built on top of the most popular distributed version control system
+([Git](https://git-scm.com)), DataLad delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
+It aims to make data management as easy as managing code, streamlining data consumption, update, and publication.
+It aids handling data of any size or type, and can link them with precisely versioned, lightweight dependencies.
+DataLad helps to make science more FAIR, by capturing complete and actionable process provenance of any data transformation to enable automatic re-computation.
 
 # Statement of Need
 
-Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
-While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles [@FAIR2016] postulating demands on public data hosting portals and the big callout for Data Science.
-Disconnected data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and data provenance---if shared at all---is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
-<!-- MIH summary: inconvenient access, version/provenance information unavailable -->
-DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing simplified core interfaces for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and making re-execution possible.
-Since it is interoperable with a large variety of scientific and commercial hosting services and available for all major operating systems, DataLad can be integrated into established systems with minimal adjustments.
+Code, data, and computing environments are at the core of scientific practice.
+Unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability.
+Established and widely-adopted infrastructure and procedures, like software distributions, distributed version control systems, and social coding portals like GitHub, streamline the collaborative development and use of research software.
+However, data have remained a “2nd-class citizen” in the contemporary scientific process, despite the increasing embracement of the FAIR principles [@FAIR2016].
+1) Disconnected data portals force a cacophony of data access and authentication methods upon the scientific community; 2) data versioning is rarely performed, or nowhere close to the precision and inspectability that is standard in software development; and 3) data provenance---if shared at all---is often not complete, because their capture is rarely considered to be an integral part of the scientific process.
+DataLad aims to solve all these issues by providing targeted interfaces and interoperability adapters to standard tools and services, scientific and commercial.
+It enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
+In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
 
-## Why Git and git-annex
+## Why Git and git-annex?
 
-Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files,<!-- citation needed, does not match self-description --> but it is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
-<!-- YOH: I do not think we need citation to support ever statement, especially for which there would be no scholary articly "deeply investigating" it.  Added a citation to some first hit on google -->
-Moreover, any data committed to Git becomes available to all clones of that repository.
-This makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? YOH: "distributed storage" != "distribution". Removed "scientic data" preamble and otherwise I think this statement is ok otherwise--> or to stop providing some individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
-Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome Git's limitation in managing individual file content that is either large or sensitive.
-File content managed by git-annex is placed into an annex, and in its place, git-annex commits a link (a symbolic link or a git link) <!-- km: think "or a git link" might be too into the weeds; drop (...) entirely? --> pointing to the content of the file.
-The content representation is based on a checksum of the file's content.
-As such, while only a lightweight link is directly committed into Git, this committed information contains the content identity of annexed files.
-Git-annex then manages content availability information in any local repository, other Git remotes, or external resources such as web urls.
-Having that information, git-annex takes care of all transport logistics to exchange content upon user request.
-This simple approach allows git-annex to manage and version control arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
-<!-- BEN thinks we need to make explicit the idea, that by means of how annex
-works, the content and access control to it is separated from the version
-control (and metadata). ATM this follows implicitly but may be much less obvious
-to someone who didn't dive into it yet -->
+Git is the most popular version control system for software development[^1].
+It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all content committed to Git reliably and efficiently available to all clones of a repository.
+At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
+This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files, or even to fully remove file content without severely impacting the integrity of a repository.
+Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
+File content managed by git-annex is placed into a managed repository annex, instead of committing it directly to Git.
+Instead of the file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
+File content references are typically based on a checksum of the content.
+Using these identifiers, git-annex tracks content availability across all repository clones (local or remote), or external resources such as URLs pointing to individual files on the web.
+Upon user request, git-annex automatically manages data transport to and from a local repository annex at a granularity of individual files.
+With this simple approach, git-annex enables separate and optimized implementations for identification and transport of arbitrarily large files, using an extensible set of protocols, while retaining the distributed nature and compatibility with versatile workflows for versioning and collaboration provided by Git.
 
-## Why Git and git-annex alone are not enough
+[^1]: https://en.wikipedia.org/wiki/Git#Adoption
 
-<!-- this is "what does datalad add to Git+git-annex -->
+## Why Git and git-annex alone are not enough?
+
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
 **They are generic and lack support for domain-specific solutions.** 
@@ -295,18 +297,18 @@ or as a core technology behind another tool or a larger platform.
 
 ## Documentation
 
-The DataLad core repository populates [docs.datalad.org](http://docs.datalad.org/en/latest/) with developer-oriented information and detailed descriptions of command line and Python interfaces.
-A comprehensive [DataLad Handbook](http://handbook.datalad.org) [@datalad-handbook:zenodo] provides documentation with numerous usage examples oriented toward novice and advanced users of all backgrounds.
+Developer-focused technical documentation at [docs.datalad.org](http://docs.datalad.org), with detailed descriptions of the command line and Python interfaces, is automatically generated from the DataLad core repository.
+A comprehensive [handbook](http://handbook.datalad.org) [@datalad-handbook:zenodo] provides user-oriented documentation with an introduction to research data management, and numerous use case descriptions for novice and advanced users of all backgrounds.
 
 The simplest "prototypical" example is `datalad search haxby` which would install the [datasets.datalad.org](http://datasets.datalad.org) superdataset, and search for datasets mentioning `haxby` anywhere in their metadata records.
 Any reported dataset could be immediately installed using `datalad install` command, and data files of interest obtained using `datalad get`.
-More use-case driven examples could be found in the [handbook](http://handbook.datalad.org/en/latest/usecases/intro.html) [@datalad-handbook:use-cases].
+More use-case descriptions are available in the handbook [@datalad-handbook:use-cases].
 
 ## Installation
 
-The DataLad Handbook provides [installation instructions](http://handbook.datalad.org/en/latest/intro/installation.html) for common operating systems.
-DataLad releases are distributed through PyPI, Debian, NeuroDebian, brew, and conda-forge.
-The [datalad-installer](https://github.com/datalad/datalad-installer/) (also available from PyPI) can be used to streamline the installation of `git-annex`, which cannot be installed via `pip` and thus may need a separate installation on some operating systems.
+The handbook provides [installation instructions](http://handbook.datalad.org/r.html?install) for all major operating systems.
+DataLad releases are distributed through [PyPI](https://pypi.org/project/datalad), [Debian](https://tracker.debian.org/pkg/datalad), [NeuroDebian](http://neuro.debian.net/pkgs/datalad.html), [brew](https://formulae.brew.sh/formula/datalad), and [conda-forge](https://anaconda.org/conda-forge/datalad).
+The [datalad-installer](https://github.com/datalad/datalad-installer) (also available from PyPI) streamlines the installation of DataLad and its dependencies, in particular git-annex, across a range of deployment scenarios, such as continuous integration systems, or high-performance computing (HPC) environments.
 
 ## Development
 
