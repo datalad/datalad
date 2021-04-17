@@ -24,7 +24,6 @@ authors:
    orcid: 0000-0003-2917-3450
    affiliation: 2
  - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
-   affiliation: FIXME
  - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
    affiliation: 14 # add full names if not yet listed, or indexes if already are
  - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
@@ -104,7 +103,6 @@ authors:
    affiliation: "6"
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
-   affiliation: FIXME
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
    orcid: 0000-0001-6398-6370
    affiliation: "2, 3"
@@ -171,7 +169,7 @@ DataLad aims to solve all these issues by providing targeted interfaces and inte
 It enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
 In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
 
-## Why Git and git-annex
+## Why Git and git-annex?
 
 Git is the standard version control system for software development[^1].
 It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all content committed to Git reliably and efficiently available to all clones of a repository.
@@ -188,9 +186,8 @@ With this simple approach, git-annex enables separate and optimized implementati
 
 [^1]: https://en.wikipedia.org/wiki/Git#Adoption
 
-## Why Git and git-annex alone are not enough
+## Why does DataLad add to Git and git-annex?
 
-<!-- this is "what does datalad add to Git+git-annex -->
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
 **They are generic and lack support for domain-specific solutions.** 
