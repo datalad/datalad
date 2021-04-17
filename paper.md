@@ -173,21 +173,20 @@ In order to maximize its utility and target audience, DataLad is available for a
 
 ## Why Git and git-annex
 
-Git is an excellent <!-- citation needed -->distributed content management system geared towards managing and collaborating on text files,<!-- citation needed, does not match self-description --> but it is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
-<!-- YOH: I do not think we need citation to support ever statement, especially for which there would be no scholary articly "deeply investigating" it.  Added a citation to some first hit on google -->
-Moreover, any data committed to Git becomes available to all clones of that repository.
-This makes it hard or impossible to provide distributed storage of managed data <!-- why? individual tailoring is hard, but distribution not, what is special about scientific data in this regard? YOH: "distributed storage" != "distribution". Removed "scientic data" preamble and otherwise I think this statement is ok otherwise--> or to stop providing some individual files, such as accidentally stored personal data or data from participants that withdrew from a study.
-Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome Git's limitation in managing individual file content that is either large or sensitive.
-File content managed by git-annex is placed into an annex, and in its place, git-annex commits a link (a symbolic link or a git link) <!-- km: think "or a git link" might be too into the weeds; drop (...) entirely? --> pointing to the content of the file.
-The content representation is based on a checksum of the file's content.
-As such, while only a lightweight link is directly committed into Git, this committed information contains the content identity of annexed files.
-Git-annex then manages content availability information in any local repository, other Git remotes, or external resources such as web urls.
-Having that information, git-annex takes care of all transport logistics to exchange content upon user request.
-This simple approach allows git-annex to manage and version control arbitrarily large files, and "link" files in a Git repository to vast data resources available online.
-<!-- BEN thinks we need to make explicit the idea, that by means of how annex
-works, the content and access control to it is separated from the version
-control (and metadata). ATM this follows implicitly but may be much less obvious
-to someone who didn't dive into it yet -->
+Git is the standard version control system for software development[^1].
+It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all content committed to Git reliably and efficiently available to all clones of a repository.
+At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
+This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files, or even to fully remove file content without severely impacting the integrity of a repository.
+Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
+File content managed by git-annex is placed into a managed repository annex, instead of committing it directly
+to Git.
+Instead of the file content, git-annex only commits a compact reference that enables identification and association of file name and content.
+File content references are typically based on a checksum of the content.
+Using these identifiers, git-annex tracks content availability across all repository clones (local or remote), or external resources such as URLs pointing to individual files on the web.
+Upon user request, git-annex automatically manages data transport to and from a local repository annex at a granularity of individual files.
+With this simple approach, git-annex enables separate and optimized implementations for identification and transport of arbitrarily large files, using an extensible set of protocols, while retaining the distributed nature and compatibility with versatile workflows for versioning and collaboration provided by Git.
+
+[^1]: https://en.wikipedia.org/wiki/Git#Adoption
 
 ## Why Git and git-annex alone are not enough
 
