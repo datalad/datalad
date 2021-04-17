@@ -303,11 +303,11 @@ A comprehensive [handbook](http://handbook.datalad.org) [@datalad-handbook:zenod
 
 The simplest "prototypical" example is `datalad search haxby` which would install the [datasets.datalad.org](http://datasets.datalad.org) superdataset, and search for datasets mentioning `haxby` anywhere in their metadata records.
 Any reported dataset could be immediately installed using `datalad install` command, and data files of interest obtained using `datalad get`.
-More use-case driven examples could be found in the [handbook](http://handbook.datalad.org/en/latest/usecases/intro.html) [@datalad-handbook:use-cases].
+More use-case descriptions are available in the handbook [@datalad-handbook:use-cases].
 
 ## Installation
 
-The DataLad Handbook provides [installation instructions](http://handbook.datalad.org/en/latest/intro/installation.html) for common operating systems.
+The DataLad Handbook provides [installation instructions](http://handbook.datalad.org/r.html?install) for common operating systems.
 DataLad releases are distributed through PyPI, Debian, NeuroDebian, brew, and conda-forge.
 The [datalad-installer](https://github.com/datalad/datalad-installer/) (also available from PyPI) can be used to streamline the installation of `git-annex`, which cannot be installed via `pip` and thus may need a separate installation on some operating systems.
 
