@@ -307,9 +307,9 @@ More use-case descriptions are available in the handbook [@datalad-handbook:use-
 
 ## Installation
 
-The DataLad Handbook provides [installation instructions](http://handbook.datalad.org/r.html?install) for common operating systems.
-DataLad releases are distributed through PyPI, Debian, NeuroDebian, brew, and conda-forge.
-The [datalad-installer](https://github.com/datalad/datalad-installer/) (also available from PyPI) can be used to streamline the installation of `git-annex`, which cannot be installed via `pip` and thus may need a separate installation on some operating systems.
+The handbook provides [installation instructions](http://handbook.datalad.org/r.html?install) for all major operating systems.
+DataLad releases are distributed through [PyPI](https://pypi.org/project/datalad), [Debian](https://tracker.debian.org/pkg/datalad), [NeuroDebian](http://neuro.debian.net/pkgs/datalad.html), [brew](https://formulae.brew.sh/formula/datalad), and [conda-forge](https://anaconda.org/conda-forge/datalad).
+The [datalad-installer](https://github.com/datalad/datalad-installer) (also available from PyPI) streamlines the installation of DataLad and its dependencies, in particular git-annex, across a range of deployment scenarios, such as continuous integration systems, or high-performance computing (HPC) environments.
 
 ## Development
 
