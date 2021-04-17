@@ -162,12 +162,14 @@ DataLad helps to make science more FAIR, by capturing complete and actionable pr
 
 # Statement of Need
 
-Code, data, and computing environments are at the core of scientific practice, and unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability. 
-While software development and sharing are streamlined with the advance of software distributions, distributed version control systems, and social coding portals like GitHub, data have remained a “2nd-class citizen” in the contemporary scientific process, despite FAIR principles [@FAIR2016] postulating demands on public data hosting portals and the big callout for Data Science.
-Disconnected data hosting portals provide a cacophony of data access and authentication methods, data versioning is frequently ignored, and data provenance---if shared at all---is often not recoverable simply because data management is rarely considered to be an integral part of the scientific process.
-<!-- MIH summary: inconvenient access, version/provenance information unavailable -->
-DataLad aims to solve these issues by streamlining data consumption, publication, and updating routines, by providing simplified core interfaces for Git and git-annex operations, and by providing additional features for reproducible science such as command execution provenance capturing and making re-execution possible.
-Since it is interoperable with a large variety of scientific and commercial hosting services and available for all major operating systems, DataLad can be integrated into established systems with minimal adjustments.
+Code, data, and computing environments are at the core of scientific practice.
+Unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability.
+Established and widely-adopted infrastructure and procedures, like software distributions, distributed version control systems, and social coding portals like GitHub, streamline the collaborative development and use of research software.
+However, data have remained a “2nd-class citizen” in the contemporary scientific process, despite the increasing embracement of the FAIR principles [@FAIR2016].
+1) Disconnected data portals force a cacophony of data access and authentication methods upon the scientific community; 2) data versioning is rarely performed, or nowhere close to the precision and inspectability that is standard in software development; and 3) data provenance---if shared at all---is often not complete, because their capture is rarely considered to be an integral part of the scientific process.
+DataLad aims to solve all these issues by providing targeted interfaces and interoperability adapters to standard tools and services, scientific and commercial.
+It enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
+In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
 
 ## Why Git and git-annex
 
