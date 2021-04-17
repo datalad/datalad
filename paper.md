@@ -153,9 +153,9 @@ bibliography: paper.bib
 # Summary
 
 The DataLad project ([datalad.org](http://datalad.org)) adapted the models of open-source software development and distribution to address technical limitations of today's data management, sharing, and provenance collection.
-Born from the idea to provide a unified data distribution for neuroscience, taking a versatile system for data logistics
+Born from the idea to provide a unified data distribution for neuroscience that takes a versatile system for data logistics
 ([git-annex](https://git-annex.branchable.com)) built on top of the most popular distributed version control system 
-([Git](https://git-scm.com)), and adopting ideas and procedures from software distributions, DataLad delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
+([Git](https://git-scm.com)), DataLad delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
 
 # Statement of Need
 
