@@ -2792,6 +2792,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of str
            files successfully copied
         """
+        warnings.warn(
+            "AnnexRepo.copy_to() is deprecated and will be removed in a "
+            "future release. Use the Dataset method push() instead.",
+            DeprecationWarning)
 
         # find --in here --not --in remote
         # TODO: full support of annex copy options would lead to `files` being
