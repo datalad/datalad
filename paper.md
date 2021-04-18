@@ -189,7 +189,7 @@ With this simple approach, git-annex enables separate and optimized implementati
 
 [^1]: https://en.wikipedia.org/wiki/Git#Adoption
 
-## Why Git and git-annex alone are not enough?
+## Why Git and git-annex alone are not enough
 
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
