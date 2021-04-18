@@ -319,8 +319,10 @@ The [datalad-installer](https://github.com/datalad/datalad-installer) (also avai
 DataLad has been developed openly in a public repository ([github.com/datalad/datalad](https://github.com/datalad/datalad)) since its inception in 2013.
 At the time of this publication, the repository amassed over 13.5k commits, 2.5k merged PRs, and 2.3k closed (+700 open) issues from over 30 contributors.
 Issue tracker, labels, milestones, and pull requests are used to coordinate development.
-DataLad heavily relies on the versatility and stability of the underlying core tools---Git and git-annex.
-To avoid reimplementing the wheel and to benefit the git-annex user community at large, many aspects of the desired functionality are and have been implemented directly in git-annex through collaboration with the git-annex developer Joey Hess [@git-annex:projects-datalad].
+The development process of DataLad is not isolated from its fundational building blocks.
+For every new feature or bug fix the most appropriate software layer is determined to maximize the size of the benefitting user base, but, importantly, also the associated developer audience.
+This strategy aims to achieve a robust integration with the larger open source software ecosystem, and simultaneously minimize the total technical debt carried solely by the DataLad development team.
+Consequently, DataLad development is tightly connected to and involves constant communication with the git-annex project and its main developer Joey Hess [@git-annex:projects-datalad].
 To guarantee robust operation across various deployments, DataLad heavily utilizes continuous integration platforms (Appveyor, GitHub actions, and Travis CI) for testing DataLad core, building and testing git-annex (in a dedicated [github.com/datalad/git-annex](https://github.com/datalad/git-annex)), and integration testing 
 with DataLad extensions ([datalad-extensions](https://github.com/datalad/datalad-extensions/)).
 
