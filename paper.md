@@ -51,9 +51,6 @@ authors:
  - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
    orcid: 0000-0001-9062-3778
    affiliation:  10
-# - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
-#   orcid: 0000-0002-8402-6173
-#   affiliation: 2
  - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
    orcid: 0000-0003-3641-3491
    affiliation:  13
@@ -348,6 +345,7 @@ Elizabeth DuPre,
 Cécile Madjar,
 Gergana Alteva,
 Timo Dickscheid,
+Alex Waite,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
 
