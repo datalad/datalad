@@ -240,16 +240,18 @@ This allowed DataLad and many other projects to facilitate access to an ever-gro
 ## DataLad core
 
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
-DataLad (see \autoref{fig:one}) operates on DataLad datasets which are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
- 
+All DataLad commands operate on *DataLad datasets*.
+On a technical level, DataLad datasets are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
+On a conceptual level, they constitute an overlay structure that allows to version control files of any size, track and publish files in a distributed fashion, and record, publish, and execute actionable provenance of files and file transformations.
+\autoref{fig:one} summarizes DataLad's most important commands and concepts for local or distributed data and provenance management.
+
 ![DataLad: a schematic overview of a dataset, datasets nesting, and selected DataLad commands for content and datasets management. DataLad Cheatsheet [@datalad-handbook:cheatsheet] provides a broader, yet still concise overview of these and other available commands. \label{fig:one}](figures/fig1.png)
 
-Using Git's submodule mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
-With this simple paradigm, DataLad fulfills the YODA principles for reproducible science [@yoda:myyoda] and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results  (see \autoref{fig:two}).
+DataLad's features can be flexibly integrated into standard scientific workflows.
+For example, by using the concept of dataset nesting to modularize the evolution of a research project, DataLad can fulfill the YODA principles for reproducible science [@yoda:myyoda], and, with this simple paradigm, facilitate efficient access, composition, scalability, reuse, sharing, and reproducibility of results (see \autoref{fig:two}).
 
 ![DataLad datasets are reusable modular components, which could be nested to establish a complete provenance trail all the way from from a publication to the raw data. Various access schemes to datasets and data could be implemented.\label{fig:two}](figures/datalad-nesting-access.png)
 
-As a testament of scalability, [datasets.datalad.org](http://datasets.datalad.org) provides a DataLad (super)dataset encapsulating thousands of datasets with unified access to over 250 TBs of primarily neural data from a wide range of hosting portals.
 
 ## Extensions
 
