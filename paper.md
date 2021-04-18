@@ -51,9 +51,6 @@ authors:
  - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
    orcid: 0000-0001-9062-3778
    affiliation:  10
- - name: Alex Waite  # 5 commits, issues: opened 1 participated in 6
-   orcid: 0000-0002-8402-6173
-   affiliation: 2
  - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
    orcid: 0000-0003-3641-3491
    affiliation:  13
@@ -285,11 +282,7 @@ or as a core technology behind another tool or a larger platform.
 ## Documentation
 
 Developer-focused technical documentation at [docs.datalad.org](http://docs.datalad.org), with detailed descriptions of the command line and Python interfaces, is automatically generated from the DataLad core repository.
-A comprehensive [handbook](http://handbook.datalad.org) [@datalad-handbook:zenodo] provides user-oriented documentation with an introduction to research data management, and numerous use case descriptions for novice and advanced users of all backgrounds.
-
-The simplest "prototypical" example is `datalad search haxby` which would install the [datasets.datalad.org](http://datasets.datalad.org) superdataset, and search for datasets mentioning `haxby` anywhere in their metadata records.
-Any reported dataset could be immediately installed using `datalad install` command, and data files of interest obtained using `datalad get`.
-More use-case descriptions are available in the handbook [@datalad-handbook:use-cases].
+A comprehensive [handbook](http://handbook.datalad.org) [@datalad-handbook:zenodo] provides user-oriented documentation with an introduction to research data management, and numerous use case descriptions for novice and advanced users of all backgrounds [@datalad-handbook:use-cases].
 
 ## Installation
 
@@ -321,15 +314,8 @@ There are no conflicts to declare.
 # Acknowledgements
 
 DataLad development was facilitated by a senior adviser Dr. James V. Haxby (Dartmouth College).
-It was made possible thanks to support by 
-NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
-[1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
-(PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
-through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
-It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects.
-It also received contributions from the Canadian Open Neuroscience Platform and the NeuroHub projects thanks in part to funding from a Brain Canada Platform Support Grant Competition Award in addition to funds and in-kind support from sponsor organizations, and from the Canada First Research Excellence Fund, awarded through the Healthy Brains, Healthy Lives initiative at McGill University, and the Brain Canada Foundation with support from Health Canada.
 We express our gratitude to Joey Hess for the development and maintenance of git-annex, and for years of productive collaboration with the DataLad team.
-We would also like to express our gratitude to 
+We would like to extend our gratitude to 
 Joey Zhou,
 Matteo Visconti di Oleggio Castello,
 John T. Wodder II,
@@ -342,8 +328,18 @@ Elizabeth DuPre,
 Cécile Madjar,
 Gergana Alteva,
 Timo Dickscheid,
+Alex Waite,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
+
+DataLad development was made possible thanks to support by 
+NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
+[1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
+(PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
+through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
+It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects.
+It also received contributions from the Canadian Open Neuroscience Platform and the NeuroHub projects thanks in part to funding from a Brain Canada Platform Support Grant Competition Award in addition to funds and in-kind support from sponsor organizations, and from the Canada First Research Excellence Fund, awarded through the Healthy Brains, Healthy Lives initiative at McGill University, and the Brain Canada Foundation with support from Health Canada.
+This development was supported by the European Regional Development Fund (Project: Center for Behavioral Brain Sciences Magdeburg, Imaging Platform), the European Union’s Horizon 2020 research and innovation programme under grant agreements [Human Brain Project (SGA3, H2020-EU.3.1.5.3, grant no. 945539)](https://cordis.europa.eu/project/id/945539), and [Virtual Brain Cloud (H2020-EU.3.1.5.3, grant no. 826421)](https://cordis.europa.eu/project/id/826421), the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grants [SFB 1451 (431549029)](https://gepris.dfg.de/gepris/projekt/431549029) and [IRTG2150 (269953372)](https://gepris.dfg.de/gepris/projekt/269953372).
 
 
 # References
