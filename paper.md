@@ -262,7 +262,7 @@ To this end, DataLad is also accompanied by rich documentation [@datalad-handboo
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
 DataLad (see \autoref{fig:one}) operates on DataLad datasets which are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
  
-![DataLad: a schematic overview of a dataset, datasets nesting, and selected DataLad commands for content and datasets management. DataLad Cheatsheet [@datalad-handbook:cheatsheet] provides a broader, yet still concise overview of these and other available commands. \label{fig:one}](figures/fig1.png)
+![Schematic overview of a dataset, datasets nesting, and selected commands for content and dataset management. A more comprehensive cheatsheet is provided in the DataLad handbook [@datalad-handbook:cheatsheet]. \label{fig:one}](figures/fig1.png)
 
 Using Git's submodule mechanism, DataLad embraces and simplifies modular composition of smaller datasets into larger (super)datasets.
 With this simple paradigm, DataLad fulfills the YODA principles for reproducible science [@yoda:myyoda] and facilitates efficient access, composition, scalability, reuse, sharing, and reproducibility of results  (see \autoref{fig:two}).
