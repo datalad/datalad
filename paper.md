@@ -302,11 +302,7 @@ or as a core technology behind another tool or a larger platform.
 ## Documentation
 
 Developer-focused technical documentation at [docs.datalad.org](http://docs.datalad.org), with detailed descriptions of the command line and Python interfaces, is automatically generated from the DataLad core repository.
-A comprehensive [handbook](http://handbook.datalad.org) [@datalad-handbook:zenodo] provides user-oriented documentation with an introduction to research data management, and numerous use case descriptions for novice and advanced users of all backgrounds.
-
-The simplest "prototypical" example is `datalad search haxby` which would install the [datasets.datalad.org](http://datasets.datalad.org) superdataset, and search for datasets mentioning `haxby` anywhere in their metadata records.
-Any reported dataset could be immediately installed using `datalad install` command, and data files of interest obtained using `datalad get`.
-More use-case descriptions are available in the handbook [@datalad-handbook:use-cases].
+A comprehensive [handbook](http://handbook.datalad.org) [@datalad-handbook:zenodo] provides user-oriented documentation with an introduction to research data management, and numerous use case descriptions for novice and advanced users of all backgrounds [@datalad-handbook:use-cases].
 
 ## Installation
 
