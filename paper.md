@@ -193,67 +193,47 @@ With this simple approach, git-annex enables separate and optimized implementati
 
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
-**They are generic and lack support for domain-specific solutions.** 
+**Modularization is needed to scale.**
+Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
+Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
+Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
+Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
+Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets.
+<!-- unclear how management of 10k small pieces becomes more scalable than one piece with 10k parts; YOH: just by virtue of being able to handle 10k * 10k files -->
+To achieve modularity without impeding usability, DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
+<!-- BEN: There are more aspect of modularization than reuse and large-scale.
+Most importantly, that's the notions of dependencies and a derivative
+relationsship that can be expressed that way, I think. -->
+With this, DataLad makes it trivial to operate on individual files deep in the hierarchy or entire sub-trees of datasets, providing a "mono-repo"-like user experience in datasets nested arbitrarily deep.
+A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
+It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 250 TBs of data across a wide range of projects and archives in a fully modularized way.
+
+**Annotation of changes is not "re-executable".**
+Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the principle of "reusability" of the FAIR principles [@FAIR2016].
+Git captures provenance with annotations of file changes, where changes are typically represented by a patch (an exact difference between two versions that could be applied to another version of the text file), and a Git commit message (a freeform, human-readable text description of the introduced changes).
+Unlike changes to text documents or source code, which are typically done "manually", data manipulations are most often performed by software.
+DataLad exploits this fact and enables automated annotation of changes which result from running an external command.
+DataLad creates a commit message which does not only include a human-readable summary, but also a human- and machine-readable record of the command invocation which introduced the changes.
+This allows for the data "change" to be re-executed to either verify that results reproduce, or to apply such a "change" to a completely different state, irrespective of the quality of the human-made commit message.
+
+<!--AW:removed the sentence below as YOH suggested
+Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch. -->
+<!-- YOH: may be strip above sentence away... I am just trying to lead somehow into "semantic" description of the change.
+  E.g. that if author was very good with the description of change, some smart AI could have redone it following the description
+  and not the patch.  The simplest analog could be "replaced word X with Y" where the patch would contain exact difference, but
+  either will not be applicable or just would miss some Xs if applied to a vastly different version -->
+
+
+
+**They are generic and lack support for domain-specific solutions.**
+Interoperability with scientific or commercial services and hosting services allows researchers to integrate data management routines into their established workflows with only minimal adjustments, but Git and git-annex do not provide all required interoperability out of the box.
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
-Interaction with non git-aware portals should then be implemented via custom Git transfer protocols, as, e.g., it was done in datalad-osf [@datalad-osf:zenodo].
+DataLad implements support for interactions with non Git-aware but commonly used portals via custom Git transfer protocols, as, e.g., it was done for interactions with the Open Science Framework (OSF) in the DataLad extension ``datalad-osf`` [@datalad-osf:zenodo].
 Git-annex provides access to a wide range of external data storage resources via various protocols but cannot implement all idiosyncrasies of any individual data portal.
 In particular, scientific data is frequently stored in compressed archives to reduce its storage demands, and/or on specialized servers, such as XNAT ([www.xnat.org](http://www.xnat.org)).
 To address these demands, git-annex established a protocol [@git-annex:special_remotes_protocol] through which external tools can provide custom transport functionality transparently to the git-annex user.
 This allowed DataLad and many other projects to facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and to overcome technological limitations (e.g., maximal file sizes, or file system inode limits).
 
-**They require a layer above to establish a *distribution*.**
-The DataLad project's initial goal was to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
-On their own, Git and git-annex do not provide user interfaces for searching across available repositories or for convenient manipulation of individual components of a data distribution. 
-[datasets.datalad.org](http://datasets.datalad.org) became an example of such a data distribution curated by the DataLad team, which at the moment provides streamlined access to over 250 TBs of data across a wide range of projects and archives.
-<!-- MIH thinks this needs a clarification of terms. If datasets.d.o is a distribution than datalad is "just a client tool" too. I think this is probably aimed at the nesting feature, and if so, we should use the term, because people can read about it in the handbook. This technical feature is then what is used to build a "unified data distribution" -->
-<!-- YOH: good point, after all every distribution relies on client tools.  I have tried to address it above by removing the notion of "just a client tool".
- I do not think we can escape "metadata" completely -->
-<!-- BEN adds to MIH: below we call ds.dl.org a testament of scalability, and
-this is what I think it is. A showcase, not somehow a central or special part of
-DataLad itself. Therefore I'd present it as the conclusion of what that
-modularization allows for. Overall the "additional layer" the headline talks
-about is not clear to me.-->
-<!-- YOH: IMHO modularization is IMHO a very related but different aspect from "distribution"
- which is largely about bringing components from different resources together under a unified interface,
- with mechanisms to declare relationships (dependencies), often versioning, and then some notion of convenient URIs (package names vs urls).
- Any distribution indeed needs some level of modularization.
- As those are two aspects are very related, order could be swapped, but then we would need to re-work out "cross-referencing" -->
-
-**Modularization is needed to scale.**
-Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
-Many research datasets contain millions of files, and that precludes placing such datasets in their entirety within a single Git repository even if individual files are tiny in their size.
-Such datasets should be partitioned into smaller subdatasets (e.g., a subdataset per each subject in the dataset comprising thousands of participants).
-This modularization allows for not only scalable management, <!-- unclear how management of 10k small pieces becomes more scalable than one piece with 10k parts; YOH: just by virtue of being able to handle 10k * 10k files --> but also for the efficient reuse of a selected subset of datasets.
-DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
-<!-- BEN: There are more aspect of modularization than reuse and large-scale.
-Most importantly, that's the notions of dependencies and a derivative
-relationsship that can be expressed that way, I think. -->
-<!-- YOH: well, there is "unambiguously link (versions of) " in above.  Could indeed be elaborated -->
-With this, DataLad makes it trivial to operate on individual files deep in the hierarchy or entire sub-trees of datasets, providing a "mono-repo"-like user experience in datasets nested arbitrarily deep.
-<!-- MIH: modularization is presented as #2, but it seems to be just #1 (nesting) described from a different angle -->
-<!-- YOH: not sure what #2 here, since in above it is "reproducible execution" in "MIH thinks:".
-
-As for #2 "reproducible execution" - I think we missed such subsection entirely, so I added it:
---> 
-
-**Annotation of changes is not "re-executable".**
-A Git commit message is a freeform text intended to provide a human-readable description of introduced changes.
-Changes themselves are typically represented by a patch (an exact difference between two versions) which could be applied to another version of the text file(s).
-Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch.
-<!-- YOH: may be strip above sentence away... I am just trying to lead somehow into "semantic" description of the change.
-  E.g. that if author was very good with the description of change, some smart AI could have redone it following the description
-  and not the patch.  The simplest analog could be "replaced word X with Y" where the patch would contain exact difference, but
-  either will not be applicable or just would miss some Xs if applied to a vastly different version -->
-Unlike changes to text documents or source code, which are typically done "manually", data manipulations are most often performed by software.
-DataLad exploits this fact and enables automated annotation of changes which result from running an external command.
-DataLad creates a commit message which does not only include a human-readable summary, but also a human- and machine-readable record of the command invocation which introduced the changes.
-This allows for the data "change" to be re-executed to either verify that results reproduce, or to apply such a "change" to a completely different state. 
-
-**Git and git-annex do not necessarily facilitate the best scientific workflow.**
-Git and git-annex, being generic tools, come with rich interfaces and allow for a wide range of workflows.
-DataLad strives to provide a higher level interface to more efficiently cover typical use cases encountered in the scientific practice than the direct invocation of individual Git and git-annex commands, and to encourage efficient computation and reproducible workflows.
-To this end, DataLad is also accompanied by rich documentation [@datalad-handbook:zenodo] to guide a scientist of any technological competency level, and agnostic of the field of science.
-<!-- key point thinks MIH: to some degree the handbook also "just" shows how to use git/git-annex to implement concrete processes that are of relevance for science. In some what "figuring out how to do it with git/git-annex is a major contribution, some of it implemented in code (simplified/alternative API), but otherwise written up in English -->
 
 # Overview of the DataLad and its ecosystem
 
