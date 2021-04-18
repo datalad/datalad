@@ -256,8 +256,9 @@ For example, by using the concept of dataset nesting to modularize the evolution
 ## Extensions
 
 Like Git and git-annex, DataLad core not only provides a generic tool not encumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of.
-DataLad extensions mechanism allows to harmoniously extend DataLad's with a domain or technology specific functionality.
-Some exemplar extensions include:
+"DataLad extensions", stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad's with a domain or technology specific functionality.
+A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used to create new DataLad extensions.
+Some exemplar established extensions include:
 
 - [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments;
 - [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] the functionality which initiated the DataLad project - to automate creation and updates of DataLad datasets from external resources;
@@ -266,7 +267,7 @@ Some exemplar extensions include:
 
 The same mechanism of extensions is used for rapid development of new functionality to later be moved into the main DataLad codebase (e.g., [datalad-metalad](https://github.com/datalad/datalad-metalad/)).
 The [datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and continuous integration testing of their released versions against released and development versions of the DataLad core. 
-The [datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used for creating new DataLad extensions.
+
 
 ## External uses and integrations
 
