@@ -159,6 +159,8 @@ It adapts principles of open-source software development and -distribution to ad
 By streamlining procedures to consume, publish, and update data, as well as providing means to handle data of any size or type and link them as precisely versioned, lightweight dependencies, DataLad aims to make data management as easy as managing code.
 By capturing complete and actionable process provenance of data transformations, and enabling automatic re-computation based on this provenance, DataLad also helps to make science more reproducible and FAIR [@FAIR2016].
 With a Python API and command-line interface, an infrastructure for software extensions, and complete independence from centralized services but development towards maximum interoperability with existing tools and services, the DataLad project ([datalad.org](http://datalad.org)) delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
+In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
+
 
 # Statement of Need
 
@@ -169,7 +171,6 @@ Reuse of data and other sizable or binary files is not as transparent, as data v
 And scientific processes are not as reproducible, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
 DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
 It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed access to all elements of scientific project, and it enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
-In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
 
 ## Why Git and git-annex?
 
