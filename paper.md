@@ -154,13 +154,11 @@ bibliography: paper.bib
 
 # Summary
 
-The DataLad project ([datalad.org](http://datalad.org)) adapted the models of open-source software development and distribution to address technical limitations of today's data management, sharing, and provenance collection.
-Born from the idea to provide a unified data distribution for neuroscience that takes a versatile system for data logistics
-([git-annex](https://git-annex.branchable.com)), built on top of the most popular distributed version control system
-([Git](https://git-scm.com)), DataLad delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
-It aims to make data management as easy as managing code, streamlining data consumption, update, and publication.
-It aids handling data of any size or type, and can link them with precisely versioned, lightweight dependencies.
-DataLad helps to make science more FAIR, by capturing complete and actionable process provenance of any data transformation to enable automatic re-computation.
+DataLad is a Python-based tool for the joint management of code, data, and their relationship, built on top of a versatile system for data logistics ([git-annex](https://git-annex.branchable.com)) and the most popular distributed version control system ([Git](https://git-scm.com)).
+It adapts principles of open-source software development and -distribution to address the technical challenges of data management, data sharing, and digital provenance collection across the life cycle of digital objects:
+By streamlining procedures to consume, publish, and update data, as well as providing means to handle data of any size or type and link them as precisely versioned, lightweight dependencies, DataLad aims to make data management as easy as managing code.
+By capturing complete and actionable process provenance of data transformations, and enabling automatic re-computation based on this provenance, DataLad also helps to make science more reproducible and FAIR [@FAIR2016].
+With a Python API and command-line interface, an infrastructure for software extensions, and complete independence from centralized services but development towards maximum interoperability with existing tools and services, the DataLad project ([datalad.org](http://datalad.org)) delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
 
 # Statement of Need
 
