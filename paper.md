@@ -334,16 +334,8 @@ There are no conflicts to declare.
 # Acknowledgements
 
 DataLad development was facilitated by a senior adviser Dr. James V. Haxby (Dartmouth College).
-It was made possible thanks to support by 
-NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
-[1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
-(PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
-through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
-It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects.
-It also received contributions from the Canadian Open Neuroscience Platform and the NeuroHub projects thanks in part to funding from a Brain Canada Platform Support Grant Competition Award in addition to funds and in-kind support from sponsor organizations, and from the Canada First Research Excellence Fund, awarded through the Healthy Brains, Healthy Lives initiative at McGill University, and the Brain Canada Foundation with support from Health Canada.
 We express our gratitude to Joey Hess for the development and maintenance of git-annex, and for years of productive collaboration with the DataLad team.
-This development was supported by the European Regional Development Fund (Project: Center for Behavioral Brain Sciences Magdeburg, Imaging Platform), the European Union’s Horizon 2020 research and innovation programme under grant agreements [Human Brain Project (SGA3, H2020-EU.3.1.5.3, grant no. 945539)](https://cordis.europa.eu/project/id/945539), and [Virtual Brain Cloud (H2020-EU.3.1.5.3, grant no. 826421)](https://cordis.europa.eu/project/id/826421), the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grants [SFB 1451 (431549029)](https://gepris.dfg.de/gepris/projekt/431549029) and [IRTG2150 (269953372)](https://gepris.dfg.de/gepris/projekt/269953372).
-We would also like to express our gratitude to 
+We would like to extend our gratitude to 
 Joey Zhou,
 Matteo Visconti di Oleggio Castello,
 John T. Wodder II,
@@ -358,6 +350,15 @@ Gergana Alteva,
 Timo Dickscheid,
 [TODOADD: notable contributors]
 for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
+
+DataLad development was made possible thanks to support by 
+NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
+[1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
+(PI: Halchenko) and BMBF 01GQ1411 and 01GQ1905 (PI: Hanke) 
+through [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
+It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) NIH projects.
+It also received contributions from the Canadian Open Neuroscience Platform and the NeuroHub projects thanks in part to funding from a Brain Canada Platform Support Grant Competition Award in addition to funds and in-kind support from sponsor organizations, and from the Canada First Research Excellence Fund, awarded through the Healthy Brains, Healthy Lives initiative at McGill University, and the Brain Canada Foundation with support from Health Canada.
+This development was supported by the European Regional Development Fund (Project: Center for Behavioral Brain Sciences Magdeburg, Imaging Platform), the European Union’s Horizon 2020 research and innovation programme under grant agreements [Human Brain Project (SGA3, H2020-EU.3.1.5.3, grant no. 945539)](https://cordis.europa.eu/project/id/945539), and [Virtual Brain Cloud (H2020-EU.3.1.5.3, grant no. 826421)](https://cordis.europa.eu/project/id/826421), the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grants [SFB 1451 (431549029)](https://gepris.dfg.de/gepris/projekt/431549029) and [IRTG2150 (269953372)](https://gepris.dfg.de/gepris/projekt/269953372).
 
 
 # References
