@@ -171,6 +171,7 @@ Reuse of data and other sizable or binary files is not as transparent, as data v
 And scientific processes are not as reproducible, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
 DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
 It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed access to all elements of scientific project, and it enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
+To this end, it builds up on and extends two established tools for version control and transport logistics, Git and git-annex.
 
 ## Why Git and git-annex?
 
