@@ -162,13 +162,13 @@ With a Python API and command-line interface, an infrastructure for software ext
 
 # Statement of Need
 
-Code, data, and computing environments are at the core of scientific practice.
-Unobstructed access and efficient management of all those digital objects promotes scientific discovery through collaboration, reproducibility, and replicability.
-Established and widely-adopted infrastructure and procedures, like software distributions, distributed version control systems, and social coding portals like GitHub, streamline the collaborative development and use of research software.
-However, data have remained a “2nd-class citizen” in the contemporary scientific process, despite the increasing embracement of the FAIR principles [@FAIR2016].
-1) Disconnected data portals force a cacophony of data access and authentication methods upon the scientific community; 2) data versioning is rarely performed, or nowhere close to the precision and inspectability that is standard in software development; and 3) data provenance---if shared at all---is often not complete, because their capture is rarely considered to be an integral part of the scientific process.
-DataLad aims to solve all these issues by providing targeted interfaces and interoperability adapters to standard tools and services, scientific and commercial.
-It enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
+Code, data and computing environments are the core components of scientific projects.
+While the collaborative development and use of research software and code is streamlined with established procedures and infrastructure, such as software distributions, distributed version control systems, and social coding portals like GitHub, other components of scientific projects are not as transparently managed or unobstructed accessible.
+Data consumption is not as streamlined, as disconnected data portals require a large variety of different data access and authentication methods;
+Reuse of data and other sizable or binary files is not as transparent, as data versioning is rarely performed, or nowhere close to the precision and inspectability that is standard in software development;
+And scientific processes are not as reproducible, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
+DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
+It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed access to all elements of scientific project, and it enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
 In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
 
 ## Why Git and git-annex?
