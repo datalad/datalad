@@ -300,11 +300,11 @@ def md5sum(filename):
 
 
 # unused in -core
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
+def sorted_files(path):
+    """Return a (sorted) list of files under path
     """
-    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
-                       for r, d, files in os.walk(dout)
+    return sorted(sum([[opj(r, f)[len(path) + 1:] for f in files]
+                       for r, d, files in os.walk(path)
                        if not '.git' in r], []))
 
 _encoded_dirsep = r'\\'  if on_windows else r'/'
