@@ -251,7 +251,7 @@ For example, by using the concept of dataset nesting to modularize the evolution
 
 ## Extensions
 
-Like Git and git-annex, DataLad core not only provides a generic tool not encumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of.
+Like Git and git-annex, DataLad core does not only provide a generic tool, that is unencumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of it.
 "DataLad extensions", stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad's with a domain or technology specific functionality.
 A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used to create new DataLad extensions.
 Some exemplar established extensions include:
