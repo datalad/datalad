@@ -106,7 +106,6 @@ Support functionality
 .. autosummary::
    :toctree: generated
 
-   auto
    cmd
    consts
    log
