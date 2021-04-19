@@ -196,7 +196,6 @@ Many research datasets contain millions of files, but a large number of files pr
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
 Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets.
-<!-- unclear how management of 10k small pieces becomes more scalable than one piece with 10k parts; YOH: just by virtue of being able to handle 10k * 10k files -->
 To achieve modularity without impeding usability, DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
 <!-- BEN: There are more aspect of modularization than reuse and large-scale.
 Most importantly, that's the notions of dependencies and a derivative
