@@ -241,7 +241,7 @@ On a technical level, DataLad datasets are just Git (with optional git-annex for
 On a conceptual level, they constitute an overlay structure that allows to version control files of any size, track and publish files in a distributed fashion, and record, publish, and execute actionable provenance of files and file transformations.
 \autoref{fig:one} summarizes DataLad's most important commands and concepts for local or distributed data and provenance management.
 
-![DataLad: a schematic overview of a dataset, datasets nesting, and selected DataLad commands for content and datasets management. DataLad Cheatsheet [@datalad-handbook:cheatsheet] provides a broader, yet still concise overview of these and other available commands. \label{fig:one}](figures/fig1.png)
+![Schematic overview of a dataset, datasets nesting, and selected commands for content and dataset management. A more comprehensive cheatsheet is provided in the DataLad handbook [@datalad-handbook:cheatsheet]. \label{fig:one}](figures/fig1.png)
 
 DataLad's features can be flexibly integrated into standard scientific workflows.
 For example, by using the concept of dataset nesting to modularize the evolution of a research project, DataLad can fulfill the YODA principles for reproducible science [@yoda:myyoda], and, with this simple paradigm, facilitate efficient access, composition, scalability, reuse, sharing, and reproducibility of results (see \autoref{fig:two}).
@@ -293,9 +293,11 @@ The [datalad-installer](https://github.com/datalad/datalad-installer) (also avai
 
 DataLad has been developed openly in a public repository ([github.com/datalad/datalad](https://github.com/datalad/datalad)) since its inception in 2013.
 At the time of this publication, the repository amassed over 13.5k commits, 2.5k merged PRs, and 2.3k closed (+700 open) issues from over 30 contributors.
-Issue tracker, labels, milestones, and pull requests (from personal forks) are used to coordinate development.
-DataLad heavily relies on the versatility and stability of the underlying core tools---Git and git-annex.
-To avoid reimplementing the wheel and to benefit the git-annex user community at large, many aspects of the desired functionality are and have been implemented directly in git-annex through collaboration with the git-annex developer Joey Hess [@git-annex:projects-datalad].
+Issue tracker, labels, milestones, and pull requests are used to coordinate development.
+The development process of DataLad is not isolated from its foundational building blocks.
+For every new feature or bug fix the most appropriate software layer is determined to maximize the size of the benefitting user base and, importantly, also the associated developer audience.
+This strategy aims to achieve a robust integration with the larger open source software ecosystem, and simultaneously minimize the total technical debt carried solely by the DataLad development team.
+Consequently, DataLad development is tightly connected to and involves constant communication with the git-annex project and its main developer Joey Hess [@git-annex:projects-datalad].
 To guarantee robust operation across various deployments, DataLad heavily utilizes continuous integration platforms (Appveyor, GitHub actions, and Travis CI) for testing DataLad core, building and testing git-annex (in a dedicated [github.com/datalad/git-annex](https://github.com/datalad/git-annex)), and integration testing 
 with DataLad extensions ([datalad-extensions](https://github.com/datalad/datalad-extensions/)).
 
