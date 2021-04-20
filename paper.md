@@ -189,17 +189,18 @@ With this simple approach, git-annex enables separate and optimized implementati
 
 [^1]: https://en.wikipedia.org/wiki/Git#Adoption
 
-## Why Git and git-annex alone are not enough
+## Why Git and git-annex alone are not enough?
 
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
-**Modularization is needed to scale.**
+**Easy to use modularization is needed.**
 Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
 Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
 Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets and for recording a derivative relationship between datasets.
-To achieve modularity without impeding usability, DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
+Git's submodule mechanism allows to unambiguously link (versions of) individual repositories by nesting one into another, but Git operations must still be performed within each individual repository.
+To achieve modularity without impeding usability, DataLad simplifies working with the resulting hierarchies of Git submodules via recursive operations across dataset boundaries.
 With this, DataLad makes it trivial to operate on individual files deep in the hierarchy or entire sub-trees of datasets, providing a "mono-repo"-like user experience in datasets nested arbitrarily deep.
 A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
 It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 250 TBs of data across a wide range of projects and archives in a fully modularized way.
