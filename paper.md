@@ -179,7 +179,7 @@ This makes it hard or impossible to use Git directly for distributed data storag
 Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
 File content managed by git-annex is placed into a managed repository annex, instead of committing it directly to Git.
 Instead of the file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
-File content references are typically based on a checksum of the content.
+Those file content references are typically based on a checksum of the content.
 Using these identifiers, git-annex tracks content availability across all repository clones (local or remote), or external resources such as URLs pointing to individual files on the web.
 Upon user request, git-annex automatically manages data transport to and from a local repository annex at a granularity of individual files.
 With this simple approach, git-annex enables separate and optimized implementations for identification and transport of arbitrarily large files, using an extensible set of protocols, while retaining the distributed nature and compatibility with versatile workflows for versioning and collaboration provided by Git.
