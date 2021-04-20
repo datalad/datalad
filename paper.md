@@ -152,9 +152,11 @@ bibliography: paper.bib
 # Summary
 
 DataLad is a Python-based tool for the joint management of code, data, and their relationship, built on top of a versatile system for data logistics ([git-annex](https://git-annex.branchable.com)) and the most popular distributed version control system ([Git](https://git-scm.com)).
-It adapts principles of open-source software development and -distribution to address the technical challenges of data management, data sharing, and digital provenance collection across the life cycle of digital objects:
-By streamlining procedures to consume, publish, and update data, as well as providing means to handle data of any size or type and link them as precisely versioned, lightweight dependencies, DataLad aims to make data management as easy as managing code.
-By capturing complete and actionable process provenance of data transformations, and enabling automatic re-computation based on this provenance, DataLad also helps to make science more reproducible and FAIR [@FAIR2016].
+It adapts principles of open-source software development and -distribution to address the technical challenges of data management, data sharing, and digital provenance collection across the life cycle of digital objects.
+DataLad aims to make data management as easy as managing code.
+It streamlines procedures to consume, publish, and update data, for data of any size or type, and to link them as precisely versioned, lightweight dependencies.
+DataLad helps to make science more reproducible and FAIR [@FAIR2016].
+It can capture complete and actionable process provenance of data transformations, and to enable automatic re-computation.
 With a Python and a command-line interface, an infrastructure for software extensions, and complete independence from centralized services but development towards maximum interoperability with existing tools and services, the DataLad project ([datalad.org](http://datalad.org)) delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
 In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal adjustments.
 
