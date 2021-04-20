@@ -276,7 +276,7 @@ or as a core technology behind another tool or a larger platform.
 [OpenNeuro](http://openneuro.org) uses DataLad for data logistics with data deposition to a public S3 bucket.
 [CONP-PCNO](https://github.com/CONP-PCNO/) adopts aforementioned features for modular composition and nesting to deliver a rich collection of datasets with public or restricted access to data.
 [ReproMan](http://reproman.repronim.org) integrates with DataLad to provide version control and data logistics.
-[www.datalad.org/integrations.html](https://www.datalad.org/integrations.html) provides a more complete list of DataLad usage and integration with other projects, and @Hanke_2021 provides a systematic depiction of DataLad as a dRDM used by a number of projects. 
+[www.datalad.org/integrations.html](https://www.datalad.org/integrations.html) provides a more complete list of DataLad usage and integration with other projects, and @Hanke_2021 provides a systematic depiction of DataLad as a system for decentral research data management (dRDM) used by a number of projects.
 
 
 ## Documentation
