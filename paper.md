@@ -175,7 +175,7 @@ To this end, it builds up on and extends two established tools for version contr
 Git is the most popular version control system for software development[^1].
 It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all content committed to Git reliably and efficiently available to all clones of a repository.
 At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
-This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files, or even to fully remove file content without severely impacting the integrity of a repository.
+This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files. 
 Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
 File content managed by git-annex is placed into a managed repository annex, instead of committing it directly to Git.
 Instead of the file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
@@ -226,9 +226,10 @@ Interoperability with scientific or commercial services and hosting services all
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
 DataLad implements support for interactions with non Git-aware but commonly used portals via custom Git transfer protocols, as, e.g., it was done for interactions with the Open Science Framework (OSF) in the DataLad extension ``datalad-osf`` [@datalad-osf:zenodo].
 Git-annex provides access to a wide range of external data storage resources via various protocols but cannot implement all idiosyncrasies of any individual data portal.
-In particular, scientific data is frequently stored in compressed archives to reduce its storage demands, and/or on specialized servers, such as XNAT ([www.xnat.org](http://www.xnat.org)).
-To address these demands, git-annex established a protocol [@git-annex:special_remotes_protocol] through which external tools can provide custom transport functionality transparently to the git-annex user.
-This allowed DataLad and many other projects to facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and to overcome technological limitations (e.g., maximal file sizes, or file system inode limits).
+In particular, scientific data is frequently stored in compressed archives, and/or on specialized servers, such as XNAT ([www.xnat.org](http://www.xnat.org)).
+Efficient scientific data processing therefore usually requires seamless access to a wide variety of different stores of scientific data.
+To address this requirement, git-annex established a protocol [@git-annex:special_remotes_protocol] through which external tools can provide custom transport functionality transparently to the git-annex user.
+This allows DataLad and many other projects to facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and to overcome technological limitations (e.g., maximal file sizes, or file system inode limits).
 
 
 # Overview of the DataLad and its ecosystem
@@ -251,9 +252,9 @@ For example, by using the concept of dataset nesting to modularize the evolution
 
 ## Extensions
 
-Like Git and git-annex, DataLad core not only provides a generic tool not encumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of.
+Like Git and git-annex, DataLad core does not only provide a generic tool, that is unencumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of it.
 "DataLad extensions", stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad's with a domain or technology specific functionality.
-A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) template repository can be used to create new DataLad extensions.
+A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) repository provides a starting point for creating new DataLad extensions.
 Some exemplar established extensions include:
 
 - [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments;
