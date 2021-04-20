@@ -189,11 +189,11 @@ With this simple approach, git-annex enables separate and optimized implementati
 
 [^1]: https://en.wikipedia.org/wiki/Git#Adoption
 
-## Why Git and git-annex alone are not enough?
+## What does DataLad add to Git and git-annex?
 
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
-**Easy to use modularization is needed.**
+**Easy to use modularization.**
 Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
 Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
@@ -205,7 +205,7 @@ With this, DataLad makes it trivial to operate on individual files deep in the h
 A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
 It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 250 TBs of data across a wide range of projects and archives in a fully modularized way.
 
-**Annotation of changes is not "re-executable".**
+**"Re-executable" annotation of changes.**
 Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the principle of "reusability" of the FAIR principles [@FAIR2016].
 Git captures provenance with annotations of file changes, where changes are typically represented by a patch (an exact difference between two versions that could be applied to another version of the text file), and a Git commit message (a freeform, human-readable text description of the introduced changes).
 Unlike changes to text documents or source code, which are typically done "manually", data manipulations are most often performed by software.
@@ -221,8 +221,7 @@ Such annotation is not sufficient to introduce changes by following the descript
   either will not be applicable or just would miss some Xs if applied to a vastly different version -->
 
 
-
-**They are generic and lack support for domain-specific solutions.**
+**Domain-specific solutions.**
 Interoperability with scientific or commercial services and hosting services allows researchers to integrate data management routines into their established workflows with only minimal adjustments, but Git and git-annex do not provide all required interoperability out of the box.
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
 DataLad implements support for interactions with non Git-aware but commonly used portals via custom Git transfer protocols, as, e.g., it was done for interactions with the Open Science Framework (OSF) in the DataLad extension ``datalad-osf`` [@datalad-osf:zenodo].
