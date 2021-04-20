@@ -221,7 +221,7 @@ Such annotation is not sufficient to introduce changes by following the descript
   either will not be applicable or just would miss some Xs if applied to a vastly different version -->
 
 
-**Domain-specific solutions.**
+**Targeted interfaces and interoperability adapters.**
 Interoperability with scientific or commercial services and hosting services allows researchers to integrate data management routines into their established workflows with only minimal adjustments, but Git and git-annex do not provide all required interoperability out of the box.
 Git can interact with other repositories on the file system or accessible via a set of standard (ssh, http) or custom (Git) network transport protocols.
 DataLad implements support for interactions with non Git-aware but commonly used portals via custom Git transfer protocols, as, e.g., it was done for interactions with the Open Science Framework (OSF) in the DataLad extension ``datalad-osf`` [@datalad-osf:zenodo].
