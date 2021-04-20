@@ -233,6 +233,18 @@ This allowed DataLad and many other projects to facilitate access to an ever-gro
 
 # Overview of the DataLad and its ecosystem
 
+## Design principles
+
+The development of DataLad is guided by a few fundamental principles to ensure its open and domain agnostic nature, to maximize the longterm utility of its datasets and to minimze the technical debt introduced by using it:
+
+- There are only two recognized entities: datasets and files
+- A dataset is a Git repository with an optional annex
+- Minimization of custom procedures and data structures: Users must not loose data or data access, if DataLad would vanish
+- Complete decentralization, no required central server or service
+
+In that sense DataLad can be regarded as a thin wrapper around Git and git-annex, since -- technically -- everything DataLad can do could be done by using Git/git-annex directly and any modification of a dataset by DataLad remains accessible/recoverable by Git/git-annex alone.
+While it can be a rather complex task to actually do any of that without DataLad, using it doesn't introduce a technical dependency of a user's data on DataLad.
+
 ## DataLad core
 
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
