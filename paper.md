@@ -315,10 +315,16 @@ with DataLad extensions ([datalad-extensions](https://github.com/datalad/datalad
 
 ## Contributions
 
-DataLad is released under [DFSG](https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines)- and [OSI](https://opensource.org/osd)-compliant MIT/Expat license, and license terms for reused in the code-base components are provided in the [COPYING](https://github.com/datalad/datalad/blob/master/COPYING) file.
-[CONTRIBUTING.md](https://github.com/datalad/datalad/blob/master/CONTRIBUTING.md) file shipped within DataLad's source repository provides guidelines for submitting contributions.
+DataLad is free and open source software and encourages unconstrained use and re-use in any context.
+Therefore, DataLad is released under [DFSG](https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines)- and [OSI](https://opensource.org/osd)-compliant MIT/Expat license.
+License terms for reused in the code-base components are provided in the [COPYING](https://github.com/datalad/datalad/blob/master/COPYING) file.
+Anyone is highly welcome to contribute to DataLad under these terms.
+Technical and procedural guidelines for such contributions can be found in the [CONTRIBUTING.md](https://github.com/datalad/datalad/blob/master/CONTRIBUTING.md) file shipped within DataLad's source repository.
+
 
 [comment2]: <> (# Author Contributions: if desired/needed -- or drop altogether.)
+<!-- BEN: Looks like drop to me. Don't see a value in listing number of commits
+or whatever metric at a particular point in time.-->
 
 # Conflicts of interest
 
