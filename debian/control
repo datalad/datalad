@@ -121,7 +121,7 @@ Recommends: python3-boto,
 Suggests: python3-duecredit,
           python3-bs4,
           python3-numpy,
-          datalad-containers,
+          datalad-container,
           datalad-crawler,
           datalad-neuroimaging
 Breaks: datalad-container (<< 1.1.2)

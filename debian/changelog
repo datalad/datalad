@@ -1,3 +1,10 @@
+datalad (0.14.0-2) UNRELEASED; urgency=medium
+
+  * d/control
+    - fix name in datalad-container suggest (not datalad-containers)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 20 Apr 2021 11:28:18 -0400
+
 datalad (0.14.0-1) unstable; urgency=medium
 
   * Fresh upstream release
