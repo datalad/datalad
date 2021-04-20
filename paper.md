@@ -168,6 +168,7 @@ While the collaborative development and use of research software and code is str
 Data consumption is not as streamlined, as disconnected data portals require a large variety of different data access and authentication methods;
 Reuse of data and other sizable or binary files is not as transparent, as data versioning is rarely performed, or nowhere close to the precision and inspectability that is standard in software development;
 And scientific processes are not as reproducible, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
+Last but not least, without a notion of data packages, there is no easy let alone uniform way to declare discoverable data dependencies and derivative relationships between such packages.
 DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
 It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed, unified access to all elements of scientific projects, and it enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
 To this end, it builds up on and extends two established tools for version control and transport logistics, Git and git-annex.
@@ -177,7 +178,7 @@ To this end, it builds up on and extends two established tools for version contr
 Git is the most popular version control system for software development[^1].
 It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all committed content reliably and efficiently available to all clones of a repository.
 At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
-This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files. 
+This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files.
 Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
 File content managed by git-annex is placed into a managed repository annex, instead of committing it directly to Git.
 Instead of the file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
@@ -197,11 +198,8 @@ Research workflows impose additional demands for an efficient research data mana
 Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
-Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets.
+Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets and for recording a derivative relationship between datasets.
 To achieve modularity without impeding usability, DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
-<!-- BEN: There are more aspect of modularization than reuse and large-scale.
-Most importantly, that's the notions of dependencies and a derivative
-relationsship that can be expressed that way, I think. -->
 With this, DataLad makes it trivial to operate on individual files deep in the hierarchy or entire sub-trees of datasets, providing a "mono-repo"-like user experience in datasets nested arbitrarily deep.
 A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
 It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 250 TBs of data across a wide range of projects and archives in a fully modularized way.
