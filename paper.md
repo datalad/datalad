@@ -234,6 +234,17 @@ This allows DataLad and many other projects to facilitate access to an ever-grow
 
 # Overview of the DataLad and its ecosystem
 
+## Design principles
+
+The development of DataLad is guided by a few fundamental principles to ensure its open and domain agnostic nature, to maximize the longterm utility of its datasets and to minimze the technical debt introduced by using it:
+
+- There are only two recognized entities: datasets and files
+- A dataset is a Git repository with an optional annex
+- Minimization of custom procedures and data structures: Users must not loose data or data access, if DataLad would vanish
+- Complete decentralization, with no required central server or service, but maximum interoperability to allow (re-)use of existing 3rd-party data resources and infrastructure
+
+Due to these principles, using DataLad does not introduce a technical dependency of a user's data on DataLad or DataLad-related services as any modification of a dataset by DataLad remains accessible/recoverable by Git/git-annex alone.
+
 ## DataLad core
 
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
@@ -305,10 +316,17 @@ with DataLad extensions ([datalad-extensions](https://github.com/datalad/datalad
 
 ## Contributions
 
-DataLad is released under [DFSG](https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines)- and [OSI](https://opensource.org/osd)-compliant MIT/Expat license, and license terms for reused in the code-base components are provided in the [COPYING](https://github.com/datalad/datalad/blob/master/COPYING) file.
-[CONTRIBUTING.md](https://github.com/datalad/datalad/blob/master/CONTRIBUTING.md) file shipped within DataLad's source repository provides guidelines for submitting contributions.
+DataLad is free and open source software and encourages unconstrained use and re-use in any context.
+Therefore, DataLad is released under [DFSG](https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines)- and [OSI](https://opensource.org/osd)-compliant MIT/Expat license.
+License terms for reused components in the code-base are provided in the [COPYING](https://github.com/datalad/datalad/blob/master/COPYING) file.
+The project aims to promote contributions rather than detached developments in forks and anyone is highly welcome to contribute to DataLad in any form under these terms.
+Technical and procedural guidelines for such contributions can be found in the [CONTRIBUTING.md](https://github.com/datalad/datalad/blob/master/CONTRIBUTING.md) file shipped within DataLad's source repository.
+Contributors are acknowledged on the project website, and also credited in the form of co-authorship in the zenodo-based archival of software releases.
+All co-authors of this paper as well as the contributors acknowledged below have added to the project with code- or non-code-based contributions, and we thank past, present, and future contributors of this community for their involvement and work.
 
 [comment2]: <> (# Author Contributions: if desired/needed -- or drop altogether.)
+<!-- BEN: Looks like drop to me. Don't see a value in listing number of commits
+or whatever metric at a particular point in time.-->
 
 # Conflicts of interest
 
