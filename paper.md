@@ -240,7 +240,7 @@ The development of DataLad is guided by a few fundamental principles to ensure i
 - There are only two recognized entities: datasets and files
 - A dataset is a Git repository with an optional annex
 - Minimization of custom procedures and data structures: Users must not loose data or data access, if DataLad would vanish
-- Complete decentralization, no required central server or service
+- Complete decentralization, with no required central server or service, but maximum interoperability to allow (re-)use of existing 3rd-party data resources and infrastructure
 
 In that sense DataLad can be regarded as a thin wrapper around Git and git-annex, since -- technically -- everything DataLad can do could be done by using Git/git-annex directly and any modification of a dataset by DataLad remains accessible/recoverable by Git/git-annex alone.
 While it can be a rather complex task to actually do any of that without DataLad, using it doesn't introduce a technical dependency of a user's data on DataLad.
