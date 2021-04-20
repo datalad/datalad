@@ -178,7 +178,7 @@ To this end, it builds up on and extends two established tools for version contr
 Git is the most popular version control system for software development[^1].
 It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all committed content reliably and efficiently available to all clones of a repository.
 At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
-This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files. 
+This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files.
 Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
 File content managed by git-annex is placed into a managed repository annex, instead of committing it directly to Git.
 Instead of the file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
