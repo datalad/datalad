@@ -198,11 +198,8 @@ Research workflows impose additional demands for an efficient research data mana
 Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
-Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets.
+Beyond scalability, modularization into homogeneous components also allows for the efficient reuse of a selected subset of datasets and for recording a derivative relationship between datasets.
 To achieve modularity without impeding usability, DataLad uses Git's submodule mechanism to unambiguously link (versions of) individual datasets into larger super-datasets, and further simplifies working with the resulting hierarchies of datasets with recursive operations across dataset boundaries.
-<!-- BEN: There are more aspect of modularization than reuse and large-scale.
-Most importantly, that's the notions of dependencies and a derivative
-relationsship that can be expressed that way, I think. -->
 With this, DataLad makes it trivial to operate on individual files deep in the hierarchy or entire sub-trees of datasets, providing a "mono-repo"-like user experience in datasets nested arbitrarily deep.
 A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
 It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 250 TBs of data across a wide range of projects and archives in a fully modularized way.
