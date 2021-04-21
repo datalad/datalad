@@ -83,7 +83,8 @@ def test_globbedpaths(path):
             ([pardir + "*.txt"], {pardir + p for p in ["1.txt", "3.txt"]}),
             ([dotdir + pardir + "*.txt"],
              {dotdir + pardir + p for p in ["1.txt", "3.txt"]}),
-            (["subdir/"], {"subdir/"})]:
+            # Patterns that don't match are retained by default.
+            (["amiss"], {"amiss"})]:
         gp = GlobbedPaths(patterns, pwd=subdir_path)
         eq_(set(gp.expand()), expected)
         eq_(set(gp.expand(full=True)),
