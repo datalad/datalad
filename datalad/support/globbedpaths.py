@@ -10,6 +10,7 @@
 """
 
 import glob
+from functools import lru_cache
 import logging
 import os.path as op
 
@@ -43,28 +44,26 @@ class GlobbedPaths(object):
 
         if patterns is None:
             self._maybe_dot = []
-            self._paths = {"patterns": [], "sub_patterns": {}}
+            self._paths = {"patterns": []}
         else:
             patterns = list(map(ensure_unicode, patterns))
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {
                 "patterns": [op.relpath(p, start=pwd) if op.isabs(p) else p
-                             for p in patterns],
-                "sub_patterns": {}}
+                             for p in patterns]}
 
     def __bool__(self):
         return bool(self._maybe_dot or self.expand())
 
-    def _get_sub_patterns(self, pattern):
+    @staticmethod
+    @lru_cache()
+    def _get_sub_patterns(pattern):
         """Extract sub-patterns from the leading path of `pattern`.
 
         The right-most path component is successively peeled off until there
         are no patterns left.
         """
-        if pattern in self._paths["sub_patterns"]:
-            return self._paths["sub_patterns"][pattern]
-
         head, tail = op.split(pattern)
         if not tail:
             # Pattern ended with a separator. Take the first directory as the
@@ -83,7 +82,6 @@ class GlobbedPaths(object):
             if seen_magic:
                 sub_patterns.append(head + op.sep)
             head = new_head
-        self._paths["sub_patterns"][pattern] = sub_patterns
         return sub_patterns
 
     def _expand_globs(self):
