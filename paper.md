@@ -227,7 +227,7 @@ Interoperability with scientific or commercial computing and storage services al
 Git can already interact with other local or remote repositories via a set of standard (ssh, http) or custom (Git) network transport protocols.
 DataLad implements support for additional services that require custom protocols, such as the Open Science Framework (OSF) [@datalad-osf:zenodo].
 Git-annex readily provides access to a wide range of external data storage resources via a large set of protocols.
-DataLad build on this support and adds, for example, more fine-grained access (e.g.
+DataLad builds on this support and adds, for example, more fine-grained access (e.g.
 direct access to individual components contained in an archive hosted on cloud storage), or specialized services, such as XNAT ([www.xnat.org](http://www.xnat.org)).
 Efficient and seamless access to scientific data is implemented using
 the *special remote* protocol provided by [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a git-annex user.
