@@ -36,6 +36,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
+    IncompleteResultsError,
 )
 from datalad.api import (
     run,
@@ -308,10 +309,9 @@ def test_run_explicit(path):
     eq_(hexsha_initial, ds.repo.get_hexsha())
 
     # If an input doesn't exist, we just show the standard warning.
-    with swallow_logs(new_level=logging.WARN) as cml:
-        with swallow_outputs():
-            ds.run("ls", inputs=["not-there"], explicit=True)
-        assert_in("Input does not exist: ", cml.out)
+    with assert_raises(IncompleteResultsError):
+        ds.run("ls", inputs=["not-there"], explicit=True,
+               on_failure="stop")
 
     remove(op.join(path, "doubled.dat"))
 
@@ -501,11 +501,6 @@ with open(name + ".txt", "w") as fh:
     ds.run(cmd + ["foo"], outputs=["*.txt"], expand="outputs")
     assert_in("foo.txt", last_commit_msg(repo))
 
-    # NOTE: An existing match for the outputs glob (i.e. "foo.txt" produced by
-    # the last command) is important for the next regression test. Without it,
-    # the glob is retained by GlobbedPaths.expand() and the output will be
-    # saved as expected due to expansion by ls-files in
-    # GitRepo.get_content_info().
     ds.run(cmd + ["bar"], outputs=["*.txt"], explicit=True)
     ok_exists(str(ds.pathobj / "bar.txt"))
     assert_repo_status(ds.path)
@@ -520,7 +515,9 @@ def test_run_unexpanded_placeholders(path):
     # It's weird, but for lack of better options, inputs and outputs that don't
     # have matches are available unexpanded.
 
-    ds.run(cmd + ["arg1", "{inputs}"], inputs=["foo*"])
+    with assert_raises(IncompleteResultsError):
+        ds.run(cmd + ["arg1", "{inputs}"], inputs=["foo*"],
+               on_failure="continue")
     assert_repo_status(ds.path)
     ok_file_has_content(op.join(path, "arg1"), "foo*")
 
@@ -530,3 +527,17 @@ def test_run_unexpanded_placeholders(path):
 
     ds.run(cmd + ["arg3", "{outputs[1]}"], outputs=["foo*", "bar"])
     ok_file_has_content(op.join(path, "arg3"), "bar")
+
+
+@with_tempfile(mkdir=True)
+def test_run_empty_repo(path):
+    ds = Dataset(path).create()
+    cmd = [sys.executable, "-c", "open('foo', 'w').write('')"]
+    # Using "*" in a completely empty repo will fail.
+    with assert_raises(IncompleteResultsError):
+        ds.run(cmd, inputs=["*"], on_failure="stop")
+    assert_repo_status(ds.path)
+    # "." will work okay, though.
+    assert_status("ok", ds.run(cmd, inputs=["."]))
+    assert_repo_status(ds.path)
+    ok_exists(str(ds.pathobj / "foo"))
