@@ -48,7 +48,6 @@ def test_globbedpaths_get_sub_patterns():
         eq_(gp._get_sub_patterns(pat), expected)
 
 
-@known_failure_windows
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",
@@ -64,9 +63,12 @@ def test_globbedpaths(path):
             (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
             ([dotdir + "*.txt", "*.dat"],
              {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
-            (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
-            ([dotdir + "subdir/*.txt"],
-             {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
+            ([op.join("subdir", "*.txt")],
+             {op.join("subdir", "1.txt"), op.join("subdir", "2.txt")}),
+            (["subdir" + op.sep], {"subdir" + op.sep}),
+            ([dotdir + op.join("subdir", "*.txt")],
+             {dotdir + op.join(*ps)
+              for ps in [("subdir", "1.txt"), ("subdir", "2.txt")]}),
             (["*.txt"], {"1.txt", "3.txt"})]:
         gp = GlobbedPaths(patterns, pwd=path)
         eq_(set(gp.expand()), expected)
