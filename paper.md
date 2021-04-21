@@ -196,7 +196,7 @@ With this simple approach, git-annex enables separate and optimized implementati
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
 **Easy to use modularization.**
-Research workflows impose additional demands for an efficient research data management platform besides "version control" and "data transport".
+Research workflows impose additional demands for an efficient research data management platform besides version control and data transport.
 Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
@@ -207,13 +207,13 @@ With this, DataLad makes it trivial to operate on individual files deep in the h
 A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
 It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 250 TBs of data across a wide range of projects and archives in a fully modularized way.
 
-**"Re-executable" annotation of changes.**
-Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the principle of "reusability" of the FAIR principles [@FAIR2016].
+**Re-executable annotation of changes.**
+Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the principle of reusability of the FAIR principles [@FAIR2016].
 Git captures provenance with annotations of file changes, where changes are typically represented by a patch (an exact difference between two versions that could be applied to another version of the text file), and a Git commit message (a freeform, human-readable text description of the introduced changes).
 Unlike changes to text documents or source code, which are typically done "manually", data manipulations are most often performed by software.
 DataLad exploits this fact and enables automated annotation of changes which result from running an external command.
 DataLad creates a commit message which does not only include a human-readable summary, but also a human- and machine-readable record of the command invocation which introduced the changes.
-This allows for the data "change" to be re-executed to either verify that results reproduce, or to apply such a "change" to a completely different state, irrespective of the quality of the human-made commit message.
+This allows for the data change to be re-executed to either verify that results reproduce, or to apply such a change to a completely different state, irrespective of the quality of the human-made commit message.
 
 <!--AW:removed the sentence below as YOH suggested
 Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch. -->
@@ -267,7 +267,7 @@ With core commands that aim to simplify and streamline version control operation
 ## Extensions
 
 Like Git and git-annex, DataLad core does not only provide a generic tool, that is unencumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of it.
-"DataLad extensions", stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad's with a domain or technology specific functionality.
+*DataLad extensions*, stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad's with a domain or technology specific functionality.
 A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) repository provides a starting point for creating new DataLad extensions.
 Some exemplar established extensions include:
 
