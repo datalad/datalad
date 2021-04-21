@@ -44,14 +44,14 @@ class GlobbedPaths(object):
 
         if patterns is None:
             self._maybe_dot = []
-            self._paths = {"patterns": []}
+            self._patterns = []
         else:
             patterns = list(map(ensure_unicode, patterns))
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
-            self._paths = {
-                "patterns": [op.relpath(p, start=pwd) if op.isabs(p) else p
-                             for p in patterns]}
+            self._patterns = [op.relpath(p, start=pwd) if op.isabs(p) else p
+                              for p in patterns]
+        self._cache = {}
 
     def __bool__(self):
         return bool(self._maybe_dot or self.expand())
@@ -94,7 +94,7 @@ class GlobbedPaths(object):
 
         expanded = []
         with chpwd(self.pwd):
-            for pattern in self._paths["patterns"]:
+            for pattern in self._patterns:
                 hits = glob.glob(pattern)
                 if hits:
                     expanded.extend(sorted(map(normalize_hit, hits)))
@@ -129,21 +129,21 @@ class GlobbedPaths(object):
             useful if there may have been changes on the file system.
         """
         maybe_dot = self._maybe_dot if dot else []
-        if not self._paths["patterns"]:
+        if not self._patterns:
             return maybe_dot + []
 
-        if refresh or "expanded" not in self._paths:
+        if refresh or "expanded" not in self._cache:
             paths = self._expand_globs()
-            self._paths["expanded"] = paths
+            self._cache["expanded"] = paths
         else:
-            paths = self._paths["expanded"]
+            paths = self._cache["expanded"]
 
         if full:
-            if refresh or "expanded_full" not in self._paths:
+            if refresh or "expanded_full" not in self._cache:
                 paths = [op.join(self.pwd, p) for p in paths]
-                self._paths["expanded_full"] = paths
+                self._cache["expanded_full"] = paths
             else:
-                paths = self._paths["expanded_full"]
+                paths = self._cache["expanded_full"]
 
         return maybe_dot + paths
 
@@ -155,4 +155,4 @@ class GlobbedPaths(object):
         """
         if self._expand:
             return self.expand()
-        return self._maybe_dot + self._paths["patterns"]
+        return self._maybe_dot + self._patterns
