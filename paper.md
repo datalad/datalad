@@ -250,9 +250,9 @@ They foster the resilience of an ecosystem using DataLad datasets as a standard 
 
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
 All DataLad commands operate on *DataLad datasets*.
-On a technical level, DataLad datasets are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
+On a technical level, these datasets are Git repositories with additional metadata.
 On a conceptual level, they constitute an overlay structure that allows to version control files of any size, track and publish files in a distributed fashion, and record, publish, and execute actionable provenance of files and file transformations.
-\autoref{fig:one} summarizes DataLad's most important commands and concepts for local or distributed data and provenance management.
+\autoref{fig:one} summarizes key commands and concepts for local or distributed data and provenance management.
 
 ![Schematic overview of a dataset, datasets nesting, and selected commands for content and dataset management. A more comprehensive cheatsheet is provided in the DataLad handbook [@datalad-handbook:cheatsheet]. \label{fig:one}](figures/fig1.png)
 
