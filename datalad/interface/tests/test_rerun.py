@@ -754,7 +754,7 @@ def test_run_inputs_outputs(src, path):
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
-    # We install subdatasets to fully resolve globs.
+    # We uninstall subdatasets to fully resolve globs.
     ds.uninstall("s0")
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
