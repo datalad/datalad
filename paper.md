@@ -258,9 +258,9 @@ On a conceptual level, they constitute an overlay structure that allows to versi
 
 DataLad's features can be flexibly integrated into standard scientific workflows.
 For example, by using the concept of dataset nesting to modularize the evolution of a research project, DataLad can fulfill the YODA principles for reproducible science [@yoda:myyoda], and, with this simple paradigm, facilitate efficient access, composition, scalability, reuse, sharing, and reproducibility of results (see \autoref{fig:two}).
-With core commands that aim to simplify and streamline version control operations across the two underlying version control tools Git and git-annex, DataLad also makes version control workflows less complex for data management novices.
+With core commands that aim to simplify operation of the underlying tools, DataLad makes RDM workflows more accessible to novices and experts alike. Importantly, compatibility with all Git/git-annex functionality is retained, such that DataLad's simplification does not impair the capabilities offers by these tools.
 
-![DataLad datasets are reusable modular components, which could be nested to establish a complete provenance trail all the way from from a publication to the raw data. Various access schemes to datasets and data could be implemented.\label{fig:two}](figures/datalad-nesting-access.png)
+![DataLad datasets are reusable modular components, which can be nested to establish a complete provenance trail all the way from a publication to the original data. Various access schemes to datasets and data are provided, and further extensibility is a key architectural property.\label{fig:two}](figures/datalad-nesting-access.png)
 
 
 ## Extensions
