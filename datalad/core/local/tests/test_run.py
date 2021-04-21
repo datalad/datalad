@@ -509,3 +509,24 @@ with open(name + ".txt", "w") as fh:
     ds.run(cmd + ["bar"], outputs=["*.txt"], explicit=True)
     ok_exists(str(ds.pathobj / "bar.txt"))
     assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_unexpanded_placeholders(path):
+    ds = Dataset(path).create()
+    cmd = [sys.executable, "-c",
+           "import sys; open(sys.argv[1], 'w').write(' '.join(sys.argv[2:]))"]
+
+    # It's weird, but for lack of better options, inputs and outputs that don't
+    # have matches are available unexpanded.
+
+    ds.run(cmd + ["arg1", "{inputs}"], inputs=["foo*"])
+    assert_repo_status(ds.path)
+    ok_file_has_content(op.join(path, "arg1"), "foo*")
+
+    ds.run(cmd + ["arg2", "{outputs}"], outputs=["bar*"])
+    assert_repo_status(ds.path)
+    ok_file_has_content(op.join(path, "arg2"), "bar*")
+
+    ds.run(cmd + ["arg3", "{outputs[1]}"], outputs=["foo*", "bar"])
+    ok_file_has_content(op.join(path, "arg3"), "bar")
