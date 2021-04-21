@@ -236,14 +236,15 @@ This allows DataLad and many other projects to facilitate access to an ever-grow
 
 ## Design principles
 
-The development of DataLad is guided by a few fundamental principles to ensure its open and domain agnostic nature, to maximize the longterm utility of its datasets and to minimze the technical debt introduced by using it:
+Besides the free software nature and open processes of the DataLad project, the development of DataLad is guided by a four principles to ensure its open and domain agnostic nature, to maximize the long-term utility of its datasets and to minimize users' technical debt:
 
-- There are only two recognized entities: datasets and files
-- A dataset is a Git repository with an optional annex
-- Minimization of custom procedures and data structures: Users must not loose data or data access, if DataLad would vanish
-- Complete decentralization, with no required central server or service, but maximum interoperability to allow (re-)use of existing 3rd-party data resources and infrastructure
+- Datasets and the files they comprise are only two recognized entities
+- A dataset is a Git repository with an *optional* annex
+- Minimization of custom procedures and data structures
+- Complete decentralization, with no required central server or service, but maximum interoperability with existing 3rd-party resources and infrastructure
 
-Due to these principles, using DataLad does not introduce a technical dependency of a user's data on DataLad or DataLad-related services as any modification of a dataset by DataLad remains accessible/recoverable by Git/git-annex alone.
+In conjunction, these principles aim to reduce the risk of adoption for DataLad users. 
+They foster the resilience of an ecosystem using DataLad datasets as a standard package format for any digital objects by avoiding any critical dependency on service deployments governed by central entities, and even on DataLad itself, for access to any resources managed with DataLad.
 
 ## DataLad core
 
