@@ -11,6 +11,7 @@
 
 import glob
 from functools import lru_cache
+from itertools import chain
 import logging
 import os.path as op
 
@@ -92,12 +93,14 @@ class GlobbedPaths(object):
                 return h
             return normalized
 
-        expanded = []
+        hits = {}
+        partial_hits = {}
+        misses = {}
         with chpwd(self.pwd):
             for pattern in self._patterns:
-                hits = glob.glob(pattern)
-                if hits:
-                    expanded.extend(sorted(map(normalize_hit, hits)))
+                full_hits = glob.glob(pattern)
+                if full_hits:
+                    hits[pattern] = sorted(map(normalize_hit, full_hits))
                 else:
                     lgr.debug("No matching files found for '%s'", pattern)
                     # We didn't find a hit for the complete pattern. If we find
@@ -106,17 +109,22 @@ class GlobbedPaths(object):
                     for sub_pattern in self._get_sub_patterns(pattern):
                         sub_hits = glob.glob(sub_pattern)
                         if sub_hits:
-                            expanded.extend(
-                                sorted(map(normalize_hit, sub_hits)))
+                            partial_hits[pattern] = sorted(
+                                map(normalize_hit, sub_hits))
                             break
-                    # ... but we still want to retain the original pattern
-                    # because we don't know for sure at this point, and it
-                    # won't bother the "install, reglob" routine.
-                    expanded.extend([pattern])
-        return expanded
+                    else:
+                        misses[pattern] = [pattern]
+        return hits, partial_hits, misses
 
-    def expand(self, full=False, dot=True, refresh=False):
+    def expand(self, full=False, dot=True, refresh=False,
+               include_partial=True, include_misses=True):
         """Return paths with the globs expanded.
+
+        Globbing is done with `glob.glob`. If a pattern doesn't have a match,
+        the trailing path component of the pattern is removed and, if any globs
+        remain, `glob.glob` is called again with the new pattern. This
+        procedure is repeated until a pattern matches or there are no more
+        patterns.
 
         Parameters
         ----------
@@ -127,6 +135,12 @@ class GlobbedPaths(object):
         refresh : bool, optional
             Run glob regardless of whether there are cached values. This is
             useful if there may have been changes on the file system.
+        include_partial : bool, optional
+            Whether the results include sub-pattern hits (see description
+            above) when the full pattern doesn't match.
+        include_misses : : bool, optional
+            Whether the results include the original pattern when there are no
+            matches for a pattern or its sub-patterns (see description above).
         """
         if refresh:
             self._cache = {}
@@ -135,20 +149,73 @@ class GlobbedPaths(object):
         if not self._patterns:
             return maybe_dot + []
 
-        if "expanded" not in self._cache:
-            paths = self._expand_globs()
-            self._cache["expanded"] = paths
+        if "hits" not in self._cache:
+            hits, partial_hits, misses = self._expand_globs()
+            self._cache["hits"] = hits
+            self._cache["partial_hits"] = partial_hits
+            self._cache["misses"] = misses
         else:
-            paths = self._cache["expanded"]
+            hits = self._cache["hits"]
+            partial_hits = self._cache["partial_hits"]
+            misses = self._cache["misses"]
+
+        key_suffix = (include_partial, include_misses)
+        key_expanded = ("expanded",) + key_suffix
+        if key_expanded not in self._cache:
+            sources = [hits]
+            if include_partial:
+                sources.append(partial_hits)
+            if include_misses:
+                sources.append(misses)
+
+            paths = []
+            for pattern in self._patterns:
+                for source in sources:
+                    if pattern in source:
+                        paths.extend(source[pattern])
+                        break
+            self._cache[key_expanded] = paths
+        else:
+            paths = self._cache[key_expanded]
 
         if full:
-            if "expanded_full" not in self._cache:
+            key_full = ("expanded_full",) + key_suffix
+            if key_full not in self._cache:
                 paths = [op.join(self.pwd, p) for p in paths]
-                self._cache["expanded_full"] = paths
+                self._cache[key_full] = paths
             else:
-                paths = self._cache["expanded_full"]
+                paths = self._cache[key_full]
 
         return maybe_dot + paths
+
+    def expand_strict(self, full=False, dot=True, refresh=False):
+        return self.expand(full=full, dot=dot, refresh=refresh,
+                           include_partial=False, include_misses=False)
+
+    def _chain(self, what):
+        if self._patterns:
+            if "hits" not in self._cache:
+                self.expand()
+            # Note: This assumes a preserved insertion order for dicts, which
+            # is true with our current minimum python version (3.6) and part of
+            # the language spec as of 3.7.
+            return list(chain(*self._cache[what].values()))
+        return []
+
+    @property
+    def partial_hits(self):
+        """Return patterns that had a partial but not complete match.
+        """
+        return self._chain("partial_hits")
+
+    @property
+    def misses(self):
+        """Return patterns that didn't have any complete or partial matches.
+
+        This doesn't include patterns where a sub-pattern matched. Those are
+        available via `partial_hits`.
+        """
+        return self._chain("misses")
 
     @property
     def paths(self):
