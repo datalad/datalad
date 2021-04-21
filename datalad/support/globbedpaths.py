@@ -54,7 +54,7 @@ class GlobbedPaths(object):
         self._cache = {}
 
     def __bool__(self):
-        return bool(self._maybe_dot or self.expand())
+        return bool(self._maybe_dot or self._patterns)
 
     @staticmethod
     @lru_cache()
