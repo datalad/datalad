@@ -152,7 +152,7 @@ bibliography: paper.bib
 # Summary
 
 DataLad is a Python-based tool for the joint management of code, data, and their relationship, built on top of a versatile system for data logistics ([git-annex](https://git-annex.branchable.com)) and the most popular distributed version control system ([Git](https://git-scm.com)).
-It adapts principles of open-source software development and -distribution to address the technical challenges of data management, data sharing, and digital provenance collection across the life cycle of digital objects.
+It adapts principles of open-source software development and distribution to address the technical challenges of data management, data sharing, and digital provenance collection across the life cycle of digital objects.
 DataLad aims to make data management as easy as managing code.
 It streamlines procedures to consume, publish, and update data, for data of any size or type, and to link them as precisely versioned, lightweight dependencies.
 DataLad helps to make science more reproducible and FAIR [@FAIR2016].
