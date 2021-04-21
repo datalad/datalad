@@ -514,6 +514,8 @@ class GitRunnerBase(object):
         if found.  If it is empty (but not None), we do nothing
         """
         if GitRunnerBase._GIT_PATH is None:
+            if not os.environ.get('PATH', None):
+                raise RuntimeError("PATH environment variable is either undefined or set empty.")
             from distutils.spawn import find_executable
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
