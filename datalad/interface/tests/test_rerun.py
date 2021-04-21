@@ -658,10 +658,6 @@ def test_run_inputs_outputs(src, path):
     ok_(ds.repo.file_has_content("input.dat"))
     ok_(ds.repo.file_has_content("extra-input.dat"))
 
-    with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("cd .> dummy", inputs=["not-there"])
-        assert_in("Input does not exist: ", cml.out)
-
     # Test different combinations of globs and explicit files.
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
     create_tree(ds.path, {i: i for i in inputs})
@@ -731,13 +727,6 @@ def test_run_inputs_outputs(src, path):
         # MIH doesn't yet understand how to port this
         with open(op.join(path, "a.dat")) as fh:
             eq_(fh.read(), " appended\n appended\n")
-
-    if not on_windows:
-        # see datalad#2606
-        with swallow_logs(new_level=logging.DEBUG) as cml:
-            with swallow_outputs():
-                ds.run("echo blah", outputs=["not-there"])
-                assert_in("Filtered out non-existing path: ", cml.out)
 
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")
