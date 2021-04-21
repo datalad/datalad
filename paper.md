@@ -236,7 +236,7 @@ This allows DataLad and many other projects to facilitate access to an ever-grow
 
 ## Design principles
 
-Besides the free software nature and open processes of the DataLad project, the development of DataLad is guided by a four principles to ensure its open and domain agnostic nature, to maximize the long-term utility of its datasets and to minimize users' technical debt:
+Besides the free software nature and open processes of the DataLad project, the development of DataLad is guided by four principles to ensure its open and domain agnostic nature, to maximize the long-term utility of its datasets and to minimize users' technical debt:
 
 - Datasets and the files they comprise are only two recognized entities
 - A dataset is a Git repository with an *optional* annex
