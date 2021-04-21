@@ -763,9 +763,10 @@ def test_run_inputs_outputs(src, path):
 
 
 @known_failure_windows
-@with_tempfile(mkdir=True)
+@with_tree({"foo": "foo"})
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(annex=False)
+    ds = Dataset(path).create(annex=False, force=True)
+    ds.save()
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
