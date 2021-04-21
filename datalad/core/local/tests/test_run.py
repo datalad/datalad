@@ -482,3 +482,30 @@ def test_run_path_semantics(path):
         run("cd .> five", dataset=ds0)
     ok_exists(op.join(ds0.path, "five"))
     assert_repo_status(ds0.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_reglob_outputs(path):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    (ds.pathobj / "write_text.py").write_text("""
+import sys
+assert len(sys.argv) == 2
+name = sys.argv[1]
+with open(name + ".txt", "w") as fh:
+    fh.write(name)
+""")
+    ds.save(to_git=True)
+    cmd = [sys.executable, "write_text.py"]
+
+    ds.run(cmd + ["foo"], outputs=["*.txt"], expand="outputs")
+    assert_in("foo.txt", last_commit_msg(repo))
+
+    # NOTE: An existing match for the outputs glob (i.e. "foo.txt" produced by
+    # the last command) is important for the next regression test. Without it,
+    # the glob is retained by GlobbedPaths.expand() and the output will be
+    # saved as expected due to expansion by ls-files in
+    # GitRepo.get_content_info().
+    ds.run(cmd + ["bar"], outputs=["*.txt"], explicit=True)
+    ok_exists(str(ds.pathobj / "bar.txt"))
+    assert_repo_status(ds.path)

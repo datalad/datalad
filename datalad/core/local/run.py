@@ -616,6 +616,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
 
 
+    # Re-glob to capture any new outputs.
+    if explicit or expand in ["outputs", "both"]:
+        outputs.expand(refresh=True)
+
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
