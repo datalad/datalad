@@ -128,18 +128,21 @@ class GlobbedPaths(object):
             Run glob regardless of whether there are cached values. This is
             useful if there may have been changes on the file system.
         """
+        if refresh:
+            self._cache = {}
+
         maybe_dot = self._maybe_dot if dot else []
         if not self._patterns:
             return maybe_dot + []
 
-        if refresh or "expanded" not in self._cache:
+        if "expanded" not in self._cache:
             paths = self._expand_globs()
             self._cache["expanded"] = paths
         else:
             paths = self._cache["expanded"]
 
         if full:
-            if refresh or "expanded_full" not in self._cache:
+            if "expanded_full" not in self._cache:
                 paths = [op.join(self.pwd, p) for p in paths]
                 self._cache["expanded_full"] = paths
             else:
