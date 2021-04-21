@@ -157,7 +157,7 @@ DataLad aims to make data management as easy as managing code.
 It streamlines procedures to consume, publish, and update data, for data of any size or type, and to link them as precisely versioned, lightweight dependencies.
 DataLad helps to make science more reproducible and FAIR [@FAIR2016].
 It can capture complete and actionable process provenance of data transformations to enable automatic re-computation.
-The DataLad project ([datalad.org](http://datalad.org)) delivers a completely open, pioneering platform for flexible decentralized research data management (dRDM) [@Hanke_2021].
+The DataLad project ([datalad.org](http://datalad.org)) delivers a completely open, pioneering platform for flexible decentralized research data management (RDM) [@Hanke_2021].
 It features a Python and a command-line interface, an extensible architecture, and does not depend on any centralized services but facilitates interoperability with a plurality of existing tools and services.
 In order to maximize its utility and target audience, DataLad is available for all major operating systems, and can be integrated into established workflows and environments with minimal friction.
 
@@ -196,7 +196,7 @@ With this simple approach, git-annex enables separate and optimized implementati
 <!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
 
 **Easy to use modularization.**
-Research workflows impose additional demands for an efficient research data management (RDM) platform besides "version control" and "data transport".
+Research workflows impose additional demands for an efficient research data management platform besides "version control" and "data transport".
 Many research datasets contain millions of files, but a large number of files precludes placing datasets in their entirety into a single Git repository even if individual files are tiny in their size.
 Partitioning such datasets into smaller subdatasets (e.g., one subdataset per each subject in the dataset comprising thousands of participants), and linking them seamlessly allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages.
@@ -249,7 +249,7 @@ Due to these principles, using DataLad does not introduce a technical dependency
 
 ## DataLad core
 
-The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of dRDM use cases for any domain.
+The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of decentralized RDM use cases for any domain.
 All DataLad commands operate on *DataLad datasets*.
 On a technical level, DataLad datasets are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
 On a conceptual level, they constitute an overlay structure that allows to version control files of any size, track and publish files in a distributed fashion, and record, publish, and execute actionable provenance of files and file transformations.
@@ -290,7 +290,7 @@ or as a core technology behind another tool or a larger platform.
 [OpenNeuro](http://openneuro.org) uses DataLad for data logistics with data deposition to a public S3 bucket.
 [CONP-PCNO](https://github.com/CONP-PCNO/) adopts aforementioned features for modular composition and nesting to deliver a rich collection of datasets with public or restricted access to data.
 [ReproMan](http://reproman.repronim.org) integrates with DataLad to provide version control and data logistics.
-[www.datalad.org/integrations.html](https://www.datalad.org/integrations.html) provides a more complete list of DataLad usage and integration with other projects, and @Hanke_2021 provides a systematic depiction of DataLad as a system for decentral research data management (dRDM) used by a number of projects.
+[www.datalad.org/integrations.html](https://www.datalad.org/integrations.html) provides a more complete list of DataLad usage and integration with other projects, and @Hanke_2021 provides a systematic depiction of DataLad as a system for decentralized RDM used by a number of projects.
 
 
 ## Documentation
