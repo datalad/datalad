@@ -164,14 +164,15 @@ In order to maximize its utility and target audience, DataLad is available for a
 
 # Statement of Need
 
-Code, data and computing environments are the core components of scientific projects.
-While the collaborative development and use of research software and code is streamlined with established procedures and infrastructure, such as software distributions, distributed version control systems, and social coding portals like GitHub, other components of scientific projects are not as transparently managed or unobstructed accessible.
-Data consumption is not as streamlined, as disconnected data portals require a large variety of different data access and authentication methods;
-Reuse of data and other sizable or binary files is not as transparent, as data versioning is rarely performed, or nowhere close to the precision and inspectability that is standard in software development;
-And scientific processes are not as reproducible, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
-Last but not least, without a notion of data packages, there is no easy let alone uniform way to declare discoverable data dependencies and derivative relationships between such packages.
+Code, data and computing environments are core components of scientific projects.
+While the collaborative development and use of research software and code is streamlined with established procedures and infrastructures, such as software distributions, distributed version control systems, and social coding portals like GitHub, other components of scientific projects are not as transparently managed or unobstructed accessible.
+Data consumption is complicated by disconnected data portals that require a large variety of different data access and authentication methods.
+(Re)used data are not as precisely identified as it is standard for code in software development, because data versioning is rarely or only coarsely practiced.
+Scientific computation is not reproducible enough, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
+Last but not least, in the absence of standardized data *packages*, there is no uniform way to declare actionable data dependencies and derivative relationships between inputs and outputs of a computation.
 DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
-It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed, unified access to all elements of scientific projects, and it enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
+It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed, unified access to all elements of scientific projects.
+This unique set of features enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
 To this end, it builds up on and extends two established tools for version control and transport logistics, Git and git-annex.
 
 ## Why Git and git-annex?
