@@ -177,6 +177,47 @@ def test_initremote_basic():
 @known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
+def _test_initremote_alias(host, ds_path, store):
+
+    ds_path = Path(ds_path)
+    store = Path(store)
+    ds = Dataset(ds_path).create()
+    populate_dataset(ds)
+    ds.save()
+
+    if host:
+        url = "ria+ssh://{host}{path}".format(host=host,
+                                              path=store)
+    else:
+        url = "ria+{}".format(store.as_uri())
+    init_opts = common_init_opts + ['url={}'.format(url)]
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    create_store(io, store, '1')
+    # set up the dataset with alias
+    create_ds_in_store(io, store, ds.id, '2', '1', 'ali')
+    ds.repo.init_remote('ria-remote', options=init_opts)
+    assert_in('ria-remote',
+              [cfg['name']
+               for uuid, cfg in ds.repo.get_special_remotes().items()]
+              )
+    assert_repo_status(ds.path)
+    assert_true(io.exists(store / "alias" / "ali"))
+
+
+def test_initremote_alias():
+
+    # TODO: Skipped due to gh-4436
+    yield known_failure_windows(skip_ssh(_test_initremote_alias)), \
+          'datalad-test'
+    yield _test_initremote_alias, None
+
+
+
+@known_failure_windows  # see gh-4469
+@with_tempfile
+@with_tempfile
 def _test_initremote_rewrite(host, ds_path, store):
 
     # rudimentary repetition of test_initremote_basic, but
