@@ -238,45 +238,46 @@ With this approach, DataLad and other projects can jointly facilitate access to 
 
 ## Design principles
 
-The development of DataLad is guided by a few fundamental principles to ensure its open and domain agnostic nature, to maximize the longterm utility of its datasets and to minimze the technical debt introduced by using it:
+Besides the free software nature and open processes of the DataLad project, the development of DataLad is guided by four principles to ensure its open and domain agnostic nature, to maximize the long-term utility of its datasets and to minimize users' technical debt:
 
-- There are only two recognized entities: datasets and files
-- A dataset is a Git repository with an optional annex
-- Minimization of custom procedures and data structures: Users must not loose data or data access, if DataLad would vanish
-- Complete decentralization, with no required central server or service, but maximum interoperability to allow (re-)use of existing 3rd-party data resources and infrastructure
+- Datasets and the files they comprise are the only two recognized entities
+- A dataset is a Git repository with an *optional* annex
+- Minimization of custom procedures and data structures
+- Complete decentralization, with no required central server or service, but maximum interoperability with existing 3rd-party resources and infrastructure
 
-Due to these principles, using DataLad does not introduce a technical dependency of a user's data on DataLad or DataLad-related services as any modification of a dataset by DataLad remains accessible/recoverable by Git/git-annex alone.
+In conjunction, these principles aim to reduce the risk of adoption for DataLad users. 
+They foster the resilience of an ecosystem using DataLad datasets as a standard package format for any digital objects by avoiding any critical dependency on service deployments governed by central entities, and even on DataLad itself, for access to any resources managed with DataLad.
 
 ## DataLad core
 
 The `datalad` Python package provides both a Python library and a command line tool which expose core DataLad functionality to fulfill a wide range of decentralized RDM use cases for any domain.
 All DataLad commands operate on *DataLad datasets*.
-On a technical level, DataLad datasets are just Git (with optional git-annex for data) repositories with additional metadata and configuration.
+On a technical level, these datasets are Git repositories with additional metadata.
 On a conceptual level, they constitute an overlay structure that allows to version control files of any size, track and publish files in a distributed fashion, and record, publish, and execute actionable provenance of files and file transformations.
-\autoref{fig:one} summarizes DataLad's most important commands and concepts for local or distributed data and provenance management.
+\autoref{fig:one} summarizes key commands and concepts for local or distributed data and provenance management.
 
 ![Schematic overview of a dataset, datasets nesting, and selected commands for content and dataset management. A more comprehensive cheatsheet is provided in the DataLad handbook [@datalad-handbook:cheatsheet]. \label{fig:one}](figures/fig1.png)
 
 DataLad's features can be flexibly integrated into standard scientific workflows.
 For example, by using the concept of dataset nesting to modularize the evolution of a research project, DataLad can fulfill the YODA principles for reproducible science [@yoda:myyoda], and, with this simple paradigm, facilitate efficient access, composition, scalability, reuse, sharing, and reproducibility of results (see \autoref{fig:two}).
-With core commands that aim to simplify and streamline version control operations across the two underlying version control tools Git and git-annex, DataLad also makes version control workflows less complex for data management novices.
+With core commands that aim to simplify operation of the underlying tools, DataLad makes RDM workflows more accessible to novices and experts alike. Importantly, compatibility with all Git/git-annex functionality is retained, such that DataLad's simplification does not impair the capabilities offers by these tools.
 
-![DataLad datasets are reusable modular components, which could be nested to establish a complete provenance trail all the way from from a publication to the raw data. Various access schemes to datasets and data could be implemented.\label{fig:two}](figures/datalad-nesting-access.png)
+![DataLad datasets are reusable modular components, which can be nested to establish a complete provenance trail all the way from a publication to the original data. Various access schemes to datasets and data are provided, and further extensibility is a key architectural property.\label{fig:two}](figures/datalad-nesting-access.png)
 
 
 ## Extensions
 
-Like Git and git-annex, DataLad core does not only provide a generic tool, that is unencumbered by a specific field of science or domain, it also establishes the foundation to build specialized solutions on top of it.
-*DataLad extensions*, stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad's with a domain or technology specific functionality.
+Like Git and git-annex, DataLad core is a generic tool that is not specifically tuned to particular data types or use cases. It offers a robust foundation to build more specialized solutions on top of.
+*DataLad extensions*, stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad with a domain-focused or technology-specific feature.
 A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) repository provides a starting point for creating new DataLad extensions.
-Some exemplar established extensions include:
+Some established extensions include:
 
-- [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments;
-- [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] the functionality which initiated the DataLad project - to automate creation and updates of DataLad datasets from external resources;
-- [datalad-neuroimaging](https://github.com/datalad/datalad-neuroimaging) [@datalad-neuroimaging:zenodo] to provide neuroimaging-specific procedures and metadata extractors;
-- [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF).
+- [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments
+- [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] the functionality which initiated the DataLad project - to automate creation and updates of DataLad datasets from external resources
+- [datalad-neuroimaging](https://github.com/datalad/datalad-neuroimaging) [@datalad-neuroimaging:zenodo] to provide neuroimaging-specific procedures and metadata extractors
+- [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF)
 
-The same mechanism of extensions is used for rapid development of new functionality to later be moved into the main DataLad codebase (e.g., [datalad-metalad](https://github.com/datalad/datalad-metalad/)).
+The same mechanism of extensions is used for rapid development of new functionality to later be moved into the core tool (e.g., [datalad-metalad](https://github.com/datalad/datalad-metalad/)).
 The [datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and continuous integration testing of their released versions against released and development versions of the DataLad core. 
 
 
