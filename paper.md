@@ -175,7 +175,7 @@ Scientific computation is not reproducible enough, because data provenance, the 
 Last but not least, in the absence of standardized data *packages*, there is no uniform way to declare actionable data dependencies and derivative relationships between inputs and outputs of a computation.
 DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
 It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed, unified access to all elements of scientific projects.
-This unique set of features enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
+This unique set of features enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.<!-- km: I think this use of "afford", while correct, is likely to throw some readers off -->
 To this end, it builds on and extends two established tools for version control and transport logistics, Git and git-annex.
 
 ## Why Git and git-annex?
@@ -184,7 +184,7 @@ Git is the most popular version control system for software development[^1].
 It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all committed content reliably and efficiently available to all clones of a repository.
 At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
 This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files.
-Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
+Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.<!-- km: I think this sentence could be dropped. -->
 File content handled by git-annex is placed into a managed repository annex, instead of being committing to Git directly.
 Rather than the actual file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
 Those file content references are typically based on a checksum of the content.
@@ -233,7 +233,7 @@ Git-annex readily provides access to a wide range of external data storage resou
 DataLad builds on this support and adds, for example, more fine-grained access (e.g.
 direct access to individual components contained in an archive hosted on cloud storage) or specialized services, such as XNAT ([www.xnat.org](http://www.xnat.org)).
 Efficient and seamless access to scientific data is implemented using
-the *special remote* protocol provided by [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a git-annex user.
+the *special remote* protocol provided by [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a git-annex user.<!-- km: The citation in this sentence appears in parentheses: "by (Hess 2013)," -->
 With this approach, DataLad and other projects can jointly facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and overcome technological limitations of storage solutions, like file size or inode limits.
 
 
