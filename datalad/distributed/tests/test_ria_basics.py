@@ -27,6 +27,7 @@ from datalad.tests.utils import (
     skip_if_adjusted_branch,
     skip_if_no_network,
     skip_ssh,
+    skip_wo_symlink_capability,
     slow,
     swallow_logs,
     turtle,
@@ -174,6 +175,7 @@ def test_initremote_basic():
     yield _test_initremote_basic, None
 
 
+@skip_wo_symlink_capability
 @known_failure_windows  # see gh-4469
 @with_tempfile
 @with_tempfile
