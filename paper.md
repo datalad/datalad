@@ -20,7 +20,7 @@ authors:
  - name: Debanjum Singh Solanky  # 212 commits, issues: opened 7 participated in 12
    orcid: 0000-0002-0774-6564
    affiliation: 1
- - name: Adina Wagner  # 98 commits, issues: opened 36 participated in 45
+ - name: Adina S. Wagner  # 98 commits, issues: opened 36 participated in 45
    orcid: 0000-0003-2917-3450
    affiliation: 2
  - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
@@ -102,7 +102,7 @@ authors:
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
    affiliation: 19
- - name: Simon Eickhoff
+ - name: Simon B. Eickhoff
    orcid: 0000-0001-6363-2759
    affiliation: "2, 3"
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
