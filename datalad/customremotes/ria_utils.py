@@ -208,6 +208,5 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=No
     io.write_file(version_file, obj_version)
     if alias:
         alias_dir = base_path / "alias"
-        if not io.exists(alias_dir):
-            io.mkdir(alias_dir)
+        io.mkdir(alias_dir)
         io.symlink(dsgit_dir, alias_dir / alias)
