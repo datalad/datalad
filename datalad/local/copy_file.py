@@ -430,6 +430,27 @@ def _get_repo_record(fpath, cache):
 
 
 def _copy_file(src, dest, cache):
+    """Transfer a single file from a source to a target dataset
+
+    Parameters
+    ----------
+    src : Path or str
+      Source file path
+    dest : Path or str
+      Destination file path
+    cache : dict
+      Repository lookup cache to be provided to _get_repo_record().
+      Each key is a directory, and each value is a dict with a 'repo'
+      key (value `None` if not within a dataset; or a *Repo() instance
+      of the containing repository), and a 'repo_root' key (`None`
+      if not within a dataset; or a `Path` instance with the unresolved
+      repository root path).
+
+    Yields
+    ------
+    dict
+      Result record.
+    """
     lgr.debug("Attempt to copy: %s -> %s", src, dest)
     str_src = str(src)
     str_dest = str(dest)
@@ -612,6 +633,29 @@ def _extract_special_remote_info(repo):
 
 
 def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
+    """Put a key into a target repository
+
+    Parameters
+    ----------
+    finfo : dict
+      Properties of the source file, as reported by get_content_annexinfo()
+    str_src : str
+      Source path as a plain str
+    dest : Path
+      Destination path
+    str_dest : str
+      Same as `dest`, but as a plain str
+    dest_repo_rec : dict
+      Repository lookup cache item. This function will add and query
+      a 'tmp' key to this record for a temp dir for copy operations
+      to be used for the destination repository.
+
+    Returns
+    -------
+    str or dict
+      If a str, the key was established and the key name is returned.
+      If a dict, an error occurred and an error result record is returned.
+    """
     dest_repo = dest_repo_rec['repo']
     src_key = finfo['key']
     # make an attempt to compute a key in the target repo, this will hopefully
