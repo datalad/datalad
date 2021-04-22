@@ -102,6 +102,9 @@ authors:
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
    affiliation: 19
+ - name: Simon Eickhoff
+   orcid: 0000-0001-6363-2759
+   affiliation: "2, 3"
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
    orcid: 0000-0001-6398-6370
    affiliation: "2, 3"
@@ -359,11 +362,11 @@ for notable contributions to the codebase, bug reports, recommendations, and pro
 DataLad development was made possible thanks to support by 
 NSF [1429999](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1429999), 
 [1912266](http://www.nsf.gov/awardsearch/showAward?AWD_ID=1912266) 
-(PI: Halchenko) and BMBF 01GQ1411, 01GQ1905
+(PI: Halchenko) and BMBF 01GQ1411, 01GQ1905 (PI: Hanke)
 through the [CRCNS](https://www.nsf.gov/funding/pgm_summ.jsp?pims_id=5147) program.
 It received significant contributions from ReproNim [1P41EB019936-01A1](https://projectreporter.nih.gov/project_info_details.cfm?aid=8999833&map=y) (PI: Kennedy) and DANDI [5R24MH117295-02](https://projectreporter.nih.gov/project_info_description.cfm?aid=9981835&icde=53349087) (PIs: Ghosh, Halchenko) NIH projects.
 It also received contributions from the Canadian Open Neuroscience Platform and the NeuroHub (Co-PI: Poline) projects thanks in part to funding from a Brain Canada Platform Support Grant Competition Award in addition to funds and in-kind support from sponsor organizations, and from the Canada First Research Excellence Fund, awarded through the Healthy Brains, Healthy Lives initiative at McGill University, and the Brain Canada Foundation with support from Health Canada.
-This development was supported by the European Regional Development Fund (Project: Center for Behavioral Brain Sciences Magdeburg, Imaging Platform), the European Union’s Horizon 2020 research and innovation programme under grant agreements [Human Brain Project (SGA3, H2020-EU.3.1.5.3, grant no. 945539)](https://cordis.europa.eu/project/id/945539), and [Virtual Brain Cloud (H2020-EU.3.1.5.3, grant no. 826421)](https://cordis.europa.eu/project/id/826421), the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grants [SFB 1451 (431549029)](https://gepris.dfg.de/gepris/projekt/431549029) and [IRTG 2150 (269953372)](https://gepris.dfg.de/gepris/projekt/269953372).
+This development was supported by the European Regional Development Fund (Project: Center for Behavioral Brain Sciences Magdeburg, Imaging Platform, PI: Hanke), the European Union’s Horizon 2020 research and innovation programme under grant agreements [Human Brain Project (SGA3, H2020-EU.3.1.5.3, grant no. 945539; Co-Investigators: Eickhoff, Hanke)](https://cordis.europa.eu/project/id/945539), and [Virtual Brain Cloud (H2020-EU.3.1.5.3, grant no. 826421; PI: Eickhoff)](https://cordis.europa.eu/project/id/826421), the Deutsche Forschungsgemeinschaft (DFG, German Research Foundation) under grants [SFB 1451 (431549029; Co-PIs: Eickhoff, Hanke)](https://gepris.dfg.de/gepris/projekt/431549029) and [IRTG 2150 (269953372; Co-PIs: Eickhoff, Hanke)](https://gepris.dfg.de/gepris/projekt/269953372).
 
 
 # References
