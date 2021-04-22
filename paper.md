@@ -212,10 +212,12 @@ It is curated by the DataLad team and provides, at the time of publication, stre
 
 **Re-executable annotation of changes.**
 Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the reusability aspect of the FAIR principles [@FAIR2016].
-Git captures provenance by annotating a patch (an exact difference between two versions that could be applied to another version of the text file), with a commit message (a freeform, human-readable text description of the introduced changes).
-Unlike changes to text documents or source code that are often the result of a manual creative process, data manipulations are most often performed programmatically by software.
-DataLad exploits this fact and performs automatic annotation of changes caused by the execution of an external command, with a generated commit message that also contains a structured record with comprehensive details on the command invocation.
-This allows for the recorded change to be re-executed, to, for example, verify if a result is computationally reproducible, or to apply an analog change to a different dataset state.
+<!-- Git captures provenance by annotating a patch (an exact difference between two versions that could be applied to another version of the text file), with a commit message (a freeform, human-readable text description of the introduced changes). -->
+<!-- km: I think the above comes too close to reading as though Git tracks changes/differences directly -->
+Knowing which code and data were used is essential, but, for changes that are programmatically introduced, how a command or script was invoked is another key piece of information to capture.
+One approach is to include this information in the Git commit message that accompanies a change, but doing so manually is tedious and error prone.
+To solve this, DataLad supports executing a command and automatically generating a commit message that includes a structured record with comprehensive details on the invocation.
+In addition to providing reliable information about past command-line invocations, these machine-readable records make it possible to easily re-execute commands (e.g., to verify if a result is computationally reproducible or to apply an analog change to a different dataset state).
 
 <!--AW:removed the sentence below as YOH suggested
 Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch. -->
