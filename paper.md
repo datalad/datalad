@@ -26,40 +26,40 @@ authors:
  - name: Jason Gors  # 60 commits, issues: opened 2 participated in 1
    affiliation: 1
  - name: Dave MacFarlane  # 30 commits, issues: opened 4 participated in 4
-   affiliation: 14 # add full names if not yet listed, or indexes if already are
+   affiliation: 3 # add full names if not yet listed, or indexes if already are
  - name: Dorian Pustina  # 0 commits, issues: opened 30 participated in 5
    orcid: 0000-0002-2834-7220
-   affiliation: 7
+   affiliation: 4
  - name: Vanessa Sochat  # 16 commits, issues: opened 8 participated in 4
    orcid: 0000-0002-4387-3819
-   affiliation: 4
+   affiliation: 5
  - name: Satrajit S. Ghosh  # 0 commits, issues: opened 7 participated in 13
    orcid: 0000-0002-5312-6729
-   affiliation:  11
+   affiliation:  6
  - name: Christian Mönch  # 11 commits, issues: opened 4 participated in 1
    orcid: 0000-0002-3092-0612
    affiliation:  2
  - name: Christopher J. Markiewicz  # 5 commits, issues: opened 5 participated in 6
    orcid: 0000-0002-6533-164X
-   affiliation: 9
+   affiliation: 7
  - name: Laura Waite  # 2 commits, issues: opened 11 participated in 2
    orcid: 0000-0003-2213-7465
    affiliation: 2
  - name: Ilya Shlyakhter  # 0 commits, issues: opened 12 participated in 3
    orcid: 0000-0002-9854-5118
-   affiliation: 18
+   affiliation: 8
  - name: Alejandro de la Vega  # 4 commits, issues: opened 7 participated in 3
    orcid: 0000-0001-9062-3778
-   affiliation:  10
+   affiliation:  9
  - name: Soichi Hayashi  # 1 commits, issues: opened 10 participated in 1
    orcid: 0000-0003-3641-3491
-   affiliation:  13
+   affiliation:  10
  - name: Christian Olaf Häusler  # 10 commits, issues: opened 2 participated in 0
    orcid: 0000-0002-0936-317X
-   affiliation: "2, 3"
+   affiliation: "2, 11"
  - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
    orcid: 0000-0002-9794-749X 
-   affiliation: 5
+   affiliation: 12
 # - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
 #   orcid: 
 #   affiliation:  # add full names if not yet listed, or indexes if already are
@@ -74,13 +74,13 @@ authors:
    affiliation: 2
  - name: Kusti Skytén  # 1 commits, issues: opened 4 participated in 1
    orcid: 0000-0001-7460-1157
-   affiliation: 8
+   affiliation: 13
  - name: Dorota Jarecka  # 0 commits, issues: opened 5 participated in 1
    orcid: 0000-0001-8282-2988
-   affiliation: 11
+   affiliation: 6
  - name: David Kennedy  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0002-9377-0797
-   affiliation:  17
+   affiliation:  14
  - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0002-1927-666X
    affiliation:  15
@@ -95,55 +95,55 @@ authors:
    affiliation:  16
  - name: Peter Vavra  # 0 commits, issues: opened 3 participated in 1
    orcid: 0000-0001-8432-5459
-   affiliation: 12
+   affiliation: 17
  - name: Horea-Ioan Ioanas  # 1 commits, issues: opened 3 participated in 0
    orcid: 0000-0001-7037-2449
-   affiliation: "6"
+   affiliation: 18
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
    affiliation: 19
  - name: Simon B. Eickhoff
    orcid: 0000-0001-6363-2759
-   affiliation: "2, 3"
+   affiliation: "2, 11"
  - name: Michael Hanke^[co-first author]  # 4158 commits, issues: opened 1097 participated in 780
    orcid: 0000-0001-6398-6370
-   affiliation: "2, 3"
+   affiliation: "2, 11"
 affiliations:
  - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
    index: 1
  - name: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany
    index: 2
- - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
-   index: 3
- - name: Lawrence Livermore National Lab, Livermore, CA, USA
-   index: 4
- - name: Faculty of Medicine and Health Sciences, McConnell Brain Imaging Centre, McGill University, Montreal, Canada
-   index: 5
- - name: Department of Biological Engineering, Massachusetts Institute of Technology, Cambridge, USA
-   index: 6
- - name: CHDI Management/CHDI Foundation, Princeton, NJ, USA
-   index: 7
- - name: University of Oslo, Oslo, Norway
-   index: 8
- - name: Stanford University, Stanford, CA, USA
-   index: 9
- - name: The University of Austin at Austin, Austin, TX, USA
-   index: 10
- - name: Massachusetts Institute of Technology, Cambridge, MA, USA
-   index: 11
- - name: Department of Biological Psychology, Otto-von-Guericke-University Magdeburg, Magdeburg, Germany
-   index: 12
- - name: Indiana University, Bloomington, IN, USA
-   index: 13
  - name: McGill Centre for Integrative Neuroscience, Montreal, Canada
+   index: 3
+ - name: CHDI Management/CHDI Foundation, Princeton, NJ, USA
+   index: 4
+ - name: Lawrence Livermore National Lab, Livermore, CA, USA
+   index: 5
+ - name: Massachusetts Institute of Technology, Cambridge, MA, USA
+   index: 6
+ - name: Stanford University, Stanford, CA, USA
+   index: 7
+ - name: Quest Diagnostics, Marlborough, MA, USA
+   index: 8
+ - name: The University of Austin at Austin, Austin, TX, USA
+   index: 9
+ - name: Indiana University, Bloomington, IN, USA
+   index: 10
+ - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
+   index: 11
+ - name: Faculty of Medicine and Health Sciences, McConnell Brain Imaging Centre, McGill University, Montreal, Canada
+   index: 12
+ - name: University of Oslo, Oslo, Norway
+   index: 13
+ - name: University of Massachusetts Medical School, Worcester, MA, USA
    index: 14
  - name: Montreal Neurological Institute, McGill University, Montreal, Canada
    index: 15
  - name: University of Pennsylvania, Philadelphia, PA
    index: 16
- - name: University of Massachusetts Medical School, Worcester, MA, USA
+ - name: Department of Biological Psychology, Otto-von-Guericke-University Magdeburg, Magdeburg, Germany
    index: 17
- - name: Quest Diagnostics, Marlborough, MA, USA
+ - name: Department of Biological Engineering, Massachusetts Institute of Technology, Cambridge, USA
    index: 18
  - name: Independent Developer, Germany
    index: 19
