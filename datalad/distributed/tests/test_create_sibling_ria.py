@@ -258,6 +258,7 @@ def test_create_push_url(detection_path, ds_path, store_path):
         ds.repo.call_annex(['copy', '.', '--to', 'datastore-storage'])
 
 
+@skip_if_on_windows
 @skip_wo_symlink_capability
 @with_tempfile
 @with_tempfile
