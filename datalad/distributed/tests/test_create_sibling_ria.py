@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import logging
 import os.path as op
 from unittest.mock import patch
 
@@ -28,7 +29,9 @@ from datalad.tests.utils import (
     ok_exists,
     skip_if_on_windows,
     skip_ssh,
+    skip_wo_symlink_capability,
     slow,
+    swallow_logs,
     with_tempfile,
     with_tree,
 )
@@ -253,6 +256,53 @@ def test_create_push_url(detection_path, ds_path, store_path):
         # usage really. However, ORA remote is tested elsewhere - if it succeeds
         # all should be good wrt `create-sibling-ria`.
         ds.repo.call_annex(['copy', '.', '--to', 'datastore-storage'])
+
+
+@skip_wo_symlink_capability
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_create_alias(ds_path, ria_path, clone_path):
+    ds_path = Path(ds_path)
+    clone_path = Path(clone_path)
+
+    ds_path.mkdir()
+    dsa = Dataset(ds_path / "a").create()
+
+    res = dsa.create_sibling_ria(url="ria+file://{}".format(ria_path),
+                                name="origin",
+                                alias="ds-a")
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    eq_(len(res), 1)
+
+    ds_clone = clone(source="ria+file://{}#~ds-a".format(ria_path),
+                     path=clone_path / "a")
+    assert_repo_status(ds_clone.path)
+
+    # multiple datasets in a RIA store with different aliases work
+    dsb = Dataset(ds_path / "b").create()
+
+    res = dsb.create_sibling_ria(url="ria+file://{}".format(ria_path),
+                                name="origin",
+                                alias="ds-b")
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    eq_(len(res), 1)
+
+    ds_clone = clone(source="ria+file://{}#~ds-b".format(ria_path),
+                     path=clone_path / "b")
+    assert_repo_status(ds_clone.path)
+
+    # second dataset in a RIA store with the same alias emits a warning
+    dsc = Dataset(ds_path / "c").create()
+
+    with swallow_logs(logging.WARNING) as cml:
+        res = dsc.create_sibling_ria(url="ria+file://{}".format(ria_path),
+                                     name="origin",
+                                     alias="ds-a")
+        assert_in("Alias 'ds-a' already exists in the RIA store, not adding an alias",
+                  cml.out)
+    assert_result_count(res, 1, status='ok', action='create-sibling-ria')
+    eq_(len(res), 1)
 
 
 @skip_if_on_windows  # ORA remote is incompatible with windows clients

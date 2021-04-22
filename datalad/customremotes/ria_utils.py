@@ -10,6 +10,11 @@
 
 """
 
+import logging
+
+
+lgr = logging.getLogger('datalad.customremotes.ria_utils')
+
 
 class UnknownLayoutVersion(Exception):
     pass
@@ -209,4 +214,8 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=No
     if alias:
         alias_dir = base_path / "alias"
         io.mkdir(alias_dir)
-        io.symlink(dsgit_dir, alias_dir / alias)
+        try:
+            io.symlink(dsgit_dir, alias_dir / alias)
+        except FileExistsError:
+            lgr.warning("Alias %r already exists in the RIA store, not adding an "
+                        "alias.", alias)
