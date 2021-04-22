@@ -102,6 +102,9 @@ authors:
  - name: Robin Schneider  # 1 commits, issues: opened 1 participated in 1
    orcid: 0000-0003-1952-5459
    affiliation: 19
+ - name: Mika Pflüger  # perspective: https://github.com/datalad/datalad/pull/5592
+   orcid: 0000-0002-7814-8916
+   affiliation: 20
  - name: Simon B. Eickhoff
    orcid: 0000-0001-6363-2759
    affiliation: "2, 11"
@@ -147,6 +150,8 @@ affiliations:
    index: 18
  - name: Independent Developer, Germany
    index: 19
+ - name: Potsdam Institute for Climate Impact Research (PIK) e. V., Potsdam, Germany
+   index: 20
 date: 24 March 2021
 bibliography: paper.bib
 
