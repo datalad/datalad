@@ -185,7 +185,7 @@ It is a distributed content management system, specifically tuned towards managi
 At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
 This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files.
 Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.<!-- km: I think this sentence could be dropped. -->
-File content handled by git-annex is placed into a managed repository annex, instead of being committing to Git directly.
+File content handled by git-annex is placed into a managed repository annex, which avoids committing the file content directly to Git.
 Instead, git-annex commits a compact reference, typically derived from the checksum of a file's content, that enables identification and association of a file name with the content.
 Using these identifiers, git-annex tracks content availability across all repository clones and external resources such as URLs pointing to individual files on the web.
 Upon user request, git-annex automatically manages data transport to and from a local repository annex at a granularity of individual files.
