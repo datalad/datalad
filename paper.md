@@ -234,7 +234,7 @@ Git-annex readily provides access to a wide range of external data storage resou
 DataLad builds on this support and adds, for example, more fine-grained access (e.g.
 direct access to individual components contained in an archive hosted on cloud storage) or specialized services, such as XNAT ([www.xnat.org](http://www.xnat.org)).
 Efficient and seamless access to scientific data is implemented using
-the *special remote* protocol provided by [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a git-annex user.<!-- km: The citation in this sentence appears in parentheses: "by (Hess 2013)," -->
+the *special remote* protocol provided by git-annex [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a user.
 With this approach, DataLad and other projects can jointly facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and overcome technological limitations of storage solutions, like file size or inode limits.
 
 
