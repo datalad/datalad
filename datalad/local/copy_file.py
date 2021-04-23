@@ -560,7 +560,6 @@ def _copy_file(src, dest, cache):
         for k, v in whereis.items()
         if v.get('urls', None)
     }
-
     if urls_by_sr:
         # some URLs are on record in the for this file
         # obtain information on special remotes
@@ -569,43 +568,13 @@ def _copy_file(src, dest, cache):
             src_srinfo = _extract_special_remote_info(src_repo)
             # put in cache
             src_repo_rec['srinfo'] = src_srinfo
-        # TODO generalize to more than one unique dest_repo
-        dest_srinfo = _extract_special_remote_info(dest_repo)
 
-        for src_rid, urls in urls_by_sr.items():
-            if not (src_rid == '00000000-0000-0000-0000-000000000001' or
-                    src_srinfo.get(src_rid, {}).get('externaltype', None) == 'datalad'):
-                # TODO generalize to any special remote
-                lgr.warning(
-                    'Ignore URL for presently unsupported special remote'
-                )
-                continue
-            if src_rid != '00000000-0000-0000-0000-000000000001' and \
-                    src_srinfo[src_rid] not in dest_srinfo.values():
-                # this is a special remote that the destination repo doesn't know
-                sri = src_srinfo[src_rid]
-                lgr.debug('Init additionally required special remote: %s', sri)
-                dest_repo.init_remote(
-                    # TODO what about a naming conflict across all dataset sources?
-                    sri['name'],
-                    ['{}={}'.format(k, v) for k, v in sri.items() if k != 'name'],
-                )
-                # must update special remote info for later matching
-                dest_srinfo = _extract_special_remote_info(dest_repo)
-            for url in urls:
-                lgr.debug('Register URL for key %s: %s', dest_key, url)
-                # TODO OPT: add .register_url(key, batched=False) to AnnexRepo
-                #  to speed up this step by batching.
-                dest_repo.call_annex(['registerurl', dest_key, url])
-            dest_rid = src_rid \
-                if src_rid == '00000000-0000-0000-0000-000000000001' \
-                else [
-                    k for k, v in dest_srinfo.items()
-                    if v['name'] == src_srinfo[src_rid]['name']
-                ].pop()
-            lgr.debug('Mark key %s as present for special remote: %s',
-                      dest_key, dest_rid)
-            dest_repo.call_annex(['setpresentkey', dest_key, dest_rid, '1'])
+        _register_urls(
+            dest_repo,
+            dest_key,
+            urls_by_sr,
+            src_srinfo,
+        )
 
     # TODO prevent copying .datalad of from other datasets?
     yield dict(
@@ -614,6 +583,55 @@ def _copy_file(src, dest, cache):
         message=dest,
         status='ok',
     )
+
+
+def _register_urls(repo, key, urls_by_sr, src_srinfo):
+    """Register URLs for a key in a repo based on special remote info
+
+    Parameters
+    ----------
+    repo : AnnexRepo
+    key : str
+    urls_by_sr : dict
+    src_srinfo : dict
+    """
+    # TODO generalize to more than one unique repo
+    dest_srinfo = _extract_special_remote_info(repo)
+
+    for src_rid, urls in urls_by_sr.items():
+        if not (src_rid == '00000000-0000-0000-0000-000000000001' or
+                src_srinfo.get(src_rid, {}).get('externaltype', None) == 'datalad'):
+            # TODO generalize to any special remote
+            lgr.warning(
+                'Ignore URL for presently unsupported special remote'
+            )
+            continue
+        if src_rid != '00000000-0000-0000-0000-000000000001' and \
+                src_srinfo[src_rid] not in dest_srinfo.values():
+            # this is a special remote that the destination repo doesn't know
+            sri = src_srinfo[src_rid]
+            lgr.debug('Init additionally required special remote: %s', sri)
+            repo.init_remote(
+                # TODO what about a naming conflict across all dataset sources?
+                sri['name'],
+                ['{}={}'.format(k, v) for k, v in sri.items() if k != 'name'],
+            )
+            # must update special remote info for later matching
+            dest_srinfo = _extract_special_remote_info(repo)
+        for url in urls:
+            lgr.debug('Register URL for key %s: %s', key, url)
+            # TODO OPT: add .register_url(key, batched=False) to AnnexRepo
+            #  to speed up this step by batching.
+            repo.call_annex(['registerurl', key, url])
+        dest_rid = src_rid \
+            if src_rid == '00000000-0000-0000-0000-000000000001' \
+            else [
+                k for k, v in dest_srinfo.items()
+                if v['name'] == src_srinfo[src_rid]['name']
+            ].pop()
+        lgr.debug('Mark key %s as present for special remote: %s',
+                  key, dest_rid)
+        repo.call_annex(['setpresentkey', key, dest_rid, '1'])
 
 
 def _replace_file(str_src, dest, str_dest, follow_symlinks):
