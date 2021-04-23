@@ -173,15 +173,15 @@ In order to maximize its utility and target audience, DataLad is available for a
 # Statement of Need
 
 Code, data and computing environments are core components of scientific projects.
-While the collaborative development and use of research software and code is streamlined with established procedures and infrastructures, such as software distributions, distributed version control systems, and social coding portals like GitHub, other components of scientific projects are not as transparently managed or unobstructed accessible.
+While the collaborative development and use of research software and code is streamlined with established procedures and infrastructures, such as software distributions, distributed version control systems, and social coding portals like GitHub, other components of scientific projects are not as transparently managed or accessible.
 Data consumption is complicated by disconnected data portals that require a large variety of different data access and authentication methods.
-(Re)used data are not as precisely identified as it is standard for code in software development, because data versioning is rarely or only coarsely practiced.
+Compared with code in software development, data tend not to be as precisely identified because data versioning is rarely or only coarsely practiced.
 Scientific computation is not reproducible enough, because data provenance, the information of how a digital file came to be, is often incomplete and rarely automatically captured.
 Last but not least, in the absence of standardized data *packages*, there is no uniform way to declare actionable data dependencies and derivative relationships between inputs and outputs of a computation.
 DataLad aims to solve these issues by providing streamlined, transparent management of code, data, computing environments, and their relationship.
 It provides targeted interfaces and interoperability adapters to established scientific and commercial tools and services to set up unobstructed, unified access to all elements of scientific projects.
-This unique set of features enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.
-To this end, it builds up on and extends two established tools for version control and transport logistics, Git and git-annex.
+This unique set of features enables workflows that are particularly suited for reproducible science, such as actionable process provenance capture for arbitrary command execution that affords automatic re-execution.<!-- km: I think this use of "afford", while correct, is likely to throw some readers off -->
+To this end, it builds on and extends two established tools for version control and transport logistics, Git and git-annex.
 
 ## Why Git and git-annex?
 
@@ -189,11 +189,10 @@ Git is the most popular version control system for software development[^1].
 It is a distributed content management system, specifically tuned towards managing and collaborating on text files, and excels at making all committed content reliably and efficiently available to all clones of a repository.
 At the same time, Git is not designed to efficiently handle large (e.g., over a gigabyte) or binary files [see, e.g., @opensource:git-binary].
 This makes it hard or impossible to use Git directly for distributed data storage with tailored access to individual files.
-Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.
-File content handled by git-annex is placed into a managed repository annex, instead of being committing to Git directly.
-Rather than the actual file content, git-annex only commits a compact reference that enables identification and association of a file name with the content.
-Those file content references are typically based on a checksum of the content.
-Using these identifiers, git-annex tracks content availability across all repository clones (local or remote), or external resources such as URLs pointing to individual files on the web.
+Git-annex takes advantage of Git's ability to efficiently manage textual information to overcome this limitation.<!-- km: I think this sentence could be dropped. -->
+File content handled by git-annex is placed into a managed repository annex, which avoids committing the file content directly to Git.
+Instead, git-annex commits a compact reference, typically derived from the checksum of a file's content, that enables identification and association of a file name with the content.
+Using these identifiers, git-annex tracks content availability across all repository clones and external resources such as URLs pointing to individual files on the web.
 Upon user request, git-annex automatically manages data transport to and from a local repository annex at a granularity of individual files.
 With this simple approach, git-annex enables separate and optimized implementations for identification and transport of arbitrarily large files, using an extensible set of protocols, while retaining the distributed nature and compatibility with versatile workflows for versioning and collaboration provided by Git.
 
@@ -209,18 +208,20 @@ Many research datasets contain millions of files, but a large number of files pr
 Partitioning such datasets into smaller, linked components (e.g., one subdataset per sample in a dataset comprising thousands) allows for scalable management.
 Research datasets and projects can also be heterogeneous, comprising different data sources or evolving data across different processing stages, and with different pace.
 Beyond scalability, modularization into homogeneous components also enables efficient reuse of a selected subset of datasets and for recording a derivative relationship between datasets.
-Git's *submodule* mechanism provides a mechanism to nest individual repositories via unambiguously versioned linkage, but Git operations must still be performed within each individual repository.
+Git's *submodule* mechanism provides a way to nest individual repositories via unambiguously versioned linkage, but Git operations must still be performed within each individual repository.
 To achieve modularity without impeding usability, DataLad simplifies working with the resulting hierarchies of Git repositories via recursive operations across dataset boundaries.
 With this, DataLad provides a "mono-repo"-like user experience in datasets with arbitrarily deep nesting, and makes it trivial to operate on individual files deep in the hierarchy or entire trees of datasets.
 A testament of this is [datasets.datalad.org](http://datasets.datalad.org), created as the project's initial goal to provide a data distribution with unified access to already available public data archives in neuroscience, such as [crcns.org](http://crcns.org) and [openfmri.org](http://openfmri.org).
-It is curated by the DataLad team, and provides, at the time of publication, streamlined access to over 260 TBs of data across over 5,000 subdatasets from a wide range of projects and dozens of archives in a fully modularized way.
+It is curated by the DataLad team and provides, at the time of publication, streamlined access to over 260 TBs of data across over 5,000 subdatasets from a wide range of projects and dozens of archives in a fully modularized way.
 
 **Re-executable annotation of changes.**
 Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the reusability aspect of the FAIR principles [@FAIR2016].
-Git captures provenance by annotating a patch (an exact difference between two versions that could be applied to another version of the text file), with a commit message (a freeform, human-readable text description of the introduced changes).
-Unlike changes to text documents or source code that are often the result of a manual creative process, data manipulations are most often performed programmatically by software.
-DataLad exploits this fact and performs automatic annotation of changes caused by the execution of an external command, with a generated commit message that also contains a structured record with comprehensive details on the command invocation.
-This allows for the recorded change to be re-executed, to, for example, verify if a result is computationally reproducible, or to apply an analog change to a different dataset state.
+<!-- Git captures provenance by annotating a patch (an exact difference between two versions that could be applied to another version of the text file), with a commit message (a freeform, human-readable text description of the introduced changes). -->
+<!-- km: I think the above comes too close to reading as though Git tracks changes/differences directly -->
+Knowing which code and data were used is essential, but, for changes that are programmatically introduced, how a command or script was invoked is another key piece of information to capture.
+One approach is to include this information in the Git commit message that accompanies a change, but doing so manually is tedious and error prone.
+To solve this, DataLad supports executing a command and automatically generating a commit message that includes a structured record with comprehensive details on the invocation.
+In addition to providing reliable information about past command-line invocations, these machine-readable records make it possible to easily re-execute commands (e.g., to verify if a result is computationally reproducible or to apply an analog change to a different dataset state).
 
 <!--AW:removed the sentence below as YOH suggested
 Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch. -->
@@ -232,13 +233,13 @@ Such annotation is not sufficient to introduce changes by following the descript
 
 **Targeted interfaces and interoperability adapters.**
 Interoperability with scientific or commercial computing and storage services allows researchers to integrate data management routines into their established workflows with minimal friction.
-Git can already interact with other local or remote repositories via a set of standard (ssh, http) or custom (Git) network transport protocols.
+Git can already interact with other local or remote repositories via standard or custom network transport protocols.
 DataLad implements support for additional services that require custom protocols, such as the Open Science Framework (OSF) [@datalad-osf:zenodo].
 Git-annex readily provides access to a wide range of external data storage resources via a large set of protocols.
 DataLad builds on this support and adds, for example, more fine-grained access (e.g.
-direct access to individual components contained in an archive hosted on cloud storage), or specialized services, such as XNAT ([www.xnat.org](http://www.xnat.org)).
+direct access to individual components contained in an archive hosted on cloud storage) or specialized services, such as XNAT ([www.xnat.org](http://www.xnat.org)).
 Efficient and seamless access to scientific data is implemented using
-the *special remote* protocol provided by [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a git-annex user.
+the *special remote* protocol provided by git-annex [@git-annex:special_remotes_protocol], through which external tools, like DataLad, can provide custom transport functionality transparently to a user.
 With this approach, DataLad and other projects can jointly facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and overcome technological limitations of storage solutions, like file size or inode limits.
 
 
@@ -268,7 +269,7 @@ On a conceptual level, they constitute an overlay structure that allows to versi
 
 DataLad's features can be flexibly integrated into standard scientific workflows.
 For example, by using the concept of dataset nesting to modularize the evolution of a research project, DataLad can fulfill the YODA principles for reproducible science [@yoda:myyoda], and, with this simple paradigm, facilitate efficient access, composition, scalability, reuse, sharing, and reproducibility of results (see \autoref{fig:two}).
-With core commands that aim to simplify operation of the underlying tools, DataLad makes RDM workflows more accessible to novices and experts alike. Importantly, compatibility with all Git/git-annex functionality is retained, such that DataLad's simplification does not impair the capabilities offers by these tools.
+With core commands that aim to simplify operation of the underlying tools, DataLad makes RDM workflows more accessible to novices and experts alike. Importantly, compatibility with all Git/git-annex functionality is retained.
 
 ![DataLad datasets are reusable modular components, which can be nested to establish a complete provenance trail all the way from a publication to the original data. Various access schemes to datasets and data are provided, and further extensibility is a key architectural property.\label{fig:two}](figures/datalad-nesting-access.png)
 
@@ -276,12 +277,12 @@ With core commands that aim to simplify operation of the underlying tools, DataL
 ## Extensions
 
 Like Git and git-annex, DataLad core is a generic tool that is not specifically tuned to particular data types or use cases. It offers a robust foundation to build more specialized solutions on top of.
-*DataLad extensions*, stand-alone Python packages with additional DataLad functionality, provide a  mechanism to harmoniously extend DataLad with a domain-focused or technology-specific feature.
+*DataLad extensions*, stand-alone Python packages with additional DataLad functionality, extend DataLad with domain-focused or technology-specific features.
 A dedicated [datalad-extension-template](https://github.com/datalad/datalad-extension-template) repository provides a starting point for creating new DataLad extensions.
 Some established extensions include:
 
 - [datalad-container](https://github.com/datalad/datalad-container) [@datalad-container:zenodo] to simplify management and use of Docker and Singularity containers typically containing complete computational environments
-- [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] the functionality which initiated the DataLad project - to automate creation and updates of DataLad datasets from external resources
+- [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] to automate creation and updates of DataLad datasets from external resources
 - [datalad-neuroimaging](https://github.com/datalad/datalad-neuroimaging) [@datalad-neuroimaging:zenodo] to provide neuroimaging-specific procedures and metadata extractors
 - [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF)
 
@@ -293,9 +294,9 @@ The [datalad-extensions](https://github.com/datalad/datalad-extensions/) reposit
 
 [comment1]: <> (TODO: probably here cite some examples of scientific papers in the wild which used DataLad)
 
-DataLad can be used as an independent tool as used by scientists to access and/or manage data (see e.g. @Wittkuhn_2021, @datasets:LAAC-LSCP),
+DataLad can be used as an independent tool to access and manage data (see e.g. @Wittkuhn_2021, @datasets:LAAC-LSCP)
 or as a core technology behind another tool or a larger platform.
-[TemplateFlow](http://templateflow.github.io/) [@Ciric_2021] uses DataLad for the management of existing and orchestration of new submissions of neuroimaging templates.
+[TemplateFlow](http://templateflow.github.io/) [@Ciric_2021] uses DataLad for the management of neuroimaging templates.
 [OpenNeuro](http://openneuro.org) uses DataLad for data logistics with data deposition to a public S3 bucket.
 [CONP-PCNO](https://github.com/CONP-PCNO/) adopts aforementioned features for modular composition and nesting to deliver a rich collection of datasets with public or restricted access to data.
 [ReproMan](http://reproman.repronim.org) integrates with DataLad to provide version control and data logistics.
@@ -321,18 +322,18 @@ Issue tracker, labels, milestones, and pull requests are used to coordinate deve
 The development process of DataLad is not isolated from its foundational building blocks.
 For every new feature or bug fix the most appropriate software layer is determined to maximize the size of the benefitting user base and, importantly, also the associated developer audience.
 This strategy aims to achieve a robust integration with the larger open source software ecosystem, and simultaneously minimize the total technical debt carried solely by the DataLad development team.
-Consequently, DataLad development is tightly connected to and involves constant communication with the git-annex project and its main developer Joey Hess [@git-annex:projects-datalad].
+Consequently, DataLad development is tightly connected to and involves frequent communication with the git-annex project and its main developer Joey Hess [@git-annex:projects-datalad].
 To guarantee robust operation across various deployments, DataLad heavily utilizes continuous integration platforms (Appveyor, GitHub actions, and Travis CI) for testing DataLad core, building and testing git-annex (in a dedicated [github.com/datalad/git-annex](https://github.com/datalad/git-annex)), and integration testing 
 with DataLad extensions ([datalad-extensions](https://github.com/datalad/datalad-extensions/)).
 
 ## Contributions
 
-DataLad is free and open source software and encourages unconstrained use and re-use in any context.
+DataLad is free and open source software and encourages unconstrained use and reuse in any context.
 Therefore, DataLad is released under [DFSG](https://en.wikipedia.org/wiki/Debian_Free_Software_Guidelines)- and [OSI](https://opensource.org/osd)-compliant MIT/Expat license.
 License terms for reused components in the code-base are provided in the [COPYING](https://github.com/datalad/datalad/blob/master/COPYING) file.
 The project aims to promote contributions rather than detached developments in forks and anyone is highly welcome to contribute to DataLad in any form under these terms.
 Technical and procedural guidelines for such contributions can be found in the [CONTRIBUTING.md](https://github.com/datalad/datalad/blob/master/CONTRIBUTING.md) file shipped within DataLad's source repository.
-Contributors are acknowledged on the project website, and also credited in the form of co-authorship in the zenodo-based archival of software releases.
+Contributors are acknowledged on the project website, and also credited in the form of co-authorship in the Zenodo-based archival of software releases.
 All co-authors of this paper as well as the contributors acknowledged below have added to the project with code- or non-code-based contributions, and we thank past, present, and future contributors of this community for their involvement and work.
 
 [comment2]: <> (# Author Contributions: if desired/needed -- or drop altogether.)
