@@ -68,7 +68,8 @@ class CachedRepo(object):
         """Fall back on the actual repo instance, if we have nothing"""
         return getattr(self._repo, name)
 
-    @lru_cache
+    # more than 20 special remotes may be rare
+    @lru_cache(maxsize=20)
     def get_special_remotes_wo_timestamp(self):
         return {
             k:
@@ -76,7 +77,8 @@ class CachedRepo(object):
             for k, v in self._repo.get_special_remotes().items()
         }
 
-    @lru_cache
+    # there can be many files, and the records per file are smallish
+    @lru_cache(maxsize=10000)
     def get_file_annexinfo(self, fpath):
         rpath = str(fpath.relative_to(self._unresolved_path))
         finfo = self._repo.get_content_annexinfo(
@@ -90,7 +92,8 @@ class CachedRepo(object):
         finfo = finfo.popitem()[1] if finfo else {}
         return finfo
 
-    @lru_cache
+    # n-keys and n-files should have the same order of magnitude
+    @lru_cache(maxsize=10000)
     def get_key_urls_by_specialremote(self, key):
         whereis = self._repo.whereis(key, key=True, output='full')
         urls_by_sr = {
@@ -141,8 +144,8 @@ class StaticRepoCache(dict):
         # `self`
         return id(self)
 
-    # XXX maybe tune cache size
-    @lru_cache
+    # a thousand dirs? should most, certainly not all datasets
+    @lru_cache(maxsize=1000)
     def _dir2reporoot(self, fdir):
         return get_dataset_root(fdir)
 
