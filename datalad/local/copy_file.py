@@ -48,10 +48,21 @@ lgr = logging.getLogger('datalad.local.copy_file')
 
 
 class CachedRepo(object):
+    """Custom wrapper around a Repo instance
+
+    It provides a few customized methods that also cache their return
+    values. For all other method access the underlying repo instance
+    is used.
+
+    A repository is assumed to be static. Cache invalidation must
+    be done manually, if that assumption does no longer hold.
+    """
+
     def __init__(self, path):
-        self.unresolved_path = path
+        self._unresolved_path = path
         self._repo = Dataset(path).repo
         self._tmpdir = None
+        self._ismanagedbranch = None
 
     def __getattr__(self, name):
         """Fall back on the actual repo instance, if we have nothing"""
@@ -64,6 +75,35 @@ class CachedRepo(object):
             {pk: pv for pk, pv in v.items() if pk != 'timestamp'}
             for k, v in self._repo.get_special_remotes().items()
         }
+
+    @lru_cache
+    def get_file_annexinfo(self, fpath):
+        rpath = str(fpath.relative_to(self._unresolved_path))
+        finfo = self._repo.get_content_annexinfo(
+            paths=[rpath],
+            # a simple `exists()` will not be enough (pointer files, etc...)
+            eval_availability=True,
+            # if it truly is a symlink, not just an annex pointer, we would not
+            # want to resolve it
+            eval_file_type=True,
+        )
+        finfo = finfo.popitem()[1] if finfo else {}
+        return finfo
+
+    @lru_cache
+    def get_key_urls_by_specialremote(self, key):
+        whereis = self._repo.whereis(key, key=True, output='full')
+        urls_by_sr = {
+            k: v['urls']
+            for k, v in whereis.items()
+            if v.get('urls', None)
+        }
+        return urls_by_sr
+
+    def is_managed_branch(self):
+        if self._ismanagedbranch is None:
+            self._ismanagedbranch = self._repo.is_managed_branch()
+        return self._ismanagedbranch
 
     def get_tmpdir(self):
         if not self._tmpdir:
@@ -91,6 +131,9 @@ class CachedRepo(object):
 
 class StaticRepoCache(dict):
     """Cache to give a repository instance for any given file path
+
+    Instances of CachedRepo are created and returned based on the
+    determined dataset root path of a given file path.
     """
     def __hash__(self):
         # every cache instance is, and should be considered unique
@@ -109,6 +152,10 @@ class StaticRepoCache(dict):
         Parameters
         ----------
         fpath : Path
+
+        Returns
+        -------
+        CachedRepo or None
         """
         repo_root = self._dir2reporoot(fpath.parent)
 
@@ -402,7 +449,6 @@ class CopyFile(Interface):
         )
 
 
-
 def _yield_specs(specs):
     if specs == '-':
         specs_it = sys.stdin
@@ -476,22 +522,6 @@ def _yield_src_dest_filepaths(src, dest, src_base=None, target_dir=None):
     yield src, dest
 
 
-def _get_repo_record(fpath, cache):
-    fdir = fpath.parent
-    # get the repository, if there is any.
-    # `src_repo` will be None, if there is none, and can serve as a flag
-    # for further processing
-    repo_rec = cache.get(fdir, None)
-    if repo_rec is None:
-        repo_root = get_dataset_root(fdir)
-        repo_rec = dict(
-            repo=None if repo_root is None else Dataset(repo_root).repo,
-            # this is different from repo.pathobj which resolves symlinks
-            repo_root=Path(repo_root) if repo_root else None)
-        cache[fdir] = repo_rec
-    return repo_rec
-
-
 def _copy_file(src, dest, cache):
     """Transfer a single file from a source to a target dataset
 
@@ -501,13 +531,7 @@ def _copy_file(src, dest, cache):
       Source file path
     dest : Path or str
       Destination file path
-    cache : dict
-      Repository lookup cache to be provided to _get_repo_record().
-      Each key is a directory, and each value is a dict with a 'repo'
-      key (value `None` if not within a dataset; or a *Repo() instance
-      of the containing repository), and a 'repo_root' key (`None`
-      if not within a dataset; or a `Path` instance with the unresolved
-      repository root path).
+    cache : StaticRepoCache
 
     Yields
     ------
@@ -563,18 +587,9 @@ def _copy_file(src, dest, cache):
 
     # now we know that we are copying from an AnnexRepo dataset
     # look for URLs on record
-    rpath = str(src.relative_to(src_repo.unresolved_path))
 
     # pull what we know about this file from the source repo
-    finfo = src_repo.get_content_annexinfo(
-        paths=[rpath],
-        # a simple `exists()` will not be enough (pointer files, etc...)
-        eval_availability=True,
-        # if it truly is a symlink, not just an annex pointer, we would not
-        # want to resolve it
-        eval_file_type=True,
-    )
-    finfo = finfo.popitem()[1] if finfo else {}
+    finfo = src_repo.get_file_annexinfo(src)
     if 'key' not in finfo or not issubclass(dest_repo.get_repotype(), AnnexRepo):
         lgr.info(
             'Copying non-annexed file or copy into non-annex dataset: %s -> %s',
@@ -615,12 +630,7 @@ def _copy_file(src, dest, cache):
 
     # are there any URLs defined? Get them by special remote
     # query by key to hopefully avoid additional file system interaction
-    whereis = src_repo.whereis(finfo['key'], key=True, output='full')
-    urls_by_sr = {
-        k: v['urls']
-        for k, v in whereis.items()
-        if v.get('urls', None)
-    }
+    urls_by_sr = src_repo.get_key_urls_by_specialremote(finfo['key'])
     if urls_by_sr:
         # some URLs are on record in the for this file
         _register_urls(
