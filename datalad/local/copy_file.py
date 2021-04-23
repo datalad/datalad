@@ -42,8 +42,91 @@ from datalad.distribution.dataset import (
     datasetmethod,
     resolve_path,
 )
+from functools import lru_cache
 
 lgr = logging.getLogger('datalad.local.copy_file')
+
+
+class CachedRepo(object):
+    def __init__(self, path):
+        self.unresolved_path = path
+        self._repo = Dataset(path).repo
+        self._tmpdir = None
+
+    def __getattr__(self, name):
+        """Fall back on the actual repo instance, if we have nothing"""
+        return getattr(self._repo, name)
+
+    @lru_cache
+    def get_special_remotes_wo_timestamp(self):
+        return {
+            k:
+            {pk: pv for pk, pv in v.items() if pk != 'timestamp'}
+            for k, v in self._repo.get_special_remotes().items()
+        }
+
+    def get_tmpdir(self):
+        if not self._tmpdir:
+            tmploc = self._repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
+            tmploc.mkdir(exist_ok=True, parents=True)
+            # put in cache for later clean/lookup
+            self._tmpdir = tmploc
+        return self._tmpdir
+
+    def cleanup_cachedrepo(self):
+        # TODO this could also be the place to stop lingering batch processes
+        if not self._tmpdir:
+            return
+
+        try:
+            self._tmpdir.rmdir()
+        except OSError as e:
+            lgr.warning(
+                'Failed to clean up temporary directory: %s',
+                exc_str(e))
+
+    def get_repotype(self):
+        return type(self._repo)
+
+
+class StaticRepoCache(dict):
+    """Cache to give a repository instance for any given file path
+    """
+    def __hash__(self):
+        # every cache instance is, and should be considered unique
+        # this is only needed for `lru_cache` to be able to handle
+        # `self`
+        return id(self)
+
+    # XXX maybe tune cache size
+    @lru_cache
+    def _dir2reporoot(self, fdir):
+        return get_dataset_root(fdir)
+
+    def __getitem__(self, fpath):
+        """Return a repository instance for a given file path
+
+        Parameters
+        ----------
+        fpath : Path
+        """
+        repo_root = self._dir2reporoot(fpath.parent)
+
+        if repo_root is None:
+            return
+
+        repo = self.get(repo_root)
+
+        if repo is None:
+            repo = CachedRepo(repo_root)
+            self[repo_root] = repo
+
+        return repo
+
+    def clear(self):
+        for repo in self.values():
+            repo.cleanup_cachedrepo()
+        super().clear()
 
 
 @build_doc
@@ -247,7 +330,7 @@ class CopyFile(Interface):
 
         # lookup cache for dir to repo mappings, and as a DB for cleaning
         # things up
-        repo_cache = {}
+        repo_cache = StaticRepoCache()
         # which paths to pass on to save
         to_save = []
         try:
@@ -305,8 +388,7 @@ class CopyFile(Interface):
                             to_save.append(res['destination'])
         finally:
             # cleanup time
-            # TODO this could also be the place to stop lingering batch processes
-            _cleanup_cache(repo_cache)
+            repo_cache.clear()
 
         if not (ds and to_save):
             # nothing left to do
@@ -319,22 +401,6 @@ class CopyFile(Interface):
             message=message,
         )
 
-
-def _cleanup_cache(repo_cache):
-    done = set()
-    for _, repo_rec in repo_cache.items():
-        repo = repo_rec['repo']
-        if not repo or repo.pathobj in done:
-            continue
-        tmp = repo_rec.get('tmp', None)
-        if tmp:
-            try:
-                tmp.rmdir()
-            except OSError as e:
-                lgr.warning(
-                    'Failed to clean up temporary directory: %s',
-                    exc_str(e))
-        done.add(repo.pathobj)
 
 
 def _yield_specs(specs):
@@ -464,11 +530,9 @@ def _copy_file(src, dest, cache):
     # get the source repository, if there is any.
     # `src_repo` will be None, if there is none, and can serve as a flag
     # for further processing
-    src_repo_rec = _get_repo_record(src, cache)
-    src_repo = src_repo_rec['repo']
+    src_repo = cache[src]
     # same for the destination repo
-    dest_repo_rec = _get_repo_record(dest, cache)
-    dest_repo = dest_repo_rec['repo']
+    dest_repo = cache[dest]
     if not dest_repo:
         yield dict(
             path=str_dest,
@@ -478,7 +542,7 @@ def _copy_file(src, dest, cache):
         return
 
     # whenever there is no annex (remember an AnnexRepo is also a GitRepo)
-    if src_repo is None or not isinstance(src_repo, AnnexRepo):
+    if src_repo is None or not issubclass(src_repo.get_repotype(), AnnexRepo):
         # so the best thing we can do is to copy the actual file into the
         # worktree of the destination dataset.
         # we will not care about unlocking or anything like that we just
@@ -499,7 +563,7 @@ def _copy_file(src, dest, cache):
 
     # now we know that we are copying from an AnnexRepo dataset
     # look for URLs on record
-    rpath = str(src.relative_to(src_repo_rec['repo_root']))
+    rpath = str(src.relative_to(src_repo.unresolved_path))
 
     # pull what we know about this file from the source repo
     finfo = src_repo.get_content_annexinfo(
@@ -511,7 +575,7 @@ def _copy_file(src, dest, cache):
         eval_file_type=True,
     )
     finfo = finfo.popitem()[1] if finfo else {}
-    if 'key' not in finfo or not isinstance(dest_repo, AnnexRepo):
+    if 'key' not in finfo or not issubclass(dest_repo.get_repotype(), AnnexRepo):
         lgr.info(
             'Copying non-annexed file or copy into non-annex dataset: %s -> %s',
             src, dest_repo)
@@ -540,10 +604,10 @@ def _copy_file(src, dest, cache):
     if not dest_repo._check_version_kludges("fromkey-supports-unlocked") \
        and dest_repo.is_managed_branch():
         res = _place_filekey_managed(
-            finfo, str_src, dest, str_dest, dest_repo_rec)
+            finfo, str_src, dest, str_dest, dest_repo)
     else:
         res = _place_filekey(
-            finfo, str_src, dest, str_dest, dest_repo_rec)
+            finfo, str_src, dest, str_dest, dest_repo)
     if isinstance(res, dict):
         yield res
         return
@@ -559,18 +623,11 @@ def _copy_file(src, dest, cache):
     }
     if urls_by_sr:
         # some URLs are on record in the for this file
-        # obtain information on special remotes
-        src_srinfo = src_repo_rec.get('srinfo', None)
-        if src_srinfo is None:
-            src_srinfo = _extract_special_remote_info(src_repo)
-            # put in cache
-            src_repo_rec['srinfo'] = src_srinfo
-
         _register_urls(
             dest_repo,
             dest_key,
             urls_by_sr,
-            src_srinfo,
+            src_repo.get_special_remotes_wo_timestamp(),
         )
 
     # TODO prevent copying .datalad of from other datasets?
@@ -592,9 +649,6 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
     urls_by_sr : dict
     src_srinfo : dict
     """
-    # TODO generalize to more than one unique repo
-    dest_srinfo = _extract_special_remote_info(repo)
-
     for src_rid, urls in urls_by_sr.items():
         if not (src_rid == '00000000-0000-0000-0000-000000000001' or
                 src_srinfo.get(src_rid, {}).get('externaltype', None) == 'datalad'):
@@ -604,7 +658,8 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
             )
             continue
         if src_rid != '00000000-0000-0000-0000-000000000001' and \
-                src_srinfo[src_rid] not in dest_srinfo.values():
+                src_srinfo[src_rid] \
+                not in repo.get_special_remotes_wo_timestamp().values():
             # this is a special remote that the destination repo doesn't know
             sri = src_srinfo[src_rid]
             lgr.debug('Init additionally required special remote: %s', sri)
@@ -614,7 +669,7 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
                 ['{}={}'.format(k, v) for k, v in sri.items() if k != 'name'],
             )
             # must update special remote info for later matching
-            dest_srinfo = _extract_special_remote_info(repo)
+            repo.get_special_remotes_wo_timestamp.cache_clear()
         for url in urls:
             lgr.debug('Register URL for key %s: %s', key, url)
             # TODO OPT: add .register_url(key, batched=False) to AnnexRepo
@@ -623,7 +678,7 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
         dest_rid = src_rid \
             if src_rid == '00000000-0000-0000-0000-000000000001' \
             else [
-                k for k, v in dest_srinfo.items()
+                k for k, v in repo.get_special_remotes_wo_timestamp().items()
                 if v['name'] == src_srinfo[src_rid]['name']
             ].pop()
         lgr.debug('Mark key %s as present for special remote: %s',
@@ -639,15 +694,7 @@ def _replace_file(str_src, dest, str_dest, follow_symlinks):
     copyfile(str_src, str_dest, follow_symlinks=follow_symlinks)
 
 
-def _extract_special_remote_info(repo):
-    return {
-        k:
-        {pk: pv for pk, pv in v.items() if pk != 'timestamp'}
-        for k, v in repo.get_special_remotes().items()
-    }
-
-
-def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
+def _place_filekey(finfo, str_src, dest, str_dest, dest_repo):
     """Put a key into a target repository
 
     Parameters
@@ -671,7 +718,6 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
       If a str, the key was established and the key name is returned.
       If a dict, an error occurred and an error result record is returned.
     """
-    dest_repo = dest_repo_rec['repo']
     src_key = finfo['key']
     # make an attempt to compute a key in the target repo, this will hopefully
     # become more relevant once "salted backends" are possible
@@ -706,14 +752,7 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
     if 'objloc' in finfo:
         # we have the chance to place the actual content into the target annex
         # put in a tmp location, git-annex will move from there
-        tmploc = dest_repo_rec.get('tmp', None)
-        if not tmploc:
-            tmploc = dest_repo.pathobj / '.git' / 'tmp' / 'datalad-copy'
-            tmploc.mkdir(exist_ok=True, parents=True)
-            # put in cache for later clean/lookup
-            dest_repo_rec['tmp'] = tmploc
-
-        tmploc = tmploc / dest_key
+        tmploc = dest_repo.get_tmpdir() / dest_key
         _replace_file(finfo['objloc'], tmploc, str(tmploc), follow_symlinks=False)
 
         dest_repo.call_annex(['reinject', str(tmploc), str_dest])
@@ -721,10 +760,9 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
     return dest_key
 
 
-def _place_filekey_managed(finfo, str_src, dest, str_dest, dest_repo_rec):
+def _place_filekey_managed(finfo, str_src, dest, str_dest, dest_repo):
     # TODO put in effect, when salted backends are a thing, until then
     # avoid double-computing the file hash
-    #dest_repo = dest_repo_rec['repo']
     #if finfo.get('has_content', True):
     #    dest_key = dest_repo.call_git_oneline(['annex', 'calckey', str_src])
     dest_key = finfo['key']
