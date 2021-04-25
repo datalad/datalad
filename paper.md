@@ -105,6 +105,8 @@ authors:
  - name: Mika Pflüger  # perspective: https://github.com/datalad/datalad/pull/5592
    orcid: 0000-0002-7814-8916
    affiliation: 20
+ - name: James V. Haxby
+   affiliation: 1
  - name: Simon B. Eickhoff
    orcid: 0000-0001-6363-2759
    affiliation: "2, 11"
@@ -346,7 +348,6 @@ There are no conflicts to declare.
 
 # Acknowledgements
 
-DataLad development was facilitated by a senior adviser Dr. James V. Haxby (Dartmouth College).
 We express our gratitude to Joey Hess for the development and maintenance of git-annex, and for years of productive collaboration with the DataLad team.
 We would like to extend our gratitude to 
 Joey Zhou,
