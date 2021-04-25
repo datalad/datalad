@@ -94,14 +94,22 @@ class _CachedRepo(object):
 
     # n-keys and n-files should have the same order of magnitude
     @lru_cache(maxsize=10000)
-    def get_key_urls_by_specialremote(self, key):
+    def get_whereis_key_by_specialremote(self, key):
+        """Returns whereis () for a single key
+
+        Returns
+        -------
+        dict
+          Keys are special remote IDs, values are dicts with all relevant
+          whereis properties, currently ('urls' (list), 'here' (bool)).
+        """
         whereis = self._repo.whereis(key, key=True, output='full')
-        urls_by_sr = {
-            k: v['urls']
+        whereis_by_sr = {
+            k: {prop: v[prop] for prop in ('urls', 'here')
+                if v.get(prop) not in (None, [])}
             for k, v in whereis.items()
-            if v.get('urls', None)
         }
-        return urls_by_sr
+        return whereis_by_sr
 
     def is_managed_branch(self):
         if self._ismanagedbranch is None:
@@ -618,6 +626,7 @@ def _copy_file(src, dest, cache):
         )
         return
 
+    #
     # at this point we are copying an annexed file into an annex repo
     if not dest_repo._check_version_kludges("fromkey-supports-unlocked") \
        and dest_repo.is_managed_branch():
@@ -633,8 +642,8 @@ def _copy_file(src, dest, cache):
 
     # are there any URLs defined? Get them by special remote
     # query by key to hopefully avoid additional file system interaction
-    urls_by_sr = src_repo.get_key_urls_by_specialremote(finfo['key'])
-    if not urls_by_sr:
+    whereis_by_sr = src_repo.get_whereis_key_by_specialremote(finfo['key'])
+    if not whereis_by_sr:
         yield dict(
             path=str_src,
             destination=str_dest,
@@ -643,14 +652,28 @@ def _copy_file(src, dest, cache):
         )
         return
 
+    avail_remote = []
+    urls_by_sr = {k: v['urls'] for k, v in whereis_by_sr.items() if v.get('urls')}
     if urls_by_sr:
         # some URLs are on record in the for this file
-        _register_urls(
+        avail_remote.extend(_register_urls(
             dest_repo,
             dest_key,
             urls_by_sr,
             src_repo.get_special_remotes_wo_timestamp(),
+        ))
+
+    if not avail_remote \
+            and not dest_repo.get_file_annexinfo(dest).get('has_content'):
+        # not having set any remotes is not a problem, if the file content got
+        # here via other means
+        yield dict(
+            path=str_src,
+            destination=str_dest,
+            message='no usable/supported remote for file content',
+            status='impossible',
         )
+        return
 
     # TODO prevent copying .datalad of from other datasets?
     yield dict(
@@ -670,7 +693,14 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
     key : str
     urls_by_sr : dict
     src_srinfo : dict
+
+    Returns
+    -------
+    list
+      IDs of (newly initialized) special remotes in the target dataset that
+      can provide the key.
     """
+    avail_sr = []
     for src_rid, urls in urls_by_sr.items():
         if not (src_rid == '00000000-0000-0000-0000-000000000001' or
                 src_srinfo.get(src_rid, {}).get('externaltype', None) == 'datalad'):
@@ -706,6 +736,9 @@ def _register_urls(repo, key, urls_by_sr, src_srinfo):
         lgr.debug('Mark key %s as present for special remote: %s',
                   key, dest_rid)
         repo.call_annex(['setpresentkey', key, dest_rid, '1'])
+        # record ID of special remote in dest dataset
+        avail_sr.append(dest_rid)
+    return avail_sr
 
 
 def _replace_file(str_src, dest, str_dest, follow_symlinks):
