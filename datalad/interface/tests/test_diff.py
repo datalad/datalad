@@ -210,7 +210,7 @@ def test_diff_helper(path):
     nosub = Dataset.create(opj(path, 'nosub'))
     # unmodified, proper submodule
     sub_clean = ds.create('sub_clean', force=True)
-    # proper submodule, but commited modifications not commited in parent
+    # proper submodule, but committed modifications not committed in parent
     sub_modified = ds.create('sub_modified', force=True)
     sub_modified.save('modified')
     # proper submodule with untracked changes

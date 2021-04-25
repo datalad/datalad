@@ -795,7 +795,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # no special remotes configures
                 return {}
             else:
-                # some unforseen error
+                # some unforeseen error
                 raise e
         return srs
 
@@ -2319,7 +2319,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             }
 
     # TODO:
-    # I think we should make interface cleaner and less ambigious for those annex
+    # I think we should make interface cleaner and less ambiguous for those annex
     # commands which could operate on globs, files, and entire repositories, separating
     # those out, e.g. annex_info_repo, annex_info_files at least.
     # If we make our calling wrappers work without relying on invoking from repo topdir,
@@ -3087,7 +3087,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             for testpath in (
                     # ATM git-annex reports hashdir in native path
                     # conventions and the actual file path `f` in
-                    # POSIX, weired...
+                    # POSIX, weird...
                     # we need to test for the actual key file, not
                     # just the containing dir, as on windows the latter
                     # may not always get cleaned up on `drop`

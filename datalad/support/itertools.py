@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Auxilary itertools"""
+"""Auxiliary itertools"""
 
 import itertools
 

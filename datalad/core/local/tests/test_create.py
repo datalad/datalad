@@ -186,7 +186,7 @@ def test_create(probe, path):
     # check description in `info`
     cmlout = ds.repo.call_annex(['info'])
     assert_in('funny [here]', cmlout)
-    # check datset ID
+    # check dataset ID
     eq_(ds.config.get_value('datalad.dataset', 'id'),
         ds.id)
 

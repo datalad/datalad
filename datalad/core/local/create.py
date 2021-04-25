@@ -373,7 +373,7 @@ class Create(Interface):
         # Re-use tbrepo instance, do not use tbds.repo
 
         # create and configure desired repository
-        # also provides inital set of content to be tracked with git (not annex)
+        # also provides initial set of content to be tracked with git (not annex)
         if no_annex:
             tbrepo, add_to_git = _setup_git_repo(path, initopts, fake_dates)
         else:

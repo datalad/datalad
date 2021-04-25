@@ -154,7 +154,7 @@ def test_dryrun(path):
         # which implies each dataset is in its own group
         # project itself is placed at '_repo'_ to give URLs like
         # http://site/dir/dir/dir/_repo_.git
-        # as a balance between readibility and name conflict minimization
+        # as a balance between readability and name conflict minimization
         project='secret/{}/_repo_'.format(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj).as_posix()),
     )

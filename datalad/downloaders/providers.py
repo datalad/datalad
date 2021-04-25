@@ -134,7 +134,7 @@ class Provider(object):
             # we need to create a new one
             Downloader = self._get_downloader_class(url)
             # we might need to provide it with credentials and authenticator
-            # Let's do via kwargs so we could accomodate cases when downloader does not necessarily
+            # Let's do via kwargs so we could accommodate cases when downloader does not necessarily
             # cares about those... duck typing or what it is in action
             kwargs = kwargs.copy()
             if self.credential:

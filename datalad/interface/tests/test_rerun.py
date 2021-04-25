@@ -455,7 +455,7 @@ def test_rerun_outofdate_tree(path):
     with open(input_file, "w") as f:
         f.write("abc\ndef")
     ds.save("foo", to_git=True)
-    # Create inital run.
+    # Create initial run.
     ds.run('grep def foo > out')
     eq_('def\n', open(output_file).read())
     # Change tree so that it is no longer compatible.

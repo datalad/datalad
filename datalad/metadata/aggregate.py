@@ -196,7 +196,7 @@ def _the_same_across_datasets(relpath, *dss):
         # TODO: or signal otherwise somehow that we just need to get at least some
         # of those files to do the check!...
         raise NeedContentError(
-            "Following paths are missing conent and have different annex "
+            "Following paths are missing content and have different annex "
             "backends: %s. Cannot determine here if the same or not!"
             % ", ".join(p for (p, b) in zip(paths, presents) if not b)
         )
@@ -445,7 +445,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
     # get extractors to engage from source dataset
     nativetypes = ['datalad_core', 'annex'] + ensure_list(get_metadata_type(aggfrom_ds))
-    # store esssential extraction config in dataset record
+    # store essential extraction config in dataset record
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
 
@@ -464,7 +464,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
         'cn': (dict(contentmeta[k], path=k) for k in sorted(contentmeta))
     }
 
-    # inject the info which commmit we are describing into the core metadata
+    # inject the info which commit we are describing into the core metadata
     # this is done here in order to avoid feeding it all the way down
     coremeta = dsmeta.get('datalad_core', {})
     version = aggfrom_ds.repo.describe(commitish=refcommit)

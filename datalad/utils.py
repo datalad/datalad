@@ -168,7 +168,7 @@ def get_func_kwargs_doc(func):
 
 
 def any_re_search(regexes, value):
-    """Return if any of regexes (list or str) searches succesfully for value"""
+    """Return if any of regexes (list or str) searches successfully for value"""
     for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
             return True
@@ -633,7 +633,7 @@ else:
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():
-            # trust noone - adjust also of the target file
+            # trust no one - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
@@ -954,7 +954,7 @@ def generate_chunks(container, size):
 
 
 def generate_file_chunks(files, cmd=None):
-    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+    """Given a list of files, generate chunks of them to avoid exceeding cmdline length
 
     Parameters
     ----------
@@ -2584,7 +2584,7 @@ def check_symlink_capability(path, target):
     assume to be able to write to tmpfile and also not import a whole lot from
     datalad's test machinery. Finally, we want to know, whether we can create a
     symlink at a specific location, not just somewhere. Therefore use
-    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    arbitrary path to test-build a symlink and delete afterwards. Suitable
     location can therefore be determined by high lever code.
 
     Parameters

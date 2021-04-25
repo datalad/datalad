@@ -749,7 +749,7 @@ class PushInfo(dict):
                 flags |= cls.NEW_TAG
             elif "[new branch]" in summary:
                 flags |= cls.NEW_HEAD
-            # uptodate encoded in control character
+            # up-to-date encoded in control character
         else:
             # fast-forward or forced update - was encoded in control character,
             # but we parse the old and new commit
@@ -1160,7 +1160,7 @@ class GitRepo(CoreGitRepo):
                                           git_options=git_options)
 
         # normalize the report, because, e.g. on windows it can come out
-        # with improper directory seperators (C:/Users/datalad)
+        # with improper directory separators (C:/Users/datalad)
         toppath = str(Path(toppath))
 
         if follow_up:
@@ -2767,7 +2767,7 @@ class GitRepo(CoreGitRepo):
         Returns
         -------
         dict:
-          Each key is a queried path (always relative to the repostiory root),
+          Each key is a queried path (always relative to the repository root),
           each value is a dictionary with attribute
           name and value items. Attribute values are either True or False,
           for set and unset attributes, or are the literal attribute value.
@@ -3600,7 +3600,7 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-        # TODO this additonal query should not be, base on status as given
+        # TODO this additional query should not be, base on status as given
         # if anyhow possible, however, when paths are given, status may
         # not contain all required information. In case of path=None AND
         # _status=None, we should be able to avoid this, because
@@ -3726,7 +3726,7 @@ class GitRepo(CoreGitRepo):
 
         This method does not use `git submodule add`, but aims to be more
         efficient by limiting the scope to mere in-place registration of
-        multiple already present respositories.
+        multiple already present repositories.
 
         Parameters
         ----------

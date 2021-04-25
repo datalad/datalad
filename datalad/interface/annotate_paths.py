@@ -291,7 +291,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
             sub['revision'] if sub['revision'] else '')
         if sub['revision_src'] and sub['revision_src'] == sub['revision']:
             # this is a special case, where subdataset reported changes without
-            # a change in state/commit -- this is code for uncommited changes
+            # a change in state/commit -- this is code for uncommitted changes
             # in the subdataset (including staged ones). In such a case, we
             # must not provide a diff range, but only the source commit we want
             # to diff against

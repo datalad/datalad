@@ -48,7 +48,7 @@ def test_get_content_info(path):
 
     # verify general rules on fused info records that are incrementally
     # assembled: for git content info, amended with annex info on 'HEAD'
-    # (to get the last commited stage and with it possibly vanished
+    # (to get the last committed stage and with it possibly vanished
     # content), and lastly annex info wrt to the present worktree, to
     # also get info on added/staged content
     # this fuses the info reported from

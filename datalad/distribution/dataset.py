@@ -654,8 +654,8 @@ def resolve_path(path, ds=None, ds_resolved=None):
             # CONCEPT: do the minimal thing to catch most real-world inputs
             # ASSUMPTION: the only sane relative path input that needs
             # handling and can be handled are upward references like
-            # '../../some/that', wherease stuff like 'down/../someotherdown'
-            # are intellectual excercises
+            # '../../some/that', whereas stuff like 'down/../someotherdown'
+            # are intellectual exercises
             # ALGORITHM: match any number of leading '..' path components
             # and shorten the PWD by that number
             # NOT using ut.Path.cwd(), because it has symlinks resolved!!

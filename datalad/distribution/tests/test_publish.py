@@ -672,7 +672,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
     assert_result_count(results, 1)
     assert_result_count(results, 1, status='ok', type='dataset', path=source.path)
 
-    # if however, a non-installed subdataset is requsted explicitly, it'll fail
+    # if however, a non-installed subdataset is requested explicitly, it'll fail
     results = source.publish(path='subm 1', to='target', on_failure='ignore')
     assert_result_count(results, 1, status='impossible', type='dataset', action='publish')
 

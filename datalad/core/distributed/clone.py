@@ -454,7 +454,7 @@ def clone_dataset(
             clone_opts['branch'] = cand['version']
         try:
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
-            # doesn't make it happen seemlessly
+            # doesn't make it happen seamlessly
             GitRepo.clone(
                 path=str(dest_path),
                 url=cand['giturl'],
@@ -1004,7 +1004,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 annex_dir.symlink_to(origin_git_path / 'annex',
                                      target_is_directory=True)
         else:
-            # TODO: What level? + note, that annex-dead is independ
+            # TODO: What level? + note, that annex-dead is independent
             lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
                         "this file system.")
 
@@ -1259,7 +1259,7 @@ def decode_source_spec(spec, cfg=None):
             raise ValueError(
                 'RIA URI not recognized, no valid dataset ID or other supported '
                 'scheme: {}'.format(spec))
-        # now we cancel the fragment in the original URL, but keep everthing else
+        # now we cancel the fragment in the original URL, but keep everything else
         # in order to be able to support the various combinations of ports, paths,
         # and everything else
         source_ri.fragment = ''

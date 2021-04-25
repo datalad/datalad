@@ -177,7 +177,7 @@ def test_something(path, new_home):
     # gitpython-style access
     assert_equal(cfg.get('something.myint'), cfg.get_value('something', 'myint'))
     assert_equal(cfg.get_value('doesnot', 'exist', default='oohaaa'), 'oohaaa')
-    # weired, but that is how it is
+    # weird, but that is how it is
     assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
 
     # modification follows
@@ -190,7 +190,7 @@ def test_something(path, new_home):
     cfg.rename_section('something', 'this')
     assert_true(cfg.has_section('this'))
     assert_false(cfg.has_section('something'))
-    # direct comparision would fail, because of section prefix
+    # direct comparison would fail, because of section prefix
     assert_equal(len(cfg.items('this')), len(comp))
     # fail if no such section
     with swallow_logs():
@@ -322,7 +322,7 @@ def test_obtain(path):
     #
     @with_testsui()
     def ask():
-        # fail on unkown dialog type
+        # fail on unknown dialog type
         assert_raises(ValueError, cfg.obtain, dummy, dialog_type='Rorschach_test')
     ask()
 

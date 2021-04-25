@@ -633,7 +633,7 @@ class CreateSibling(Interface):
                 )
             super_url = CreateSibling._get_remote_url(super_ds, name)
             # for now assuming hierarchical setup
-            # (TODO: to be able to destinguish between the two, probably
+            # (TODO: to be able to distinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
             sshurl = slash_join(super_url, relpath(refds_path, super_ds.path))
 

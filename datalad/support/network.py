@@ -492,7 +492,7 @@ class RI(object):
         # by default RIs point to remote locations
         raise ValueError("%s points to remote location" % self)
 
-    # Apparently doesn't quite play nicely with multiple inheritence for MixIn'
+    # Apparently doesn't quite play nicely with multiple inheritance for MixIn'
     # of regexp based URLs
     #@abstractmethod
     #@classmethod
@@ -799,7 +799,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
     # For now or forever we don't deal with any fragments or other special stuff
     _REGEX = re.compile(r'//(?P<remote>[^\s/]*)/(?P<path>.*)$')
 
-    # do they need to be normalized??? loosing track ...
+    # do they need to be normalized??? losing track ...
 
     def as_str(self):
         return "//{remote}/{path}".format(**self._fields)

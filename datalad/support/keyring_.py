@@ -25,7 +25,7 @@ class Keyring(object):
     @property
     def _keyring(self):
         if self.__keyring is None:
-            # Setup logging for keyring if we are debugging, althought keyring's logging
+            # Setup logging for keyring if we are debugging, although keyring's logging
             # is quite scarce ATM
             from datalad.log import lgr
             import logging

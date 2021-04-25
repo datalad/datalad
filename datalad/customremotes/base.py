@@ -381,7 +381,7 @@ class AnnexCustomRemote(object):
             self.debug("Not claiming url %s" % url)
             self.send("CLAIMURL-FAILURE")
 
-    # TODO: we should unify what to be overriden and some will provide CHECKURL
+    # TODO: we should unify what to be overridden and some will provide CHECKURL
 
     def req_TRANSFER(self, cmd, key, file):
         if cmd in ("RETRIEVE",):

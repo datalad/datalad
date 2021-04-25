@@ -236,7 +236,7 @@ class CopyFile(Interface):
             # no specific target set, but we have to write into a dataset,
             # and one was given. It seems to make sense to use this dataset
             # as a target. it is already to reference for any path resolution.
-            # Any explicitely given destination, will take precedence over
+            # Any explicitly given destination, will take precedence over
             # a general target_dir setting nevertheless.
             target_dir = ds.pathobj
 
@@ -485,7 +485,7 @@ def _copy_file(src, dest, cache):
         paths=[rpath],
         # a simple `exists()` will not be enough (pointer files, etc...)
         eval_availability=True,
-        # if it truely is a symlink, not just an annex pointer, we would not
+        # if it truly is a symlink, not just an annex pointer, we would not
         # want to resolve it
         eval_file_type=True,
     )

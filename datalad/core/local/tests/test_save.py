@@ -504,7 +504,7 @@ def test_gh1597(path):
         f.write('\n')
     assert_repo_status(ds.path, modified=['.gitmodules'])
     ds.save('.gitmodules')
-    # must not come under annex mangement
+    # must not come under annex management
     assert_not_in(
         'key',
         ds.repo.annexstatus(paths=['.gitmodules']).popitem()[1])
@@ -977,7 +977,7 @@ def test_save_amend(dspath):
     eq_(orig_author, ds.repo.format_commit("%an"))
     eq_(orig_email, ds.repo.format_commit("%ae"))
     eq_(orig_date, ds.repo.format_commit("%ad"))
-    # comitter changed:
+    # committer changed:
     eq_(ds.repo.format_commit("%cn"), "Hopefully Different")
     eq_(ds.repo.format_commit("%ce"), "hope.diff@example.com")
 
