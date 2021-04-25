@@ -1394,7 +1394,7 @@ def assert_result_values_equal(results, prop, values):
 
 def assert_result_values_cond(results, prop, cond):
     """Verify that the values of all results for a given key in the status dicts
-    fullfill condition `cond`.
+    fulfill condition `cond`.
 
     Parameters
     ----------

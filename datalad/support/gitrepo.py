@@ -440,7 +440,7 @@ class GitProgress(WitlessProtocol):
                 # in case of partial progress lines, this can lead to
                 # leakage of progress info into the output, but
                 # it is better to enable better (maybe more expensive)
-                # subsequent filtering than hidding lines with
+                # subsequent filtering than hiding lines with
                 # unknown, potentially important info
                 lgr.debug('Non-progress stderr: %s', line)
                 if line.endswith((b'\r', b'\n')):

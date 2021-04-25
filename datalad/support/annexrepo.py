@@ -1092,7 +1092,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         #
         # So, Ben thinks we should just spit it out here, since everything
         # calling _call_annex_records is concerned with the actual results
-        # being returned. More over, this kind of response is special toi
+        # being returned. Moreover, this kind of response is special to
         # particular special remotes rather than particular annex commands.
         # So, likely there's nothing callers could do about it other than
         # spitting it out.

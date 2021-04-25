@@ -293,7 +293,7 @@ def _describe_credentials():
     return props
 
 
-# Actuall callables for WTF. If None -- should be bound later since depend on
+# Actual callables for WTF. If None -- should be bound later since depend on
 # the context
 SECTION_CALLABLES = {
     'datalad': _describe_datalad,

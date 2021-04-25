@@ -245,7 +245,7 @@ class Providers(object):
                 items = {
                     o: config.get(section, o) for o in config.options(section)
                 }
-                # side-effect -- items get poped
+                # side-effect -- items get popped
                 locals().get(type_ + "s")[name] = getattr(
                     cls, '_process_' + type_)(name, items)
                 if len(items):

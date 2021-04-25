@@ -245,7 +245,7 @@ class Install(Interface):
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
-                    # down that deals with an install from an actuall `source`
+                    # down that deals with an install from an actual `source`
                     # any necessary fixes should go there too!
                     r['refds'] = refds_path
                     yield r

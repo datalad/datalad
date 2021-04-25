@@ -557,7 +557,7 @@ def _copy_file(src, dest, cache):
                 continue
             if src_rid != '00000000-0000-0000-0000-000000000001' and \
                     src_srinfo[src_rid] not in dest_srinfo.values():
-                # this is a special remote that the destination repo doesnt know
+                # this is a special remote that the destination repo doesn't know
                 sri = src_srinfo[src_rid]
                 lgr.debug('Init additionally required special remote: %s', sri)
                 dest_repo.init_remote(

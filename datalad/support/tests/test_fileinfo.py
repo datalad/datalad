@@ -71,7 +71,7 @@ def test_get_content_info(path):
                 r.get('gitshasum', None) and not f.match('subds*'):
             # this should be known to annex, one way or another
             # regardless of whether things add deleted or staged
-            # or anything inbetween
+            # or anything in between
             assert_in('key', r, f)
             assert_in('keyname', r, f)
             assert_in('backend', r, f)

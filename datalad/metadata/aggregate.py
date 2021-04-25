@@ -628,7 +628,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     procds_paths = [ds.path] + subds_paths
     for dpath in procds_paths:
         ds_dbinfo = agginfo_db.get(dpath, {}).copy()
-        # relative path of the currect dataset within the dataset we are updating
+        # relative path of the current dataset within the dataset we are updating
         drelpath = op.relpath(dpath, start=ds.path)
         for loclabel in location_keys:
             # TODO filepath_info is obsolete

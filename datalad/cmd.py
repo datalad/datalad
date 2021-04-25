@@ -107,7 +107,7 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         await cmd_done
         result = protocol._prepare_result()
     finally:
-        # protect against a crash whe launching the process
+        # protect against a crash when launching the process
         if transport:
             transport.close()
 
