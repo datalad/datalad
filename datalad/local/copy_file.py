@@ -47,7 +47,7 @@ from functools import lru_cache
 lgr = logging.getLogger('datalad.local.copy_file')
 
 
-class CachedRepo(object):
+class _CachedRepo(object):
     """Custom wrapper around a Repo instance
 
     It provides a few customized methods that also cache their return
@@ -132,10 +132,10 @@ class CachedRepo(object):
         return type(self._repo)
 
 
-class StaticRepoCache(dict):
+class _StaticRepoCache(dict):
     """Cache to give a repository instance for any given file path
 
-    Instances of CachedRepo are created and returned based on the
+    Instances of _CachedRepo are created and returned based on the
     determined dataset root path of a given file path.
     """
     def __hash__(self):
@@ -158,7 +158,7 @@ class StaticRepoCache(dict):
 
         Returns
         -------
-        CachedRepo or None
+        _CachedRepo or None
         """
         repo_root = self._dir2reporoot(fpath.parent)
 
@@ -168,7 +168,7 @@ class StaticRepoCache(dict):
         repo = self.get(repo_root)
 
         if repo is None:
-            repo = CachedRepo(repo_root)
+            repo = _CachedRepo(repo_root)
             self[repo_root] = repo
 
         return repo
@@ -380,7 +380,7 @@ class CopyFile(Interface):
 
         # lookup cache for dir to repo mappings, and as a DB for cleaning
         # things up
-        repo_cache = StaticRepoCache()
+        repo_cache = _StaticRepoCache()
         # which paths to pass on to save
         to_save = []
         try:
