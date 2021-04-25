@@ -634,6 +634,15 @@ def _copy_file(src, dest, cache):
     # are there any URLs defined? Get them by special remote
     # query by key to hopefully avoid additional file system interaction
     urls_by_sr = src_repo.get_key_urls_by_specialremote(finfo['key'])
+    if not urls_by_sr:
+        yield dict(
+            path=str_src,
+            destination=str_dest,
+            message='no known location of file content',
+            status='impossible',
+        )
+        return
+
     if urls_by_sr:
         # some URLs are on record in the for this file
         _register_urls(

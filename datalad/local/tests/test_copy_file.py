@@ -368,3 +368,28 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
     badobj = dest.pathobj / '.git' / 'objects' / 'i-do-not-exist'
     dest.copy_file([sub.pathobj / '.git' / 'config', badobj])
     ok_(badobj.exists())
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_copy_file_nourl(serv_path, orig_path, tst_path):
+    """Tests availability transfer to normal git-annex remote"""
+    # prep source dataset that will have the file content
+    srv_ds = Dataset(serv_path).create()
+    (srv_ds.pathobj / 'myfile.dat').write_text('I am content')
+    (srv_ds.pathobj / 'noavail.dat').write_text('null')
+    srv_ds.save()
+    srv_ds.drop('noavail.dat', check=False)
+    # make an empty superdataset, with the test dataset as a subdataset
+    orig_ds = Dataset(orig_path).create()
+    orig_ds.clone(source=serv_path, path='serv')
+    assert_repo_status(orig_ds.path)
+    # now copy the test file into the superdataset
+    no_avail_file = orig_ds.pathobj / 'serv' / 'noavail.dat'
+    assert_in_results(
+        orig_ds.copy_file(no_avail_file, on_failure='ignore'),
+        status='impossible',
+        message='no known location of file content',
+        path=str(no_avail_file),
+    )
