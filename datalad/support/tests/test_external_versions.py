@@ -119,7 +119,7 @@ def test_external_versions_popular_packages():
     ev = ExternalVersions()
 
     for modname in ('scipy', 'numpy', 'mvpa2', 'sklearn', 'statsmodels', 'pandas',
-                    'matplotlib', 'psychopy'):
+                    'matplotlib', 'psychopy', 'github'):
         yield _test_external, ev, modname
 
     # more of a smoke test
