@@ -362,12 +362,15 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None):
     for gp in gps:
         for res in _install_and_reglob(dset_path, gp):
             yield res
-        for res in get(dataset=dset_path, path=gp.expand(), on_failure="ignore"):
-            if _is_nonexistent_path(res):
-                # MIH why just a warning if given inputs are not valid?
-                lgr.warning("Input does not exist: %s", res["path"])
-            else:
-                yield res
+        if gp.misses:
+            ds = Dataset(dset_path)
+            for miss in gp.misses:
+                yield get_status_dict(
+                    action="run", ds=ds, status="error",
+                    message=("Input did not match existing file: %s",
+                             miss))
+        yield from get(dataset=dset_path, path=gp.expand_strict(),
+                       on_failure="ignore")
 
 
 def _unlock_or_remove(dset_path, paths):
@@ -609,7 +612,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 if outputs:
                     for res in _install_and_reglob(ds_path, outputs):
                         yield res
-                    for res in _unlock_or_remove(ds_path, outputs.expand()):
+                    for res in _unlock_or_remove(ds_path,
+                                                 outputs.expand_strict()):
                         yield res
 
                 if rerun_outputs is not None:
@@ -645,6 +649,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             cmd_expanded, pwd,
             expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
 
+
+    # Re-glob to capture any new outputs.
+    #
+    # TODO: If a warning or error is desired when an --output pattern doesn't
+    # have a match, this would be the spot to do it.
+    if explicit or expand in ["outputs", "both"]:
+        outputs.expand(refresh=True)
 
     # amend commit message with `run` info:
     # - pwd if inside the dataset
@@ -698,7 +709,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
 
-    outputs_to_save = outputs.expand() if explicit else None
+    outputs_to_save = outputs.expand_strict() if explicit else None
     if outputs_to_save is not None and use_sidecar:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save

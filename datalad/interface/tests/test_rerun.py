@@ -661,10 +661,6 @@ def test_run_inputs_outputs(src, path):
     ok_(ds.repo.file_has_content("input.dat"))
     ok_(ds.repo.file_has_content("extra-input.dat"))
 
-    with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("cd .> dummy", inputs=["not-there"])
-        assert_in("Input does not exist: ", cml.out)
-
     # Test different combinations of globs and explicit files.
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
     create_tree(ds.path, {i: i for i in inputs})
@@ -735,13 +731,6 @@ def test_run_inputs_outputs(src, path):
         with open(op.join(path, "a.dat")) as fh:
             eq_(fh.read(), " appended\n appended\n")
 
-    if not on_windows:
-        # see datalad#2606
-        with swallow_logs(new_level=logging.DEBUG) as cml:
-            with swallow_outputs():
-                ds.run("echo blah", outputs=["not-there"])
-                assert_in("Filtered out non-existing path: ", cml.out)
-
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
@@ -757,7 +746,7 @@ def test_run_inputs_outputs(src, path):
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
-    # We install subdatasets to fully resolve globs.
+    # We uninstall subdatasets to fully resolve globs.
     ds.uninstall("s0")
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
@@ -777,9 +766,10 @@ def test_run_inputs_outputs(src, path):
 
 
 @known_failure_windows
-@with_tempfile(mkdir=True)
+@with_tree({"foo": "foo"})
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(annex=False)
+    ds = Dataset(path).create(annex=False, force=True)
+    ds.save()
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
