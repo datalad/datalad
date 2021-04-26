@@ -546,7 +546,7 @@ def _process_results(
     # used to track repeated messages in the default renderer
     last_result = None
     last_result_ts = None
-    # which result dict keys to inspect for changes to discover repetions
+    # which result dict keys to inspect for changes to discover repetitions
     # of similar messages
     repetition_keys = set(('action', 'status', 'type', 'refds'))
     # counter for detected repetitions

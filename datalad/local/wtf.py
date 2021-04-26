@@ -293,7 +293,7 @@ def _describe_credentials():
     return props
 
 
-# Actuall callables for WTF. If None -- should be bound later since depend on
+# Actual callables for WTF. If None -- should be bound later since depend on
 # the context
 SECTION_CALLABLES = {
     'datalad': _describe_datalad,
@@ -361,7 +361,7 @@ class WTF(Interface):
             args=("-D", "--decor"),
             constraints=EnsureChoice('html_details') | EnsureNone(),
             doc="""decoration around the rendering to facilitate embedding into
-            issues etc, e.g. use 'html_details' for posting collapsable entry
+            issues etc, e.g. use 'html_details' for posting collapsible entry
             to GitHub issues."""),
         clipboard=Parameter(
             args=("-c", "--clipboard",),

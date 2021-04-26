@@ -44,7 +44,7 @@ from datalad.support.exceptions import CommandError
 
 
 def py2cmd(code):
-    """Helper to invoke some Python code through a cmdline invokation of
+    """Helper to invoke some Python code through a cmdline invocation of
     the Python interpreter.
 
     This should be more portable in some cases.
@@ -129,7 +129,7 @@ def test_runner_cwd_encoding(path):
 def test_runner_stdin(path):
     runner = Runner()
     fakestdin = Path(path) / 'io'
-    # go for diffcult content
+    # go for difficult content
     fakestdin.write_text(OBSCURE_FILENAME)
 
     res = runner.run(

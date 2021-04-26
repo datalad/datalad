@@ -433,7 +433,7 @@ def test_utils_suppress_similar():
 
     with _swallow_outputs() as cmo:
         # for this one test yield results slightly slower than 2Hz
-        # such that we can see each individual supression message
+        # such that we can see each individual suppression message
         # and no get caught by the rate limiter
         sleep_dur = 0.51
         list(tu(13, result_fn=n_foo, result_renderer="default"))

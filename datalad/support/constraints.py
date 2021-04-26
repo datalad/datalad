@@ -483,4 +483,4 @@ def expand_constraint_spec(spec):
         try:
             return constraint_spec_map[spec]
         except KeyError:
-            raise ValueError("unsupport constraint specification '%r'" % (spec,))
+            raise ValueError("unsupported constraint specification '%r'" % (spec,))

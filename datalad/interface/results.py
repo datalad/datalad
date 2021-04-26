@@ -201,7 +201,7 @@ translate_annex_notes = {
 def annexjson2result(d, ds, **kwargs):
     """Helper to convert an annex JSON result to a datalad result dict
 
-    Info from annex is rather heterogenous, partly because some of it
+    Info from annex is rather heterogeneous, partly because some of it
     our support functions are faking.
 
     This helper should be extended with all needed special cases to

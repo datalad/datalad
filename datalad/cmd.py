@@ -107,7 +107,7 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         await cmd_done
         result = protocol._prepare_result()
     finally:
-        # protect against a crash whe launching the process
+        # protect against a crash when launching the process
         if transport:
             transport.close()
 
@@ -420,7 +420,7 @@ class WitlessRunner(object):
         """Check if WitlessRunner is used under a new PID
 
         Note that this is a function that is meant to be called from within a
-        particular context only. The RuntimeError is expected to be catched by
+        particular context only. The RuntimeError is expected to be caught by
         the caller and is meant to be more like a response message than an
         exception.
 
@@ -451,7 +451,7 @@ class WitlessRunner(object):
         Sets _loop_need_new variable to a bool depending on what it finds
 
         Note that this is a function that is meant to be called from within a
-        particular context only. The RuntimeError is expected to be catched by
+        particular context only. The RuntimeError is expected to be caught by
         the caller and is meant to be more like a response message than an
         exception.
 

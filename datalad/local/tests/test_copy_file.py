@@ -114,7 +114,7 @@ def test_copy_file_errors(dspath1, dspath2, nondspath):
         ds1.copy_file('somepath', target_dir=dspath2, on_failure='ignore'))
 
     # attempt to copy from a directory, but no recursion is enabled.
-    # use no reference ds to excercise a different code path
+    # use no reference ds to exercise a different code path
     assert_status(
         'impossible', copy_file([nondspath, dspath1], on_failure='ignore'))
 

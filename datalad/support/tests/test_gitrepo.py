@@ -1358,7 +1358,7 @@ def test_gitattributes(path):
     # tag entirely
     gr.set_gitattributes([('*', {'tag': False})])
     eq_(gr.get_gitattributes('.')['.'], {'tag': False, 'sec.key': 'val'})
-    # attributes file is not added or commited, we can ignore such
+    # attributes file is not added or committed, we can ignore such
     # attributes
     eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
 

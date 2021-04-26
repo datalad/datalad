@@ -139,7 +139,7 @@ def test_borrow_kwargs():
         # indentation should have been squashed properly
         assert_true(not '   ' in docstring)
 
-    # some additional checks to see if we are not loosing anything
+    # some additional checks to see if we are not losing anything
     assert_true('Some postamble' in B.met1.__doc__)
     assert_true('B.met_nodockwargs' in B.met_nodockwargs.__doc__)
     assert_true('boguse' in B.met_excludes.__doc__)

@@ -58,9 +58,9 @@ class CreateSiblingGitlab(Interface):
 
     An existing GitLab project, or a project created via the GitLab web
     interface can be configured as a sibling with the :command:`siblings`
-    command. Alternativly, this command can create a GitLab project at any
+    command. Alternatively, this command can create a GitLab project at any
     location/path a given user has appropriate permissions for. This is
-    particulary helpful for recursive sibling creation for subdatasets. API
+    particularly helpful for recursive sibling creation for subdatasets. API
     access and authentication are implemented via python-gitlab, and all its
     features are supported. A particular GitLab site must be configured in a
     named section of a python-gitlab.cfg file (see

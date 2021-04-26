@@ -260,7 +260,7 @@ def test_clone_isnot_recursive(path_src, path_nr, path_r):
 
     ds = clone(src, path_nr, result_xfm='datasets', return_type='item-or-list')
     ok_(ds.is_installed())
-    # check nothin is unintentionally installed
+    # check nothing is unintentionally installed
     subdss = ds.subdatasets(recursive=True)
     assert_result_count(subdss, len(subdss), state='absent')
     # this also means, subdatasets to be listed as not fulfilled:
@@ -462,7 +462,7 @@ def test_clone_isnt_a_smartass(origin_path, path):
     with chpwd(path):
         # no were are inside a dataset clone, and we make another one
         # we do not want automatic subdatasetification without given a dataset
-        # explicitely
+        # explicitly
         clonedsub = clone(origin, 'testsub',
                           result_xfm='datasets', return_type='item-or-list')
     # correct destination
@@ -849,7 +849,7 @@ def test_ria_http(lcl, storepath, url):
     ok_(cloned_by_label.config.get('remote.origin.url').startswith(url))
     eq_(cloned_by_label.config.get('remote.origin.annex-ignore'), 'true')
     # ... the clone candidates go with the label-based URL such that
-    # future get() requests acknowlege a (system-wide) configuration
+    # future get() requests acknowledge a (system-wide) configuration
     # update
     eq_(cloned_by_label.config.get('datalad.get.subdataset-source-candidate-200origin'),
         'ria+ssh://somelabel#{id}')

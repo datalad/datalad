@@ -1092,7 +1092,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 
-    # and closing the pipes now shoudn't anyhow affect things
+    # and closing the pipes now shouldn't anyhow affect things
     eq_(len(ar._batched), 1)
     ar._batched.close()
     eq_(len(ar._batched), 1)  # doesn't remove them, just closes
@@ -2134,7 +2134,7 @@ def _test_add_under_subdir(path):
     create_tree(subdir, {'empty': ''})
     runner = Runner(cwd=subdir)
     with chpwd(subdir):
-        runner.run(['git', 'add', 'empty'])  # should add sucesfully
+        runner.run(['git', 'add', 'empty'])  # should add successfully
         # gr.commit('important') #
         runner.run(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)

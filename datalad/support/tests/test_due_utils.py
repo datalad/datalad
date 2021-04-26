@@ -30,7 +30,7 @@ def test_duecredit_dataset(path):
     dataset = Dataset(path)
 
     # Verify that we do not call duecredit_dataset if due is not enabled
-    # Seems cant patch.object.enabled so we will just test differently
+    # Seems can't patch.object.enabled so we will just test differently
     # depending on either enabled or not
     if not due.active:
         with patch.object(dataset_mod, 'duecredit_dataset') as cmdc:

@@ -440,7 +440,7 @@ def _install_necessary_subdatasets(
                                      on_failure='ignore',
                                      result_filter=is_ok_dataset)
         if not subds_trail:
-            # no (newly available) subdataset get's us any closer
+            # no (newly available) subdataset gets us any closer
             return
         # next round
         cur_subds = subds_trail[-1]

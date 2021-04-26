@@ -71,10 +71,10 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
     levels : list of list
       List of specifications for :func:`random.randint` call per each level.
     ds : Dataset, optional
-      Super-dataset which would contain a new dataset (thus its path whould be
+      Super-dataset which would contain a new dataset (thus its path would be
       a parent of path. Note that ds needs to be installed.
     max_leading_dirs : int, optional
-      Up to how many leading directories withing a dataset could lead to a
+      Up to how many leading directories within a dataset could lead to a
       sub-dataset
 
     Yields

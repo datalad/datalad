@@ -134,7 +134,7 @@ class Provider(object):
             # we need to create a new one
             Downloader = self._get_downloader_class(url)
             # we might need to provide it with credentials and authenticator
-            # Let's do via kwargs so we could accomodate cases when downloader does not necessarily
+            # Let's do via kwargs so we could accommodate cases when downloader does not necessarily
             # cares about those... duck typing or what it is in action
             kwargs = kwargs.copy()
             if self.credential:
@@ -245,7 +245,7 @@ class Providers(object):
                 items = {
                     o: config.get(section, o) for o in config.options(section)
                 }
-                # side-effect -- items get poped
+                # side-effect -- items get popped
                 locals().get(type_ + "s")[name] = getattr(
                     cls, '_process_' + type_)(name, items)
                 if len(items):

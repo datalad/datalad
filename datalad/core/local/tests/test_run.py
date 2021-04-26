@@ -204,7 +204,7 @@ def test_sidecar(path):
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
 
-    # make sure sidecar file is committed when explicitly specifiying outputs
+    # make sure sidecar file is committed when explicitly specifying outputs
     ds.run("cd .> dummy4",
            outputs=["dummy4"],
            sidecar=True,
