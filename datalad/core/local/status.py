@@ -312,7 +312,7 @@ class Status(Interface):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
-        # disk as a contsraint (e.g. to figure out which subdataset a path is
+        # disk as a constraint (e.g. to figure out which subdataset a path is
         # in) `diff` cannot do that (everything need to be handled based on a
         # "virtual" representation of a dataset hierarchy).
         # MIH concludes that while `status` can be implemented as a special case

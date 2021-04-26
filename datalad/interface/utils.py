@@ -200,7 +200,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     spec : dict
       `content_by_ds`-style dictionary that will receive information about the
       discovered datasets. Specifically, for each discovered dataset there
-      will be in item with its path under the key (path) of the respective
+      will be an item with its path under the key (path) of the respective
       superdataset.
     includeds : sequence, optional
       Any paths given are treated as existing subdatasets, regardless of
