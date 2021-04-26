@@ -182,6 +182,10 @@ def path_is_under(values, path=None):
     return False
 
 
+# TODO(OPT)? YOH: from a cursory review seems like possibly an expensive function
+# whenever many paths were provided (e.g. via shell glob).
+# Might be worth testing on some usecase and py-spy'ing if notable portion
+# of time is spent.
 def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                                       spec, includeds=None):
     """Discover the edges and nodes in a dataset tree to given target paths
