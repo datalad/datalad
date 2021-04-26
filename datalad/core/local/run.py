@@ -732,7 +732,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     if dry_run:
         yield get_status_dict(
-            "run", ds=ds, status="ok", message="Dry run",
+            "run [dry-run]", ds=ds, status="ok", message="Dry run",
             run_info=run_info,
             dry_run_info=dict(cmd_expanded=cmd_expanded,
                               pwd_full=pwd,
