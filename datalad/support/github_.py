@@ -79,6 +79,17 @@ def _get_tokens_for_login(login, tokens):
     return selected_tokens
 
 
+def _gh_exception(exc_cls, status, data):
+    """Compatibility wrapper for instantiating a GithubException.
+    """
+    try:
+        exc = exc_cls(status, data, None)
+    except TypeError:
+        # Before PyGithub 1.5, GithubException had only two required arguments.
+        exc = exc_cls(status, data)
+    return exc
+
+
 def _gen_github_ses(github_login):
     """Generate viable Github sessions
 
@@ -96,7 +107,8 @@ def _gen_github_ses(github_login):
 
     """
     if github_login == 'disabledloginfortesting':
-        raise gh.BadCredentialsException(403, 'no login specified')
+        raise _gh_exception(gh.BadCredentialsException,
+                            403, 'no login specified')
 
     # see if we have tokens - might be many. Doesn't cost us much so get at once
     tokens = unique(
