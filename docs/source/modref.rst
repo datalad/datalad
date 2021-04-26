@@ -77,7 +77,6 @@ Plumbing commands
    api.create_test_dataset
    api.diff
    api.download_url
-   api.ls
    api.push
    api.sshrun
    api.siblings
@@ -107,7 +106,6 @@ Support functionality
 .. autosummary::
    :toctree: generated
 
-   auto
    cmd
    consts
    log

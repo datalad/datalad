@@ -1926,59 +1926,6 @@ class GitRepo(CoreGitRepo):
             all_=all_,
             git_options=git_options)
 
-    # XXX Consider removing this method. It is only used in `update()`,
-    # where it could be easily replaced with fetch+merge
-    def pull(self, remote=None, refspec=None, git_options=None, **kwargs):
-        """Pulls changes from a remote.
-
-        Parameters
-        ----------
-        remote : str, optional
-          name of the remote to pull from. If no remote is given,
-          the remote tracking branch is used.
-        refspec : str, optional
-          refspec to fetch.
-        git_options : list, optional
-          Additional command line options for git-pull.
-        kwargs :
-          Deprecated. GitPython-style keyword argument for git-pull.
-          Will be appended to any git_options.
-        """
-        git_options = ensure_list(git_options)
-        if kwargs:
-            git_options.extend(to_options(**kwargs))
-
-        cmd = ['git'] + self._GIT_COMMON_OPTIONS
-        cmd.extend(['pull', '--progress'] + git_options)
-
-        if remote is None:
-            if refspec:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError(
-                    "refspec specified without a remote. ({})".format(refspec))
-            # No explicit remote to fetch.
-            # => get tracking branch:
-            tb_remote, refspec = self.get_tracking_branch()
-            if tb_remote is not None:
-                remote = tb_remote
-            else:
-                # No remote, no tracking branch
-                # => fail
-                raise ValueError("Neither a remote is specified to pull "
-                                 "from nor a tracking branch is set up.")
-
-        cmd.append(remote)
-        if refspec:
-            cmd += ensure_list(refspec)
-
-        self._maybe_open_ssh_connection(remote)
-        self._git_runner.run(
-            cmd,
-            protocol=StdOutCaptureWithGitProgress,
-        )
-
     def push(self, remote=None, refspec=None, all_remotes=False,
              all_=False, git_options=None, **kwargs):
         """Push changes to a remote (or all remotes).
