@@ -1206,7 +1206,7 @@ class RIARemote(SpecialRemote):
         self.push_io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 
-        if tmp_path.exists():
+        if self.push_io.exists(tmp_path):
             # Just in case - some parallel job could already be writing to it at
             # least tell the conclusion, not just some obscure permission error
             raise RIARemoteError('{}: upload already in progress'
