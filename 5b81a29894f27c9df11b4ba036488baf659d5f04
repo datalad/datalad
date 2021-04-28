@@ -1,0 +1,32 @@
+Update 0.14.2-1-g121926aaeb:CHANGELOG.md
+
+Generated with
+  git log --format="?  %s%n   %h^-1" --reverse --first-parent \
+    121926aaeb0e6306779f915ffa9463afa1c67daa..cdc61fa4ade2904f4a10c8addb1fd6b83826ab79
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+-  Merge pull request #5574 from yarikoptic/enh-nosecrets
+   b16632f41c^-1
+-  Merge pull request #5579 from kyleam/noannex-test-update
+   43e276c6fc^-1
++  Merge pull request #5544 from yarikoptic/enh-shell-completion
+   1a3627283a^-1
++  Merge pull request #5580 from mih/bf-5490
+   1878d0d7f6^-1
++  Merge pull request #5594 from kyleam/run-glob-fixes
+   d55866d55d^-1
++  Merge pull request #5603 from kyleam/pygithub-incompat
+   9e1af3027f^-1
++  Merge pull request #5605 from yarikoptic/bf-pygithub-version-etc
+   b7eaa4b37f^-1
+-  Merge pull request #5606 from yarikoptic/misc-enh
+   26c3ccdbfb^-1
++  Merge pull request #5609 from yarikoptic/bf-annex-copies
+   53e907fc20^-1
++  Merge pull request #5607 from mih/bf-ria-maint
+   cdc61fa4ad^-1
