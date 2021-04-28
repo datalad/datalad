@@ -591,8 +591,6 @@ class Publish(Interface):
       transfers annexed data by default and does not handle sibling creation
       (i.e. it does not have a `--missing` option).
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
     # TODO: Figure out, how to tell about tracking branch/upstream
     #      (and the respective remote)
     #      - it is used, when no destination is given
