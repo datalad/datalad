@@ -11,6 +11,7 @@
 """
 
 import logging
+from pathlib import Path
 
 
 lgr = logging.getLogger('datalad.customremotes.ria_utils')
@@ -215,7 +216,11 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=No
         alias_dir = base_path / "alias"
         io.mkdir(alias_dir)
         try:
-            io.symlink(dsgit_dir, alias_dir / alias)
+            # go for a relative path to keep the alias links valid
+            # when moving a store
+            io.symlink(
+                Path('..') / dsgit_dir.relative_to(base_path),
+                alias_dir / alias)
         except FileExistsError:
             lgr.warning("Alias %r already exists in the RIA store, not adding an "
                         "alias.", alias)
