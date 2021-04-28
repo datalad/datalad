@@ -405,7 +405,7 @@ def test_name_with_underscore(path):
     # environment variable.
     with patch.dict("os.environ",
                     {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
-                     'python {script}'}):
+                     '%s {script}' % sys.executable}):
         with assert_raises(ValueError):
             ds.run_procedure(spec=["print_args"])
 
@@ -413,7 +413,7 @@ def test_name_with_underscore(path):
     with patch.dict("os.environ",
                     {"DATALAD_CONFIG_OVERRIDES_JSON":
                      '{"datalad.procedures.print_args.call-format": '
-                     '"python {script}"}'}):
+                     '"%s {script}"}' % sys.executable}):
         ds.config.reload()
         ds.run_procedure(spec=["print_args"])
 
