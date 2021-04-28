@@ -9,7 +9,7 @@ jobs:
   Update:
     name: Generate
     runs-on: ubuntu-latest
-    if: contains(github.repository, "datalad/datalad")
+    if: contains(github.repository, 'datalad/datalad')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
