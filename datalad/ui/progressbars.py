@@ -258,6 +258,10 @@ try:
                      unit_scale=True, total=total, file=out,
                      leave=leave,
                      ))
+            if label and 'total' in label.lower() and 'smoothing' not in self._pbar_params:
+                # ad-hoc: All tqdm totals will report total mean, and not some
+                # momentary speed
+                self._pbar_params['smoothing'] = 0
             self._pbar = None
 
         def _create(self, initial=0):

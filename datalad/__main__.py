@@ -93,7 +93,7 @@ def main(argv=None):
         runctx(code, globs, globs)
         # TODO: see if we could hide our presence from the final tracebacks if execution fails
     except IOError as err:
-        lgr.error("Cannot run file %r because: %s" % (sys.argv[0], err))
+        lgr.error("Cannot run file %r because: %s", sys.argv[0], err)
         sys.exit(1)
     except SystemExit:
         pass

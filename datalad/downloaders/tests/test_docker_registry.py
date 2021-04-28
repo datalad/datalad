@@ -8,18 +8,24 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the docker-registry:// downloader"""
 
+import os
+
 from datalad.distribution.dataset import Dataset
 from datalad.tests.utils import (
     assert_in,
     eq_,
     integration,
     patch_config,
+    skip_if,
     skip_if_no_network,
     slow,
     with_tempfile,
 )
 
 
+@skip_if(os.environ.get("TRAVIS_EVENT_TYPE") != "cron" and
+         os.environ.get("GITHUB_EVENT_NAME") != "schedule",
+         "run restricted cron due to rate limiting")
 @skip_if_no_network
 @slow  # ~7s
 @integration

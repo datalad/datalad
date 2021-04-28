@@ -314,10 +314,11 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
             recursion_limit=recursion_limit,
             # make it as fast as possible
             eval_file_type=False,
-            # we relay on all records of a dataset coming out
-            # in succession, with no interuption by records
-            # concerning subdataset content
-            reporting_order='breadth-first'):
+            # TODO?: expose order as an option for diff and push
+            # since in some cases breadth-first would be sufficient
+            # and result in "taking action faster"
+            reporting_order='bottom-up'
+    ):
         if res.get('action', None) != 'diff':
             # we don't care right now
             continue
@@ -331,9 +332,9 @@ def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
                 'Cannot handle diff result without a parent dataset '
                 'property: {}'.format(res))
         if res.get('type', None) == 'dataset':
-            # a subdataset record in another data
+            # a subdataset record in another dataset
             # this could be here, because
-            # - this dataset with explicitely requested by path
+            # - this dataset was explicitly requested by path
             #   -> should get a dedicated dataset record -- even without recursion
             # - a path within an existing subdataset was given
             # - a path within an non-existing subdataset was given
@@ -386,7 +387,7 @@ def _push(dspath, content, target, data, force, jobs, res_kwargs, pbars,
 
     res_kwargs.update(type='dataset', path=dspath)
 
-    # content will be unique for every push (even on the some dataset)
+    # content will be unique for every push (even on the same dataset)
     pbar_id = 'push-{}-{}'.format(target, id(content))
     # register for final orderly take down
     pbars[pbar_id] = ds

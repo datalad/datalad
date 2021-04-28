@@ -595,7 +595,7 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         if self._silent:
             return
-        lgr.debug("HTTP: " + format % args)
+        lgr.debug("HTTP: " + format, *args)
 
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
@@ -1100,7 +1100,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 break
             ntested += 1
             if __debug__:
-                lgr.debug('Running %s on %s' % (t.__name__, uri))
+                lgr.debug('Running %s on %s', t.__name__, uri)
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
@@ -1378,24 +1378,31 @@ def assert_result_count(results, n, **kwargs):
                 _format_res(results)))
 
 
-def assert_in_results(results, **kwargs):
-    """Verify that the particular combination of keys and values is found in
-    one of the results"""
+def _check_results_in(should_contain, results, **kwargs):
     found = False
     for r in ensure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    if not found:
-        raise AssertionError(
-            "Desired result\n{}\nnot found among\n{}"
-            .format(_format_res(kwargs), _format_res(results)))
+            break
+    if found ^ should_contain:
+        if should_contain:
+            msg = "Desired result\n{}\nnot found among\n{}"
+        else:
+            msg = "Result\n{}\nunexpectedly found among\n{}"
+        raise AssertionError(msg.format(_format_res(kwargs),
+                                        _format_res(results)))
+
+
+def assert_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is found in
+    one of the results"""
+    _check_results_in(True, results, **kwargs)
 
 
 def assert_not_in_results(results, **kwargs):
     """Verify that the particular combination of keys and values is not in any
     of the results"""
-    for r in ensure_list(results):
-        assert any(k not in r or r[k] != v for k, v in kwargs.items())
+    _check_results_in(False, results, **kwargs)
 
 
 def assert_result_values_equal(results, prop, values):

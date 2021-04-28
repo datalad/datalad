@@ -9,6 +9,76 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.14.2 (April 14, 2021) -- .
+
+### Fixes
+
+- [push][] now works bottom-up, pushing submodules first so that hooks
+  on the remote can aggregate updated subdataset information. ([#5416][])
+
+- [run-procedure][] didn't ensure that the configuration of
+  subdatasets was reloaded.  ([#5552][])
+
+
+## 0.14.1 (April 01, 2021) -- .
+
+### Fixes
+
+- The recent default branch changes on GitHub's side can lead to
+  "git-annex" being selected over "master" as the default branch on
+  GitHub when setting up a sibling with [create-sibling-github][].  To
+  work around this, the current branch is now pushed first.
+  ([#5010][])
+
+- The logic for reading in a JSON line from git-annex failed if the
+  response exceeded the buffer size (256 KB on *nix systems).
+
+- Calling [unlock][] with a path of "." from within an untracked
+  subdataset incorrectly aborted, complaining that the "dataset
+  containing given paths is not underneath the reference dataset".
+  ([#5458][])
+
+- [clone][] didn't account for the possibility of multiple accessible
+  ORA remotes or the fact that none of them may be associated with the
+  RIA store being cloned.  ([#5488][])
+
+- [create-sibling-ria][] didn't call `git update-server-info` after
+  setting up the remote repository and, as a result, the repository
+  couldn't be fetched until something else (e.g., a push) triggered a
+  call to `git update-server-info`.  ([#5531][])
+
+- The parser for git-config output didn't properly handle multi-line
+  values and got thrown off by unexpected and unrelated lines.  ([#5509][])
+
+- The 0.14 release introduced regressions in the handling of progress
+  bars for git-annex actions, including collapsing progress bars for
+  concurrent operations.  ([#5421][]) ([#5438][])
+
+- [save][] failed if the user configured Git's `diff.ignoreSubmodules`
+  to a non-default value.  ([#5453][])
+
+- A interprocess lock is now used to prevent a race between checking
+  for an SSH socket's existence and creating it.  ([#5466][])
+
+- If a Python procedure script is executable, [run-procedure][]
+  invokes it directly rather than passing it to `sys.executable`.  The
+  non-executable Python procedures that ship with DataLad now include
+  shebangs so that invoking them has a chance of working on file
+  systems that present all files as executable.  ([#5436][])
+
+- DataLad's wrapper around `argparse` failed if an underscore was used
+  in a positional argument.  ([#5525][])
+
+### Enhancements and new features
+
+- DataLad's method for mapping environment variables to configuration
+  options (e.g., `DATALAD_FOO_X__Y` to `datalad.foo.x-y`) doesn't work
+  if the subsection name ("FOO") has an underscore.  This limitation
+  can be sidestepped with the new `DATALAD_CONFIG_OVERRIDES_JSON`
+  environment variable, which can be set to a JSON record of
+  configuration values.  ([#5505][])
+
+
 ## 0.14.0 (February 02, 2021) -- .
 
 ### Major refactoring and deprecations
@@ -3519,6 +3589,7 @@ publishing
 [#5001]: https://github.com/datalad/datalad/issues/5001
 [#5002]: https://github.com/datalad/datalad/issues/5002
 [#5008]: https://github.com/datalad/datalad/issues/5008
+[#5010]: https://github.com/datalad/datalad/issues/5010
 [#5017]: https://github.com/datalad/datalad/issues/5017
 [#5022]: https://github.com/datalad/datalad/issues/5022
 [#5025]: https://github.com/datalad/datalad/issues/5025
@@ -3579,3 +3650,16 @@ publishing
 [#5350]: https://github.com/datalad/datalad/issues/5350
 [#5367]: https://github.com/datalad/datalad/issues/5367
 [#5391]: https://github.com/datalad/datalad/issues/5391
+[#5416]: https://github.com/datalad/datalad/issues/5416
+[#5421]: https://github.com/datalad/datalad/issues/5421
+[#5436]: https://github.com/datalad/datalad/issues/5436
+[#5438]: https://github.com/datalad/datalad/issues/5438
+[#5453]: https://github.com/datalad/datalad/issues/5453
+[#5458]: https://github.com/datalad/datalad/issues/5458
+[#5466]: https://github.com/datalad/datalad/issues/5466
+[#5488]: https://github.com/datalad/datalad/issues/5488
+[#5505]: https://github.com/datalad/datalad/issues/5505
+[#5509]: https://github.com/datalad/datalad/issues/5509
+[#5525]: https://github.com/datalad/datalad/issues/5525
+[#5531]: https://github.com/datalad/datalad/issues/5531
+[#5552]: https://github.com/datalad/datalad/issues/5552

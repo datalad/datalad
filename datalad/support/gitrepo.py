@@ -53,7 +53,7 @@ from datalad.cmd import (
 )
 from datalad.config import (
     ConfigManager,
-    _parse_gitconfig_dump,
+    parse_gitconfig_dump,
     write_config_section,
 )
 
@@ -790,6 +790,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     GIT_MIN_VERSION = "2.19.1"
     git_version = None
 
+    # Could be used to e.g. disable automatic garbage and autopacking
+    # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+    _GIT_COMMON_OPTIONS = ["-c", "diff.ignoreSubmodules=none"]
+    _git_cmd_prefix = ["git"] + _GIT_COMMON_OPTIONS
+
     def _flyweight_invalid(self):
         return not self.is_valid_git()
 
@@ -920,10 +925,6 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
-
-        # Could be used to e.g. disable automatic garbage and autopacking
-        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-        self._GIT_COMMON_OPTIONS = []
 
         if git_opts is None:
             git_opts = {}
@@ -1083,6 +1084,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     lgr.info("Expanded source path to %s from %s", new_url, url)
                     url = new_url
 
+        cmd_base = cls._git_cmd_prefix + ['clone', '--progress']
         fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
@@ -1090,7 +1092,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
 
                 res = GitWitlessRunner().run(
-                        ['git', 'clone', '--progress', url, path] \
+                        cmd_base + [url, path] \
                         + (to_options(**clone_options)
                            if clone_options else []),
                         protocol=GitProgress,
@@ -1450,7 +1452,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
             # confirmed?
             # What's best in case of a list of files?
         except OSError as e:
-            lgr.error("add: %s" % e)
+            lgr.error("add: %s", e)
             raise
 
         # Make sure return value from GitRepo is consistent with AnnexRepo
@@ -1666,7 +1668,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         self.precommit()
 
         # assemble commandline
-        cmd = ['git', 'commit']
+        cmd = self._git_cmd_prefix + ['commit']
         options = ensure_list(options)
 
         if date:
@@ -1689,7 +1691,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if index_file:
             env['GIT_INDEX_FILE'] = index_file
 
-        lgr.debug("Committing via direct call of git: %s" % cmd)
+        lgr.debug("Committing via direct call of git: %s", cmd)
 
         file_chunks = generate_file_chunks(files, cmd) if files else [[]]
 
@@ -2114,7 +2116,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         runner = self._git_runner
         stderr_log_level = {True: 5, False: 11}[expect_stderr]
 
-        cmd = ['git'] + self._GIT_COMMON_OPTIONS + args
+        cmd = self._git_cmd_prefix + args
 
         env = None
         if not read_only and self.fake_dates_enabled:
@@ -2342,7 +2344,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     def fetch_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `fetch`, but returns a generator"""
         yield from self._fetch_push_helper(
-            base_cmd=['git', 'fetch', '--verbose', '--progress'],
+            base_cmd=self._git_cmd_prefix + ['fetch', '--verbose', '--progress'],
             action='fetch',
             urlvars=('remote.{}.url', 'remote.{}.url'),
             protocol=GitProgress,
@@ -2376,7 +2378,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if kwargs:
             git_options.extend(to_options(**kwargs))
 
-        cmd = ['git', 'pull', '--progress'] + git_options
+        cmd = ['git'] + self._GIT_COMMON_OPTIONS
+        cmd.extend(['pull', '--progress'] + git_options)
 
         if remote is None:
             if refspec:
@@ -2413,6 +2416,15 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
              all_=False, git_options=None, **kwargs):
         """Push changes to a remote (or all remotes).
 
+        If remote and refspec are specified, and remote has
+        `remote.{remote}.datalad-push-default-first` configuration variable
+        set (e.g. by `create-sibling-github`), we will first push the first
+        refspec separately to possibly ensure that the first refspec is chosen
+        by remote as the "default branch".
+        See https://github.com/datalad/datalad/issues/4997
+        Upon successful push if this variable was set in the local git config,
+        we unset it, so subsequent pushes would proceed normally.
+
         Parameters
         ----------
         remote : str, optional
@@ -2434,19 +2446,36 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if all_remotes:
             # be nice to the elderly
             all_ = True
-        return list(
-            self.push_(
-                remote=remote,
-                refspec=refspec,
-                all_=all_,
-                git_options=git_options,
+
+        push_refspecs = [refspec]
+        cfg = self.config  # shortcut
+        cfg_push_var = "remote.{}.datalad-push-default-first".format(remote)
+        if remote and refspec and cfg.obtain(cfg_push_var, default=False, valtype=bool):
+            refspec = ensure_list(refspec)
+            lgr.debug("As indicated by %s pushing first refspec %s separately first",
+                      cfg_push_var, refspec[0])
+            push_refspecs = [[refspec[0]], refspec[1:]]
+
+        push_res = []
+        for refspecs in push_refspecs:
+            push_res.extend(
+                self.push_(
+                    remote=remote,
+                    refspec=refspecs,
+                    all_=all_,
+                    git_options=git_options,
+                )
             )
-        )
+        # note: above push_ should raise exception if errors out
+        if cfg.get_from_source('local', cfg_push_var) is not None:
+            lgr.debug("Removing %s variable from local git config after successful push", cfg_push_var)
+            cfg.unset(cfg_push_var, 'local')
+        return push_res
 
     def push_(self, remote=None, refspec=None, all_=False, git_options=None):
         """Like `push`, but returns a generator"""
         yield from self._fetch_push_helper(
-            base_cmd=['git', 'push', '--progress', '--porcelain'],
+            base_cmd=self._git_cmd_prefix + ['push', '--progress', '--porcelain'],
             action='push',
             urlvars=('remote.{}.pushurl', 'remote.{}.url'),
             protocol=StdOutCaptureWithGitProgress,
@@ -2757,7 +2786,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         # anyways, and they should not appear in a normal .gitmodules file
         # but could easily appear when duplicates are included. In this case,
         # we better not crash
-        db, _ = _parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
+        db, _ = parse_gitconfig_dump(out, cwd=self.path, multi_value=False)
         mods = {}
         for k, v in db.items():
             if not k.startswith('submodule.'):
@@ -4143,7 +4172,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                     if 'error-messages' in r else None,
                     logger=lgr)
         except OSError as e:
-            lgr.error("add: %s" % e)
+            lgr.error("add: %s", e)
             raise
 
     def _save_add_submodules(self, paths):

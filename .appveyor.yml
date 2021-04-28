@@ -70,7 +70,7 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     # Windows core tests
     - ID: WinP39core
       # ~35 min
@@ -160,14 +160,14 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
     - ID: Ubu20P37
       PY: 3.7
       DTS: datalad
       APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu2004
       INSTALL_SYSPKGS: python3-virtualenv
       # system git-annex is way too old, use better one
-      INSTALL_GITANNEX: git-annex -m deb-url --url http://ftp.us.debian.org/debian/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
+      INSTALL_GITANNEX: git-annex -m deb-url --url http://snapshot.debian.org/archive/debian/20201228T023115Z/pool/main/g/git-annex/git-annex_8.20201127-1_amd64.deb
 
 matrix:
   allow_failures:
@@ -250,8 +250,8 @@ install:
   - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
-  - cmd: IF DEFINED INSTALL_GITANNEX python datalad_installer.py %INSTALL_GITANNEX%
-  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && python datalad_installer.py ${INSTALL_GITANNEX}"
+  - cmd: IF DEFINED INSTALL_GITANNEX python datalad_installer.py --sudo ok %INSTALL_GITANNEX%
+  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && python datalad_installer.py --sudo ok ${INSTALL_GITANNEX}"
   # TODO remove when datalad-installer can handle this
   - cmd: tools\ci\appveyor_install_git-annex.bat
 
@@ -288,13 +288,15 @@ test_script:
 
 
 after_test:
-  # prepare coverage.xml in a separate invocation.
-  # if invoked directly with nose - do not include test_ files themselves
-  - python -m coverage xml
-  - cmd: powershell Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
-  - cmd: "set PATH=C:\\msys64\\usr\\bin;%PATH%"
-  - cmd: bash codecov.sh -f "coverage.xml" -U "-s" -A "-s" 
-  - sh: bash <(curl -s https://codecov.io/bash)
+  # move coverage into the project dir to make default handling applicable
+  - cmd: move .coverage ..
+  - sh: mv .coverage ..
+  - cd ..
+  # use windows codecov uploader package
+  - cmd: choco install codecov
+  - cmd: python -m coverage xml
+  - cmd: codecov -f coverage.xml
+  - sh: bash <(curl -sfS https://codecov.io/bash)
 
 
 #on_success:

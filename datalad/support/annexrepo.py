@@ -209,7 +209,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                               ' Initializing ...' % self.path)
                     do_init = True
             elif create:
-                lgr.debug('Initializing annex repository at %s...' % self.path)
+                lgr.debug('Initializing annex repository at %s...', self.path)
                 do_init = True
             else:
                 raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
@@ -3410,6 +3410,7 @@ class AnnexJsonProtocol(WitlessProtocol):
         super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
+        self._unprocessed = None
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -3435,54 +3436,101 @@ class AnnexJsonProtocol(WitlessProtocol):
             # let the base class decide what to do with it
             super().pipe_data_received(fd, data)
             return
+        if self._unprocessed:
+            data = self._unprocessed + data
+            self._unprocessed = None
         # this is where the JSON records come in
         # json_loads() is already logging any error, which is OK, because
         # under no circumstances we would expect broken JSON
-        for line in data.splitlines():
+        lines = data.splitlines()
+        for iline, line in enumerate(lines):
             try:
                 j = json_loads(line)
-            except Exception:
-                # TODO turn this into an error result, or put the exception
-                # onto the result future -- needs more thought
+            except Exception as exc:
                 if line.strip():
                     # do not complain on empty lines
-                    lgr.error('Received undecodable JSON output: %s', data)
+                    if iline == len(lines) - 1 and not data.endswith(os.linesep.encode()):
+                        lgr.debug("Caught %s while trying to parse JSON line %s which might "
+                                  "be not yet a full line", exc, line)
+                        # it is the last line and fails to parse -- it can/likely
+                        # to happen that it was not a complete line and that buffer
+                        # got filled up/provided before the end of line.
+                        # Store it so that it can be prepended to data in the next call.
+                        self._unprocessed = line
+                        break
+                    # TODO turn this into an error result, or put the exception
+                    # onto the result future -- needs more thought
+                    lgr.error('Received undecodable JSON output: %s', line)
                 continue
             self._proc_json_record(j)
+
+    def _get_pbar_id(self, record):
+        # NOTE: Look at the "action" field for byte-progress records and the
+        # top-level `record` for the final record. The action record as a whole
+        # should be stable link across byte-progress records, but a subset of
+        # the keys is hard coded below so that the action record can be linked
+        # to the final one.
+        info = record.get("action") or record
+        return 'annexprogress-{}-{}'.format(
+            id(self),
+            hash(frozenset((k, info.get(k))
+                           for k in ["command", "key", "file"])))
+
+    def _get_pbar_label(self, action):
+        # do not crash if no command is reported
+        label = action.get('command', '').capitalize()
+        target = action.get('file') or action.get('key')
+        if target:
+            label += " " + target
+
+        if label:
+            from datalad.ui import utils as ui_utils
+            # Reserving 55 characters for the progress bar is based
+            # approximately off what used to be done in the now-removed
+            # (948ccf3e18) ProcessAnnexProgressIndicators.
+            max_label_width = ui_utils.get_console_width() - 55
+            if max_label_width < 0:
+                # We're squeezed. Just show bar.
+                label = ""
+            elif len(label) > max_label_width:
+                mid = max_label_width // 2
+                label = label[:mid] + " .. " + label[-mid:]
+        return label
 
     def _proc_json_record(self, j):
         # check for progress reports and act on them immediately
         # but only if there is something to build a progress report from
-        if 'action' in j and 'byte-progress' in j:
-            for err_msg in j['action'].pop('error-messages', []):
+        pbar_id = self._get_pbar_id(j)
+        known_pbar = pbar_id in self._pbars
+        action = j.get('action')
+        if action:
+            for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
-            # use the action report to build a stable progress bar ID
-            pbar_id = 'annexprogress-{}-{}'.format(
-                id(self),
-                hash(frozenset(j['action'])))
-            if pbar_id in self._pbars and \
-                    j.get('byte-progress', None) == j.get('total-size', None):
-                # take a known pbar down, completion or broken report
-                log_progress(
-                    lgr.info,
-                    pbar_id,
-                    'Finished annex action: {}'.format(j['action']),
-                    noninteractive_level=5,
-                )
-                self._pbars.discard(pbar_id)
-                # we are done here
+
+        is_progress = action and 'byte-progress' in j
+        if known_pbar and (not is_progress or
+                           j.get('byte-progress') == j.get('total-size')):
+            # take a known pbar down, completion or broken report
+            log_progress(
+                lgr.info,
+                pbar_id,
+                'Finished annex action: {}'.format(action),
+                noninteractive_level=5,
+            )
+            self._pbars.discard(pbar_id)
+            if is_progress:
+                # The final record is yet to come.
                 return
 
-            if pbar_id not in self._pbars and \
-                    j.get('byte-progress', None) != j.get('total-size', None):
+        if is_progress:
+            if not known_pbar:
                 # init the pbar, the is some progress left to be made
                 # worth it
                 log_progress(
                     lgr.info,
                     pbar_id,
-                    'Start annex action: {}'.format(j['action']),
-                    # do not crash if no command is reported
-                    label=j['action'].get('command', '').capitalize(),
+                    'Start annex action: {}'.format(action),
+                    label=self._get_pbar_label(action),
                     unit=' Bytes',
                     total=float(j.get('total-size', 0)),
                     noninteractive_level=5,
@@ -3545,6 +3593,11 @@ class AnnexJsonProtocol(WitlessProtocol):
                 pbar_id,
                 'Finished',
                 noninteractive_level=5,
+            )
+        if self._unprocessed:
+            lgr.error(
+                "%d bytes of received undecodable JSON output remain: %s",
+                len(self._unprocessed), self._unprocessed
             )
         super().process_exited()
 
@@ -3620,14 +3673,14 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
     """Read stdout until line ends with ok or failed"""
     out = ''
     i = 0
-    lgr.log(3, "Trying to receive from %s" % stdout)
+    lgr.log(3, "Trying to receive from %s", stdout)
     while not stdout.closed:
         i += 1
         if maxlines > 0 and i > maxlines:
             raise IOError("Expected no more than %d lines. So far received: %r" % (maxlines, out))
         lgr.log(2, "Expecting a line")
         line = stdout.readline()
-        lgr.log(2, "Received line %r" % line)
+        lgr.log(2, "Received line %r", line)
         out += line
         if re.match(r'^.*\b(failed|ok)$', line.rstrip()):
             break

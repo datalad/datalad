@@ -40,6 +40,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
     ConfigManager,
+    parse_gitconfig_dump,
     rewrite_url,
     write_config_section,
 )
@@ -63,10 +64,57 @@ myint = 3
 findme = 5.0
 """
 
+gitcfg_dump = """\
+core.withdot
+true\0just.a.key\0annex.version
+8\0filter.with2dots.some
+long\ntext with\nnewlines\0annex.something
+abcdef\0"""
+
+
+# include a "command line" origin
+gitcfg_dump_w_origin = """\
+file:.git/config\0core.withdot
+true\0file:.git/config\0just.a.key\0file:/home/me/.gitconfig\0annex.version
+8\0file:.git/config\0filter.with2dots.some
+long\ntext with\nnewlines\0file:.git/config\0command line:\0annex.something
+abcdef\0"""
+
+
+gitcfg_parsetarget = {
+    'core.withdot': 'true',
+    'just.a.key': None,
+    'annex.version': '8',
+    'filter.with2dots.some': 'long\ntext with\nnewlines',
+    'annex.something': 'abcdef',
+}
+
+
 _dataset_config_template = {
     'ds': {
         '.datalad': {
             'config': _config_file_content}}}
+
+
+def test_parse_gitconfig_dump():
+    # simple case, no origin info, clean output
+    parsed, files = parse_gitconfig_dump(gitcfg_dump)
+    assert_equal(files, set())
+    assert_equal(gitcfg_parsetarget, parsed)
+    # now with origin information in the dump
+    parsed, files = parse_gitconfig_dump(gitcfg_dump_w_origin, cwd='ROOT')
+    assert_equal(
+        files,
+        # the 'command line:' origin is ignored
+        set((Path('ROOT/.git/config'), Path('/home/me/.gitconfig'))))
+    assert_equal(gitcfg_parsetarget, parsed)
+
+    # now contaminate the output with a prepended error message
+    # https://github.com/datalad/datalad/issues/5502
+    # must work, but really needs the trailing newline
+    parsed, files = parse_gitconfig_dump(
+        "unfortunate stdout\non more lines\n" + gitcfg_dump_w_origin)
+    assert_equal(gitcfg_parsetarget, parsed)
 
 
 @with_tree(tree=_dataset_config_template)
@@ -361,6 +409,46 @@ def test_from_env():
         assert_equal(cfg['datalad.crazy.override'], 'fromenv')
 
 
+def test_from_env_overrides():
+    cfg = ConfigManager()
+    assert_not_in("datalad.FoO", cfg)
+
+    # Some details, like case and underscores, cannot be handled by the direct
+    # environment variable mapping.
+    with patch.dict("os.environ",
+                    {"DATALAD_FOO": "val"}):
+        cfg.reload()
+        assert_not_in("datalad.FoO", cfg)
+        assert_equal(cfg["datalad.foo"], "val")
+
+    # But they can be handled via DATALAD_CONFIG_OVERRIDES_JSON.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"datalad.FoO": "val"}'}):
+        cfg.reload()
+        assert_equal(cfg["datalad.FoO"], "val")
+
+    # DATALAD_CONFIG_OVERRIDES_JSON isn't limited to datalad variables.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"a.b.c": "val"}'}):
+        cfg.reload()
+        assert_equal(cfg["a.b.c"], "val")
+
+    # Explicitly provided DATALAD_ variables take precedence over those in
+    # DATALAD_CONFIG_OVERRIDES_JSON.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"datalad.foo": "val"}',
+                     "DATALAD_FOO": "val-direct"}):
+        cfg.reload()
+        assert_equal(cfg["datalad.foo"], "val-direct")
+
+    # JSON decode errors don't lead to crash.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{'}):
+        with swallow_logs(logging.WARNING) as cml:
+            cfg.reload()
+        assert_in("Failed to load DATALAD_CONFIG_OVERRIDE", cml.out)
+
+
 def test_overrides():
     cfg = ConfigManager()
     # any sensible (and also our CI) test environment(s) should have this
@@ -600,4 +688,3 @@ def test_external_modification(path):
     runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
     config.reload()
     assert_equal(config[key], '11')
-

@@ -155,7 +155,7 @@ def load_interface(spec):
     if isinstance(spec[1], dict):
         intf = _load_plugin(spec[1]['file'], fail=False)
     else:
-        lgr.log(5, "Importing module %s " % spec[0])
+        lgr.log(5, "Importing module %s ", spec[0])
         try:
             mod = import_module(spec[0], package='datalad')
         except Exception as e:
@@ -354,12 +354,12 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     # get the signature
     ndefaults = 0
     args, varargs, varkw, defaults = getargspec(func)
+    defaults = defaults or tuple()
     if add_args:
         add_argnames = sorted(add_args.keys())
         args.extend(add_argnames)
         defaults = defaults + tuple(add_args[k] for k in add_argnames)
-    if defaults is not None:
-        ndefaults = len(defaults)
+    ndefaults = len(defaults)
     # start documentation with what the callable brings with it
     doc = prefix if prefix else u''
     if len(args) > 1:
@@ -662,33 +662,49 @@ class Interface(object):
         # get the signature
         ndefaults = 0
         args, varargs, varkw, defaults = getargspec(cls.__call__)
-        if not defaults is None:
+        if defaults is not None:
             ndefaults = len(defaults)
+        default_offset = ndefaults - len(args)
+        prefix_chars = parser.prefix_chars
         for i, arg in enumerate(args):
             if not is_api_arg(arg):
                 continue
             param = cls._params_[arg]
-            defaults_idx = ndefaults - len(args) + i
+            defaults_idx = default_offset + i
             cmd_args = param.cmd_args
             if cmd_args == tuple():
                 # explicitly provided an empty sequence of argument names
                 # this shall not appear in the parser
                 continue
-            elif cmd_args is None:
-                cmd_args = []
-            if not len(cmd_args):
-                if defaults_idx >= 0:
-                    # dealing with a kwarg
-                    template = '--%s'
-                else:
-                    # positional arg
-                    template = '%s'
-                # use parameter name as default argument name
-                parser_args = (template % arg.replace('_', '-'),)
-            else:
-                parser_args = [c.replace('_', '-') for c in cmd_args]
+
             parser_kwargs = param.cmd_kwargs
-            if defaults_idx >= 0:
+            has_default = defaults_idx >= 0
+            if cmd_args:
+                if cmd_args[0][0] in prefix_chars:
+                    # TODO: All the Paramteter(args=...) values in this code
+                    # base use hyphens, so there is no point in the below
+                    # conversion. If it looks like no extensions rely on this
+                    # behavior either, this could be dropped.
+                    parser_args = [c.replace('_', '-') for c in cmd_args]
+                else:
+                    # Argparse will not convert dashes to underscores for
+                    # arguments that don't start with a prefix character, so
+                    # the above substitution must be avoided so that
+                    # call_from_parser() can find the corresponding parameter.
+                    parser_args = cmd_args
+            elif has_default:
+                # Construct the option from the Python parameter name.
+                parser_args = ("--{}".format(arg.replace("_", "-")),)
+            else:
+                # If args= wasn't given and its a positional argument in the
+                # function, add a positional argument to argparse. If `dest` is
+                # specified, we need to remove it from the keyword arguments
+                # because add_argument() expects it as the first argument. Note
+                # that `arg` shouldn't have a dash here, but `metavar` can be
+                # used if a dash is preferred for the command-line help.
+                parser_args = (parser_kwargs.pop("dest", arg),)
+
+            if has_default:
                 parser_kwargs['default'] = defaults[defaults_idx]
             help = alter_interface_docs_for_cmdline(param._doc)
             if help and help.rstrip()[-1] != '.':

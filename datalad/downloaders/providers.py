@@ -254,7 +254,7 @@ class Providers(object):
                 lgr.warning("Do not know how to treat section %s here" % section)
 
         # link credentials into providers
-        lgr.debug("Assigning credentials into %d providers" % len(providers))
+        lgr.debug("Assigning credentials into %d providers", len(providers))
         for provider in providers.values():
             if provider.credential:
                 if provider.credential not in credentials:
@@ -356,7 +356,7 @@ class Providers(object):
         # protocols
         scheme = Provider.get_scheme_from_url(url)
         if scheme not in self._default_providers:
-            lgr.debug("Initializing default provider for %s" % scheme)
+            lgr.debug("Initializing default provider for %s", scheme)
             self._default_providers[scheme] = Provider(name="", url_res=["%s://.*" % scheme])
         provider = self._default_providers[scheme]
         lgr.debug("No dedicated provider, returning default one for %s: %s",

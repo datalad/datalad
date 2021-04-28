@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import os.path as op
 import sys
+from unittest.mock import patch
 
 from datalad.cmd import (
     WitlessRunner,
@@ -39,7 +40,6 @@ from datalad.tests.utils import (
     on_windows,
     patch_config,
     skip_if,
-    skip_if_on_windows,
     with_tempfile,
     with_tree,
 )
@@ -346,7 +346,6 @@ def test_quoting(path):
                 protocol=KillOutput)
 
 
-@skip_if_on_windows
 @with_tree(tree={
     # "TEXT" ones
     'empty': '',  # we have special rule to treat empty ones as text
@@ -393,3 +392,42 @@ def test_text2git(path):
     # and trivial binaries - annexed
     for f in BINARY_FILES:
         assert_true(ds.repo.is_under_annex(f))
+
+
+@with_tree(tree={".datalad": {"procedures": {"print_args": """
+import sys
+print(sys.argv)
+"""}}})
+def test_name_with_underscore(path):
+    ds = Dataset(path).create(force=True)
+
+    # Procedure name with underscore can't be reached directly with a DATALAD_
+    # environment variable.
+    with patch.dict("os.environ",
+                    {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
+                     'python {script}'}):
+        with assert_raises(ValueError):
+            ds.run_procedure(spec=["print_args"])
+
+    # But it can be set via DATALAD_CONFIG_OVERRIDES_JSON.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON":
+                     '{"datalad.procedures.print_args.call-format": '
+                     '"python {script}"}'}):
+        ds.config.reload()
+        ds.run_procedure(spec=["print_args"])
+
+
+@with_tempfile
+def test_call_fmt_from_env_requires_reload(path):
+    ds = Dataset(path).create()
+    subds = ds.create("sub")
+    (subds.pathobj / ".datalad" / "procedures").mkdir(
+        parents=True, exist_ok=True)
+    script = subds.pathobj / ".datalad" / "procedures" / "p"
+    script.write_text("import sys; assert len(sys.argv) == 1")
+    with patch.dict("os.environ",
+                    {"DATALAD_PROCEDURES_P_CALL__FORMAT":
+                     f"{sys.executable} {{script}}"}):
+        # This will fail if the above environment variable isn't in effect.
+        ds.run_procedure("p")

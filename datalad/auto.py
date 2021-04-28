@@ -99,6 +99,7 @@ class AutomagicIO(object):
         self._patch = patch
         self._paths_cache = set() if check_once else None
         self._repos_cache = {} if check_once else None
+        self._getting_repo_instance = False
         if activate:
             self.activate()
 
@@ -125,6 +126,8 @@ class AutomagicIO(object):
         try:
             if self._in_open:
                 raise _EarlyExit("within open already")
+            if self._getting_repo_instance:
+                raise _EarlyExit("we are opening an annex repo - no files must be annexed")
             self._in_open = True  # just in case someone kept alias/assignment
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
@@ -241,11 +244,18 @@ class AutomagicIO(object):
             try:
                 # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
                 # see https://github.com/datalad/datalad/issues/204
+                #
+                # While getting a repo instance, we should not bother to proxy any call
+                # since there should be no file we are to get.  This should address
+                # circular call-in and causing a lockdown of https://github.com/datalad/datalad/issues/5379
+                self._getting_repo_instance = True
                 annex = get_repo_instance(filedir)
                 lgr.log(2, "Got the repository %s id:%s containing %s", annex, id(annex), filedir)
             except (RuntimeError, InvalidGitRepositoryError) as e:
                 # must be not under annex etc
                 return
+            finally:
+                self._getting_repo_instance = False
             if self._repos_cache is not None:
                 self._repos_cache[filedir] = annex
         if not isinstance(annex, AnnexRepo):
@@ -293,7 +303,7 @@ class AutomagicIO(object):
             # wrong or being undesired. Nested invokation could happen
             # caused by independent pieces of code, e.g. user code
             # that invokes our own metadata handling.
-            lgr.debug("%s already active. No action taken" % self)
+            lgr.debug("%s already active. No action taken", self)
             return
         # overloads
         builtins.open = self._proxy_open

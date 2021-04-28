@@ -81,8 +81,6 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
       The nature of the return value is determined by the given
       protocol class.
     """
-    lgr.debug('Async run %s', cmd)
-
     if protocol_kwargs is None:
         protocol_kwargs = {}
     cmd_done = asyncio.Future(loop=loop)
@@ -179,7 +177,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             # The way we log is to stay consistent with Runner.
             # TODO: later we might just log in a single entry, without
             # fd_name prefix
-            lgr.log(5, "%s| %s " % (fd_name, log_data))
+            lgr.log(5, "%s| %s ", fd_name, log_data)
 
     def connection_made(self, transport):
         self.transport = transport
@@ -376,6 +374,7 @@ class WitlessRunner(object):
             event_loop = self._get_new_event_loop()
             new_loop = True
         try:
+            lgr.debug('Async run:\n cwd=%s\n cmd=%s', cwd, cmd)
             # include the subprocess manager in the asyncio event loop
             results = event_loop.run_until_complete(
                 run_async_cmd(
@@ -706,8 +705,8 @@ class BatchedCommand(SafeDelCloseMixin):
         self._stderr_out_fname = None
 
     def _initialize(self):
-        lgr.debug("Initiating a new process for %s" % repr(self))
-        lgr.log(5, "Command: %s" % self.cmd)
+        lgr.debug("Initiating a new process for %s", repr(self))
+        lgr.log(5, "Command: %s", self.cmd)
         # according to the internet wisdom there is no easy way with subprocess
         # while avoid deadlocks etc.  We would need to start a thread/subprocess
         # to timeout etc
@@ -784,7 +783,7 @@ class BatchedCommand(SafeDelCloseMixin):
             self._initialize()
 
         entry = arg + '\n'
-        lgr.log(5, "Sending %r to batched command %s" % (entry, self))
+        lgr.log(5, "Sending %r to batched command %s", entry, self)
         # apparently communicate is just a one time show
         # stdout, stderr = self._process.communicate(entry)
         # according to the internet wisdom there is no easy way with subprocess
@@ -804,7 +803,7 @@ class BatchedCommand(SafeDelCloseMixin):
             if not process.stdout.closed else None
         if stderr:
             lgr.warning("Received output in stderr: %r", stderr)
-        lgr.log(5, "Received output: %r" % stdout)
+        lgr.log(5, "Received output: %r", stdout)
         return stdout
 
     def close(self, return_stderr=False):

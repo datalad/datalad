@@ -22,6 +22,7 @@ from textwrap import wrap
 from ..cmd import WitlessRunner as Runner
 from ..log import is_interactive
 from ..utils import (
+    ensure_unicode,
     getpwd,
     unlink,
 )
@@ -142,6 +143,73 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
         parser.add_argument(*names, **opt_kwargs)
 
 
+def parser_add_common_options(parser, version):
+    parser_add_common_opt(parser, 'log_level')
+    parser_add_common_opt(parser, 'pbs_runner')
+    parser_add_common_opt(parser, 'change_path')
+    parser_add_common_opt(
+        parser,
+        'version',
+        version=f'datalad {version}\n')
+    if __debug__:
+        parser.add_argument(
+            '--dbg', action='store_true', dest='common_debug',
+            help="enter Python debugger when uncaught exception happens")
+        parser.add_argument(
+            '--idbg', action='store_true', dest='common_idebug',
+            help="enter IPython debugger when uncaught exception happens")
+    parser.add_argument(
+        '-c', action='append', dest='cfg_overrides', metavar='KEY=VALUE',
+        help="""configuration variable setting. Overrides any configuration
+        read from a file, but is potentially overridden itself by configuration
+        variables in the process environment.""")
+    parser.add_argument(
+        '-f', '--output-format', dest='common_output_format',
+        default='default',
+        type=ensure_unicode,
+        metavar="{default,json,json_pp,tailored,'<template>'}",
+        help="""select format for returned command results. 'default' give one line
+        per result reporting action, status, path and an optional message;
+        'json' renders a JSON object with all properties for each result (one per
+        line); 'json_pp' pretty-prints JSON spanning multiple lines; 'tailored'
+        enables a command-specific rendering style that is typically
+        tailored to human consumption (no result output otherwise),
+        '<template>' reports any value(s) of any result properties in any format
+        indicated by the template (e.g. '{path}'; compare with JSON
+        output for all key-value choices). The template syntax follows the Python
+        "format() language". It is possible to report individual
+        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
+        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the template,
+        like so: '{metadata[music#Genre]}'.""")
+    parser.add_argument(
+        '--report-status', dest='common_report_status',
+        choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
+        help="""constrain command result report to records matching the given
+        status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands
+        for 'impossible' OR 'error'.""")
+    parser.add_argument(
+        '--report-type', dest='common_report_type',
+        choices=['dataset', 'file'],
+        action='append',
+        help="""constrain command result report to records matching the given
+        type. Can be given more than once to match multiple types.""")
+    parser.add_argument(
+        '--on-failure', dest='common_on_failure',
+        choices=['ignore', 'continue', 'stop'],
+        # no default: better be configure per-command
+        help="""when an operation fails: 'ignore' and continue with remaining
+        operations, the error is logged but does not lead to a non-zero exit code
+        of the command; 'continue' works like 'ignore', but an error causes a
+        non-zero exit code; 'stop' halts on first failure and yields non-zero exit
+        code. A failure is any result with status 'impossible' or 'error'.""")
+    parser.add_argument(
+        '--cmd', dest='_', action='store_true',
+        help="""syntactical helper that can be used to end the list of global
+        command line options before the subcommand label. Options taking
+        an arbitrary number of arguments may require to be followed by a single
+        --cmd in order to enable identification of the subcommand.""")
+
+
 def strip_arg_from_argv(args, value, opt_names):
     """Strip an originally listed option (with its value) from the list cmdline args
     """
@@ -188,7 +256,7 @@ queue
 """ % locals())
         f.close()
         Runner().run(['condor_submit', f.name])
-        lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
+        lgr.info("Scheduled execution via %s.  Logs will be stored under %s", pbs, logs)
     finally:
         unlink(f.name)
 

@@ -61,7 +61,7 @@ class _UI_Switcher(object):
 
     def set_backend(self, backend):
         if backend and (backend == self._backend):
-            lgr.debug("not changing backend since the same %s" % backend)
+            lgr.debug("not changing backend since the same %s", backend)
             return
         if backend is None:
             # Might be IPython
@@ -83,7 +83,7 @@ class _UI_Switcher(object):
             else:
                 backend = 'dialog' if is_interactive() else 'no-progress'
         self._ui = KNOWN_BACKENDS[backend]()
-        lgr.debug("UI set to %s" % self._ui)
+        lgr.debug("UI set to %s", self._ui)
         self._backend = backend
 
     @property

@@ -218,11 +218,21 @@ class CreateSiblingGithub(Interface):
         # lastly configure the local datasets
         for d, url, existed in rinfo:
             if not dryrun:
-                # first make sure that annex doesn't touch this one
-                # but respect any existing config
-                ignore_var = 'remote.{}.annex-ignore'.format(name)
-                if not ignore_var in d.config:
-                    d.config.add(ignore_var, 'true', where='local')
+                extra_remote_vars = {
+                    # first make sure that annex doesn't touch this one
+                    # but respect any existing config
+                    'annex-ignore': 'true',
+                    # first push should separately push active branch first
+                    # to overcome github issue of choosing "default" branch
+                    # alphabetically if its name does not match the default
+                    # branch for the user (or organization) which now defaults
+                    # to "main"
+                    'datalad-push-default-first': 'true'
+                }
+                for var_name, var_value in extra_remote_vars.items():
+                    var = 'remote.{}.{}'.format(name, var_name)
+                    if var not in d.config:
+                        d.config.add(var, var_value, where='local')
                 Siblings()(
                     'configure',
                     dataset=d,

@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     assert_false,
     assert_in,
     assert_in_results,
+    assert_not_is_instance,
     assert_message,
     assert_not_in,
     assert_raises,
@@ -572,6 +573,13 @@ def test_expanduser(srcpath, destpath):
     src = Dataset(Path(srcpath) / 'src').create()
     dest = Dataset(Path(destpath) / 'dest').create()
 
+    # We switch away from home set up in datalad.setup_package(), so make sure
+    # we have a valid identity.
+    with open(op.join(srcpath, ".gitconfig"), "w") as fh:
+        fh.write("[user]\n"
+                 "name = DataLad oooooTester\n"
+                 "email = test@example.com\n")
+
     with chpwd(destpath), patch.dict('os.environ', get_home_envvars(srcpath)):
         res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
@@ -624,8 +632,8 @@ def test_cfg_originorigin(path):
     with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*Async run \[('git', 'annex'|'git-annex'), "
-                              r"'init'",
+        cml.assert_logged(msg=r"[^[]*Async run:\n cwd=.*\n"
+                              r" cmd=\[('git',.*'annex'|'git-annex'), 'init'",
                           match=False,
                           level='DEBUG')
     assert_result_count(
@@ -891,6 +899,21 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                                                     if url.startswith('http')
                                                     else "store-storage"))
 
+    # Second ORA remote is enabled and not reconfigured:
+    untouched_remote = riaclone.siblings(name='anotherstore-storage',
+                                         return_type='item-or-list')
+    assert_not_is_instance(untouched_remote, list)
+    untouched_url = riaclone.repo.get_special_remotes()[
+        untouched_remote['annex-uuid']]['url']
+    ok_(untouched_url.startswith("ria+file://"))
+    ok_(not untouched_url.startswith("ria+{}".format(url)))
+
+    # publication dependency was set for store-storage but not for
+    # anotherstore-storage:
+    eq_(riaclone.config.get("remote.origin.datalad-publish-depends",
+                            get_all=True),
+        "store-storage")
+
     # same thing for the sub ds (we don't need a store-url and id - get should
     # figure those itself):
     with swallow_logs(new_level=logging.INFO) as cml:
@@ -909,6 +932,12 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
                                                     if url.startswith('http')
                                                     else "store-storage"))
 
+    # publication dependency was set for store-storage but not for
+    # anotherstore-storage:
+    eq_(riaclonesub.config.get("remote.origin.datalad-publish-depends",
+                               get_all=True),
+        "store-storage")
+
     # finally get the plain git subdataset.
     # Clone should figure to also clone it from a ria+ URL
     # (subdataset-source-candidate), notice that there wasn't an autoenabled ORA
@@ -917,6 +946,11 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     assert_result_count(res, 1, status='ok', type='dataset', action='install')
     assert_result_count(res, 1, status='notneeded', type='file')
     assert_result_count(res, 2)
+    # no ORA remote, no publication dependency:
+    riaclonesubgit = Dataset(riaclone.pathobj / 'subdir' / 'subgit')
+    eq_(riaclonesubgit.config.get("remote.origin.datalad-publish-depends",
+                                  get_all=True),
+        None)
 
     # Now, test that if cloning into a dataset, ria-URL is preserved and
     # post-clone configuration is triggered again, when we remove the subds and
@@ -958,7 +992,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
 
 
 @with_tempfile
-def _postclonetest_prepare(lcl, storepath, link):
+def _postclonetest_prepare(lcl, storepath, storepath2, link):
 
     from datalad.customremotes.ria_utils import (
         create_store,
@@ -980,11 +1014,13 @@ def _postclonetest_prepare(lcl, storepath, link):
                         },
                       })
 
-    # create a local dataset with a subdataset
     lcl = Path(lcl)
     storepath = Path(storepath)
+    storepath2 = Path(storepath2)
     link = Path(link)
     link.symlink_to(storepath)
+
+    # create a local dataset with a subdataset
     subds = Dataset(lcl / 'ds' / 'subdir' / 'subds').create(force=True)
     subds.save()
     # add a plain git dataset as well
@@ -996,6 +1032,22 @@ def _postclonetest_prepare(lcl, storepath, link):
     assert_repo_status(ds.path)
 
     io = LocalIO()
+
+    # Have a second store with valid ORA remote. This should not interfere with
+    # reconfiguration of the first one, when that second store is not the one we
+    # clone from. However, don't push data into it for easier get-based testing
+    # later on.
+    # Doing this first, so datasets in "first"/primary store know about this.
+    create_store(io, storepath2, '1')
+    url2 = "ria+{}".format(get_local_file_url(str(storepath2)))
+    for d in (ds, subds, subgit):
+        create_ds_in_store(io, storepath2, d.id, '2', '1')
+        d.create_sibling_ria(url2, "anotherstore")
+        d.push('.', to='anotherstore', data='nothing')
+        store2_loc, _, _ = get_layout_locations(1, storepath2, d.id)
+        Runner(cwd=str(store2_loc)).run(['git', 'update-server-info'])
+
+    # Now the store to clone from:
     create_store(io, storepath, '1')
 
     # URL to use for upload. Point is, that this should be invalid for the clone
@@ -1045,8 +1097,9 @@ def test_ria_postclonecfg():
     from datalad.utils import make_tempfile
     from datalad.tests.utils import HTTPPath
 
-    with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store:
-        id = _postclonetest_prepare(lcl, store)
+    with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store, \
+            make_tempfile(mkdir=True) as store2:
+        id = _postclonetest_prepare(lcl, store, store2)
 
         # test cloning via ria+file://
         yield _test_ria_postclonecfg, \

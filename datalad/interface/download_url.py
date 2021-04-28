@@ -98,6 +98,13 @@ class DownloadURL(Interface):
              code_py="download_url(urls='s3://bucket/file2.dat', message='added a file', path='myfile.dat')",
              code_cmd="""datalad download-url -m 'added a file' -O myfile.dat \\
                          s3://bucket/file2.dat"""),
+        dict(text="Append a trailing slash to the target path "
+                  "to download into a specified directory",
+             code_py="download_url(['http://example.com/file.dat'], path='data/')",
+             code_cmd="datalad download-url --path=data/ http://example.com/file.dat"),
+        dict(text="Leave off the trailing slash to download into a regular file",
+             code_py="download_url(['http://example.com/file.dat'], path='data')",
+             code_cmd="datalad download-url --path=data http://example.com/file.dat"),
     ]
 
     @staticmethod

@@ -90,7 +90,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             Indicates that it is not currently possible to verify if the key is
             present in the remote. (Perhaps the remote cannot be contacted.)
         """
-        lgr.debug("VERIFYING key %s" % key)
+        lgr.debug("VERIFYING key %s", key)
         resp = None
         for url in self.gen_URLS(key):
             # somewhat duplicate of CHECKURL
@@ -152,7 +152,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 downloaded_path = self._providers.download(
                     url, path=path, overwrite=True
                 )
-                lgr.info("Successfully downloaded %s into %s" % (url, downloaded_path))
+                lgr.info("Successfully downloaded %s into %s", url, downloaded_path)
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
