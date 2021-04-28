@@ -1450,7 +1450,7 @@ def test_annex_drop(src, dst):
     with assert_raises(CommandError) as e:
         ar.drop('somefile.txt')
     # CommandError has to pull the errors from the JSON record 'note'
-    assert_in('necessary copies', str(e.exception))
+    assert_in('necessary cop', str(e.exception))
 
     with assert_raises(CommandError) as e:
         ar._call_annex_records(['fsck', '-N', '3'])
