@@ -12,7 +12,7 @@ Last-Update: 2018-06-05
 
 --- a/datalad/tests/test_config.py
 +++ b/datalad/tests/test_config.py
-@@ -59,7 +59,7 @@ novalue
+@@ -60,7 +60,7 @@ novalue
  empty =
  myint = 3
  
@@ -21,7 +21,7 @@ Last-Update: 2018-06-05
  findme = 5.0
  """
  
-@@ -85,16 +85,16 @@ def test_something(path, new_home):
+@@ -133,16 +133,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -41,7 +41,7 @@ Last-Update: 2018-06-05
           ('something.empty', ''),
           ('something.myint', '3'),
           ('something.novalue', None),
-@@ -114,7 +114,7 @@ def test_something(path, new_home):
+@@ -162,7 +162,7 @@ def test_something(path, new_home):
          cfg.get('something.user', get_all=True),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -50,7 +50,7 @@ Last-Update: 2018-06-05
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      # git demands a key without value at all to be used as a flag, thus True
-@@ -133,8 +133,8 @@ def test_something(path, new_home):
+@@ -181,8 +181,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows
@@ -150,7 +150,7 @@ Last-Update: 2018-06-05
          eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1475,7 +1475,9 @@ def with_parametric_batch(t):
+@@ -1482,7 +1482,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
