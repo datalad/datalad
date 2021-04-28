@@ -109,6 +109,35 @@ def verify_ria_url(url, cfg):
         url
 
 
+def _ensure_version(io, base_path, version):
+    """Check a store or dataset version and make sure it is declared
+
+    Parameters
+    ----------
+    io: SSHRemoteIO or LocalIO
+    base_path: Path
+      root path of a store or dataset
+    version: str
+      target layout version of the store (dataset tree)
+    """
+    version_file = base_path / 'ria-layout-version'
+    if io.exists(version_file):
+        existing_version = io.read_file(version_file).split('|')[0].strip()
+        if existing_version != version.split('|')[0]:
+            # We have an already existing location with a conflicting version on
+            # record.
+            # Note, that a config flag after pipe symbol is fine.
+            raise ValueError("Conflicting version found at target: {}"
+                             .format(existing_version))
+        else:
+            # already exists, recorded version fits - nothing to do
+            return
+    # Note, that the following does create the base-path dir as well, since
+    # mkdir has parents=True:
+    io.mkdir(base_path)
+    io.write_file(version_file, version)
+
+
 def create_store(io, base_path, version):
     """Helper to create a RIA store
 
@@ -132,28 +161,9 @@ def create_store(io, base_path, version):
         raise UnknownLayoutVersion("RIA store layout version unknown: {}."
                                    "Supported versions: {}"
                                    .format(version, known_versions_dst))
-
+    _ensure_version(io, base_path, version)
     error_logs = base_path / 'error_logs'
-    version_file = base_path / 'ria-layout-version'
-    # TODO: Check base path for being empty?
-    #       Requires proper IO (command abstraction class).
-    #       But: Likely unnecessary. For now, check for version conflict only.
-    if io.exists(version_file):
-        existing_version = io.read_file(version_file).split('|')[0].strip()
-        if existing_version != version.split('|')[0]:
-            # We have an already existing location with a conflicting version on
-            # record.
-            # Note, that a config flag after pipe symbol is fine.
-            raise ValueError("Conflicting version found at target: {}"
-                             .format(existing_version))
-        else:
-            # already exists, recorded version fits - nothing to do
-            return
-
-    # Note, that the following does create the base-path dir as well, since
-    # mkdir has parents=True:
     io.mkdir(error_logs)
-    io.write_file(version_file, version)
 
 
 def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=None):
@@ -197,20 +207,10 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=No
                                    "Supported: {}"
                                    .format(obj_version, known_versions_objt))
 
-    version_file = dsgit_dir / 'ria-layout-version'
-
-    if version_file.exists():
-        existing_version = version_file.read_text().split('|')[0].strip()
-        if existing_version != obj_version.split('|')[0]:
-            # We have an already existing location with a conflicting version on
-            # record.
-            # Note, that a config flag after pipe symbol is fine.
-            raise ValueError("Conflicting dataset layout version found at "
-                             "target: {}".format(existing_version))
+    _ensure_version(io, dsgit_dir, obj_version)
 
     io.mkdir(archive_dir)
     io.mkdir(dsobj_dir)
-    io.write_file(version_file, obj_version)
     if alias:
         alias_dir = base_path / "alias"
         io.mkdir(alias_dir)
