@@ -3,6 +3,9 @@ datalad (0.14.2-1) experimental; urgency=medium
   * d/control
     - fix name in datalad-container suggest (not datalad-containers)
   * Recent upstream release
+  * d/patches
+    + 0001-BF-TST-use-sys.executable-and-not-hardcoded-python.patch
+      https://github.com/datalad/datalad/pull/5612
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 28 Apr 2021 09:04:18 -0400
 
