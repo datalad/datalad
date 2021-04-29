@@ -1,7 +1,9 @@
 datalad (0.14.3-1) experimental; urgency=medium
 
   * Fresh upstream release.
-  * d/p/deb_no_utf8 is refreshed
+  * d/p
+    - deb_no_utf8 is refreshed
+    - deb_skip_if_no_github - added
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 29 Apr 2021 08:49:51 -0400
 

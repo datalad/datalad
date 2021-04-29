@@ -4,3 +4,4 @@ deb_no_utf8
 python3.patch
 0001-BF-serve_path_via_http-HTTPPath-use-localhost-not-ha.patch
 0001-BF-TST-use-sys.executable-and-not-hardcoded-python.patch
+deb_skip_if_no_github
