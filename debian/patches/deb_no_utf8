@@ -63,7 +63,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_section('unheard.of'))
 --- a/datalad/core/local/tests/test_run.py
 +++ b/datalad/core/local/tests/test_run.py
-@@ -154,29 +154,29 @@ def test_py2_unicode_command(path):
+@@ -155,29 +155,29 @@ def test_py2_unicode_command(path):
      touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
      cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                          touch_cmd,
@@ -120,10 +120,10 @@ Last-Update: 2018-06-05
              ([dotdir + "*.txt", "*.dat"],
 -             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
 +             {dotdir + "1.txt", "2.dat", u"bB.dat", dotdir + "3.txt"}),
-             (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
-             ([dotdir + "subdir/*.txt"],
-              {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
-@@ -89,12 +89,12 @@ def test_globbedpaths(path):
+             ([op.join("subdir", "*.txt")],
+              {op.join("subdir", "1.txt"), op.join("subdir", "2.txt")}),
+             (["subdir" + op.sep], {"subdir" + op.sep}),
+@@ -93,12 +93,12 @@ def test_globbedpaths(path):
  
      # Full patterns still get returned as relative to pwd.
      gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
@@ -139,7 +139,7 @@ Last-Update: 2018-06-05
      gp = GlobbedPaths(["."], pwd=path, expand=False)
      eq_(gp.expand(), ["."])
      eq_(gp.paths, ["."])
-@@ -107,7 +107,7 @@ def test_globbedpaths(path):
+@@ -111,7 +111,7 @@ def test_globbedpaths(path):
          eq_(gp.expand(), ["z", "b", "d", "x"])
  
      # glob expansion for paths property is determined by expand argument.
