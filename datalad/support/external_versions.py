@@ -152,6 +152,11 @@ class ExternalVersions(object):
         'cmd:system-ssh': _get_system_ssh_version,
         'cmd:7z': _get_system_7z_version,
     }
+    # ad-hoc hardcoded map for relevant Python packages which do not provide
+    # __version__ and are shipped by a differently named pypi package
+    _PYTHON_PACKAGES = {  # Python package -> distribution package
+        'github': 'pygithub',
+    }
     _INTERESTING = (
         'annexremote',
         'appdirs',
@@ -189,9 +194,10 @@ class ExternalVersions(object):
 
         # try pkg_resources
         if version is None and hasattr(value, '__name__'):
+            pkg_name = klass._PYTHON_PACKAGES.get(value.__name__, value.__name__)
             try:
                 import pkg_resources
-                version = pkg_resources.get_distribution(value.__name__).version
+                version = pkg_resources.get_distribution(pkg_name).version
             except Exception:
                 pass
 
