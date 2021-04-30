@@ -37,6 +37,7 @@ from datalad.support.gitrepo import (
     GitRepo,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     with_tempfile,
     assert_in,
@@ -55,6 +56,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_in_results,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     skip_if_adjusted_branch,
     SkipTest,
     slow,
@@ -74,9 +76,9 @@ def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
-    source.repo.remove_remote("origin")
+    source.repo.remove_remote(DEFAULT_REMOTE)
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())
@@ -96,7 +98,7 @@ def test_update_simple(origin, src_path, dst_path):
     assert_status('ok', dest.update())
     assert_repo_status(dst_path)
 
-    # modify origin:
+    # modify remote:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
     source.save(path="update.txt", message="Added update.txt")
@@ -107,8 +109,9 @@ def test_update_simple(origin, src_path, dst_path):
     # modification is not known to active branch:
     assert_not_in("update.txt",
                   dest.repo.get_files(dest.repo.get_active_branch()))
-    # modification is known to branch origin/<default branch>
-    assert_in("update.txt", dest.repo.get_files("origin/" + DEFAULT_BRANCH))
+    # modification is known to branch <default remote>/<default branch>
+    assert_in("update.txt",
+              dest.repo.get_files(DEFAULT_REMOTE + "/" + DEFAULT_BRANCH))
 
     # merge:
     assert_status('ok', dest.update(merge=True))
@@ -280,7 +283,7 @@ def test_newthings_coming_down(originpath, destpath):
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
     assert_is_instance(ds.repo, GitRepo)
-    assert_in('origin', ds.repo.get_remotes())
+    assert_in(DEFAULT_REMOTE, ds.repo.get_remotes())
     # turn origin into an annex
     origin = AnnexRepo(originpath, create=True)
     # clone doesn't know yet
@@ -696,6 +699,12 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
 @skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
+    if on_adjusted and DEFAULT_REMOTE != "origin" and \
+       external_versions['cmd:annex'] <= "8.20210330":
+        raise SkipTest(
+            "'git annex init' with adjusted branch currently fails "
+            "due to hard-coded 'origin'")
+
     # Note: For the adjusted case, this is not much more than a smoke test that
     # on an adjusted branch we fail sensibly. The resulting state is not easy
     # to reason about nor desirable.

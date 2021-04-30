@@ -13,7 +13,10 @@ from datalad.utils import (
     rmtree
 )
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import (
+    DEFAULT_REMOTE,
+    with_tempfile,
+)
 
 
 DATALAD_TESTS_CACHE = cfg.obtain("datalad.tests.cache")
@@ -111,7 +114,7 @@ def get_cached_dataset(url, version=None, keys=None):
     # things. It's about datasets used in the tests - they shouldn't change too
     # frequently.
     elif any('uptodate' not in c['operations']
-             for c in ds.repo.fetch('origin')):
+             for c in ds.repo.fetch(DEFAULT_REMOTE)):
         rmtree(ds.path)
         ds = Clone()(url, ds.pathobj)
 
@@ -178,7 +181,7 @@ def cached_dataset(f, url=None, version=None, paths=None):
                 # translate to keys.
                 keys = clone_ds.repo.get_file_key(paths)
                 ds.repo.get(keys, key=True)
-                clone_ds.repo.fsck(remote='origin', fast=True)
+                clone_ds.repo.fsck(remote=DEFAULT_REMOTE, fast=True)
 
             clone_ds.get(paths)
         return f(*(arg[:-1] + (clone_ds,)), **kw)

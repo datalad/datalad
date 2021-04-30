@@ -121,8 +121,13 @@ def setup_package():
     consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
-    from datalad.tests.utils import DEFAULT_BRANCH
-    set_envvar("GIT_CONFIG_PARAMETERS", "'init.defaultBranch={}'".format(DEFAULT_BRANCH))
+    from datalad.tests.utils import (
+        DEFAULT_BRANCH,
+        DEFAULT_REMOTE,
+    )
+    set_envvar("GIT_CONFIG_PARAMETERS",
+               "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
+               .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)

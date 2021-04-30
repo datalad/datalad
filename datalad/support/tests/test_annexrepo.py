@@ -78,6 +78,7 @@ from datalad.tests.utils import (
     assert_true,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     find_files,
     get_most_obscure_supported_name,
@@ -1166,10 +1167,10 @@ def test_annex_ssh(topdir):
     topdir = Path(topdir)
     rm1 = AnnexRepo(topdir / "remote1", create=True)
     rm2 = AnnexRepo.clone(rm1.path, str(topdir / "remote2"))
-    rm2.remove_remote("origin")
+    rm2.remove_remote(DEFAULT_REMOTE)
 
     main_tmp = AnnexRepo.clone(rm1.path, str(topdir / "main"))
-    main_tmp.remove_remote("origin")
+    main_tmp.remove_remote(DEFAULT_REMOTE)
     repo_path = main_tmp.path
     del main_tmp
     remote_1_path = rm1.path
@@ -1505,7 +1506,7 @@ def test_is_available(batch, p):
     assert is_available(fname) is True
 
     # known remote but doesn't have it
-    assert is_available(fname, remote='origin') is False
+    assert is_available(fname, remote=DEFAULT_REMOTE) is False
 
     # If the 'datalad' special remote is present, it will claim fname's URL.
     if DATALAD_SPECIAL_REMOTE in annex.get_remotes():
@@ -1920,7 +1921,7 @@ def test_wanted(path):
     GitRepo.clone(ar.path, ar1_path)
     ar1 = AnnexRepo(ar1_path, init=False)
     eq_(ar1.get_preferred_content('wanted'), None)
-    eq_(ar1.get_preferred_content('wanted', 'origin'), v)
+    eq_(ar1.get_preferred_content('wanted', DEFAULT_REMOTE), v)
     ar1.set_preferred_content('wanted', expr='standard')
     eq_(ar1.get_preferred_content('wanted'), 'standard')
 
@@ -2062,7 +2063,8 @@ def test_AnnexRepo_get_tracking_branch(src_path, path):
     ar = AnnexRepo.clone(src_path, path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
-    eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
+    eq_((DEFAULT_REMOTE, 'refs/heads/' + DEFAULT_BRANCH),
+        ar.get_tracking_branch())
 
 
 @skip_if_adjusted_branch
@@ -2093,7 +2095,7 @@ def test_is_special(path):
     ok_(rem.is_special_annex_remote("imspecial"))
 
     ar = AnnexRepo.clone(rem.path, op.join(path, "main"))
-    assert_false(ar.is_special_annex_remote("origin"))
+    assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
 
     assert_false(ar.is_special_annex_remote("imspecial",
                                             check_if_known=False))
@@ -2101,9 +2103,9 @@ def test_is_special(path):
     ok_(ar.is_special_annex_remote("imspecial"))
 
     # With a mis-configured remote, give warning and return false.
-    ar.config.unset("remote.origin.url", where="local")
+    ar.config.unset(f"remote.{DEFAULT_REMOTE}.url", where="local")
     with swallow_logs(new_level=logging.WARNING) as cml:
-        assert_false(ar.is_special_annex_remote("origin"))
+        assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
         cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
 
 
@@ -2404,7 +2406,7 @@ def test_ro_operations(path):
     # progress forward original repo and fetch (but nothing else) it into repo2
     repo.add('file2')
     repo.commit()
-    repo2.fetch('origin')
+    repo2.fetch(DEFAULT_REMOTE)
 
     # Assure that regardless of umask everyone could read it all
     run(['chmod', '-R', 'a+rX', repo2.path])
