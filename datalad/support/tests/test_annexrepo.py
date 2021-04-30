@@ -2544,7 +2544,7 @@ def test_whereis_batch_eqv(path):
     repo_b = repo_a.clone(repo_a.path, str(path / "b"))
     repo_b.drop(["bar"])
     repo_b.drop(["baz"])
-    repo_b.drop(["baz"], options=["--from=origin", "--force"])
+    repo_b.drop(["baz"], options=["--from=" + DEFAULT_REMOTE, "--force"])
 
     files = ["foo", "bar", "baz"]
     for output in "full", "uuids", "descriptions":
