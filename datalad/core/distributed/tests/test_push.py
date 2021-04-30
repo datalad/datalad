@@ -29,6 +29,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     known_failure_githubci_osx,
     known_failure_githubci_win,
@@ -619,7 +620,7 @@ def test_gh1811(srcpath, clonepath):
     (clone.pathobj / 'somemore').write_text('somemore')
     clone.save()
     clone.repo.call_git(['checkout', 'HEAD~1'])
-    res = clone.push(to='origin', on_failure='ignore')
+    res = clone.push(to=DEFAULT_REMOTE, on_failure='ignore')
     assert_result_count(res, 1)
     assert_result_count(
         res, 1,

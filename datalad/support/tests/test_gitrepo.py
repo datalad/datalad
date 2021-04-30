@@ -46,6 +46,7 @@ from datalad.tests.utils import (
     assert_true,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     get_most_obscure_supported_name,
     integration,
@@ -528,12 +529,12 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     clone.fetch("very_origin")
     eq_(
         _get_remotes_having_commit(clone, clone.get_hexsha()),
-        ['origin']
+        [DEFAULT_REMOTE]
     )
     prev_commit = clone.get_hexsha('HEAD^')
     eq_(
         set(_get_remotes_having_commit(clone, prev_commit)),
-        {'origin', 'very_origin'}
+        {DEFAULT_REMOTE, 'very_origin'}
     )
 
 
@@ -556,14 +557,15 @@ def test_GitRepo_fetch(orig_path, clone_path):
     origin.add(filename)
     origin.commit("new file added.")
 
-    fetched = clone.fetch(remote='origin')
+    fetched = clone.fetch(remote=DEFAULT_REMOTE)
     # test FetchInfo list returned by fetch
-    eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
+    eq_([DEFAULT_REMOTE + '/' + clone.get_active_branch(),
+         DEFAULT_REMOTE + '/new_branch'],
         [commit['ref'] for commit in fetched])
 
     assert_repo_status(clone.path, annex=False)
-    assert_in("origin/new_branch", clone.get_remote_branches())
-    assert_in(filename, clone.get_files("origin/new_branch"))
+    assert_in(DEFAULT_REMOTE + "/new_branch", clone.get_remote_branches())
+    assert_in(filename, clone.get_files(DEFAULT_REMOTE + "/new_branch"))
     assert_false(op.exists(op.join(clone_path, filename)))  # not checked out
 
     # create a remote without an URL:
@@ -729,7 +731,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
     clone.add(filename)
     clone.commit("new file added.")
     # TODO: need checkout first:
-    clone.push('origin', '+{}:new-branch'.format(DEFAULT_BRANCH))
+    clone.push(DEFAULT_REMOTE, '+{}:new-branch'.format(DEFAULT_BRANCH))
     origin.checkout('new-branch')
     ok_(op.exists(op.join(orig_path, filename)))
 
@@ -802,7 +804,8 @@ def test_GitRepo_get_files(src_path, path):
 
     # get the files via GitRepo:
     local_files = set(gr.get_files())
-    remote_files = set(gr.get_files(branch="origin/" + DEFAULT_BRANCH))
+    remote_files = set(gr.get_files(
+        branch=f"{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"))
 
     eq_(local_files, set(gr.get_indexed_files()))
     eq_(local_files, remote_files)
@@ -820,7 +823,8 @@ def test_GitRepo_get_files(src_path, path):
     local_files = set(gr.get_files())
     eq_(local_files, os_files.union({filename}))
     # retrieve remote branch again, which should not have changed:
-    remote_files = set(gr.get_files(branch="origin/" + DEFAULT_BRANCH))
+    remote_files = set(gr.get_files(
+        branch=f"{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"))
     eq_(remote_files, os_files)
     eq_(set([filename]), local_files.difference(remote_files))
 
@@ -977,14 +981,14 @@ def test_get_tracking_branch(o_path, c_path):
     master_branch = clone.get_active_branch()
     ok_(master_branch)
 
-    eq_(('origin', 'refs/heads/' + master_branch),
+    eq_((DEFAULT_REMOTE, 'refs/heads/' + master_branch),
         clone.get_tracking_branch())
 
     clone.checkout('new_branch', ['-b'])
 
     eq_((None, None), clone.get_tracking_branch())
 
-    eq_(('origin', 'refs/heads/' + master_branch),
+    eq_((DEFAULT_REMOTE, 'refs/heads/' + master_branch),
         clone.get_tracking_branch(master_branch))
 
     clone.checkout(master_branch, options=["--track", "-btopic"])
@@ -1729,7 +1733,7 @@ def test_gitrepo_push_default_first_kludge(path):
 
     # push() usually pushes all refspecs in one go.
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        res_oneshot = repo_b.push(remote="origin",
+        res_oneshot = repo_b.push(remote=DEFAULT_REMOTE,
                                   refspec=[DEFAULT_BRANCH + ":b-oneshot",
                                            DEFAULT_BRANCH + ":a-oneshot",
                                            DEFAULT_BRANCH + ":c-oneshot"])
@@ -1742,10 +1746,10 @@ def test_gitrepo_push_default_first_kludge(path):
     eq_(len(res_oneshot), 3)
 
     # But if datalad-push-default-first is set...
-    cfg_var = "remote.origin.datalad-push-default-first"
+    cfg_var = f"remote.{DEFAULT_REMOTE}.datalad-push-default-first"
     repo_b.config.set(cfg_var, "true", where="local")
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        res_twoshot = repo_b.push(remote="origin",
+        res_twoshot = repo_b.push(remote=DEFAULT_REMOTE,
                                   refspec=[DEFAULT_BRANCH + ":b-twoshot",
                                            DEFAULT_BRANCH + ":a-twoshot",
                                            DEFAULT_BRANCH + ":c-twoshot"])

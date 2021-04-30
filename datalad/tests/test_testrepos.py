@@ -13,6 +13,7 @@ import os
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import usecase
 from datalad.tests.utils import (
+    DEFAULT_REMOTE,
     ok_,
     with_testrepos,
     with_tempfile,
@@ -33,8 +34,8 @@ def test_having_annex(path):
     #ok_('git-annex' in branches, msg="Didn't find git-annex among %s" % branches)
     # look for it among remote refs
     refs = repo.get_remote_branches()
-    ok_('origin/git-annex' in refs, msg="Didn't find git-annex among refs %s"
-                                        % refs)
+    ok_(DEFAULT_REMOTE +'/git-annex' in refs,
+        msg="Didn't find git-annex among refs %s" % refs)
 
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):

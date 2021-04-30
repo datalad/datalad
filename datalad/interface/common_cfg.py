@@ -423,7 +423,10 @@ definitions = {
                     "clone source is configured as an 'origin-2' remote "
                     "to make its annex automatically available. The process "
                     "is repeated recursively for any further qualifying "
-                    "'origin' dataset thereof."}),
+                    "'origin' dataset thereof."
+                    "Note that if clone.defaultRemoteName is configured "
+                    "to use a name other than 'origin', that name will be "
+                    "used instead."}),
         'default': True,
         'type': EnsureBool(),
     },

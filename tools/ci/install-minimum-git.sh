@@ -13,5 +13,5 @@ target_dir="$PWD/git-src"
 git clone https://github.com/git/git "$target_dir"
 cd "$target_dir"
 git checkout "refs/tags/v$MIN_VERSION"
-make --jobs
+make --jobs 2
 ./git version
