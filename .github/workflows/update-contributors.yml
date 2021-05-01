@@ -77,7 +77,7 @@ jobs:
           echo "PULL_REQUEST_BODY=Tributors update automated pull request." >> $GITHUB_ENV
 
       - name: Open Pull Request
-        uses: vsoch/pull-request-action@1.0.6
+        uses: vsoch/pull-request-action@1.0.17
         if: ${{ env.OPEN_PULL_REQUEST == '1' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
