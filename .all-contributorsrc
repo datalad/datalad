@@ -339,6 +339,39 @@
             "avatar_url": [
                 "https://avatars3.githubusercontent.com/u/19843?v=4"
             ]
+        },
+        {
+            "login": "mattcieslak",
+            "name": "Matt Cieslak",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mattcieslak",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/170026?v=4"
+            ]
+        },
+        {
+            "login": "mikapfl",
+            "name": "Mika Pflüger",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mikapfl",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/7226087?v=4"
+            ]
+        },
+        {
+            "login": "christian-monch",
+            "name": "Christian Mönch",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/christian-monch",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/17925232?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
