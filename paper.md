@@ -245,6 +245,17 @@ the *special remote* protocol provided by git-annex [@git-annex:special_remotes_
 With this approach, DataLad and other projects can jointly facilitate access to an ever-growing collection of resources [@git-annex:special_remotes] and overcome technological limitations of storage solutions, like file size or inode limits.
 
 
+**Metadata management.**
+Metadata are essential for scientific discovery, as they are routinely used to complete all data analyses.
+Metadata is the core concept behind Git and git-annex functioning:
+Git records and uses metadata about each change (author, date, description, original state, etc) for each commit.
+Git-annex manages metadata about content availability and allows to associate additional arbitrary key-value pairs to any annexed content.
+Files managed by git and git-annex can in turn be of standardized file formats comprised of data with rich metadata records.
+Moreover, entire repositories might conform to a standard (e.g., BIDS [@bids:paper]) or provide a standardized dataset descriptor (e.g., [Frictionless data package](https://frictionlessdata.io/data-package/)).
+To facilitate metadata availability and utility, DataLad provides an extensible framework for metadata extraction and aggregation.
+Metadata for each file (contained in the file or recorded by git and git-annex) or associated with the entire dataset can be extracted into a collection of machine-readable (JSON) records and aggregated across all contained subdatasets.
+Such simple mechanism makes it possible to provide immediate access to metadata about all contained data within a larger super-dataset (such as [datasets.datalad.org](http://datasets.datalad.org)).
+
 # Overview of the DataLad and its ecosystem
 
 ## Design principles
