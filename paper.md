@@ -60,15 +60,6 @@ authors:
  - name: Jean-Baptiste Poline  # 0 commits, issues: opened 2 participated in 7
    orcid: 0000-0002-9794-749X 
    affiliation: 12
-# - name: Taylor Olson  # 7 commits, issues: opened 1 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Chris Gorgolewski  # 0 commits, issues: opened 5 participated in 3
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Simon Dube  # 0 commits, issues: opened 6 participated in 1
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Tobias Kadelka  # 0 commits, issues: opened 4 participated in 3
    orcid: 0000-0002-0152-3490
    affiliation: 2
@@ -84,12 +75,6 @@ authors:
  - name: Ted Strauss  # 0 commits, issues: opened 4 participated in 1
    orcid: 0000-0002-1927-666X
    affiliation:  15
-# - name: Anisha Keshavan  # 3 commits, issues: opened 1 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
-# - name: Arvind Sharma  # 0 commits, issues: opened 4 participated in 0
-#   orcid: 
-#   affiliation:  # add full names if not yet listed, or indexes if already are
  - name: Matt Cieslak  # 2 commits, issues: opened 2 participated in 0
    orcid: 0000-0002-1931-4734
    affiliation:  16
@@ -202,8 +187,6 @@ With this simple approach, git-annex enables separate and optimized implementati
 
 ## What does DataLad add to Git and git-annex?
 
-<!-- MIH thinks: #1 nesting, #2 reproducible execution, #3 additional software adaptors for concrete services relevant for science -->
-
 **Easy to use modularization.**
 Research workflows impose additional demands for an efficient research data management platform besides version control and data transport.
 Many research datasets contain millions of files, but a large number of files precludes managing such a dataset in a single Git repository, even if the total storage demand is not huge.
@@ -218,19 +201,10 @@ It is curated by the DataLad team and provides, at the time of publication, stre
 
 **Re-executable annotation of changes.**
 Digital provenance is crucial for the trustworthiness and reproducibility of a research result, and contributes to the reusability aspect of the FAIR principles [@FAIR2016].
-<!-- Git captures provenance by annotating a patch (an exact difference between two versions that could be applied to another version of the text file), with a commit message (a freeform, human-readable text description of the introduced changes). -->
-<!-- km: I think the above comes too close to reading as though Git tracks changes/differences directly -->
 Knowing which code and data were used is essential, but, for changes that are programmatically introduced, how a command or script was invoked is another key piece of information to capture.
 One approach is to include this information in the Git commit message that accompanies a change, but doing so manually is tedious and error prone.
 To solve this, DataLad supports executing a command and automatically generating a commit message that includes a structured record with comprehensive details on the invocation.
 In addition to providing reliable information about past command-line invocations, these machine-readable records make it possible to easily re-execute commands (e.g., to verify if a result is computationally reproducible or to apply an analog change to a different dataset state).
-
-<!--AW:removed the sentence below as YOH suggested
-Such annotation is not sufficient to introduce changes by following the description, if they cannot be completely represented by such a patch. -->
-<!-- YOH: may be strip above sentence away... I am just trying to lead somehow into "semantic" description of the change.
-  E.g. that if author was very good with the description of change, some smart AI could have redone it following the description
-  and not the patch.  The simplest analog could be "replaced word X with Y" where the patch would contain exact difference, but
-  either will not be applicable or just would miss some Xs if applied to a vastly different version -->
 
 
 **Targeted interfaces and interoperability adapters.**
@@ -305,8 +279,6 @@ The [datalad-extensions](https://github.com/datalad/datalad-extensions/) reposit
 
 ## External uses and integrations
 
-[comment1]: <> (TODO: probably here cite some examples of scientific papers in the wild which used DataLad)
-
 DataLad can be used as an independent tool to access and manage data (see e.g. @Wittkuhn_2021, @datasets:LAAC-LSCP)
 or as a core technology behind another tool or a larger platform.
 [TemplateFlow](http://templateflow.github.io/) [@Ciric_2021] uses DataLad for the management of neuroimaging templates.
@@ -349,10 +321,6 @@ Technical and procedural guidelines for such contributions can be found in the [
 Contributors are acknowledged on the project website, and also credited in the form of co-authorship in the Zenodo-based archival of software releases.
 All co-authors of this paper as well as the contributors acknowledged below have added to the project with code- or non-code-based contributions, and we thank past, present, and future contributors of this community for their involvement and work.
 
-[comment2]: <> (# Author Contributions: if desired/needed -- or drop altogether.)
-<!-- BEN: Looks like drop to me. Don't see a value in listing number of commits
-or whatever metric at a particular point in time.-->
-
 # Conflicts of interest
 
 There are no conflicts to declare.
@@ -373,8 +341,7 @@ Elizabeth DuPre,
 Cécile Madjar,
 Gergana Alteva,
 Timo Dickscheid,
-Alex Waite,
-[TODOADD: notable contributors]
+Alex Waite
 for notable contributions to the codebase, bug reports, recommendations, and promotion of DataLad.
 
 DataLad development was made possible thanks to support by 
