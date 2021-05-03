@@ -708,6 +708,8 @@ class RegisterUrl(object):
         self._err_res = get_status_dict(action="addurls", ds=self.ds,
                                         type="file", status="error")
         self.use_pointer = repo.is_managed_branch()
+        self._avoid_fromkey = self.use_pointer and \
+            not repo._check_version_kludges("fromkey-supports-unlocked")
 
     def examinekey(self, parsed_key, filename, migrate=False):
         opts = []
@@ -742,9 +744,9 @@ class RegisterUrl(object):
         try:
             parsed_key = row["key"]
             migrate = "target_backend" in parsed_key
-            use_pointer = self.use_pointer
+            avoid_fromkey = self._avoid_fromkey
             ek_info = None
-            if use_pointer or migrate:
+            if avoid_fromkey or migrate:
                 ek_info = self.examinekey(parsed_key, filename,
                                           migrate=migrate)
                 if not ek_info:
@@ -758,7 +760,7 @@ class RegisterUrl(object):
                 key = parsed_key["key"]
 
             self.registerurl(key, row["url"])
-            if use_pointer:
+            if avoid_fromkey:
                 res = self._write_pointer(row, ek_info)
             else:
                 res = annexjson2result(self.fromkey(key, filename),
