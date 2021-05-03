@@ -55,9 +55,11 @@ def test_copy_file(workdir, webdir, weburl):
     ok_file_has_content(src_ds.pathobj / 'myfile1.txt', '123')
     # now create a fresh dataset
     dest_ds = Dataset(workdir / 'dest').create()
-    if not dest_ds.repo.is_managed_branch():
+    if dest_ds.repo._check_version_kludges("fromkey-supports-unlocked") or \
+       not dest_ds.repo.is_managed_branch():
         # unless we have a target ds on a cripples FS (where `annex fromkey`
-        # doesn't work), we can even drop the file content in the source repo
+        # doesn't work until after 8.20210428), we can even drop the file
+        # content in the source repo
         src_ds.drop('myfile1.txt', check=False)
         nok_(src_ds.repo.file_has_content('myfile1.txt'))
     # copy the file from the source dataset into it.
