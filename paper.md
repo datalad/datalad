@@ -255,7 +255,6 @@ Moreover, entire repositories might conform to a standard (e.g., BIDS [@bids:pap
 To facilitate metadata availability and utility, DataLad provides an extensible framework for metadata extraction and aggregation.
 Metadata for each file (contained in the file or recorded by git and git-annex) or associated with the entire dataset can be extracted into a collection of machine-readable (JSON) records and aggregated across all contained subdatasets.
 Such simple mechanism makes it possible to provide immediate access to metadata about all contained data within a larger super-dataset (such as [datasets.datalad.org](http://datasets.datalad.org)).
-The currently released implementation of metadata management is being actively reworked in [datalad-metalad](https://github.com/datalad/datalad-metalad/) DataLad extension to provide more efficient and consistent implementation.
 
 # Overview of the DataLad and its ecosystem
 
