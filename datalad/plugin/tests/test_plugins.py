@@ -202,7 +202,8 @@ def test_no_annex(path):
     # add inannex and README post configuration
     ds.save([opj('code', 'notinannex'), 'README'])
 
-    if ds.repo.is_managed_branch():
+    repo = ds.repo
+    if repo.is_managed_branch():
         # For unlocked files, if .gitattributes is configured so that a file
         # should go to git, an annexed file will switch to be tracked by git
         # the next time the clean filter runs on it.
@@ -214,7 +215,7 @@ def test_no_annex(path):
         # one is annex'ed, the other is not, despite no change in add call
         # importantly, also .gitattribute is not annexed
         eq_([opj('code', 'inannex')],
-            [str(Path(p)) for p in ds.repo.get_annexed_files()])
+            [str(Path(p)) for p in repo.get_annexed_files()])
 
 
 _ds_template = {
