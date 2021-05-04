@@ -66,7 +66,6 @@ from datalad.tests.utils import (
     ok_,
     ok_exists,
     ok_file_has_content,
-    slow,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
@@ -620,3 +619,67 @@ def test_run_empty_repo(path):
     assert_status("ok", ds.run(cmd, inputs=["."]))
     assert_repo_status(ds.path)
     ok_exists(str(ds.pathobj / "foo"))
+
+
+@with_tree(tree={"foo": "f", "bar": "b"})
+def test_dry_run(path):
+    ds = Dataset(path).create(force=True)
+
+    # The dataset is reported as dirty, and the custom result render relays
+    # that to the default renderer.
+    with swallow_outputs() as cmo:
+        with assert_raises(IncompleteResultsError):
+            ds.run("blah ", dry_run="basic")
+        assert_in("run(impossible)", cmo.out)
+        assert_not_in("blah", cmo.out)
+
+    ds.save()
+
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="basic")
+        assert_in("Dry run", cmo.out)
+        assert_in("location", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("expanded inputs", cmo.out)
+        assert_not_in("expanded outputs", cmo.out)
+
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs} {outputs}", dry_run="basic",
+               inputs=["fo*"], outputs=["b*r"])
+        assert_in(
+            'blah "foo" "bar"' if on_windows else "blah foo bar",
+            cmo.out)
+        assert_in("expanded inputs", cmo.out)
+        assert_in("['foo']", cmo.out)
+        assert_in("expanded outputs", cmo.out)
+        assert_in("['bar']", cmo.out)
+
+    # Just the command.
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="command")
+        assert_not_in("Dry run", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("inputs", cmo.out)
+
+    # The output file wasn't unlocked.
+    assert_repo_status(ds.path)
+
+    # Subdaset handling
+
+    subds = ds.create("sub")
+    (subds.pathobj / "baz").write_text("z")
+    ds.save(recursive=True)
+
+    # If a subdataset is installed, it works as usual.
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
+        assert_in(
+            'blah "sub\\baz"' if on_windows else 'blah sub/baz',
+            cmo.out)
+
+    # However, a dry run will not do the install/reglob procedure.
+    ds.uninstall("sub", check=False)
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
+        assert_in("sub/b*", cmo.out)
+        assert_not_in("baz", cmo.out)
