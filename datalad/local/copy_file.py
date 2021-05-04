@@ -516,7 +516,8 @@ def _copy_file(src, dest, cache):
         return
 
     # at this point we are copying an annexed file into an annex repo
-    if dest_repo.is_managed_branch():
+    if not dest_repo._check_version_kludges("fromkey-supports-unlocked") \
+       and dest_repo.is_managed_branch():
         res = _place_filekey_managed(
             finfo, str_src, dest, str_dest, dest_repo_rec)
     else:

@@ -552,9 +552,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if cls.git_annex_version is None:
             cls._check_git_annex_version()
 
-        # NOTE: All the kludges that were here have been removed with the
-        # latest GIT_ANNEX_MIN_VERSION increase. This method is being kept
-        # around for future kludges, but it's safe to drop.
+        ver = cls.git_annex_version
+        kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
         cls._version_kludges = kludges
         return kludges[key]
 
