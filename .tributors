@@ -145,16 +145,19 @@
     },
     "christian-monch": {
         "name": "Christian Mönch",
-        "email": "christian.moench@web.de"
+        "email": "christian.moench@web.de",
+        "blog": "https://github.com/christian-monch"
     },
     "mikapfl": {
         "name": "Mika Pflüger",
         "email": "mika.pflueger@pik-potsdam.de",
         "orcid": "0000-0002-7814-8916",
-        "affiliation": "Potsdam Institute for Climate Impact Research"
+        "affiliation": "Potsdam Institute for Climate Impact Research",
+        "blog": "https://github.com/mikapfl"
     },
     "mattcieslak": {
         "name": "Matt Cieslak",
-        "bio": "Senior Scientist at UPenn Brain & Behavior Lab. Diffusion imaging enthusiast."
+        "bio": "Senior Scientist at UPenn Brain & Behavior Lab. Diffusion imaging enthusiast.",
+        "blog": "https://github.com/mattcieslak"
     }
 }
