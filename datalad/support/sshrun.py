@@ -41,8 +41,6 @@ class SSHRun(Interface):
 
     Configure `datalad.ssh.identityfile` to pass a file to the ssh's -i option.
     """
-    # prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         login=Parameter(

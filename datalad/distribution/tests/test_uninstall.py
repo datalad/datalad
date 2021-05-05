@@ -345,7 +345,7 @@ def test_uninstall_recursive(path):
     assert_result_values_cond(
         res, 'message',
         lambda x: "configured minimum number of copies not found" in x or
-        "Could only verify the existence of 0 out of 1 necessary copies" in x
+        "Could only verify the existence of 0 out of 1 necessary cop" in x
     )
 
     # this should do it
@@ -428,7 +428,7 @@ def test_kill(path):
     assert_result_values_cond(
         [err_result], 'message',
         lambda x: "configured minimum number of copies not found" in x or
-        "Could only verify the existence of 0 out of 1 necessary copies" in x
+        "Could only verify the existence of 0 out of 1 necessary cop" in x
     )
     eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
         [subds, ds])

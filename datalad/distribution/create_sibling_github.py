@@ -14,39 +14,39 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import re
+import warnings
 
-from os.path import relpath
-
-from ..interface.base import (
+from datalad.interface.base import (
     build_doc,
     Interface,
 )
-from ..interface.common_opts import (
+from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
     publish_depends,
 )
-from ..support.param import Parameter
-from ..support.constraints import (
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import eval_results
+from datalad.support.param import Parameter
+from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from ..utils import (
-    ensure_list,
-)
-from .dataset import (
+from datalad.distribution.dataset import (
     datasetmethod,
     EnsureDataset,
     require_dataset,
 )
-from .siblings import Siblings
+from datalad.distribution.siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
-# presently only implemented method to turn subdataset paths into Github
-# compliant repository name suffixes
-template_fx = lambda x: re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', x))
+
+def normalize_reponame(path):
+    """Turn name (e.g. path) into a Github compliant repository name
+    """
+    return re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', path))
 
 
 @build_doc
@@ -79,8 +79,6 @@ class CreateSiblingGithub(Interface):
     *hub.oauthtoken*, and store/check the token in credential store as associated
     with that specific login name.
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         dataset=Parameter(
@@ -142,17 +140,23 @@ class CreateSiblingGithub(Interface):
             will be marked as private and only visible to those granted 
             access or by membership of a team/organization/etc.
             """),
+        dry_run=Parameter(
+            args=("--dry-run",),
+            action="store_true",
+            doc="""If this flag is set, no repositories will be created.
+            Instead tests for name collisions with existing projects will be
+            performed, and would-be repository names are reported for all
+            relevant datasets"""),
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
-            doc="""If this flag is set, no communication with GitHub is
-            performed, and no repositories will be created. Instead
-            would-be repository names are reported for all relevant datasets
-            """),
+            doc="""Deprecated. Use the renamed
+            [CMD: --dry-run CMD][PY: `dry_run` PY] parameter"""),
     )
 
     @staticmethod
     @datasetmethod(name='create_sibling_github')
+    @eval_results
     def __call__(
             reponame,
             dataset=None,
@@ -165,17 +169,38 @@ class CreateSiblingGithub(Interface):
             access_protocol='https',
             publish_depends=None,
             private=False,
-            dryrun=False):
+            dryrun=False,
+            dry_run=False):
+        if dryrun and not dry_run:
+            # the old one is used, and not in agreement with the new one
+            warnings.warn(
+                "datalad-create-sibling-github's `dryrun` option is "
+                "deprecated and will be removed in a future release, "
+                "use the renamed `dry_run/--dry-run` option instead.",
+                DeprecationWarning)
+            dry_run = dryrun
+
         # this is an absolute leaf package, import locally to avoid
         # unnecessary dependencies
-        from datalad.support.github_ import _make_github_repos
+        from datalad.support.github_ import _make_github_repos_
+
+        if reponame != normalize_reponame(reponame):
+            raise ValueError('Invalid name for a GitHub project: {}'.format(
+                reponame))
 
         # what to operate on
         ds = require_dataset(
             dataset, check_installed=True, purpose='create GitHub sibling')
+
+        res_kwargs = dict(
+            action='create_sibling_github [dry-run]' if dry_run else
+            'create_sibling_github',
+            logger=lgr,
+            refds=ds.path,
+        )
         # gather datasets and essential info
         # dataset instance and mountpoint relative to the top
-        toprocess = [(ds, '')]
+        toprocess = [ds]
         if recursive:
             for sub in ds.subdatasets(
                     fulfilled=None,  # we want to report on missing dataset in here
@@ -185,39 +210,45 @@ class CreateSiblingGithub(Interface):
                 if not sub.is_installed():
                     lgr.info('Ignoring unavailable subdataset %s', sub)
                     continue
-                toprocess.append((sub, relpath(sub.path, start=ds.path)))
+                toprocess.append(sub)
 
         # check for existing remote configuration
         filtered = []
-        for d, mp in toprocess:
+        for d in toprocess:
             if name in d.repo.get_remotes():
-                if existing == 'error':
-                    msg = '{} already has a configured sibling "{}"'.format(
-                        d, name)
-                    if dryrun:
-                        lgr.error(msg)
-                    else:
-                        raise ValueError(msg)
-                elif existing == 'skip':
-                    continue
-            gh_reponame = '{}{}{}'.format(
-                reponame,
-                '-' if mp else '',
-                template_fx(mp))
+                yield get_status_dict(
+                    ds=d,
+                    status='error' if existing == 'error' else 'notneeded',
+                    message=('already has a configured sibling "%s"', name),
+                    **res_kwargs)
+                continue
+            gh_reponame = reponame if d == ds else \
+                '{}-{}'.format(
+                    reponame,
+                    normalize_reponame(str(d.pathobj.relative_to(ds.pathobj))))
             filtered.append((d, gh_reponame))
 
         if not filtered:
             # all skipped
-            return []
+            return
 
         # actually make it happen on GitHub
-        rinfo = _make_github_repos(
-            github_login, github_organization, filtered,
-            existing, access_protocol, private, dryrun)
-
-        # lastly configure the local datasets
-        for d, url, existed in rinfo:
-            if not dryrun:
+        for res in _make_github_repos_(
+                github_login, github_organization, filtered,
+                existing, access_protocol, private, dry_run):
+            # blend reported results with standard properties
+            res = dict(
+                res,
+                **res_kwargs)
+            if 'message' not in res:
+                res['message'] = ("project at %s", res['url'])
+            # report to caller
+            yield get_status_dict(**res)
+            if res['status'] not in ('ok', 'notneeded'):
+                # something went wrong, do not proceed
+                continue
+            # lastly configure the local datasets
+            if not dry_run:
                 extra_remote_vars = {
                     # first make sure that annex doesn't touch this one
                     # but respect any existing config
@@ -233,31 +264,14 @@ class CreateSiblingGithub(Interface):
                     var = 'remote.{}.{}'.format(name, var_name)
                     if var not in d.config:
                         d.config.add(var, var_value, where='local')
-                Siblings()(
+                yield from Siblings()(
                     'configure',
                     dataset=d,
                     name=name,
-                    url=url,
+                    url=res['url'],
                     recursive=False,
                     # TODO fetch=True, maybe only if one existed already
-                    publish_depends=publish_depends)
+                    publish_depends=publish_depends,
+                    result_renderer='disabled')
 
         # TODO let submodule URLs point to GitHub (optional)
-        return rinfo
-
-    @staticmethod
-    def result_renderer_cmdline(res, args):
-        from datalad.ui import ui
-        res = ensure_list(res)
-        if args.dryrun:
-            ui.message('DRYRUN -- Anticipated results:')
-        if not len(res):
-            ui.message("Nothing done")
-        else:
-            for d, url, existed in res:
-                ui.message(
-                    "'{}'{} configured as sibling '{}' for {}".format(
-                        url,
-                        " (existing repository)" if existed else '',
-                        args.name,
-                        d))

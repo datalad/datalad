@@ -16,6 +16,7 @@ import os
 import re
 import sys
 import gzip
+import warnings
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
@@ -132,6 +133,55 @@ class LogLevelAction(argparse.Action):
 #        i = 1
 
 
+def parser_add_version_opt(parser, mod_name, include_name=False, delay=False):
+    """Setup --version option
+
+    Parameters
+    ----------
+    parser:
+    mod_name: str, optional
+    include_name: bool, optional
+    delay: bool, optional
+      If set to True, no action is taken immediately, and rather
+      we assign the function which would print the version. Necessary for
+      early pre-parsing of the cmdline
+    """
+
+    def print_version():
+        mod = sys.modules.get(mod_name, None)
+        version = getattr(mod, '__version__', None)
+        if version is None:
+            # Let's use the standard Python mechanism if underlying module
+            # did not provide __version__
+            try:
+                import pkg_resources
+                version = pkg_resources.get_distribution(mod_name).version
+            except:
+                version = "unknown"
+        if include_name:
+            print("%s %s" % (mod_name, version))
+        else:
+            print(version)
+        sys.exit(0)
+
+    class versionAction(argparse.Action):
+        def __call__(self, parser, args, values, option_string=None):
+            if delay:
+                setattr(args, self.dest, print_version)
+            else:
+                print_version()
+
+    parser.add_argument(
+        "--version",
+        nargs=0,
+        action=versionAction,
+        help=(
+            "show the program's version"
+            if not mod_name
+            else "show the module and its version which provides the command")
+    )
+
+
 def parser_add_common_opt(parser, opt, names=None, **kwargs):
     from . import common_args
     opt_tmpl = getattr(common_args, opt)
@@ -143,14 +193,16 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
         parser.add_argument(*names, **opt_kwargs)
 
 
-def parser_add_common_options(parser, version):
+def parser_add_common_options(parser, version=None):
     parser_add_common_opt(parser, 'log_level')
     parser_add_common_opt(parser, 'pbs_runner')
     parser_add_common_opt(parser, 'change_path')
-    parser_add_common_opt(
-        parser,
-        'version',
-        version=f'datalad {version}\n')
+    if version is not None:
+        warnings.warn("Passing 'version' to parser_add_common_options "
+                      "no longer has an effect "
+                      "and will be removed in a future release.",
+                      DeprecationWarning)
+    parser_add_version_opt(parser, 'datalad', include_name=True, delay=True)
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',

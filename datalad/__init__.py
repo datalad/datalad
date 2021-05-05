@@ -97,6 +97,8 @@ _test_states = {
     'env': {},
 }
 
+# handle to an HTTP server instance that is used as part of the tests
+test_http_server = None
 
 def setup_package():
     import os
@@ -119,8 +121,13 @@ def setup_package():
     consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
-    from datalad.tests.utils import DEFAULT_BRANCH
-    set_envvar("GIT_CONFIG_PARAMETERS", "'init.defaultBranch={}'".format(DEFAULT_BRANCH))
+    from datalad.tests.utils import (
+        DEFAULT_BRANCH,
+        DEFAULT_REMOTE,
+    )
+    set_envvar("GIT_CONFIG_PARAMETERS",
+               "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
+               .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
@@ -203,6 +210,21 @@ def setup_package():
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
 
+    # in order to avoid having to fiddle with rather uncommon
+    # file:// URLs in the tests, have a standard HTTP server
+    # that serves an 'httpserve' directory in the test HOME
+    # the URL will be available from datalad.test_http_server.url
+    from datalad.tests.utils import HTTPPath
+    import tempfile
+    global test_http_server
+    serve_path = tempfile.mkdtemp(
+        dir=cfg.get("datalad.tests.temp.dir"),
+        prefix='httpserve',
+    )
+    test_http_server = HTTPPath(serve_path)
+    test_http_server.start()
+    _TEMP_PATHS_GENERATED.append(serve_path)
+
     if cfg.obtain('datalad.tests.setup.testrepos'):
         lgr.debug("Pre-populating testrepos")
         from datalad.tests.utils import with_testrepos
@@ -234,6 +256,9 @@ def teardown_package():
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
+
+    if test_http_server:
+        test_http_server.stop()
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):

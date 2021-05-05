@@ -26,6 +26,47 @@ bet we will fix some bugs and make a world even a better place.
 ?
 
 
+## 0.14.3 (April 28, 2021) -- .
+
+### Fixes
+
+- For outputs that include a glob, [run][] didn't re-glob after
+  executing the command, which is necessary to catch changes if
+  `--explicit` or `--expand={outputs,both}` is specified.  ([#5594][])
+
+- [run][] now gives an error result rather than a warning when an
+  input glob doesn't match.  ([#5594][])
+
+- The procedure for creating a RIA store checks for an existing
+  ria-layout-version file and makes sure its version matches the
+  desired version.  This check wasn't done correctly for SSH hosts.
+  ([#5607][])
+
+- A helper for transforming git-annex JSON records into DataLad
+  results didn't account for the unusual case where the git-annex
+  record doesn't have a "file" key.  ([#5580][])
+
+- The test suite required updates for recent changes in PyGithub and
+  git-annex.  ([#5603][]) ([#5609][])
+
+### Enhancements and new features
+
+- The DataLad source repository has long had a
+  tools/cmdline-completion helper.  This functionality is now exposed
+  as a command, `datalad shell-completion`.  ([#5544][])
+
+
+## 0.14.2 (April 14, 2021) -- .
+
+### Fixes
+
+- [push][] now works bottom-up, pushing submodules first so that hooks
+  on the remote can aggregate updated subdataset information. ([#5416][])
+
+- [run-procedure][] didn't ensure that the configuration of
+  subdatasets was reloaded.  ([#5552][])
+
+
 ## 0.14.1 (April 01, 2021) -- .
 
 ### Fixes
@@ -3656,6 +3697,7 @@ publishing
 [#5350]: https://github.com/datalad/datalad/issues/5350
 [#5367]: https://github.com/datalad/datalad/issues/5367
 [#5391]: https://github.com/datalad/datalad/issues/5391
+[#5416]: https://github.com/datalad/datalad/issues/5416
 [#5421]: https://github.com/datalad/datalad/issues/5421
 [#5436]: https://github.com/datalad/datalad/issues/5436
 [#5438]: https://github.com/datalad/datalad/issues/5438
@@ -3667,3 +3709,10 @@ publishing
 [#5509]: https://github.com/datalad/datalad/issues/5509
 [#5525]: https://github.com/datalad/datalad/issues/5525
 [#5531]: https://github.com/datalad/datalad/issues/5531
+[#5544]: https://github.com/datalad/datalad/issues/5544
+[#5552]: https://github.com/datalad/datalad/issues/5552
+[#5580]: https://github.com/datalad/datalad/issues/5580
+[#5594]: https://github.com/datalad/datalad/issues/5594
+[#5603]: https://github.com/datalad/datalad/issues/5603
+[#5607]: https://github.com/datalad/datalad/issues/5607
+[#5609]: https://github.com/datalad/datalad/issues/5609

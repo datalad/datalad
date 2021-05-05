@@ -193,7 +193,7 @@ class Create(Interface):
             action='append',
             doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
             on the created dataset. Use
-            [PY: `run_procedure(discover=True)` PY][CMD: run_procedure --discover CMD]
+            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
             to get a list of available procedures, such as cfg_text2git.
             """
         )
@@ -373,7 +373,7 @@ class Create(Interface):
         # Re-use tbrepo instance, do not use tbds.repo
 
         # create and configure desired repository
-        # also provides inital set of content to be tracked with git (not annex)
+        # also provides initial set of content to be tracked with git (not annex)
         if no_annex:
             tbrepo, add_to_git = _setup_git_repo(path, initopts, fake_dates)
         else:

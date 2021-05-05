@@ -135,7 +135,7 @@ def test_siblings(origin, repo_path, local_clone_path):
         source.repo.get_remote_url("test-remote"))
 
     # no longer a use case, I would need additional convincing that
-    # this is anyhow useful other then tripple checking other peoples
+    # this is anyhow useful other then triple checking other peoples
     # errors. for an actual check use 'query'
     # maybe it could be turned into a set of warnings when `configure`
     # alters an existing setting, but then why call configure, if you

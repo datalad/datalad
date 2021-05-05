@@ -561,7 +561,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         #     lgr.debug,
         #     'metadataextractors_loc',
         #     'Metadata extraction per location for %s', mtype,
-        #     # contentmeta_t is a generator... so no cound is known
+        #     # contentmeta_t is a generator... so no count is known
         #     # total=len(contentmeta_t or []),
         #     label='Metadata extraction per location',
         #     unit=' locations',

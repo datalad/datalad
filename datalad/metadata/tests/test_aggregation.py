@@ -340,7 +340,7 @@ def test_update_strategy(path):
         eq_(len(_get_contained_objs(ds)), 0)
     # aggregate the entire tree, but by default only updates
     # the top-level dataset with all objects, none of the leaf
-    # or intermediate datasets get's touched
+    # or intermediate datasets gets touched
     base.aggregate_metadata(recursive=True)
     eq_(len(_get_contained_objs(base)), 6)
     eq_(len(_get_referenced_objs(base)), 6)

@@ -84,7 +84,7 @@ def test_Providers_default_ones():
 
 
 def test_Providers_process_credential():
-    # If uknown type -- raises ValueError
+    # If unknown type -- raises ValueError
     assert_raises(ValueError, Providers._process_credential, 'cred', {'type': '_unknown_'})
 
 

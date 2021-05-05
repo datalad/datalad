@@ -552,9 +552,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         if cls.git_annex_version is None:
             cls._check_git_annex_version()
 
-        # NOTE: All the kludges that were here have been removed with the
-        # latest GIT_ANNEX_MIN_VERSION increase. This method is being kept
-        # around for future kludges, but it's safe to drop.
+        ver = cls.git_annex_version
+        kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -795,7 +794,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # no special remotes configures
                 return {}
             else:
-                # some unforseen error
+                # some unforeseen error
                 raise e
         return srs
 
@@ -1092,7 +1091,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         #
         # So, Ben thinks we should just spit it out here, since everything
         # calling _call_annex_records is concerned with the actual results
-        # being returned. More over, this kind of response is special toi
+        # being returned. Moreover, this kind of response is special to
         # particular special remotes rather than particular annex commands.
         # So, likely there's nothing callers could do about it other than
         # spitting it out.
@@ -2319,7 +2318,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             }
 
     # TODO:
-    # I think we should make interface cleaner and less ambigious for those annex
+    # I think we should make interface cleaner and less ambiguous for those annex
     # commands which could operate on globs, files, and entire repositories, separating
     # those out, e.g. annex_info_repo, annex_info_files at least.
     # If we make our calling wrappers work without relying on invoking from repo topdir,
@@ -2792,6 +2791,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of str
            files successfully copied
         """
+        warnings.warn(
+            "AnnexRepo.copy_to() is deprecated and will be removed in a "
+            "future release. Use the Dataset method push() instead.",
+            DeprecationWarning)
 
         # find --in here --not --in remote
         # TODO: full support of annex copy options would lead to `files` being
@@ -3083,7 +3086,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             for testpath in (
                     # ATM git-annex reports hashdir in native path
                     # conventions and the actual file path `f` in
-                    # POSIX, weired...
+                    # POSIX, weird...
                     # we need to test for the actual key file, not
                     # just the containing dir, as on windows the latter
                     # may not always get cleaned up on `drop`

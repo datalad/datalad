@@ -179,6 +179,14 @@ class CreateSiblingRia(Interface):
             a storage sibling is created, this setting is ignored, and
             the primary sibling name is used.""",
             constraints=EnsureStr() | EnsureNone()),
+        alias=Parameter(
+            args=('--alias',),
+            metavar='ALIAS',
+            doc="""Alias for the dataset in the RIA store.
+            Add the necessary symlink so that this dataset can be cloned from the RIA
+            store using the given ALIAS instead of its ID.
+            With `recursive=True`, only the top dataset will be aliased.""",
+            constraints=EnsureStr() | EnsureNone()),
         post_update_hook=Parameter(
             args=("--post-update-hook",),
             doc="""Enable git's default post-update-hook for the created
@@ -246,6 +254,7 @@ class CreateSiblingRia(Interface):
                  name,
                  dataset=None,
                  storage_name=None,
+                 alias=None,
                  post_update_hook=False,
                  shared=None,
                  group=None,
@@ -396,6 +405,7 @@ class CreateSiblingRia(Interface):
             name,
             storage_sibling,
             storage_name,
+            alias,
             existing,
             shared,
             group,
@@ -419,6 +429,7 @@ class CreateSiblingRia(Interface):
                     name,
                     storage_sibling,
                     storage_name,
+                    None,  # subdatasets can't have the same alias as the parent
                     existing,
                     shared,
                     group,
@@ -434,6 +445,7 @@ def _create_sibling_ria(
         name,
         storage_sibling,
         storage_name,
+        alias,
         existing,
         shared,
         group,
@@ -548,7 +560,7 @@ def _create_sibling_ria(
             " and '{}'".format(storage_name) if storage_name else '',
         ))
     create_ds_in_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
-                       base_path, ds.id, '2', '1')
+                       base_path, ds.id, '2', '1', alias)
     if storage_sibling:
         # we are using the main `name`, if the only thing we are creating
         # is the storage sibling

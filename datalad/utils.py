@@ -168,7 +168,7 @@ def get_func_kwargs_doc(func):
 
 
 def any_re_search(regexes, value):
-    """Return if any of regexes (list or str) searches succesfully for value"""
+    """Return if any of regexes (list or str) searches successfully for value"""
     for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
             return True
@@ -300,11 +300,11 @@ def md5sum(filename):
 
 
 # unused in -core
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
+def sorted_files(path):
+    """Return a (sorted) list of files under path
     """
-    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
-                       for r, d, files in os.walk(dout)
+    return sorted(sum([[opj(r, f)[len(path) + 1:] for f in files]
+                       for r, d, files in os.walk(path)
                        if not '.git' in r], []))
 
 _encoded_dirsep = r'\\'  if on_windows else r'/'
@@ -633,7 +633,7 @@ else:
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():
-            # trust noone - adjust also of the target file
+            # trust no one - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
@@ -954,7 +954,7 @@ def generate_chunks(container, size):
 
 
 def generate_file_chunks(files, cmd=None):
-    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+    """Given a list of files, generate chunks of them to avoid exceeding cmdline length
 
     Parameters
     ----------
@@ -2087,20 +2087,6 @@ def slash_join(base, extension):
          extension.lstrip('/')))
 
 
-def safe_print(s):
-    """Print with protection against UTF-8 encoding errors"""
-    # A little bit of dance to be able to test this code
-    print_f = getattr(builtins, "print")
-    try:
-        print_f(s)
-    except UnicodeEncodeError:
-        # failed to encode so let's do encoding while ignoring errors
-        # to print at least something
-        # explicit `or ascii` since somehow on buildbot it seemed to return None
-        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
-            if hasattr(s, 'encode') else s
-        print_f(s.decode())
-
 #
 # IO Helpers
 #
@@ -2598,7 +2584,7 @@ def check_symlink_capability(path, target):
     assume to be able to write to tmpfile and also not import a whole lot from
     datalad's test machinery. Finally, we want to know, whether we can create a
     symlink at a specific location, not just somewhere. Therefore use
-    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    arbitrary path to test-build a symlink and delete afterwards. Suitable
     location can therefore be determined by high lever code.
 
     Parameters

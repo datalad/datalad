@@ -65,20 +65,6 @@ definitions = {
         'destination': 'global',
         'default_fn': lambda: opj(dirs.user_cache_dir, 'sockets'),
     },
-    'datalad.locations.system-plugins': {
-        'ui': ('question', {
-               'title': 'System plugin directory',
-               'text': 'Where should datalad search for system plugins?'}),
-        'destination': 'global',
-        'default_fn': lambda: opj(dirs.site_config_dir, 'plugins'),
-    },
-    'datalad.locations.user-plugins': {
-        'ui': ('question', {
-               'title': 'User plugin directory',
-               'text': 'Where should datalad search for user plugins?'}),
-        'destination': 'global',
-        'default_fn': lambda: opj(dirs.user_config_dir, 'plugins'),
-    },
     'datalad.locations.system-procedures': {
         'ui': ('question', {
                'title': 'System procedure directory',
@@ -423,7 +409,10 @@ definitions = {
                     "clone source is configured as an 'origin-2' remote "
                     "to make its annex automatically available. The process "
                     "is repeated recursively for any further qualifying "
-                    "'origin' dataset thereof."}),
+                    "'origin' dataset thereof."
+                    "Note that if clone.defaultRemoteName is configured "
+                    "to use a name other than 'origin', that name will be "
+                    "used instead."}),
         'default': True,
         'type': EnsureBool(),
     },

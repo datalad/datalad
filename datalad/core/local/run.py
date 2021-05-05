@@ -30,6 +30,7 @@ from datalad.dochelpers import exc_str
 from datalad.interface.unlock import Unlock
 
 from datalad.interface.base import Interface
+from datalad.interface.utils import default_result_renderer
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
@@ -37,6 +38,7 @@ from datalad.interface.common_opts import save_message_opt
 
 from datalad.config import anything2bool
 
+import datalad.support.ansi_colors as ac
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
@@ -49,6 +51,8 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
+
+from datalad.ui import ui
 
 from datalad.utils import (
     chpwd,
@@ -171,6 +175,8 @@ class Run(Interface):
              'outfile.txt' 'code/script.sh'""")
     ]
 
+    result_renderer = "tailored"
+
     _params_ = dict(
         cmd=Parameter(
             args=("cmd",),
@@ -231,6 +237,18 @@ class Run(Interface):
             '.datalad/runinfo' directory (customizable via the
             'datalad.run.record-directory' configuration variable).""",
             constraints=EnsureNone() | EnsureBool()),
+        dry_run=Parameter(
+            # Leave out common -n short flag to avoid confusion with
+            # `containers-run [-n|--container-name]`.
+            args=("--dry-run",),
+            doc="""Do not run the command; just display details about the
+            command execution. A value of "basic" reports a few important
+            details about the execution, including the expanded command and
+            expanded inputs and outputs. "command" displays the expanded
+            command only. Note that input and output globs underneath an
+            uninstalled dataset will be left unexpanded because no subdatasets
+            will be installed for a dry run.""",
+            constraints=EnsureChoice(None, "basic", "command")),
     )
 
     @staticmethod
@@ -245,15 +263,63 @@ class Run(Interface):
             assume_ready=None,
             explicit=False,
             message=None,
-            sidecar=None):
+            sidecar=None,
+            dry_run=None):
         for r in run_command(cmd, dataset=dataset,
                              inputs=inputs, outputs=outputs,
                              expand=expand,
                              assume_ready=assume_ready,
                              explicit=explicit,
                              message=message,
-                             sidecar=sidecar):
+                             sidecar=sidecar,
+                             dry_run=dry_run):
             yield r
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        dry_run = kwargs.get("dry_run")
+        if dry_run and "dry_run_info" in res:
+            if dry_run == "basic":
+                _display_basic(res)
+            elif dry_run == "command":
+                ui.message(res["dry_run_info"]["cmd_expanded"])
+            else:
+                raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
+        else:
+            default_result_renderer(res)
+
+
+def _display_basic(res):
+    ui.message(ac.color_word("Dry run information", ac.MAGENTA))
+
+    def fmt_line(key, value, multiline=False):
+        return (" {key}:{sep}{value}"
+                .format(key=ac.color_word(key, ac.BOLD),
+                        sep=os.linesep + "  " if multiline else " ",
+                        value=value))
+
+    dry_run_info = res["dry_run_info"]
+    lines = [fmt_line("location", dry_run_info["pwd_full"])]
+
+    # TODO: Inputs and outputs could be pretty long. These may be worth
+    # truncating.
+    inputs = dry_run_info["inputs"]
+    if inputs:
+        lines.append(fmt_line("expanded inputs", inputs,
+                              multiline=True))
+    outputs = dry_run_info["outputs"]
+    if outputs:
+        lines.append(fmt_line("expanded outputs", outputs,
+                              multiline=True))
+
+    cmd = res["run_info"]["cmd"]
+    cmd_expanded = dry_run_info["cmd_expanded"]
+    lines.append(fmt_line("command", cmd, multiline=True))
+    if cmd != cmd_expanded:
+        lines.append(fmt_line("expanded command", cmd_expanded,
+                              multiline=True))
+
+    ui.message(os.linesep.join(lines))
 
 
 def get_command_pwds(dataset):
@@ -362,12 +428,15 @@ def prepare_inputs(dset_path, inputs, extra_inputs=None):
     for gp in gps:
         for res in _install_and_reglob(dset_path, gp):
             yield res
-        for res in get(dataset=dset_path, path=gp.expand(), on_failure="ignore"):
-            if _is_nonexistent_path(res):
-                # MIH why just a warning if given inputs are not valid?
-                lgr.warning("Input does not exist: %s", res["path"])
-            else:
-                yield res
+        if gp.misses:
+            ds = Dataset(dset_path)
+            for miss in gp.misses:
+                yield get_status_dict(
+                    action="run", ds=ds, status="error",
+                    message=("Input did not match existing file: %s",
+                             miss))
+        yield from get(dataset=dset_path, path=gp.expand_strict(),
+                       on_failure="ignore")
 
 
 def _unlock_or_remove(dset_path, paths):
@@ -510,6 +579,7 @@ def _execute_command(command, pwd, expected_exit=None):
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 assume_ready=None, explicit=False, message=None, sidecar=None,
+                dry_run=False,
                 extra_info=None,
                 rerun_info=None,
                 extra_inputs=None,
@@ -595,7 +665,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # ATTN: For correct path handling, all dataset commands call should be
     # unbound. They should (1) receive a string dataset argument, (2) receive
     # relative paths, and (3) happen within a chpwd(pwd) context.
-    if not inject:
+    if not (inject or dry_run):
         with chpwd(pwd):
             for res in prepare_inputs(
                     ds_path,
@@ -609,7 +679,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 if outputs:
                     for res in _install_and_reglob(ds_path, outputs):
                         yield res
-                    for res in _unlock_or_remove(ds_path, outputs.expand()):
+                    for res in _unlock_or_remove(ds_path,
+                                                 outputs.expand_strict()):
                         yield res
 
                 if rerun_outputs is not None:
@@ -640,19 +711,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      exc))
         return
 
-    if not inject:
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
-
-
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
     # - exit code of the command
     run_info = {
         'cmd': cmd,
-        'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
         'extra_inputs': extra_inputs.paths,
@@ -665,6 +729,30 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info["dsid"] = ds.id
     if extra_info:
         run_info.update(extra_info)
+
+    if dry_run:
+        yield get_status_dict(
+            "run [dry-run]", ds=ds, status="ok", message="Dry run",
+            run_info=run_info,
+            dry_run_info=dict(cmd_expanded=cmd_expanded,
+                              pwd_full=pwd,
+                              inputs=inputs.expand(),
+                              outputs=outputs.expand()))
+        return
+
+    if not inject:
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+        run_info['exit'] = cmd_exitcode
+
+    # Re-glob to capture any new outputs.
+    #
+    # TODO: If a warning or error is desired when an --output pattern doesn't
+    # have a match, this would be the spot to do it.
+    if explicit or expand in ["outputs", "both"]:
+        outputs.expand(refresh=True)
+        run_info["outputs"] = outputs.paths
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
@@ -698,7 +786,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
 
-    outputs_to_save = outputs.expand() if explicit else None
+    outputs_to_save = outputs.expand_strict() if explicit else None
     if outputs_to_save is not None and use_sidecar:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save

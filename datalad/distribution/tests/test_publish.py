@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     assert_status,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     known_failure_windows,
     neq_,
@@ -160,9 +161,9 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
-    source.repo.remove_remote("origin")
+    source.repo.remove_remote(DEFAULT_REMOTE)
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -219,9 +220,9 @@ def test_publish_plain_git(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
-    source.repo.remove_remote("origin")
+    source.repo.remove_remote(DEFAULT_REMOTE)
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -672,7 +673,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
     assert_result_count(results, 1)
     assert_result_count(results, 1, status='ok', type='dataset', path=source.path)
 
-    # if however, a non-installed subdataset is requsted explicitly, it'll fail
+    # if however, a non-installed subdataset is requested explicitly, it'll fail
     results = source.publish(path='subm 1', to='target', on_failure='ignore')
     assert_result_count(results, 1, status='impossible', type='dataset', action='publish')
 
@@ -734,7 +735,7 @@ def test_gh1811(srcpath, clonepath):
     (clone.pathobj / 'somemore').write_text('somemore')
     clone.save()
     clone.repo.call_git(['checkout', 'HEAD~1'])
-    res = clone.publish(to='origin', on_failure='ignore')
+    res = clone.publish(to=DEFAULT_REMOTE, on_failure='ignore')
     assert_result_count(res, 1)
     assert_result_count(
         res, 1,
@@ -750,12 +751,12 @@ def test_publish_no_fetch_refspec_configured(path):
     GitWitlessRunner(cwd=str(path)).run(
         ["git", "init", "--bare", "empty-remote"])
     ds = Dataset(path / "ds").create()
-    ds.repo.add_remote("origin", str(ds.pathobj.parent / "empty-remote"))
+    ds.repo.add_remote(DEFAULT_REMOTE, str(ds.pathobj.parent / "empty-remote"))
     # Mimic a situation that can happen with an LFS remote. See gh-4199.
-    ds.repo.config.unset("remote.origin.fetch", where="local")
+    ds.repo.config.unset(f"remote.{DEFAULT_REMOTE}.fetch", where="local")
     (ds.repo.pathobj / "foo").write_text("a")
     ds.save()
-    ds.publish(to="origin")
+    ds.publish(to=DEFAULT_REMOTE)
 
 
 @known_failure_windows

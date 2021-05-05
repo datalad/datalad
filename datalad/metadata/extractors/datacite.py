@@ -73,10 +73,10 @@ def _process_tree(tree, nstag):
 
 class MetadataExtractor(BaseMetadataExtractor):
     def _get_dataset_metadata(self):
-        cannonical = op.join(self.ds.path, '.datalad', 'meta.datacite.xml')
+        canonical = op.join(self.ds.path, '.datalad', 'meta.datacite.xml')
 
         # look for the first matching filename and go with it
-        fname = [cannonical] if op.lexists(cannonical) else \
+        fname = [canonical] if op.lexists(canonical) else \
             [op.join(self.ds.path, f) for f in self.paths
              if op.basename(f) == 'meta.datacite.xml']
         if not fname or not op.lexists(fname[0]):

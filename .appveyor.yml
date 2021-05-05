@@ -107,7 +107,6 @@ environment:
       DTS: >
           datalad.downloaders
           datalad.interface
-          datalad.plugin
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PY: 39-x64
     - ID: WinP39a3
@@ -136,7 +135,6 @@ environment:
       DTS: >
           datalad.downloaders
           datalad.interface
-          datalad.plugin
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       INSTALL_GITANNEX: git-annex

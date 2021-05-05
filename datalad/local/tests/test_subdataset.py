@@ -292,7 +292,7 @@ def test_state(path):
     assert_not_in('state', res[0])
     # uninstall the subdataset
     ds.uninstall('sub')
-    # normale 'gone' is "absent"
+    # normal 'gone' is "absent"
     assert_false(sub.is_installed())
     assert_result_count(
         ds.subdatasets(), 1, path=sub.path, state='absent')

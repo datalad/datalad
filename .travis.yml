@@ -28,10 +28,6 @@ env:
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"
 
-# Disabled since old folks don't want to change workflows of submitting through central authority
-#    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
-#    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
-
 matrix:
   include:
   # Additional custom ones
@@ -211,14 +207,6 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - tools/ci/prep-travis-forssh.sh
-  # Install nvm https://github.com/nvm-sh/nvm/blob/master/README.md
-  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
-  # Use install & use node v10 as grunt-contrib-qunit uses generic try catch <https://github.com/datalad/datalad/issues/4635#issue-640604347>
-  - nvm install 10 && nvm use 10
-  # Echo node and npm version for debug
-  - which node && node -v && which npm && npm -v
-  # Install grunt-cli
-  - eatmydata npm install -g grunt-cli
   # Install various basic depedencies
   - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   # needed for tests of patool compression fall-back solution
@@ -230,12 +218,13 @@ before_install:
   - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  # Maybe build install custom git.
+  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
+  - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   # Install git-annex
   - wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
   - eval python3 datalad_installer.py --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
   - source new.env && cat new.env >> ~/.bashrc
-  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
-  - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   - pip install --upgrade pip
 
 install:
@@ -247,19 +236,12 @@ install:
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # git-annex workaround. TODO: remove - should not be needed
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
-  # S3
-  - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
-  # Install grunt to test run javascript frontend tests
-  - npm install grunt
-  - npm install grunt-contrib-qunit@^4.0.0
 
 script:
   # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing
   - if [ -n "${_DL_TMPDIR:-}" ]; then export TMPDIR="${_DL_TMPDIR}"; fi
   # Test installation system-wide
   - sudo pip install .
-  # Run javascript tests
-  - grunt test --verbose
   # Report WTF information using system wide installed version
   - datalad wtf
   - mkdir -p __testhome__

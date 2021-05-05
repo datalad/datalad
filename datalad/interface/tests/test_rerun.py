@@ -60,6 +60,7 @@ from datalad.tests.utils import (
     ok_file_under_git,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     neq_,
     assert_status,
@@ -455,7 +456,7 @@ def test_rerun_outofdate_tree(path):
     with open(input_file, "w") as f:
         f.write("abc\ndef")
     ds.save("foo", to_git=True)
-    # Create inital run.
+    # Create initial run.
     ds.run('grep def foo > out')
     eq_('def\n', open(output_file).read())
     # Change tree so that it is no longer compatible.
@@ -661,16 +662,12 @@ def test_run_inputs_outputs(src, path):
     ok_(ds.repo.file_has_content("input.dat"))
     ok_(ds.repo.file_has_content("extra-input.dat"))
 
-    with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("cd .> dummy", inputs=["not-there"])
-        assert_in("Input does not exist: ", cml.out)
-
     # Test different combinations of globs and explicit files.
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
     create_tree(ds.path, {i: i for i in inputs})
 
     ds.save()
-    ds.repo.copy_to(inputs, remote="origin")
+    ds.repo.copy_to(inputs, remote=DEFAULT_REMOTE)
     ds.repo.drop(inputs, options=["--force"])
 
     test_cases = [(["*.dat"], ["a.dat", "b.dat"]),
@@ -690,7 +687,7 @@ def test_run_inputs_outputs(src, path):
     create_tree(ds.path, {"subdir": {"a": "subdir a",
                                      "b": "subdir b"}})
     ds.save("subdir")
-    ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
+    ds.repo.copy_to(["subdir/a", "subdir/b"], remote=DEFAULT_REMOTE)
     ds.repo.drop("subdir", options=["--force"])
     ds.run("cd .> subdir-dummy", inputs=[op.join(ds.path, "subdir")])
     ok_(all(ds.repo.file_has_content(op.join("subdir", f)) for f in ["a", "b"]))
@@ -709,7 +706,7 @@ def test_run_inputs_outputs(src, path):
     # time of the run.
     create_tree(ds.path, {"after-dot-run": "after-dot-run content"})
     ds.save()
-    ds.repo.copy_to(["after-dot-run"], remote="origin")
+    ds.repo.copy_to(["after-dot-run"], remote=DEFAULT_REMOTE)
     ds.repo.drop(["after-dot-run"], options=["--force"])
     ds.rerun(DEFAULT_BRANCH + "^")
     ds.repo.file_has_content("after-dot-run")
@@ -735,13 +732,6 @@ def test_run_inputs_outputs(src, path):
         with open(op.join(path, "a.dat")) as fh:
             eq_(fh.read(), " appended\n appended\n")
 
-    if not on_windows:
-        # see datalad#2606
-        with swallow_logs(new_level=logging.DEBUG) as cml:
-            with swallow_outputs():
-                ds.run("echo blah", outputs=["not-there"])
-                assert_in("Filtered out non-existing path: ", cml.out)
-
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
@@ -757,7 +747,7 @@ def test_run_inputs_outputs(src, path):
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
-    # We install subdatasets to fully resolve globs.
+    # We uninstall subdatasets to fully resolve globs.
     ds.uninstall("s0")
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
@@ -777,9 +767,10 @@ def test_run_inputs_outputs(src, path):
 
 
 @known_failure_windows
-@with_tempfile(mkdir=True)
+@with_tree({"foo": "foo"})
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(annex=False)
+    ds = Dataset(path).create(annex=False, force=True)
+    ds.save()
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))

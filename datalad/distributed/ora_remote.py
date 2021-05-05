@@ -2,6 +2,7 @@ from annexremote import SpecialRemote
 from annexremote import RemoteError
 from annexremote import ProtocolError
 
+import os
 from pathlib import (
     Path,
     PurePosixPath
@@ -91,6 +92,9 @@ class IOBase(object):
     def mkdir(self, path):
         raise NotImplementedError
 
+    def symlink(self, target, link_name):
+        raise NotImplementedError
+
     def put(self, src, dst, progress_cb):
         raise NotImplementedError
 
@@ -167,6 +171,9 @@ class LocalIO(IOBase):
             parents=True,
             exist_ok=True,
         )
+
+    def symlink(self, target, link_name):
+        os.symlink(target, link_name)
 
     def put(self, src, dst, progress_cb):
         shutil.copy(
@@ -418,6 +425,9 @@ class SSHRemoteIO(IOBase):
 
     def mkdir(self, path):
         self._run('mkdir -p {}'.format(sh_quote(str(path))))
+
+    def symlink(self, target, link_name):
+        self._run('ln -s {} {}'.format(sh_quote(str(target)), sh_quote(str(link_name))))
 
     def put(self, src, dst, progress_cb):
         self.ssh.put(str(src), str(dst))
@@ -1196,7 +1206,7 @@ class RIARemote(SpecialRemote):
         self.push_io.mkdir(transfer_dir)
         tmp_path = transfer_dir / key
 
-        if tmp_path.exists():
+        if self.push_io.exists(tmp_path):
             # Just in case - some parallel job could already be writing to it at
             # least tell the conclusion, not just some obscure permission error
             raise RIARemoteError('{}: upload already in progress'

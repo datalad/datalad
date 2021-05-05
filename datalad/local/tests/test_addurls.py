@@ -23,7 +23,7 @@ from io import StringIO
 from datalad.api import addurls, Dataset, subdatasets
 from datalad.cmd import WitlessRunner
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
-import datalad.plugin.addurls as au
+import datalad.local.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
@@ -674,7 +674,7 @@ class TestAddurls(object):
                 raise ValueError("Scheme error")
             return url + ".v1"
 
-        with patch("datalad.plugin.addurls.get_versioned_url", version_fn):
+        with patch("datalad.local.addurls.get_versioned_url", version_fn):
             with swallow_logs(new_level=logging.WARNING) as cml:
                 ds.addurls(self.json_file, "{url}", "{name}",
                            version_urls=True)

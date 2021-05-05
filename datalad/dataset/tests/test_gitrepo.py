@@ -84,14 +84,14 @@ def test_GitRepo_instance_from_not_existing(path, path2):
     gr = GitRepo(path2).init()
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path2, '.git')))
-    # reenable from core GitRepo has a status() method
+    # re-enable from core GitRepo has a status() method
     #assert_repo_status(path2, annex=False)
 
     # 4. create=True, path exists, but no git repo:
     gr = GitRepo(path).init()
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     ok_(op.exists(op.join(path, '.git')))
-    # reenable from core GitRepo has a status() method
+    # re-enable from core GitRepo has a status() method
     #assert_repo_status(path, annex=False)
 
 

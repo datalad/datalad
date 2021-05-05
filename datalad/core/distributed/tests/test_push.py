@@ -29,6 +29,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     known_failure_githubci_osx,
     known_failure_githubci_win,
@@ -325,7 +326,7 @@ def test_push_recursive(
         assert_in_results(
             res, status='ok', type='dataset', path=d.path,
             refspec=DEFAULT_REFSPEC)
-    # all correspondig branches match across all datasets
+    # all corresponding branches match across all datasets
     for s, d in zip((top, sub, subnoannex, subsub),
                     (target_top, target_sub, target_subnoannex,
                      target_subsub)):
@@ -478,7 +479,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
     ok_(len(whereis_prior) < len(
         src.repo.whereis(files=['test_mod_annex_file'])[0]))
 
-    # do it yet again will do nothing, because all is uptodate
+    # do it yet again will do nothing, because all is up-to-date
     assert_status('notneeded', src.push(to='target', force=None))
     # an explicit reference point doesn't change that
     assert_status('notneeded',
@@ -619,7 +620,7 @@ def test_gh1811(srcpath, clonepath):
     (clone.pathobj / 'somemore').write_text('somemore')
     clone.save()
     clone.repo.call_git(['checkout', 'HEAD~1'])
-    res = clone.push(to='origin', on_failure='ignore')
+    res = clone.push(to=DEFAULT_REMOTE, on_failure='ignore')
     assert_result_count(res, 1)
     assert_result_count(
         res, 1,

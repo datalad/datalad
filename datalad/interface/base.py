@@ -26,6 +26,7 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
+import warnings
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -38,8 +39,6 @@ from datalad.support.constraints import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.plugin import _get_plugins
-from datalad.plugin import _load_plugin
 
 
 default_logchannels = {
@@ -72,16 +71,13 @@ def get_cmdline_command_name(intfspec):
 def get_interface_groups(include_plugins=False):
     """Return a list of command groups.
 
-    Parameters
-    ----------
-    include_plugins : bool, optional
-        Whether to include a group named 'plugins' that has a list of
-        discovered plugin commands.
-
     Returns
     -------
     A list of tuples with the form (GROUP_NAME, GROUP_DESCRIPTION, COMMANDS).
     """
+    if include_plugins:
+        warnings.warn("Plugins are no longer supported.", DeprecationWarning)
+
     from .. import interface as _interfaces
 
     grps = []
@@ -93,13 +89,6 @@ def get_interface_groups(include_plugins=False):
         grp_name = _item[7:]
         grp = getattr(_interfaces, _item)
         grps.append((grp_name,) + grp)
-    # TODO(yoh): see if we could retain "generator" for plugins
-    # ATM we need to make it explicit so we could check the command(s) below
-    # It could at least follow the same destiny as extensions so we would
-    # just do more iterative "load ups"
-
-    if include_plugins:
-        grps.append(('plugins', 'Plugins', list(_get_plugins())))
     return grps
 
 
@@ -145,25 +134,21 @@ def load_interface(spec):
     ----------
     spec : tuple
         For a standard interface, the first item is the datalad source module
-        and the second object name for the interface. For a plugin, the second
-        item should be a dictionary that maps 'file' to the path the of module.
+        and the second object name for the interface.
 
     Returns
     -------
     The interface class or, if importing the module fails, None.
     """
-    if isinstance(spec[1], dict):
-        intf = _load_plugin(spec[1]['file'], fail=False)
+    lgr.log(5, "Importing module %s ", spec[0])
+    try:
+        mod = import_module(spec[0], package='datalad')
+    except Exception as e:
+        lgr.error("Internal error, cannot import interface '%s': %s",
+                  spec[0], exc_str(e))
+        intf = None
     else:
-        lgr.log(5, "Importing module %s ", spec[0])
-        try:
-            mod = import_module(spec[0], package='datalad')
-        except Exception as e:
-            lgr.error("Internal error, cannot import interface '%s': %s",
-                      spec[0], exc_str(e))
-            intf = None
-        else:
-            intf = getattr(mod, spec[1])
+        intf = getattr(mod, spec[1])
     return intf
 
 
@@ -516,8 +501,8 @@ def build_doc(cls, **kwargs):
     spec = getattr(cls, '_params_', dict())
 
 
-    # update class attributes that may override defaults 
-    if hasattr(cls, '_no_eval_results'):
+    # update class attributes that may override defaults
+    if not _has_eval_results_call(cls):
         add_args = None
     else:
         add_args = {k: getattr(cls, k, v) for k, v in eval_defaults.items()}
@@ -649,10 +634,6 @@ class Interface(object):
     # mode would fall into the debugger
     _interrupted_exit_code = 1
 
-    _OLDSTYLE_COMMANDS = (
-        'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-        'CreateTestDataset', 'Export', 'Ls', 'SSHRun', 'Test')
-
     @classmethod
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
@@ -773,7 +754,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ not in Interface._OLDSTYLE_COMMANDS:
+        if _has_eval_results_call(cls):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -869,3 +850,9 @@ def get_allargs_as_kwargs(call, args, kwargs):
     # from their signature...
     #assert (nargs == len(kwargs_))
     return kwargs_
+
+
+def _has_eval_results_call(cls):
+    """Return True if cls has a __call__ decorated with @eval_results
+    """
+    return getattr(getattr(cls, '__call__', None), '_eval_results', False)

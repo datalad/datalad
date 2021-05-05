@@ -182,6 +182,10 @@ def path_is_under(values, path=None):
     return False
 
 
+# TODO(OPT)? YOH: from a cursory review seems like possibly an expensive function
+# whenever many paths were provided (e.g. via shell glob).
+# Might be worth testing on some usecase and py-spy'ing if notable portion
+# of time is spent.
 def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                                       spec, includeds=None):
     """Discover the edges and nodes in a dataset tree to given target paths
@@ -200,7 +204,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     spec : dict
       `content_by_ds`-style dictionary that will receive information about the
       discovered datasets. Specifically, for each discovered dataset there
-      will be in item with its path under the key (path) of the respective
+      will be an item with its path under the key (path) of the respective
       superdataset.
     includeds : sequence, optional
       Any paths given are treated as existing subdatasets, regardless of
@@ -481,7 +485,9 @@ def eval_results(func):
             lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
             return return_func(generator_func)(*args, **kwargs)
 
-    return eval_func(func)
+    ret = eval_func(func)
+    ret._eval_results = True
+    return ret
 
 
 def default_result_renderer(res):
@@ -546,7 +552,7 @@ def _process_results(
     # used to track repeated messages in the default renderer
     last_result = None
     last_result_ts = None
-    # which result dict keys to inspect for changes to discover repetions
+    # which result dict keys to inspect for changes to discover repetitions
     # of similar messages
     repetition_keys = set(('action', 'status', 'type', 'refds'))
     # counter for detected repetitions

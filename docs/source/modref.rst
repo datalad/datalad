@@ -77,7 +77,6 @@ Plumbing commands
    api.create_test_dataset
    api.diff
    api.download_url
-   api.ls
    api.push
    api.sshrun
    api.siblings
@@ -92,25 +91,13 @@ Miscellaneous commands
 
    api.add_archive_content
    api.test
-
-Plugins
--------
-
-DataLad can be customized by plugins. The following plugins are shipped
-with DataLad.
-
-.. currentmodule:: datalad.plugin
-.. autosummary::
-   :toctree: generated
-
-   add_readme
-   addurls
-   check_dates
-   export_archive
-   export_to_figshare
-   no_annex
-   wtf
-
+   api.add_readme
+   api.addurls
+   api.check_dates
+   api.export_archive
+   api.export_to_figshare
+   api.no_annex
+   api.wtf
 
 Support functionality
 =====================
@@ -119,7 +106,6 @@ Support functionality
 .. autosummary::
    :toctree: generated
 
-   auto
    cmd
    consts
    log

@@ -44,6 +44,7 @@ from datalad.tests.utils import (
     assert_repo_status,
     assert_result_count,
     assert_message,
+    DEFAULT_REMOTE,
     serve_path_via_http,
     skip_if_adjusted_branch,
     skip_ssh,
@@ -103,20 +104,20 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     # own location default remote for current branch
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
-        [dict(cost=500, name='origin', url=ds_subpath)])
+        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
-        [dict(cost=500, name='origin', url=ds_subpath),
-         dict(cost=600, name='origin', url=sshurl)])
+        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+         dict(cost=600, name=DEFAULT_REMOTE, url=sshurl)])
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
-        [dict(cost=500, name='origin', url=ds_subpath),
-         dict(cost=600, name='origin', url=httpurl)])
+        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+         dict(cost=600, name=DEFAULT_REMOTE, url=httpurl)])
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            dict(cost=500, name='origin', url=ds_subpath),
+            dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -125,7 +126,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
                    result_renderer='disabled')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
-            dict(cost=500, name='origin', url=ds_subpath),
+            dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -133,7 +134,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='youredead', from_config=True),
         ])
     # we can alter the cost by given the name a two-digit prefix
@@ -143,7 +144,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
                 dict(cost=400, name='bang', url='youredead', from_config=True),
-                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -151,7 +152,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
             [
-                dict(cost=500, name='origin', url=ds_subpath),
+                dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
                      from_config=True),
         ])

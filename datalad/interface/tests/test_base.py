@@ -76,9 +76,8 @@ def test_call_from_parser_old_style():
         def __call__(arg=None):
             eq_(arg, "nothing")
             return "magical"
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', ('DummyOne',)):
-        val = DummyOne.call_from_parser(_args(arg="nothing"))
-        eq_(val, "magical")
+    val = DummyOne.call_from_parser(_args(arg="nothing"))
+    eq_(val, "magical")
 
 
 def test_call_from_parser_old_style_generator():
@@ -89,9 +88,8 @@ def test_call_from_parser_old_style_generator():
             eq_(arg, "nothing")
             yield "nothing is"
             yield "magical"
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', ('DummyOne',)):
-        val = DummyOne.call_from_parser(_args(arg="nothing"))
-        eq_(val, ["nothing is", "magical"])
+    val = DummyOne.call_from_parser(_args(arg="nothing"))
+    eq_(val, ["nothing is", "magical"])
 
 
 def test_call_from_parser_default_args():
@@ -104,15 +102,17 @@ def test_call_from_parser_default_args():
             eq_(kwargs['common_report_type'], None)
             # and even those we didn't pass
             eq_(kwargs['common_output_format'], "default")
-            eq_(kwargs['return_type'], "generator")
+            # with dissolution of _OLD_STYLE_COMMANDS yoh yet to find
+            # a real interface which had return_type (defined in
+            # eval_defaults and eval_params) but no @eval_results
+            # eq_(kwargs['return_type'], "generator")
             eq_(arg, "nothing")
             yield "nothing is"
             yield "magical"
 
     # just to be sure no evil spirits chase away our Dummy
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', tuple()):
-        val = DummyOne.call_from_parser(_new_args(arg="nothing"))
-        eq_(val, ["nothing is", "magical"])
+    val = DummyOne.call_from_parser(_new_args(arg="nothing"))
+    eq_(val, ["nothing is", "magical"])
 
 
 def test_call_from_parser_result_filter():
@@ -121,14 +121,17 @@ def test_call_from_parser_result_filter():
         def __call__(**kwargs):
             yield kwargs
 
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', tuple()):
-        # call_from_parser doesn't add result_filter to the keyword arguments
-        # unless a CLI option sets it to a non-None value.
-        assert_not_in("result_filter",
-                      DummyOne.call_from_parser(_new_args())[0])
-        assert_in("result_filter",
-                  DummyOne.call_from_parser(
-                      _new_args(common_report_type="dataset"))[0])
+    # call_from_parser doesn't add result_filter to the keyword arguments
+    assert_not_in("result_filter",
+                  DummyOne.call_from_parser(_new_args())[0])
+    # with dissolution of _OLD_STYLE_COMMANDS and just relying on having
+    # @eval_results, no result_filter is added, since those commands are
+    # not guaranteed to return/yield any record suitable for filtering.
+    # The effect is the same -- those "common" options are not really applicable
+    # to Interface's which do not return/yield expected records
+    assert_not_in("result_filter",
+              DummyOne.call_from_parser(
+                  _new_args(common_report_type="dataset"))[0])
 
 
 def test_get_result_filter_arg_vs_config():
@@ -235,7 +238,7 @@ def check_call_from_parser_pos_arg_underscore(how):
             return pos_arg
 
     parser = argparse.ArgumentParser()
-    parser_add_common_options(parser, version="v1")
+    parser_add_common_options(parser)
     Cmd.setup_parser(parser)
     args = parser.parse_args(["val"])
     eq_(Cmd.call_from_parser(args),

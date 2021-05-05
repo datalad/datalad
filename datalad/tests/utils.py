@@ -116,6 +116,13 @@ if external_versions["cmd:git"] >= "2.28":
 else:
     DEFAULT_BRANCH = "master"
 
+if external_versions["cmd:git"] >= "2.30.0":
+    # The specific value here doesn't matter, but it should not be the default
+    # from any Git version to test that we work with custom values.
+    DEFAULT_REMOTE = "dl-test-remote"  # Set by setup_package().
+else:
+    DEFAULT_REMOTE = "origin"
+
 # additional shortcuts
 neq_ = assert_not_equal
 nok_ = assert_false
@@ -1394,7 +1401,7 @@ def assert_result_values_equal(results, prop, values):
 
 def assert_result_values_cond(results, prop, cond):
     """Verify that the values of all results for a given key in the status dicts
-    fullfill condition `cond`.
+    fulfill condition `cond`.
 
     Parameters
     ----------

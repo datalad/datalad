@@ -75,7 +75,7 @@ def _parse_git_submodules(ds, paths, cache):
                 # it.
                 paths = None
             else:
-                # we had path contraints, but none matched this dataset
+                # we had path constraints, but none matched this dataset
                 return
     # can we use the reported as such, or do we need to recode wrt to the
     # query context dataset?
