@@ -33,8 +33,10 @@ from ..dochelpers import exc_str
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import (
-    EnsureKeyChoice,
+    AltConstraints,
     EnsureChoice,
+    EnsureKeyChoice,
+    EnsureNone,
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
@@ -711,6 +713,13 @@ class Interface(object):
                 help = help.rstrip() + '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
+                # if we have an option which does not default to None
+                # but has None as possible value, allow for empty value
+                if (isinstance(param.constraints, AltConstraints)
+                     and any(isinstance(c, EnsureNone) for c in param.constraints.constraints)
+                     and parser_kwargs.get('default', None) is not None
+                    ):
+                    parser_kwargs['nargs'] = '?'
                 # include value constraint description and default
                 # into the help string
                 cdoc = alter_interface_docs_for_cmdline(
