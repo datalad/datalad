@@ -245,8 +245,13 @@ class ProducerConsumer:
         else:
             self.total += 1
 
-    def __iter__(self):
-        jobs = self.jobs
+    @classmethod
+    def get_effective_jobs(cls, jobs):
+        """Return actual number of jobs to be used.
+
+        It will account for configuration vairable ('datalad.runtime.max-jobs') and possible
+        other requirements (such as version of Python).
+        """
         if jobs in (None, "auto"):
             from datalad import cfg
             # ATM there is no "auto" for this operation, so in both auto and None
@@ -254,7 +259,7 @@ class ProducerConsumer:
             # "auto" could be for some auto-scaling based on a single future time
             # to complete, scaling up/down. Ten config variable could accept "auto" as well
             jobs = cfg.obtain('datalad.runtime.max-jobs')
-        if jobs >= 1 and not self._can_use_threads:
+        if jobs >= 1 and not cls._can_use_threads:
             # if we have arrived with jobs=1 and older python, we will not
             # even alert that we are running serially.  The fact is that
             # ProducerConsumer with jobs=1 does parallel run of the producer
@@ -265,11 +270,14 @@ class ProducerConsumer:
                     "Will run serially", jobs)
                 ProducerConsumer._alerted_already = True
             jobs = 0
-        self._jobs = jobs
-        if jobs == 0:
+        return jobs
+
+    def __iter__(self):
+        self._jobs = self.get_effective_jobs(self.jobs)
+        if self._jobs == 0:
             yield from self._iter_serial()
         else:
-            yield from self._iter_threads(jobs)
+            yield from self._iter_threads(self._jobs)
 
     def _iter_serial(self):
         # depchecker is not consulted, serial execution
