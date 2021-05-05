@@ -312,11 +312,19 @@ class ForEach(Interface):
             pc_class = ProducerConsumerProgressLog
             pc_kw = dict(lgr=lgr, label="foreach", unit="datasets")
 
-        if python and chpwd:
+        if python:
             effective_jobs = pc_class.get_effective_jobs(jobs)
             if effective_jobs > 1:
-                lgr.warning("Got jobs=%d . Execution of Python commands in parallel threads while changing directory "
-                            "is not thread-safe.  We will execute without parallelization.", jobs)
+                warning = ""
+                if chpwd:
+                    warning += \
+                        "Execution of Python commands in parallel threads while changing directory " \
+                        "is not thread-safe. "
+                if output_streams == 'capture':
+                    warning += \
+                        "Execution of Python commands in parallel while capturing output is not possible."
+                if warning:
+                    lgr.warning("Got jobs=%d. %s We will execute without parallization", jobs, warning)
             jobs = 0  # no threading even between producer/consumer
 
         yield from pc_class(
