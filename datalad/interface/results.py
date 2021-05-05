@@ -27,6 +27,7 @@ from datalad.utils import (
     path_is_subpath,
     PurePosixPath,
 )
+from datalad.support.exceptions import CommandError
 from datalad.support.path import robust_abspath
 from datalad.support.exceptions import (
     format_oneline_tb,
@@ -106,6 +107,8 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
             if isinstance(exception, CapturedException) \
             else format_oneline_tb(
                 exception, include_str=False)
+        if isinstance(exception, CommandError):
+            d['exit_code'] = exception.code
     if kwargs:
         d.update(kwargs)
     return d
