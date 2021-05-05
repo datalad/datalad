@@ -60,7 +60,7 @@ def test_python(path):
     res = ds.foreach("dir()", cmd_type='exec')
     assert_not_in('result', res[0])
     # but allows for more complete/interesting setups in which we could import modules etc
-    res = ds.foreach('import sys; print("DIR: %s" % str(dir()))', cmd_type='exec')
+    res = ds.foreach('import sys; print("DIR: %s" % str(dir()))', output_streams='capture', cmd_type='exec')
     assert_in('ds', res[0]['stdout'])
     assert_in('sys', res[0]['stdout'])
     eq_(res[0]['stderr'], '')

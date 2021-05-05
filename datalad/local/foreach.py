@@ -177,7 +177,7 @@ class ForEach(Interface):
             contains=None,
             bottomup=False,
             subdatasets_only=False,
-            output_streams='capture',
+            output_streams='pass-through',
             chpwd=True,  # as the most common case/scenario
             jobs=None
             ):
