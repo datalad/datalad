@@ -188,7 +188,7 @@ class Clone(Interface):
             metavar='SOURCE',
             doc="""URL, DataLad resource identifier, local path or instance of
             dataset to be cloned""",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureStr()),
         path=Parameter(
             args=("path",),
             metavar='PATH',
