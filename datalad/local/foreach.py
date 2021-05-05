@@ -233,6 +233,7 @@ class ForEach(Interface):
                 pwd=pwd,
                 # pass actual instances so .format could access attributes even for external commands
                 ds=ds,  # if python else ds.path,
+                dspath=ds.path,  # just for consistency with `run`
                 refds=refds,  # if python else refds.path,
                 # Check if the command contains "tmpdir" to avoid creating an
                 # unnecessary temporary directory in most but not all cases.
