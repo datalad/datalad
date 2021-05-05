@@ -1500,3 +1500,24 @@ def test_clone_recorded_subds_reset(path):
     eq_(ds_b.subdatasets()[0]["gitshasum"],
         sub_repo.get_hexsha(
             sub_repo.get_corresponding_branch(branch) or branch))
+
+
+@with_tempfile
+def test_clone_git_clone_opts(path):
+    path = Path(path)
+    ds_a = create(path / "ds_a", annex=False)
+
+    repo_a = ds_a.repo
+    repo_a.commit(msg="c1", options=["--allow-empty"])
+    repo_a.checkout(DEFAULT_BRANCH + "-other", ["-b"])
+    repo_a.commit(msg="c2", options=["--allow-empty"])
+    repo_a.tag("atag")
+
+    ds_b = clone(ds_a.path, path / "ds_b",
+                 git_clone_opts=[f"--branch={DEFAULT_BRANCH}",
+                                 "--single-branch", "--no-tags"])
+    repo_b = ds_b.repo
+    eq_(repo_b.get_active_branch(), DEFAULT_BRANCH)
+    eq_(set(x["refname"] for x in repo_b.for_each_ref_(fields="refname")),
+        {f"refs/heads/{DEFAULT_BRANCH}",
+         f"refs/remotes/{DEFAULT_REMOTE}/{DEFAULT_BRANCH}"})
