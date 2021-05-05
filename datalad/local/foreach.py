@@ -40,6 +40,7 @@ from datalad.interface.common_opts import (
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.support.constraints import (
+    EnsureBool,
     EnsureChoice,
     EnsureNone,
 )
@@ -53,8 +54,9 @@ from datalad.support.parallel import (
 from datalad.support.param import Parameter
 from datalad.utils import (
     SequenceFormatter,
-    chpwd,
+    chpwd as chpwd_cm,
     getpwd,
+    nothing_cm,
     shortened_repr,
     swallow_outputs,
 )
@@ -127,6 +129,8 @@ class ForEach(Interface):
         #  on present subdatasets?  but having it explicit could be good to
         #  "not miss any".  But `--fulfilled true` is getting on my nerves
         # But not clear how to specify `None` from CLI if I default it to True
+        # https://github.com/datalad/datalad/pull/5640 is needed to allow for it
+        # to default to True. Then we need to overload the default of None to True here
         fulfilled=fulfilled,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -149,6 +153,12 @@ class ForEach(Interface):
             constraints=EnsureChoice('capture', 'pass-through'),
             doc="""whether to capture and return outputs from 'cmd' in the record ('stdout', 'stderr') or
             just 'pass-through' to the screen (and thus absent from returned record)."""),
+        chpwd=Parameter(
+            args=("--chpwd",),
+            constraints=EnsureBool(),
+            doc="""whether to change working directory to the corresponding dataset. Note that for Python
+            commands, due to use of threads, we do not allow to be used with jobs > 1.
+            """),
         jobs=jobs_opt,
         # TODO: might want explicit option to either worry about 'safe_to_consume' setting for parallel
         # For now - always safe
@@ -168,6 +178,7 @@ class ForEach(Interface):
             bottomup=False,
             subdatasets_only=False,
             output_streams='capture',
+            chpwd=True,  # as the most common case/scenario
             jobs=None
             ):
         if not cmd:
@@ -242,7 +253,8 @@ class ForEach(Interface):
             try:
                 if python:
                     python_cmd = _PYTHON_CMDS[cmd_type]
-                    with chpwd(ds.path):
+                    cm = chpwd_cm(ds.path) if chpwd else nothing_cm()
+                    with cm:
                         if output_streams == 'pass-through':
                             res = python_cmd(cmd, placeholders)
                             out = {}
@@ -268,8 +280,11 @@ class ForEach(Interface):
                             status='impossible',
                             message=('command has an unrecognized placeholder: %s', exc))
                         return
-                    # TODO: avoid use of _git_runner
-                    out = ds.repo._git_runner.run(cmd_expanded, protocol=protocol)
+                    # TODO: avoid use of _git_runner? why?
+                    out = ds.repo._git_runner.run(
+                        cmd_expanded,
+                        cwd=ds.path if chpwd else pwd,
+                        protocol=protocol)
                 if output_streams == 'capture':
                     status_rec.update(out)
                     # provide some feedback to user in default rendering
@@ -287,7 +302,8 @@ class ForEach(Interface):
                     command=cmd,
                     exception=exc,
                     status='error',
-                    message=str(exc))
+                    message=str(exc)
+                )
 
         if output_streams == 'pass-through':
             pc_class = ProducerConsumer
@@ -295,6 +311,13 @@ class ForEach(Interface):
         else:
             pc_class = ProducerConsumerProgressLog
             pc_kw = dict(lgr=lgr, label="foreach", unit="datasets")
+
+        if python and chpwd:
+            effective_jobs = pc_class.get_effective_jobs(jobs)
+            if effective_jobs > 1:
+                lgr.warning("Got jobs=%d . Execution of Python commands in parallel threads while changing directory "
+                            "is not thread-safe.  We will execute without parallelization.", jobs)
+            jobs = 0  # no threading even between producer/consumer
 
         yield from pc_class(
             producer=datasets_it,
