@@ -324,7 +324,7 @@ class ForEach(Interface):
                     warning += \
                         "Execution of Python commands in parallel while capturing output is not possible."
                 if warning:
-                    lgr.warning("Got jobs=%d. %s We will execute without parallization", jobs, warning)
+                    lgr.warning("Got jobs=%d. %s We will execute without parallelization", jobs, warning)
             jobs = 0  # no threading even between producer/consumer
 
         yield from pc_class(
@@ -333,7 +333,7 @@ class ForEach(Interface):
             # probably not needed
             # It is ok to start with subdatasets since top dataset already exists
             safe_to_consume=no_subds_in_futures if bottomup else no_parentds_in_futures,
-            # or vise versa
+            # or vice versa
             jobs=jobs,
             **pc_kw
         )

@@ -249,7 +249,7 @@ class ProducerConsumer:
     def get_effective_jobs(cls, jobs):
         """Return actual number of jobs to be used.
 
-        It will account for configuration vairable ('datalad.runtime.max-jobs') and possible
+        It will account for configuration variable ('datalad.runtime.max-jobs') and possible
         other requirements (such as version of Python).
         """
         if jobs in (None, "auto"):
