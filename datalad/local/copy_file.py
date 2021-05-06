@@ -662,7 +662,12 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
         tmploc = tmploc / dest_key
         _replace_file(finfo['objloc'], tmploc, str(tmploc), follow_symlinks=False)
 
-        dest_repo.call_annex(['reinject', str(tmploc), str_dest])
+        # Note: A relative path for the destination is needed for pointer
+        # files.
+        #
+        # https://git-annex.branchable.com/bugs/reinject__58___silent_failure_with_absolute_path_to_poi/
+        dest_repo.call_annex(['reinject', str(tmploc),
+                              str(dest.relative_to(dest_repo.pathobj))])
 
     return dest_key
 
