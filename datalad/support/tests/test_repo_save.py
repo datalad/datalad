@@ -5,7 +5,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test saveds fuction"""
+"""Test saveds function"""
 
 
 from datalad.tests.utils import (

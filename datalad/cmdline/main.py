@@ -93,7 +93,7 @@ def setup_parser(
             and Git-annex. DataLad command line tools allow to manipulate (obtain,
             create, update, publish, etc.) datasets and provide a comprehensive
             toolbox for joint management of data and code. Compared to Git/annex
-            it primarly extends their functionality to transparently and
+            it primarily extends their functionality to transparently and
             simultaneously work with multiple inter-related repositories."""),
         epilog='"Be happy!"',
         formatter_class=formatter_class,

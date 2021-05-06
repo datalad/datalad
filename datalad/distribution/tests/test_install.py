@@ -61,6 +61,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_in_results,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     ok_startswith,
     serve_path_via_http,
     swallow_logs,
@@ -891,7 +892,8 @@ def check_datasets_datalad_org(suffix, tdir):
     # Apparently things can break, especially with introduction of the
     # smart HTTP backend for apache2 etc
     ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w' + suffix)
-    eq_(ds.config.get('remote.origin.annex-ignore', None), None)
+    eq_(ds.config.get(f'remote.{DEFAULT_REMOTE}.annex-ignore', None),
+        None)
     # assert_result_count and not just assert_status since for some reason on
     # Windows we get two records due to a duplicate attempt (as res[1]) to get it
     # again, which is reported as "notneeded".  For the purpose of this test

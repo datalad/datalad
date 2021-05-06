@@ -218,7 +218,7 @@ def test_diff(path, norepo):
         action='diff', path=op.join(ds.path, 'new'), state='modified')
     # stage changes
     ds.repo.add('.', git=True)
-    # no change in diff, staged is not commited
+    # no change in diff, staged is not committed
     assert_result_count(_dirty_results(ds.diff(result_renderer=None)), 1)
     ds.save()
     assert_repo_status(ds.path)

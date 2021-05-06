@@ -1181,7 +1181,7 @@ def test_get_open_files(p):
         # however, on windows get_open_files() can be very slow
         # (e.g. the first invocation in this test (above) can easily
         # take 30-50s). It is not worth slowing the tests to
-        # accomodate this issue, given we have tested proper functioning
+        # accommodate this issue, given we have tested proper functioning
         # in principle already above).
         return
 

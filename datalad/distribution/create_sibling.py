@@ -430,8 +430,6 @@ class CreateSibling(Interface):
     mechanism is provided to produce a flat list of datasets (see
     --target-dir).
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         # TODO: Figure out, whether (and when) to use `sshurl` as push url
@@ -633,7 +631,7 @@ class CreateSibling(Interface):
                 )
             super_url = CreateSibling._get_remote_url(super_ds, name)
             # for now assuming hierarchical setup
-            # (TODO: to be able to destinguish between the two, probably
+            # (TODO: to be able to distinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
             sshurl = slash_join(super_url, relpath(refds_path, super_ds.path))
 

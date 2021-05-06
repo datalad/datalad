@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from itertools import product
 import logging
 from unittest.mock import patch
 import os.path as op
@@ -48,7 +49,6 @@ def test_globbedpaths_get_sub_patterns():
         eq_(gp._get_sub_patterns(pat), expected)
 
 
-@known_failure_windows
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",
@@ -64,9 +64,12 @@ def test_globbedpaths(path):
             (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
             ([dotdir + "*.txt", "*.dat"],
              {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
-            (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
-            ([dotdir + "subdir/*.txt"],
-             {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
+            ([op.join("subdir", "*.txt")],
+             {op.join("subdir", "1.txt"), op.join("subdir", "2.txt")}),
+            (["subdir" + op.sep], {"subdir" + op.sep}),
+            ([dotdir + op.join("subdir", "*.txt")],
+             {dotdir + op.join(*ps)
+              for ps in [("subdir", "1.txt"), ("subdir", "2.txt")]}),
             (["*.txt"], {"1.txt", "3.txt"})]:
         gp = GlobbedPaths(patterns, pwd=path)
         eq_(set(gp.expand()), expected)
@@ -81,7 +84,8 @@ def test_globbedpaths(path):
             ([pardir + "*.txt"], {pardir + p for p in ["1.txt", "3.txt"]}),
             ([dotdir + pardir + "*.txt"],
              {dotdir + pardir + p for p in ["1.txt", "3.txt"]}),
-            (["subdir/"], {"subdir/"})]:
+            # Patterns that don't match are retained by default.
+            (["amiss"], {"amiss"})]:
         gp = GlobbedPaths(patterns, pwd=subdir_path)
         eq_(set(gp.expand()), expected)
         eq_(set(gp.expand(full=True)),
@@ -115,3 +119,78 @@ def test_globbedpaths(path):
     with swallow_logs(new_level=logging.DEBUG) as cml:
         GlobbedPaths(["not here"], pwd=path).expand()
         assert_in("No matching files found for 'not here'", cml.out)
+
+
+@with_tree(tree={"1.txt": "", "2.dat": "", "3.txt": ""})
+def test_globbedpaths_misses(path):
+    gp = GlobbedPaths(["amiss"], pwd=path)
+    eq_(gp.expand_strict(), [])
+    eq_(gp.misses, ["amiss"])
+    eq_(gp.expand(include_misses=True), ["amiss"])
+
+    # miss at beginning
+    gp = GlobbedPaths(["amiss", "*.txt", "*.dat"], pwd=path)
+    eq_(gp.expand_strict(), ["1.txt", "3.txt", "2.dat"])
+    eq_(gp.expand(include_misses=True),
+        ["amiss", "1.txt", "3.txt", "2.dat"])
+
+    # miss in middle
+    gp = GlobbedPaths(["*.txt", "amiss", "*.dat"], pwd=path)
+    eq_(gp.expand_strict(), ["1.txt", "3.txt", "2.dat"])
+    eq_(gp.misses, ["amiss"])
+    eq_(gp.expand(include_misses=True),
+        ["1.txt", "3.txt", "amiss", "2.dat"])
+
+    # miss at end
+    gp = GlobbedPaths(["*.txt", "*.dat", "amiss"], pwd=path)
+    eq_(gp.expand_strict(), ["1.txt", "3.txt", "2.dat"])
+    eq_(gp.misses, ["amiss"])
+    eq_(gp.expand(include_misses=True),
+        ["1.txt", "3.txt", "2.dat", "amiss"])
+
+    # miss at beginning, middle, and end
+    gp = GlobbedPaths(["amiss1", "amiss2", "*.txt", "amiss3", "*.dat",
+                       "amiss4"],
+                      pwd=path)
+    eq_(gp.expand_strict(), ["1.txt", "3.txt", "2.dat"])
+    eq_(gp.misses, ["amiss1", "amiss2", "amiss3", "amiss4"])
+    eq_(gp.expand(include_misses=True),
+        ["amiss1", "amiss2", "1.txt", "3.txt", "amiss3", "2.dat", "amiss4"])
+
+    # Property expands if needed.
+    gp = GlobbedPaths(["amiss"], pwd=path)
+    eq_(gp.misses, ["amiss"])
+
+
+@with_tree(tree={"adir": {},
+                 "bdir": {},
+                 "other": {},
+                 "1.txt": "", "2.dat": "", "3.txt": ""})
+def test_globbedpaths_partial_matches(path):
+    gp = GlobbedPaths([op.join("?dir", "*.txt"), "*.txt"], pwd=path)
+    eq_(gp.expand_strict(), ["1.txt", "3.txt"])
+
+    expected_partial = ["adir" + op.sep, "bdir" + op.sep]
+    eq_(gp.partial_hits, expected_partial)
+    eq_(gp.expand(include_partial=True),
+        expected_partial + ["1.txt", "3.txt"])
+
+    # Property expands if needed.
+    gp = GlobbedPaths([op.join("?dir", "*.txt")], pwd=path)
+    eq_(gp.partial_hits, expected_partial)
+
+
+@with_tree(tree={"1.txt": "",
+                 "2.dat": "",
+                 "3.txt": "",
+                 "foo.dat": ""})
+def test_globbedpaths_cached(path):
+    # Smoke test to trigger cache handling.
+    gp = GlobbedPaths([op.join("?", ".dat"), "*.txt"], pwd=path)
+    for full, partial, misses in product([False, True], repeat=3):
+        eq_(gp.expand(full=full,
+                      include_misses=misses,
+                      include_partial=partial),
+            gp.expand(full=full,
+                      include_misses=misses,
+                      include_partial=partial))

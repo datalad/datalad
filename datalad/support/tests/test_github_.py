@@ -33,6 +33,7 @@ from .. import github_
 from ..github_ import (
     _gen_github_entity,
     _get_github_cred,
+    _gh_exception,
     _token_str,
     get_repo_url,
 )
@@ -101,7 +102,8 @@ def test__make_github_repos():
 
     def _make_github_repo(github_login, entity, reponame, *args):
         if entity == 'entity1':
-            raise gh.BadCredentialsException("very bad status", "some data")
+            raise _gh_exception(gh.BadCredentialsException,
+                                "very bad status", "some data")
         return dict(status='ok')
 
     with mock.patch.object(github_, '_gen_github_entity', _gen_github_entity), \
@@ -114,7 +116,8 @@ def test__make_github_repos():
 
     def _make_github_repo(github_login, entity, reponame, *args):
         # Always throw an exception
-        raise gh.BadCredentialsException("very bad status", "some data")
+        raise _gh_exception(gh.BadCredentialsException,
+                            "very bad status", "some data")
 
     with mock.patch.object(github_, '_gen_github_entity', _gen_github_entity), \
             mock.patch.object(github_, '_make_github_repo', _make_github_repo):

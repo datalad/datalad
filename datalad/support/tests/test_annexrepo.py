@@ -43,7 +43,11 @@ from datalad.cmd import (
     GitWitlessRunner,
     WitlessRunner as Runner,
 )
-from datalad.consts import WEB_SPECIAL_REMOTE_UUID
+from datalad.consts import (
+    DATALAD_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+    WEB_SPECIAL_REMOTE_UUID,
+)
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
 
@@ -74,6 +78,7 @@ from datalad.tests.utils import (
     assert_true,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     find_files,
     get_most_obscure_supported_name,
@@ -1088,7 +1093,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 
-    # and closing the pipes now shoudn't anyhow affect things
+    # and closing the pipes now shouldn't anyhow affect things
     eq_(len(ar._batched), 1)
     ar._batched.close()
     eq_(len(ar._batched), 1)  # doesn't remove them, just closes
@@ -1162,10 +1167,10 @@ def test_annex_ssh(topdir):
     topdir = Path(topdir)
     rm1 = AnnexRepo(topdir / "remote1", create=True)
     rm2 = AnnexRepo.clone(rm1.path, str(topdir / "remote2"))
-    rm2.remove_remote("origin")
+    rm2.remove_remote(DEFAULT_REMOTE)
 
     main_tmp = AnnexRepo.clone(rm1.path, str(topdir / "main"))
-    main_tmp.remove_remote("origin")
+    main_tmp.remove_remote(DEFAULT_REMOTE)
     repo_path = main_tmp.path
     del main_tmp
     remote_1_path = rm1.path
@@ -1446,7 +1451,7 @@ def test_annex_drop(src, dst):
     with assert_raises(CommandError) as e:
         ar.drop('somefile.txt')
     # CommandError has to pull the errors from the JSON record 'note'
-    assert_in('necessary copies', str(e.exception))
+    assert_in('necessary cop', str(e.exception))
 
     with assert_raises(CommandError) as e:
         ar._call_annex_records(['fsck', '-N', '3'])
@@ -1501,23 +1506,35 @@ def test_is_available(batch, p):
     assert is_available(fname) is True
 
     # known remote but doesn't have it
-    assert is_available(fname, remote='origin') is False
+    assert is_available(fname, remote=DEFAULT_REMOTE) is False
+
+    # If the 'datalad' special remote is present, it will claim fname's URL.
+    if DATALAD_SPECIAL_REMOTE in annex.get_remotes():
+        remote = DATALAD_SPECIAL_REMOTE
+        uuid = DATALAD_SPECIAL_REMOTES_UUIDS[DATALAD_SPECIAL_REMOTE]
+    else:
+        remote = "web"
+        uuid = WEB_SPECIAL_REMOTE_UUID
+
     # it is on the 'web'
-    assert is_available(fname, remote='web') is True
+    assert is_available(fname, remote=remote) is True
     # not effective somehow :-/  may be the process already running or smth
     # with swallow_logs(), swallow_outputs():  # it will complain!
     assert is_available(fname, remote='unknown') is False
     assert_false(is_available("boguskey", key=True))
 
     # remove url
-    urls = annex.get_urls(fname) #, **bkw)
+    urls = annex.whereis(fname, output="full").get(uuid, {}).get("urls", [])
+
     assert(len(urls) == 1)
-    eq_(urls, annex.get_urls(annex.get_file_key(fname), key=True))
+    eq_(urls,
+        annex.whereis(annex.get_file_key(fname), key=True, output="full")
+        .get(uuid, {}).get("urls"))
     annex.rm_url(fname, urls[0])
 
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
-    assert is_available(fname, remote='web') is False
+    assert is_available(fname, remote=remote) is False
 
 
 @with_tempfile(mkdir=True)
@@ -1904,7 +1921,7 @@ def test_wanted(path):
     GitRepo.clone(ar.path, ar1_path)
     ar1 = AnnexRepo(ar1_path, init=False)
     eq_(ar1.get_preferred_content('wanted'), None)
-    eq_(ar1.get_preferred_content('wanted', 'origin'), v)
+    eq_(ar1.get_preferred_content('wanted', DEFAULT_REMOTE), v)
     ar1.set_preferred_content('wanted', expr='standard')
     eq_(ar1.get_preferred_content('wanted'), 'standard')
 
@@ -2046,7 +2063,8 @@ def test_AnnexRepo_get_tracking_branch(src_path, path):
     ar = AnnexRepo.clone(src_path, path)
 
     # we want the relation to original branch, e.g. in v6+ adjusted branch
-    eq_(('origin', 'refs/heads/' + DEFAULT_BRANCH), ar.get_tracking_branch())
+    eq_((DEFAULT_REMOTE, 'refs/heads/' + DEFAULT_BRANCH),
+        ar.get_tracking_branch())
 
 
 @skip_if_adjusted_branch
@@ -2077,7 +2095,7 @@ def test_is_special(path):
     ok_(rem.is_special_annex_remote("imspecial"))
 
     ar = AnnexRepo.clone(rem.path, op.join(path, "main"))
-    assert_false(ar.is_special_annex_remote("origin"))
+    assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
 
     assert_false(ar.is_special_annex_remote("imspecial",
                                             check_if_known=False))
@@ -2085,9 +2103,9 @@ def test_is_special(path):
     ok_(ar.is_special_annex_remote("imspecial"))
 
     # With a mis-configured remote, give warning and return false.
-    ar.config.unset("remote.origin.url", where="local")
+    ar.config.unset(f"remote.{DEFAULT_REMOTE}.url", where="local")
     with swallow_logs(new_level=logging.WARNING) as cml:
-        assert_false(ar.is_special_annex_remote("origin"))
+        assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
         cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
 
 
@@ -2118,7 +2136,7 @@ def _test_add_under_subdir(path):
     create_tree(subdir, {'empty': ''})
     runner = Runner(cwd=subdir)
     with chpwd(subdir):
-        runner.run(['git', 'add', 'empty'])  # should add sucesfully
+        runner.run(['git', 'add', 'empty'])  # should add successfully
         # gr.commit('important') #
         runner.run(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
@@ -2388,7 +2406,7 @@ def test_ro_operations(path):
     # progress forward original repo and fetch (but nothing else) it into repo2
     repo.add('file2')
     repo.commit()
-    repo2.fetch('origin')
+    repo2.fetch(DEFAULT_REMOTE)
 
     # Assure that regardless of umask everyone could read it all
     run(['chmod', '-R', 'a+rX', repo2.path])
@@ -2526,7 +2544,7 @@ def test_whereis_batch_eqv(path):
     repo_b = repo_a.clone(repo_a.path, str(path / "b"))
     repo_b.drop(["bar"])
     repo_b.drop(["baz"])
-    repo_b.drop(["baz"], options=["--from=origin", "--force"])
+    repo_b.drop(["baz"], options=["--from=" + DEFAULT_REMOTE, "--force"])
 
     files = ["foo", "bar", "baz"]
     for output in "full", "uuids", "descriptions":

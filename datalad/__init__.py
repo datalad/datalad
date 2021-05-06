@@ -121,8 +121,13 @@ def setup_package():
     consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
-    from datalad.tests.utils import DEFAULT_BRANCH
-    set_envvar("GIT_CONFIG_PARAMETERS", "'init.defaultBranch={}'".format(DEFAULT_BRANCH))
+    from datalad.tests.utils import (
+        DEFAULT_BRANCH,
+        DEFAULT_REMOTE,
+    )
+    set_envvar("GIT_CONFIG_PARAMETERS",
+               "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
+               .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
@@ -205,11 +210,6 @@ def setup_package():
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
 
-    if cfg.obtain('datalad.tests.setup.testrepos'):
-        lgr.debug("Pre-populating testrepos")
-        from datalad.tests.utils import with_testrepos
-        with_testrepos()(lambda repo: 1)()
-
     # in order to avoid having to fiddle with rather uncommon
     # file:// URLs in the tests, have a standard HTTP server
     # that serves an 'httpserve' directory in the test HOME
@@ -224,6 +224,11 @@ def setup_package():
     test_http_server = HTTPPath(serve_path)
     test_http_server.start()
     _TEMP_PATHS_GENERATED.append(serve_path)
+
+    if cfg.obtain('datalad.tests.setup.testrepos'):
+        lgr.debug("Pre-populating testrepos")
+        from datalad.tests.utils import with_testrepos
+        with_testrepos()(lambda repo: 1)()
 
 
 def teardown_package():

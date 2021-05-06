@@ -590,6 +590,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 # New helpers, courtesy of datalad-revolution.
 
 
+# note: not thread safe if threads chdir - uses getpwd
 def resolve_path(path, ds=None, ds_resolved=None):
     """Resolve a path specification (against a Dataset location)
 
@@ -628,6 +629,7 @@ def resolve_path(path, ds=None, ds_resolved=None):
         ds = ds_resolved or require_dataset(
             ds, check_installed=False, purpose='path resolution')
     out = []
+    pwd_parts = None  # get it upon first use but only once
     for p in ensure_list(path):
         if ds is None or not got_ds_instance:
             # no dataset at all or no instance provided -> CWD is always the reference
@@ -654,12 +656,13 @@ def resolve_path(path, ds=None, ds_resolved=None):
             # CONCEPT: do the minimal thing to catch most real-world inputs
             # ASSUMPTION: the only sane relative path input that needs
             # handling and can be handled are upward references like
-            # '../../some/that', wherease stuff like 'down/../someotherdown'
-            # are intellectual excercises
+            # '../../some/that', whereas stuff like 'down/../someotherdown'
+            # are intellectual exercises
             # ALGORITHM: match any number of leading '..' path components
             # and shorten the PWD by that number
             # NOT using ut.Path.cwd(), because it has symlinks resolved!!
-            pwd_parts = ut.Path(getpwd()).parts
+            if not pwd_parts:
+                pwd_parts = ut.Path(getpwd()).parts
             path_parts = p.parts
             leading_parents = 0
             for pp in p.parts:

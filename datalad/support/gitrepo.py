@@ -440,7 +440,7 @@ class GitProgress(WitlessProtocol):
                 # in case of partial progress lines, this can lead to
                 # leakage of progress info into the output, but
                 # it is better to enable better (maybe more expensive)
-                # subsequent filtering than hidding lines with
+                # subsequent filtering than hiding lines with
                 # unknown, potentially important info
                 lgr.debug('Non-progress stderr: %s', line)
                 if line.endswith((b'\r', b'\n')):
@@ -749,7 +749,7 @@ class PushInfo(dict):
                 flags |= cls.NEW_TAG
             elif "[new branch]" in summary:
                 flags |= cls.NEW_HEAD
-            # uptodate encoded in control character
+            # up-to-date encoded in control character
         else:
             # fast-forward or forced update - was encoded in control character,
             # but we parse the old and new commit
@@ -1160,7 +1160,7 @@ class GitRepo(CoreGitRepo):
                                           git_options=git_options)
 
         # normalize the report, because, e.g. on windows it can come out
-        # with improper directory seperators (C:/Users/datalad)
+        # with improper directory separators (C:/Users/datalad)
         toppath = str(Path(toppath))
 
         if follow_up:
@@ -1925,59 +1925,6 @@ class GitRepo(CoreGitRepo):
             refspec=refspec,
             all_=all_,
             git_options=git_options)
-
-    # XXX Consider removing this method. It is only used in `update()`,
-    # where it could be easily replaced with fetch+merge
-    def pull(self, remote=None, refspec=None, git_options=None, **kwargs):
-        """Pulls changes from a remote.
-
-        Parameters
-        ----------
-        remote : str, optional
-          name of the remote to pull from. If no remote is given,
-          the remote tracking branch is used.
-        refspec : str, optional
-          refspec to fetch.
-        git_options : list, optional
-          Additional command line options for git-pull.
-        kwargs :
-          Deprecated. GitPython-style keyword argument for git-pull.
-          Will be appended to any git_options.
-        """
-        git_options = ensure_list(git_options)
-        if kwargs:
-            git_options.extend(to_options(**kwargs))
-
-        cmd = ['git'] + self._GIT_COMMON_OPTIONS
-        cmd.extend(['pull', '--progress'] + git_options)
-
-        if remote is None:
-            if refspec:
-                # conflicts with using tracking branch or fetch all remotes
-                # For now: Just fail.
-                # TODO: May be check whether it fits to tracking branch
-                raise ValueError(
-                    "refspec specified without a remote. ({})".format(refspec))
-            # No explicit remote to fetch.
-            # => get tracking branch:
-            tb_remote, refspec = self.get_tracking_branch()
-            if tb_remote is not None:
-                remote = tb_remote
-            else:
-                # No remote, no tracking branch
-                # => fail
-                raise ValueError("Neither a remote is specified to pull "
-                                 "from nor a tracking branch is set up.")
-
-        cmd.append(remote)
-        if refspec:
-            cmd += ensure_list(refspec)
-
-        self._maybe_open_ssh_connection(remote)
-        self._git_runner.run(
-            cmd,
-            protocol=StdOutCaptureWithGitProgress,
-        )
 
     def push(self, remote=None, refspec=None, all_remotes=False,
              all_=False, git_options=None, **kwargs):
@@ -2820,7 +2767,7 @@ class GitRepo(CoreGitRepo):
         Returns
         -------
         dict:
-          Each key is a queried path (always relative to the repostiory root),
+          Each key is a queried path (always relative to the repository root),
           each value is a dictionary with attribute
           name and value items. Attribute values are either True or False,
           for set and unset attributes, or are the literal attribute value.
@@ -3653,7 +3600,7 @@ class GitRepo(CoreGitRepo):
                     status='ok',
                     logger=lgr)
 
-        # TODO this additonal query should not be, base on status as given
+        # TODO this additional query should not be, base on status as given
         # if anyhow possible, however, when paths are given, status may
         # not contain all required information. In case of path=None AND
         # _status=None, we should be able to avoid this, because
@@ -3779,7 +3726,7 @@ class GitRepo(CoreGitRepo):
 
         This method does not use `git submodule add`, but aims to be more
         efficient by limiting the scope to mere in-place registration of
-        multiple already present respositories.
+        multiple already present repositories.
 
         Parameters
         ----------

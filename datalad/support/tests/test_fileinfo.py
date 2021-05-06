@@ -48,7 +48,7 @@ def test_get_content_info(path):
 
     # verify general rules on fused info records that are incrementally
     # assembled: for git content info, amended with annex info on 'HEAD'
-    # (to get the last commited stage and with it possibly vanished
+    # (to get the last committed stage and with it possibly vanished
     # content), and lastly annex info wrt to the present worktree, to
     # also get info on added/staged content
     # this fuses the info reported from
@@ -71,7 +71,7 @@ def test_get_content_info(path):
                 r.get('gitshasum', None) and not f.match('subds*'):
             # this should be known to annex, one way or another
             # regardless of whether things add deleted or staged
-            # or anything inbetween
+            # or anything in between
             assert_in('key', r, f)
             assert_in('keyname', r, f)
             assert_in('backend', r, f)

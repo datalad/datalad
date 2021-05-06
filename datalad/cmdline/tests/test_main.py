@@ -300,7 +300,7 @@ def test_fail_with_short_help():
             known=["mother", "mutter", "father", "son"],
             provided="muther",
             hint="You can become one",
-            exit_code=0,  # noone forbids
+            exit_code=0,  # no one forbids
             what="parent",
             out=out)
     assert_equal(cme.exception.code, 0)

@@ -312,7 +312,7 @@ class Status(Interface):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
-        # disk as a contsraint (e.g. to figure out which subdataset a path is
+        # disk as a constraint (e.g. to figure out which subdataset a path is
         # in) `diff` cannot do that (everything need to be handled based on a
         # "virtual" representation of a dataset hierarchy).
         # MIH concludes that while `status` can be implemented as a special case
@@ -333,6 +333,14 @@ class Status(Interface):
                 # for further decision logic below
                 orig_path = str(p)
                 p = resolve_path(p, dataset)
+                # TODO(OPT)? YOH does not spot any optimization for paths under the same
+                # directory: if not isdir(path) - files would all have the same
+                # "root", and we could avoid doing full `get_dataset_root` check for
+                # those. Moreover, if some path points UNDER that path which isdir, and
+                # we have some other path already with the root above - we can just take
+                # the same. Altogether sounds like a logic duplicated with
+                # discover_dataset_trace_to_targets and even get_tree_roots
+                # of save.
                 root = get_dataset_root(str(p))
                 if root is None:
                     # no root, not possibly underneath the refds

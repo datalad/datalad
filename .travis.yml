@@ -28,10 +28,6 @@ env:
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"
 
-# Disabled since old folks don't want to change workflows of submitting through central authority
-#    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
-#    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
-
 matrix:
   include:
   # Additional custom ones
@@ -222,12 +218,13 @@ before_install:
   - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
+  # Maybe build install custom git.
+  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
+  - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   # Install git-annex
   - wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
   - eval python3 datalad_installer.py --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
   - source new.env && cat new.env >> ~/.bashrc
-  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
-  - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   - pip install --upgrade pip
 
 install:
@@ -239,8 +236,6 @@ install:
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # git-annex workaround. TODO: remove - should not be needed
   - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
-  # S3
-  - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
 
 script:
   # Now it should be safe to point TMPDIR to a "tricky" setup just for the purpose of testing

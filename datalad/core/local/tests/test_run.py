@@ -37,6 +37,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
     NoDatasetFound,
+    IncompleteResultsError,
 )
 from datalad.api import (
     run,
@@ -65,7 +66,6 @@ from datalad.tests.utils import (
     ok_,
     ok_exists,
     ok_file_has_content,
-    slow,
     swallow_logs,
     swallow_outputs,
     with_tempfile,
@@ -204,7 +204,7 @@ def test_sidecar(path):
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
 
-    # make sure sidecar file is committed when explicitly specifiying outputs
+    # make sure sidecar file is committed when explicitly specifying outputs
     ds.run("cd .> dummy4",
            outputs=["dummy4"],
            sidecar=True,
@@ -368,10 +368,9 @@ def test_run_explicit(path):
     eq_(hexsha_initial, ds.repo.get_hexsha())
 
     # If an input doesn't exist, we just show the standard warning.
-    with swallow_logs(new_level=logging.WARN) as cml:
-        with swallow_outputs():
-            ds.run("ls", inputs=["not-there"], explicit=True)
-        assert_in("Input does not exist: ", cml.out)
+    with assert_raises(IncompleteResultsError):
+        ds.run("ls", inputs=["not-there"], explicit=True,
+               on_failure="stop")
 
     remove(op.join(path, "doubled.dat"))
 
@@ -561,3 +560,126 @@ def test_run_remove_keeps_leading_directory(path):
                result_renderer=None),
         action="run.remove", status="ok")
     assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_reglob_outputs(path):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    (ds.pathobj / "write_text.py").write_text("""
+import sys
+assert len(sys.argv) == 2
+name = sys.argv[1]
+with open(name + ".txt", "w") as fh:
+    fh.write(name)
+""")
+    ds.save(to_git=True)
+    cmd = [sys.executable, "write_text.py"]
+
+    ds.run(cmd + ["foo"], outputs=["*.txt"], expand="outputs")
+    assert_in("foo.txt", last_commit_msg(repo))
+
+    ds.run(cmd + ["bar"], outputs=["*.txt"], explicit=True)
+    ok_exists(str(ds.pathobj / "bar.txt"))
+    assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_unexpanded_placeholders(path):
+    ds = Dataset(path).create()
+    cmd = [sys.executable, "-c",
+           "import sys; open(sys.argv[1], 'w').write(' '.join(sys.argv[2:]))"]
+
+    # It's weird, but for lack of better options, inputs and outputs that don't
+    # have matches are available unexpanded.
+
+    with assert_raises(IncompleteResultsError):
+        ds.run(cmd + ["arg1", "{inputs}"], inputs=["foo*"],
+               on_failure="continue")
+    assert_repo_status(ds.path)
+    ok_file_has_content(op.join(path, "arg1"), "foo*")
+
+    ds.run(cmd + ["arg2", "{outputs}"], outputs=["bar*"])
+    assert_repo_status(ds.path)
+    ok_file_has_content(op.join(path, "arg2"), "bar*")
+
+    ds.run(cmd + ["arg3", "{outputs[1]}"], outputs=["foo*", "bar"])
+    ok_file_has_content(op.join(path, "arg3"), "bar")
+
+
+@with_tempfile(mkdir=True)
+def test_run_empty_repo(path):
+    ds = Dataset(path).create()
+    cmd = [sys.executable, "-c", "open('foo', 'w').write('')"]
+    # Using "*" in a completely empty repo will fail.
+    with assert_raises(IncompleteResultsError):
+        ds.run(cmd, inputs=["*"], on_failure="stop")
+    assert_repo_status(ds.path)
+    # "." will work okay, though.
+    assert_status("ok", ds.run(cmd, inputs=["."]))
+    assert_repo_status(ds.path)
+    ok_exists(str(ds.pathobj / "foo"))
+
+
+@with_tree(tree={"foo": "f", "bar": "b"})
+def test_dry_run(path):
+    ds = Dataset(path).create(force=True)
+
+    # The dataset is reported as dirty, and the custom result render relays
+    # that to the default renderer.
+    with swallow_outputs() as cmo:
+        with assert_raises(IncompleteResultsError):
+            ds.run("blah ", dry_run="basic")
+        assert_in("run(impossible)", cmo.out)
+        assert_not_in("blah", cmo.out)
+
+    ds.save()
+
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="basic")
+        assert_in("Dry run", cmo.out)
+        assert_in("location", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("expanded inputs", cmo.out)
+        assert_not_in("expanded outputs", cmo.out)
+
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs} {outputs}", dry_run="basic",
+               inputs=["fo*"], outputs=["b*r"])
+        assert_in(
+            'blah "foo" "bar"' if on_windows else "blah foo bar",
+            cmo.out)
+        assert_in("expanded inputs", cmo.out)
+        assert_in("['foo']", cmo.out)
+        assert_in("expanded outputs", cmo.out)
+        assert_in("['bar']", cmo.out)
+
+    # Just the command.
+    with swallow_outputs() as cmo:
+        ds.run("blah ", dry_run="command")
+        assert_not_in("Dry run", cmo.out)
+        assert_in("blah", cmo.out)
+        assert_not_in("inputs", cmo.out)
+
+    # The output file wasn't unlocked.
+    assert_repo_status(ds.path)
+
+    # Subdaset handling
+
+    subds = ds.create("sub")
+    (subds.pathobj / "baz").write_text("z")
+    ds.save(recursive=True)
+
+    # If a subdataset is installed, it works as usual.
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
+        assert_in(
+            'blah "sub\\baz"' if on_windows else 'blah sub/baz',
+            cmo.out)
+
+    # However, a dry run will not do the install/reglob procedure.
+    ds.uninstall("sub", check=False)
+    with swallow_outputs() as cmo:
+        ds.run("blah {inputs}", dry_run="basic", inputs=["sub/b*"])
+        assert_in("sub/b*", cmo.out)
+        assert_not_in("baz", cmo.out)

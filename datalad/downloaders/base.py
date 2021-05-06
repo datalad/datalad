@@ -224,7 +224,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     # give up
                     raise
                 lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
-                # TODO: may be fail ealier than after 20 attempts in such a case?
+                # TODO: may be fail earlier than after 20 attempts in such a case?
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
@@ -452,7 +452,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # eventually we might want to continue the download
                 lgr.warning(
                     "Temporary file %s from the previous download was found. "
-                    "It will be overriden" % temp_filepath)
+                    "It will be overridden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
             with open(temp_filepath, 'wb') as fp:

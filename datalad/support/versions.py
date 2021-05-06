@@ -40,7 +40,7 @@ def get_versions(vfpath_statuses, regex, overlay=True,
       match considered to be a version.  Matched entry is stripped from the filename
       to generate unversioned path (fpath)
     overlay: bool, optional
-      Assume overlayed structure, so if a file misses an entry for some version,
+      Assume overlaid structure, so if a file misses an entry for some version,
       it is ok
     unversioned: ('fail', 'default'), optional
       What to do if detected both versioned and unversioned file.

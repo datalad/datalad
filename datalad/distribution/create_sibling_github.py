@@ -79,6 +79,7 @@ class CreateSiblingGithub(Interface):
     *hub.oauthtoken*, and store/check the token in credential store as associated
     with that specific login name.
     """
+
     _params_ = dict(
         dataset=Parameter(
             args=("--dataset", "-d",),
