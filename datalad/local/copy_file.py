@@ -629,6 +629,14 @@ def _place_filekey(finfo, str_src, dest, str_dest, dest_repo_rec):
         # failing next on 'fromkey', due to a key mismatch.
         # this is more compatible with the nature of 'cp'
         dest.unlink()
+    # Make sure the destination exists because fromkey doesn't do this when
+    # writing a pointer file:
+    # https://git-annex.branchable.com/bugs/fromkey__58___create_directories_for_pointer_files__63__/
+    #
+    # TODO: Remove this mkdir() call if the patch at the above link (or
+    # something like it) is applied on git-annex's end before there is another
+    # release (current version is 8.20210428).
+    dest.parent.mkdir(exist_ok=True, parents=True)
     res = dest_repo._call_annex_records(
         # we use force, because in all likelihood there is no content for this key
         # yet
