@@ -63,6 +63,7 @@ from datalad.support.parallel import (
 )
 from datalad.dochelpers import (
     single_or_plural,
+    exc_str,
 )
 from datalad.utils import (
     unique,
@@ -243,7 +244,15 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         ds_repo.config[c])
                        for c in ds_repo.config.keys()
                        if c.startswith(candcfg_prefix)]:
-        url = tmpl.format(**sm_candidate_props)
+        try:
+            url = tmpl.format(**sm_candidate_props)
+        except KeyError as e:
+            # don't crash if the submodule lacks properties required by the
+            # template - this can happen if a pure Git repository is queried
+            # for a dataset id, for example.
+            lgr.debug('Caught a key error in the generation of a submodule '
+                      'URL using the template %s (%s)', tmpl, exc_str(e))
+            continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
         # outside. Additional guesswork can only make it slower
