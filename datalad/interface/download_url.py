@@ -112,6 +112,7 @@ class DownloadURL(Interface):
     @eval_results
     def __call__(urls, dataset=None, path=None, overwrite=False,
                  archive=False, save=True, message=None):
+        from ..downloaders.http import HTTPDownloader
         from ..downloaders.providers import Providers
 
         ds = None
@@ -177,12 +178,12 @@ class DownloadURL(Interface):
         providers = Providers.from_config_files()
         downloaded_paths = []
         path_urls = {}
+        need_datalad_remote = False
         for url in urls:
             # somewhat "ugly"
-            # providers.get_provider(url).get_downloader(url).download(url, path=path)
-            # for now -- via sugaring
+            downloader = providers.get_provider(url).get_downloader(url)
             try:
-                downloaded_path = providers.download(url, path=path, overwrite=overwrite)
+                downloaded_path = downloader.download(url, path=path, overwrite=overwrite)
             except Exception as e:
                 yield get_status_dict(
                     status="error",
@@ -192,6 +193,10 @@ class DownloadURL(Interface):
                     exception=e,
                     **common_report)
             else:
+                if not need_datalad_remote \
+                   and (downloader.authenticator or downloader.credential or
+                        type(downloader) != HTTPDownloader):
+                    need_datalad_remote = True
                 downloaded_paths.append(downloaded_path)
                 path_urls[downloaded_path] = url
                 yield get_status_dict(
@@ -219,6 +224,11 @@ URLs:
 
             ds_repo = ds.repo
             if isinstance(ds_repo, AnnexRepo):
+                if need_datalad_remote:
+                    from datalad.customremotes.base import ensure_datalad_remote
+                    ensure_datalad_remote(
+                        ds_repo, autoenable=True, encryption=None)
+
                 if got_ds_instance:
                     # Paths in `downloaded_paths` are already relative to the
                     # dataset.
