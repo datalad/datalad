@@ -11,17 +11,30 @@
 
 from os.path import isabs
 
+from datalad.api import (
+    clone,
+    Dataset,
+)
+from datalad.consts import DATALAD_SPECIAL_REMOTE
 from datalad.tests.utils import (
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
     eq_,
     known_failure_githubci_win,
+    with_tempfile,
     with_tree,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.utils import Path
 
 from ..base import (
     AnnexCustomRemote,
     DEFAULT_AVAILABILITY,
     DEFAULT_COST,
+    ensure_datalad_remote,
+    init_datalad_remote,
 )
 
 
@@ -162,3 +175,37 @@ def test_interactions(tdir):
     ]:
         check_interaction_scenario(AnnexCustomRemote, tdir, scenario)
 
+
+def test_ensure_datalad_remote_unkown_remote():
+    with assert_raises(ValueError):
+        ensure_datalad_remote("doesn't matter", "unknown")
+
+
+@with_tempfile
+def test_ensure_datalad_remote_init_and_enable_needed(path):
+    from datalad.consts import DATALAD_SPECIAL_REMOTE
+    ds = Dataset(path).create(force=True)
+    repo = ds.repo
+    assert_false(repo.get_remotes())
+    ensure_datalad_remote(repo)
+    assert_in(DATALAD_SPECIAL_REMOTE, repo.get_remotes())
+
+
+@with_tempfile
+def check_ensure_datalad_remote_maybe_enable(autoenable, path):
+    path = Path(path)
+    ds_a = Dataset(path / "a").create(force=True)
+    init_datalad_remote(ds_a.repo, DATALAD_SPECIAL_REMOTE,
+                        autoenable=autoenable)
+
+    ds_b = clone(source=ds_a.path, path=path / "b")
+    repo = ds_b.repo
+    if not autoenable:
+        assert_not_in("datalad", repo.get_remotes())
+    ensure_datalad_remote(repo)
+    assert_in("datalad", repo.get_remotes())
+
+
+def test_ensure_datalad_remote_maybe_enable():
+    yield check_ensure_datalad_remote_maybe_enable, False
+    yield check_ensure_datalad_remote_maybe_enable, True
