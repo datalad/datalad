@@ -84,7 +84,7 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx>=1.7.8',
+        'sphinx>=1.7.8, <4',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
