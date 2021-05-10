@@ -172,7 +172,12 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         [i['url']
          for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
     )
-
+    # smoke test to check for #5631: We shouldn't crash with a KeyError when a
+    # template can not be matched.
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{not-a-key}-post'}):
+        f(clone, clone.subdatasets(return_type='item-or-list'))
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
 
