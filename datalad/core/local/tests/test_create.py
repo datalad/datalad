@@ -39,6 +39,7 @@ from datalad.tests.utils import (
     has_symlink_capability,
     OBSCURE_FILENAME,
     ok_,
+    ok_exists,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -509,3 +510,24 @@ def test_gh2927(path, linkpath):
     ds.create('subds_clean')
     assert_status('ok', ds.create(op.join('subds_clean', 'subds_lvl1_clean'),
                                   result_xfm=None, return_type='list'))
+
+
+@with_tempfile(mkdir=True)
+def check_create_initopts_form(form, path):
+    path = Path(path)
+
+    template_dir = path / "templates"
+    template_dir.mkdir()
+    (template_dir / "foo").write_text("")
+
+    forms = {"list": [f"--template={template_dir}"],
+             "dict": {"template": str(template_dir)}}
+
+    ds = Dataset(path / "ds")
+    ds.create(initopts=forms[form])
+    ok_exists(ds.repo.dot_git / "foo")
+
+
+def test_create_initopts_form():
+    yield check_create_initopts_form, "dict"
+    yield check_create_initopts_form, "list"
