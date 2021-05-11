@@ -26,7 +26,6 @@ from datalad.utils import (
 )
 from datalad.cmd import (
     WitlessRunner as Runner,
-    StdOutErrCapture,
 )
 
 from datalad.tests.utils import (

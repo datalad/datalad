@@ -30,7 +30,6 @@ from datalad.interface.base import build_doc
 from datalad.interface.common_opts import (
     location_description,
 )
-from datalad.interface.results import ResultXFM
 from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
