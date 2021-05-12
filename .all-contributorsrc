@@ -372,6 +372,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/7226087?v=4"
             ]
+        },
+        {
+            "login": "ypid",
+            "name": "Robin Schneider",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://me.ypid.de/",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/1301158?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
