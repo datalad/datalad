@@ -19,6 +19,9 @@ import logging
 from collections import (
     OrderedDict,
 )
+from collections.abc import (
+    Mapping,
+)
 from os import linesep
 from os.path import (
     join as opj,
@@ -937,9 +940,10 @@ class GitRepo(CoreGitRepo):
         ----------
         url : str
         path : str
-        clone_options : dict
-          Key/value pairs of arbitrary options that will be passed on to the
-          underlying call to `git-clone`.
+        clone_options : dict or list
+          Arbitrary options that will be passed on to the underlying call to
+          `git-clone`. This may be a list of plain options or key-value pairs
+          that will be converted to a list of plain options with `to_options`.
         expect_fail : bool
           Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
@@ -995,7 +999,9 @@ class GitRepo(CoreGitRepo):
 
         cmd = cls._git_cmd_prefix + ['clone', '--progress']
         if clone_options:
-            cmd.extend(to_options(**clone_options))
+            if isinstance(clone_options, Mapping):
+                clone_options = to_options(**clone_options)
+            cmd.extend(clone_options)
         cmd.extend([url, path])
 
         fix_annex = None
