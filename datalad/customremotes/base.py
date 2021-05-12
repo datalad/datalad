@@ -558,4 +558,42 @@ def init_datalad_remote(repo, remote, encryption=None, autoenable=False, opts=[]
     return repo.init_remote(remote, remote_opts + opts)
 
 
+def ensure_datalad_remote(repo, remote=None,
+                          encryption=None, autoenable=False):
+    """Initialize and enable datalad special remote if it isn't already.
+
+    Parameters
+    ----------
+    repo : AnnexRepo
+    remote : str, optional
+        Special remote name. This should be one of the values in
+        datalad.consts.DATALAD_SPECIAL_REMOTES_UUIDS and defaults to
+        datalad.consts.DATALAD_SPECIAL_REMOTE.
+    encryption, autoenable : optional
+        Passed to `init_datalad_remote`.
+    """
+    from datalad.consts import DATALAD_SPECIAL_REMOTE
+    from datalad.consts import DATALAD_SPECIAL_REMOTES_UUIDS
+
+    remote = remote or DATALAD_SPECIAL_REMOTE
+
+    uuid = DATALAD_SPECIAL_REMOTES_UUIDS.get(remote)
+    if not uuid:
+        raise ValueError("'{}' is not a known datalad special remote: {}"
+                         .format(remote,
+                                 ", ".join(DATALAD_SPECIAL_REMOTES_UUIDS)))
+    name = repo.get_special_remotes().get(uuid, {}).get("name")
+
+    if not name:
+        from datalad.consts import DATALAD_SPECIAL_REMOTE
+
+        init_datalad_remote(repo, DATALAD_SPECIAL_REMOTE,
+                            encryption=encryption, autoenable=autoenable)
+    elif repo.is_special_annex_remote(name, check_if_known=False):
+        lgr.debug("datalad special remote '%s' is already enabled", name)
+    else:
+        lgr.info("datalad special remote '%s' found. Enabling", name)
+        repo.enable_remote(name)
+
+
 lgr.log(5, "Done importing datalad.customremotes.main")
