@@ -898,9 +898,10 @@ class GitRepo(CoreGitRepo):
         self._cfg = None
 
         if do_create:  # we figured it out earlier
+            from_cmdline = git_opts.pop('_from_cmdline_', [])
             self.init(
                 sanity_checks=create_sanity_checks,
-                init_options=to_options(**git_opts),
+                init_options=from_cmdline + to_options(**git_opts),
             )
 
         # with DryRunProtocol path might still not exist
