@@ -193,7 +193,7 @@ class Create(Interface):
             action='append',
             doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
             on the created dataset. Use
-            [PY: `run_procedure(discover=True)` PY][CMD: run_procedure --discover CMD]
+            [PY: `run_procedure(discover=True)` PY][CMD: run-procedure --discover CMD]
             to get a list of available procedures, such as cfg_text2git.
             """
         )

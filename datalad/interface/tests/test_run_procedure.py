@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import json
 import os.path as op
 import sys
 from unittest.mock import patch
@@ -405,15 +406,17 @@ def test_name_with_underscore(path):
     # environment variable.
     with patch.dict("os.environ",
                     {"DATALAD_PROCEDURES_PRINT_ARGS_CALL__FORMAT":
-                     'python {script}'}):
+                     '%s {script}' % sys.executable}):
         with assert_raises(ValueError):
             ds.run_procedure(spec=["print_args"])
 
     # But it can be set via DATALAD_CONFIG_OVERRIDES_JSON.
     with patch.dict("os.environ",
                     {"DATALAD_CONFIG_OVERRIDES_JSON":
-                     '{"datalad.procedures.print_args.call-format": '
-                     '"python {script}"}'}):
+                     json.dumps({
+                         "datalad.procedures.print_args.call-format":
+                         "%s {script}" % sys.executable
+                    })}):
         ds.config.reload()
         ds.run_procedure(spec=["print_args"])
 

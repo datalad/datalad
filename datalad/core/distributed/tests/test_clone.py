@@ -50,6 +50,7 @@ from datalad.tests.utils import (
     assert_status,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     get_datasets_topdir,
     integration,
@@ -621,7 +622,7 @@ def test_cfg_originorigin(path):
     eq_(
         Path(clone_lev2.siblings(
             'query',
-            name='origin-2',
+            name=DEFAULT_REMOTE + '-2',
             return_type='item-or-list')['url']),
         origin.pathobj
     )
@@ -800,8 +801,8 @@ def test_ria_http(lcl, storepath, url):
         if not ds.repo.is_managed_branch():
             # test logic cannot handle adjusted branches
             eq_(origds.repo.get_hexsha(), cloneds.repo.get_hexsha())
-        ok_(cloneds.config.get('remote.origin.url').startswith(url))
-        eq_(cloneds.config.get('remote.origin.annex-ignore'), 'true')
+        ok_(cloneds.config.get(f'remote.{DEFAULT_REMOTE}.url').startswith(url))
+        eq_(cloneds.config.get(f'remote.{DEFAULT_REMOTE}.annex-ignore'), 'true')
         eq_(cloneds.config.get('datalad.get.subdataset-source-candidate-200origin'),
             'ria+%s#{id}' % url)
 
@@ -850,8 +851,10 @@ def test_ria_http(lcl, storepath, url):
     if not ds.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
         eq_(origds.repo.get_hexsha(), cloned_by_label.repo.get_hexsha())
-    ok_(cloned_by_label.config.get('remote.origin.url').startswith(url))
-    eq_(cloned_by_label.config.get('remote.origin.annex-ignore'), 'true')
+    ok_(cloned_by_label.config.get(
+        f'remote.{DEFAULT_REMOTE}.url').startswith(url))
+    eq_(cloned_by_label.config.get(f'remote.{DEFAULT_REMOTE}.annex-ignore'),
+        'true')
     # ... the clone candidates go with the label-based URL such that
     # future get() requests acknowlege a (system-wide) configuration
     # update
@@ -895,7 +898,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     assert_result_count(res, 1,
                         status='ok',
                         path=str(riaclone.pathobj / 'test.txt'),
-                        message="from {}...".format("origin"
+                        message="from {}...".format(DEFAULT_REMOTE
                                                     if url.startswith('http')
                                                     else "store-storage"))
 
@@ -910,7 +913,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
 
     # publication dependency was set for store-storage but not for
     # anotherstore-storage:
-    eq_(riaclone.config.get("remote.origin.datalad-publish-depends",
+    eq_(riaclone.config.get(f"remote.{DEFAULT_REMOTE}.datalad-publish-depends",
                             get_all=True),
         "store-storage")
 
@@ -928,13 +931,13 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     assert_result_count(res, 1,
                         status='ok',
                         path=str(riaclonesub.pathobj / 'testsub.txt'),
-                        message="from {}...".format("origin"
+                        message="from {}...".format(DEFAULT_REMOTE
                                                     if url.startswith('http')
                                                     else "store-storage"))
 
     # publication dependency was set for store-storage but not for
     # anotherstore-storage:
-    eq_(riaclonesub.config.get("remote.origin.datalad-publish-depends",
+    eq_(riaclonesub.config.get(f"remote.{DEFAULT_REMOTE}.datalad-publish-depends",
                                get_all=True),
         "store-storage")
 
@@ -948,7 +951,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     assert_result_count(res, 2)
     # no ORA remote, no publication dependency:
     riaclonesubgit = Dataset(riaclone.pathobj / 'subdir' / 'subgit')
-    eq_(riaclonesubgit.config.get("remote.origin.datalad-publish-depends",
+    eq_(riaclonesubgit.config.get(f"remote.{DEFAULT_REMOTE}.datalad-publish-depends",
                                   get_all=True),
         None)
 
@@ -986,7 +989,7 @@ def _test_ria_postclonecfg(url, dsid, clone_path, superds):
     assert_result_count(res, 1,
                         status='ok',
                         path=str(subds.pathobj / 'test.txt'),
-                        message="from {}...".format("origin"
+                        message="from {}...".format(DEFAULT_REMOTE
                                                     if url.startswith('http')
                                                     else "store-storage"))
 
@@ -1279,7 +1282,8 @@ def test_ephemeral(origin_path, bare_path,
                       where="local")
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
-    clone1.publish(to='origin', transfer_data='none' if can_symlink else 'auto')
+    clone1.publish(to=DEFAULT_REMOTE,
+                   transfer_data='none' if can_symlink else 'auto')
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
         eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())
@@ -1460,8 +1464,8 @@ def test_fetch_git_special_remote(url_path, url, path):
     ds_special.save()
     ds_special.repo.call_git(["update-server-info"])
 
-    ds_a.repo.fetch("origin")
-    ds_a.repo.merge("origin/" + DEFAULT_BRANCH)
+    ds_a.repo.fetch(DEFAULT_REMOTE)
+    ds_a.repo.merge(f"{DEFAULT_REMOTE}/{DEFAULT_BRANCH}")
 
     ds_b = clone(ds_a.path, path / "other")
     ds_b.get("f1")

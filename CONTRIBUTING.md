@@ -657,7 +657,7 @@ Refer datalad/config.py for information on how to add these environment variable
 For the upcoming release use this template
 
 ```markdown
-## 0.14.4 (??? ??, 2021) -- will be better than ever
+## 0.14.5 (??? ??, 2021) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
