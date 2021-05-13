@@ -150,6 +150,13 @@ class Install(Interface):
             metavar='SOURCE',
             doc="URL or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
+        branch=Parameter(
+            args=("--branch",),
+            doc="""Clone source at this branch or tag. This option applies only
+            to the top-level dataset not any subdatasets that may be cloned
+            when installing recursively. Note that if the source is a RIA URL
+            with a version, it takes precedence over this option.""",
+            constraints=EnsureStr() | EnsureNone()),
         get_data=Parameter(
             args=("-g", "--get-data",),
             doc="""if given, obtain all data content too""",
@@ -173,7 +180,8 @@ class Install(Interface):
             recursive=False,
             recursion_limit=None,
             reckless=None,
-            jobs="auto"):
+            jobs="auto",
+            branch=None):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
@@ -352,6 +360,7 @@ class Install(Interface):
         res = Clone.__call__(
             source, path, dataset=ds, description=description,
             reckless=reckless,
+            git_clone_opts=["--branch=" + branch] if branch else None,
             # we need to disable error handling in order to have it done at
             # the very top, otherwise we are not able to order a global
             # "ignore-and-keep-going"
