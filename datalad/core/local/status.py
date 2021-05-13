@@ -355,7 +355,9 @@ class Status(Interface):
                 else:
                     if dataset and root == str(p) and \
                             not (orig_path.endswith(op.sep) or
-                                 orig_path == "."):
+                                 # Note: Compare to Dataset(root).path rather
+                                 # than root to get same path normalization.
+                                 Dataset(root).path == ds_path):
                         # the given path is pointing to a dataset
                         # distinguish rsync-link syntax to identify
                         # the dataset as whole (e.g. 'ds') vs its
