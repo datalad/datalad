@@ -424,19 +424,20 @@ def _read_from_file(fname, input_type):
     return records, colidx_to_name
 
 
-def _get_placeholder_exception(exc, msg_prefix, row):
+def _get_placeholder_exception(exc, what, row):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
     value = exc.args[0]
     if isinstance(value, str):
-        sugmsg = get_suggestions_msg(value, row)
+        msg = "Unknown placeholder '{}' in {}: {}".format(
+            value, what, get_suggestions_msg(value, row))
     else:
-        sugmsg = "Out-of-bounds or unsupported index."
+        msg = "Out-of-bounds or unsupported index {} in {}".format(
+            value, what)
     # Note: Keeping this a KeyError is probably more appropriate but then the
     # entire message, which KeyError takes as the key, will be rendered with
     # outer quotes.
-    return ValueError("{}: {}{}{}"
-                      .format(msg_prefix, exc, ". " if sugmsg else "", sugmsg))
+    return ValueError(msg)
 
 
 def _format_filenames(format_fn, rows, row_infos):
@@ -446,7 +447,7 @@ def _format_filenames(format_fn, rows, row_infos):
             filename = format_fn(row)
         except KeyError as exc:
             raise _get_placeholder_exception(
-                exc, "Unknown placeholder in file name", row)
+                exc, "file name", row)
         filename, spaths = get_subpaths(filename)
         subpaths |= set(spaths)
         info["filename"] = filename
@@ -628,7 +629,7 @@ def extract(rows, colidx_to_name=None,
             url = format_url(row)
         except KeyError as exc:
             raise _get_placeholder_exception(
-                exc, "Unknown placeholder in URL", row)
+                exc, "URL", row)
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
