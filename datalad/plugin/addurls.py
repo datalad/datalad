@@ -424,12 +424,12 @@ def _read_from_file(fname, input_type):
     return records, colidx_to_name
 
 
-def _get_placeholder_exception(exc, msg_prefix, known):
+def _get_placeholder_exception(exc, msg_prefix, row):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
     value = exc.args[0]
     if isinstance(value, str):
-        sugmsg = get_suggestions_msg(value, known)
+        sugmsg = get_suggestions_msg(value, row)
     else:
         sugmsg = "Out-of-bounds or unsupported index."
     # Note: Keeping this a KeyError is probably more appropriate but then the
