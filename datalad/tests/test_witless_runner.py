@@ -145,9 +145,9 @@ def test_runner_parametrized_protocol():
 
     # protocol returns a given value whatever it receives
     class ProtocolInt(StdOutCapture):
-        def __init__(self, done_future, value):
+        def __init__(self, value):
             self.value = value
-            super().__init__(done_future)
+            super().__init__()
 
         def pipe_data_received(self, fd, data):
             super().pipe_data_received(fd, self.value)

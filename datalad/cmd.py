@@ -50,70 +50,6 @@ _TEMP_std = sys.stdout, sys.stderr
 _MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
 
-async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
-                        **kwargs):
-    """Run a command in a subprocess managed by asyncio
-
-    This implementation has been inspired by
-    https://pymotw.com/3/asyncio/subprocesses.html
-
-    Parameters
-    ----------
-    loop : asyncio.AbstractEventLoop
-      asyncio event loop instance. Must support subprocesses on the
-      target platform.
-    cmd : list or str
-      Command to be executed, passed to `subprocess_exec` (list), or
-      `subprocess_shell` (str).
-    protocol : WitlessProtocol
-      Protocol class to be instantiated for managing communication
-      with the subprocess.
-    stdin : file-like or None
-      Passed to the subprocess as its standard input.
-    protocol_kwargs : dict, optional
-      Passed to the Protocol class constructor.
-    kwargs : Pass to `subprocess_exec`, will typically be parameters
-      supported by `subprocess.Popen`.
-
-    Returns
-    -------
-    undefined
-      The nature of the return value is determined by the given
-      protocol class.
-    """
-    if protocol_kwargs is None:
-        protocol_kwargs = {}
-    cmd_done = asyncio.Future(loop=loop)
-    factory = functools.partial(protocol, cmd_done, **protocol_kwargs)
-    kwargs.update(
-        stdin=stdin,
-        # ask the protocol which streams to capture
-        stdout=asyncio.subprocess.PIPE if protocol.proc_out else None,
-        stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
-    )
-    if isinstance(cmd, str):
-        proc = loop.subprocess_shell(factory, cmd, **kwargs)
-    else:
-        proc = loop.subprocess_exec(factory, *cmd, **kwargs)
-    transport = None
-    result = None
-    try:
-        lgr.debug('Launching process %s', cmd)
-        transport, protocol = await proc
-        lgr.debug('Waiting for process %i to complete', transport.get_pid())
-        # The next wait is a workaround that avoids losing the output of
-        # quickly exiting commands (https://bugs.python.org/issue41594).
-        await asyncio.ensure_future(transport._wait())
-        await cmd_done
-        result = protocol._prepare_result()
-    finally:
-        # protect against a crash when launching the process
-        if transport:
-            transport.close()
-
-    return result
-
-
 class WitlessProtocol(asyncio.SubprocessProtocol):
     """Subprocess communication protocol base class for `run_async_cmd`
 
@@ -128,29 +64,28 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
     and a list with bytestrings of all captured output streams.
     """
 
-    FD_NAMES = ['stdin', 'stdout', 'stderr']
-
     proc_out = None
     proc_err = None
 
-    def __init__(self, done_future, encoding=None):
+    def __init__(self, encoding=None):
         """
         Parameters
         ----------
-        done_future : asyncio.Future
-          Future promise to be fulfilled when process exits.
         encoding : str
           Encoding to be used for process output bytes decoding. By default,
           the preferred system encoding is guessed.
         """
-        self.done = done_future
+
+        self.fd_infos = {}
+
+        self.process = None
+        self.stdout_fileno = 1
+        self.stderr_fileno = 2
+
         # capture output in bytearrays while the process is running
-        Streams = namedtuple('Streams', ['out', 'err'])
-        self.buffer = Streams(
-            out=bytearray() if self.proc_out else None,
-            err=bytearray() if self.proc_err else None,
-        )
-        self.pid = None
+        self.fd_infos[self.stdout_fileno] = ("stdout", bytearray()) if self.proc_out else ("stdout", None)
+        self.fd_infos[self.stderr_fileno] = ("stderr", bytearray()) if self.proc_err else ("stderr", None)
+
         super().__init__()
         self.encoding = encoding or getpreferredencoding(do_setlocale=False)
 
@@ -169,9 +104,9 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         pass
 
     def _log_summary(self, fd, data):
-        fd_name = self.FD_NAMES[fd]
+        fd_name = self.fd_infos[fd]
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
-                len(data), self.pid, fd_name, ':' if self._log_outputs else '')
+                len(data), self.process.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
             log_data = ensure_unicode(data)
             # The way we log is to stay consistent with Runner.
@@ -179,16 +114,16 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             # fd_name prefix
             lgr.log(5, "%s| %s ", fd_name, log_data)
 
-    def connection_made(self, transport):
-        self.transport = transport
-        self.pid = transport.get_pid()
-        lgr.debug('Process %i started', self.pid)
+    def connection_made(self, process):
+        self.process = process
+        lgr.debug('Process %i started', self.process.pid)
 
     def pipe_data_received(self, fd, data):
         self._log(fd, data)
         # store received output if stream was to be captured
-        if self.buffer[fd - 1] is not None:
-            self.buffer[fd - 1].extend(data)
+        fd_name, buffer = self.fd_infos[fd]
+        if buffer is not None:
+            buffer.extend(data)
 
     def _prepare_result(self):
         """Prepares the final result to be returned to the runner
@@ -200,23 +135,24 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         this exception class as kwargs on error. The Runner will overwrite
         'cmd' and 'cwd' on error, if they are present in the result.
         """
-        return_code = self.transport.get_returncode()
+        return_code = self.process.poll()
+        assert return_code is not None
         lgr.debug(
             'Process %i exited with return code %i',
-            self.pid, return_code)
+            self.process.pid, return_code)
         # give captured process output back to the runner as string(s)
         results = {
-            name:
-            bytes(byt).decode(self.encoding)
-            if byt else ''
-            for name, byt in zip(self.FD_NAMES[1:], self.buffer)
+            self.fd_infos[fileno][0]: (
+                bytes(self.fd_infos[fileno][1]).decode(self.encoding)
+                if self.fd_infos[fileno][1] is not None
+                else '')
+            for fileno in (self.stdout_fileno, self.stderr_fileno)
         }
         results['code'] = return_code
         return results
 
     def process_exited(self):
-        # actually fulfill the future promise and let the execution finish
-        self.done.set_result(True)
+        pass
 
 
 class NoCapture(WitlessProtocol):
@@ -256,7 +192,7 @@ class KillOutput(WitlessProtocol):
             lgr.log(
                 5,
                 'Discarded %i bytes from %i[%s]',
-                len(data), self.pid, self.FD_NAMES[fd])
+                len(data), self.process.pid, self.fd_infos[fd][0])
 
 
 class WitlessRunner(object):
@@ -359,41 +295,17 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        # rescue any event-loop to be able to reassign after we are done
-        # with our own event loop management
-        # this is how ipython does it
-        try:
-            is_new_proc = self._check_if_new_proc()
-            event_loop = asyncio.get_event_loop()
-            if is_new_proc:
-                self._check_if_loop_usable(event_loop, stdin)
-            if event_loop.is_closed():
-                raise RuntimeError("the loop was closed - use our own")
-            new_loop = False
-        except RuntimeError:
-            event_loop = self._get_new_event_loop()
-            new_loop = True
-        try:
-            lgr.debug('Async run:\n cwd=%s\n cmd=%s', cwd, cmd)
-            # include the subprocess manager in the asyncio event loop
-            results = event_loop.run_until_complete(
-                run_async_cmd(
-                    event_loop,
-                    cmd,
-                    protocol,
-                    stdin,
-                    protocol_kwargs=kwargs,
-                    cwd=cwd,
-                    env=env,
-                )
-            )
-        finally:
-            if new_loop:
-                # be kind to callers and leave asyncio as we found it
-                asyncio.set_event_loop(None)
-                # terminate the event loop, cannot be undone, hence we start a fresh
-                # one each time (see BlockingIOError notes above)
-                event_loop.close()
+        from .nonasyncrunner import run_command
+
+        lgr.debug('Async run:\n cwd=%s\n cmd=%s', cwd, cmd)
+        results = run_command(
+            cmd,
+            protocol,
+            stdin,
+            protocol_kwargs=kwargs,
+            cwd=cwd,
+            env=env,
+        )
 
         # log before any exception is raised
         lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
@@ -443,57 +355,6 @@ class WitlessRunner(object):
         elif cls._loop_need_new:
             raise RuntimeError("we know we need a new loop")
         return is_new_proc
-
-    @classmethod
-    def _check_if_loop_usable(cls, event_loop, stdin):
-        """Check if given event_loop could run a simple command
-
-        Sets _loop_need_new variable to a bool depending on what it finds
-
-        Note that this is a function that is meant to be called from within a
-        particular context only. The RuntimeError is expected to be caught by
-        the caller and is meant to be more like a response message than an
-        exception.
-
-        Raises
-        ------
-        RuntimeError
-          If loop is not reusable
-        """
-        # We need to check if we can run any command smoothly
-        try:
-            event_loop.run_until_complete(
-                run_async_cmd(
-                    event_loop,
-                    [sys.executable, "--version"],  # fast! 0.004 sec and to be ran once per process
-                    KillOutput,
-                    stdin,
-                )
-            )
-            cls._loop_need_new = False
-        except OSError as e:
-            # due to https://bugs.python.org/issue21998
-            # exhibits in https://github.com/ReproNim/testkraken/issues/95
-            lgr.debug("It seems we need a new loop when running our commands: %s", exc_str(e))
-            cls._loop_need_new = True
-            raise RuntimeError("the loop is not reusable")
-
-    @staticmethod
-    def _get_new_event_loop():
-        # start a new event loop, which we will close again further down
-        # if this is not done events like this will occur
-        #   BlockingIOError: [Errno 11] Resource temporarily unavailable
-        #   Exception ignored when trying to write to the signal wakeup fd:
-        # It is unclear to me why it happens when reusing an event looped
-        # that it stopped from time to time, but starting fresh and doing
-        # a full termination seems to address the issue
-        if sys.platform == "win32":
-            # use special event loop that supports subprocesses on windows
-            event_loop = asyncio.ProactorEventLoop()
-        else:
-            event_loop = asyncio.SelectorEventLoop()
-        asyncio.set_event_loop(event_loop)
-        return event_loop
 
 
 class GitRunnerBase(object):

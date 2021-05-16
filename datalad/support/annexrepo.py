@@ -3408,10 +3408,10 @@ class AnnexJsonProtocol(WitlessProtocol):
     proc_out = True
     proc_err = True
 
-    def __init__(self, done_future, total_nbytes=None):
+    def __init__(self, total_nbytes=None):
+        super().__init__()
         # to collect parsed JSON command output
         self.json_out = []
-        super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
         self._unprocessed = None
