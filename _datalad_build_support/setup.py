@@ -430,8 +430,6 @@ def datalad_setup(name, **kwargs):
         kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
     if kwargs.get('long_description') is None:
         kwargs.update(get_long_description_from_README())
-    if kwargs.get('version') is None:
-        kwargs['version'] = get_version(name)
 
     cmdclass = kwargs.get('cmdclass', {})
     # Check if command needs some module specific handling
