@@ -1,0 +1,15 @@
+{
+    "onlyPublishWithReleaseLabel": true,
+    "baseBranch": "master",
+    "author": "auto <auto@nil>",
+    "noVersionPrefix": true,
+    "plugins": [
+        "git-tag",
+        [
+            "exec",
+            {
+                "afterRelease": "python -m build && twine upload dist/*"
+            }
+        ]
+    ]
+}
