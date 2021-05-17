@@ -62,7 +62,6 @@ class ReaderThread(threading.Thread):
                 self.queue.put((self.file.fileno(), None, time.time()))
                 return
 
-            logger.debug(f"{self} got data: {data}")
             self.queue.put((self.file.fileno(), data, time.time()))
 
 
