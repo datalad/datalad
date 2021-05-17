@@ -48,7 +48,7 @@ class ReaderThread(threading.Thread):
         self.file.close()
 
     def run(self):
-        logger.debug(f"ReaderThread({self.file}, {self.queue}) started")
+        logger.debug("ReaderThread(%s, %s) started", self.file, self.queue)
         while not self.quit:
             try:
                 data = os.read(self.file.fileno(), 1024)
