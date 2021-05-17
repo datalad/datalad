@@ -53,7 +53,7 @@ class ReaderThread(threading.Thread):
             try:
                 data = os.read(self.file.fileno(), 1024)
             except BrokenPipeError as exc:
-                logger.debug(f"{self} exiting (broken pipe)")
+                logger.debug("%s exiting (broken pipe)", self)
                 self.queue.put((self.file.fileno(), exc, time.time()))
                 return
 
