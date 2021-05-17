@@ -221,10 +221,13 @@ class Update(Interface):
                 # test against user-provided value!
                 remote=None if sibling is None else sibling_,
                 all_=sibling is None,
-                # required to not trip over submodules that
-                # were removed in the origin clone
-                recurse_submodules="no",
-                prune=True)  # prune to not accumulate a mess over time
+                git_options=[
+                    # required to not trip over submodules that were removed in
+                    # the origin clone
+                    "--no-recurse-submodules",
+                    # prune to not accumulate a mess over time
+                    "--prune"]
+            )
             repo.fetch(**fetch_kwargs)
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
