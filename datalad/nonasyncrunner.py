@@ -58,7 +58,7 @@ class ReaderThread(threading.Thread):
                 return
 
             if data == b"":
-                logger.debug(f"{self} exiting (stream end)")
+                logger.debug("%s exiting (stream end)", self)
                 self.queue.put((self.file.fileno(), None, time.time()))
                 return
 
