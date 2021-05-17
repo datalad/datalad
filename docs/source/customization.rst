@@ -30,7 +30,7 @@ operate on a particular dataset, but also general functionality that can be
 used outside the context of a specific dataset. The following table provides an
 overview of plugins included in this DataLad release.
 
-.. currentmodule:: datalad.plugin
+.. currentmodule:: datalad.api
 .. autosummary::
    :toctree: generated
 

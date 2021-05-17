@@ -99,7 +99,7 @@ Plugins
 DataLad can be customized by plugins. The following plugins are shipped
 with DataLad.
 
-.. currentmodule:: datalad.plugin
+.. currentmodule:: datalad.api
 .. autosummary::
    :toctree: generated
 
