@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from os.path import lexists, join as opj
+from os.path import lexists
 import itertools
 
 from datalad.dochelpers import exc_str
