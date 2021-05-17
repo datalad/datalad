@@ -228,7 +228,13 @@ class Update(Interface):
                     # prune to not accumulate a mess over time
                     "--prune"]
             )
-            repo.fetch(**fetch_kwargs)
+            try:
+                repo.fetch(**fetch_kwargs)
+            except CommandError as exc:
+                yield dict(res, status="error",
+                           message=("Fetch failed: %s", exc_str(exc)))
+                continue
+
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
             repo = ds.repo
