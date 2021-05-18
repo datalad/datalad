@@ -265,6 +265,4 @@ def teardown_package():
 
 lgr.log(5, "Done importing main __init__")
 
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+from .version import __version__
