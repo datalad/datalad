@@ -89,7 +89,7 @@ def run_command(cmd,
        Passed to the Protocol class constructor.
     kwargs : Pass to `subprocess.Popen`, will typically be parameters
        supported by `subprocess.Popen`. Note that `bufsize`, `stdin`,
-       `stdout`, `stderr`, and `shell` will be overwriten by
+       `stdout`, `stderr`, and `shell` will be overwritten by
        `run_command`.
 
     Returns
