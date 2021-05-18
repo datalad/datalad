@@ -48,15 +48,11 @@ class ReaderThread(threading.Thread):
         self.file.close()
 
     def run(self):
-        logger.debug("ReaderThread(%s, %s) started", self.file, self.queue)
-        while not self.quit:
-            try:
-                data = os.read(self.file.fileno(), 1024)
-            except BrokenPipeError as exc:
-                logger.debug("%s exiting (broken pipe)", self)
-                self.queue.put((self.file.fileno(), exc, time.time()))
-                return
+        logger.debug("%s ", self)
 
+        while not self.quit:
+
+            data = os.read(self.file.fileno(), 1024)
             if data == b"":
                 logger.debug("%s exiting (stream end)", self)
                 self.queue.put((self.file.fileno(), None, time.time()))
@@ -70,6 +66,40 @@ def run_command(cmd,
                 stdin,
                 protocol_kwargs=None,
                 **kwargs) -> Any:
+    """
+    Run a command in a subprocess
+
+    This is a naive implementation that uses sub`process.Popen`
+    and threads to read from sub-proccess' stdout and stderr and
+    put it into a queue from which the main-thread reads.
+    Upon receiving data from the queue, the main thread
+    will delegate data handling to a protocol_class instance
+
+    Parameters
+    ----------
+    cmd : list or str
+      Command to be executed, passed to `subprocess.Popen`. If cmd
+      is a str, `subprocess.Popen will be called with `shell=True`.
+    protocol : WitlessProtocol
+      Protocol class to be instantiated for managing communication
+      with the subprocess.
+    stdin : file-like or None
+      Passed to the subprocess as its standard input.
+    protocol_kwargs : dict, optional
+       Passed to the Protocol class constructor.
+    kwargs : Pass to `subprocess.Popen`, will typically be parameters
+       supported by `subprocess.Popen`. Note that `bufsize`, `stdin`,
+       `stdout`, `stderr`, and `shell` will be overwriten by
+       `run_command`.
+
+    Returns
+    -------
+    undefined
+      The nature of the return value is determined by the method
+      `_prepare_result` of the given protocol class or its superclass.
+    """
+
+    protocol_kwargs = {} if protocol_kwargs is None else protocol_kwargs
 
     catch_stdout = protocol_class.proc_out is not None
     catch_stderr = protocol_class.proc_err is not None
@@ -85,22 +115,19 @@ def run_command(cmd,
         )
     }
 
+    protocol = protocol_class(**protocol_kwargs)
+
     process = subprocess.Popen(cmd, **kwargs)
     process_stdout_fileno = process.stdout.fileno() if catch_stdout else None
     process_stderr_fileno = process.stderr.fileno() if catch_stderr else None
-    protocol = protocol_class(**protocol_kwargs)
 
     # We pass process as transport-argument. It does not have the same
     # semantics as the asyncio-signature, but since it is only used in
-    # WitlessProtocol, we can change it there.
+    # WitlessProtocol, all necessary changes can be made there.
     protocol.connection_made(process)
 
     # Map the pipe file numbers to stdout and stderr file number, because
     # the latter are hardcoded in the protocol code
-    # TODO: the fixed file numbers seem to be a side-effect of using
-    #  SubprocessProtocol. Some datalad-code relies on this. Shall
-    #  we replace hard coded stdout, stderr-file numbers with parameters?
-
     fileno_mapping = {
         process_stdout_fileno: STDOUT_FILENO,
         process_stderr_fileno: STDERR_FILENO
