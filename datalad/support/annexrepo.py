@@ -3408,7 +3408,11 @@ class AnnexJsonProtocol(WitlessProtocol):
     proc_out = True
     proc_err = True
 
-    def __init__(self, total_nbytes=None):
+    def __init__(self, done_future=None, total_nbytes=None):
+        if done_future is not None:
+            warnings.warn("`done_future` argument is ignored "
+                          "and will be removed in a future release",
+                          DeprecationWarning)
         super().__init__()
         # to collect parsed JSON command output
         self.json_out = []

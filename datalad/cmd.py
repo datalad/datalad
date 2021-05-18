@@ -67,14 +67,21 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
     proc_out = None
     proc_err = None
 
-    def __init__(self, encoding=None):
+    def __init__(self, done_future=None, encoding=None):
         """
         Parameters
         ----------
+        done_future: Any
+          Ignored parameter, kept for backward compatibility (DEPRECATED)
         encoding : str
           Encoding to be used for process output bytes decoding. By default,
           the preferred system encoding is guessed.
         """
+
+        if done_future is not None:
+            warnings.warn("`done_future` argument is ignored "
+                          "and will be removed in a future release",
+                          DeprecationWarning)
 
         self.fd_infos = {}
 
@@ -532,7 +539,6 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
 
 
 def readline_rstripped(stdout):
-    #return iter(stdout.readline, b'').next().rstrip()
     return stdout.readline().rstrip()
 
 
