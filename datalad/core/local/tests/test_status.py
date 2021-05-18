@@ -237,9 +237,33 @@ def test_subds_status(path):
         refds=ds.path)
 
     # path="." gets treated as "this dataset's content" without requiring a
-    # trailing "/".
+    # trailing "/"...
     assert_result_count(
         subds.status(path=".", result_renderer=None),
+        1,
+        type="dataset",
+        path=op.join(subds.path, "someotherds"),
+        refds=subds.path)
+
+    # ... and so does path=<path/to/ds>.
+    assert_result_count(
+        subds.status(path=subds.path, result_renderer=None),
+        1,
+        type="dataset",
+        path=op.join(subds.path, "someotherds"),
+        refds=subds.path)
+
+    assert_result_count(
+        subds.status(path=op.join(subds.path, op.pardir, "subds"),
+                     result_renderer=None),
+        1,
+        type="dataset",
+        path=op.join(subds.path, "someotherds"),
+        refds=subds.path)
+
+    assert_result_count(
+        subds.status(path=op.join(subds.path, op.curdir),
+                     result_renderer=None),
         1,
         type="dataset",
         path=op.join(subds.path, "someotherds"),
