@@ -323,7 +323,7 @@ class Status(Interface):
         # on a manageable level
         ds = require_dataset(
             dataset, check_installed=True, purpose='status reporting')
-
+        ds_path = ds.path
         paths_by_ds = OrderedDict()
         if path:
             # sort any path argument into the respective subdatasets
@@ -347,7 +347,7 @@ class Status(Interface):
                     yield dict(
                         action='status',
                         path=p,
-                        refds=ds.path,
+                        refds=ds_path,
                         status='error',
                         message='path not underneath this dataset',
                         logger=lgr)
@@ -355,7 +355,9 @@ class Status(Interface):
                 else:
                     if dataset and root == str(p) and \
                             not (orig_path.endswith(op.sep) or
-                                 orig_path == "."):
+                                 # Note: Compare to Dataset(root).path rather
+                                 # than root to get same path normalization.
+                                 Dataset(root).path == ds_path):
                         # the given path is pointing to a dataset
                         # distinguish rsync-link syntax to identify
                         # the dataset as whole (e.g. 'ds') vs its
@@ -394,7 +396,7 @@ class Status(Interface):
                 # there is only a single refds
                 yield dict(
                     path=str(qdspath),
-                    refds=ds.path,
+                    refds=ds_path,
                     action='status',
                     status='error',
                     message=(
@@ -428,7 +430,7 @@ class Status(Interface):
                     content_info_cache):
                 yield dict(
                     r,
-                    refds=ds.path,
+                    refds=ds_path,
                     action='status',
                     status='ok',
                 )
