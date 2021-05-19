@@ -15,19 +15,13 @@ import subprocess
 import sys
 import logging
 import os
-import functools
 import tempfile
 from locale import getpreferredencoding
 import asyncio
-from collections import (
-    namedtuple,
-)
+import warnings
 
 from .consts import GIT_SSH_COMMAND
-from .dochelpers import (
-    borrowdoc,
-    exc_str,
-)
+from .dochelpers import borrowdoc
 from .support import path as op
 from .support.exceptions import CommandError
 from .utils import (
