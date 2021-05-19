@@ -8,15 +8,15 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test the thread based runner (aka. non asyncio based runner).
 """
-import logging
+import asyncio
 import os
 import queue
 import subprocess
-import sys
+
 
 from datalad.tests.utils import assert_true, eq_
 
-from ..cmd import WitlessProtocol
+from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
 from ..nonasyncrunner import ReaderThread, run_command
 
 
@@ -101,8 +101,6 @@ def test_interactive_communication():
 
 
 def test_thread_exit():
-    logger = logging.getLogger("datalad.runner")
-    logger.setLevel(logging.DEBUG)
 
     (read_descriptor, write_descriptor) = os.pipe()
     read_file = os.fdopen(read_descriptor, "r")
@@ -123,3 +121,13 @@ def test_thread_exit():
     data = read_queue.get()
     eq_(data[1], b"more data")
     assert_true(read_queue.empty())
+
+
+def test_inside_async():
+    async def main():
+        runner = WitlessRunner()
+        return runner.run(["echo", "abc"], StdOutCapture)
+
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(main())
+    eq_(result["stdout"], "abc\n")
