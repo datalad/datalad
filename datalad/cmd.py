@@ -22,6 +22,7 @@ import warnings
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import borrowdoc
+from .nonasyncrunner import run_command
 from .support import path as op
 from .support.exceptions import CommandError
 from .utils import (
@@ -138,7 +139,9 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         """
         return_code = self.process.poll()
         if return_code is None:
-            raise CommandError("Got None as a return_code for the process %i", self.process.pid)
+            raise CommandError(
+                "Got None as a return_code for the process %i",
+                self.process.pid)
         lgr.debug(
             'Process %i exited with return code %i',
             self.process.pid, return_code)
@@ -296,8 +299,6 @@ class WitlessRunner(object):
             env or self.env,
             cwd=cwd,
         )
-
-        from .nonasyncrunner import run_command
 
         lgr.debug('run:\n cwd=%s\n cmd=%s', cwd, cmd)
         results = run_command(

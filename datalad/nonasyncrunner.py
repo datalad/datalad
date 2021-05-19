@@ -17,7 +17,7 @@ import queue
 import subprocess
 import threading
 import time
-from typing import Any
+from typing import Any, IO, List, Union
 
 
 logger = logging.getLogger("datalad.runner")
@@ -27,10 +27,14 @@ STDERR_FILENO = 2
 
 
 class ReaderThread(threading.Thread):
-    def __init__(self, file, a_queue, command):
+    def __init__(self,
+                 file: IO,
+                 queue_: queue.Queue,
+                 command: Union[str, List]):
+
         super().__init__(daemon=True)
         self.file = file
-        self.queue = a_queue
+        self.queue = queue_
         self.command = command
         self.quit = False
 
@@ -78,7 +82,7 @@ def run_command(cmd,
     cmd : list or str
       Command to be executed, passed to `subprocess.Popen`. If cmd
       is a str, `subprocess.Popen will be called with `shell=True`.
-    protocol : WitlessProtocol
+    protocol_class : WitlessProtocol
       Protocol class to be instantiated for managing communication
       with the subprocess.
     stdin : file-like, subprocess.PIPE or None
