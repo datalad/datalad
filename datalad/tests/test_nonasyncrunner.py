@@ -11,10 +11,12 @@
 import asyncio
 import os
 import queue
+import signal
 import subprocess
 from time import sleep, time
 
-from datalad.tests.utils import assert_true, eq_, with_tempfile
+from datalad.tests.utils import assert_true, eq_, known_failure_windows, \
+    known_failure_osx, with_tempfile
 
 from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
 from ..nonasyncrunner import ReaderThread, run_command
@@ -42,7 +44,7 @@ def test_subprocess_return_code_capture():
         def process_exited(self):
             self.result_pool["process_exited_called"] = True
 
-    signal_to_send = 13
+    signal_to_send = signal.SIGINT
     result_pool = dict()
     result = run_command(["sleep", "10000"],
                          KillProtocol,
@@ -88,7 +90,7 @@ def test_interactive_communication():
                 os.write(self.process.stdin.fileno(), b"exit(0)\n")
 
     result_pool = dict()
-    result = run_command(["python3", "-i"],
+    result = run_command(["python", "-i"],
                          BidirectionalProtocol,
                          stdin=subprocess.PIPE,
                          protocol_kwargs={
@@ -133,6 +135,8 @@ def test_inside_async():
     eq_(result["stdout"], "abc\n")
 
 
+@known_failure_osx
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile
 def test_popen_invocation(src_path, dest_path):
