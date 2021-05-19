@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     HTTPPath,
     known_failure_githubci_win,
     ok_exists,
+    ok_file_has_content,
     ok_startswith,
     skip_if,
     SkipTest,
@@ -647,6 +648,38 @@ class TestAddurls(object):
                        exclude_autometa="*",
                        on_collision="error-if-different")
         ok_exists(op.join(ds.path, "a"))
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_on_collision_choose(self, path):
+        ds = Dataset(path).create(force=True)
+        data = deepcopy(self.data)
+        for row in data:
+            row["name"] = "a"
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
+                action="addurls",
+                status="error")
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}",
+                           on_collision="error-if-different",
+                           on_failure="ignore"),
+                action="addurls",
+                status="error")
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}-first",
+                       on_collision="take-first")
+        ok_file_has_content(op.join(ds.path, "a-first"), "a content",
+                            strip=True)
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}-last",
+                       on_collision="take-last")
+        ok_file_has_content(op.join(ds.path, "a-last"), "c content",
+                            strip=True)
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_parts(self, path):

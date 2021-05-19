@@ -624,7 +624,7 @@ def _find_collision_mismatches(rows, collisions):
     return mismathches
 
 
-def _ignore_collisions(rows, collisions):
+def _ignore_collisions(rows, collisions, last_wins=True):
     """Modify `rows`, marking those that produce collision as ignored.
 
     Parameters
@@ -633,9 +633,13 @@ def _ignore_collisions(rows, collisions):
     collisions : dict
         File names with collisions mapped to positions in `rows` that have a
         given file name.
+    last_wins : boolean, optional
+        When true, mark all but the last row that has a given file name as
+        ignored. Otherwise mark all but the first row as ignored.
     """
+    which = slice(-1) if last_wins else slice(1, None)
     for fname in collisions:
-        for idx in collisions[fname][:-1]:
+        for idx in collisions[fname][which]:
             lgr.debug("Ignoring collision of file name '%s' at row %d",
                       fname, rows[idx]["input_idx"])
             rows[idx]["ignore"] = True
@@ -652,7 +656,7 @@ def _handle_collisions(rows, on_collision):
     Parameters
     ----------
     rows : list of dict
-    on_collision : {"error", "error-if-different"}
+    on_collision : {"error", "error-if-different", "take-first", "take-last"}
 
     Returns
     -------
@@ -665,6 +669,8 @@ def _handle_collisions(rows, on_collision):
             to_report = collisions
         elif on_collision == "error-if-different":
             to_report = _find_collision_mismatches(rows, collisions)
+        elif on_collision in ["take-first", "take-last"]:
+            to_report = None
         else:
             raise ValueError(
                 f"Unsupported `on_collision` value: {on_collision}")
@@ -673,7 +679,8 @@ def _handle_collisions(rows, on_collision):
             err_msg = ("There are file name collisions; "
                        "consider using {_repindex}")
         else:
-            _ignore_collisions(rows, collisions)
+            _ignore_collisions(rows, collisions,
+                               last_wins=on_collision == "take-last")
     return err_msg
 
 
@@ -1246,11 +1253,14 @@ class Addurls(Interface):
         ),
         on_collision=Parameter(
             args=("--on-collision",),
-            constraints=EnsureChoice("error", "error-if-different"),
+            constraints=EnsureChoice("error", "error-if-different",
+                                     "take-first", "take-last"),
             doc="""What to do when more than one row produces the same file
             name. By default an error is triggered. "error-if-different"
             suppresses that error if rows for a given file name collision have
-            the same URL and metadata."""),
+            the same URL and metadata. "take-first" or "take-last" indicate to
+            instead take the first row or last row from each set of colliding
+            rows."""),
     )
 
     @staticmethod
