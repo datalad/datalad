@@ -144,11 +144,11 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             self.process.pid, return_code)
         # give captured process output back to the runner as string(s)
         results = {
-            self.fd_infos[fileno][0]: (
-                bytes(self.fd_infos[fileno][1]).decode(self.encoding)
-                if self.fd_infos[fileno][1] is not None
+            name: (
+                bytes(byt).decode(self.encoding)
+                if byt is not None
                 else '')
-            for fileno in (self.stdout_fileno, self.stderr_fileno)
+            for name, byt in self.fd_infos.items()
         }
         results['code'] = return_code
         return results
