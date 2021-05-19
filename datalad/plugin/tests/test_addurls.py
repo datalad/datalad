@@ -9,6 +9,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test addurls plugin"""
 
+from copy import deepcopy
 import json
 import logging
 import os
@@ -847,7 +848,7 @@ class TestAddurls(object):
         if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
             raise SkipTest("Adjusted branch functionality requires "
                            "more recent `git annex examinekey`")
-        data = self.data.copy()
+        data = deepcopy(self.data)
         for row in data:
             if row["name"] == "b":
                 del row["md5sum"]
