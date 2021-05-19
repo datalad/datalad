@@ -609,8 +609,8 @@ def extract(rows, colidx_to_name=None,
     Returns
     -------
     A tuple where the first item is a list with a dict of extracted information
-    for each row in `stream` and the second item a list subdataset paths,
-    sorted breadth-first.
+    for each row and the second item a list subdataset paths, sorted
+    breadth-first.
     """
     meta = ensure_list(meta)
     colidx_to_name = colidx_to_name or {}
