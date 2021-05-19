@@ -148,7 +148,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
                 bytes(byt).decode(self.encoding)
                 if byt is not None
                 else '')
-            for name, byt in self.fd_infos.items()
+            for name, byt in self.fd_infos.values()
         }
         results['code'] = return_code
         return results
@@ -299,7 +299,7 @@ class WitlessRunner(object):
 
         from .nonasyncrunner import run_command
 
-        lgr.debug('Async run:\n cwd=%s\n cmd=%s', cwd, cmd)
+        lgr.debug('run:\n cwd=%s\n cmd=%s', cwd, cmd)
         results = run_command(
             cmd,
             protocol,
