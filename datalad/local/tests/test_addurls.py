@@ -621,6 +621,34 @@ class TestAddurls(object):
             ok_exists(op.join(ds.path, fname))
 
     @with_tempfile(mkdir=True)
+    def test_addurls_url_on_collision_error_if_different(self, path):
+        ds = Dataset(path).create(force=True)
+
+        data = [self.data[0].copy(), self.data[0].copy()]
+        data[0]["some_metadata"] = "1"
+        data[1]["some_metadata"] = "2"
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
+                action="addurls",
+                status="error")
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}",
+                           on_collision="error-if-different",
+                           on_failure="ignore"),
+                action="addurls",
+                status="error")
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}",
+                       exclude_autometa="*",
+                       on_collision="error-if-different")
+        ok_exists(op.join(ds.path, "a"))
+
+    @with_tempfile(mkdir=True)
     def test_addurls_url_parts(self, path):
         ds = Dataset(path).create(force=True)
         ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}")
