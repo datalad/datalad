@@ -22,6 +22,7 @@ from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
 from ..nonasyncrunner import ReaderThread, run_command
 
 
+@known_failure_windows
 def test_subprocess_return_code_capture():
 
     class KillProtocol(WitlessProtocol):
@@ -97,7 +98,8 @@ def test_interactive_communication():
                             "result_pool": result_pool
                          })
 
-    eq_(result["stdout"], "2\n8\n")
+    lines = [line.strip() for line in result["stdout"].splitlines()]
+    eq_(lines, ["2", "8"])
     assert_true(result_pool["connection_lost_called"], True)
     assert_true(result_pool["process_exited_called"], True)
 
