@@ -137,7 +137,8 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         'cmd' and 'cwd' on error, if they are present in the result.
         """
         return_code = self.process.poll()
-        assert return_code is not None
+        if return_code is None:
+            raise CommandError("Got None as a return_code for the process %i", self.process.pid)
         lgr.debug(
             'Process %i exited with return code %i',
             self.process.pid, return_code)
