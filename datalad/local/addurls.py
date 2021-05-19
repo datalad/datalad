@@ -692,7 +692,7 @@ def extract(rows, colidx_to_name=None,
 
     rows_with_url = []
     infos = []
-    for row in rows:
+    for idx, row in enumerate(rows):
         try:
             url = format_url(row)
         except KeyError as exc:
@@ -701,7 +701,7 @@ def extract(rows, colidx_to_name=None,
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
-        info = {"url": url}
+        info = {"url": url, "input_idx": idx}
         for fn in info_fns:
             fn(info, row)
         infos.append(info)
