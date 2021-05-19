@@ -576,6 +576,28 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                          "Finished requesting file names")
 
 
+def _find_collisions(rows):
+    """Find file name collisions.
+
+    Parameters
+    ----------
+    rows : list of dict
+
+    Returns
+    -------
+    Dict where each key is a file name with a collision and values are the rows
+    (list of ints) that have the given file name.
+    """
+    fname_idxs = defaultdict(list)
+    collisions = set()
+    for idx, row in enumerate(rows):
+        fname = row["filename"]
+        if fname in fname_idxs:
+            collisions.add(fname)
+        fname_idxs[fname].append(idx)
+    return {fname: fname_idxs[fname] for fname in collisions}
+
+
 def _handle_collisions(rows):
     """Handle file name collisions in `rows`.
 
@@ -588,7 +610,8 @@ def _handle_collisions(rows):
     Error message (str) or None
     """
     err_msg = None
-    if len(rows) != len(set(row["filename"] for row in rows)):
+    collisions = _find_collisions(rows)
+    if collisions:
         err_msg = ("There are file name collisions; "
                    "consider using {_repindex}")
     return err_msg
