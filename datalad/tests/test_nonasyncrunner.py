@@ -19,10 +19,10 @@ from datalad.tests.utils import assert_true, eq_, known_failure_windows, \
     known_failure_osx, with_tempfile
 
 from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
-from ..nonasyncrunner import ReaderThread, run_command
+from ..nonasyncrunner import _ReaderThread, run_command
 
 
-@known_failure_windows
+@known_failure_windows  # Windows uses different signals and commands
 def test_subprocess_return_code_capture():
 
     class KillProtocol(WitlessProtocol):
@@ -107,10 +107,10 @@ def test_interactive_communication():
 def test_thread_exit():
 
     (read_descriptor, write_descriptor) = os.pipe()
-    read_file = os.fdopen(read_descriptor, "r")
+    read_file = os.fdopen(read_descriptor, "rb")
     read_queue = queue.Queue()
 
-    reader_thread = ReaderThread(read_file, read_queue, "test")
+    reader_thread = _ReaderThread(read_file, read_queue, "test")
     reader_thread.start()
 
     os.write(write_descriptor, b"some data")
@@ -120,6 +120,11 @@ def test_thread_exit():
 
     reader_thread.request_exit()
 
+    # Check the blocking part
+    sleep(5)
+    assert_true(reader_thread.is_alive())
+
+    # Check actual exit
     os.write(write_descriptor, b"more data")
     reader_thread.join()
     data = read_queue.get()

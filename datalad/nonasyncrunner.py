@@ -7,8 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
-Wrapper for command and function calls, allowing for dry runs and output handling
-
+Thread based subprocess execution with stdout and stderr passed to protocol objects
 """
 
 import logging
@@ -17,8 +16,9 @@ import queue
 import subprocess
 import threading
 import time
-from typing import Any, IO, List, Union
+from typing import Any, Dict, IO, List, Type, Union, Optional
 
+from .cmd import WitlessProtocol
 
 logger = logging.getLogger("datalad.runner")
 
@@ -26,15 +26,29 @@ STDOUT_FILENO = 1
 STDERR_FILENO = 2
 
 
-class ReaderThread(threading.Thread):
+class _ReaderThread(threading.Thread):
+
     def __init__(self,
                  file: IO,
-                 queue_: queue.Queue,
+                 q: queue.Queue,
                  command: Union[str, List]):
-
+        """
+        Parameters
+        ----------
+        file:
+          File object from which the thread will read data
+          and write it into the queue. This is usually the
+          read end of a pipe.
+        q:
+          A queue into which the thread writes what it reads
+          from file.
+        command:
+          The command for which the thread was created. This
+          is mainly used to improve debug output messages.
+        """
         super().__init__(daemon=True)
         self.file = file
-        self.queue = queue_
+        self.queue = q
         self.command = command
         self.quit = False
 
@@ -45,7 +59,11 @@ class ReaderThread(threading.Thread):
         """
         Request the thread to exit. This is not guaranteed to
         have any effect, because the thread might be waiting in
-        os.read() or queue.put().
+        `os.read()` or on `queue.put()`, if the queue size is finite.
+        To ensure thread termination, you can ensure that another thread
+        empties the queue, and try to trigger a read on `self.file.fileno()`,
+        e.g. by writing into the write-end of a pipe that is connected to
+        `self.file.fileno()`.
         """
         self.quit = True
 
@@ -63,10 +81,10 @@ class ReaderThread(threading.Thread):
             self.queue.put((self.file.fileno(), data, time.time()))
 
 
-def run_command(cmd,
-                protocol_class,
-                stdin,
-                protocol_kwargs=None,
+def run_command(cmd: Union[str, List],
+                protocol_class: Type[WitlessProtocol],
+                stdin: Any,
+                protocol_kwargs: Optional[Dict] = None,
                 **kwargs) -> Any:
     """
     Run a command in a subprocess
@@ -140,11 +158,11 @@ def run_command(cmd,
         output_queue = queue.Queue()
         active_file_numbers = set()
         if catch_stderr:
-            stderr_reader_thread = ReaderThread(process.stderr, output_queue, cmd)
+            stderr_reader_thread = _ReaderThread(process.stderr, output_queue, cmd)
             stderr_reader_thread.start()
             active_file_numbers.add(process.stderr.fileno())
         if catch_stdout:
-            stdout_reader_thread = ReaderThread(process.stdout, output_queue, cmd)
+            stdout_reader_thread = _ReaderThread(process.stdout, output_queue, cmd)
             stdout_reader_thread.start()
             active_file_numbers.add(process.stdout.fileno())
 

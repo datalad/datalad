@@ -22,7 +22,6 @@ import warnings
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import borrowdoc
-from .nonasyncrunner import run_command
 from .support import path as op
 from .support.exceptions import CommandError
 from .utils import (
@@ -290,6 +289,10 @@ class WitlessRunner(object):
         FileNotFoundError
           When a given executable does not exist.
         """
+
+        # imported here to avoid recursive importing
+        from .nonasyncrunner import run_command
+
         if protocol is None:
             # by default let all subprocess stream pass through
             protocol = NoCapture
