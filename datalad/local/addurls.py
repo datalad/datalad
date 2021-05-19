@@ -25,7 +25,10 @@ from urllib.parse import urlparse
 from datalad.support.external_versions import external_versions
 import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
-from datalad.dochelpers import exc_str
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
@@ -693,9 +696,11 @@ def _handle_collisions(records, rows, on_collision):
                         [records[i]
                          for i in remapped[next(iter(remapped))][:2]],
                         sort_keys=True, indent=2, default=str))
-            err_msg = ("There are file name collisions; "
+            err_msg = ("%s collided across rows; "
                        "troubleshoot by logging at debug level or "
-                       "consider using {_repindex}")
+                       "consider using {_repindex}",
+                       single_or_plural("file name", "file names",
+                                        len(to_report), include_count=True))
         else:
             _ignore_collisions(rows, collisions,
                                last_wins=on_collision == "take-last")

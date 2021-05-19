@@ -614,7 +614,7 @@ class TestAddurls(object):
 
         with assert_raises(IncompleteResultsError) as raised:
             ds.addurls(self.json_file, "{url}", "{subdir}")
-        assert_in("There are file name collisions", str(raised.exception))
+        assert_in("collided", str(raised.exception))
 
         ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}")
 
