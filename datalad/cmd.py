@@ -535,6 +535,9 @@ class GitWitlessRunner(WitlessRunner, GitRunnerBase):
 
 
 def readline_rstripped(stdout):
+    warnings.warn("the function `readline_rstripped()` is deprecated "
+                  "and will be removed in a future release",
+                  DeprecationWarning)
     return stdout.readline().rstrip()
 
 
