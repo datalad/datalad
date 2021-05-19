@@ -12,9 +12,9 @@ import asyncio
 import os
 import queue
 import subprocess
+from time import sleep, time
 
-
-from datalad.tests.utils import assert_true, eq_
+from datalad.tests.utils import assert_true, eq_, with_tempfile
 
 from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
 from ..nonasyncrunner import ReaderThread, run_command
@@ -131,3 +131,23 @@ def test_inside_async():
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(main())
     eq_(result["stdout"], "abc\n")
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_popen_invocation(src_path, dest_path):
+    # https://github.com/ReproNim/testkraken/issues/93
+    from datalad.distribution.dataset import Dataset
+    from datalad.api import clone
+    from multiprocessing import Process
+    src = Dataset(src_path).create()
+    (src.pathobj / "file.dat").write_bytes(b"\000")
+    src.save(message="got data")
+    dest = clone(source=src_path, path=dest_path)
+    fetching_data = Process(target=dest.get, kwargs={"path": 'file.dat'})
+    fetching_data.start()
+    t0 = time()
+    while fetching_data.is_alive():
+        if time() - t0 > 5:
+            raise AssertionError("Child is stuck!")
+        sleep(0.1)
