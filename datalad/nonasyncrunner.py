@@ -27,28 +27,26 @@ STDERR_FILENO = 2
 
 
 class ReaderThread(threading.Thread):
-    def __init__(self, file, q):
+    def __init__(self, file, a_queue, command):
         super().__init__(daemon=True)
         self.file = file
-        self.queue = q
+        self.queue = a_queue
+        self.command = command
         self.quit = False
 
     def __str__(self):
-        return f"ReaderThread({self.file}, {self.queue})"
+        return f"ReaderThread({self.file}, {self.queue}, {self.command})"
 
     def request_exit(self):
         """
         Request the thread to exit. This is not guaranteed to
         have any effect, because the thread might be waiting in
-        os.read() or queue.put(). We are closing the file that read
-        is reading from here, but the queue has to be emptied in
-        another thread in order to ensure thread-exiting.
+        os.read() or queue.put().
         """
         self.quit = True
-        self.file.close()
 
     def run(self):
-        logger.debug("%s ", self)
+        logger.debug("%s started", self)
 
         while not self.quit:
 
@@ -83,7 +81,7 @@ def run_command(cmd,
     protocol : WitlessProtocol
       Protocol class to be instantiated for managing communication
       with the subprocess.
-    stdin : file-like or None
+    stdin : file-like, subprocess.PIPE or None
       Passed to the subprocess as its standard input.
     protocol_kwargs : dict, optional
        Passed to the Protocol class constructor.
@@ -138,11 +136,11 @@ def run_command(cmd,
         output_queue = queue.Queue()
         active_file_numbers = set()
         if catch_stderr:
-            stderr_reader_thread = ReaderThread(process.stderr, output_queue)
+            stderr_reader_thread = ReaderThread(process.stderr, output_queue, cmd)
             stderr_reader_thread.start()
             active_file_numbers.add(process.stderr.fileno())
         if catch_stdout:
-            stdout_reader_thread = ReaderThread(process.stdout, output_queue)
+            stdout_reader_thread = ReaderThread(process.stdout, output_queue, cmd)
             stdout_reader_thread.start()
             active_file_numbers.add(process.stdout.fileno())
 
