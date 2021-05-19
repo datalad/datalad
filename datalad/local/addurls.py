@@ -12,6 +12,7 @@
 from collections import defaultdict
 from collections.abc import Mapping
 
+import json
 import logging
 import os
 import re
@@ -645,7 +646,7 @@ def _ignore_collisions(rows, collisions, last_wins=True):
             rows[idx]["ignore"] = True
 
 
-def _handle_collisions(rows, on_collision):
+def _handle_collisions(records, rows, on_collision):
     """Handle file name collisions in `rows`.
 
     "Handling" consists of either marking all but one colliding row with
@@ -655,7 +656,11 @@ def _handle_collisions(rows, on_collision):
 
     Parameters
     ----------
+    records : list of dict
+        Items read from `url_file`.
     rows : list of dict
+        Extract information from `records`. This may be a different length if
+        `records` had any items with an empty URL.
     on_collision : {"error", "error-if-different", "take-first", "take-last"}
 
     Returns
@@ -676,7 +681,20 @@ def _handle_collisions(rows, on_collision):
                 f"Unsupported `on_collision` value: {on_collision}")
 
         if to_report:
+            if lgr.isEnabledFor(logging.DEBUG):
+                # Remap to the position in the url_file. This may not be the
+                # same if rows without a URL were filtered out.
+                remapped = {f: [rows[i]["input_idx"] for i in idxs]
+                            for f, idxs in to_report.items()}
+                lgr.debug("Colliding names and positions:\n%s", remapped)
+                lgr.debug(
+                    "Example of two colliding rows:\n%s",
+                    json.dumps(
+                        [records[i]
+                         for i in remapped[next(iter(remapped))][:2]],
+                        sort_keys=True, indent=2, default=str))
             err_msg = ("There are file name collisions; "
+                       "troubleshoot by logging at debug level or "
                        "consider using {_repindex}")
         else:
             _ignore_collisions(rows, collisions,
@@ -1341,7 +1359,7 @@ class Addurls(Interface):
                        message="No rows to process")
             return
 
-        collision_err = _handle_collisions(rows, on_collision)
+        collision_err = _handle_collisions(records, rows, on_collision)
         if collision_err:
             yield dict(st_dict, status="error", message=collision_err)
             return
