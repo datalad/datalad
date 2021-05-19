@@ -3,10 +3,12 @@ from annexremote import RemoteError
 from annexremote import ProtocolError
 
 import os
+import stat
 from pathlib import (
     Path,
     PurePosixPath
 )
+from contextlib import contextmanager
 import requests
 import shutil
 from shlex import quote as sh_quote
@@ -166,6 +168,46 @@ class IOBase(object):
 
 class LocalIO(IOBase):
     """IO operation if the object tree is local (e.g. NFS-mounted)"""
+
+    @staticmethod
+    @contextmanager
+    def ensure_write_permission_parent(destination):
+        """Context manager to get permissions on directory and restore
+        afterwards
+
+        If git-annex ever touch this key store, the keys will
+        be in mode 444 directories, and we need to give permission
+        first.
+
+        Notes
+        -----
+
+        As pointed out in gh-5668, Ben is not convinced that this should really
+        be solved client-side, although it seems kind of fine, if we are able to
+        obtain the permission. However, store-side permissions should be set for
+        a reason, git-annex actually shouldn't touch the object tree and it
+        seems better to make sure that unaware people/programs don't
+        accidentally mess with a store's internal settings.
+        Hence, address the particular issue for the object tree only, not
+        enhancing the approach for all write operations ATM.
+
+        Parameters
+        ----------
+        destination: Path
+          path to the target file
+        """
+
+        par = destination.parent
+        # remember original mode -- better than to prescribe a fixed mode
+        par_mode = par.stat().st_mode
+        # only IWRITE works on windows, in principle
+        par.chmod(par_mode | stat.S_IWRITE)
+        try:
+            yield
+        finally:
+            # restore original mode
+            par.chmod(par_mode)
+
     def mkdir(self, path):
         path.mkdir(
             parents=True,
@@ -202,13 +244,16 @@ class LocalIO(IOBase):
         #         Set output stream for output/error/progress line
 
     def rename(self, src, dst):
-        src.rename(dst)
+        with self.ensure_write_permission_parent(dst):
+            src.rename(dst)
 
     def remove(self, path):
-        path.unlink()
+        with self.ensure_write_permission_parent(path):
+            path.unlink()
 
     def remove_dir(self, path):
-        path.rmdir()
+        with self.ensure_write_permission_parent(path):
+            path.rmdir()
 
     def exists(self, path):
         return path.exists()
@@ -423,6 +468,46 @@ class SSHRemoteIO(IOBase):
             raise RIARemoteError("{}: {}".format(call, "".join(lines)))
         return "".join(lines[:-1])
 
+    @contextmanager
+    def ensure_write_permission_parent(self, destination):
+        """Context manager to get permissions on directory and restore
+        afterwards
+
+        If git-annex ever touch this key store, the keys will
+        be in mode 444 directories, and we need to give permission
+        first.
+
+        Notes
+        -----
+
+        As pointed out in gh-5668, Ben is not convinced that this should really
+        be solved client-side, although it seems kind of fine, if we are able to
+        obtain the permission. However, store-side permissions should be set for
+        a reason, git-annex actually shouldn't touch the object tree and it
+        seems better to make sure that unaware people/programs don't
+        accidentally mess with a store's internal settings.
+        Hence, address the particular issue for the object tree only, not
+        enhancing the approach for all write operations ATM.
+
+        Parameters
+        ----------
+        destination: Path
+          path to the target file
+        """
+
+        par = sh_quote(str(destination.parent))
+        # remember original mode -- better than to prescribe a fixed mode
+        par_mode = self._run("stat --format=\"%a\" {}".format(par),
+                             no_output=False, check=True)
+        self._run("chmod u+w {}".format(par))
+
+        try:
+            yield
+        finally:
+            # restore original mode
+            self._run("chmod {mode} {file}".format(mode=par_mode,
+                                                   file=destination))
+
     def mkdir(self, path):
         self._run('mkdir -p {}'.format(sh_quote(str(path))))
 
@@ -483,13 +568,16 @@ class SSHRemoteIO(IOBase):
                     progress_cb(bytes_received)
 
     def rename(self, src, dst):
-        self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
+        with self.ensure_write_permission_parent(dst):
+            self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
 
     def remove(self, path):
-        self._run('rm {}'.format(sh_quote(str(path))))
+        with self.ensure_write_permission_parent(path):
+            self._run('rm {}'.format(sh_quote(str(path))), check=True)
 
     def remove_dir(self, path):
-        self._run('rmdir {}'.format(sh_quote(str(path))))
+        with self.ensure_write_permission_parent(path):
+            self._run('rmdir {}'.format(sh_quote(str(path))))
 
     def exists(self, path):
         try:
