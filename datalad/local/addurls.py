@@ -9,6 +9,7 @@
 """Create and update a dataset from a list of URLs.
 """
 
+from collections import defaultdict
 from collections.abc import Mapping
 
 import logging
@@ -573,6 +574,24 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                              update=1, increment=True)
             log_progress(lgr.info, "addurls_requestnames",
                          "Finished requesting file names")
+
+
+def _handle_collisions(rows):
+    """Handle file name collisions in `rows`.
+
+    Parameters
+    ----------
+    rows : list of dict
+
+    Returns
+    -------
+    Error message (str) or None
+    """
+    err_msg = None
+    if len(rows) != len(set(row["filename"] for row in rows)):
+        err_msg = ("There are file name collisions; "
+                   "consider using {_repindex}")
+    return err_msg
 
 
 def sort_paths(paths):
@@ -1221,10 +1240,9 @@ class Addurls(Interface):
                        message="No rows to process")
             return
 
-        if len(rows) != len(set(row["filename"] for row in rows)):
-            yield dict(st_dict, status="error",
-                       message=("There are file name collisions; "
-                                "consider using {_repindex}"))
+        collision_err = _handle_collisions(rows)
+        if collision_err:
+            yield dict(st_dict, status="error", message=collision_err)
             return
 
         if dry_run:
