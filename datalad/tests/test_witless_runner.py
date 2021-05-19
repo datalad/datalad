@@ -9,11 +9,12 @@
 """Test WitlessRunner
 """
 
+import logging
 import os
 import signal
 import sys
+import unittest.mock
 
-from pathlib import Path
 from time import (
     sleep,
     time,
@@ -29,12 +30,14 @@ from datalad.tests.utils import (
     ok_,
     ok_file_has_content,
     SkipTest,
+    swallow_logs,
     with_tempfile,
 )
 from datalad.cmd import (
-    StdOutErrCapture,
-    WitlessRunner as Runner,
     StdOutCapture,
+    StdOutErrCapture,
+    WitlessProtocol,
+    WitlessRunner as Runner,
 )
 from datalad.utils import (
     on_windows,
@@ -227,3 +230,13 @@ def test_asyncio_forked(temp):
     else:
        # sleep enough so parent just kills me the kid before I continue doing bad deeds
        sleep(10)
+
+
+def test_done_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = WitlessProtocol("done")
+        warn_mock.assert_called_once()
+
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = WitlessProtocol()
+        warn_mock.assert_not_called()
