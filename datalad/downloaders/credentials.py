@@ -31,6 +31,8 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..support.network import iso8601_to_epoch
 
+from datalad import cfg as dlcfg
+
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.credentials')
 
@@ -94,7 +96,10 @@ class Credential(object):
             return False
 
     def _get_field_value(self, field):
-        return self._keyring.get(self.name, field)
+        return dlcfg.get('datalad.credential.{name}.{field}'.format(
+            name=self.name,
+            field=field.replace('_', '-')
+        )) or self._keyring.get(self.name, field)
 
     def _ask_field_value(self, f, instructions=None):
         msg = instructions if instructions else \
