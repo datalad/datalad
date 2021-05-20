@@ -248,3 +248,16 @@ def test_readline_rstripped_deprecation():
                 return "abc\n"
         readline_rstripped(StdoutMock())
         warn_mock.assert_called_once()
+
+
+def test_faulty_poll_detection():
+
+    class PopenMock:
+        pid = 666
+
+        def poll(self):
+            return None
+
+    protocol = WitlessProtocol()
+    protocol.process = PopenMock()
+    assert_raises(CommandError, protocol._prepare_result)
