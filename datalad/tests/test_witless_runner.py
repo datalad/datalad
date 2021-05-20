@@ -9,7 +9,6 @@
 """Test WitlessRunner
 """
 
-import logging
 import os
 import signal
 import sys
@@ -30,7 +29,6 @@ from datalad.tests.utils import (
     ok_,
     ok_file_has_content,
     SkipTest,
-    swallow_logs,
     with_tempfile,
 )
 from datalad.cmd import (
