@@ -558,7 +558,8 @@ def _process_results(
     # counter for detected repetitions
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
-    render_n_repetitions = 10 \
+    render_n_repetitions = \
+        dlcfg.obtain('datalad.ui.suppress-similar-results-threshold') \
         if sys.stdout.isatty() \
         and dlcfg.obtain('datalad.ui.suppress-similar-results') \
         else float("inf")

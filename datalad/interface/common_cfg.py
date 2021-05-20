@@ -405,6 +405,16 @@ definitions = {
         'default': True,
         'type': EnsureBool(),
     },
+    'datalad.ui.suppress-similar-results-threshold': {
+        'ui': ('question', {
+            'title': 'Threshold for suppressing similar repetitive results',
+            'text': "Minimum number of similar results to occur before "
+                    "suppression is considered. "
+                    "See 'datalad.ui.suppress-similar-results' for more "
+                    "information."}),
+        'default': 10,
+        'type': EnsureInt(),
+    },
     'datalad.save.no-message': {
         'ui': ('question', {
             'title': 'Commit message handling',
