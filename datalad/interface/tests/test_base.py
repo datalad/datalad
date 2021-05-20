@@ -183,18 +183,12 @@ def test_status_custom_summary_no_repeats(path):
     # command for this test, but it's at least a necessary condition.
     ok_(hasattr(Status, "custom_result_summary_renderer"))
 
-    # Note: This test was added on a branch without a60bf7274a (BF: Don't be
-    # silent in default renderer when everything is clean, 2020-01-30), but
-    # once merged into a branch with that commit, the block below and --annex
-    # could be dropped.
-    ds = Dataset(path).create()
-    (ds.pathobj / "foo").write_text("foo content")
-    ds.save()
-
+    Dataset(path).create()
     out = WitlessRunner(cwd=path).run(
-        ["datalad", "--output-format=tailored", "status", "--annex"],
+        ["datalad", "--output-format=tailored", "status"],
         protocol=StdOutCapture)
     out_lines = out['stdout'].splitlines()
+    ok_(out_lines)
     eq_(len(out_lines), len(set(out_lines)))
 
 
