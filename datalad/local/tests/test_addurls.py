@@ -50,6 +50,7 @@ from datalad.tests.utils import (
     skip_if,
     SkipTest,
     swallow_logs,
+    swallow_outputs,
     with_tempfile,
     with_tree,
     on_windows,
@@ -582,11 +583,18 @@ class TestAddurls(object):
 
         for save in True, False:
             label = "save" if save else "nosave"
-            ds.addurls(self.json_file, "{url}",
-                       "{subdir}-" + label + "//{name}",
-                       save=save,
-                       cfg_proc=["yoda"],
-                       result_renderer=None)
+            with swallow_outputs() as cmo:
+                ds.addurls(self.json_file, "{url}",
+                           "{subdir}-" + label + "//{name}",
+                           save=save,
+                           cfg_proc=["yoda"])
+                # The custom result renderer transforms the subdataset
+                # action=create results into something more informative than
+                # "create(ok): . (dataset)"...
+                assert_in("create(ok): foo-{} (dataset)".format(label),
+                          cmo.out)
+                # ... and that doesn't lose the standard summary.
+                assert_in("create (ok: 2)", cmo.out)
 
             subdirs = [op.join(ds.path, "{}-{}".format(d, label))
                        for d in ["foo", "bar"]]
