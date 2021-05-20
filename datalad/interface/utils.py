@@ -455,12 +455,7 @@ def eval_results(func):
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
                 # action performed
-                ui.message("action summary:\n  {}".format(
-                    '\n  '.join('{} ({})'.format(
-                        act,
-                        ', '.join('{}: {}'.format(status, action_summary[act][status])
-                                  for status in sorted(action_summary[act])))
-                                for act in sorted(action_summary))))
+                render_action_summary(action_summary)
 
             if incomplete_results:
                 raise IncompleteResultsError(
@@ -516,6 +511,16 @@ def default_result_renderer(res):
                 if isinstance(res['message'], tuple) else res[
                     'message'])
             if res.get('message', None) else ''))
+
+
+def render_action_summary(action_summary):
+    ui.message("action summary:\n  {}".format(
+        '\n  '.join('{} ({})'.format(
+            act,
+            ', '.join('{}: {}'.format(status, action_summary[act][status])
+                      for status in sorted(action_summary[act])))
+                    for act in sorted(action_summary))))
+
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
