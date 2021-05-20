@@ -18,6 +18,7 @@ from datalad.tests.utils import (
     eq_,
     ok_,
     patch_config,
+    swallow_outputs,
     with_tempfile,
 )
 from datalad.utils import (
@@ -183,13 +184,17 @@ def test_status_custom_summary_no_repeats(path):
     # command for this test, but it's at least a necessary condition.
     ok_(hasattr(Status, "custom_result_summary_renderer"))
 
-    Dataset(path).create()
+    ds = Dataset(path).create()
     out = WitlessRunner(cwd=path).run(
         ["datalad", "--output-format=tailored", "status"],
         protocol=StdOutCapture)
     out_lines = out['stdout'].splitlines()
     ok_(out_lines)
     eq_(len(out_lines), len(set(out_lines)))
+
+    with swallow_outputs() as cmo:
+        ds.status(return_type="list", result_renderer="tailored")
+        eq_(out_lines, cmo.out.splitlines())
 
 
 def test_update_docstring_with_parameters_no_kwds():
