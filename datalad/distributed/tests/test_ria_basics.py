@@ -15,6 +15,7 @@ from datalad.api import (
 from datalad.utils import Path
 from datalad.tests.utils import (
     assert_equal,
+    assert_false,
     assert_in,
     assert_not_in,
     assert_raises,
@@ -625,3 +626,82 @@ def test_push_url(storepath, dspath, blockfile):
     known_sources = ds.repo.whereis('one.txt')
     assert_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)
+
+
+@with_tempfile
+@with_tempfile
+def _test_obtain_permission(host, storepath, dspath):
+
+    # Test whether ORA correctly obtains write permissions within object tree,
+    # when they are changed by other means (possibly git-annex). See gh-5668.
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    ds = Dataset(dspath).create()
+    populate_dataset(ds)
+    ds.save()
+    assert_repo_status(ds.path)
+    testfile = 'one.txt'
+
+    # set up store:
+    io = SSHRemoteIO(host) if host else LocalIO()
+    if host:
+        store_url = "ria+ssh://{host}{path}".format(host=host,
+                                                    path=storepath)
+    else:
+        store_url = "ria+{}".format(storepath.as_uri())
+
+    create_store(io, storepath, '1')
+    create_ds_in_store(io, storepath, ds.id, '2', '1')
+    _, _, obj_tree = get_layout_locations(1, storepath, ds.id)
+    assert_true(obj_tree.is_dir())
+    file_key_in_store = obj_tree / 'X9' / '6J' / 'MD5E-s8--7e55db001d319a94b0b713529a756623.txt' / 'MD5E-s8--7e55db001d319a94b0b713529a756623.txt'
+
+    init_opts = common_init_opts + ['url={}'.format(store_url)]
+    ds.repo.init_remote('store', options=init_opts)
+
+    store_uuid = ds.siblings(name='store',
+                             return_type='item-or-list')['annex-uuid']
+    here_uuid = ds.siblings(name='here',
+                            return_type='item-or-list')['annex-uuid']
+
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
+    assert_false(file_key_in_store.exists())
+
+    ds.repo.call_annex(['copy', testfile, '--to', 'store'])
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
+    assert_true(file_key_in_store.exists())
+
+    # remove from store shouldn't be problematic at this point
+    ds.repo.call_annex(['drop', testfile, '--from', 'store'])
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
+    assert_false(file_key_in_store.exists())
+
+    # copy back
+    ds.repo.call_annex(['copy', testfile, '--to', 'store'])
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_in(store_uuid, known_sources)
+    assert_true(file_key_in_store.exists())
+
+    # now remove write permissions from object tree directories and try again
+    for p in obj_tree.glob('*/*/*'):
+        p.chmod(0o555)
+
+    ds.repo.call_annex(['drop', testfile, '--from', 'store'])
+    known_sources = ds.repo.whereis(testfile)
+    assert_in(here_uuid, known_sources)
+    assert_not_in(store_uuid, known_sources)
+    assert_false(file_key_in_store.exists())
+
+
+def test_obtain_permission():
+    # TODO: Skipped due to gh-4436
+    yield known_failure_windows(skip_ssh(_test_obtain_permission)), 'datalad-test'
+    yield _test_obtain_permission, None
