@@ -13,10 +13,10 @@ import os
 import queue
 import signal
 import subprocess
-from time import sleep, time
+from time import sleep
 
-from datalad.tests.utils import assert_true, eq_, known_failure_windows, \
-    known_failure_osx, with_tempfile
+from datalad.tests.utils import assert_false, assert_true, eq_, \
+    known_failure_windows, known_failure_osx, with_tempfile
 
 from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
 from ..nonasyncrunner import _ReaderThread, run_command
@@ -151,14 +151,13 @@ def test_popen_invocation(src_path, dest_path):
     from datalad.distribution.dataset import Dataset
     from datalad.api import clone
     from multiprocessing import Process
+
     src = Dataset(src_path).create()
     (src.pathobj / "file.dat").write_bytes(b"\000")
     src.save(message="got data")
+
     dest = clone(source=src_path, path=dest_path)
     fetching_data = Process(target=dest.get, kwargs={"path": 'file.dat'})
     fetching_data.start()
-    t0 = time()
-    while fetching_data.is_alive():
-        if time() - t0 > 5:
-            raise AssertionError("Child is stuck!")
-        sleep(0.1)
+    fetching_data.join(5.0)
+    assert_false(fetching_data.is_alive(), "Child is stuck!")

@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import sys
+import unittest.mock
 
 from functools import partial
 from glob import glob
@@ -2554,3 +2555,13 @@ def test_whereis_batch_eqv(path):
     # --key= and --batch are incompatible.
     with assert_raises(ValueError):
         repo_b.whereis(files=files, batch=True, key=True)
+
+
+def test_done_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = AnnexJsonProtocol("done")
+        warn_mock.assert_called_once()
+
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = AnnexJsonProtocol()
+        warn_mock.assert_not_called()

@@ -32,6 +32,7 @@ from datalad.tests.utils import (
     with_tempfile,
 )
 from datalad.cmd import (
+    readline_rstripped,
     StdOutCapture,
     StdOutErrCapture,
     WitlessProtocol,
@@ -238,3 +239,12 @@ def test_done_deprecation():
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
         _ = WitlessProtocol()
         warn_mock.assert_not_called()
+
+
+def test_readline_rstripped_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        class StdoutMock:
+            def readline(self):
+                return "abc\n"
+        readline_rstripped(StdoutMock())
+        warn_mock.assert_called_once()
