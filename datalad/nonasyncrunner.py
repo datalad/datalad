@@ -18,7 +18,8 @@ import threading
 import time
 from typing import Any, Dict, IO, List, Type, Union, Optional
 
-from .cmd import WitlessProtocol
+from .cmd_protocols import WitlessProtocol
+
 
 logger = logging.getLogger("datalad.runner")
 
@@ -82,7 +83,7 @@ class _ReaderThread(threading.Thread):
 
 
 def run_command(cmd: Union[str, List],
-                protocol_class: Type[WitlessProtocol],
+                protocol: Type[WitlessProtocol],
                 stdin: Any,
                 protocol_kwargs: Optional[Dict] = None,
                 **kwargs) -> Any:
@@ -100,7 +101,7 @@ def run_command(cmd: Union[str, List],
     cmd : list or str
       Command to be executed, passed to `subprocess.Popen`. If cmd
       is a str, `subprocess.Popen will be called with `shell=True`.
-    protocol_class : WitlessProtocol
+    protocol : WitlessProtocol class or subclass
       Protocol class to be instantiated for managing communication
       with the subprocess.
     stdin : file-like, subprocess.PIPE or None
@@ -121,8 +122,8 @@ def run_command(cmd: Union[str, List],
 
     protocol_kwargs = {} if protocol_kwargs is None else protocol_kwargs
 
-    catch_stdout = protocol_class.proc_out is not None
-    catch_stderr = protocol_class.proc_err is not None
+    catch_stdout = protocol.proc_out is not None
+    catch_stderr = protocol.proc_err is not None
 
     kwargs = {
         **kwargs,
@@ -135,7 +136,7 @@ def run_command(cmd: Union[str, List],
         )
     }
 
-    protocol = protocol_class(**protocol_kwargs)
+    protocol = protocol(**protocol_kwargs)
 
     process = subprocess.Popen(cmd, **kwargs)
     process_stdout_fileno = process.stdout.fileno() if catch_stdout else None
