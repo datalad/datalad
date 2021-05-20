@@ -15,16 +15,37 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
-from ...api import download_url, Dataset
-from ...utils import chpwd
-from ...tests.utils import ok_, ok_exists, eq_, assert_cwd_unchanged, \
-    assert_in, assert_false, assert_message, assert_result_count, \
-    with_tempfile
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_in_results
-from ...tests.utils import with_tree
-from ...tests.utils import serve_path_via_http
-from ...tests.utils import known_failure_windows
+from ...api import (
+    clone,
+    download_url,
+    Dataset,
+)
+from ...utils import (
+    chpwd,
+    Path,
+)
+from ...downloaders.tests.utils import get_test_providers
+from ...tests.utils import (
+    assert_cwd_unchanged,
+    assert_false,
+    assert_in,
+    assert_message,
+    assert_result_count,
+    eq_,
+    ok_,
+    ok_exists,
+    with_tempfile,
+)
+from ...tests.utils import (
+    DEFAULT_REMOTE,
+    assert_in_results,
+    assert_not_in,
+    known_failure_windows,
+    serve_path_via_http,
+    skip_if_no_network,
+    slow,
+    with_tree,
+)
 
 
 def test_download_url_exceptions():
@@ -205,3 +226,19 @@ def test_download_url_archive_trailing_separator(toppath, topurl, path):
     ds.download_url([topurl + "a1.tar.gz"], path="no-slash",
                     archive=True)
     ok_(ds.repo.file_has_content(opj("a1", "f1.txt")))
+
+
+@slow  # 12-14 sec
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_download_url_need_datalad_remote(path):
+    # publicly available (requires anonymous s3 access, so still needs our special remote)
+    url = "s3://dandiarchive/ros3test.hdf5"
+    path = Path(path)
+    ds_a = Dataset(path / "a").create()
+    ds_a.download_url([url], path="foo")
+    ds_b = clone(source=ds_a.path, path=str(path / "b"),
+                 result_xfm="datasets", return_type="item-or-list")
+    ds_b.repo.remove_remote(DEFAULT_REMOTE)
+    ds_b.get("foo")
+    ok_(ds_b.repo.file_has_content("foo"))

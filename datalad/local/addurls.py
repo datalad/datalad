@@ -424,19 +424,46 @@ def _read_from_file(fname, input_type):
     return records, colidx_to_name
 
 
-def _get_placeholder_exception(exc, msg_prefix, known):
+_FIXED_SPECIAL_KEYS = {
+    "_repindex",
+    "_url_basename",
+    "_url_basename_ext",
+    "_url_basename_ext_py",
+    "_url_basename_root",
+    "_url_basename_root_py",
+    "_url_filename",
+    "_url_filename_ext",
+    "_url_filename_ext_py",
+    "_url_filename_root",
+    "_url_filename_root_py",
+    "_url_hostname",
+}
+
+
+def _is_known_special_key(key):
+    return key in _FIXED_SPECIAL_KEYS or re.match(r"\A_url[0-9]+\Z", key)
+
+
+def _get_placeholder_exception(exc, what, row):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
     value = exc.args[0]
     if isinstance(value, str):
-        sugmsg = get_suggestions_msg(value, known)
+        if _is_known_special_key(value):
+            msg = ("Special key '{}' could not be constructed for row: {}"
+                   .format(value,
+                           {k: v for k, v in row.items()
+                            if not _is_known_special_key(k)}))
+        else:
+            msg = "Unknown placeholder '{}' in {}: {}".format(
+                value, what, get_suggestions_msg(value, row))
     else:
-        sugmsg = "Out-of-bounds or unsupported index."
+        msg = "Out-of-bounds or unsupported index {} in {}".format(
+            value, what)
     # Note: Keeping this a KeyError is probably more appropriate but then the
     # entire message, which KeyError takes as the key, will be rendered with
     # outer quotes.
-    return ValueError("{}: {}{}{}"
-                      .format(msg_prefix, exc, ". " if sugmsg else "", sugmsg))
+    return ValueError(msg)
 
 
 def _format_filenames(format_fn, rows, row_infos):
@@ -446,7 +473,7 @@ def _format_filenames(format_fn, rows, row_infos):
             filename = format_fn(row)
         except KeyError as exc:
             raise _get_placeholder_exception(
-                exc, "Unknown placeholder in file name", row)
+                exc, "file name", row)
         filename, spaths = get_subpaths(filename)
         subpaths |= set(spaths)
         info["filename"] = filename
@@ -582,8 +609,8 @@ def extract(rows, colidx_to_name=None,
     Returns
     -------
     A tuple where the first item is a list with a dict of extracted information
-    for each row in `stream` and the second item a list subdataset paths,
-    sorted breadth-first.
+    for each row and the second item a list subdataset paths, sorted
+    breadth-first.
     """
     meta = ensure_list(meta)
     colidx_to_name = colidx_to_name or {}
@@ -628,7 +655,7 @@ def extract(rows, colidx_to_name=None,
             url = format_url(row)
         except KeyError as exc:
             raise _get_placeholder_exception(
-                exc, "Unknown placeholder in URL", row)
+                exc, "URL", row)
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)

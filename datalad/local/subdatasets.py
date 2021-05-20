@@ -108,8 +108,7 @@ class Subdatasets(Interface):
         SHA1 of the subdataset commit recorded in the parent dataset
 
     "state"
-        Condition of the subdataset: 'clean', 'modified', 'absent', 'conflict'
-        as reported by `git submodule`
+        Condition of the subdataset: 'absent', 'present'
 
     "gitmodule_url"
         URL of the subdataset recorded in the parent
@@ -312,6 +311,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         # not matching `contains`
         if not sm_path.exists() or not GitRepo.is_valid_repo(sm_path):
             sm['state'] = 'absent'
+        else:
+            assert 'state' not in sm
+            sm['state'] = 'present'
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \

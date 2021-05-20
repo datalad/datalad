@@ -832,14 +832,27 @@ def postclonecfg_ria(ds, props, remote="origin"):
     srs = repo.get_special_remotes() \
         if hasattr(repo, 'get_special_remotes') else dict()
 
-    if (not ora_remotes and any(
-            r.get('externaltype') == 'ora' for r in srs.values())) or \
-            all(not srs[r['annex-uuid']]['url'].startswith(ria_store_url)
-                for r in ora_remotes):
+    has_only_disabled_ora = \
+        not ora_remotes and \
+        any(r.get('externaltype') == 'ora' for r in srs.values())
+
+    def match_in_urls(special_remote_cfg, url_to_match):
+        # Figure whether either `url` or `push-url` in an ORA remote's config
+        # match a given URL (to a RIA store).
+        return special_remote_cfg['url'].startswith(url_to_match) or \
+               (special_remote_cfg['push-url'].startswith(url_to_match)
+                if 'push-url' in special_remote_cfg else False)
+
+    no_enabled_ora_matches_url = \
+        all(not match_in_urls(srs[r['annex-uuid']], ria_store_url)
+            for r in ora_remotes)
+
+    if has_only_disabled_ora or no_enabled_ora_matches_url:
+
         # No ORA remote autoenabled, but configuration known about at least one,
         # or enabled ORA remotes seem to not match clone URL.
-        # Let's check the remote's config for datalad.ora-remote.uuid as stored by
-        # create-sibling-ria and enable try enabling that one.
+        # Let's check the remote's config for datalad.ora-remote.uuid as stored
+        # by create-sibling-ria and try enabling that one.
         lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
                   "up in source config ...")
 

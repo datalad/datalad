@@ -30,7 +30,6 @@ from datalad.interface.base import build_doc
 from datalad.interface.common_opts import (
     location_description,
 )
-from datalad.interface.results import ResultXFM
 from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
@@ -463,7 +462,7 @@ def _setup_git_repo(path, initopts=None, fake_dates=False):
     ----------
     path: str or Path
       Path of the repository
-    initopts: list, optional
+    initopts: dict, optional
       Git options to be passed to the GitRepo constructor
     fake_dates: bool, optional
       Passed to the GitRepo constructor
@@ -503,7 +502,7 @@ def _setup_annex_repo(path, initopts=None, fake_dates=False,
     ----------
     path: str or Path
       Path of the repository
-    initopts: list, optional
+    initopts: dict, optional
       Git options to be passed to the AnnexRepo constructor
     fake_dates: bool, optional
       Passed to the AnnexRepo constructor

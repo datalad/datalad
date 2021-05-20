@@ -307,12 +307,21 @@ class Update(Interface):
                 # test against user-provided value!
                 remote=None if sibling is None else sibling_,
                 all_=sibling is None,
-                # required to not trip over submodules that
-                # were removed in the origin clone
-                recurse_submodules="no",
-                prune=True)  # prune to not accumulate a mess over time
+                git_options=[
+                    # required to not trip over submodules that were removed in
+                    # the origin clone
+                    "--no-recurse-submodules",
+                    # prune to not accumulate a mess over time
+                    "--prune"]
+            )
             if not (follow_parent_lazy and repo.commit_exists(revision)):
-                repo.fetch(**fetch_kwargs)
+                try:
+                    repo.fetch(**fetch_kwargs)
+                except CommandError as exc:
+                    yield dict(res, status="error",
+                               message=("Fetch failed: %s", exc_str(exc)))
+                    continue
+
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
             repo = ds.repo

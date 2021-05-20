@@ -646,21 +646,7 @@ def test_partial_unlocked(path):
     ds.repo.set_gitattributes([
         ('*', {'annex.largefiles': 'nothing'})])
     ds.save()
-    try:
-        assert_repo_status(ds.path)
-    except AssertionError:
-        if ds.repo.git_annex_version > "8.20210428":
-            # Before git-annex's 424bef6b6 (smudge: check for known annexed
-            # inodes before checking annex.largefiles, 2021-05-03), the above
-            # leads to the last commit including the switch of culprit.txt to
-            # being tracked in git. With 424bef6b6, the switch is (racily) left
-            # staged, where the commit captures the symbolic link to pointer
-            # change.
-            #
-            # https://git-annex.branchable.com/bugs/case_where_using_pathspec_with_git-commit_leaves_s/
-            assert_repo_status(ds.path, modified=["culprit.txt"])
-        else:
-            raise
+    assert_repo_status(ds.path)
 
 
 @with_tree({'.gitattributes': "* annex.largefiles=(largerthan=4b)",
