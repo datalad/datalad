@@ -526,7 +526,7 @@ def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
         # CPU load than the actual processing
         # arbitrarily go for a 2Hz update frequency -- it "feels" good
         if last_ts is None or final or (ts - last_ts > 0.5):
-            ui.message('  [{} similar {} been suppressed]'
+            ui.message('  [{} similar {} been suppressed; disable with datalad.ui.suppress-similar-results=off]'
                        .format(n_suppressed,
                                single_or_plural("message has",
                                                 "messages have",
