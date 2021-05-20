@@ -721,6 +721,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'inputs': inputs.paths,
         'extra_inputs': extra_inputs.paths,
         'outputs': outputs.paths,
+        'explicit': explicit,
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
