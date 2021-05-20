@@ -246,10 +246,14 @@ install:
   - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
   # Missing system software
   - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
-  # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
-  # deploy git-annex, if desired
-  - cmd: IF DEFINED INSTALL_GITANNEX datalad-installer --sudo ok %INSTALL_GITANNEX%
-  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && datalad-installer --sudo ok ${INSTALL_GITANNEX}"
+  # Deploy the datalad installer, override version via DATALAD_INSTALLER_VERSION
+  - cmd:
+      IF DEFINED DATALAD_INSTALLER_VERSION (
+      python -m pip install "datalad-installer%DATALAD_INSTALLER_VERSION%"
+      ) ELSE (
+      python -m pip install datalad-installer
+      )
+  - sh: python -m pip install datalad-installer${DATALAD_INSTALLER_VERSION:-}
 
 
 #before_build:
