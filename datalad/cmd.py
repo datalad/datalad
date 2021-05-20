@@ -333,36 +333,6 @@ class WitlessRunner(object):
         results.pop('code', None)
         return results
 
-    @classmethod
-    def _check_if_new_proc(cls):
-        """Check if WitlessRunner is used under a new PID
-
-        Note that this is a function that is meant to be called from within a
-        particular context only. The RuntimeError is expected to be caught by
-        the caller and is meant to be more like a response message than an
-        exception.
-
-        Returns
-        -------
-        bool
-
-        Raises
-        ------
-        RuntimeError
-          If it is not a new proc and we already know that we need a new loop
-          in this pid
-        """
-        pid = os.getpid()
-        is_new_proc = cls._loop_pid is None or cls._loop_pid != pid
-        if is_new_proc:
-            # We need to check if we can run any command smoothly
-            cls._loop_pid = pid
-            cls._loop_need_new = None
-        elif cls._loop_need_new:
-            raise RuntimeError("we know we need a new loop")
-        return is_new_proc
-
-
 class GitRunnerBase(object):
     """
     Mix-in class for Runners to be used to run git and git annex commands
