@@ -498,7 +498,19 @@ def _rerun(dset, results, assume_ready=None, explicit=False):
             auto_outputs = [p for p in auto_outputs
                             # run records outputs relative to the "pwd" field.
                             if op.relpath(p, outputs_dir) not in outputs]
-
+            original_explicit = run_info.get("explicit")
+            # if the original run command was invoked with --explicit, but the
+            # rerun is not, the original explicit takes precedence, but we
+            # report it to the user.
+            if original_explicit and not explicit:
+                explicit_arg = original_explicit
+                lgr.info(
+                    "Run commit %s was invoked using --explicit. The "
+                    "rerun of this commit will set --explicit, too.",
+                    res_hexsha[:7]
+                )
+            else:
+                explicit_arg = explicit
             message = res["rerun_message"] or res["run_message"]
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
@@ -506,7 +518,7 @@ def _rerun(dset, results, assume_ready=None, explicit=False):
                                  extra_inputs=run_info.get("extra_inputs", []),
                                  outputs=outputs,
                                  assume_ready=assume_ready,
-                                 explicit=explicit,
+                                 explicit=explicit_arg,
                                  rerun_outputs=auto_outputs,
                                  message=message,
                                  rerun_info=run_info):
