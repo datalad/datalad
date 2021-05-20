@@ -87,11 +87,14 @@ class Credential(object):
         """Return True if values for all fields of the credential are known"""
         try:
             return all(
-                self._is_field_optional(f) or self._keyring.get(self.name, f) is not None
+                self._is_field_optional(f) or self._get_field_value(f) is not None
                 for f in self._FIELDS)
         except Exception as exc:
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
+
+    def _get_field_value(self, field):
+        return self._keyring.get(self.name, field)
 
     def _ask_field_value(self, f, instructions=None):
         msg = instructions if instructions else \
@@ -148,10 +151,9 @@ class Credential(object):
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
-        name = self.name
         fields = {}
         for f in self._FIELDS:
-            v = self._keyring.get(name, f)
+            v = self._get_field_value(f)
             if not self._is_field_optional(f):
                 while v is None:  # was not known
                     v = self._ask_and_set(f)
@@ -174,7 +176,7 @@ class Credential(object):
             raise ValueError("Unknown field %s. Known are: %s"
                              % (f, self._FIELDS.keys()))
         try:
-            return self._keyring.get(self.name, f)
+            return self._get_field_value(f)
         except:  # MIH: what could even happen? _keyring not a dict?
             return default
 
