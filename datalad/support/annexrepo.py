@@ -3107,9 +3107,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         Parameters
         ----------
-        paths : list
-          Specific paths to query info for. In none are given, info is
-          reported for all content.
+        paths : list or None
+          Specific paths to query info for. In `None`, info is reported for all
+          content.
         init : 'git' or dict-like or None
           If set to 'git' annex content info will amend the output of
           GitRepo.get_content_info(), otherwise the dict-like object
@@ -3155,6 +3155,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 paths=paths, ref=ref, **kwargs)
         else:
             info = init
+
+        if not paths and paths is not None:
+            return info
+
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex
