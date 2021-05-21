@@ -20,6 +20,7 @@ from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
 from ..cmd import WitlessRunner as Runner
+from ..interface.common_opts import on_failure_default
 from ..log import is_interactive
 from ..utils import (
     ensure_unicode,
@@ -180,7 +181,7 @@ def parser_add_common_options(parser, version):
         "format() language". It is possible to report individual
         dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
         a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the template,
-        like so: '{metadata[music#Genre]}'.""")
+        like so: '{metadata[music#Genre]}'. [Default: 'default']""")
     parser.add_argument(
         '--report-status', dest='common_report_status',
         choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
@@ -195,13 +196,14 @@ def parser_add_common_options(parser, version):
         type. Can be given more than once to match multiple types.""")
     parser.add_argument(
         '--on-failure', dest='common_on_failure',
+        default=on_failure_default,
         choices=['ignore', 'continue', 'stop'],
-        # no default: better be configure per-command
-        help="""when an operation fails: 'ignore' and continue with remaining
+        help=f"""when an operation fails: 'ignore' and continue with remaining
         operations, the error is logged but does not lead to a non-zero exit code
         of the command; 'continue' works like 'ignore', but an error causes a
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
-        code. A failure is any result with status 'impossible' or 'error'.""")
+        code. A failure is any result with status 'impossible' or 'error'.
+        [Default: '{on_failure_default}']""")
     parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
