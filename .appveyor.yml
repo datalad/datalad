@@ -79,8 +79,9 @@ environment:
       # Python version specification is non-standard on windows
       PY: 39-x64
       # TODO: use datalad/git-annex (github release packages) but
-      # it would need setup of a GITHUB_TOKEN to access
-      INSTALL_GITANNEX: git-annex -m datalad/packages
+      # it would need setup of a GITHUB_TOKEN to access.
+      # This one is set in master but kept without change in maint for now
+      # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
     - ID: MacP38core
       # ~25min
