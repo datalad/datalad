@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import subprocess
 
+from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit
@@ -679,8 +680,10 @@ def _create_sibling_ria(
         if post_update_hook:
             disabled_hook.rename(enabled_hook)
         if group:
-            # TODO; do we need a cwd here?
-            subprocess.run(chgrp_cmd, cwd=ds.path)
+            # No CWD needed here, since `chgrp` is expected to be found via PATH
+            # and the path it's operating on is absolute (repo_path). No
+            # repository operation involved.
+            Runner().run(chgrp_cmd)
         # finally update server
         if post_update_hook:
             # Conditional on post_update_hook, since one w/o the other doesn't
