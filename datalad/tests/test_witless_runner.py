@@ -12,8 +12,8 @@
 import os
 import signal
 import sys
+import unittest.mock
 
-from pathlib import Path
 from time import (
     sleep,
     time,
@@ -32,9 +32,11 @@ from datalad.tests.utils import (
     with_tempfile,
 )
 from datalad.cmd import (
-    StdOutErrCapture,
-    WitlessRunner as Runner,
+    readline_rstripped,
     StdOutCapture,
+    StdOutErrCapture,
+    WitlessProtocol,
+    WitlessRunner as Runner,
 )
 from datalad.utils import (
     on_windows,
@@ -145,9 +147,9 @@ def test_runner_parametrized_protocol():
 
     # protocol returns a given value whatever it receives
     class ProtocolInt(StdOutCapture):
-        def __init__(self, done_future, value):
+        def __init__(self, value):
             self.value = value
-            super().__init__(done_future)
+            super().__init__()
 
         def pipe_data_received(self, fd, data):
             super().pipe_data_received(fd, self.value)
@@ -227,3 +229,35 @@ def test_asyncio_forked(temp):
     else:
        # sleep enough so parent just kills me the kid before I continue doing bad deeds
        sleep(10)
+
+
+def test_done_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = WitlessProtocol("done")
+        warn_mock.assert_called_once()
+
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = WitlessProtocol()
+        warn_mock.assert_not_called()
+
+
+def test_readline_rstripped_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        class StdoutMock:
+            def readline(self):
+                return "abc\n"
+        readline_rstripped(StdoutMock())
+        warn_mock.assert_called_once()
+
+
+def test_faulty_poll_detection():
+
+    class PopenMock:
+        pid = 666
+
+        def poll(self):
+            return None
+
+    protocol = WitlessProtocol()
+    protocol.process = PopenMock()
+    assert_raises(CommandError, protocol._prepare_result)
