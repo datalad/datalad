@@ -528,12 +528,23 @@ class CustomSummary(Interface):
                                   message="message", x=x, logger=lgr)
 
     @staticmethod
-    def custom_result_summary_renderer(arg):
-        assert_equal(len(arg), 4)
-        assert_result_count(arg, 2, action="test.one", status="ok")
-        assert_result_count(arg, 1, action="test.two", status="ok")
-        assert_result_count(arg, 1, action="test.two", status="notneeded")
+    def custom_result_summary_renderer(*args):
+        if getattr(CustomSummary, "custom_result_summary_renderer_pass_summary",
+                   False):
+            action_summary = args[1]
+            assert_equal(action_summary["test.one"], {"ok": 2})
+            assert_equal(action_summary["test.two"], {"ok": 1, "notneeded": 1})
+        results = args[0]
+        assert_equal(len(results), 4)
+        assert_result_count(results, 2, action="test.one", status="ok")
+        assert_result_count(results, 1, action="test.two", status="ok")
+        assert_result_count(results, 1, action="test.two", status="notneeded")
 
 
 def test_custom_result_summary_renderer():
     list(CustomSummary().__call__("arg"))
+    try:
+        CustomSummary.custom_result_summary_renderer_pass_summary = True
+        list(CustomSummary().__call__("arg"))
+    finally:
+        del CustomSummary.custom_result_summary_renderer_pass_summary
