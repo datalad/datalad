@@ -3199,10 +3199,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # of None/NaN etc.
                     del rec['bytesize']
             info[path] = rec
-            # TODO make annex availability checks optional and move in here
-            if not eval_availability:
-                # not desired, or not annexed
-                continue
+        # TODO make annex availability checks optional and move in here
+        if eval_availability:
             self._mark_content_availability(info)
         return info
 
