@@ -311,4 +311,4 @@ def test_get_content_info_paths_empty_list(path):
 @with_tempfile
 def test_status_paths_empty_list(path):
     ds = Dataset(path).create()
-    assert_false(ds.repo.status(paths=[]))
+    assert_equal(ds.repo.status(paths=[]), {})
