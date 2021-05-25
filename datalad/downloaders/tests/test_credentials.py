@@ -27,6 +27,7 @@ from ..credentials import (
     CompositeCredential,
     UserPassword,
 )
+from datalad.config import ConfigManager
 
 
 @with_testsui(responses=[
@@ -124,11 +125,32 @@ def test_credentials_from_env():
     assert_equal(cred.get('key_id'), None)
     assert_equal(cred.get('secret_id'), None)
 
-    with patch.dict('os.environ', {'DATALAD_test_s3_key_id': '1'}):
+    def _check1():
         assert_equal(cred.get('key_id'), '1')
         assert_false(cred.is_known)
+
+    def _check2():
+        assert_equal(cred.get('key_id'), '1')
+        assert_equal(cred.get('secret_id'), '2')
+        assert_true(cred.is_known)
+
+    # this is the old way, should still work
+    with patch.dict('os.environ', {'DATALAD_test_s3_key_id': '1'}):
+        _check1()
         with patch.dict('os.environ', {'DATALAD_test_s3_secret_id': '2'}):
-            assert_equal(cred.get('key_id'), '1')
-            assert_equal(cred.get('secret_id'), '2')
-            assert_true(cred.is_known)
+            _check2()
         assert_false(cred.is_known)  # no memory of the past
+
+    # here is the new way
+    import datalad
+    try:
+        with patch.dict('os.environ', {'DATALAD_CREDENTIAL_test__s3_key__id': '1'}):
+            datalad.cfg.reload()
+            _check1()
+            with patch.dict('os.environ', {'DATALAD_CREDENTIAL_test__s3_secret__id': '2'}):
+                datalad.cfg.reload()
+                _check2()
+            datalad.cfg.reload()
+            assert_false(cred.is_known)  # no memory of the past
+    finally:
+        datalad.cfg.reload()
