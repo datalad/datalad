@@ -559,8 +559,6 @@ def _execute_command(command, pwd, expected_exit=None):
             command
         )
     except CommandError as e:
-        # strip our own info from the exception. The original command output
-        # went to stdout/err -- we just have to exitcode in the same way
         exc = e
         cmd_exitcode = e.code
 
