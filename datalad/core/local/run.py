@@ -176,6 +176,7 @@ class Run(Interface):
     ]
 
     result_renderer = "tailored"
+    on_failure = "stop"
 
     _params_ = dict(
         cmd=Parameter(
