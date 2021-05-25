@@ -325,11 +325,6 @@ def eval_results(func):
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
         lgr.log(2, "Entered eval_func for %s", func)
-        # for result filters
-        # we need to produce a dict with argname/argvalue pairs for all args
-        # incl. defaults and args given as positionals
-        allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
-
         # determine the command class associated with `wrapped`
         wrapped_class = get_wrapped_class(wrapped)
 
@@ -348,6 +343,12 @@ def eval_results(func):
                     # or the common default
                     eval_defaults[p_name]))
             for p_name in eval_params}
+
+        # for result filters
+        # we need to produce a dict with argname/argvalue pairs for all args
+        # incl. defaults and args given as positionals
+        allkwargs = get_allargs_as_kwargs(wrapped, args,
+                                          {**kwargs, **common_params})
 
         # short cuts and configured setup for common options
         return_type = common_params['return_type']
