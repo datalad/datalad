@@ -988,3 +988,4 @@ def test_push_custom_summary(path):
     with swallow_outputs() as cmo:
         ds.push(to="sib", result_renderer="default", on_failure="ignore")
         assert_in("Potential hints to solve", cmo.out)
+        assert_in("action summary:", cmo.out)
