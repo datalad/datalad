@@ -78,6 +78,10 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 39-x64
+      # TODO: use datalad/git-annex (github release packages) but
+      # it would need setup of a GITHUB_TOKEN to access.
+      # This one is set in master but kept without change in maint for now
+      # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
     - ID: MacP38core
       # ~25min
@@ -106,7 +110,6 @@ environment:
       DTS: >
           datalad.downloaders
           datalad.interface
-          datalad.plugin
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PY: 39-x64
     - ID: WinP39a3
@@ -135,7 +138,6 @@ environment:
       DTS: >
           datalad.downloaders
           datalad.interface
-          datalad.plugin
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       INSTALL_GITANNEX: git-annex
@@ -228,8 +230,6 @@ init:
   # Temporary keys for localhost access in default place
   - cmd: ssh-keygen -f C:\Users\appveyor\.ssh\id_rsa -N ""
   - sh: ssh-keygen -f ~/.ssh/id_rsa -N ""
-  # deploy the datalad installer
-  - appveyor DownloadFile https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py -FileName datalad_installer.py
 
 
 install:
@@ -246,12 +246,20 @@ install:
   # use of python/pip executables below
   - sh: "[ \"x$PY\" != x ] && . ${HOME}/venv${PY}/bin/activate || virtualenv -p 3 ${HOME}/dlvenv && . ${HOME}/dlvenv/bin/activate; ln -s \"$VIRTUAL_ENV\" \"${HOME}/VENV\""
   - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
+  # deploy the datalad installer, override version via DATALAD_INSTALLER_VERSION
+  - cmd:
+      IF DEFINED DATALAD_INSTALLER_VERSION (
+      python -m pip install "datalad-installer%DATALAD_INSTALLER_VERSION%"
+      ) ELSE (
+      python -m pip install datalad-installer
+      )
+  - sh: python -m pip install datalad-installer${DATALAD_INSTALLER_VERSION:-}
   # Missing system software
-  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
+  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
-  - cmd: IF DEFINED INSTALL_GITANNEX python datalad_installer.py --sudo ok %INSTALL_GITANNEX%
-  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && python datalad_installer.py --sudo ok ${INSTALL_GITANNEX}"
+  - cmd: IF DEFINED INSTALL_GITANNEX datalad-installer --sudo ok %INSTALL_GITANNEX%
+  - sh: "[ -n \"${INSTALL_GITANNEX}\" ] && datalad-installer --sudo ok ${INSTALL_GITANNEX}"
   # TODO remove when datalad-installer can handle this
   - cmd: tools\ci\appveyor_install_git-annex.bat
 
@@ -261,8 +269,8 @@ install:
 
 
 build_script:
-  - pip install ".[tests]"
-  - pip install ".[devel-utils]"
+  - python -m pip install ".[tests]"
+  - python -m pip install ".[devel-utils]"
 
 
 #after_build:
