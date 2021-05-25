@@ -18,6 +18,7 @@ from datalad.tests.utils import (
     eq_,
     ok_,
     patch_config,
+    swallow_outputs,
     with_tempfile,
 )
 from datalad.utils import (
@@ -183,19 +184,17 @@ def test_status_custom_summary_no_repeats(path):
     # command for this test, but it's at least a necessary condition.
     ok_(hasattr(Status, "custom_result_summary_renderer"))
 
-    # Note: This test was added on a branch without a60bf7274a (BF: Don't be
-    # silent in default renderer when everything is clean, 2020-01-30), but
-    # once merged into a branch with that commit, the block below and --annex
-    # could be dropped.
     ds = Dataset(path).create()
-    (ds.pathobj / "foo").write_text("foo content")
-    ds.save()
-
     out = WitlessRunner(cwd=path).run(
-        ["datalad", "--output-format=tailored", "status", "--annex"],
+        ["datalad", "--output-format=tailored", "status"],
         protocol=StdOutCapture)
     out_lines = out['stdout'].splitlines()
+    ok_(out_lines)
     eq_(len(out_lines), len(set(out_lines)))
+
+    with swallow_outputs() as cmo:
+        ds.status(return_type="list", result_renderer="tailored")
+        eq_(out_lines, cmo.out.splitlines())
 
 
 def test_update_docstring_with_parameters_no_kwds():
