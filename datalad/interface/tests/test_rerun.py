@@ -308,15 +308,16 @@ def test_run_failure(path):
 
     hexsha_initial = ds.repo.get_hexsha()
 
-    with assert_raises(CommandError):
-        with swallow_outputs():
-            if on_windows:
-                # this does not do exactly the same as the cmd on other systems
-                # but is close enough to make running the test worthwhile
-                ds.run("echo x>{} & false".format(op.join("sub", "grows")))
-            else:
-                ds.run("echo x$(cat {0}) > {0} && false"
+    if on_windows:
+        # this does not do exactly the same as the cmd on other systems
+        # but is close enough to make running the test worthwhile
+        cmd_failing = "echo x>{} & false".format(op.join("sub", "grows"))
+    else:
+        cmd_failing = ("echo x$(cat {0}) > {0} && false"
                        .format(op.join("sub", "grows")))
+
+    with assert_raises(IncompleteResultsError):
+        ds.run(cmd_failing, result_renderer=None)
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -343,13 +344,13 @@ def test_run_failure(path):
     # error that doesn't match.
     ds.run("[ ! -e bar ] && echo c >bar")
     assert_repo_status(ds.path)
-    with assert_raises(CommandError):
-        ds.rerun()
+    assert_in_results(ds.rerun(result_renderer=None, on_failure="ignore"),
+                      action="run", status="error")
 
     # We don't show instructions if the caller specified us not to save.
     remove(msgfile)
-    with assert_raises(CommandError):
-        ds.run("false", explicit=True, outputs=None)
+    with assert_raises(IncompleteResultsError):
+        ds.run("false", explicit=True, outputs=None, on_failure="stop")
     assert_false(op.exists(msgfile))
 
 
@@ -462,8 +463,10 @@ def test_rerun_outofdate_tree(path):
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
-    with swallow_outputs():
-        assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
+    assert_in_results(
+        ds.rerun(revision=DEFAULT_BRANCH + "~",
+                 result_renderer=None, on_failure="ignore"),
+        status="error", action="run")
 
 
 @known_failure_windows

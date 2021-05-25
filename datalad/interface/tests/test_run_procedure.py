@@ -72,7 +72,10 @@ def test_invalid_call(path):
 def test_dirty(path):
     ds = Dataset(path).create(force=True)
     # must fail, because README.md is to be modified, but already dirty
-    assert_raises(CommandError, ds.run_procedure, 'cfg_yoda')
+    assert_in_results(
+        ds.run_procedure('cfg_yoda',
+                         on_failure="ignore", result_renderer=None),
+        action="run", status="error")
     # make sure that was the issue
     # save to git explicitly to keep the test simple and avoid unlocking...
     ds.save('README.md', to_git=True)
@@ -334,8 +337,10 @@ def test_quoting(path):
                   where="dataset")
     with swallow_outputs():
         ds.run_procedure(spec=["just2args", "with ' sing", 'with " doub'])
-        with assert_raises(CommandError):
-            ds.run_procedure(spec=["just2args", "still-one arg"])
+        assert_in_results(
+            ds.run_procedure(spec=["just2args", "still-one arg"],
+                             on_failure="ignore", result_renderer=None),
+            action="run", status="error")
 
         runner = WitlessRunner(cwd=ds.path)
         runner.run(

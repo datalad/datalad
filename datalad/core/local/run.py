@@ -286,6 +286,14 @@ class Run(Interface):
             else:
                 raise ValueError(f"Unknown dry-run mode: {dry_run!r}")
         else:
+            if kwargs.get("on_failure") == "stop" and \
+               res.get("action") == "run" and res.get("status") == "error":
+                msg_path = res.get("msg_path")
+                if msg_path:
+                    lgr.info("The command had a non-zero exit code. "
+                             "If this is expected, you can save the changes "
+                             "with 'datalad save -d . -r -F %s'",
+                             msg_path)
             default_result_renderer(res)
 
 
@@ -546,7 +554,7 @@ def format_command(dset, command, **kwds):
     return sfmt.format(command, **kwds)
 
 
-def _execute_command(command, pwd, expected_exit=None):
+def _execute_command(command, pwd):
     from datalad.cmd import WitlessRunner
 
     exc = None
@@ -561,16 +569,6 @@ def _execute_command(command, pwd, expected_exit=None):
     except CommandError as e:
         exc = e
         cmd_exitcode = e.code
-
-        if expected_exit is not None and expected_exit != cmd_exitcode:
-            # we failed in a different way during a rerun.  This can easily
-            # happen if we try to alter a locked file
-            #
-            # TODO add the ability to `git reset --hard` the dataset tree on failure
-            # we know that we started clean, so we could easily go back, needs gh-1424
-            # to be able to do it recursively
-            raise exc
-
     lgr.info("== Command exit (modification check follows) =====")
     return cmd_exitcode or 0, exc
 
@@ -739,9 +737,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         return
 
     if not inject:
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+        cmd_exitcode, exc = _execute_command(cmd_expanded, pwd)
         run_info['exit'] = cmd_exitcode
 
     # Re-glob to capture any new outputs.
@@ -788,18 +784,34 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if outputs_to_save is not None and use_sidecar:
         outputs_to_save.append(record_path)
     do_save = outputs_to_save is None or outputs_to_save
+    msg_path = None
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
             msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
                 ofh.write(ensure_bytes(msg))
-            lgr.info("The command had a non-zero exit code. "
-                     "If this is expected, you can save the changes with "
-                     "'datalad save -d . -r -F %s'",
-                     msg_path)
-        raise exc
-    elif do_save:
+
+    expected_exit = rerun_info.get("exit", 0) if rerun_info else None
+    if cmd_exitcode and expected_exit != cmd_exitcode:
+        status = "error"
+    else:
+        status = "ok"
+
+    yield get_status_dict(
+        "run", ds=ds,
+        status=status,
+        message="Executed command",
+        run_info=run_info,
+        exitcode=cmd_exitcode,
+        exception=exc,
+        # Provide msg_path and explicit outputs so that, under
+        # on_failure='stop', callers can react to a failure and then call
+        # save().
+        msg_path=msg_path,
+        explicit_outputs=outputs_to_save)
+
+    if do_save:
         with chpwd(pwd):
             for r in Save.__call__(
                     dataset=ds_path,
