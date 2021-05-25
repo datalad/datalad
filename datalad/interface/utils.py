@@ -526,7 +526,7 @@ def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
         # CPU load than the actual processing
         # arbitrarily go for a 2Hz update frequency -- it "feels" good
         if last_ts is None or final or (ts - last_ts > 0.5):
-            ui.message('  [{} similar {} been suppressed]'
+            ui.message('  [{} similar {} been suppressed; disable with datalad.ui.suppress-similar-results=off]'
                        .format(n_suppressed,
                                single_or_plural("message has",
                                                 "messages have",
@@ -558,7 +558,11 @@ def _process_results(
     # counter for detected repetitions
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
-    render_n_repetitions = 10 if sys.stdout.isatty() else float("inf")
+    render_n_repetitions = \
+        dlcfg.obtain('datalad.ui.suppress-similar-results-threshold') \
+        if sys.stdout.isatty() \
+        and dlcfg.obtain('datalad.ui.suppress-similar-results') \
+        else float("inf")
 
     for res in results:
         if not res or 'action' not in res:

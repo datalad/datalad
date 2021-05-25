@@ -391,6 +391,30 @@ definitions = {
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
     },
+    'datalad.ui.suppress-similar-results': {
+        'ui': ('question', {
+            'title': 'Suppress rendering of similar repetitive results',
+            'text': "If enabled, after a certain number of subsequent "
+                    "results that are identical regarding key properties, "
+                    "such as 'status', 'action', and 'type', additional "
+                    "similar results are not rendered by the common result "
+                    "renderer anymore. Instead, a count "
+                    "of suppressed results is displayed. If disabled, or "
+                    "when not running in an interactive terminal, all results "
+                    "are rendered."}),
+        'default': True,
+        'type': EnsureBool(),
+    },
+    'datalad.ui.suppress-similar-results-threshold': {
+        'ui': ('question', {
+            'title': 'Threshold for suppressing similar repetitive results',
+            'text': "Minimum number of similar results to occur before "
+                    "suppression is considered. "
+                    "See 'datalad.ui.suppress-similar-results' for more "
+                    "information."}),
+        'default': 10,
+        'type': EnsureInt(),
+    },
     'datalad.save.no-message': {
         'ui': ('question', {
             'title': 'Commit message handling',
