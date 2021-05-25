@@ -472,11 +472,6 @@ def eval_results(func):
                     # unwind generator if there is one, this actually runs
                     # any processing
                     results = list(results)
-                # render summaries
-                if not result_xfm and result_renderer in ('tailored', 'default'):
-                    # cannot render transformed results
-                    if hasattr(wrapped_class, 'custom_result_summary_renderer'):
-                        wrapped_class.custom_result_summary_renderer(results)
                 if return_type == 'item-or-list' and \
                         len(results) < 2:
                     return results[0] if results else None

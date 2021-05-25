@@ -22,17 +22,18 @@ jobs:
 
     - uses: actions/checkout@v1
 
-    - name: Install git-annex
-      run: |
-        wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
-        python3 datalad_installer.py --sudo ok -E new.env git-annex -m ${{ matrix.install_scenario }}
-        . new.env
-        echo "PATH=$PATH" >> "$GITHUB_ENV"
-
     - name: Set up Python 3.6
       uses: actions/setup-python@v1
       with:
         python-version: 3.6
+    
+    - name: Install git-annex
+      run: |
+        pip install datalad-installer
+        datalad-installer --sudo ok -E new.env git-annex -m ${{ matrix.install_scenario }}
+        . new.env
+        echo "PATH=$PATH" >> "$GITHUB_ENV"
+
 
     - name: Install dependencies
       run: |
