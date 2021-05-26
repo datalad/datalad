@@ -245,7 +245,19 @@ class AnnexRepo(GitRepo, RepoInterface):
             # '' cannot be converted to int (via Constraint as defined for
             # "datalad.repo.version" in common_cfg
             # => Allow conversion to result in None?
-            if not version:
+            if version:
+                try:
+                    version = int(version)
+                except ValueError:
+                    # Just give a warning if things look off and let
+                    # git-annex-init complain if it can't actually handle it.
+                    lgr.warning(
+                        "Expected an int for datalad.repo.version, got %s",
+                        version)
+            else:
+                # The above comment refers to an empty string case. The commit
+                # (f12eb03f40) seems to deal with direct mode, so perhaps this
+                # isn't reachable anymore.
                 version = None
 
         if do_init:
