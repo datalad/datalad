@@ -827,7 +827,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     """Generate a kwargs dict from a call signature and *args, **kwargs
 
     Basically resolving the argnames for all positional arguments, and
-    resolvin the defaults for all kwargs that are not given in a kwargs
+    resolving the defaults for all kwargs that are not given in a kwargs
     dict
     """
     from datalad.utils import getargspec
