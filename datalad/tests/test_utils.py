@@ -102,7 +102,6 @@ from .utils import (
     eq_,
     has_symlink_capability,
     known_failure,
-    known_failure_v6,
     nok_,
     OBSCURE_FILENAME,
     ok_,
@@ -984,32 +983,6 @@ def test_known_failure():
         failing()
     else:
         # not skipping and not probing results in the original failure:
-        assert_raises(AssertionError, failing)
-
-
-def test_known_failure_v6():
-
-    @known_failure_v6
-    def failing():
-        raise AssertionError("Failed")
-
-    v6 = dl_cfg.obtain("datalad.repo.version") == 6
-    skip = dl_cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = dl_cfg.obtain("datalad.tests.knownfailures.probe")
-
-    if v6:
-        if skip:
-            # skipping takes precedence over probing
-            failing()
-        elif probe:
-            # if we probe a known failure it's okay to fail:
-            failing()
-        else:
-            # not skipping and not probing results in the original failure:
-            assert_raises(AssertionError, failing)
-
-    else:
-        # behaves as if it wasn't decorated at all, no matter what
         assert_raises(AssertionError, failing)
 
 
