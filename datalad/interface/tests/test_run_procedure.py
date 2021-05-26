@@ -80,7 +80,6 @@ def test_dirty(path):
     assert_repo_status(ds.path)
 
 
-@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -212,7 +211,6 @@ def _check_procedure_properties(ps):
         len(ps))
 
 
-@skip_if(cond=on_windows and dl_cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
