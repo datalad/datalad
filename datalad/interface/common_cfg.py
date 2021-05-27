@@ -290,7 +290,7 @@ definitions = {
                'title': 'git-annex repository version',
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
-        'default': 5,
+        'default': 8,
     },
     'datalad.metadata.maxfieldsize': {
         'ui': ('question', {
