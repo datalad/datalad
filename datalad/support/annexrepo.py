@@ -126,6 +126,9 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180913 -- annex fixes all known to us issues for v6
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
     # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
+    #
+    # When bumping this, check whether datalad.repo.version needs to be
+    # adjusted.
     GIT_ANNEX_MIN_VERSION = '8.20200309'
     git_annex_version = None
     supports_direct_mode = None
@@ -3107,9 +3110,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         Parameters
         ----------
-        paths : list
-          Specific paths to query info for. In none are given, info is
-          reported for all content.
+        paths : list or None
+          Specific paths to query info for. In `None`, info is reported for all
+          content.
         init : 'git' or dict-like or None
           If set to 'git' annex content info will amend the output of
           GitRepo.get_content_info(), otherwise the dict-like object
@@ -3155,6 +3158,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 paths=paths, ref=ref, **kwargs)
         else:
             info = init
+
+        if not paths and paths is not None:
+            return info
+
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex
@@ -3199,10 +3206,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # of None/NaN etc.
                     del rec['bytesize']
             info[path] = rec
-            # TODO make annex availability checks optional and move in here
-            if not eval_availability:
-                # not desired, or not annexed
-                continue
+        # TODO make annex availability checks optional and move in here
+        if eval_availability:
             self._mark_content_availability(info)
         return info
 
@@ -3408,10 +3413,14 @@ class AnnexJsonProtocol(WitlessProtocol):
     proc_out = True
     proc_err = True
 
-    def __init__(self, done_future, total_nbytes=None):
+    def __init__(self, done_future=None, total_nbytes=None):
+        if done_future is not None:
+            warnings.warn("`done_future` argument is ignored "
+                          "and will be removed in a future release",
+                          DeprecationWarning)
+        super().__init__()
         # to collect parsed JSON command output
         self.json_out = []
-        super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
         self._unprocessed = None

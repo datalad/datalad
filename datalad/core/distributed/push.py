@@ -28,6 +28,7 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.utils import (
     eval_results,
+    render_action_summary,
 )
 from datalad.interface.results import annexjson2result
 from datalad.log import log_progress
@@ -273,8 +274,10 @@ class Push(Interface):
                 path=ds.path,
             )
 
+    custom_result_summary_renderer_pass_summary = True
+
     @staticmethod
-    def custom_result_summary_renderer(results):  # pragma: more cover
+    def custom_result_summary_renderer(results, action_summary):  # pragma: more cover
         # report on any hints at the end
         # get all unique hints
         hints = set([r.get('hints', None) for r in results])
@@ -289,6 +292,8 @@ class Push(Interface):
             [ui.message("{}: {}".format(
                 ansi_colors.color_word(id + 1, ansi_colors.YELLOW), hint))
                 for id, hint in enumerate(hints)]
+
+        render_action_summary(action_summary)
 
 
 def _datasets_since_(dataset, since, paths, recursive, recursion_limit):

@@ -388,6 +388,9 @@ def eval_results(func):
             results = []
             do_custom_result_summary = result_renderer in ('tailored', 'default') \
                 and hasattr(wrapped_class, 'custom_result_summary_renderer')
+            pass_summary = do_custom_result_summary and \
+                getattr(wrapped_class,
+                        'custom_result_summary_renderer_pass_summary', None)
 
             # process main results
             for r in _process_results(
@@ -443,17 +446,16 @@ def eval_results(func):
             # result summary before a potential exception
             # custom first
             if do_custom_result_summary:
-                wrapped_class.custom_result_summary_renderer(results)
+                if pass_summary:
+                    summary_args = (results, action_summary)
+                else:
+                    summary_args = (results,)
+                wrapped_class.custom_result_summary_renderer(*summary_args)
             elif result_renderer == 'default' and action_summary and \
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
                 # action performed
-                ui.message("action summary:\n  {}".format(
-                    '\n  '.join('{} ({})'.format(
-                        act,
-                        ', '.join('{}: {}'.format(status, action_summary[act][status])
-                                  for status in sorted(action_summary[act])))
-                                for act in sorted(action_summary))))
+                render_action_summary(action_summary)
 
             if incomplete_results:
                 raise IncompleteResultsError(
@@ -472,11 +474,6 @@ def eval_results(func):
                     # unwind generator if there is one, this actually runs
                     # any processing
                     results = list(results)
-                # render summaries
-                if not result_xfm and result_renderer in ('tailored', 'default'):
-                    # cannot render transformed results
-                    if hasattr(wrapped_class, 'custom_result_summary_renderer'):
-                        wrapped_class.custom_result_summary_renderer(results)
                 if return_type == 'item-or-list' and \
                         len(results) < 2:
                     return results[0] if results else None
@@ -516,6 +513,16 @@ def default_result_renderer(res):
             if res.get('message', None) else ''))
 
 
+def render_action_summary(action_summary):
+    ui.message("action summary:\n  {}".format(
+        '\n  '.join('{} ({})'.format(
+            act,
+            ', '.join('{}: {}'.format(status, action_summary[act][status])
+                      for status in sorted(action_summary[act])))
+                    for act in sorted(action_summary))))
+
+
+
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
     # +1 because there was the original result + nsimilar displayed.
     n_suppressed = nsimilar - ndisplayed + 1
@@ -526,7 +533,7 @@ def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
         # CPU load than the actual processing
         # arbitrarily go for a 2Hz update frequency -- it "feels" good
         if last_ts is None or final or (ts - last_ts > 0.5):
-            ui.message('  [{} similar {} been suppressed]'
+            ui.message('  [{} similar {} been suppressed; disable with datalad.ui.suppress-similar-results=off]'
                        .format(n_suppressed,
                                single_or_plural("message has",
                                                 "messages have",
@@ -558,7 +565,11 @@ def _process_results(
     # counter for detected repetitions
     result_repetitions = 0
     # how many repetitions to show, before suppression kicks in
-    render_n_repetitions = 10 if sys.stdout.isatty() else float("inf")
+    render_n_repetitions = \
+        dlcfg.obtain('datalad.ui.suppress-similar-results-threshold') \
+        if sys.stdout.isatty() \
+        and dlcfg.obtain('datalad.ui.suppress-similar-results') \
+        else float("inf")
 
     for res in results:
         if not res or 'action' not in res:

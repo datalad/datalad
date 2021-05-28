@@ -45,6 +45,7 @@ from datalad.tests.utils import (
     HTTPPath,
     known_failure_githubci_win,
     ok_exists,
+    ok_file_has_content,
     ok_startswith,
     skip_if,
     SkipTest,
@@ -613,12 +614,72 @@ class TestAddurls(object):
 
         with assert_raises(IncompleteResultsError) as raised:
             ds.addurls(self.json_file, "{url}", "{subdir}")
-        assert_in("There are file name collisions", str(raised.exception))
+        assert_in("collided", str(raised.exception))
 
         ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}")
 
         for fname in ["foo-0", "bar-0", "foo-1"]:
             ok_exists(op.join(ds.path, fname))
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_on_collision_error_if_different(self, path):
+        ds = Dataset(path).create(force=True)
+
+        data = [self.data[0].copy(), self.data[0].copy()]
+        data[0]["some_metadata"] = "1"
+        data[1]["some_metadata"] = "2"
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
+                action="addurls",
+                status="error")
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}",
+                           on_collision="error-if-different",
+                           on_failure="ignore"),
+                action="addurls",
+                status="error")
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}",
+                       exclude_autometa="*",
+                       on_collision="error-if-different")
+        ok_exists(op.join(ds.path, "a"))
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_on_collision_choose(self, path):
+        ds = Dataset(path).create(force=True)
+        data = deepcopy(self.data)
+        for row in data:
+            row["name"] = "a"
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}", on_failure="ignore"),
+                action="addurls",
+                status="error")
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            assert_in_results(
+                ds.addurls("-", "{url}", "{name}",
+                           on_collision="error-if-different",
+                           on_failure="ignore"),
+                action="addurls",
+                status="error")
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}-first",
+                       on_collision="take-first")
+        ok_file_has_content(op.join(ds.path, "a-first"), "a content",
+                            strip=True)
+
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            ds.addurls("-", "{url}", "{name}-last",
+                       on_collision="take-last")
+        ok_file_has_content(op.join(ds.path, "a-last"), "c content",
+                            strip=True)
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_parts(self, path):

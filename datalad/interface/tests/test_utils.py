@@ -26,6 +26,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_re_in,
     assert_repo_status,
+    assert_result_count,
     assert_true,
     ok_,
     slow,
@@ -510,3 +511,40 @@ def test_incorrect_msg_interpolation():
 
     # there should be no exception if reported in the record path contains %
     TestUtils2().__call__("%eatthis")
+
+
+class CustomSummary(Interface):
+    result_renderer = "tailored"
+    _params_ = dict(x=Parameter(args=("x",)))
+
+    @staticmethod
+    @eval_results
+    def __call__(x):
+        for action, status in [("test.one", "ok"),
+                               ("test.two", "ok"),
+                               ("test.two", "notneeded"),
+                               ("test.one", "ok")]:
+            yield get_status_dict(action=action, status=status,
+                                  message="message", x=x, logger=lgr)
+
+    @staticmethod
+    def custom_result_summary_renderer(*args):
+        if getattr(CustomSummary, "custom_result_summary_renderer_pass_summary",
+                   False):
+            action_summary = args[1]
+            assert_equal(action_summary["test.one"], {"ok": 2})
+            assert_equal(action_summary["test.two"], {"ok": 1, "notneeded": 1})
+        results = args[0]
+        assert_equal(len(results), 4)
+        assert_result_count(results, 2, action="test.one", status="ok")
+        assert_result_count(results, 1, action="test.two", status="ok")
+        assert_result_count(results, 1, action="test.two", status="notneeded")
+
+
+def test_custom_result_summary_renderer():
+    list(CustomSummary().__call__("arg"))
+    try:
+        CustomSummary.custom_result_summary_renderer_pass_summary = True
+        list(CustomSummary().__call__("arg"))
+    finally:
+        del CustomSummary.custom_result_summary_renderer_pass_summary

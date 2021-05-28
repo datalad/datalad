@@ -161,14 +161,6 @@ matrix:
     # Test under NFS mount  (full, only in master)
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
-#  - if: type = cron
-#    python: 3.6
-#    # test whether known v6 failures still fail
-#    env:
-#    - DATALAD_REPO_VERSION=6
-#    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-#    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-#    - DATALAD_TESTS_SSH=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
@@ -176,13 +168,6 @@ matrix:
     python: 3.6
     env:
     - _DL_TMPDIR="/tmp/nfsmount"
-#  # test whether known v6 failures still fail
-#  - if: type = cron
-#    env:
-#    - DATALAD_REPO_VERSION=6
-#    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-#    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-#    - DATALAD_TESTS_SSH=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -222,8 +207,8 @@ before_install:
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
   # Install git-annex
-  - wget -O datalad_installer.py https://raw.githubusercontent.com/datalad/datalad-installer/master/src/datalad_installer.py
-  - eval python3 datalad_installer.py --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
+  - pip install datalad-installer
+  - eval datalad-installer --sudo ok -E new.env ${_DL_ANNEX_INSTALL_SCENARIO}
   - source new.env && cat new.env >> ~/.bashrc
   - pip install --upgrade pip
 
