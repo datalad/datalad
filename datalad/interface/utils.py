@@ -388,6 +388,9 @@ def eval_results(func):
             results = []
             do_custom_result_summary = result_renderer in ('tailored', 'default') \
                 and hasattr(wrapped_class, 'custom_result_summary_renderer')
+            pass_summary = do_custom_result_summary and \
+                getattr(wrapped_class,
+                        'custom_result_summary_renderer_pass_summary', None)
 
             # process main results
             for r in _process_results(
@@ -443,17 +446,16 @@ def eval_results(func):
             # result summary before a potential exception
             # custom first
             if do_custom_result_summary:
-                wrapped_class.custom_result_summary_renderer(results)
+                if pass_summary:
+                    summary_args = (results, action_summary)
+                else:
+                    summary_args = (results,)
+                wrapped_class.custom_result_summary_renderer(*summary_args)
             elif result_renderer == 'default' and action_summary and \
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
                 # action performed
-                ui.message("action summary:\n  {}".format(
-                    '\n  '.join('{} ({})'.format(
-                        act,
-                        ', '.join('{}: {}'.format(status, action_summary[act][status])
-                                  for status in sorted(action_summary[act])))
-                                for act in sorted(action_summary))))
+                render_action_summary(action_summary)
 
             if incomplete_results:
                 raise IncompleteResultsError(
@@ -509,6 +511,16 @@ def default_result_renderer(res):
                 if isinstance(res['message'], tuple) else res[
                     'message'])
             if res.get('message', None) else ''))
+
+
+def render_action_summary(action_summary):
+    ui.message("action summary:\n  {}".format(
+        '\n  '.join('{} ({})'.format(
+            act,
+            ', '.join('{}: {}'.format(status, action_summary[act][status])
+                      for status in sorted(action_summary[act])))
+                    for act in sorted(action_summary))))
+
 
 
 def _display_suppressed_message(nsimilar, ndisplayed, last_ts, final=False):
