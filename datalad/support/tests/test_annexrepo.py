@@ -1307,10 +1307,9 @@ def test_init_scanning_message(path):
     with swallow_logs(new_level=logging.INFO) as cml:
         AnnexRepo(path, create=True, version=7)
         # somewhere around 8.20210428-186-g428c91606 git annex changed
-        # handling of scanning for unlocked files upon init . It was optimized etc
-        # and that message is no longer appears. yoh is not yet sure when it would
-        if external_versions['cmd:annex'] <= '8.20210428':
-            assert_in("for unlocked", cml.out)
+        # handling of scanning for unlocked files upon init and started to report
+        # "scanning for annexed" instead of "scanning for unlocked".
+        assert_re_in(".*scanning for .* files", cml.out, flags=re.IGNORECASE)
 
 
 @with_tempfile
