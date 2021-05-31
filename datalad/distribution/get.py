@@ -240,6 +240,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
 
     cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
+    # create a place to collect any mis-built URL. If cloning fails, it is
+    # reported to the user
+    misbuilt_url = {}
     for name, tmpl in [(c[len(candcfg_prefix):],
                         ds_repo.config[c])
                        for c in ds_repo.config.keys()
@@ -252,6 +255,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             # for a dataset id, for example.
             lgr.debug('Caught a key error in the generation of a submodule '
                       'URL using the template %s (%s)', tmpl, exc_str(e))
+            misbuilt_url[name] = tmpl
             continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
@@ -293,7 +297,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # unique() takes out the duplicated at the tail end
     clone_urls = unique(clone_urls, lambda x: x['url'])
 
-    return clone_urls
+    return clone_urls, misbuilt_url
 
 
 def _install_subds_from_flexible_source(ds, sm, **kwargs):
@@ -310,7 +314,8 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
     """
     sm_path = op.relpath(sm['path'], start=sm['parentds'])
     # compose a list of candidate clone URLs
-    clone_urls = _get_flexible_source_candidates_for_submodule(ds, sm)
+    clone_urls, misbuilt_urls = \
+        _get_flexible_source_candidates_for_submodule(ds, sm)
 
     # prevent inevitable exception from `clone`
     dest_path = op.join(ds.path, sm_path)
@@ -334,6 +339,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             Dataset(dest_path),
             cfg=ds.config,
             checkout_gitsha=sm['gitshasum'],
+            misbuilt_url=misbuilt_urls,
             **kwargs):
         if res.get('action', None) == 'install' and \
                 res.get('status', None) == 'ok' and \

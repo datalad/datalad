@@ -94,68 +94,68 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     sshurl = 'ssh://e.c'
     httpurl = 'http://e.c'
     ds_subpath = str(ds.pathobj / 'sub')
-    eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), [])
+    eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), ([], {}))
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=sshurl)),
-        [dict(cost=900, name='local', url=sshurl)])
+        ([dict(cost=900, name='local', url=sshurl)], {}))
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=httpurl)),
-        [dict(cost=900, name='local', url=httpurl)])
+        ([dict(cost=900, name='local', url=httpurl)], {}))
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path)),
-        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath)])
+        ([dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath)], {}))
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=sshurl)),
-        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-         dict(cost=600, name=DEFAULT_REMOTE, url=sshurl)])
+        ([dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+         dict(cost=600, name=DEFAULT_REMOTE, url=sshurl)], {}))
     eq_(f(clone, dict(path=clone_subpath, parentds=clone.path, gitmodule_url=httpurl)),
-        [dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-         dict(cost=600, name=DEFAULT_REMOTE, url=httpurl)])
+        ([dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
+         dict(cost=600, name=DEFAULT_REMOTE, url=httpurl)], {}))
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
     clone_subpath = str(clone.pathobj / 'sub')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
-        [
+        ([
             dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-    ])
+    ], {}))
 
     # check that a configured remote WITHOUT the desired submodule commit
     # does not show up as a candidate
     clone.siblings('add', name='myremote', url='http://example.com',
                    result_renderer='disabled')
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
-        [
+        ([
             dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-    ])
+    ], {}))
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
             'os.environ',
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
-            [
+            ([
                 dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='youredead', from_config=True),
-        ])
+        ], {}))
     # we can alter the cost by given the name a two-digit prefix
     with patch.dict(
             'os.environ',
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__400BANG': 'youredead'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
-            [
+            ([
                 dict(cost=400, name='bang', url='youredead', from_config=True),
                 dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
-        ])
+        ], {}))
     # verify template instantiation works
     with patch.dict(
             'os.environ',
             {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
         eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
-            [
+            ([
                 dict(cost=500, name=DEFAULT_REMOTE, url=ds_subpath),
                 dict(cost=700, name='bang', url='pre-{}-post'.format(sub.id),
                      from_config=True),
-        ])
+        ], {}))
     # now again, but have an additional remote besides origin that
     # actually has the relevant commit
     clone3 = install(
@@ -170,7 +170,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     assert_in(
         ds_subpath,
         [i['url']
-         for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
+         for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))[0]]
     )
     # smoke test to check for #5631: We shouldn't crash with a KeyError when a
     # template can not be matched.

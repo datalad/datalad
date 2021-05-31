@@ -327,7 +327,8 @@ def clone_dataset(
         description=None,
         result_props=None,
         cfg=None,
-        checkout_gitsha=None):
+        checkout_gitsha=None,
+        misbuilt_url=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -356,6 +357,11 @@ def clone_dataset(
       did not obtain the commit object. Should the checkout of the target commit
       cause a detached HEAD, the previously active branch will be reset to the
       target commit.
+    misbuilt_url : dict, optional
+      A dictionary of custom submodule source candidate locations that resulted
+      in a key error during flexible source candidate generation. Should cloning
+      fail eventually, the information on unsuccessfully built clone candidates
+      is reported in the result summary.
 
     Yields
     ------
@@ -463,8 +469,12 @@ def clone_dataset(
 
         except CommandError as e:
             e_stderr = e.stderr
-
             error_msgs[cand['giturl']] = e
+            # we might have gotten here because a misbuilt clone candidate
+            # for a submodule left no other choice than to patch a broken git
+            # url together
+            if misbuilt_url:
+                _add_hint_on_misbuilt_urls(misbuilt_url, error_msgs)
             lgr.debug("Failed to clone from URL: %s (%s)",
                       cand['giturl'], exc_str(e))
             if dest_path.exists():
@@ -1324,6 +1334,36 @@ def decode_source_spec(spec, cfg=None):
         # if we still have no good idea on where a dataset could be cloned to if no
         # path was given, do something similar to git clone and derive the path from
         # the source
-        props['default_destpath'] = _get_installationpath_from_url(props['giturl'])
+        props['default_destpath'] = _get_installationpath_from_url(
+            props['giturl'])
 
     return props
+
+
+def _add_hint_on_misbuilt_urls(urls, error_msgs):
+    """If cloning failed, but a KeyError was caught in the generation of a
+    submodule clone candidate URL, the misbuilt submodule URL template is
+    reported to the user
+
+    Parameters
+    ----------
+    urls : dict
+      contains a submodule and unmatched URL template
+
+    Returns
+    -------
+    error_msgs : OrderedDict
+      encountered cloning errors
+    """
+    # import pdb; pdb.set_trace()
+    from datalad.ui import ui
+    from datalad.support import ansi_colors
+    intro = ansi_colors.color_word(
+        "Hint: A configuration for custom subdataset clone candidates exists, "
+        "but some key(s) used in the template were missing: ",
+        ansi_colors.YELLOW)
+    hint = ansi_colors.color_word('\n- '.join(
+        '{} {}'.format(subds, tmpl)
+        for subds, tmpl in urls.items()),
+        ansi_colors.YELLOW)
+    error_msgs[intro] = hint
