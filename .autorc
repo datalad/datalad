@@ -1,6 +1,6 @@
 {
     "onlyPublishWithReleaseLabel": true,
-    "baseBranch": "master",
+    "baseBranch": "maint",
     "author": "auto <auto@nil>",
     "noVersionPrefix": true,
     "plugins": [
