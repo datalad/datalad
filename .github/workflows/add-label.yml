@@ -8,7 +8,7 @@ jobs:
   auto-release:
     runs-on: ubuntu-latest
     if: >
-      github.repository == "datalad/datalad"
+      github.repository == 'datalad/datalad'
       && !contains(github.event.pull_request.labels.*.name, 'patch')
       && !contains(github.event.pull_request.labels.*.name, 'minor')
       && !contains(github.event.pull_request.labels.*.name, 'major')
