@@ -21,5 +21,7 @@ jobs:
           fi
           gh -R "$GITHUB_REPOSITORY" pr edit --add-label "$label" \
             "${{ github.event.pull_request.number }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 # vim:set sts=2:
