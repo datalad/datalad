@@ -1309,7 +1309,8 @@ def test_init_scanning_message(path):
         # somewhere around 8.20210428-186-g428c91606 git annex changed
         # handling of scanning for unlocked files upon init and started to report
         # "scanning for annexed" instead of "scanning for unlocked".
-        assert_re_in(".*scanning for .* files", cml.out, flags=re.IGNORECASE)
+        # Could be a line among many (as on Windows) so match=False so we search
+        assert_re_in(".*scanning for .* files", cml.out, flags=re.IGNORECASE, match=False)
 
 
 @with_tempfile
