@@ -668,8 +668,6 @@ The section that `auto` adds to the changelog on a new release consists of the
 titles of all pull requests merged into master since the previous release,
 organized by label.  `auto` recognizes the following PR labels:
 
-- `major` — for changes corresponding to an increase in the major version
-  component
 - `minor` — for changes corresponding to an increase in the minor version
   component
 - `patch` — for changes corresponding to an increase in the patch/micro version
