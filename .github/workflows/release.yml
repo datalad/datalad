@@ -4,7 +4,6 @@ on:
   # ATM, this is the closest trigger to a PR merging
   push:
     branches:
-      - master
       - maint
 
 jobs:
