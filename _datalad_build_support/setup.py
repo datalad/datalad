@@ -7,7 +7,6 @@
 
 
 import datetime
-from importlib_metadata import version as importlib_version
 import os
 import platform
 import setuptools
@@ -40,6 +39,8 @@ def get_version(name):
     name: str
       Name of the folder (package) where from to read version.py
     """
+    # delay import so we do not require it for a simple setup stage
+    from importlib_metadata import version as importlib_version
     return importlib_version(name)
 
 
