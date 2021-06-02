@@ -1,7 +1,7 @@
 {
     "onlyPublishWithReleaseLabel": true,
     "baseBranch": "maint",
-    "author": "auto <auto@nil>",
+    "author": "DataLad Bot <bot@datalad.org>",
     "noVersionPrefix": true,
     "plugins": [
         "git-tag",
