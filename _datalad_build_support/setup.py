@@ -7,6 +7,7 @@
 
 
 import datetime
+from importlib_metadata import version as importlib_version
 import os
 import platform
 import setuptools
@@ -32,19 +33,14 @@ def _path_rel2file(*p):
 
 
 def get_version(name):
-    """Load version from version.py without entailing any imports
+    """Determine version via importlib_metadata
 
     Parameters
     ----------
     name: str
       Name of the folder (package) where from to read version.py
     """
-    # This might entail lots of imports which might not yet be available
-    # so let's do ad-hoc parsing of the version.py
-    with open(_path_rel2file(name, 'version.py')) as f:
-        version_lines = list(filter(lambda x: x.startswith('__version__'), f))
-    assert (len(version_lines) == 1)
-    return version_lines[0].split('=')[1].strip(" '\"\t\n")
+    return importlib_version(name)
 
 
 class BuildManPage(Command):
