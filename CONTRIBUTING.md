@@ -569,8 +569,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_LOG_VMEM*:
   Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
 - *DATALAD_EXC_STR_TBLIMIT*: 
-  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
-  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+  This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables
