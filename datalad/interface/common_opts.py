@@ -23,11 +23,6 @@ from datalad.support.constraints import (
     EnsureStrPrefix,
 )
 
-
-return_type_default = 'list'
-on_failure_default = 'continue'
-
-
 location_description = Parameter(
     args=("-D", "--description",),
     constraints=EnsureStr() | EnsureNone(),
@@ -241,6 +236,7 @@ annex_groupwanted_opt = Parameter(
     See https://git-annex.branchable.com/git-annex-groupwanted/ for more information""",
     constraints=EnsureStr() | EnsureNone())
 
+
 inherit_opt = Parameter(
     args=("--inherit",),
     action="store_true",
@@ -307,7 +303,7 @@ eval_params = dict(
         value is returned instead of a one-item return value list, or a
         list in case of multiple return values. `None` is return in case
         of an empty list.""",
-        default=return_type_default,
+        default='list',
         constraints=EnsureChoice('generator', 'list', 'item-or-list')),
     result_filter=Parameter(
         doc="""if given, each to-be-returned
@@ -329,7 +325,6 @@ eval_params = dict(
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
-        default='default',
         constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
@@ -340,14 +335,11 @@ eval_params = dict(
         'impossible' or 'error'. Raised exception is an IncompleteResultsError
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
-        default=on_failure_default,
+        default='continue',
         constraints=EnsureChoice('ignore', 'continue', 'stop')),
 )
 
-eval_defaults = dict(
-    return_type=return_type_default,
-    result_filter=None,
-    result_renderer=None,
-    result_xfm=None,
-    on_failure=on_failure_default,
-)
+eval_defaults = {
+    k: p.cmd_kwargs.get('default', None)
+    for k, p in eval_params.items()
+}

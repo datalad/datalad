@@ -20,7 +20,7 @@ from tempfile import NamedTemporaryFile
 from textwrap import wrap
 
 from ..cmd import WitlessRunner as Runner
-from ..interface.common_opts import on_failure_default
+from ..interface.common_opts import eval_defaults
 from ..log import is_interactive
 from ..utils import (
     ensure_unicode,
@@ -164,6 +164,9 @@ def parser_add_common_options(parser, version):
         help="""configuration variable setting. Overrides any configuration
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
+    # CLI analog of eval_params.result_renderer but with `<template>` handling
+    # and a different default: in Python API we have None as default and do not render
+    # the results but return them.  In CLI we default to "default" renderer
     parser.add_argument(
         '-f', '--output-format', dest='common_output_format',
         default='default',
@@ -181,7 +184,7 @@ def parser_add_common_options(parser, version):
         "format() language". It is possible to report individual
         dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
         a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the template,
-        like so: '{metadata[music#Genre]}'. [Default: 'default']""")
+        like so: '{metadata[music#Genre]}'. [Default: '%(default)s']""")
     parser.add_argument(
         '--report-status', dest='common_report_status',
         choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
@@ -194,16 +197,17 @@ def parser_add_common_options(parser, version):
         action='append',
         help="""constrain command result report to records matching the given
         type. Can be given more than once to match multiple types.""")
+    # CLI analog of eval_params.on_failure. TODO: dedup
     parser.add_argument(
         '--on-failure', dest='common_on_failure',
-        default=on_failure_default,
+        default=eval_defaults['on_failure'],
         choices=['ignore', 'continue', 'stop'],
-        help=f"""when an operation fails: 'ignore' and continue with remaining
+        help="""when an operation fails: 'ignore' and continue with remaining
         operations, the error is logged but does not lead to a non-zero exit code
         of the command; 'continue' works like 'ignore', but an error causes a
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.
-        [Default: '{on_failure_default}']""")
+        [Default: '%(default)s']""")
     parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
