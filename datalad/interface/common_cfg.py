@@ -255,6 +255,12 @@ definitions = {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
     },
+    'datalad.log.exc': {
+        'ui': ('yesno', {
+               'title': 'Include exceptions and their traceback in log messages. If set, \'datalad.exc.str.tblimit\' applies.'}),
+        'default': False,
+        'type': EnsureBool(),
+    },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
                'title': "If set, pass this file as ssh's -i option."}),
