@@ -44,9 +44,28 @@ from .siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 
-# presently only implemented method to turn subdataset paths into Github
-# compliant repository name suffixes
+
+# Sanitization of a repository name
 template_fx = lambda x: re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', x))
+
+
+def _get_gh_reponame(reponame, sub=''):
+    """Return a name suitable for github, flattening via - for an optional sub(dataset).
+
+    We also do sanitization of the full name of the repository.  Divergence from
+    github behavior: it replaces spaces with "-" (so "test  _- whatever" becomes
+    "test-_--whatever.git"), and we replace with "_" and use "-" for joining different levels
+
+    Parameters
+    ----------
+    reponame: str
+      Name of the repository.  Must not contain any /, i.e. be just the name of the
+      repository and not "organization/name"
+    sub: str, optional
+      Name of the subdataset repository.
+    """
+    assert '/' not in reponame
+    return template_fx('-'.join(filter(bool, (reponame, sub))))
 
 
 @build_doc
@@ -200,10 +219,7 @@ class CreateSiblingGithub(Interface):
                         raise ValueError(msg)
                 elif existing == 'skip':
                     continue
-            gh_reponame = '{}{}{}'.format(
-                reponame,
-                '-' if mp else '',
-                template_fx(mp))
+            gh_reponame = _get_gh_reponame(reponame, mp)
             filtered.append((d, gh_reponame))
 
         if not filtered:
