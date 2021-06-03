@@ -1282,13 +1282,16 @@ def test_annex_remove(path):
 @with_tempfile
 @with_tempfile
 def test_repo_version(path1, path2, path3):
-    annex = AnnexRepo(path1, create=True, version=6)
-    assert_repo_status(path1, annex=True)
-    version = int(annex.config.get('annex.version'))
-    # Since git-annex 7.20181031, v6 repos upgrade to v7.
-    supported_versions = AnnexRepo.check_repository_versions()["supported"]
-    v6_lands_on = next(i for i in supported_versions if i >= 6)
-    eq_(version, v6_lands_on)
+    with swallow_logs(new_level=logging.INFO) as cm:
+        annex = AnnexRepo(path1, create=True, version=6)
+        assert_repo_status(path1, annex=True)
+        version = int(annex.config.get('annex.version'))
+        # Since git-annex 7.20181031, v6 repos upgrade to v7.
+        supported_versions = AnnexRepo.check_repository_versions()["supported"]
+        v6_lands_on = next(i for i in supported_versions if i >= 6)
+        eq_(version, v6_lands_on)
+
+        assert_in("will be upgraded to 8", cm.out)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
