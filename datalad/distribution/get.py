@@ -68,6 +68,7 @@ from datalad.utils import (
     unique,
     Path,
     get_dataset_root,
+    shortened_repr,
 )
 
 from datalad.local.subdatasets import Subdatasets
@@ -846,7 +847,7 @@ class Get(Interface):
 
         # we have to have a single dataset to operate on
         refds = require_dataset(
-            dataset, check_installed=True, purpose='get content')
+            dataset, check_installed=True, purpose='get content of %s' % shortened_repr(path))
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not
