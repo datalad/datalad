@@ -17,10 +17,15 @@ from os.path import isabs
 from os.path import normpath
 import posixpath
 
-from datalad.support.network import DataLadRI
-from datalad.support.network import URL
-from datalad.support.network import RI
-from datalad.support.network import PathRI
+from datalad.support.network import (
+    PathRI,
+    RI,
+    URL,
+    is_url,
+    urlunquote,
+)
+
+from .create_sibling_github import _get_gh_reponame
 
 
 lgr = logging.getLogger('datalad.distribution.utils')
@@ -52,19 +57,44 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
     ri = RI(src)
     if isinstance(ri, PathRI) and not isabs(ri.path) and base_url:
         ri = RI(base_url)
+        is_github = is_url(ri) \
+            and (ri.hostname == 'github.com' or ri.hostname.endswith('.github.com'))
+
         if ri.path.endswith('/.git'):
             base_path = ri.path[:-5]
+            base_suffix = '.git'
+        elif is_github and ri.path.endswith('.git'):
+            base_path = ri.path[:-4]
             base_suffix = '.git'
         else:
             base_path = ri.path
             base_suffix = ''
+
         if isinstance(ri, PathRI):
             # this is a path, so stay native
             ri.path = normpath(opj(base_path, src, base_suffix))
         else:
-            # we are handling a URL, use POSIX path conventions
-            ri.path = posixpath.normpath(
-                posixpath.join(base_path, src, base_suffix))
+            # we are handling a URL, use POSIX path conventions unless github
+            # which is known to not support more than two levels, so it makes no sense
+            # to even try to try /lev1/lev2/lev3.
+            if (is_github
+                # for SSH RI it might not have leading `/` in the path, so react only if
+                # there is `/` in the middle somewhere
+                and ('/' in base_path.lstrip('/'))
+            ):
+                # Note: Outside code urlencodes path if a URL. To minimize github-support PR
+                # we just urlunquote here and rely on our ad-hoc sanitization for github
+                org_path, reponame = base_path.rsplit('/', 1)
+                ri.path = posixpath.normpath(
+                    opj(org_path,
+                        _get_gh_reponame(reponame, urlunquote(src))  # follow our default preparation
+                        + base_suffix   # github uses .git not /.git as well there
+                        )
+                )
+            else:
+                # straightforward POSIX
+                ri.path = posixpath.normpath(
+                    posixpath.join(base_path, src, base_suffix))
 
     src = str(ri)
 
