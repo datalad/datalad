@@ -86,9 +86,10 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
                 # we just urlunquote here and rely on our ad-hoc sanitization for github
                 org_path, reponame = base_path.rsplit('/', 1)
                 ri.path = posixpath.normpath(
-                    opj(org_path,
-                        _get_gh_reponame(reponame, urlunquote(src))  # follow our default preparation
-                        + base_suffix   # github uses .git not /.git as well there
+                    '{}/{}{}'.format(
+                        org_path,
+                        _get_gh_reponame(reponame, urlunquote(src)),  # follow our default preparation
+                        base_suffix   # github uses .git not /.git as well there
                         )
                 )
             else:

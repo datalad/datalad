@@ -946,7 +946,7 @@ def _create_test_install_recursive_github(path):  # pragma: no cover
 @with_tempfile(mkdir=True)
 def test_install_recursive_github(path):
     # test recursive installation of a hierarchy of datasets created on github
-    # using datalad create-sibling-github.  Following invocation was used to poplate it
+    # using datalad create-sibling-github.  Following invocation was used to populate it
     #
     # out = _create_test_install_recursive_github(path)
 
