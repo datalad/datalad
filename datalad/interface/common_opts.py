@@ -63,6 +63,15 @@ fulfilled = Parameter(
     status""",
     constraints=EnsureBool() | EnsureNone())
 
+dataset_state = Parameter(
+    args=("--state",),
+    doc="""indicate which (sub)datasets to consider: either only locally present,
+    absent, or any of those two kinds.
+    """,
+    # yoh: intentionally left out the description of default since might be
+    # command specific
+    constraints=EnsureChoice('present', 'absent', 'any'))
+
 shared_access_opt = Parameter(
     args=('--shared-access',),
     metavar='MODE',

@@ -32,7 +32,7 @@ from datalad.interface.base import (
 )
 from datalad.interface.common_opts import (
     contains,
-    fulfilled,
+    dataset_state,
     jobs_opt,
     recursion_flag,
     recursion_limit,
@@ -125,13 +125,7 @@ class ForEach(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
-        # TODO: assume True since in 99% of use cases we just want to operate
-        #  on present subdatasets?  but having it explicit could be good to
-        #  "not miss any".  But `--fulfilled true` is getting on my nerves
-        # But not clear how to specify `None` from CLI if I default it to True
-        # https://github.com/datalad/datalad/pull/5640 is needed to allow for it
-        # to default to True. Then we need to overload the default of None to True here
-        fulfilled=fulfilled,
+        state=dataset_state,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         contains=contains,
@@ -171,7 +165,7 @@ class ForEach(Interface):
             cmd=None,
             cmd_type="external",
             dataset=None,
-            fulfilled=None,
+            state='present',
             recursive=False,
             recursion_limit=None,
             contains=None,
@@ -205,7 +199,7 @@ class ForEach(Interface):
         # Producer -- datasets to act on
         #
         subdatasets_it = refds.subdatasets(
-            fulfilled=fulfilled,
+            state=state,
             recursive=recursive, recursion_limit=recursion_limit,
             contains=contains,
             bottomup=bottomup,
