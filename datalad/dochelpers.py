@@ -378,6 +378,10 @@ def exc_str_old(exc=None, limit=None, include_str=True):
 
 def exc_str(exc=None, limit=None, include_str=True):
     """Temporary test shim, for finding issues re refactoring for
-    using CapturedExcpetion instead."""
+    using CapturedException instead.
 
-    return str(CapturedException.capture_exc(exc))
+    See gh-5716
+    """
+
+    return str(CapturedException(exc))
+

@@ -11,7 +11,7 @@ def test_CapturedException():
     try:
         raise Exception("BOOM")
     except Exception as e:
-        captured_exc = CapturedException.capture_exc(e)
+        captured_exc = CapturedException(e)
 
     assert_re_in("BOOM \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
     assert_re_in("^\[.*\]", captured_exc.format_oneline_tb(include_str=False))  # only traceback
@@ -19,7 +19,7 @@ def test_CapturedException():
     try:
         raise NotImplementedError
     except Exception as e:
-        captured_exc = CapturedException.capture_exc(e)
+        captured_exc = CapturedException(e)
 
     assert_re_in("NotImplementedError \[test_captured_exception.py:test_CapturedException:[0-9]+\]", captured_exc.format_oneline_tb())
 
@@ -35,7 +35,7 @@ def test_CapturedException():
     try:
         f()
     except Exception as e:
-        captured_exc = CapturedException.capture_exc(e)
+        captured_exc = CapturedException(e)
 
     # default limit: one level:
     estr1 = captured_exc.format_oneline_tb(limit=1)

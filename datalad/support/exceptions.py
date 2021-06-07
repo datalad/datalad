@@ -26,8 +26,7 @@ class CapturedException(object):
     reporting.
     """
 
-    @classmethod
-    def capture_exc(cls, exc=None, limit=None, capture_locals=False):
+    def __init__(self, exc=None, limit=None, capture_locals=False):
         """Capture an exception and its traceback for logging.
 
         Clears the exception's traceback frame references afterwards.
@@ -41,18 +40,13 @@ class CapturedException(object):
           traceback depth. Formatting for output comes with it's own limit.
         capture_locals: bool
           Whether or not to capture the local context of traceback frames.
-
-        Returns
-        -------
-        CapturedException
         """
         # Note, that with lookup_lines=False the lookup is deferred,
         # not disabled. Unclear to me ATM, whether that means to keep frame
         # references around, but prob. not. TODO: Test that.
-
         if exc is None:
             exctype, value, tb = sys.exc_info()
-            tb_exc = traceback.TracebackException(
+            self.tb = traceback.TracebackException(
                 exctype, value, tb,
                 limit=limit,
                 lookup_lines=True,
@@ -60,25 +54,13 @@ class CapturedException(object):
             )
             traceback.clear_frames(tb)
         else:
-            tb_exc = traceback.TracebackException.from_exception(
+            self.tb = traceback.TracebackException.from_exception(
                 exc,
                 limit=limit,
                 lookup_lines=True,
                 capture_locals=capture_locals
             )
             traceback.clear_frames(exc.__traceback__)
-
-        return CapturedException(tb_exc)
-
-    def __init__(self, tb_exc):
-        """
-
-        Parameters
-        ----------
-        tb_exc: traceback.TracebackException
-        """
-
-        self.tb = tb_exc
 
     def format_oneline_tb(self, limit=None, include_str=True):
         """Format an exception traceback as a one-line summary
