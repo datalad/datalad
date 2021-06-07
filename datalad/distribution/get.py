@@ -255,7 +255,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             # for a dataset id, for example.
             lgr.debug('Caught a key error in the generation of a submodule '
                       'URL using the template %s (%s)', tmpl, exc_str(e))
-            misbuilt_url[name] = tmpl
+            misbuilt_url[name] = (tmpl, e)
             continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
