@@ -275,7 +275,7 @@ def test_clone_into_dataset(source_path, top_path):
     source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
-
+    hexsha_before = ds.repo.get_hexsha()
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
@@ -289,6 +289,13 @@ def test_clone_into_dataset(source_path, top_path):
     sds = ds.subdatasets("sub")
     assert_result_count(sds, 1, action='subdataset')
     eq_(sds[0]['gitmodule_datalad-url'], source.path)
+    # Clone produced one commit including the addition to .gitmodule:
+    commits = list(ds.repo.get_branch_commits_(
+        branch=DEFAULT_BRANCH,
+        stop=hexsha_before
+    ))
+    assert_not_in(hexsha_before, commits)
+    eq_(len(commits), 1)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
