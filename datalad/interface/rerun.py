@@ -527,6 +527,18 @@ def _rerun(dset, results, assume_ready=None, explicit=False):
         if new_head not in [head, res_hexsha]:
             new_bases[res_hexsha] = new_head
         head = new_head
+        # if a run with explicit was rerun, and there are untracked files, save
+        # them in an extra commit to not leak them into the next commit
+        if any(ds_repo.untracked_files):
+            lgr.debug("The following files are untracked "
+                      "after a rerun: %s", ds_repo.untracked_files)
+            msg = "[DATALAD] Automatic save of untracked files during rerun\n" \
+                  "\nThe rerun of commit {sha} left untracked files behind.\n" \
+                  "They have been included in this commit automatically \n" \
+                  "to not leak into an existing commit.\n" \
+                  "Run 'git show {sha}' to investigate the original commit \n" \
+                  "that was rerun.".format(sha=res_hexsha[:7])
+            ds_repo.save(message=msg)
 
     if branch_to_restore:
         # The user asked us to replay the sequence onto a branch, but the
