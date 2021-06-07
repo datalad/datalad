@@ -243,6 +243,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         ds_repo.config[c])
                        for c in ds_repo.config.keys()
                        if c.startswith(candcfg_prefix)]:
+        # ensure that there is only one template of the same name
+        if type(tmpl) == tuple and len(tmpl) > 1:
+            raise ValueError(
+                f"There are multiple URL templates for submodule clone "
+                f"candidate '{name}', but only one is allowed. "
+                f"Check your configuration!"
+            )
         url = tmpl.format(**sm_candidate_props)
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
