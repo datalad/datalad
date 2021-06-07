@@ -247,6 +247,16 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         ds_repo.config[c])
                        for c in ds_repo.config.keys()
                        if c.startswith(candcfg_prefix)]:
+        # ensure that there is only one template of the same name
+        if type(tmpl) == tuple and len(tmpl) > 1:
+            lgr.debug('Found %i URL templates for the submodule clone '
+                      'candidate %s, but only one is allowed. Check your '
+                      'dataset configuration!', len(tmpl), name)
+            raise ValueError(
+                "There are multiple URL templates for submodule clone "
+                "candidate '{}', but only one is allowed. "
+                "Check your configuration!".format(name)
+            )
         try:
             url = tmpl.format(**sm_candidate_props)
         except KeyError as e:
