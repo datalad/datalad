@@ -895,23 +895,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         cmd.append('annex')
         cmd += args
 
-        if lgr.getEffectiveLevel() <= 8:
-            cmd.append('--debug')
-
-        if self._annex_common_options:
-            cmd += self._annex_common_options
-
-        if jobs == 'auto':
-            # Limit to # of CPUs (but at least 3 to start with)
-            # and also an additional config constraint (by default 1
-            # due to https://github.com/datalad/datalad/issues/4404)
-            jobs = self._n_auto_jobs or min(
-                self.config.obtain('datalad.runtime.max-annex-jobs'),
-                max(3, cpu_count()))
-            # cache result to avoid repeated calls to cpu_count()
-            self._n_auto_jobs = jobs
-        if jobs and jobs != 1:
-            cmd.append('-J%d' % jobs)
+        cmd += self._get_annex_options(jobs)
 
         runner = self._git_runner
         env = None
@@ -970,6 +954,27 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # we don't know how to handle this, just pass it on
             raise
+
+    def _get_annex_options(self, jobs):
+        """Common logic to populate annex call options across our spectrum of annex invocations
+        """
+        cmd = []
+        if lgr.getEffectiveLevel() <= 8:
+            cmd.append('--debug')
+        if self._annex_common_options:
+            cmd += self._annex_common_options
+        if jobs == 'auto':
+            # Limit to # of CPUs (but at least 3 to start with)
+            # and also an additional config constraint (by default 1
+            # due to https://github.com/datalad/datalad/issues/4404)
+            jobs = self._n_auto_jobs or min(
+                self.config.obtain('datalad.runtime.max-annex-jobs'),
+                max(3, cpu_count()))
+            # cache result to avoid repeated calls to cpu_count()
+            self._n_auto_jobs = jobs
+        if jobs and jobs != 1:
+            cmd.append('-J%d' % jobs)
+        return cmd
 
     def _call_annex_records(self, args, files=None, jobs=None,
                             git_options=None,
@@ -1519,7 +1524,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         list of dict or dict
         """
-
         return list(self.add_(
             files, git=git, backend=backend, options=options, jobs=jobs,
             git_options=git_options, annex_options=annex_options, update=update
@@ -1604,12 +1608,23 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             if backend:
                 options.extend(('--backend', backend))
-            for r in self._call_annex_records(
-                    ['add'] + options,
-                    files=files,
-                    jobs=jobs,
-                    total_nbytes=sum(expected_additions.values())):
-                yield r
+            batch = None  # TODO
+            if batch or (batch is None and len(files) > 1):
+                # TODO: interfacing total_nbytes etc
+                # Note: took the same 166s here and 169s on master for AnnexRepo only of
+                # python -m nose -s -v datalad/support/tests/test_annexrepo.py:test_files_split
+                yield from self._batched.get(
+                    'add',
+                    json=True,
+                    annex_options=self._get_annex_options(jobs),
+                    path=self.path
+                ).yield_(files)
+            else:
+                yield from self._call_annex_records(
+                        ['add'] + options,
+                        files=files,
+                        jobs=jobs,
+                        total_nbytes=sum(expected_additions.values()))
 
     @normalize_paths
     def get_file_key(self, files, batch=None):
