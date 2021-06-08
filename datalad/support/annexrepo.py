@@ -1608,23 +1608,29 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             if backend:
                 options.extend(('--backend', backend))
-            batch = None  # TODO
-            if batch or (batch is None and len(files) > 1):
-                # TODO: interfacing total_nbytes etc
-                # Note: took the same 166s here and 169s on master for AnnexRepo only of
-                # python -m nose -s -v datalad/support/tests/test_annexrepo.py:test_files_split
-                yield from self._batched.get(
-                    'add',
-                    json=True,
-                    annex_options=self._get_annex_options(jobs),
-                    path=self.path
-                ).yield_(files)
-            else:
-                yield from self._call_annex_records(
-                        ['add'] + options,
-                        files=files,
-                        jobs=jobs,
-                        total_nbytes=sum(expected_additions.values()))
+            yield from self._maybe_batched_add(
+                files, options, jobs, expected_additions, batch=None)
+
+    def _maybe_batched_add(self, files, options, jobs, expected_additions, batch=None):
+        # Common code to be reused across existing implementations of "annex add" invocation
+        if batch or (batch is None and len(files) > 1):
+            # TODO: interfacing total_nbytes etc
+            # Note: took the same-ish 144s here and 169s on master for AnnexRepo only of
+            # python -m nose -s -v datalad/support/tests/test_annexrepo.py:test_files_split
+            yield from self._batched.get(
+                'add',
+                json=True,
+                annex_options=options + self._get_annex_options(jobs),
+                path=self.path
+            ).yield_(files)
+        else:
+            yield from self._call_annex_records(
+                    ['add'] + options,
+                    files=files,
+                    jobs=jobs,
+                    total_nbytes=sum(expected_additions.values())
+                    if expected_additions else None
+            )
 
     @normalize_paths
     def get_file_key(self, files, batch=None):
@@ -3303,13 +3309,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         if git is True:
             yield from GitRepo._save_add(self, files, git_opts=git_opts)
         else:
-            for r in self._call_annex_records(
-                    ['add'] + options,
-                    files=list(files.keys()),
-                    # TODO
+            for r in self._maybe_batched_add(
+                    list(files.keys()),
+                    options,
+                    # TODO: was marked TODO -- keeping a TODO
                     jobs=None,
-                    total_nbytes=sum(expected_additions.values())
-                    if expected_additions else None):
+                    expected_additions=expected_additions
+            ):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
