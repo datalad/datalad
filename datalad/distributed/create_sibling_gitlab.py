@@ -248,7 +248,7 @@ class CreateSiblingGitlab(Interface):
             for subds in ds.subdatasets(
                     path=path,
                     # we can only operate on present datasets
-                    fulfilled=True,
+                    state='present',
                     recursive=recursive,
                     recursion_limit=recursion_limit,
                     contains=None,

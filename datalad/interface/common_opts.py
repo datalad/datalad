@@ -57,10 +57,11 @@ contains = Parameter(
 
 fulfilled = Parameter(
     args=("--fulfilled",),
-    doc="""if given, must be a boolean flag indicating whether
+    doc="""DEPRECATED: use [CMD: --state CMD][PY: `state` PY]
+    instead. If given, must be a boolean flag indicating whether
     to consider either only locally present or absent datasets.
     By default all subdatasets are considered regardless of their
-    status""",
+    status.""",
     constraints=EnsureBool() | EnsureNone())
 
 dataset_state = Parameter(

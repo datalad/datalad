@@ -88,7 +88,7 @@ def test_invalid_call(origin, tdir):
     dummy = Dataset(tdir).create()
     dummy_sub = dummy.create('sub')
     dummy_sub.uninstall()
-    assert_in('sub', dummy.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in('sub', dummy.subdatasets(state='absent', result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
     assert_result_count(
         dummy.publish('sub', on_failure='ignore'),

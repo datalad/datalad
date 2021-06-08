@@ -418,7 +418,7 @@ class CreateSiblingRia(Interface):
             # recursion when querying for them and _no_recursion with the
             # actual call. Theoretically this can be parallelized.
 
-            for subds in ds.subdatasets(fulfilled=True,
+            for subds in ds.subdatasets(state='present',
                                         recursive=True,
                                         recursion_limit=recursion_limit,
                                         result_xfm='datasets'):

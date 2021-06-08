@@ -372,7 +372,7 @@ def test_recurseinto(dspath, dest):
                         path=opj(dest, 'b', 'bb'))
     assert_not_in(
         opj(dest, 'b', 'bb'),
-        Dataset(dest).subdatasets(fulfilled=True, result_xfm='paths'))
+        Dataset(dest).subdatasets(state='present', result_xfm='paths'))
     assert(not Dataset(opj(dest, 'b', 'bb')).is_installed())
 
     # cleanup

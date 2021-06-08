@@ -273,7 +273,7 @@ class Siblings(Interface):
 
         subds_pushurl = None
         for subds in dataset.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
             subds_name = op.relpath(subds.path, start=dataset.path)

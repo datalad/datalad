@@ -535,11 +535,11 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     ds = install(
         path, source=src,
         result_xfm='datasets', return_type='item-or-list')
-    eq_(len(ds.subdatasets(fulfilled=True)), 0)
+    eq_(len(ds.subdatasets(state='present')), 0)
 
     with chpwd(ds.path):
         results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
-    eq_(len(ds.subdatasets(fulfilled=True, recursive=True)), 2)
+    eq_(len(ds.subdatasets(state='present', recursive=True)), 2)
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
     assert_in(subsub, results)

@@ -96,7 +96,7 @@ def test_create_raises(path, outside_path):
     # now deinstall the sub and fail trying to create a new one at the
     # same location
     ds.uninstall(obscure_ds, check=False)
-    assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    assert_in(obscure_ds, ds.subdatasets(state='absent', result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
         ds.create(obscure_ds, **raw),

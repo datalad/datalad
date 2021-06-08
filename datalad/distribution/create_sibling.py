@@ -675,7 +675,7 @@ class CreateSibling(Interface):
                     for sds in ds.subdatasets(
                         recursive=recursive,
                         recursion_limit=recursion_limit,
-                        fulfilled=True,
+                        state='present',
                         result_renderer=None)
                 ],
                 # save cycles, we are only looking for datasets

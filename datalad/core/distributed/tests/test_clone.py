@@ -265,7 +265,7 @@ def test_clone_isnot_recursive(path_src, path_nr, path_r):
     subdss = ds.subdatasets(recursive=True)
     assert_result_count(subdss, len(subdss), state='absent')
     # this also means, subdatasets to be listed as not fulfilled:
-    eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
+    eq_(set(ds.subdatasets(recursive=True, state='absent', result_xfm='relpaths')),
         {'subm 1', '2'})
 
 
@@ -280,7 +280,7 @@ def test_clone_into_dataset(source_path, top_path):
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
-    assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_in('sub', ds.subdatasets(state='present', result_xfm='relpaths'))
     # sub is clean:
     assert_repo_status(subds.path, annex=None)
     # top is clean:
@@ -314,8 +314,8 @@ def test_notclone_known_subdataset(src_path, path):
     # subdataset not installed:
     subds = Dataset(ds.pathobj / 'subm 1')
     assert_false(subds.is_installed())
-    assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
     # clone is not meaningful
     res = ds.clone('subm 1', on_failure='ignore')
     assert_status('error', res)
@@ -329,8 +329,8 @@ def test_notclone_known_subdataset(src_path, path):
     # Verify that it is the correct submodule installed and not
     # new repository initiated
     eq_(subds.id, sub_id)
-    assert_not_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
-    assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
+    assert_not_in('subm 1', ds.subdatasets(state='absent', result_xfm='relpaths'))
+    assert_in('subm 1', ds.subdatasets(state='present', result_xfm='relpaths'))
 
 
 @with_tempfile(mkdir=True)

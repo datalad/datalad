@@ -203,7 +203,7 @@ class CreateSiblingGithub(Interface):
         toprocess = [ds]
         if recursive:
             for sub in ds.subdatasets(
-                    fulfilled=None,  # we want to report on missing dataset in here
+                    state='any',  # we want to report on missing dataset in here
                     recursive=recursive,
                     recursion_limit=recursion_limit,
                     result_xfm='datasets'):

@@ -83,7 +83,7 @@ class Clean(Interface):
         ds = require_dataset(dataset, purpose='clean-up')
         res_kwargs = dict(action='clean', logger=lgr, refds=ds.path)
         for wds in itertools.chain([ds], ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',

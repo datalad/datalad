@@ -589,7 +589,7 @@ def _install_targetpath(
         return
     if recursion_limit == 'existing':
         for res in ds.subdatasets(
-                fulfilled=True,
+                state='present',
                 path=target_path,
                 recursive=recursive,
                 recursion_limit=recursion_limit,

@@ -721,7 +721,7 @@ class AnnotatePaths(Interface):
                     subdss = subdss_cache[parent]
                 else:
                     subdss = containing_ds.subdatasets(
-                        fulfilled=None, recursive=False,
+                        state='any', recursive=False,
                         result_xfm=None, result_filter=None, return_type='list')
                     subdss_cache[parent] = subdss
                 if path in [s['path'] for s in subdss]:

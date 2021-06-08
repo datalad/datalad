@@ -81,7 +81,7 @@ def _uninstall_dataset(ds, check, has_super, **kwargs):
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that
     # TODO check that the relevant branched are pushed to a remote
-    if ds.subdatasets(fulfilled=True):
+    if ds.subdatasets(state='present'):
         yield get_status_dict(
             status='error',
             ds=ds,
@@ -193,7 +193,7 @@ class Uninstall(Interface):
                 # in subdatasets()
                 dataset=dataset,
                 path=path,
-                fulfilled=True,
+                state='present',
                 # makes no sense to ignore subdatasets further down
                 recursive=True,
                 # important to start at the bottom for proper deinit
