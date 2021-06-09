@@ -229,7 +229,6 @@ class Push(Interface):
                     if sr
                     else 'No targets configured in dataset.'))
             return
-
         if since == '^':
             # figure out state of remote branch and set `since`
             since = _get_corresponding_remote_state(ds_repo, to)
@@ -266,6 +265,23 @@ class Push(Interface):
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
         if not matched_anything:
+            potential_remote = False
+            if not to and path:
+                # if we get a remote name without --to, provide a hint
+                sr = ds_repo.get_remotes(**get_remote_kwargs)
+                potential_remote = [
+                    p for p in ensure_list(path) if p in sr
+                ]
+            if potential_remote:
+                msg = "It seems like you specified a sibling name {} " \
+                      "as a path. Forgot to use --to?".format(potential_remote)
+                yield dict(
+                    res_kwargs,
+                    status='impossible',
+                    message=msg,
+                    type='dataset',
+                    path=ds.path,
+                )
             yield dict(
                 res_kwargs,
                 status='notneeded',
