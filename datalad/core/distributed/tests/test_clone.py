@@ -275,7 +275,9 @@ def test_clone_into_dataset(source_path, top_path):
     source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
-    hexsha_before = ds.repo.get_hexsha()
+    # Note, we test against the produced history in DEFAULT_BRANCH, not what it
+    # turns into in an adjusted branch!
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
