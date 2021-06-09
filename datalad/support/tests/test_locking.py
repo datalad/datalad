@@ -40,7 +40,7 @@ class Subproc:
         self.tempfile = tempfile
 
     def __call__(self, q):
-        with lock_if_check_fails(False, self.tempfile, blocking=False, return_acquired=True)\
+        with lock_if_check_fails(False, self.tempfile, blocking=False, _return_acquired=True)\
                 as (_, lock2, acquired):
             # we used to check for .acquired here but it was removed from
             # fasteners API: https://github.com/harlowja/fasteners/issues/71
@@ -79,7 +79,7 @@ def test_lock_if_check_fails(tempfile):
     p = Process(target=Subproc(tempfile), args=(q,))
 
     # now we need somehow to actually check the bloody lock functioning
-    with lock_if_check_fails((op.exists, (tempfile,)), tempfile, return_acquired=True) as (check, lock, acquired):
+    with lock_if_check_fails((op.exists, (tempfile,)), tempfile, _return_acquired=True) as (check, lock, acquired):
         eq_(check, False)
         ok_(lock)
         ok_(acquired)

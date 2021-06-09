@@ -30,7 +30,7 @@ def lock_if_check_fails(
     lock_path,
     operation=None,
     blocking=True,
-    return_acquired=False,
+    _return_acquired=False,
     **kwargs
 ):
     """A context manager to establish a lock conditionally on result of a check
@@ -66,8 +66,9 @@ def lock_if_check_fails(
     blocking: bool, optional
       If blocking, process would be blocked until acquired and verified that it
       was acquired after it gets the lock
-    return_acquired: bool, optional
-      Return also if lock was acquired
+    _return_acquired: bool, optional
+      Return also if lock was acquired.  For "private" use within DataLad (tests),
+      do not rely on it in 3rd party solutions.
     **kwargs
       Passed to `.acquire` of the fasteners.InterProcessLock
 
@@ -97,7 +98,7 @@ def lock_if_check_fails(
             assert acquired
         check2 = _get(check)
         ret_lock = None if check2 else lock
-        if return_acquired:
+        if _return_acquired:
             yield check2, ret_lock, acquired
         else:
             yield check2, ret_lock
