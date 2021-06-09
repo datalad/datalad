@@ -114,7 +114,7 @@ class Push(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
-            doc="""path to contrain a push to. If given, only
+            doc="""path to constrain a push to. If given, only
             data or changes for those paths are considered for a push.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
