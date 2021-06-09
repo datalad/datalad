@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.support.annexrepo import AnnexRepo
 
 
 @build_doc
@@ -51,12 +52,19 @@ class AddReadme(Interface):
             'skip': do nothing; 'append': append information to the existing
             file; 'replace': replace the existing file with new content.""",
             constraints=EnsureChoice("skip", "append", "replace")),
+        annex=Parameter(
+            args=("--annex",),
+            action='store_true',
+            default=False,
+            doc="""By default, the dataset will be configured to store a newly
+            created README in Git. If this parameter is given, the README will
+            be annexed."""),
     )
 
     @staticmethod
     @datasetmethod(name='add_readme')
     @eval_results
-    def __call__(dataset, filename='README.md', existing='skip'):
+    def __call__(dataset, filename='README.md', existing='skip', annex=False):
         from os.path import lexists
         from os.path import join as opj
         from io import open
@@ -82,6 +90,25 @@ class AddReadme(Interface):
         # unlock, file could be annexed
         if lexists(filename):
             dataset.unlock(filename)
+        if not lexists(filename):
+            if isinstance(dataset.repo, AnnexRepo):
+                # if we have an annex repo, shall the README go to Git or annex?
+                if dataset.status(
+                        '.gitattributes',
+                        result_renderer='disabled',
+                        return_type='list',)[0]['state'] != 'clean':
+                    raise RuntimeError(
+                        'Stopping, because the .gitattributes file is modified'
+                        )
+                # unless --annex is set, configure the README to go into Git
+                dataset.repo.set_gitattributes(
+                    [('README.md', {'annex.largefiles': 'anything' if annex
+                                                        else 'nothing'})])
+                dataset.save(
+                    path='.gitattributes',
+                    message="[DATALAD] Configure README to be in {}".format(
+                        "annex" if annex else "Git")
+                )
 
         # get any metadata on the dataset itself
         dsinfo = dataset.metadata(
