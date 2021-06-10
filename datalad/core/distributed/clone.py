@@ -306,7 +306,7 @@ class Clone(Interface):
         if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
-            save_results = []
+            actually_saved_subds = False
             for r in ds.save(
                     path,
                     # Note, that here we know we don't save anything but a new
@@ -317,37 +317,38 @@ class Clone(Interface):
                     result_filter=None,
                     result_xfm=None,
                     on_failure='ignore'):
-                save_results.append(r)
+                actually_saved_subds = actually_saved_subds or (
+                        r['action'] == 'save' and
+                        r['type'] == 'dataset' and
+                        r['refds'] == ds.path and
+                        r['status'] == 'ok')
                 yield r
 
             # Modify .gitmodules to contain originally given url. This is
             # particularly relevant for postclone routines on a later `get`
             # for that subdataset. See gh-5256.
-            if any(r['action'] == 'save' and r['type'] == 'dataset' and \
-                   r['refds'] == ds.path for r in save_results):
-                if r['status'] == 'ok':
-                    # New subdataset actually saved. Amend the modification
-                    # of .gitmodules. Note, that we didn't allow to deviate
-                    # from git default behavior WRT a submodule's name vs
-                    # its path when we made this a new subdataset.
-                    subds_name = path.relative_to(ds.pathobj)
-                    ds.repo.call_git(
-                        ['config',
-                         '--file',
-                         '.gitmodules',
-                         '--replace-all',
-                         'submodule.{}.{}'.format(subds_name,
-                                                  "datalad-url"),
-                         source]
-                    )
-                    yield from ds.save('.gitmodules',
-                                       amend=True, to_git=True)
-                else:
-                    # We didn't really commit. Yield and call `subdatasets`
-                    # in that case.
-                    yield r
-                    ds.subdatasets(path,
-                                   set_property=[("datalad-url", source)])
+            if actually_saved_subds:
+                # New subdataset actually saved. Amend the modification
+                # of .gitmodules. Note, that we didn't allow to deviate
+                # from git default behavior WRT a submodule's name vs
+                # its path when we made this a new subdataset.
+                subds_name = path.relative_to(ds.pathobj)
+                ds.repo.call_git(
+                    ['config',
+                     '--file',
+                     '.gitmodules',
+                     '--replace-all',
+                     'submodule.{}.{}'.format(subds_name,
+                                              "datalad-url"),
+                     source]
+                )
+                yield from ds.save('.gitmodules',
+                                   amend=True, to_git=True)
+            else:
+                # We didn't really commit. Just call `subdatasets`
+                # in that case to have the modification included in the
+                # post-clone state (whatever that may be).
+                ds.subdatasets(path, set_property=[("datalad-url", source)])
 
 
 def clone_dataset(
