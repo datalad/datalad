@@ -28,7 +28,6 @@ from os.path import (
     isdir,
     normpath
 )
-from multiprocessing import cpu_count
 from weakref import (
     finalize,
     WeakValueDictionary
@@ -954,14 +953,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd += self._annex_common_options
 
         if jobs == 'auto':
-            # Limit to # of CPUs (but at least 3 to start with)
-            # and also an additional config constraint (by default 1
-            # due to https://github.com/datalad/datalad/issues/4404)
             if self._n_auto_jobs is None:
                 # cache the value
-                self._n_auto_jobs = min(
-                    self.config.obtain('datalad.runtime.max-annex-jobs'),
-                    max(3, cpu_count()))
+                self._n_auto_jobs = self.config.obtain('datalad.runtime.max-annex-jobs')
             jobs = self._n_auto_jobs
         if jobs:
             cmd.append('-J%d' % jobs)

@@ -13,14 +13,16 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from multiprocessing import cpu_count
 from os import environ
 from os.path import join as opj, expanduser
-from datalad.support.constraints import EnsureBool
-from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureListOf
-from datalad.support.constraints import EnsureStr
+
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureInt,
+    EnsureStr,
+)
 from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -350,10 +352,11 @@ definitions = {
                'title': 'Maximum number of git-annex jobs to request when "jobs" option set to "auto" (default)',
                'text': 'Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). '
                        'The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores). '
-                       'If set to 0, we do not instruct git-annex on number of jobs.'
+                       'If set to 0, we do not instruct git-annex on number of jobs. '
+                       'Default value is set to cpu count, but not less than 3 and not greater than 8.'
         }),
         'type': EnsureInt(),
-        'default': 0,
+        'default': min(8, max(3, cpu_count())),
     },
     'datalad.runtime.max-jobs': {
         'ui': ('question', {
