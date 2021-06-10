@@ -1355,15 +1355,12 @@ def _add_hint_on_misbuilt_urls(urls, error_msgs):
     error_msgs : OrderedDict
       encountered cloning errors
     """
-    # import pdb; pdb.set_trace()
-    from datalad.ui import ui
-    from datalad.support import ansi_colors
-    intro = ansi_colors.color_word(
-        "Hint: A configuration for custom subdataset clone candidates exists, "
-        "but some key(s) used in the template were missing: ",
-        ansi_colors.YELLOW)
-    hint = ansi_colors.color_word('\n- '.join(
-        '{} {}'.format(subds, tmpl)
-        for subds, tmpl in urls.items()),
-        ansi_colors.YELLOW)
-    error_msgs[intro] = hint
+    for remote in urls.keys():
+        from datalad.support import ansi_colors
+        formatted_msg = ansi_colors.color_word(
+                             urls[remote]['msg'],
+                             ansi_colors.YELLOW)
+        msg = '{} {}'.format(
+                 formatted_msg,
+                 urls[remote]['error'])
+        error_msgs[remote] = msg

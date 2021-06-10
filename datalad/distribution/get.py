@@ -264,8 +264,12 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             # template - this can happen if a pure Git repository is queried
             # for a dataset id, for example.
             lgr.debug('Caught a key error in the generation of a submodule '
-                      'URL using the template %s (%s)', tmpl, exc_str(e))
-            misbuilt_url[name] = (tmpl, e)
+                      'URL using the template %s (%s). The URL will not be '
+                      'constructed.', tmpl, exc_str(e))
+            msg = 'Hint! A custom clone candidate configuration exists, ' \
+                'but some key(s) in this template were missing:'
+            misbuilt_url[name] = {'msg': msg,
+                                  'error': tmpl}
             continue
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
