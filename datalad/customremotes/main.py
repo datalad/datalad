@@ -21,6 +21,7 @@ from ..cmdline import helpers
 
 from ..utils import setup_exceptionhook
 from ..ui import ui
+from datalad import cfg
 
 backends = ['archive']
 
@@ -77,7 +78,10 @@ def _main(args, backend=None):
     assert(backend is not None)
     if backend == 'archive':
         from .archives import ArchiveAnnexCustomRemote
-        remote = ArchiveAnnexCustomRemote()
+        autoclean = cfg.obtain("datalad.remote.archives.autoclean")
+        remote = ArchiveAnnexCustomRemote(
+            persistent_cache=not autoclean
+        )
     elif backend == 'datalad':
         from .datalad import DataladAnnexCustomRemote
         remote = DataladAnnexCustomRemote()

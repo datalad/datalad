@@ -440,6 +440,14 @@ definitions = {
         'default': True,
         'type': EnsureBool(),
     },
+    'datalad.remote.archives.autoclean': {
+        'ui': ('yesno', {
+               'title': "datalad-archives special remote extraction cache",
+               'text': "Set this flag to autoremove temporary, extracted files"
+                       " instead of keeping them as a cache."}),
+        'type': EnsureBool(),
+        'default': True,
+    },
 }
 
 

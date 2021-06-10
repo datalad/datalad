@@ -338,3 +338,48 @@ def test_link_file_load(tempfile):
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
     unlink(tempfile2)  # TODO: next two with_tempfile
+
+
+@with_tree(tree=
+    {'1.tar.gz':
+         {
+             'bu.dat': '52055957098986598349795121365535' * 10000,
+             'bu3.dat': '8236397048205454767887168342849275422' * 10000
+          },
+    }
+)
+@with_tempfile
+def test_autoclean_cache(dspath, clonepath):
+    from datalad.consts import ARCHIVES_TEMP_DIR
+    from datalad.api import add_archive_content
+    from datalad.api import create
+    from datalad.api import clone
+
+    ds = create(dspath, force=True)
+    ds.save()
+    # NOTE: add_archive_content isn't proper datalad command ATM. It doesn't
+    # operate on a Dataset instance!
+    with chpwd(dspath):
+        add_archive_content('1.tar.gz', delete=True, drop_after=True)
+
+    clone_ds = clone(ds.path, clonepath)
+    cache_path = clone_ds.pathobj / ARCHIVES_TEMP_DIR
+
+    try:
+        with patch.dict("os.environ",
+                        {"DATALAD_REMOTE_ARCHIVES_AUTOCLEAN": "1"}):
+            dl_cfg.reload()
+            clone_ds.get()
+            assert_false(cache_path.exists())
+
+        clone_ds.drop('.')
+
+        with patch.dict("os.environ",
+                        {"DATALAD_REMOTE_ARCHIVES_AUTOCLEAN": "0"}):
+            dl_cfg.reload()
+            clone_ds.get()
+            assert_true(cache_path.exists())
+            # contains .stamp + dir
+            assert_equal(len([p for p in cache_path.iterdir()]), 2)
+    finally:
+        dl_cfg.reload()
