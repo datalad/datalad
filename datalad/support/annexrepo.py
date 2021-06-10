@@ -885,11 +885,12 @@ class AnnexRepo(GitRepo, RepoInterface):
           If command passes list of files. If list is too long
           (by number of files or overall size) it will be split, and multiple
           command invocations will follow
-        jobs : int or 'auto', optional
+        jobs: int or 'auto' or None, optional
           If 'auto', the number of jobs will be determined automatically,
           informed by the configuration setting
-          'datalad.runtime.max-annex-jobs'.
-        protocol : WitlessProtocol, optional
+          'datalad.runtime.max-annex-jobs'. `None` causes no --jobs to be
+          passed to git-annex
+        protocol: WitlessProtocol, optional
           Protocol class to pass to GitWitlessRunner.run(). By default this is
           StdOutErrCapture, which will provide default logging behavior and
           guarantee that stdout/stderr are included in potential CommandError
@@ -1405,7 +1406,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.config.reload()
 
     @normalize_paths
-    def get(self, files, remote=None, options=None, jobs=None, key=False):
+    def get(self, files, remote=None, options=None, jobs='auto', key=False):
         """Get the actual content of files
 
         Parameters
@@ -1416,9 +1417,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             from which remote to fetch content
         options : list of str, optional
             commandline options for the git annex get command
-        jobs : int or None, optional
+        jobs : int or 'auto' or None, optional
             how many jobs to run in parallel (passed to git-annex call).
-            If not specified (None), then
+            See _call_annex for more details.
         key : bool, optional
             If provided file value is actually a key
 
@@ -1534,7 +1535,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return expected_files, fetch_files
 
     @normalize_paths
-    def add(self, files, git=None, backend=None, options=None, jobs=None,
+    def add(self, files, git=None, backend=None, options=None, jobs='auto',
             git_options=None, annex_options=None, update=False):
         """Add file(s) to the repository.
 
@@ -1570,7 +1571,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             git_options=git_options, annex_options=annex_options, update=update
         ))
 
-    def add_(self, files, git=None, backend=None, options=None, jobs=None,
+    def add_(self, files, git=None, backend=None, options=None, jobs='auto',
             git_options=None, annex_options=None, update=False):
         """Like `add`, but returns a generator"""
         if update and not git:
@@ -2117,7 +2118,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,
-                 jobs=None,
+                 jobs='auto',
                  git_options=None, annex_options=None):
         """Downloads each url to its own file, which is added to the annex.
 
@@ -2149,6 +2150,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return self._call_annex_records(
             ['addurl'] + options + urls,
+            jobs=jobs,
             git_options=git_options,
             progress=True)
 
@@ -2182,7 +2184,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return locations.get(WEB_SPECIAL_REMOTE_UUID, {}).get('urls', [])
 
     @normalize_paths
-    def drop(self, files, options=None, key=False, jobs=None):
+    def drop(self, files, options=None, key=False, jobs='auto'):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -2823,7 +2825,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     # We need --auto and --fast having exposed  TODO
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
-    def copy_to(self, files, remote, options=None, jobs=None):
+    def copy_to(self, files, remote, options=None, jobs='auto'):
         """Copy the actual content of `files` to `remote`
 
         Parameters
@@ -3311,7 +3313,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     ['add'] + options,
                     files=list(files.keys()),
                     # TODO
-                    jobs=None,
+                    jobs='auto',
                     total_nbytes=sum(expected_additions.values())
                     if expected_additions else None):
                 yield get_status_dict(
