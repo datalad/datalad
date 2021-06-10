@@ -81,7 +81,7 @@ class Unlock(Interface):
             recursive=False,
             recursion_limit=None):
         refds = require_dataset(dataset, check_installed=True,
-                                purpose="unlocking")
+                                purpose="unlock")
 
         # Before passing the results to status()
         #   * record explicitly specified non-directory paths so that we can

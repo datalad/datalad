@@ -204,7 +204,7 @@ def diff_dataset(
         raise ValueError('Unknown reporting order: {}'.format(reporting_order))
 
     ds = require_dataset(
-        dataset, check_installed=True, purpose='difference reporting')
+        dataset, check_installed=True, purpose='report difference')
 
     # we cannot really perform any sorting of paths into subdatasets
     # or rejecting paths based on the state of the filesystem, as

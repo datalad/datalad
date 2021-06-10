@@ -221,7 +221,7 @@ class Drop(Interface):
         # where it did not ValueError, but yielded error status
         try:
             ds = require_dataset(
-                dataset, check_installed=True, purpose='dropping content')
+                dataset, check_installed=True, purpose='drop content')
         except ValueError as e:
             yield dict(
                 status='error',
