@@ -93,13 +93,18 @@ class AddReadme(Interface):
         if not lexists(filename):
             if isinstance(dataset.repo, AnnexRepo):
                 # if we have an annex repo, shall the README go to Git or annex?
-                if dataset.status(
+                attr_state = dataset.status(
                         '.gitattributes',
                         result_renderer='disabled',
-                        return_type='list',)[0]['state'] != 'clean':
-                    raise RuntimeError(
-                        'Stopping, because the .gitattributes file is modified'
-                        )
+                        return_type='item')
+                if attr_state:
+                    # we have made sure that .gitattributes exists. We only fail
+                    # now if the state of the .gitattributes file is not clean
+                    if not attr_state[0].get('state') == 'clean':
+                        raise RuntimeError(
+                            'Stopping, as the .gitattributes file is modified'
+                            )
+
                 # unless --annex is set, configure the README to go into Git
                 dataset.repo.set_gitattributes(
                     [('README.md', {'annex.largefiles': 'anything' if annex
@@ -107,7 +112,8 @@ class AddReadme(Interface):
                 dataset.save(
                     path='.gitattributes',
                     message="[DATALAD] Configure README to be in {}".format(
-                        "annex" if annex else "Git")
+                        "annex" if annex else "Git"),
+                    to_git=True
                 )
 
         # get any metadata on the dataset itself
