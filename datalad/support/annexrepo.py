@@ -218,6 +218,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # initialize
         self._uuid = None
+        # will be evaluated lazily
+        self._n_auto_jobs = None
         self._annex_common_options = ["-c", "annex.dotfiles=true"]
 
         if annex_opts or annex_init_opts:
@@ -296,9 +298,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ["-c",
                  "annex.retry={}".format(
                      config.obtain("datalad.annex.retry"))])
-
-        # will be evaluated lazily
-        self._n_auto_jobs = None
 
         # Finally, register a finalizer (instead of having a __del__ method).
         # This will be called by garbage collection as well as "atexit". By
