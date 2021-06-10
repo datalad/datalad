@@ -1293,6 +1293,7 @@ def test_repo_version(path1, path2, path3):
             eq_(version, 5)
 
 
+@skip_if(external_versions['cmd:annex'] > '8.20210428', "Stopped showing if too quick")
 @with_tempfile
 def test_init_scanning_message(path):
     # | begin kludge
