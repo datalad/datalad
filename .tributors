@@ -63,7 +63,8 @@
     "adelavega": {
         "name": "Alejandro de la Vega",
         "blog": "https://github.com/adelavega",
-        "email": "delavega@utexas.edu"
+        "email": "delavega@utexas.edu",
+        "bio": "Postdoc in the Psychoinformatics Lab"
     },
     "kskyten": {
         "name": "kskyten",
