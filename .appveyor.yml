@@ -51,6 +51,7 @@ shallow_clone: true
 
 environment:
   DATALAD_TESTS_SSH: 1
+  DATALAD_RUNTIME_MAX__ANNEX__JOBS: 5
 
   # Do not use `image` as a matrix dimension, to have fine-grained control over
   # what tests run on which platform
