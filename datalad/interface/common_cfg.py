@@ -348,9 +348,12 @@ definitions = {
     'datalad.runtime.max-annex-jobs': {
         'ui': ('question', {
                'title': 'Maximum number of git-annex jobs to request when "jobs" option set to "auto" (default)',
-               'text': 'Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores).'}),
+               'text': 'Set this value to enable parallel annex jobs that may speed up certain operations (e.g. get file content). '
+                       'The effective number of jobs will not exceed the number of available CPU cores (or 3 if there is less than 3 cores). '
+                       'If set to 0, we do not instruct git-annex on number of jobs.'
+        }),
         'type': EnsureInt(),
-        'default': 1,
+        'default': 0,
     },
     'datalad.runtime.max-jobs': {
         'ui': ('question', {

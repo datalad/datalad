@@ -888,7 +888,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         jobs: int or 'auto' or None, optional
           If 'auto', the number of jobs will be determined automatically,
           informed by the configuration setting
-          'datalad.runtime.max-annex-jobs'. `None` causes no --jobs to be
+          'datalad.runtime.max-annex-jobs'. `None` or 0 causes no --jobs to be
           passed to git-annex
         protocol: WitlessProtocol, optional
           Protocol class to pass to GitWitlessRunner.run(). By default this is
@@ -957,12 +957,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Limit to # of CPUs (but at least 3 to start with)
             # and also an additional config constraint (by default 1
             # due to https://github.com/datalad/datalad/issues/4404)
-            jobs = self._n_auto_jobs or min(
-                self.config.obtain('datalad.runtime.max-annex-jobs'),
-                max(3, cpu_count()))
-            # cache result to avoid repeated calls to cpu_count()
-            self._n_auto_jobs = jobs
-        if jobs and jobs != 1:
+            if self._n_auto_jobs is None:
+                # cache the value
+                self._n_auto_jobs = min(
+                    self.config.obtain('datalad.runtime.max-annex-jobs'),
+                    max(3, cpu_count()))
+            jobs = self._n_auto_jobs
+        if jobs:
             cmd.append('-J%d' % jobs)
 
         runner = self._git_runner
