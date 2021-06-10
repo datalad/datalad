@@ -2358,7 +2358,12 @@ def test_files_split_exc():
 _HEAVY_TREE = {
     # might already run into 'filename too long' on windows probably
     "d" * 98 + '%03d' % d: {
-        'f' * 98 + '%03d' % f: ''
+        # populate with not entirely unique but still not all identical (empty) keys.
+        # With content unique to that filename we would still get 100 identical
+        # files for each key, thus possibly hitting regressions in annex like
+        # https://git-annex.branchable.com/bugs/significant_performance_regression_impacting_datal/
+        # but also would not hit filesystem as hard as if we had all the keys unique.
+        'f' * 98 + '%03d' % f: str(f)
         for f in range(100)
     }
     for d in range(100)
