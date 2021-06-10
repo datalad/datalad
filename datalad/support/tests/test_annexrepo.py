@@ -52,6 +52,7 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.utils import (
     chpwd,
     get_linux_distribution,
+    on_windows,
     rmtree,
     unlink,
     Path,
@@ -2354,14 +2355,24 @@ def test_files_split_exc():
     for cls in GitRepo, AnnexRepo:
         yield check_files_split_exc, cls
 
+# with 204  (/ + (98+3)*2 + /) chars guaranteed, we hit "filename too long" quickly on windows
+# so we are doomed to shorten the filepath for testing on windows. Since the limits are smaller
+# on windows (16k vs e.g. 1m on linux in CMD_MAX_ARG), it would already be a "struggle" for it,
+# we also reduce number of dirs/files
+_ht_len, _ht_n = (48, 20) if on_windows else (98, 100)
 
 _HEAVY_TREE = {
     # might already run into 'filename too long' on windows probably
-    "d" * 98 + '%03d' % d: {
-        'f' * 98 + '%03d' % f: ''
-        for f in range(100)
+    "d" * _ht_len + '%03d' % d: {
+        # populate with not entirely unique but still not all identical (empty) keys.
+        # With content unique to that filename we would still get 100 identical
+        # files for each key, thus possibly hitting regressions in annex like
+        # https://git-annex.branchable.com/bugs/significant_performance_regression_impacting_datal/
+        # but also would not hit filesystem as hard as if we had all the keys unique.
+        'f' * _ht_len + '%03d' % f: str(f)
+        for f in range(_ht_n)
     }
-    for d in range(100)
+    for d in range(_ht_n)
 }
 
 
@@ -2385,7 +2396,7 @@ def check_files_split(cls, topdir):
     dl.save(dataset=r.path, path=dirs)
 
 
-@known_failure_windows  # does not find files to add (too long paths?)
+# @known_failure_windows  # might fail with some older annex `cp` failing to set permissions
 @slow  # 313s  well -- if errors out - only 3 sec
 def test_files_split():
     for cls in GitRepo, AnnexRepo:
