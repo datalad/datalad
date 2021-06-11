@@ -24,7 +24,9 @@ from ..consts import (
 )
 
 from datalad.support.gitrepo import GitRepo
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import (
+    EnsureNone,
+)
 from datalad.distribution.dataset import (
     EnsureDataset,
     require_dataset,
@@ -37,7 +39,6 @@ from datalad.interface.common_opts import (
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-
 from logging import getLogger
 lgr = getLogger('datalad.api.clean')
 
@@ -56,6 +57,8 @@ class Clean(Interface):
       $ datalad clean
     """
 
+    result_renderer = 'tailored'
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -63,15 +66,20 @@ class Clean(Interface):
                 no dataset is given, an attempt is made to identify the dataset
                 in current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
-        # TODO:  --info  -- which performs dry run just summarizing what is to be cleaned up
+        dry_run = Parameter(
+            args=("--dry-run",),
+            doc="""Report on cleanable locations - not actually cleaning up
+            anything.""",
+            action="store_true",),
         # TODO: Python only???
         what=Parameter(
             args=("--what",),
             dest='what',
-            choices=('cached-archives', 'annex-tmp', 'annex-transfer', 'search-index'),
+            choices=('cached-archives', 'annex-tmp', 'annex-transfer',
+                     'search-index'),
             nargs="*",
-            doc="""What to clean.  If none specified -- all known targets are
-            cleaned"""),
+            doc="""What to clean. If none specified -- all known
+            targets are considered."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
     )
@@ -79,9 +87,14 @@ class Clean(Interface):
     @staticmethod
     @datasetmethod(name='clean')
     @eval_results
-    def __call__(dataset=None, what=None, recursive=False, recursion_limit=None):
-        ds = require_dataset(dataset, purpose='clean-up')
-        res_kwargs = dict(action='clean', logger=lgr, refds=ds.path)
+    def __call__(dataset=None, what=None, dry_run=False,
+                 recursive=False, recursion_limit=None):
+
+        ds = require_dataset(dataset,
+                             purpose="report on cleanable locations"
+                             if dry_run else "clean dataset")
+        res_kwargs = dict(action='clean [dry-run]' if dry_run else 'clean',
+                          logger=lgr, refds=ds.path)
         for wds in itertools.chain([ds], ds.subdatasets(
                 fulfilled=True,
                 recursive=recursive,
@@ -115,10 +128,62 @@ class Clean(Interface):
                         path=topdir, status='notneeded', type='directory', **res_kwargs)
                     continue
                 pl = len(paths) > 1
-                message = ("Removed %d %s %s: %s",
+                message = ("%s %d %s %s: %s",
+                           "Discovered" if dry_run else "Removed",
                            len(paths), msg, sing_pl[int(pl)],
                            ", ".join(sorted([x[len(topdir) + 1:] for x in paths])))
-                rmtree(topdir)
-                yield get_status_dict(
-                    path=topdir, status='ok', type='dir', message=message,
-                    **res_kwargs)
+
+                if not dry_run:
+                    rmtree(topdir)
+
+                yield get_status_dict(path=topdir,
+                                      status='ok',
+                                      type='directory',
+                                      message=message,
+                                      **res_kwargs)
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):  # pragma: more cover
+        # Don't render things like 'status' for clean-info messages -
+        # seems rather meaningless.
+
+        from datalad.interface.utils import default_result_renderer
+        import datalad.support.ansi_colors as ac
+        from datalad.utils import Path
+        from os import getcwd
+
+        if res['action'] == 'clean':
+            # default renderer is just fine
+            return default_result_renderer(res)
+        elif res['action'] != 'clean [dry-run]':
+            # Result didn't come from within `clean`.
+            # Should be handled elsewhere.
+            return
+
+        assert res['action'] == 'clean [dry-run]'
+
+        if res.get('status', None) == 'ok':
+            from datalad.ui import ui
+
+            # when to render relative paths:
+            #  1) if a dataset arg was given
+            #  2) if CWD is the refds
+
+            refds = res.get('refds', None)
+            refds = refds if kwargs.get('dataset', None) is not None \
+                or refds == getcwd() else None
+            path = res['path'] if refds is None \
+                else str(Path(res['path']).relative_to(refds))
+
+            ui.message(u"{path}: {message}".format(
+                path=ac.color_word(path, ac.BOLD),
+                message=(res['message'][0] % res['message'][1:]
+                         if isinstance(res['message'], tuple)
+                         else res['message'])
+                        if res.get('message', None) else ''
+                )
+            )
+
+        else:
+            # Any other status than 'ok' is reported the default way.
+            return default_result_renderer(res)
