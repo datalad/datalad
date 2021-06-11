@@ -322,7 +322,7 @@ class Status(Interface):
         # come with evidence that speed does not suffer, and complexity stays
         # on a manageable level
         ds = require_dataset(
-            dataset, check_installed=True, purpose='status reporting')
+            dataset, check_installed=True, purpose='report status')
         ds_path = ds.path
         paths_by_ds = OrderedDict()
         if path:

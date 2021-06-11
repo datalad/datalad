@@ -240,7 +240,7 @@ class Siblings(Interface):
         worker = action_worker_map[action]
 
         dataset = require_dataset(
-            dataset, check_installed=False, purpose='sibling configuration')
+            dataset, check_installed=False, purpose='configure sibling')
         refds_path = dataset.path
 
         res_kwargs = dict(refds=refds_path, logger=lgr)

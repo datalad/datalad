@@ -215,7 +215,7 @@ class Clone(Interface):
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
         ds = require_dataset(
-            dataset, check_installed=True, purpose='cloning') \
+            dataset, check_installed=True, purpose='clone') \
             if dataset is not None else dataset
         refds_path = ds.path if ds else None
 

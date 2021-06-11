@@ -162,7 +162,7 @@ class Update(Interface):
             lgr.warning('path constraints for subdataset updates ignored, '
                         'because `recursive` option was not given')
 
-        refds = require_dataset(dataset, check_installed=True, purpose='updating')
+        refds = require_dataset(dataset, check_installed=True, purpose='update')
 
         save_paths = []
         merge_failures = set()

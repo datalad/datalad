@@ -120,7 +120,7 @@ class DownloadURL(Interface):
             try:
                 ds = require_dataset(
                     dataset, check_installed=True,
-                    purpose='downloading urls')
+                    purpose='download urls')
             except NoDatasetFound:
                 pass
 

@@ -172,7 +172,7 @@ class CreateSiblingGithub(Interface):
 
         # what to operate on
         ds = require_dataset(
-            dataset, check_installed=True, purpose='create GitHub sibling')
+            dataset, check_installed=True, purpose='create GitHub sibling(s)')
         # gather datasets and essential info
         # dataset instance and mountpoint relative to the top
         toprocess = [(ds, '')]

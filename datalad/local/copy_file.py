@@ -193,7 +193,7 @@ class CopyFile(Interface):
         ds = None
         if dataset:
             ds = require_dataset(dataset, check_installed=True,
-                                 purpose='copying into')
+                                 purpose='copy into')
 
         if target_dir:
             target_dir = resolve_path(target_dir, dataset)
