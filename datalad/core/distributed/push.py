@@ -298,6 +298,7 @@ class Push(Interface):
 
     @staticmethod
     def custom_result_summary_renderer(results, action_summary):  # pragma: more cover
+        render_action_summary(action_summary)
         # report on any hints at the end
         # get all unique hints
         hints = set([r.get('hints', None) for r in results])
@@ -306,14 +307,13 @@ class Push(Interface):
             from datalad.ui import ui
             from datalad.support import ansi_colors
             intro = ansi_colors.color_word(
-                "Potential hints to solve encountered errors: ",
+                "Hints: ",
                 ansi_colors.YELLOW)
             ui.message(intro)
             [ui.message("{}: {}".format(
                 ansi_colors.color_word(id + 1, ansi_colors.YELLOW), hint))
                 for id, hint in enumerate(hints)]
 
-        render_action_summary(action_summary)
 
 
 def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
