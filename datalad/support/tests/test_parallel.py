@@ -179,7 +179,7 @@ def test_gracefull_death():
 
     def producer():
         for i in range(10):
-            sleep(0.0001)
+            sleep(0.0003)
             yield i
         raise ValueError()
     # by default we do not stop upon producer failing
@@ -196,10 +196,10 @@ def test_gracefull_death():
     assert_equal(results, list(range(len(results))))
     assert_greater_equal(len(results), 2)
     if info_log_level and not (on_windows or on_osx):
-        # windows does not behave according to the initial performance
-        # expectations gh-5296 (~9), and neither does a macosx cloud instance
-        # (~7)
-        assert_greater_equal(6, len(results))
+        # consumers should not be able to consume all produced items.
+        # production of 10 should take 3 unites, while consumers 10/2 (jobs)
+        # 5 units, so some should not have a chance.
+        assert_greater_equal(8, len(results))
 
     # Simulate situation close to what we have when outside code consumes
     # some yielded results and then "looses interest" (on_failure="error").
