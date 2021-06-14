@@ -283,9 +283,9 @@ class Push(Interface):
                     type='dataset',
                     path=ds.path,
                 )
-                    type='dataset',
-                    path=ds.path,
-                )
+                # there's no matching path and we have generated a hint on
+                # fixing the call - we can return now
+                return
             yield dict(
                 res_kwargs,
                 status='notneeded',
