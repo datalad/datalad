@@ -22,6 +22,9 @@ class AddReadme(Interface):
 
     The README file is added to the dataset and the addition is saved
     in the dataset.
+    Note: Make sure that no unsaved modifications to your dataset's
+    .gitattributes file exist.
+
     """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
