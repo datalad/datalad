@@ -52,19 +52,12 @@ class AddReadme(Interface):
             'skip': do nothing; 'append': append information to the existing
             file; 'replace': replace the existing file with new content.""",
             constraints=EnsureChoice("skip", "append", "replace")),
-        annex=Parameter(
-            args=("--annex",),
-            action='store_true',
-            default=False,
-            doc="""By default, the dataset will be configured to store a newly
-            created README in Git. If this parameter is given, the README will
-            be annexed."""),
     )
 
     @staticmethod
     @datasetmethod(name='add_readme')
     @eval_results
-    def __call__(dataset, filename='README.md', existing='skip', annex=False):
+    def __call__(dataset, filename='README.md', existing='skip'):
         from os.path import lexists
         from os.path import join as opj
         from io import open
@@ -77,10 +70,10 @@ class AddReadme(Interface):
         dataset = require_dataset(dataset, check_installed=True,
                                   purpose='add README')
 
-        filename = opj(dataset.path, filename)
-        res_kwargs = dict(action='add_readme', path=filename)
+        fpath = opj(dataset.path, filename)
+        res_kwargs = dict(action='add_readme', path=fpath)
 
-        if lexists(filename) and existing == 'skip':
+        if lexists(fpath) and existing == 'skip':
             yield dict(
                 res_kwargs,
                 status='notneeded',
@@ -88,31 +81,20 @@ class AddReadme(Interface):
             return
 
         # unlock, file could be annexed
-        if lexists(filename):
-            dataset.unlock(filename)
-        if not lexists(filename):
-            if isinstance(dataset.repo, AnnexRepo):
-                # if we have an annex repo, shall the README go to Git or annex?
-                attr_state = dataset.status(
-                        '.gitattributes',
-                        result_renderer='disabled',
-                        return_type='item')
-                if attr_state:
-                    # we have made sure that .gitattributes exists. We only fail
-                    # now if the state of the .gitattributes file is not clean
-                    if not attr_state[0].get('state') == 'clean':
-                        raise RuntimeError(
-                            'Stopping, as the .gitattributes file is modified'
-                            )
+        if lexists(fpath):
+            dataset.unlock(fpath)
+        if not lexists(fpath):
+            # if we have an annex repo, shall the README go to Git or annex?
 
-                # unless --annex is set, configure the README to go into Git
+            if isinstance(dataset.repo, AnnexRepo) \
+                and 'annex.largefiles' not in \
+                    dataset.repo.get_gitattributes(filename).get(filename, {}):
+                # configure the README to go into Git
                 dataset.repo.set_gitattributes(
-                    [('README.md', {'annex.largefiles': 'anything' if annex
-                                                        else 'nothing'})])
+                    [(filename, {'annex.largefiles': 'nothing'})])
                 dataset.save(
                     path='.gitattributes',
-                    message="[DATALAD] Configure README to be in {}".format(
-                        "annex" if annex else "Git"),
+                    message="[DATALAD] Configure README to be in Git",
                     to_git=True
                 )
 
@@ -236,16 +218,16 @@ files by whom, and when.
             id=u' (id: {})'.format(dataset.id) if dataset.id else '',
             )
 
-        with open(filename, 'a' if existing == 'append' else 'w', encoding='utf-8') as fp:
+        with open(fpath, 'a' if existing == 'append' else 'w', encoding='utf-8') as fp:
             fp.write(default_content)
             yield dict(
                 status='ok',
-                path=filename,
+                path=fpath,
                 type='file',
                 action='add_readme')
 
         for r in dataset.save(
-                filename,
+                fpath,
                 message='[DATALAD] added README',
                 result_filter=None,
                 result_xfm=None):
