@@ -114,10 +114,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
         self._lock = InterProcessLock(
-            op.join(
-                cfg.obtain('datalad.locations.cache'),
-                'locks',
-                'downloader-auth.lck'))
+            op.join(cfg.obtain('datalad.locations.locks'),
+                    'downloader-auth.lck')
+        )
 
     def access(self, method, url, allow_old_session=True, **kwargs):
         """Generic decorator to manage access to the URL via some method
