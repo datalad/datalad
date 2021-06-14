@@ -273,12 +273,16 @@ class Push(Interface):
                     p for p in ensure_list(path) if p in sr
                 ]
             if potential_remote:
-                msg = "{} matches a sibling name and not a path. " \
+                hint = "{} matches a sibling name and not a path. " \
                       "Forgot --to?".format(potential_remote)
                 yield dict(
                     res_kwargs,
-                    status='impossible',
-                    message=msg,
+                    status='notneeded',
+                    message=hint,
+                    hints=hint,
+                    type='dataset',
+                    path=ds.path,
+                )
                     type='dataset',
                     path=ds.path,
                 )
