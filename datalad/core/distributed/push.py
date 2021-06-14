@@ -266,7 +266,7 @@ class Push(Interface):
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
         if not matched_anything:
             potential_remote = False
-            if not to and path:
+            if not to and len(paths) == 1:
                 # if we get a remote name without --to, provide a hint
                 sr = ds_repo.get_remotes(**get_remote_kwargs)
                 potential_remote = [
