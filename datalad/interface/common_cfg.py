@@ -58,6 +58,13 @@ definitions = {
         'destination': 'global',
         'default_fn': lambda: opj(expanduser('~'), 'datalad'),
     },
+    'datalad.locations.locks': {
+        'ui': ('question', {
+               'title': 'Lockfile directory',
+               'text': 'Where should datalad store lock files?'}),
+        'destination': 'global',
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'locks')
+    },
     'datalad.locations.sockets': {
         'ui': ('question', {
                'title': 'Socket directory',
