@@ -162,7 +162,7 @@ class ForEach(Interface):
     @datasetmethod(name='foreach')
     @eval_results
     def __call__(
-            cmd=None,
+            cmd,
             cmd_type="external",
             dataset=None,
             state='present',
