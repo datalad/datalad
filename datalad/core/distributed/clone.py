@@ -11,7 +11,6 @@
 
 import logging
 import re
-import requests
 from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
@@ -32,7 +31,6 @@ from datalad.cmd import (
     CommandError,
     GitWitlessRunner,
     StdOutCapture,
-    StdOutErrCapture,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
