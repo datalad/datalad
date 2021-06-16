@@ -45,6 +45,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
+from datalad.support.strings import get_replacement_dict
 from datalad.support.network import (
     get_local_file_url,
     download_url,
@@ -60,6 +61,7 @@ from datalad.dochelpers import (
 )
 from datalad.utils import (
     ensure_bool,
+    ensure_list,
     knows_annex,
     make_tempfile,
     Path,
@@ -119,6 +121,18 @@ class Clone(Interface):
     an installed dataset, regardless of whether it was newly installed ('ok'
     result), or found already installed from the specified source ('notneeded'
     result).<< PYTHON ||
+
+    URL mapping configuration
+
+    'clone' supports the transformation of URL via (multi-part) substitution
+    specifications. Substitutions are defined as a string with a match and
+    substitution expression, each following Python's regular expression syntax.
+    Both expressions are concatenated to a single string with an arbitrary
+    delimiter character. The delimiter is defined by prefixing the string with
+    the delimiter. Prefix and delimiter are stripped from the expressions.
+    Example: ,^http://(.*)$,https://\\1
+    TODO continue once match preference (longest match?) is decided and
+    implemented.
 
     .. seealso::
 
@@ -349,6 +363,63 @@ class Clone(Interface):
                 ds.subdatasets(path, set_property=[("datalad-url", source)])
 
 
+def _get_url_mappings(cfg):
+    return [
+        # decode the rule specifications
+        get_replacement_dict(
+            # one or more could come out
+            ensure_list(
+                cfg.get(
+                    k,
+                    default=[],
+                    # we specifically support declaration of multiple
+                    # settings to build replacement chains
+                    get_all=True)))
+        for k in cfg.keys()
+        if k.startswith('datalad.clone.url-substitute.')
+    ]
+
+
+def _map_urls(cfg, urls):
+    mapping_specs = _get_url_mappings(cfg)
+    if not mapping_specs:
+        return urls
+
+    mapped = []
+    # we process the candidate in order to maintain any prioritization
+    # encoded in it (e.g. _get_flexible_source_candidates_for_submodule)
+    # if we have a matching mapping replace the URL in its position
+    for u in urls:
+        # we only permit a single match
+        # TODO we likely want to RF this to pick the longest match
+        mapping_applied = False
+        # try one mapping set at a time
+        for mapping_spec in mapping_specs:
+            # process all substitution patterns in the specification
+            mu = u
+            matched = False
+            for match_ex, subst_ex in mapping_spec.items():
+                if not matched:
+                    matched = re.match(match_ex, mu) is not None
+                if not matched:
+                    break
+                # try to map, would return unchanged, if there is no match
+                mu = re.sub(match_ex, subst_ex, mu)
+            if mu != u:
+                lgr.debug("URL substitution: '%s' -> '%s'", u, mu)
+                mapped.append(mu)
+                # we could consider breaking after the for effective mapping
+                # specification. however, that would mean any generic
+                # definition of a broadly matching substitution would derail
+                # the entroe system. moreover, suddently order would matter
+                # substantially
+                mapping_applied = True
+        if not mapping_applied:
+            # none of the mappings matches, go with the original URL
+            mapped.append(u)
+    return mapped
+
+
 def clone_dataset(
         srcs,
         destds,
@@ -407,6 +478,11 @@ def clone_dataset(
         reckless = cfg.get('datalad.clone.reckless', None)
 
     dest_path = destds.pathobj
+
+    # check for configured URL mappings, either in the given config manager
+    # or in the one of the destination dataset, which is typically not existent
+    # yet and the process config manager is then used effectively
+    srcs = _map_urls(cfg or destds.config, srcs)
 
     # decode all source candidate specifications
     candidate_sources = [decode_source_spec(s, cfg=cfg) for s in srcs]
