@@ -9,8 +9,10 @@
 """Create and update a dataset from a list of URLs.
 """
 
+from collections import defaultdict
 from collections.abc import Mapping
 
+import json
 import logging
 import os
 import re
@@ -23,7 +25,10 @@ from urllib.parse import urlparse
 from datalad.support.external_versions import external_versions
 import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
-from datalad.dochelpers import exc_str
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
@@ -424,19 +429,46 @@ def _read_from_file(fname, input_type):
     return records, colidx_to_name
 
 
-def _get_placeholder_exception(exc, msg_prefix, known):
+_FIXED_SPECIAL_KEYS = {
+    "_repindex",
+    "_url_basename",
+    "_url_basename_ext",
+    "_url_basename_ext_py",
+    "_url_basename_root",
+    "_url_basename_root_py",
+    "_url_filename",
+    "_url_filename_ext",
+    "_url_filename_ext_py",
+    "_url_filename_root",
+    "_url_filename_root_py",
+    "_url_hostname",
+}
+
+
+def _is_known_special_key(key):
+    return key in _FIXED_SPECIAL_KEYS or re.match(r"\A_url[0-9]+\Z", key)
+
+
+def _get_placeholder_exception(exc, what, row):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
     value = exc.args[0]
     if isinstance(value, str):
-        sugmsg = get_suggestions_msg(value, known)
+        if _is_known_special_key(value):
+            msg = ("Special key '{}' could not be constructed for row: {}"
+                   .format(value,
+                           {k: v for k, v in row.items()
+                            if not _is_known_special_key(k)}))
+        else:
+            msg = "Unknown placeholder '{}' in {}: {}".format(
+                value, what, get_suggestions_msg(value, row))
     else:
-        sugmsg = "Out-of-bounds or unsupported index."
+        msg = "Out-of-bounds or unsupported index {} in {}".format(
+            value, what)
     # Note: Keeping this a KeyError is probably more appropriate but then the
     # entire message, which KeyError takes as the key, will be rendered with
     # outer quotes.
-    return ValueError("{}: {}{}{}"
-                      .format(msg_prefix, exc, ". " if sugmsg else "", sugmsg))
+    return ValueError(msg)
 
 
 def _format_filenames(format_fn, rows, row_infos):
@@ -446,7 +478,7 @@ def _format_filenames(format_fn, rows, row_infos):
             filename = format_fn(row)
         except KeyError as exc:
             raise _get_placeholder_exception(
-                exc, "Unknown placeholder in file name", row)
+                exc, "file name", row)
         filename, spaths = get_subpaths(filename)
         subpaths |= set(spaths)
         info["filename"] = filename
@@ -548,6 +580,133 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                          "Finished requesting file names")
 
 
+def _find_collisions(rows):
+    """Find file name collisions.
+
+    Parameters
+    ----------
+    rows : list of dict
+
+    Returns
+    -------
+    Dict where each key is a file name with a collision and values are the rows
+    (list of ints) that have the given file name.
+    """
+    fname_idxs = defaultdict(list)
+    collisions = set()
+    for idx, row in enumerate(rows):
+        fname = row["filename"]
+        if fname in fname_idxs:
+            collisions.add(fname)
+        fname_idxs[fname].append(idx)
+    return {fname: fname_idxs[fname] for fname in collisions}
+
+
+def _find_collision_mismatches(rows, collisions):
+    """Find collisions where URL and metadata fields don't match.
+
+    Parameters
+    ----------
+    rows : list of dict
+    collisions : dict
+        File names with collisions mapped to positions in `rows` that have a
+        given file name.
+
+    Returns
+    -------
+    Dict with subset of `collisions` where at least one colliding row has a
+    different URL or metadata field value.
+    """
+    def get_key(row):
+        return row["url"], row.get("meta_args")
+
+    mismathches = {}
+    for fname, idxs in collisions.items():
+        key_0 = get_key(rows[idxs[0]])
+        if any(key_0 != get_key(rows[i]) for i in idxs[1:]):
+            mismathches[fname] = idxs
+    return mismathches
+
+
+def _ignore_collisions(rows, collisions, last_wins=True):
+    """Modify `rows`, marking those that produce collision as ignored.
+
+    Parameters
+    ----------
+    rows : list of dict
+    collisions : dict
+        File names with collisions mapped to positions in `rows` that have a
+        given file name.
+    last_wins : boolean, optional
+        When true, mark all but the last row that has a given file name as
+        ignored. Otherwise mark all but the first row as ignored.
+    """
+    which = slice(-1) if last_wins else slice(1, None)
+    for fname in collisions:
+        for idx in collisions[fname][which]:
+            lgr.debug("Ignoring collision of file name '%s' at row %d",
+                      fname, rows[idx]["input_idx"])
+            rows[idx]["ignore"] = True
+
+
+def _handle_collisions(records, rows, on_collision):
+    """Handle file name collisions in `rows`.
+
+    "Handling" consists of either marking all but one colliding row with
+    ignore=True or returning an error message, depending on the value of
+    `on_collision`. When an error message is returned, downstream processing of
+    the rows should not be done.
+
+    Parameters
+    ----------
+    records : list of dict
+        Items read from `url_file`.
+    rows : list of dict
+        Extract information from `records`. This may be a different length if
+        `records` had any items with an empty URL.
+    on_collision : {"error", "error-if-different", "take-first", "take-last"}
+
+    Returns
+    -------
+    Error message (str) or None
+    """
+    err_msg = None
+    collisions = _find_collisions(rows)
+    if collisions:
+        if on_collision == "error":
+            to_report = collisions
+        elif on_collision == "error-if-different":
+            to_report = _find_collision_mismatches(rows, collisions)
+        elif on_collision in ["take-first", "take-last"]:
+            to_report = None
+        else:
+            raise ValueError(
+                f"Unsupported `on_collision` value: {on_collision}")
+
+        if to_report:
+            if lgr.isEnabledFor(logging.DEBUG):
+                # Remap to the position in the url_file. This may not be the
+                # same if rows without a URL were filtered out.
+                remapped = {f: [rows[i]["input_idx"] for i in idxs]
+                            for f, idxs in to_report.items()}
+                lgr.debug("Colliding names and positions:\n%s", remapped)
+                lgr.debug(
+                    "Example of two colliding rows:\n%s",
+                    json.dumps(
+                        [records[i]
+                         for i in remapped[next(iter(remapped))][:2]],
+                        sort_keys=True, indent=2, default=str))
+            err_msg = ("%s collided across rows; "
+                       "troubleshoot by logging at debug level or "
+                       "consider using {_repindex}",
+                       single_or_plural("file name", "file names",
+                                        len(to_report), include_count=True))
+        else:
+            _ignore_collisions(rows, collisions,
+                               last_wins=on_collision == "take-last")
+    return err_msg
+
+
 def sort_paths(paths):
     """Sort `paths` by directory level and then alphabetically.
 
@@ -582,8 +741,8 @@ def extract(rows, colidx_to_name=None,
     Returns
     -------
     A tuple where the first item is a list with a dict of extracted information
-    for each row in `stream` and the second item a list subdataset paths,
-    sorted breadth-first.
+    for each row and the second item a list subdataset paths, sorted
+    breadth-first.
     """
     meta = ensure_list(meta)
     colidx_to_name = colidx_to_name or {}
@@ -623,16 +782,16 @@ def extract(rows, colidx_to_name=None,
 
     rows_with_url = []
     infos = []
-    for row in rows:
+    for idx, row in enumerate(rows):
         try:
             url = format_url(row)
         except KeyError as exc:
             raise _get_placeholder_exception(
-                exc, "Unknown placeholder in URL", row)
+                exc, "URL", row)
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
-        info = {"url": url}
+        info = {"url": url, "input_idx": idx}
         for fn in info_fns:
             fn(info, row)
         infos.append(info)
@@ -1115,6 +1274,16 @@ class Addurls(Interface):
             action="store_true",
             doc="""drop files after adding to annex""",
         ),
+        on_collision=Parameter(
+            args=("--on-collision",),
+            constraints=EnsureChoice("error", "error-if-different",
+                                     "take-first", "take-last"),
+            doc="""What to do when more than one row produces the same file
+            name. By default an error is triggered. "error-if-different"
+            suppresses that error if rows for a given file name collision have
+            the same URL and metadata. "take-first" or "take-last" indicate to
+            instead take the first row or last row from each set of colliding
+            rows."""),
     )
 
     @staticmethod
@@ -1124,7 +1293,8 @@ class Addurls(Interface):
                  input_type="ext", exclude_autometa=None, meta=None, key=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True, version_urls=False,
-                 cfg_proc=None, jobs=None, drop_after=False):
+                 cfg_proc=None, jobs=None, drop_after=False,
+                 on_collision="error"):
         # This was to work around gh-2269. That's fixed, but changing the
         # positional argument names now would cause breakage for any callers
         # that used these arguments as keyword arguments.
@@ -1194,20 +1364,23 @@ class Addurls(Interface):
                        message="No rows to process")
             return
 
-        if len(rows) != len(set(row["filename"] for row in rows)):
-            yield dict(st_dict, status="error",
-                       message=("There are file name collisions; "
-                                "consider using {_repindex}"))
+        collision_err = _handle_collisions(records, rows, on_collision)
+        if collision_err:
+            yield dict(st_dict, status="error", message=collision_err)
             return
 
         if dry_run:
             for subpath in subpaths:
                 lgr.info("Would create a subdataset at %s", subpath)
             for row in rows:
-                lgr.info("Would %s %s to %s",
-                         "register" if row.get("key") else "download",
-                         row["url"],
-                         os.path.join(ds.path, row["filename"]))
+                if row.get("ignore"):
+                    lgr.info("Would ignore row due to collision: %s",
+                             records[row["input_idx"]])
+                else:
+                    lgr.info("Would %s %s to %s",
+                             "register" if row.get("key") else "download",
+                             row["url"],
+                             os.path.join(ds.path, row["filename"]))
                 if "meta_args" in row:
                     lgr.info("Metadata: %s",
                              sorted(u"{}={}".format(k, v)
@@ -1307,8 +1480,10 @@ class Addurls(Interface):
             # The top-level dataset has a subpath of None.
             return d.get("subpath") or ""
 
+        rows_nonignored = (r for r in rows if not r.get("ignore"))
         # We need to serialize itertools.groupby .
-        rows_by_ds = [(k, tuple(v)) for k, v in groupby_sorted(rows, key=keyfn)]
+        rows_by_ds = [(k, tuple(v))
+                      for k, v in groupby_sorted(rows_nonignored, key=keyfn)]
 
         # There could be "intermediate" subdatasets which have no rows but would need
         # their datasets created and saved, so let's add them

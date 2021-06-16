@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import sys
+import unittest.mock
 
 from functools import partial
 from glob import glob
@@ -1281,13 +1282,16 @@ def test_annex_remove(path):
 @with_tempfile
 @with_tempfile
 def test_repo_version(path1, path2, path3):
-    annex = AnnexRepo(path1, create=True, version=6)
-    assert_repo_status(path1, annex=True)
-    version = int(annex.config.get('annex.version'))
-    # Since git-annex 7.20181031, v6 repos upgrade to v7.
-    supported_versions = AnnexRepo.check_repository_versions()["supported"]
-    v6_lands_on = next(i for i in supported_versions if i >= 6)
-    eq_(version, v6_lands_on)
+    with swallow_logs(new_level=logging.INFO) as cm:
+        annex = AnnexRepo(path1, create=True, version=6)
+        assert_repo_status(path1, annex=True)
+        version = int(annex.config.get('annex.version'))
+        # Since git-annex 7.20181031, v6 repos upgrade to v7.
+        supported_versions = AnnexRepo.check_repository_versions()["supported"]
+        v6_lands_on = next(i for i in supported_versions if i >= 6)
+        eq_(version, v6_lands_on)
+
+        assert_in("will be upgraded to 8", cm.out)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
@@ -1307,7 +1311,11 @@ def test_repo_version(path1, path2, path3):
 def test_init_scanning_message(path):
     with swallow_logs(new_level=logging.INFO) as cml:
         AnnexRepo(path, create=True, version=7)
-        assert_in("for unlocked", cml.out)
+        # somewhere around 8.20210428-186-g428c91606 git annex changed
+        # handling of scanning for unlocked files upon init and started to report
+        # "scanning for annexed" instead of "scanning for unlocked".
+        # Could be a line among many (as on Windows) so match=False so we search
+        assert_re_in(".*scanning for .* files", cml.out, flags=re.IGNORECASE, match=False)
 
 
 @with_tempfile
@@ -2554,3 +2562,13 @@ def test_whereis_batch_eqv(path):
     # --key= and --batch are incompatible.
     with assert_raises(ValueError):
         repo_b.whereis(files=files, batch=True, key=True)
+
+
+def test_done_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = AnnexJsonProtocol("done")
+        warn_mock.assert_called_once()
+
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = AnnexJsonProtocol()
+        warn_mock.assert_not_called()

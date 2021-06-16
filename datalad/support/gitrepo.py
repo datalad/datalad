@@ -898,9 +898,10 @@ class GitRepo(CoreGitRepo):
         self._cfg = None
 
         if do_create:  # we figured it out earlier
+            from_cmdline = git_opts.pop('_from_cmdline_', [])
             self.init(
                 sanity_checks=create_sanity_checks,
-                init_options=to_options(**git_opts),
+                init_options=from_cmdline + to_options(**git_opts),
             )
 
         # with DryRunProtocol path might still not exist
@@ -2859,11 +2860,11 @@ class GitRepo(CoreGitRepo):
 
         Parameters
         ----------
-        paths : list(pathlib.PurePath)
+        paths : list(pathlib.PurePath) or None
           Specific paths, relative to the resolved repository root, to query
           info for. Paths must be normed to match the reporting done by Git,
           i.e. no parent dir components (ala "some/../this").
-          If none are given, info is reported for all content.
+          If `None`, info is reported for all content.
         ref : gitref or None
           If given, content information is retrieved for this Git reference
           (via ls-tree), otherwise content information is produced for the
@@ -2920,6 +2921,8 @@ class GitRepo(CoreGitRepo):
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
             paths = [ut.PurePosixPath(p) for p in paths]
+        elif paths is not None:
+            return info
 
         path_strs = list(map(str, paths)) if paths else None
         if path_strs and (not ref or external_versions["cmd:git"] >= "2.29.0"):

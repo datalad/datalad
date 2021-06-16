@@ -302,31 +302,6 @@ def skip_nomultiplex_ssh(func):
         return func(*args, **kwargs)
     return  _wrap_skip_nomultiplex_ssh
 
-
-@optional_args
-def skip_v6_or_later(func, method='raise'):
-    """Skip tests if v6 or later will be used as the default repo version.
-
-    The default repository version is controlled by the configured value of
-    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
-    installed git-annex.
-    """
-
-    from datalad.support.annexrepo import AnnexRepo
-
-    version = dl_cfg.obtain("datalad.repo.version")
-    info = AnnexRepo.check_repository_versions()
-
-    @skip_if(version >= 6 or 5 not in info["supported"],
-             msg="Skip test in v6+ test run", method=method)
-    @wraps(func)
-    @attr('skip_v6_or_later')
-    @attr('v6_or_later')
-    def  _wrap_skip_v6_or_later(*args, **kwargs):
-        return func(*args, **kwargs)
-    return  _wrap_skip_v6_or_later
-
-
 #
 # Addition "checkers"
 #
@@ -824,39 +799,6 @@ def known_failure(func):
     def  _wrap_known_failure(*args, **kwargs):
         return func(*args, **kwargs)
     return  _wrap_known_failure
-
-
-def known_failure_v6_or_later(func):
-    """Test decorator marking a test as known to fail in a v6+ test run
-
-    If the default repository version is 6 or later behaves like `known_failure`.
-    Otherwise the original (undecorated) function is returned.
-    The default repository version is controlled by the configured value of
-    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
-    installed git-annex.
-    """
-
-    from datalad.support.annexrepo import AnnexRepo
-
-    version = dl_cfg.obtain("datalad.repo.version")
-    info = AnnexRepo.check_repository_versions()
-
-    if (version and version >= 6) or 5 not in info["supported"]:
-
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_v6_or_later')
-        @attr('v6_or_later')
-        def v6_func(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return v6_func
-
-    return func
-
-
-# TODO: Remove once the released version of datalad-crawler no longer uses it.
-known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):

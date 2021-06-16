@@ -96,6 +96,10 @@ from .exceptions import (
 
 lgr = logging.getLogger('datalad.annex')
 
+# This is a map between an auto-upgradeable version and the version that it
+# upgrades to. It should track autoUpgradeableVersions in Annex.Version.
+_AUTO_UPGRADEABLE_VERSIONS = {v: 8 for v in range(3, 8)}
+
 
 class AnnexRepo(GitRepo, RepoInterface):
     """Representation of an git-annex repository.
@@ -126,6 +130,9 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180913 -- annex fixes all known to us issues for v6
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
     # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
+    #
+    # When bumping this, check whether datalad.repo.version needs to be
+    # adjusted.
     GIT_ANNEX_MIN_VERSION = '8.20200309'
     git_annex_version = None
     supports_direct_mode = None
@@ -245,7 +252,19 @@ class AnnexRepo(GitRepo, RepoInterface):
             # '' cannot be converted to int (via Constraint as defined for
             # "datalad.repo.version" in common_cfg
             # => Allow conversion to result in None?
-            if not version:
+            if version:
+                try:
+                    version = int(version)
+                except ValueError:
+                    # Just give a warning if things look off and let
+                    # git-annex-init complain if it can't actually handle it.
+                    lgr.warning(
+                        "Expected an int for datalad.repo.version, got %s",
+                        version)
+            else:
+                # The above comment refers to an empty string case. The commit
+                # (f12eb03f40) seems to deal with direct mode, so perhaps this
+                # isn't reachable anymore.
                 version = None
 
         if do_init:
@@ -1304,6 +1323,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if description is not None:
             opts += [description]
         if version is not None:
+            upgraded_version = _AUTO_UPGRADEABLE_VERSIONS.get(version)
+            if upgraded_version:
+                lgr.info("Annex repository version %s will be upgraded to %s",
+                         version, upgraded_version)
             opts += ['--version', '{0}'.format(version)]
 
         # TODO: RM DIRECT?  or RF at least ?
@@ -3107,9 +3130,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         Parameters
         ----------
-        paths : list
-          Specific paths to query info for. In none are given, info is
-          reported for all content.
+        paths : list or None
+          Specific paths to query info for. In `None`, info is reported for all
+          content.
         init : 'git' or dict-like or None
           If set to 'git' annex content info will amend the output of
           GitRepo.get_content_info(), otherwise the dict-like object
@@ -3155,6 +3178,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 paths=paths, ref=ref, **kwargs)
         else:
             info = init
+
+        if not paths and paths is not None:
+            return info
+
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex
@@ -3199,10 +3226,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # of None/NaN etc.
                     del rec['bytesize']
             info[path] = rec
-            # TODO make annex availability checks optional and move in here
-            if not eval_availability:
-                # not desired, or not annexed
-                continue
+        # TODO make annex availability checks optional and move in here
+        if eval_availability:
             self._mark_content_availability(info)
         return info
 
@@ -3408,10 +3433,14 @@ class AnnexJsonProtocol(WitlessProtocol):
     proc_out = True
     proc_err = True
 
-    def __init__(self, done_future, total_nbytes=None):
+    def __init__(self, done_future=None, total_nbytes=None):
+        if done_future is not None:
+            warnings.warn("`done_future` argument is ignored "
+                          "and will be removed in a future release",
+                          DeprecationWarning)
+        super().__init__()
         # to collect parsed JSON command output
         self.json_out = []
-        super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
         self._unprocessed = None
@@ -3613,9 +3642,9 @@ class AnnexInitOutput(WitlessProtocol):
     def pipe_data_received(self, fd, byts):
         line = byts.decode(self.encoding)
         if fd == 1:
-            if "scanning for unlocked files" in line:
-                lgr.info("Scanning for unlocked files "
-                         "(this may take some time)")
+            res = re.search("(scanning for .* files)", line, flags=re.IGNORECASE)
+            if res:
+                lgr.info("%s (this may take some time)", res.groups()[0])
         elif fd == 2:
             lgr.info(line.strip())
 

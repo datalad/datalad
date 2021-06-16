@@ -25,6 +25,18 @@ bet we will fix some bugs and make a world even a better place.
 
 ?
 
+## 0.14.4 (May 10, 2021) -- .
+
+### Fixes
+
+- Following an internal call to `git-clone`, [clone][] assumed that
+  the remote name was "origin", but this may not be the case if
+  `clone.defaultRemoteName` is configured (available as of Git 2.30).
+  ([#5572][])
+
+- Several test fixes, including updates for changes in git-annex.
+  ([#5612][]) ([#5632][]) ([#5639][])
+
 
 ## 0.14.3 (April 28, 2021) -- .
 
@@ -3711,8 +3723,12 @@ publishing
 [#5531]: https://github.com/datalad/datalad/issues/5531
 [#5544]: https://github.com/datalad/datalad/issues/5544
 [#5552]: https://github.com/datalad/datalad/issues/5552
+[#5572]: https://github.com/datalad/datalad/issues/5572
 [#5580]: https://github.com/datalad/datalad/issues/5580
 [#5594]: https://github.com/datalad/datalad/issues/5594
 [#5603]: https://github.com/datalad/datalad/issues/5603
 [#5607]: https://github.com/datalad/datalad/issues/5607
 [#5609]: https://github.com/datalad/datalad/issues/5609
+[#5612]: https://github.com/datalad/datalad/issues/5612
+[#5632]: https://github.com/datalad/datalad/issues/5632
+[#5639]: https://github.com/datalad/datalad/issues/5639

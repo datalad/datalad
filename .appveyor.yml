@@ -78,7 +78,10 @@ environment:
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 39-x64
-      INSTALL_GITANNEX: git-annex -m datalad/packages
+      # TODO: use datalad/git-annex (github release packages) but
+      # it would need setup of a GITHUB_TOKEN to access.
+      # This one is set in master but kept without change in maint for now
+      # INSTALL_GITANNEX: git-annex -m datalad/packages
     # MacOS core tests
     - ID: MacP38core
       # ~25min
@@ -252,7 +255,7 @@ install:
       )
   - sh: python -m pip install datalad-installer${DATALAD_INSTALLER_VERSION:-}
   # Missing system software
-  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} || sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS} ) || true"
+  - sh: "[ -n \"$INSTALL_SYSPKGS\" ] && ( [ \"x${APPVEYOR_BUILD_WORKER_IMAGE}\" = \"xmacOS\" ] && brew install -q ${INSTALL_SYSPKGS} ||  { sudo apt-get update -y && sudo apt-get install --no-install-recommends -y ${INSTALL_SYSPKGS}; } ) || true"
   # Install git-annex on windows, otherwise INSTALL_SYSPKGS can be used
   # deploy git-annex, if desired
   - cmd: IF DEFINED INSTALL_GITANNEX datalad-installer --sudo ok %INSTALL_GITANNEX%

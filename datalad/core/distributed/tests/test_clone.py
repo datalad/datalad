@@ -629,7 +629,7 @@ def test_cfg_originorigin(path):
     with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*Async run:\n cwd=.*\n"
+        cml.assert_logged(msg=r"[^[]*run:\n cwd=.*\n"
                               r" cmd=\[('git',.*'annex'|'git-annex'), 'init'",
                           match=False,
                           level='DEBUG')
@@ -1115,6 +1115,61 @@ def test_ria_postclonecfg():
         # test cloning via ria+ssh://
         yield skip_ssh(_test_ria_postclonecfg), \
             "ssh://datalad-test:{}".format(Path(store).as_posix()), id
+
+
+@known_failure_windows
+@skip_ssh
+@with_tree(tree={'somefile.txt': 'some content'})
+@with_tempfile
+@with_tempfile
+def test_no_ria_postclonecfg(dspath, storepath, clonepath):
+
+    dspath = Path(dspath)
+    storepath = Path(storepath)
+    clonepath = Path(clonepath)
+
+    # Test that particular configuration(s) do NOT lead to a reconfiguration
+    # upon clone. (See gh-5628)
+
+    from datalad.customremotes.ria_utils import (
+        create_store,
+    )
+    from datalad.distributed.ora_remote import (
+        LocalIO,
+    )
+
+    ds = Dataset(dspath).create(force=True)
+    ds.save()
+    assert_repo_status(ds.path)
+
+    io = LocalIO()
+    create_store(io, storepath, '1')
+    file_url = "ria+{}".format(get_local_file_url(str(storepath)))
+    ssh_url = "ria+ssh://datalad-test:{}".format(storepath.as_posix())
+    ds.create_sibling_ria(file_url, "teststore",
+                          push_url=ssh_url, alias="testds")
+    ds.push('.', to='teststore')
+
+    # Now clone via SSH. Should not reconfigure although `url` doesn't match the
+    # URL we cloned from. However, `push-url` does.
+    riaclone = clone('{}#{}'.format(ssh_url, ds.id), clonepath)
+
+    # ORA remote is enabled (since URL still valid) but not reconfigured:
+    untouched_remote = riaclone.siblings(name='teststore-storage',
+                                         return_type='item-or-list')
+    assert_not_is_instance(untouched_remote, list)
+    ora_cfg = riaclone.repo.get_special_remotes()[
+        untouched_remote['annex-uuid']]
+    ok_(ora_cfg['url'] == file_url)
+    ok_(ora_cfg['push-url'] == ssh_url)
+
+    # publication dependency was still set (and it's the only one that was set):
+    eq_(riaclone.config.get(f"remote.{DEFAULT_REMOTE}.datalad-publish-depends",
+                            get_all=True),
+        "teststore-storage")
+
+    # we can still get the content
+    ds.get("somefile.txt")
 
 
 # fatal: Could not read from remote repository.
