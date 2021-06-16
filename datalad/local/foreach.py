@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 
+import inspect
 import logging
 
 from argparse import REMAINDER
@@ -110,14 +111,18 @@ class ForEach(Interface):
             For --cmd-type exec or eval only a single
             command argument (Python code) is supported. CMD]
             [PY: For `cmd_type='exec'` or `cmd_type='eval'` (Python code) should
-            be either a string or a list with only a single item. PY]
+            be either a string or a list with only a single item. If 'eval', the
+            actual function can be passed, which will be provided all placeholders
+            as keyword arguments. PY]
             """),
         cmd_type=Parameter(
             args=("--cmd-type",),
-            constraints=EnsureChoice('external', 'exec', 'eval'),
+            constraints=EnsureChoice('auto', 'external', 'exec', 'eval'),
             doc="""type of the command. `external`: to be run in a child process using dataset's runner;
             'exec': Python source code to execute using 'exec(), no value returned;
-            'eval': Python source code to evaluate using 'eval()', return value is placed into 'result' field."""),
+            'eval': Python source code to evaluate using 'eval()', return value is placed into 'result' field.
+            'auto': If used via Python API, and `cmd` is a Python function, it will use 'eval', and
+            otherwise would assume 'external'."""),
         # Following options are taken from subdatasets
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -163,7 +168,7 @@ class ForEach(Interface):
     @eval_results
     def __call__(
             cmd,
-            cmd_type="external",
+            cmd_type="auto",
             dataset=None,
             state='present',
             recursive=False,
@@ -177,18 +182,30 @@ class ForEach(Interface):
             ):
         if not cmd:
             raise InsufficientArgumentsError("No command given")
+
+        if cmd_type == 'auto':
+            cmd_type = 'eval' if _is_callable(cmd) else 'external'
+
         python = cmd_type in _PYTHON_CMDS
+
         if python:
-            # yoh decided to avoid unnecessary complication/inhomogeneity with support
-            # of multiple Python commands for now; and also allow for a single string command
-            # in Python interface
-            if isinstance(cmd, (list, tuple)):
-                if len(cmd) > 1:
-                    raise ValueError(f"Please provide a single Python expression. Got {len(cmd)}: {cmd!r}")
-                cmd = cmd[0]
-            if not isinstance(cmd, str):
-                raise ValueError(f"Please provide a single Python expression. Got {cmd!r}")
+            if _is_callable(cmd):
+                if cmd_type != 'eval':
+                    raise ValueError(f"Can invoke provided function only in 'eval' mode. {cmd_type!r} was provided")
+            else:
+                # yoh decided to avoid unnecessary complication/inhomogeneity with support
+                # of multiple Python commands for now; and also allow for a single string command
+                # in Python interface
+                if isinstance(cmd, (list, tuple)):
+                    if len(cmd) > 1:
+                        raise ValueError(f"Please provide a single Python expression. Got {len(cmd)}: {cmd!r}")
+                    cmd = cmd[0]
+
+                if not isinstance(cmd, str):
+                    raise ValueError(f"Please provide a single Python expression or a function. Got {cmd!r}")
         else:
+            if _is_callable(cmd):
+                raise ValueError(f"cmd_type={cmd_type} but a function {cmd} was provided")
             protocol = NoCapture if output_streams == 'pass-through' else StdOutErrCapture
 
         refds = require_dataset(
@@ -246,15 +263,21 @@ class ForEach(Interface):
                 tmpdir=mkdtemp(prefix="datalad-run-") if "tmpdir" in str(cmd) else "")
             try:
                 if python:
-                    python_cmd = _PYTHON_CMDS[cmd_type]
+                    if isinstance(cmd, str):
+                        cmd_f, cmd_a, cmd_kw = _PYTHON_CMDS[cmd_type], (cmd, placeholders), {}
+                    else:
+                        assert _is_callable(cmd)
+                        # all placeholders are passed as kwargs to the function
+                        cmd_f, cmd_a, cmd_kw = cmd, [], placeholders
+
                     cm = chpwd_cm(ds.path) if chpwd else nothing_cm()
                     with cm:
                         if output_streams == 'pass-through':
-                            res = python_cmd(cmd, placeholders)
+                            res = cmd_f(*cmd_a, **cmd_kw)
                             out = {}
                         elif output_streams == 'capture':
                             with swallow_outputs() as cmo:
-                                res = python_cmd(cmd, placeholders)
+                                res = cmd_f(*cmd_a, **cmd_kw)
                                 out = {
                                     'stdout': cmo.out,
                                     'stderr': cmo.err,
@@ -351,3 +374,7 @@ def format_command(command, **kwds):
     command = normalize_command(command)
     sfmt = SequenceFormatter()
     return sfmt.format(command, **kwds)
+
+
+def _is_callable(f):
+    return inspect.isfunction(f) or inspect.isbuiltin(f)

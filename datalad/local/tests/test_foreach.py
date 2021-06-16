@@ -47,20 +47,38 @@ def test_basic_resilience():
 
 
 @with_tempfile(mkdir=True)
-def test_python(path):
+def check_python_eval(cmd, path):
     ds = Dataset(path).create()
-    res = ds.foreach("dir()", cmd_type='eval')
+    res = ds.foreach(cmd, cmd_type='eval')
     eq_(len(res), 1)
     expected_variables = {'ds', 'pwd', 'refds'}
     eq_(expected_variables.intersection(res[0]['result']), expected_variables)
     # besides expected, there could be few more ATM, +5 arbitrarily just to test
     # that we are not leaking too much
     assert_greater(len(expected_variables) + 5, len(res[0]['result']))
+
+
+@with_tempfile(mkdir=True)
+def check_python_exec(cmd, path):
+    ds = Dataset(path).create()
+
     # but exec has no result
-    res = ds.foreach("dir()", cmd_type='exec')
+    res = ds.foreach(cmd, cmd_type='exec')
     assert_not_in('result', res[0])
     # but allows for more complete/interesting setups in which we could import modules etc
     res = ds.foreach('import sys; print("DIR: %s" % str(dir()))', output_streams='capture', cmd_type='exec')
     assert_in('ds', res[0]['stdout'])
     assert_in('sys', res[0]['stdout'])
     eq_(res[0]['stderr'], '')
+
+
+def test_python():
+    yield check_python_eval, "dir()"
+    yield check_python_exec, "dir()"
+
+    def dummy_dir(*args, **kwargs):
+        """Ensure that we pass all placeholders as kwargs"""
+        assert not args
+        return kwargs
+
+    yield check_python_eval, dummy_dir  # direct function invocation
