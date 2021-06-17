@@ -201,7 +201,7 @@ class Push(Interface):
         paths = [resolve_path(p, dataset) for p in ensure_list(path)]
 
         ds = require_dataset(
-            dataset, check_installed=True, purpose='pushing')
+            dataset, check_installed=True, purpose='push')
         ds_repo = ds.repo
 
         res_kwargs = dict(

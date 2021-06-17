@@ -280,7 +280,7 @@ class Create(Interface):
         if refds_path and refds_path != str(path):
             refds = require_dataset(
                 refds_path, check_installed=True,
-                purpose='creating a subdataset')
+                purpose='create a subdataset')
 
             path_inrefds = path_under_rev_dataset(refds, path)
             if path_inrefds is None:

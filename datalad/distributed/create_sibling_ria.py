@@ -284,7 +284,7 @@ class CreateSiblingRia(Interface):
             )
 
         ds = require_dataset(
-            dataset, check_installed=True, purpose='create sibling RIA')
+            dataset, check_installed=True, purpose='create RIA sibling(s)')
         res_kwargs = dict(
             ds=ds,
             action="create-sibling-ria",

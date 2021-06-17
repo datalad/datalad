@@ -380,7 +380,7 @@ class WTF(Interface):
 
         ds = None
         try:
-            ds = require_dataset(dataset, check_installed=False, purpose='reporting')
+            ds = require_dataset(dataset, check_installed=False, purpose='report')
         except NoDatasetFound:
             # failure is already logged
             pass

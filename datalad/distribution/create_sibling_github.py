@@ -190,7 +190,7 @@ class CreateSiblingGithub(Interface):
 
         # what to operate on
         ds = require_dataset(
-            dataset, check_installed=True, purpose='create GitHub sibling')
+            dataset, check_installed=True, purpose='create GitHub sibling(s)')
 
         res_kwargs = dict(
             action='create_sibling_github [dry-run]' if dry_run else
