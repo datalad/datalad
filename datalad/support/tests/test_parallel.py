@@ -195,11 +195,18 @@ def test_gracefull_death():
     # we will get some results, seems around 4 and they should be "sequential"
     assert_equal(results, list(range(len(results))))
     assert_greater_equal(len(results), 2)
-    if info_log_level and not (on_windows or on_osx):
-        # consumers should not be able to consume all produced items.
-        # production of 10 should take 3 unites, while consumers 10/2 (jobs)
-        # 5 units, so some should not have a chance.
-        assert_greater_equal(8, len(results))
+
+    # This test relies too much on threads scheduling to not hog up on handling
+    # consumers, but if it happens so - they might actually consume all results
+    # before producer decides to finally raise an exception.  As such it remains
+    # flaky and thus not ran, but could be useful to test locally while
+    # changing that logic.
+    #
+    # if info_log_level and not (on_windows or on_osx):
+    #     # consumers should not be able to consume all produced items.
+    #     # production of 10 should take 3 unites, while consumers 10/2 (jobs)
+    #     # 5 units, so some should not have a chance.
+    #     assert_greater_equal(8, len(results))
 
     # Simulate situation close to what we have when outside code consumes
     # some yielded results and then "looses interest" (on_failure="error").
