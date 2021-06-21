@@ -1,3 +1,55 @@
+# 0.14.5 (Mon Jun 21 2021)
+
+#### 🐛 Bug Fix
+
+- BF(TST): parallel - take longer for producer to produce [#5747](https://github.com/datalad/datalad/pull/5747) ([@yarikoptic](https://github.com/yarikoptic))
+- add --on-failure default value and document it [#5690](https://github.com/datalad/datalad/pull/5690) ([@christian-monch](https://github.com/christian-monch) [@yarikoptic](https://github.com/yarikoptic))
+- ENH: harmonize "purpose" statements to imperative form [#5733](https://github.com/datalad/datalad/pull/5733) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH(TST): populate heavy tree with 100 unique keys (not just 1) among 10,000 [#5734](https://github.com/datalad/datalad/pull/5734) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: do not use .acquired - just get state from acquire() [#5718](https://github.com/datalad/datalad/pull/5718) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: account for annex now "scanning for annexed" instead of "unlocked" files [#5705](https://github.com/datalad/datalad/pull/5705) ([@yarikoptic](https://github.com/yarikoptic))
+- interface: Don't repeat custom summary for non-generator results [#5688](https://github.com/datalad/datalad/pull/5688) ([@kyleam](https://github.com/kyleam))
+- RF: just pip install datalad-installer [#5676](https://github.com/datalad/datalad/pull/5676) ([@yarikoptic](https://github.com/yarikoptic))
+- DOC: addurls.extract: Drop mention of removed 'stream' parameter [#5690](https://github.com/datalad/datalad/pull/5690) ([@kyleam](https://github.com/kyleam))
+- Merge pull request #5674 from kyleam/test-addurls-copy-fix [#5674](https://github.com/datalad/datalad/pull/5674) ([@kyleam](https://github.com/kyleam))
+- Merge pull request #5663 from kyleam/status-ds-equal-path [#5663](https://github.com/datalad/datalad/pull/5663) ([@kyleam](https://github.com/kyleam))
+- Merge pull request #5671 from kyleam/update-fetch-fail [#5671](https://github.com/datalad/datalad/pull/5671) ([@kyleam](https://github.com/kyleam))
+- BF: update: Honor --on-failure if fetch fails [#5671](https://github.com/datalad/datalad/pull/5671) ([@kyleam](https://github.com/kyleam))
+- RF: update: Avoid fetch's deprecated kwargs [#5671](https://github.com/datalad/datalad/pull/5671) ([@kyleam](https://github.com/kyleam))
+- CLN: update: Drop an unused import [#5671](https://github.com/datalad/datalad/pull/5671) ([@kyleam](https://github.com/kyleam))
+- Merge pull request #5664 from kyleam/addurls-better-url-parts-error [#5664](https://github.com/datalad/datalad/pull/5664) ([@kyleam](https://github.com/kyleam))
+- Merge pull request #5661 from kyleam/sphinx-fix-plugin-refs [#5661](https://github.com/datalad/datalad/pull/5661) ([@kyleam](https://github.com/kyleam))
+- BF: status: Provide special treatment of "this dataset" path [#5663](https://github.com/datalad/datalad/pull/5663) ([@kyleam](https://github.com/kyleam))
+- BF: addurls: Provide better placeholder error for special keys [#5664](https://github.com/datalad/datalad/pull/5664) ([@kyleam](https://github.com/kyleam))
+- RF: addurls: Simply construction of placeholder exception message [#5664](https://github.com/datalad/datalad/pull/5664) ([@kyleam](https://github.com/kyleam))
+- RF: addurls._get_placeholder_exception: Rename a parameter [#5664](https://github.com/datalad/datalad/pull/5664) ([@kyleam](https://github.com/kyleam))
+- RF: status: Avoid repeated Dataset.path access [#5663](https://github.com/datalad/datalad/pull/5663) ([@kyleam](https://github.com/kyleam))
+- DOC: Reference plugins via datalad.api [#5661](https://github.com/datalad/datalad/pull/5661) ([@kyleam](https://github.com/kyleam))
+- download-url: Set up datalad special remote if needed [#5648](https://github.com/datalad/datalad/pull/5648) ([@kyleam](https://github.com/kyleam) [@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `maint`
+
+- MNT: Post-release dance ([@kyleam](https://github.com/kyleam))
+
+#### 🏠 Internal
+
+- Switch to versioneer and auto [#5669](https://github.com/datalad/datalad/pull/5669) ([@jwodder](https://github.com/jwodder) [@yarikoptic](https://github.com/yarikoptic))
+- MNT: setup.py: Temporarily avoid Sphinx 4 [#5649](https://github.com/datalad/datalad/pull/5649) ([@kyleam](https://github.com/kyleam))
+
+#### 🧪 Tests
+
+- BF(TST): skip testing for showing "Scanning for ..." since not shown if too quick [#5727](https://github.com/datalad/datalad/pull/5727) ([@yarikoptic](https://github.com/yarikoptic))
+- Revert "TST: test_partial_unlocked: Document and avoid recent git-annex failure" [#5651](https://github.com/datalad/datalad/pull/5651) ([@kyleam](https://github.com/kyleam))
+
+#### Authors: 4
+
+- Christian Mönch ([@christian-monch](https://github.com/christian-monch))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Kyle Meyer ([@kyleam](https://github.com/kyleam))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.14.4 (May 10, 2021) -- .
 
 ## Fixes
