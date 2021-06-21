@@ -320,7 +320,7 @@ class AnnexCustomRemote(object):
             try:
                 method(*req_load)
             except Exception as e:
-                self.error("Problem processing %r with parameters %r: %r"
+                self.error("Problem processing %r with parameters %r: %s"
                            % (req, req_load, exc_str(e)))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s", format_exc())

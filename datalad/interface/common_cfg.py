@@ -101,7 +101,7 @@ definitions = {
     },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
-               'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
+               'title': 'This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
     },
     'datalad.fake-dates': {
         'ui': ('yesno', {
@@ -254,6 +254,12 @@ definitions = {
     'datalad.log.traceback': {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
+    },
+    'datalad.log.exc': {
+        'ui': ('yesno', {
+               'title': 'Include exceptions and their traceback in log messages. If set, \'datalad.exc.str.tblimit\' applies.'}),
+        'default': False,
+        'type': EnsureBool(),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {

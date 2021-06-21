@@ -51,6 +51,8 @@ shallow_clone: true
 
 environment:
   DATALAD_TESTS_SSH: 1
+  # The following is currently necessary as we test a lot of logging output in high detail:
+  DATALAD_LOG_EXC: 1
 
   # Do not use `image` as a matrix dimension, to have fine-grained control over
   # what tests run on which platform

@@ -10,8 +10,134 @@
 """
 
 import re
+import sys
+import traceback
 from os import linesep
+from pathlib import Path
 from pprint import pformat
+
+
+class CapturedException(object):
+    """This class represents information about an occurred exception (including
+    its traceback), while not holding any references to the actual exception
+    object or its traceback, frame references, etc.
+
+    Just keep the textual information for logging or whatever other kind of
+    reporting.
+    """
+
+    def __init__(self, exc=None, limit=None, capture_locals=False):
+        """Capture an exception and its traceback for logging.
+
+        Clears the exception's traceback frame references afterwards.
+
+        Parameters
+        ----------
+        exc: Exception or None
+          If None, rely on sys.exc_info() to get the latest.
+        limit: int
+          Note, that this is limiting the capturing of the exception's
+          traceback depth. Formatting for output comes with it's own limit.
+        capture_locals: bool
+          Whether or not to capture the local context of traceback frames.
+        """
+        # Note, that with lookup_lines=False the lookup is deferred,
+        # not disabled. Unclear to me ATM, whether that means to keep frame
+        # references around, but prob. not. TODO: Test that.
+        if exc is None:
+            exctype, value, tb = sys.exc_info()
+            self.tb = traceback.TracebackException(
+                exctype, value, tb,
+                limit=limit,
+                lookup_lines=True,
+                capture_locals=capture_locals
+            )
+            traceback.clear_frames(tb)
+        else:
+            self.tb = traceback.TracebackException.from_exception(
+                exc,
+                limit=limit,
+                lookup_lines=True,
+                capture_locals=capture_locals
+            )
+            traceback.clear_frames(exc.__traceback__)
+
+    def format_oneline_tb(self, limit=None, include_str=True):
+        """Format an exception traceback as a one-line summary
+
+        Returns a string of the form [filename:contextname:linenumber, ...].
+        If include_str is True (default), this is prepended with the string
+        representation of the exception.
+        """
+
+        # Note: No import at module level, since ConfigManager imports
+        # dochelpers -> circular import when creating datalad.cfg instance at
+        # startup.
+        from datalad import cfg
+
+        if include_str:
+            # try exc message
+            leading = str(self.tb)
+            if not leading:
+                # go with type
+                leading = self.tb.exc_type.__qualname__
+            out = "{} ".format(leading)
+        else:
+            out = ""
+
+        if limit is None:
+            # TODO: config logging.exceptions.traceback_levels = 1
+            #       ^ This is taken from exc_str(). What exactly does it mean?
+            #         Controlling the tblimit differently for logging, result
+            #         reporting, whatever else?
+            limit = int(cfg.obtain('datalad.exc.str.tblimit', default=1))
+
+        entries = []
+        entries.extend(self.tb.stack)
+        if self.tb.__cause__:
+            entries.extend(self.tb.__cause__.stack)
+        elif self.tb.__context__ and not self.tb.__suppress_context__:
+            entries.extend(self.tb.__context__.stack)
+
+        if entries:
+            tb_str = "[%s]" % (','.join(
+                "{}:{}:{}".format(
+                    Path(frame_summary.filename).name,
+                    frame_summary.name,
+                    frame_summary.lineno)
+                for frame_summary in entries[-limit:])
+            )
+            out += "{}".format(tb_str)
+
+        return out
+
+    def format_standard(self):
+        """Gives python's standard traceback output"""
+        # TODO: intended for introducing a decent debug mode later;
+        #       for now: a one-liner is free ;-)
+
+        return ''.join(self.tb.format())
+
+    def __str__(self):
+        """String representation
+
+        This is intended to be used via logging Formatters, which is why
+        its behavior is controlled by 'datalad.log.exc'. If that config is false
+        (default), an empty string is returned.
+        """
+        # Note: No import at module level, since ConfigManager imports
+        # dochelpers -> circular import when creating datalad.cfg instance at
+        # startup.
+        from datalad import cfg
+
+        if cfg.obtain('datalad.log.exc'):
+            return self.format_oneline_tb(limit=None, include_str=True)
+        else:
+            return ""
+
+    def __repr__(self):
+        return self.tb.exc_type.__qualname__ + '(' + str(self.tb) + ')'
+
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
