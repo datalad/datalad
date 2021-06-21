@@ -63,7 +63,8 @@
     "adelavega": {
         "name": "Alejandro de la Vega",
         "blog": "https://github.com/adelavega",
-        "email": "delavega@utexas.edu"
+        "email": "delavega@utexas.edu",
+        "bio": "Research Scientist @ UT Austin. "
     },
     "kskyten": {
         "name": "kskyten",
