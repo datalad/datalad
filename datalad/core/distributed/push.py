@@ -114,7 +114,7 @@ class Push(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
-            doc="""path to contrain a push to. If given, only
+            doc="""path to constrain a push to. If given, only
             data or changes for those paths are considered for a push.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
@@ -229,7 +229,6 @@ class Push(Interface):
                     if sr
                     else 'No targets configured in dataset.'))
             return
-
         if since == '^':
             # figure out state of remote branch and set `since`
             since = _get_corresponding_remote_state(ds_repo, to)
@@ -266,6 +265,27 @@ class Push(Interface):
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
         if not matched_anything:
+            potential_remote = False
+            if not to and len(paths) == 1:
+                # if we get a remote name without --to, provide a hint
+                sr = ds_repo.get_remotes(**get_remote_kwargs)
+                potential_remote = [
+                    p for p in ensure_list(path) if p in sr
+                ]
+            if potential_remote:
+                hint = "{} matches a sibling name and not a path. " \
+                      "Forgot --to?".format(potential_remote)
+                yield dict(
+                    res_kwargs,
+                    status='notneeded',
+                    message=hint,
+                    hints=hint,
+                    type='dataset',
+                    path=ds.path,
+                )
+                # there's no matching path and we have generated a hint on
+                # fixing the call - we can return now
+                return
             yield dict(
                 res_kwargs,
                 status='notneeded',
@@ -278,6 +298,7 @@ class Push(Interface):
 
     @staticmethod
     def custom_result_summary_renderer(results, action_summary):  # pragma: more cover
+        render_action_summary(action_summary)
         # report on any hints at the end
         # get all unique hints
         hints = set([r.get('hints', None) for r in results])
@@ -286,14 +307,13 @@ class Push(Interface):
             from datalad.ui import ui
             from datalad.support import ansi_colors
             intro = ansi_colors.color_word(
-                "Potential hints to solve encountered errors: ",
+                "Hints: ",
                 ansi_colors.YELLOW)
             ui.message(intro)
             [ui.message("{}: {}".format(
                 ansi_colors.color_word(id + 1, ansi_colors.YELLOW), hint))
                 for id, hint in enumerate(hints)]
 
-        render_action_summary(action_summary)
 
 
 def _datasets_since_(dataset, since, paths, recursive, recursion_limit):

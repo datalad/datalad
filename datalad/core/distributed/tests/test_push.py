@@ -987,5 +987,5 @@ def test_push_custom_summary(path):
     ds.config.set("advice.pushFetchFirst", "true", where="local")
     with swallow_outputs() as cmo:
         ds.push(to="sib", result_renderer="default", on_failure="ignore")
-        assert_in("Potential hints to solve", cmo.out)
+        assert_in("Hints:", cmo.out)
         assert_in("action summary:", cmo.out)
