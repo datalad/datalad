@@ -1,34 +1,6 @@
-     ____            _             _                   _ 
-    |  _ \    __ _  | |_    __ _  | |       __ _    __| |
-    | | | |  / _` | | __|  / _` | | |      / _` |  / _` |
-    | |_| | | (_| | | |_  | (_| | | |___  | (_| | | (_| |
-    |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
-                                               Change Log
+# 0.14.4 (May 10, 2021) -- .
 
-This is a high level and scarce summary of the changes between releases.
-We would recommend to consult log of the 
-[DataLad git repository](http://github.com/datalad/datalad) for more details.
-
-## 0.14.5 (??? ??, 2021) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
-
-### Fixes
-
-?
-
-### Enhancements and new features
-
-?
-
-
-## 0.14.4 (May 10, 2021) -- .
-
-### Fixes
+## Fixes
 
 - Following an internal call to `git-clone`, [clone][] assumed that
   the remote name was "origin", but this may not be the case if
@@ -39,9 +11,9 @@ bet we will fix some bugs and make a world even a better place.
   ([#5612][]) ([#5632][]) ([#5639][])
 
 
-## 0.14.3 (April 28, 2021) -- .
+# 0.14.3 (April 28, 2021) -- .
 
-### Fixes
+## Fixes
 
 - For outputs that include a glob, [run][] didn't re-glob after
   executing the command, which is necessary to catch changes if
@@ -62,16 +34,16 @@ bet we will fix some bugs and make a world even a better place.
 - The test suite required updates for recent changes in PyGithub and
   git-annex.  ([#5603][]) ([#5609][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The DataLad source repository has long had a
   tools/cmdline-completion helper.  This functionality is now exposed
   as a command, `datalad shell-completion`.  ([#5544][])
 
 
-## 0.14.2 (April 14, 2021) -- .
+# 0.14.2 (April 14, 2021) -- .
 
-### Fixes
+## Fixes
 
 - [push][] now works bottom-up, pushing submodules first so that hooks
   on the remote can aggregate updated subdataset information. ([#5416][])
@@ -80,9 +52,9 @@ bet we will fix some bugs and make a world even a better place.
   subdatasets was reloaded.  ([#5552][])
 
 
-## 0.14.1 (April 01, 2021) -- .
+# 0.14.1 (April 01, 2021) -- .
 
-### Fixes
+## Fixes
 
 - The recent default branch changes on GitHub's side can lead to
   "git-annex" being selected over "master" as the default branch on
@@ -129,7 +101,7 @@ bet we will fix some bugs and make a world even a better place.
 - DataLad's wrapper around `argparse` failed if an underscore was used
   in a positional argument.  ([#5525][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - DataLad's method for mapping environment variables to configuration
   options (e.g., `DATALAD_FOO_X__Y` to `datalad.foo.x-y`) doesn't work
@@ -139,9 +111,9 @@ bet we will fix some bugs and make a world even a better place.
   configuration values.  ([#5505][])
 
 
-## 0.14.0 (February 02, 2021) -- .
+# 0.14.0 (February 02, 2021) -- .
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - Git versions below v2.19.1 are no longer supported.  ([#4650][])
 
@@ -218,7 +190,7 @@ bet we will fix some bugs and make a world even a better place.
 - The long-deprecated (and non-functional) `url` parameter of
   `GitRepo.__init__` has been removed.  ([#5342][])
 
-### Fixes
+## Fixes
 
 - Cloning onto a system that enters adjusted branches by default (as
   Windows does) did not properly record the clone URL.  ([#5128][])
@@ -239,7 +211,7 @@ bet we will fix some bugs and make a world even a better place.
   improved to play nicer with outside applications and scripts that
   use asyncio.  ([#5350][]) ([#5367][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The subdataset handling for adjusted branches, which is particularly
   important on Windows where git-annex enters an adjusted branch by
@@ -356,9 +328,9 @@ bet we will fix some bugs and make a world even a better place.
   ([#5141][]) ([#5142][]) ([#5229][])
 
 
-## 0.13.7 (January 04, 2021) -- .
+# 0.13.7 (January 04, 2021) -- .
 
-### Fixes
+## Fixes
 
 - Cloning from a RIA store on the local file system initialized annex
   in the Git sibling of the RIA source, which is problematic because
@@ -376,15 +348,15 @@ bet we will fix some bugs and make a world even a better place.
 
 - Update tests for compatibility with latest git-annex.  ([#5254][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [copy-file][] now aborts if .git/ is in the target directory, adding
   to its existing .git/ safety checks.  ([#5258][])
 
 
-## 0.13.6 (December 14, 2020) -- .
+# 0.13.6 (December 14, 2020) -- .
 
-### Fixes
+## Fixes
 
 - An assortment of fixes for Windows compatibility.  ([#5113][]) ([#5119][])
   ([#5125][]) ([#5127][]) ([#5136][]) ([#5201][]) ([#5200][]) ([#5214][])
@@ -421,7 +393,7 @@ bet we will fix some bugs and make a world even a better place.
   8.20201103.  (This is also resolved on git-annex's end as of
   8.20201127.)  ([#5151][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The credential helper no longer asks the user to repeat tokens or
   AWS keys.  ([#5219][])
@@ -430,9 +402,9 @@ bet we will fix some bugs and make a world even a better place.
   stores SSH sockets, allowing users to more easily work around file
   system and path length restrictions.  ([#5238][])
 
-## 0.13.5 (October 30, 2020) -- .
+# 0.13.5 (October 30, 2020) -- .
 
-### Fixes
+## Fixes
 
 - SSH connection handling has been reworked to fix cloning on Windows.
   A new configuration option, `datalad.ssh.multiplex-connections`,
@@ -470,7 +442,7 @@ bet we will fix some bugs and make a world even a better place.
 - The default credentials configured for `indi-s3` prevented anonymous
   access.  ([#5045][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Messages about suppressed similar results are now rate limited to
   improve performance when there are many similar results coming
@@ -483,9 +455,9 @@ bet we will fix some bugs and make a world even a better place.
   tqdm 2.1 or later).  ([#5057][])
 
 
-## 0.13.4 (October 6, 2020) -- .
+# 0.13.4 (October 6, 2020) -- .
 
-### Fixes
+## Fixes
 
 - Ephemeral clones mishandled bare repositories.  ([#4899][])
 
@@ -513,7 +485,7 @@ bet we will fix some bugs and make a world even a better place.
 - Several issues with the handling of S3 credentials and token
   expiration have been addressed.  ([#4927][]) ([#4931][]) ([#4952][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - A warning is now given if the detected Git is below v2.13.0 to let
   users that run into problems know that their Git version is likely
@@ -541,9 +513,9 @@ bet we will fix some bugs and make a world even a better place.
   ([#4877][])
 
 
-## 0.13.3 (August 28, 2020) -- .
+# 0.13.3 (August 28, 2020) -- .
 
-### Fixes
+## Fixes
 
 - Work around a Python bug that led to our asyncio-based command
   runner intermittently failing to capture the output of commands that
@@ -556,23 +528,23 @@ bet we will fix some bugs and make a world even a better place.
   reports any failures rather than crashing.  A change in v0.12.0
   broke this handling in a particular case.  ([#4817][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The wrapper functions returned by decorators are now given more
   meaningful names to hopefully make tracebacks easier to digest.
   ([#4834][])
 
 
-## 0.13.2 (August 10, 2020) -- .
+# 0.13.2 (August 10, 2020) -- .
 
-### Deprecations
+## Deprecations
 
 - The `allow_quick` parameter of `AnnexRepo.file_has_content` and
   `AnnexRepo.is_under_annex` is now ignored and will be removed in a
   later release.  This parameter was only relevant for git-annex
   versions before 7.20190912.  ([#4736][])
 
-### Fixes
+## Fixes
 
 - Updates for compatibility with recent git and git-annex releases.
   ([#4746][]) ([#4760][]) ([#4684][])
@@ -604,7 +576,7 @@ bet we will fix some bugs and make a world even a better place.
   `AnnexRepo` incorrectly took the "allow quick" code path on file
   systems that did not support it ([#4736][])
 
-### Enhancements
+## Enhancements
 
 - [create][] now assigns version 4 (random) UUIDs instead of version 1
   UUIDs that encode the time and hardware address.  ([#4790][])
@@ -626,9 +598,9 @@ bet we will fix some bugs and make a world even a better place.
   information after auto-enabling `type=git` special remotes.  ([#2897][])
 
 
-## 0.13.1 (July 17, 2020) -- .
+# 0.13.1 (July 17, 2020) -- .
 
-### Fixes
+## Fixes
 
 - Cloning a subdataset should inherit the parent's
   `datalad.clone.reckless` value, but that did not happen when cloning
@@ -651,7 +623,7 @@ bet we will fix some bugs and make a world even a better place.
   any changes to the process environment that occurred after
   instantiation.  ([#4703][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - `datalad push` now avoids unnecessary `git push` dry runs and pushes
   all refspecs with a single `git push` call rather than invoking `git
@@ -671,12 +643,12 @@ bet we will fix some bugs and make a world even a better place.
   `on_debian_wheezy` attributes in `datalad.utils.
 
 
-## 0.13.0 (June 23, 2020) -- .
+# 0.13.0 (June 23, 2020) -- .
 
 A handful of new commands, including `copy-file`, `push`, and
 `create-sibling-ria`, along with various fixes and enhancements
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - The `no_annex` parameter of [create][], which is exposed in the
   Python API but not the command line, is deprecated and will be
@@ -710,7 +682,7 @@ A handful of new commands, including `copy-file`, `push`, and
   `AnnexRepo.WEB_UUID` for compatibility, but new code should use
   `consts.WEB_SPECIAL_REMOTE_UUID` ([#4460][]).
 
-### Fixes
+## Fixes
 
 - Widespread improvements in functionality and test coverage on
   Windows and crippled file systems in general.  ([#4057][])
@@ -753,7 +725,7 @@ A handful of new commands, including `copy-file`, `push`, and
   incorrect default when the command overrode the value of command
   parameters such as `result_renderer`.  ([#4480][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The default result renderer learned to elide a chain of results
   after seeing ten consecutive results that it considers similar,
@@ -887,9 +859,9 @@ A handful of new commands, including `copy-file`, `push`, and
   ([#4243][])
 
 
-## 0.12.7 (May 22, 2020) -- .
+# 0.12.7 (May 22, 2020) -- .
 
-### Fixes
+## Fixes
 
 - Requesting tailored output (`--output=tailored`) from a command with
   a custom result summary renderer produced repeated output. ([#4463][])
@@ -930,7 +902,7 @@ A handful of new commands, including `copy-file`, `push`, and
   silenced, with the overall failure of a [metadata][] call logged at
   the debug level.  ([#4568][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The resource identifier helper learned to recognize URLs with
   embedded Git transport information, such as
@@ -941,15 +913,15 @@ A handful of new commands, including `copy-file`, `push`, and
   asked to do so.  ([#4553][])
 
 
-## 0.12.6 (April 23, 2020) -- .
+# 0.12.6 (April 23, 2020) -- .
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - The value of `datalad.support.annexrep.N_AUTO_JOBS` is no longer
   considered.  The variable will be removed in a later release.
   ([#4409][])
 
-### Fixes
+## Fixes
 
 - Staring with v0.12.0, `datalad save` recorded the current branch of
   a parent dataset as the `branch` value in the .gitmodules entry for
@@ -983,7 +955,7 @@ A handful of new commands, including `copy-file`, `push`, and
 - [create-sibling-github][] did not gracefully handle a token that did
   not have the necessary permissions.  ([#4400][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [search] learned to use the query as a regular expression that
   restricts the keys that are shown for `--show-keys short`. ([#4354][])
@@ -993,11 +965,11 @@ A handful of new commands, including `copy-file`, `push`, and
   extension is not installed.  ([#4400][]) ([#4174][])
 
 
-## 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
+# 0.12.5 (Apr 02, 2020) -- a small step for datalad ...
 ￼
 Fix some bugs and make the world an even better place.
 
-### Fixes
+## Fixes
 
 - Our `log_progress` helper mishandled the initial display and step of
   the progress bar.  ([#4326][])
@@ -1019,24 +991,24 @@ Fix some bugs and make the world an even better place.
   it considered to add the origin of the origin as a remote.  ([#4367][])
 
 
-## 0.12.4 (Mar 19, 2020) -- Windows?!
+# 0.12.4 (Mar 19, 2020) -- Windows?!
 ￼
 The main purpose of this release is to have one on PyPi that has no
 associated wheel to enable a working installation on Windows ([#4315][]).
 
-### Fixes
+## Fixes
 
 - The description of the `log.outputs` config switch did not keep up
   with code changes and incorrectly stated that the output would be
   logged at the DEBUG level; logging actually happens at a lower
   level.  ([#4317][])
 
-## 0.12.3 (March 16, 2020) -- .
+# 0.12.3 (March 16, 2020) -- .
 
 Updates for compatibility with the latest git-annex, along with a few
 miscellaneous fixes
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - All spots that raised a `NoDatasetArgumentFound` exception now raise
   a `NoDatasetFound` exception to better reflect the situation: it is
@@ -1044,7 +1016,7 @@ miscellaneous fixes
   compatibility, the latter inherits from the former, but new code
   should prefer the latter.  ([#4285][])
 
-### Fixes
+## Fixes
 
 - Updates for compatibility with git-annex version 8.20200226. ([#4214][])
 
@@ -1069,7 +1041,7 @@ miscellaneous fixes
 - `AnnexRepo.set_remote_url` is supposed to establish shared SSH
   connections but failed to do so.  ([#4262][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The message provided when a command cannot determine what dataset to
   operate on has been improved.  ([#4285][])
@@ -1081,16 +1053,16 @@ miscellaneous fixes
 - The xmp metadata extractor now recognizes ".wav" files.
 
 
-## 0.12.2 (Jan 28, 2020) -- Smoothen the ride
+# 0.12.2 (Jan 28, 2020) -- Smoothen the ride
 
 Mostly a bugfix release with various robustifications, but also makes
 the first step towards versioned dataset installation requests.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - The minimum required version for GitPython is now 2.1.12. ([#4070][])
 
-### Fixes
+## Fixes
 
 - The class for handling configuration values, `ConfigManager`,
   inappropriately considered the current working directory's dataset,
@@ -1118,7 +1090,7 @@ the first step towards versioned dataset installation requests.
 - When cloning failed, error lines were not bubbled up to the user in
   some scenarios.  ([#4060][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [clone][] (and thus [install][])
   - now propagates the `reckless` mode from the superdataset when
@@ -1138,18 +1110,18 @@ the first step towards versioned dataset installation requests.
   set or the `7z` executable is not found.  ([#4041][])
 
 
-## 0.12.1 (Jan 15, 2020) -- Small bump after big bang
+# 0.12.1 (Jan 15, 2020) -- Small bump after big bang
 
 Fix some fallout after major release.
 
-### Fixes
+## Fixes
 
 - Revert incorrect relative path adjustment to URLs in [clone][]. ([#3538][])
 
 - Various small fixes to internal helpers and test to run on Windows
   ([#2566][]) ([#2534][])
 
-## 0.12.0 (Jan 11, 2020) -- Krakatoa
+# 0.12.0 (Jan 11, 2020) -- Krakatoa
 
 This release is the result of more than a year of development that includes
 fixes for a large number of issues, yielding more robust behavior across a
@@ -1158,7 +1130,7 @@ is the first release for which extensive user documentation is available in a
 dedicated [DataLad Handbook][handbook].  Python 3 (3.5 and later) is now the
 only supported Python flavor.
 
-### Major changes 0.12 vs 0.11
+## Major changes 0.12 vs 0.11
 
 - [save][] fully replaces [add][] (which is obsolete now, and will be removed
   in a future release).
@@ -1198,7 +1170,7 @@ only supported Python flavor.
   meant to provide longer-term stability. Application developers are encouraged to
   preferentially build on these commands.
 
-### Major refactoring and deprecations since 0.12.0rc6
+## Major refactoring and deprecations since 0.12.0rc6
 
 - [clone][] has been incorporated into the growing core API. The public
   `--alternative-source` parameter has been removed, and a `clone_dataset`
@@ -1236,7 +1208,7 @@ only supported Python flavor.
   hook mechanism provides an alternative for `proc-post`
   procedures. ([#3963][])
 
-### Fixes since 0.12.0rc6
+## Fixes since 0.12.0rc6
 
 - [publish][] crashed when called with a detached HEAD.  It now aborts
   with an informative message.  ([#3804][])
@@ -1318,7 +1290,7 @@ only supported Python flavor.
   - configured the wrong pushurl and annexurl values in some
     cases. ([#3955][])
 
-### Enhancements and new features since 0.12.0rc6
+## Enhancements and new features since 0.12.0rc6
 
 - By default, datasets cloned from local source paths will now get a
   configured remote for any recursively discoverable 'origin' sibling that
@@ -1389,11 +1361,11 @@ only supported Python flavor.
 - Commands now accept a `dataset` value of "^."  as shorthand for "the
   dataset to which the current directory belongs".  ([#3242][])
 
-## 0.12.0rc6 (Oct 19, 2019) -- some releases are better than the others
+# 0.12.0rc6 (Oct 19, 2019) -- some releases are better than the others
 
 bet we will fix some bugs and make a world even a better place.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - DataLad no longer supports Python 2.  The minimum supported version
   of Python is now 3.5.  ([#3629][])
@@ -1437,7 +1409,7 @@ bet we will fix some bugs and make a world even a better place.
 - The `rev_resolve_path` substituted `resolve_path` helper. ([#3797][])
 
 
-### Fixes
+## Fixes
 
 - Correctly handle relative paths in [publish][]. ([#3799][]) ([#3102][])
 
@@ -1478,7 +1450,7 @@ bet we will fix some bugs and make a world even a better place.
 - `path_is_under()` was incapable of comparing Windows paths with different
   drive letters.  ([#3728][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Provide a collection of "public" `call_git*` helpers within GitRepo
   and replace use of "private" and less specific `_git_custom_command`
@@ -1527,11 +1499,11 @@ bet we will fix some bugs and make a world even a better place.
 - Do not pretend to be able to work in optimized (`python -O`) mode,
   crash early with an informative message. ([#3803][])
 
-## 0.12.0rc5 (September 04, 2019) -- .
+# 0.12.0rc5 (September 04, 2019) -- .
 
 Various fixes and enhancements that bring the 0.12.0 release closer.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - The two modules below have a new home.  The old locations still
   exist as compatibility shims and will be removed in a future
@@ -1566,7 +1538,7 @@ Various fixes and enhancements that bring the 0.12.0 release closer.
   `unlock` and `addurls`, follow the new logic.  The goal is for all
   commands to eventually do so.
 
-### Fixes
+## Fixes
 
 - The function for loading JSON streams wasn't clever enough to handle
   content that included a Unicode line separator like
@@ -1603,7 +1575,7 @@ Various fixes and enhancements that bring the 0.12.0 release closer.
   arguments to avoid exceeding the command-line character limit.
   ([#3587][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - New command `create-sibling-gitlab` provides an interface for
   creating a publication target on a GitLab instance.  ([#3447][])
@@ -1644,7 +1616,7 @@ Various fixes and enhancements that bring the 0.12.0 release closer.
 - [addurls][] learned to accept a `--cfg-proc` value and pass it to
   its `create` calls.  ([#3562][])
 
-## 0.12.0rc4 (May 15, 2019) -- the revolution is over
+# 0.12.0rc4 (May 15, 2019) -- the revolution is over
 
 With the replacement of the `save` command implementation with `rev-save`
 the revolution effort is now over, and the set of key commands for
@@ -1652,12 +1624,12 @@ local dataset operations (`create`, `run`, `save`, `status`, `diff`) is
  now complete. This new core API is available from `datalad.core.local`
 (and also via `datalad.api`, as any other command).
 ￼
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - The `add` command is now deprecated. It will be removed in a future
   release.
 
-### Fixes
+## Fixes
 
 - Remove hard-coded dependencies on POSIX path conventions in SSH support
   code ([#3400][])
@@ -1667,19 +1639,19 @@ local dataset operations (`create`, `run`, `save`, `status`, `diff`) is
 - SSH file transfer now actually opens a shared connection, if none exists
   yet ([#3403][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - `SSHConnection` now offers methods for file upload and dowload (`get()`,
   `put()`. The previous `copy()` method only supported upload and was
   discontinued ([#3401][])
 
 
-## 0.12.0rc3 (May 07, 2019) -- the revolution continues
+# 0.12.0rc3 (May 07, 2019) -- the revolution continues
 ￼
 Continues API consolidation and replaces the `create` and `diff` command
 with more performant implementations.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - The previous `diff` command has been replaced by the diff variant
   from the [datalad-revolution][] extension.  ([#3366][])
@@ -1703,7 +1675,7 @@ with more performant implementations.
 - `AnnexRepo.get_status` has been replaced by `AnnexRepo.status`.
   ([#3330][])
 
-### Fixes
+## Fixes
 
 - [status][]
   - reported on directories that contained only ignored files ([#3238][])
@@ -1724,7 +1696,7 @@ with more performant implementations.
 - The new pathlib-based code had various encoding issues on Python 2.
   ([#3332][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [wtf][] now includes information about the Python version.  ([#3255][])
 
@@ -1779,15 +1751,15 @@ with more performant implementations.
 - The XMP metadata extractor now filters based on file name to improve
   its performance.  ([#3329][])
 
-## 0.12.0rc2 (Mar 18, 2019) -- revolution!
+# 0.12.0rc2 (Mar 18, 2019) -- revolution!
 
-### Fixes
+## Fixes
 
 - `GitRepo.dirty` does not report on nested empty directories ([#3196][]).
 
 - `GitRepo.save()` reports results on deleted files.
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Absorb a new set of core commands from the datalad-revolution extension:
   - `rev-status`: like `git status`, but simpler and working with dataset
@@ -1798,14 +1770,14 @@ with more performant implementations.
 - JSON support tools can now read and write compressed files.
 
 
-## 0.12.0rc1 (Mar 03, 2019) -- to boldly go ...
+# 0.12.0rc1 (Mar 03, 2019) -- to boldly go ...
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - Discontinued support for git-annex direct-mode (also no longer
   supported upstream).
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Dataset and Repo object instances are now hashable, and can be
   created based on pathlib Path object instances
@@ -1814,16 +1786,16 @@ with more performant implementations.
   information and save changes.
 
 
-## 0.11.8 (Oct 11, 2019) -- annex-we-are-catching-up
+# 0.11.8 (Oct 11, 2019) -- annex-we-are-catching-up
 
-### Fixes
+## Fixes
 
 - Our internal command runner failed to capture output in some cases.
   ([#3656][])
 - Workaround in the tests around python in cPython >= 3.7.5 ';' in
   the filename confusing mimetypes ([#3769][]) ([#3770][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Prepared for upstream changes in git-annex, including support for
   the latest git-annex
@@ -1835,11 +1807,11 @@ with more performant implementations.
   stored in git rather than annex.  ([#3667][])
 
 
-## 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
+# 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
 
 Primarily bugfixes with some optimizations and refactorings.
 
-### Fixes
+## Fixes
 
 - [addurls][]
   - now provides better handling when the URL file isn't in the
@@ -1869,7 +1841,7 @@ Primarily bugfixes with some optimizations and refactorings.
 - [download-url][] now will create leading directories of the output path
   if they do not exist ([#3646][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The [annotate-paths][] helper now caches subdatasets it has seen to
   avoid unnecessary calls.  ([#3570][])
@@ -1893,11 +1865,11 @@ Primarily bugfixes with some optimizations and refactorings.
   ([#3631][])
 
 
-## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
+# 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
 
 Primarily bug fixes to achieve more robust performance
 
-### Fixes
+## Fixes
 
 - Our tests needed various adjustments to keep up with upstream
   changes in Travis and Git. ([#3479][]) ([#3492][]) ([#3493][])
@@ -1919,7 +1891,7 @@ Primarily bug fixes to achieve more robust performance
 - Cloning a `type=git` special remote showed a spurious warning about
   the remote not being enabled.  ([#3547][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - For calls to git and git-annex, we disable automatic garbage
   collection due to past issues with GitPython's state becoming stale,
@@ -1935,11 +1907,11 @@ Primarily bug fixes to achieve more robust performance
 - The [metadata][] command aborts earlier if a metadata extractor is
   unavailable.  ([#3525][])
 
-## 0.11.5 (May 23, 2019) -- stability is not overrated
+# 0.11.5 (May 23, 2019) -- stability is not overrated
 
 Should be faster and less buggy, with a few enhancements.
 
-### Fixes
+## Fixes
 
 - [create-sibling][]  ([#3318][])
   - Siblings are no longer configured with a post-update hook unless a
@@ -1966,7 +1938,7 @@ Should be faster and less buggy, with a few enhancements.
   SSH RIs.  ([#3425][])
 - The detection of SSH RIs has been improved.  ([#3425][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - The internal command runner was too aggressive in its decision to
   sleep.  ([#3322][])
@@ -2000,17 +1972,17 @@ Should be faster and less buggy, with a few enhancements.
     sections and a `--decor` option, which currently knows how to
     format the output as GitHub's `<details>` section.  ([#3440][])
 
-## 0.11.4 (Mar 18, 2019) -- get-ready
+# 0.11.4 (Mar 18, 2019) -- get-ready
 
 Largely a bug fix release with a few enhancements
 
-### Important
+## Important
 
 - 0.11.x series will be the last one with support for direct mode of [git-annex][]
   which is used on crippled (no symlinks and no locking) filesystems.
   v7 repositories should be used instead.
 
-### Fixes
+## Fixes
 
 - Extraction of .gz files is broken without p7zip installed.  We now
   abort with an informative error in this situation.  ([#3176][])
@@ -2047,7 +2019,7 @@ Largely a bug fix release with a few enhancements
 - Check for stdin/out/err to not be closed before checking for `.isatty`.
   ([#3268][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Creating a new repository now aborts if any of the files in the
   directory are tracked by a repository in a parent directory.
@@ -2072,11 +2044,11 @@ Largely a bug fix release with a few enhancements
   - The new `DATASET_CONFIG_FILE` refers to `DATALAD_DOTDIR/config`.
   - `METADATA_FILENAME` has been renamed to `OLDMETADATA_FILENAME`.
 
-## 0.11.3 (Feb 19, 2019) -- read-me-gently
+# 0.11.3 (Feb 19, 2019) -- read-me-gently
 
 Just a few of important fixes and minor enhancements.
 
-### Fixes
+## Fixes
 
 - The logic for setting the maximum command line length now works
   around Python 3.4 returning an unreasonably high value for
@@ -2089,7 +2061,7 @@ Just a few of important fixes and minor enhancements.
   `annex.merge-annex-branches` in some common "read-only" scenarios to
   avoid these failures. ([#3164][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Accessing an "unbound" dataset method now automatically imports the
   necessary module rather than requiring an explicit import from the
@@ -2101,17 +2073,17 @@ Just a few of important fixes and minor enhancements.
   DataLad to pass a value to the `-i` option of `ssh`. ([#3149][])
   ([#3168][])
 
-## 0.11.2 (Feb 07, 2019) -- live-long-and-prosper
+# 0.11.2 (Feb 07, 2019) -- live-long-and-prosper
 
 A variety of bugfixes and enhancements
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - All extracted metadata is now placed under git-annex by default.
   Previously files smaller than 20 kb were stored in git. ([#3109][])
 - The function `datalad.cmd.get_runner` has been removed. ([#3104][])
 
-### Fixes
+## Fixes
 
 - Improved handling of long commands:
   - The code that inspected `SC_ARG_MAX` didn't check that the
@@ -2150,7 +2122,7 @@ A variety of bugfixes and enhancements
 - Pass `GIT_SSH_VARIANT=ssh` to git processes to be able to specify
   alternative ports in SSH urls
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [search][] learned to suggest closely matching keys if there are no
   hits. ([#3089][])
@@ -2183,12 +2155,12 @@ A variety of bugfixes and enhancements
 - `datalad --help` now avoids using `man` so that the list of
   subcommands is shown.  ([#3124][])
 
-## 0.11.1 (Nov 26, 2018) -- v7-better-than-v6
+# 0.11.1 (Nov 26, 2018) -- v7-better-than-v6
 
 Rushed out bugfix release to stay fully compatible with recent
 [git-annex][] which introduced v7 to replace v6.
 
-### Fixes
+## Fixes
 
 - [install][]: be able to install recursively into a dataset ([#2982][])
 - [save][]: be able to commit/save changes whenever files potentially
@@ -2216,7 +2188,7 @@ Rushed out bugfix release to stay fully compatible with recent
 - Make sure that credential defined in env var takes precedence
   ([#2960][]) ([#2950][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [shub://datalad/datalad:git-annex-dev](https://singularity-hub.org/containers/5663/view)
   provides a Debian buster Singularity image with build environment for
@@ -2236,18 +2208,18 @@ Rushed out bugfix release to stay fully compatible with recent
   error) ([#2958][])
 
 
-## 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
+# 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
 
 [git-annex][] 6.20180913 (or later) is now required - provides a number of
 fixes for v6 mode operations etc.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - `datalad.consts.LOCAL_CENTRAL_PATH` constant was deprecated in favor
   of `datalad.locations.default-dataset` [configuration][config] variable
   ([#2835][])
 
-### Minor refactoring
+## Minor refactoring
 
 - `"notneeded"` messages are no longer reported by default results
   renderer
@@ -2258,7 +2230,7 @@ fixes for v6 mode operations etc.
 - `GitRepo.get_merge_base` argument is now called `commitishes` instead
   of `treeishes` ([#2903][])
 
-### Fixes
+## Fixes
 
 - [update][] should not leave the dataset in non-clean state ([#2858][])
   and some other enhancements ([#2859][])
@@ -2285,7 +2257,7 @@ fixes for v6 mode operations etc.
 - `GlobbedPaths.expand(..., full=True)` incorrectly returned relative
    paths when called more than once ([#2921][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Report progress on [clone][] when installing from "smart" git servers
   ([#2876][])
@@ -2302,12 +2274,12 @@ fixes for v6 mode operations etc.
   - Procedures in user and system locations now take precedence over
     those in datasets.
 
-## 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
+# 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
 
 Emergency bugfix to address forgotten boost of version in
 `datalad/version.py`.
 
-## 0.10.3 (Sep 13, 2018) -- Almost-perfect
+# 0.10.3 (Sep 13, 2018) -- Almost-perfect
 
 This is largely a bugfix release which addressed many (but not yet all)
 issues of working with git-annex direct and version 6 modes, and operation
@@ -2320,7 +2292,7 @@ Although we do not require with this release, it is recommended to make
 sure that you are using a recent `git-annex` since it also had a variety
 of fixes and enhancements in the past months.
 
-### Fixes
+## Fixes
 
 - Parsing of combined short options has been broken since DataLad
   v0.10.0. ([#2710][])
@@ -2361,7 +2333,7 @@ of fixes and enhancements in the past months.
 - Minor (in)compatibility with git 2.19 - (no) trailing period
   in an error message now. ([#2815][])
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Anonymous access is now supported for S3 and other downloaders.  ([#2708][])
 - A new interface is available to ease setting up new providers.  ([#2708][])
@@ -2405,19 +2377,19 @@ of fixes and enhancements in the past months.
   display a progress bar.  ([#2738][])
 
 
-## 0.10.2 (Jul 09, 2018) -- Thesecuriestever
+# 0.10.2 (Jul 09, 2018) -- Thesecuriestever
 
 Primarily a bugfix release to accommodate recent git-annex release
 forbidding file:// and http://localhost/ URLs which might lead to
 revealing private files if annex is publicly shared.
 
-### Fixes
+## Fixes
 
 - fixed testing to be compatible with recent git-annex (6.20180626)
 - [download-url][] will now download to current directory instead of the
   top of the dataset
 
-### Enhancements and new features
+## Enhancements and new features
 
 - do not quote ~ in URLs to be consistent with quote implementation in
   Python 3.7 which now follows RFC 3986
@@ -2428,22 +2400,22 @@ revealing private files if annex is publicly shared.
 - `--discover` option added to [run-procedure][] to list available
   procedures
 
-## 0.10.1 (Jun 17, 2018) -- OHBM polish
+# 0.10.1 (Jun 17, 2018) -- OHBM polish
 
 The is a minor bugfix release.
 
-### Fixes
+## Fixes
 
 - Be able to use backports.lzma as a drop-in replacement for pyliblzma.
 - Give help when not specifying a procedure name in `run-procedure`.
 - Abort early when a downloader received no filename.
 - Avoid `rerun` error when trying to unlock non-available files.
 
-## 0.10.0 (Jun 09, 2018) -- The Release
+# 0.10.0 (Jun 09, 2018) -- The Release
 
 This release is a major leap forward in metadata support.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - Metadata
   - Prior metadata provided by datasets under `.datalad/meta` is no
@@ -2467,7 +2439,7 @@ This release is a major leap forward in metadata support.
 - By default a dataset X is now only considered to be a super-dataset of
   another dataset Y, if Y is also a registered subdataset of X.
 
-### Fixes
+## Fixes
 
 A number of fixes did not make it into the 0.9.x series:
 
@@ -2485,7 +2457,7 @@ A number of fixes did not make it into the 0.9.x series:
   e.g., via pip)
 - More robust URL handling in `simple_with_archives` crawler pipeline.
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Support for DataLad extension that can contribute API components from 3rd-party sources,
   incl. commands, metadata extractors, and test case implementations.
@@ -2538,11 +2510,11 @@ A number of fixes did not make it into the 0.9.x series:
   temporarily re-enable reporting that was disable by configuration settings.
 
 
-## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
+# 0.9.3 (Mar 16, 2018) -- pi+0.02 release
 
 Some important bug fixes which should improve usability
 
-### Fixes
+## Fixes
 
 - `datalad-archives` special remote now will lock on acquiring or
   extracting an archive - this allows for it to be used with -J flag
@@ -2555,7 +2527,7 @@ Some important bug fixes which should improve usability
   "git mv"ed, so you can now `datalad run git mv old new` and have
   changes recorded
 
-### Enhancements and new features
+## Enhancements and new features
 
 - `--jobs` argument now could take `auto` value which would decide on
   # of jobs depending on the # of available CPUs.
@@ -2566,11 +2538,11 @@ Some important bug fixes which should improve usability
   and provide reproducible UUIDs etc (useful for testing and demos)
 
 
-## 0.9.2 (Mar 04, 2018) -- it is (again) better than ever
+# 0.9.2 (Mar 04, 2018) -- it is (again) better than ever
 
 Largely a bugfix release with a few enhancements.
 
-### Fixes
+## Fixes
 
 - Execution of external commands (git) should not get stuck when
   lots of both stdout and stderr output, and should not loose remaining
@@ -2591,7 +2563,7 @@ Largely a bugfix release with a few enhancements.
   - now auto-focuses on search edit box upon entering the page
 - Assure that extracted from tarballs directories have executable bit set
 
-### Enhancements and new features
+## Enhancements and new features
 
 - A log message and progress bar will now inform if a tarball to be
   downloaded while getting specific files
@@ -2621,11 +2593,11 @@ Largely a bugfix release with a few enhancements.
   and the system
 
 
-## 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
+# 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
 
 Minor bugfix release
 
-### Fixes
+## Fixes
 
 - Should work correctly with subdatasets named as numbers of bool
   values (requires also GitPython >= 2.1.6)
@@ -2633,9 +2605,9 @@ Minor bugfix release
   git-annex >= 6.20170924
 
 
-## 0.9.0 (Sep 19, 2017) -- isn't it a lucky day even though not a Friday?
+# 0.9.0 (Sep 19, 2017) -- isn't it a lucky day even though not a Friday?
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - the `files` argument of [save][] has been renamed to `path` to be uniform with
   any other command
@@ -2647,7 +2619,7 @@ Minor bugfix release
   the selection which datasets to publish (which is done via their paths).
   Moreover, [publish][] now transfers data before repository content is pushed.
 
-### Fixes
+## Fixes
 
 - [drop][] no longer errors when some subdatasets are not installed
 - [install][] will no longer report nothing when a Dataset instance was
@@ -2669,7 +2641,7 @@ Minor bugfix release
   specified in `.gitattributes`
 
 
-### Enhancements and new features
+## Enhancements and new features
 
 - **Exciting new feature** [run][] command to protocol execution of an external 
   command and rerun computation if desired. 
@@ -2690,11 +2662,11 @@ Minor bugfix release
 - new [project YouTube channel](https://www.youtube.com/channel/UCB8-Zf7D0DSzAsREoIt0Bvw) 
 - tests failing in direct and/or v6 modes marked explicitly
 
-## 0.8.1 (Aug 13, 2017) -- the best birthday gift
+# 0.8.1 (Aug 13, 2017) -- the best birthday gift
 
 Bugfixes
 
-### Fixes
+## Fixes
 
 - Do not attempt to [update][] a not installed sub-dataset
 - In case of too many files to be specified for [get][] or [copy_to][], we
@@ -2702,7 +2674,7 @@ Bugfixes
   overfill command line
 - More robust handling of unicode output in terminals which might not support it
 
-### Enhancements and new features
+## Enhancements and new features
 
 - Ship a copy of numpy.testing to facilitate [test][] without requiring numpy
   as dependency. Also allow to pass to command which test(s) to run
@@ -2710,11 +2682,11 @@ Bugfixes
   ones we deduced need to be transferred, solely for knowing the total
 
 
-## 0.8.0 (Jul 31, 2017) -- it is better than ever
+# 0.8.0 (Jul 31, 2017) -- it is better than ever
 
 A variety of fixes and enhancements
 
-### Fixes
+## Fixes
 
 - [publish][] would now push merged `git-annex` branch even if no other changes
   were done
@@ -2723,7 +2695,7 @@ A variety of fixes and enhancements
 - [publish][] should better tollerate publishing to pure git and `git-annex` 
   special remotes 
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [plugin][] mechanism came to replace [export][]. See [export_tarball][] for the
   replacement of [export][].  Now it should be easy to extend datalad's interface
@@ -2733,17 +2705,17 @@ A variety of fixes and enhancements
 - minor fixes and enhancements to crawler (e.g. support of recursive removes)
 
 
-## 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
+# 0.7.0 (Jun 25, 2017) -- when it works - it is quite awesome!
 
 New features, refactorings, and bug fixes.
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - [add-sibling][] has been fully replaced by the [siblings][] command
 - [create-sibling][], and [unlock][] have been re-written to support the
   same common API as most other commands
 
-### Enhancements and new features
+## Enhancements and new features
 
 - [siblings][] can now be used to query and configure a local repository by
   using the sibling name ``here``
@@ -2755,7 +2727,7 @@ New features, refactorings, and bug fixes.
 - Significant parts of the documentation of been updated
 - Instantiate GitPython's Repo instances lazily
 
-### Fixes
+## Fixes
 
 - API documentation is now rendered properly as HTML, and is easier to browse by
   having more compact pages
@@ -2763,7 +2735,7 @@ New features, refactorings, and bug fixes.
 - Restored basic (consumer mode of operation) compatibility with Windows OS 
 
 
-## 0.6.0 (Jun 14, 2017) -- German perfectionism
+# 0.6.0 (Jun 14, 2017) -- German perfectionism
 
 This release includes a **huge** refactoring to make code base and functionality
 more robust and flexible
@@ -2776,14 +2748,14 @@ more robust and flexible
 - input paths/arguments analysis was redone for majority of the commands to provide
   unified behavior
 
-### Major refactoring and deprecations
+## Major refactoring and deprecations
 
 - `add-sibling` and `rewrite-urls` were refactored in favor of new [siblings][]
   command which should be used for siblings manipulations
 - 'datalad.api.alwaysrender' config setting/support is removed in favor of new
   outputs processing
 
-### Fixes
+## Fixes
 
 - Do not flush manually git index in pre-commit to avoid "Death by the Lock" issue
 - Deployed by [publish][] `post-update` hook script now should be more robust
@@ -2792,7 +2764,7 @@ more robust and flexible
   [list of pull requests and issues closed](https://github.com/datalad/datalad/milestone/41?closed=1)
   for more information
 
-### Enhancements and new features
+## Enhancements and new features
 
 - new [annotate-paths][] plumbing command to inspect and annotate provided
   paths.  Use `--modified` to summarize changes between different points in
@@ -2818,11 +2790,11 @@ more robust and flexible
 - Small improvements to the online documentation.  See e.g.
   [summary of differences between git/git-annex/datalad](http://docs.datalad.org/en/latest/related.html#git-git-annex-datalad)
 
-## 0.5.1 (Mar 25, 2017) -- cannot stop the progress
+# 0.5.1 (Mar 25, 2017) -- cannot stop the progress
 
 A bugfix release
 
-### Fixes
+## Fixes
 
 - [add][] was forcing addition of files to annex regardless of settings
   in `.gitattributes`.  Now that decision is left to annex by default
@@ -2836,7 +2808,7 @@ A bugfix release
   - should no longer crash **datalad** and report correct sizes and speeds
   - should provide progress reports while using Python 3.x
 
-### Enhancements and new features
+## Enhancements and new features
 
 - `doc/examples`
   - [nipype_workshop_dataset.sh](http://docs.datalad.org/en/latest/generated/examples/nipype_workshop_dataset.html)
@@ -2844,7 +2816,7 @@ A bugfix release
     as a part of our datasets collection
 
 
-## 0.5.0 (Mar 20, 2017) -- it's huge
+# 0.5.0 (Mar 20, 2017) -- it's huge
 
 This release includes an avalanche of bug fixes, enhancements, and
 additions which at large should stay consistent with previous behavior
@@ -2853,7 +2825,7 @@ more consistent code-base, and some API breakage has happened.  Further
 work is ongoing to standardize output and results reporting
 ([#1350][])
 
-### Most notable changes
+## Most notable changes
 
 - requires [git-annex][] >= 6.20161210 (or better even >= 6.20161210 for
   improved functionality)
@@ -2885,14 +2857,14 @@ work is ongoing to standardize output and results reporting
     - got `--skip-failing` refactored into `--missing` option
       which could use new feature of [create-sibling][] `--inherit`
 
-### Fixes
+## Fixes
 
 - More consistent interaction through ssh - all ssh connections go
   through [sshrun][] shim for a "single point of authentication", etc.
 - More robust [ls][] operation outside of the datasets
 - A number of fixes for direct and v6 mode of annex
 
-### Enhancements and new features
+## Enhancements and new features
 
 - New [drop][] and [remove][] commands
 - [clean][]
@@ -2904,17 +2876,17 @@ work is ongoing to standardize output and results reporting
   reused for the same dataset
 - progressbars should not add more empty lines
 
-### Internal refactoring
+## Internal refactoring
 
 - Majority of the commands now go through `_prep` for arguments validation
   and pre-processing to avoid recursive invocations
 
 
-## 0.4.1 (Nov 10, 2016) -- CA release
+# 0.4.1 (Nov 10, 2016) -- CA release
 
 Requires now GitPython >= 2.1.0
 
-### Fixes
+## Fixes
 
 - [save][]
      - to not save staged files if explicit paths were provided
@@ -2923,7 +2895,7 @@ Requires now GitPython >= 2.1.0
 - do not log calls to `git config` to avoid leakage of possibly 
   sensitive settings to the logs
 
-### Enhancements and new features
+## Enhancements and new features
 
 - New [rfc822-compliant metadata][] format
 - [save][]
@@ -2941,19 +2913,19 @@ Requires now GitPython >= 2.1.0
       connections
 
 
-## 0.4 (Oct 22, 2016) -- Paris is waiting
+# 0.4 (Oct 22, 2016) -- Paris is waiting
 
 Primarily it is a bugfix release but because of significant refactoring
 of the [install][] and [get][] implementation, it gets a new minor release. 
 
-### Fixes
+## Fixes
 
 - be able to [get][] or [install][] while providing paths while being 
   outside of a dataset
 - remote annex datasets get properly initialized
 - robust detection of outdated [git-annex][]
 
-### Enhancements and new features
+## Enhancements and new features
 
 - interface changes
     - [get][] `--recursion-limit=existing` to not recurse into not-installed
@@ -2967,19 +2939,19 @@ of the [install][] and [get][] implementation, it gets a new minor release.
 - various webface improvements:  breadcrumb paths, instructions how
   to install dataset, show version from the tags, etc.
 
-## 0.3.1 (Oct 1, 2016) -- what a wonderful week
+# 0.3.1 (Oct 1, 2016) -- what a wonderful week
 
 Primarily bugfixes but also a number of enhancements and core
 refactorings
 
-### Fixes
+## Fixes
 
 - do not build manpages and examples during installation to avoid
   problems with possibly previously outdated dependencies
 - [install][] can be called on already installed dataset (with `-r` or
   `-g`)
 
-### Enhancements and new features
+## Enhancements and new features
 
 - complete overhaul of datalad configuration settings handling
   (see [Configuration documentation][]), so majority of the environment.
@@ -3011,7 +2983,7 @@ refactorings
   used/supported)
 
 
-## 0.3 (Sep 23, 2016) -- winter is coming
+# 0.3 (Sep 23, 2016) -- winter is coming
 
 Lots of everything, including but not limited to
 
@@ -3024,14 +2996,14 @@ Lots of everything, including but not limited to
 - datalad [search][] would give you an option to install datalad's 
   super-dataset under ~/datalad if ran outside of a dataset
 
-### 0.2.3 (Jun 28, 2016) -- busy OHBM
+## 0.2.3 (Jun 28, 2016) -- busy OHBM
 
 New features and bugfix release
 
 - support of /// urls to point to http://datasets.datalad.org
 - variety of fixes and enhancements throughout
 
-### 0.2.2 (Jun 20, 2016) -- OHBM we are coming!
+## 0.2.2 (Jun 20, 2016) -- OHBM we are coming!
 
 New feature and bugfix release
 
@@ -3040,15 +3012,15 @@ New feature and bugfix release
   --to REMOTE for consistent with annex invocation
 - variety of fixes and enhancements throughout
 
-### 0.2.1 (Jun 10, 2016)
+## 0.2.1 (Jun 10, 2016)
 
 - variety of fixes and enhancements throughout
 
-## 0.2 (May 20, 2016)
+# 0.2 (May 20, 2016)
 
 Major RFing to switch from relying on rdf to git native submodules etc
 
-## 0.1 (Oct 14, 2015)
+# 0.1 (Oct 14, 2015)
 
 Release primarily focusing on interface functionality including initial
 publishing

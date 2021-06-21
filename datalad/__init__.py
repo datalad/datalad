@@ -64,8 +64,6 @@ ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
 
-from .version import __version__
-
 
 def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
     """A helper to run datalad's tests.  Requires nose
@@ -266,3 +264,5 @@ def teardown_package():
 
 
 lgr.log(5, "Done importing main __init__")
+
+from .version import __version__

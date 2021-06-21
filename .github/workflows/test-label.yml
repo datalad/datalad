@@ -1,0 +1,32 @@
+name: Test for semver label
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.repository == 'datalad/datalad'
+    steps:
+      - name: Check that PR against master has "minor" or "internal" label
+        if: github.event.pull_request.base.label == 'datalad:master'
+        run: |
+          # This should evaluate to either `true` or `false`, which runs the
+          # command of the same name.
+          ${{
+            contains(github.event.pull_request.labels.*.name, 'minor')
+            || contains(github.event.pull_request.labels.*.name, 'internal')
+          }}
+
+      - name: Check that PR against maint has "patch" or "internal" label
+        if: github.event.pull_request.base.label == 'datalad:maint'
+        run: |
+          # This should evaluate to either `true` or `false`, which runs the
+          # command of the same name.
+          ${{
+            contains(github.event.pull_request.labels.*.name, 'patch')
+            || contains(github.event.pull_request.labels.*.name, 'internal')
+          }}
+
+# vim:set sts=2:
