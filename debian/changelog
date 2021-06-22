@@ -1,3 +1,10 @@
+datalad (0.14.5-1) experimental; urgency=medium
+
+  * Fresh upstream release
+    - dropping CPed upstream patches
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 22 Jun 2021 09:17:46 -0400
+
 datalad (0.14.3-1) experimental; urgency=medium
 
   * Fresh upstream release.
