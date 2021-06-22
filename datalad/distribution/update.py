@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from os.path import lexists, join as opj
+from os.path import lexists
 import itertools
 
 from datalad.dochelpers import exc_str
@@ -162,7 +162,7 @@ class Update(Interface):
             lgr.warning('path constraints for subdataset updates ignored, '
                         'because `recursive` option was not given')
 
-        refds = require_dataset(dataset, check_installed=True, purpose='updating')
+        refds = require_dataset(dataset, check_installed=True, purpose='update')
 
         save_paths = []
         merge_failures = set()
@@ -221,11 +221,20 @@ class Update(Interface):
                 # test against user-provided value!
                 remote=None if sibling is None else sibling_,
                 all_=sibling is None,
-                # required to not trip over submodules that
-                # were removed in the origin clone
-                recurse_submodules="no",
-                prune=True)  # prune to not accumulate a mess over time
-            repo.fetch(**fetch_kwargs)
+                git_options=[
+                    # required to not trip over submodules that were removed in
+                    # the origin clone
+                    "--no-recurse-submodules",
+                    # prune to not accumulate a mess over time
+                    "--prune"]
+            )
+            try:
+                repo.fetch(**fetch_kwargs)
+            except CommandError as exc:
+                yield dict(res, status="error",
+                           message=("Fetch failed: %s", exc_str(exc)))
+                continue
+
             # NOTE reevaluate ds.repo again, as it might have be converted from
             # a GitRepo to an AnnexRepo
             repo = ds.repo

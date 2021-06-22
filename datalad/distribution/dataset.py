@@ -575,7 +575,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 
     assert(dataset is not None)
     lgr.debug(u"Resolved dataset%s: %s",
-              u' for {}'.format(purpose) if purpose else '',
+              u' to {}'.format(purpose) if purpose else '',
               dataset.path)
 
     if check_installed and not dataset.is_installed():

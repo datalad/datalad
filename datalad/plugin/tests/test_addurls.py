@@ -9,12 +9,14 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test addurls plugin"""
 
+from copy import deepcopy
 import json
 import logging
 import os
 import os.path as op
 import shutil
 import tempfile
+from urllib.parse import urlparse
 
 from unittest.mock import patch
 
@@ -488,8 +490,8 @@ class TestAddurls(object):
 
         # Ignore this check if we're faking dates because that disables
         # batch mode.
-        # Also ignore if on Windows as it seems as if a git-annex bug 
-        # leads to separate meta data commits: 
+        # Also ignore if on Windows as it seems as if a git-annex bug
+        # leads to separate meta data commits:
         # https://github.com/datalad/datalad/pull/5202#discussion_r535429704
         if not (dl_cfg.get('datalad.fake-dates') or on_windows):
             # We should have two new commits on the git-annex: one for the
@@ -641,6 +643,21 @@ class TestAddurls(object):
                       self.json_file,
                       "{url}/nofilename/",
                       "{_url0}/{_url_filename}")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_special_key_fail(self, path):
+        ds = Dataset(path).create(force=True)
+
+        res1 = ds.addurls(self.json_file, "{url}", "{_url4}/{_url_filename}",
+                          on_failure="ignore")
+        assert_in("Special key", res1[0]["message"])
+
+        data = self.data.copy()[:1]
+        data[0]["url"] = urlparse(data[0]["url"]).netloc
+        with patch("sys.stdin", new=StringIO(json.dumps(data))):
+            res2 = ds.addurls("-", "{url}", "{_url_basename}",
+                              on_failure="ignore")
+        assert_in("Special key", res2[0]["message"])
 
     @with_tempfile(mkdir=True)
     def test_addurls_metafail(self, path):
@@ -831,7 +848,7 @@ class TestAddurls(object):
         if OLD_EXAMINEKEY and ds.repo.is_managed_branch():
             raise SkipTest("Adjusted branch functionality requires "
                            "more recent `git annex examinekey`")
-        data = self.data.copy()
+        data = deepcopy(self.data)
         for row in data:
             if row["name"] == "b":
                 del row["md5sum"]

@@ -205,7 +205,7 @@ class Install(Interface):
         ds = None
         if dataset is not None:
             ds = require_dataset(dataset, check_installed=True,
-                                 purpose='installation')
+                                 purpose='install')
             common_kwargs['dataset'] = dataset
         # pre-compute for results below
         refds_path = Interface.get_refds_path(ds)

@@ -823,3 +823,34 @@ def test_update_unborn_master(path):
     assert_status("ok",
                   ds_b.update(merge=True, on_failure="ignore"))
     eq_(ds_a.repo.get_hexsha(), ds_b.repo.get_hexsha())
+
+
+@with_tempfile(mkdir=True)
+def test_update_fetch_failure(path):
+    path = Path(path)
+
+    ds_a = Dataset(path / "ds_a").create()
+    s1 = ds_a.create("s1")
+    ds_a.create("s2")
+
+    ds_b = install(source=ds_a.path, path=str(path / "ds-b"), recursive=True)
+
+    # Rename s1 to make fetch fail.
+    s1.pathobj.rename(s1.pathobj.parent / "s3")
+
+    res = ds_b.update(recursive=True, on_failure="ignore")
+    assert_in_results(
+        res,
+        status="error",
+        path=str(ds_b.pathobj / "s1"),
+        action="update")
+    assert_in_results(
+        res,
+        status="ok",
+        path=str(ds_b.pathobj / "s2"),
+        action="update")
+    assert_in_results(
+        res,
+        status="ok",
+        path=ds_b.path,
+        action="update")

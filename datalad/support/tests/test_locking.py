@@ -40,8 +40,11 @@ class Subproc:
         self.tempfile = tempfile
 
     def __call__(self, q):
-        with lock_if_check_fails(False, self.tempfile, blocking=False) as (_, lock2):
-            q.put(lock2.acquired)
+        with lock_if_check_fails(False, self.tempfile, blocking=False, _return_acquired=True)\
+                as (_, lock2, acquired):
+            # we used to check for .acquired here but it was removed from
+            # fasteners API: https://github.com/harlowja/fasteners/issues/71
+            q.put(acquired)
 
 
 @known_failure_windows
@@ -52,7 +55,6 @@ def test_lock_if_check_fails(tempfile):
         assert check is True
         assert lock is None
     assert check  # still available outside
-
     # and with a callable
     with lock_if_check_fails(lambda: "valuable", None) as (check, lock):
         eq_(check, "valuable")
@@ -61,14 +63,14 @@ def test_lock_if_check_fails(tempfile):
 
     # basic test, should never try to lock so filename is not important
     with lock_if_check_fails(False, tempfile) as (check, lock):
-        ok_(lock.acquired)
+        ok_(lock)
         ok_exists(tempfile + '.lck')
     assert not op.exists(tempfile + '.lck')  # and it gets removed after
 
     # the same with providing operation
     # basic test, should never try to lock so filename is not important
     with lock_if_check_fails(False, tempfile, operation='get') as (check, lock):
-        ok_(lock.acquired)
+        ok_(lock)
         ok_exists(tempfile + '.get-lck')
     assert not op.exists(tempfile + '.get-lck')  # and it gets removed after
 
@@ -77,9 +79,10 @@ def test_lock_if_check_fails(tempfile):
     p = Process(target=Subproc(tempfile), args=(q,))
 
     # now we need somehow to actually check the bloody lock functioning
-    with lock_if_check_fails((op.exists, (tempfile,)), tempfile) as (check, lock):
+    with lock_if_check_fails((op.exists, (tempfile,)), tempfile, _return_acquired=True) as (check, lock, acquired):
         eq_(check, False)
-        ok_(lock.acquired)
+        ok_(lock)
+        ok_(acquired)
         # but now we will try to lock again, but we need to do it in another
         # process
         p.start()

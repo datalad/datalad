@@ -30,6 +30,7 @@ def lock_if_check_fails(
     lock_path,
     operation=None,
     blocking=True,
+    _return_acquired=False,
     **kwargs
 ):
     """A context manager to establish a lock conditionally on result of a check
@@ -65,12 +66,15 @@ def lock_if_check_fails(
     blocking: bool, optional
       If blocking, process would be blocked until acquired and verified that it
       was acquired after it gets the lock
+    _return_acquired: bool, optional
+      Return also if lock was acquired.  For "private" use within DataLad (tests),
+      do not rely on it in 3rd party solutions.
     **kwargs
       Passed to `.acquire` of the fasteners.InterProcessLock
 
     Returns
     -------
-    result of check, lock
+    result of check, lock[, acquired]
     """
     check1 = _get(check)
     if check1:  # we are done - nothing to do
@@ -85,19 +89,21 @@ def lock_if_check_fails(
     lock_filename += 'lck'
 
     lock = InterProcessLock(lock_filename)
+    acquired = False
     try:
         lgr.debug("Acquiring a lock %s", lock_filename)
-        lock.acquire(blocking=blocking, **kwargs)
-        lgr.debug("Acquired? lock %s: %s", lock_filename, lock.acquired)
+        acquired = lock.acquire(blocking=blocking, **kwargs)
+        lgr.debug("Acquired? lock %s: %s", lock_filename, acquired)
         if blocking:
-            assert lock.acquired
+            assert acquired
         check2 = _get(check)
-        if check2:
-            yield check2, None
+        ret_lock = None if check2 else lock
+        if _return_acquired:
+            yield check2, ret_lock, acquired
         else:
-            yield check2, lock
+            yield check2, ret_lock
     finally:
-        if lock.acquired:
+        if acquired:
             lgr.debug("Releasing lock %s", lock_filename)
             lock.release()
             if exists(lock_filename):
