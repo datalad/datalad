@@ -205,7 +205,12 @@ class LocalIO(IOBase):
         src.rename(dst)
 
     def remove(self, path):
-        path.unlink()
+        try:
+            path.unlink()
+        except PermissionError as e:
+            raise RIARemoteError(str(e) + os.linesep +
+                                 "Note: Write permissions for a key's parent"
+                                 "directory are also required to drop content.")
 
     def remove_dir(self, path):
         path.rmdir()
@@ -486,7 +491,13 @@ class SSHRemoteIO(IOBase):
         self._run('mv {} {}'.format(sh_quote(str(src)), sh_quote(str(dst))))
 
     def remove(self, path):
-        self._run('rm {}'.format(sh_quote(str(path))))
+        try:
+            self._run('rm {}'.format(sh_quote(str(path))))
+        except RemoteCommandFailedError as e:
+            raise RIARemoteError(
+                str(e) + os.linesep +
+                "Note: Write permissions for a key's parent"
+                "directory are also required to drop content.")
 
     def remove_dir(self, path):
         self._run('rmdir {}'.format(sh_quote(str(path))))
