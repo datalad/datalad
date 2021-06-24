@@ -279,7 +279,7 @@ The [datalad-extensions](https://github.com/datalad/datalad-extensions/) reposit
 
 ## External uses and integrations
 
-DataLad can be used as an independent tool to access and manage data (see e.g. @Wittkuhn_2021, @datasets:LAAC-LSCP)
+DataLad can be used as an independent tool to access and manage data (see e.g. @Wittkuhn_2021, @Gautheron_2021, @datasets:LAAC-LSCP)
 or as a core technology behind another tool or a larger platform.
 [TemplateFlow](http://templateflow.github.io/) [@Ciric_2021] uses DataLad for the management of neuroimaging templates.
 [OpenNeuro](http://openneuro.org) uses DataLad for data logistics with data deposition to a public S3 bucket.
