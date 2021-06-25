@@ -272,6 +272,8 @@ Some established extensions include:
 - [datalad-crawler](https://github.com/datalad/datalad-crawler) [@datalad-crawler:zenodo] to automate creation and updates of DataLad datasets from external resources
 - [datalad-neuroimaging](https://github.com/datalad/datalad-neuroimaging) [@datalad-neuroimaging:zenodo] to provide neuroimaging-specific procedures and metadata extractors
 - [datalad-osf](https://github.com/datalad/datalad-osf/) [@datalad-osf:zenodo] to collaborate using DataLad through the Open Science Framework (OSF)
+- [datalad-ukbiobank](https://github.com/datalad/datalad-ukbiobank/) [@datalad-ukb:zenodo] obtain and BIDS-normalize imaging data releases of the UKBiobank
+
 
 The same mechanism of extensions is used for rapid development of new functionality to later be moved into the core tool (e.g., [datalad-metalad](https://github.com/datalad/datalad-metalad/)).
 The [datalad-extensions](https://github.com/datalad/datalad-extensions/) repository provides a list of extensions and continuous integration testing of their released versions against released and development versions of the DataLad core. 
