@@ -101,9 +101,9 @@ authors:
 affiliations:
  - name: Center for Open Neuroscience, Department of Psychological and Brain Sciences, Dartmouth College, Hanover, NH, USA
    index: 1
- - name: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany
+ - name: Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Center Jülich, Jülich, Germany
    index: 2
- - name: McGill Centre for Integrative Neuroscience, Montreal, Canada
+ - name: McGill Center for Integrative Neuroscience, Montreal, Canada
    index: 3
  - name: CHDI Management/CHDI Foundation, Princeton, NJ, USA
    index: 4
@@ -121,7 +121,7 @@ affiliations:
    index: 10
  - name: Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany
    index: 11
- - name: Faculty of Medicine and Health Sciences, McConnell Brain Imaging Centre, McGill University, Montreal, Canada
+ - name: Faculty of Medicine and Health Sciences, McConnell Brain Imaging Center, McGill University, Montreal, Canada
    index: 12
  - name: University of Oslo, Oslo, Norway
    index: 13
