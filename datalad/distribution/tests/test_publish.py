@@ -285,6 +285,10 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # we will be publishing back to origin, so to not alter testrepo
     # we will first clone it
     origin = install(origin_path, source=pristine_origin, recursive=True)
+    # uncouple subdataset from testrepo sources after recursive install
+    # to make this clone the source of all `get` attempts
+    for sub in origin.subdatasets(result_xfm=lambda x: x['gitmodule_name']):
+        origin.subdatasets(path=sub, set_property=[('url', './{}'.format(sub))])
     # prepare src
     source = install(src_path, source=origin.path, recursive=True)
     # we will be trying to push into this later on, need to give permissions...
@@ -366,14 +370,12 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
     # still nothing gets pushed, because origin is up to date
     res_ = publish(dataset=source, recursive=True, since='HEAD^')
-    assert_result_count(
-        res_, 3, status='notneeded', type='dataset')
+    assert_status('notneeded', res_)
 
     # and we should not fail if we run it from within the dataset
     with chpwd(source.path):
         res_ = publish(recursive=True, since='HEAD^')
-        assert_result_count(
-            res_, 3, status='notneeded', type='dataset')
+        assert_status('notneeded', res_)
 
     # Let's now update one subm
     with open(opj(sub2.path, "file.txt"), 'w') as f:
