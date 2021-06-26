@@ -230,7 +230,7 @@ To facilitate metadata availability and utility, DataLad provides an extensible 
 Metadata for each file (contained in the file or recorded by git and git-annex) or associated with the entire dataset can be extracted into a collection of machine-readable (JSON) records and aggregated across all contained subdatasets.
 Such simple mechanism makes it possible to provide immediate access to metadata about all contained data within a larger super-dataset (such as [datasets.datalad.org](http://datasets.datalad.org)).
 
-# Overview of the DataLad and its ecosystem
+# Overview of DataLad and its ecosystem
 
 ## Design principles
 
