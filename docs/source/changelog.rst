@@ -2,6 +2,25 @@
 
 Change log
 **********
+0.14.6 (Sun Jun 27 2021)
+========================
+
+Internal
+--------
+
+-  BF: update changelog conversion from .md to .rst (for sphinx)
+   `#5757 <https://github.com/datalad/datalad/pull/5757>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__
+   `@jwodder <https://github.com/jwodder>`__)
+
+Authors: 2
+----------
+
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.14.5 (Mon Jun 21 2021)
 ========================
 
@@ -88,6 +107,8 @@ Pushed to ``maint``
 -------------------
 
 -  MNT: Post-release dance (`@kyleam <https://github.com/kyleam>`__)
+
+.. _internal-1:
 
 Internal
 --------
@@ -425,7 +446,7 @@ Enhancements and new features
    default, has been improved. A core piece of the new approach is
    registering the commit of the primary branch, not its checked out
    adjusted branch, in the superdataset. Note: This means that
-   ``git   status`` will always consider a subdataset on an adjusted
+   ``git status`` will always consider a subdataset on an adjusted
    branch as dirty while ``datalad status`` will look more closely and
    see if the tip of the primary branch matches the registered commit.
    (`#5241 <https://github.com/datalad/datalad/issues/5241>`__)
@@ -554,10 +575,10 @@ Enhancements and new features
 
 -  The ``ConfigManager`` methods ``get``, ``getbool``, ``getfloat``, and
    ``getint`` now return a single value (with same precedence as
-   ``git   config --get``) when there are multiple values for the same
-   key (in the non-committed git configuration, if the key is present
-   there, or in the dataset configuration). For ``get``, the old
-   behavior can be restored by specifying ``get_all=True``.
+   ``git config --get``) when there are multiple values for the same key
+   (in the non-committed git configuration, if the key is present there,
+   or in the dataset configuration). For ``get``, the old behavior can
+   be restored by specifying ``get_all=True``.
    (`#4924 <https://github.com/datalad/datalad/issues/4924>`__)
 
 -  Command-line scripts are now defined via the ``entry_points``
@@ -1025,7 +1046,7 @@ Enhancements and new features
 
 -  ``datalad push`` now avoids unnecessary ``git push`` dry runs and
    pushes all refspecs with a single ``git push`` call rather than
-   invoking ``git   push`` for each one.
+   invoking ``git push`` for each one.
    (`#4692 <https://github.com/datalad/datalad/issues/4692>`__)
    (`#4675 <https://github.com/datalad/datalad/issues/4675>`__)
 
@@ -1378,9 +1399,8 @@ Fixes
 -  A longstanding regression in argcomplete-based command-line
    completion for Bash has been fixed. You can enable completion by
    configuring a Bash startup file to run
-   ``eval   "$(register-python-argcomplete datalad)"`` or source
-   DataLad’s ``tools/cmdline-completion``. The latter should work for
-   Zsh as well.
+   ``eval "$(register-python-argcomplete datalad)"`` or source DataLad’s
+   ``tools/cmdline-completion``. The latter should work for Zsh as well.
    (`#4477 <https://github.com/datalad/datalad/issues/4477>`__)
 
 -  `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
@@ -1461,13 +1481,12 @@ Fixes
 
 -  The default for the ``--jobs`` option, “auto”, instructed DataLad to
    pass a value to git-annex’s ``--jobs`` equal to
-   ``min(8, max(3, <number   of CPUs>))``, which could lead to issues
-   due to the large number of child processes spawned and file
-   descriptors opened. To avoid this behavior, ``--jobs=auto`` now
-   results in git-annex being called with ``--jobs=1`` by default.
-   Configure the new option ``datalad.runtime.max-annex-jobs`` to
-   control the maximum value that will be considered when
-   ``--jobs='auto'``.
+   ``min(8, max(3, <number of CPUs>))``, which could lead to issues due
+   to the large number of child processes spawned and file descriptors
+   opened. To avoid this behavior, ``--jobs=auto`` now results in
+   git-annex being called with ``--jobs=1`` by default. Configure the
+   new option ``datalad.runtime.max-annex-jobs`` to control the maximum
+   value that will be considered when ``--jobs='auto'``.
    (`#4409 <https://github.com/datalad/datalad/issues/4409>`__)
 
 -  Various commands have been adjusted to better handle the case where a
@@ -2251,7 +2270,7 @@ Enhancements and new features
    (`#3693 <https://github.com/datalad/datalad/issues/3693>`__)
 
 -  ``GitRepo`` now has a ``for_each_ref_`` method that wraps
-   ``git   for-each-ref``, which is used in various spots that used to
+   ``git for-each-ref``, which is used in various spots that used to
    rely on GitPython functionality.
    (`#3705 <https://github.com/datalad/datalad/issues/3705>`__)
 
@@ -2581,7 +2600,7 @@ Enhancements and new features
       (`#3334 <https://github.com/datalad/datalad/issues/3334>`__)
 
 -  Querying repository content is faster due to batching of
-   ``git   cat-file`` calls.
+   ``git cat-file`` calls.
    (`#3301 <https://github.com/datalad/datalad/issues/3301>`__)
 
 -  The dataset ID of a subdataset is now recorded in the superdataset.
@@ -3436,7 +3455,7 @@ Fixes
    command with a non-zero exit were incorrectly formatted.
    (`#2692 <https://github.com/datalad/datalad/issues/2692>`__)
 -  Decompression of zip files (e.g., through
-   ``datalad   add-archive-content``) failed on Python 3.
+   ``datalad add-archive-content``) failed on Python 3.
    (`#2702 <https://github.com/datalad/datalad/issues/2702>`__)
 -  Windows:
 
@@ -3538,15 +3557,15 @@ Enhancements and new features
    of each extension.
    (`#2741 <https://github.com/datalad/datalad/issues/2741>`__)
 -  The internal handling of gitattributes information has been improved.
-   A user-visible consequence is that ``datalad create   --force`` no
+   A user-visible consequence is that ``datalad create --force`` no
    longer duplicates existing attributes.
    (`#2744 <https://github.com/datalad/datalad/issues/2744>`__)
 -  The “annex” metadata extractor can now be used even when no content
    is present.
    (`#2724 <https://github.com/datalad/datalad/issues/2724>`__)
 -  The ``add_url_to_file`` method (called by commands like
-   ``datalad   download-url`` and ``datalad add-archive-content``)
-   learned how to display a progress bar.
+   ``datalad download-url`` and ``datalad add-archive-content``) learned
+   how to display a progress bar.
    (`#2738 <https://github.com/datalad/datalad/issues/2738>`__)
 
 0.10.2 (Jul 09, 2018) – Thesecuriestever
@@ -3652,7 +3671,7 @@ A number of fixes did not make it into the 0.9.x series:
 -  ``add`` now correctly saves staged subdataset additions.
 -  Running ``datalad save`` in a dataset no longer adds untracked
    content to the dataset. In order to add content a path has to be
-   given, e.g. ``datalad save .``
+   given, e.g. \ ``datalad save .``
 -  ``wtf`` now works reliably with a DataLad that wasn’t installed from
    Git (but, e.g., via pip)
 -  More robust URL handling in ``simple_with_archives`` crawler
