@@ -1,3 +1,16 @@
+# 0.14.6 (Sun Jun 27 2021)
+
+#### 🏠 Internal
+
+- BF: update changelog conversion from .md to .rst (for sphinx) [#5757](https://github.com/datalad/datalad/pull/5757) ([@yarikoptic](https://github.com/yarikoptic) [@jwodder](https://github.com/jwodder))
+
+#### Authors: 2
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.14.5 (Mon Jun 21 2021)
 
 #### 🐛 Bug Fix
