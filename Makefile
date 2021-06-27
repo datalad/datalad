@@ -38,11 +38,21 @@ code-analysis:
 linkissues-changelog:
 	tools/link_issues_CHANGELOG
 
-update-changelog: linkissues-changelog
-	# test if the changelog still contains a release placeholder
-	git grep -q '^##.*??? ??' -- CHANGELOG.md && exit 1 || true
+update-changelog: CHANGELOG.md
 	@echo ".. This file is auto-converted from CHANGELOG.md (make update-changelog) -- do not edit\n\nChange log\n**********" > docs/source/changelog.rst
-	pandoc -t rst CHANGELOG.md >> docs/source/changelog.rst
+	# sphinx 3.4.3-2 on Debian incorrectly handles unicode character
+	# and then fails claiming that underlines are too short. So we remove all
+	# such problematic ones for now.
+	# Also, for some reason auto sticks subsections all the way to 4th level of sectioning,
+	# so we bring them back to 2nd.
+	# And pandoc manages to just skip all the valid markdown urls for authors within (),
+	# so doing manual post conversion
+	cat "$<" | sed -e 's,^#### ,## ,g' \
+	| iconv -c -f utf-8 -t ascii \
+	| pandoc -t rst \
+	| sed -e 's,\[\(@[^]]*\)\](\([^)]*\)),\`\1 <\2>\`__,g' \
+	>> docs/source/changelog.rst
+
 
 release-pypi: update-changelog
 	# avoid upload of stale builds
