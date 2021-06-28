@@ -27,6 +27,39 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 definitions = {
+    'datalad.clone.url-substitute.github': {
+        'ui': ('question', {
+               'title': 'GitHub URL substitution rule',
+               'text': 'Substitution specification defined as a string with a '
+                       'match and substitution expression, each following '
+                       "Python's regular expression syntax. Both expressions "
+                       'are concatenated to a single string with an arbitrary '
+                       'delimiter character. The delimiter is defined by '
+                       'prefixing the string with the delimiter. Prefix and '
+                       'delimiter are stripped from the expressions '
+                       '(Example: ",^http://(.*)$,https://\\1"). '
+                       'This setting can be defined multiple times. '
+                       'Substitutions will be applied incrementally, in order '
+                       'of their definition. The first substitution in such '
+                       'a series must match, otherwise no further substitutions '
+                       'in a series will be considered. However, following the '
+                       'first match all further substitutions in a series are '
+                       'processed, regardless whether intermediate expressions '
+                       'match or not.'
+        }),
+        'destination': 'global',
+        'default': (
+            # take any github project URL apart into <org>###<identifier>
+            r',https?://github.com/([^/]+)/(.*)$,\1###\2',
+            # replace any (back)slashes with a single dash
+            r',[/\\]+,-',
+            # replace any whitespace (include urlquoted variant)
+            # with a single underscore
+            r',\s+|(%2520)+|(%20)+,_',
+            # rebuild functional project URL
+            r',([^#]+)###(.*),https://github.com/\1/\2',
+        )
+    },
     # this is actually used in downloaders, but kept cfg name original
     'datalad.crawl.cache': {
         'ui': ('yesno', {

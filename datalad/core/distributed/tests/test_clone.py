@@ -1604,14 +1604,6 @@ def test_clone_url_mapping(src_path, dest_path):
     eq_(submod_rec['gitmodule_url'], src_path)
 
 
-_github_map = {
-    'datalad.clone.url-substitute.github': (
-        r',https://github.com/([^/]+)/(.*)$,\1###\2',
-        r',[/\\]+,-',
-        r',\s+,_',
-        r',([^#]+)###(.*),https://github.com/\1/\2',
-    )
-}
 _nomatch_map = {
     'datalad.clone.url-substitute.nomatch': (
         ',nomatch,NULL',
@@ -1632,17 +1624,17 @@ def test_url_mapping_specs():
             (_windows_map,
              r'C:\Users\datalad\from',
              r'D:\to'),
-            # test standard github mapping
-            (_github_map,
+            # test standard github mapping, no pathc needed
+            ({},
              'https://github.com/datalad/testrepo_gh/sub _1',
              'https://github.com/datalad/testrepo_gh-sub__1'),
             # and on deep subdataset too
-            (_github_map,
+            ({},
              'https://github.com/datalad/testrepo_gh/sub _1/d/sub_-  1',
              'https://github.com/datalad/testrepo_gh-sub__1-d-sub_-_1'),
             # test that the presence of another mapping spec doesn't ruin
             # the outcome
-            (dict(_nomatch_map, **_github_map),
+            (_nomatch_map,
              'https://github.com/datalad/testrepo_gh/sub _1',
              'https://github.com/datalad/testrepo_gh-sub__1'),
             ):

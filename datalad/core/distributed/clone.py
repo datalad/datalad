@@ -124,13 +124,21 @@ class Clone(Interface):
 
     URL mapping configuration
 
-    'clone' supports the transformation of URL via (multi-part) substitution
-    specifications. Substitutions are defined as a string with a match and
-    substitution expression, each following Python's regular expression syntax.
-    Both expressions are concatenated to a single string with an arbitrary
-    delimiter character. The delimiter is defined by prefixing the string with
-    the delimiter. Prefix and delimiter are stripped from the expressions.
-    Example: ,^http://(.*)$,https://\\1
+    'clone' supports the transformation of URLs via (multi-part) substitution
+    specifications. Substitution specification is defined as a configuration
+    setting 'datalad.clone.url-substition.<seriesID>' with a string containing
+    a match and substitution expression, each following Python's regular
+    expression syntax. Both expressions are concatenated to a single string
+    with an arbitrary delimiter character. The delimiter is defined by
+    prefixing the string with the delimiter. Prefix and delimiter are
+    stripped from the expressions (Example: ",^http://(.*)$,https://\\1").
+    This setting can be defined multiple times, using the same '<seriesID>'.
+    Substitutions will be applied incrementally, in order of their definition.
+    The first substitution in such a series must match, otherwise no further
+    substitutions in a series will be considered. However, following the
+    first match all further substitutions in a series are processed,
+    regardless whether intermediate expressions match or not.
+
     TODO continue once match preference (longest match?) is decided and
     implemented.
 
@@ -364,6 +372,13 @@ class Clone(Interface):
 
 
 def _get_url_mappings(cfg):
+    cfg_prefix = 'datalad.clone.url-substitute.'
+    # figure out which keys we should be looking for
+    # in the active config
+    subst_keys = set(k for k in cfg.keys() if k.startswith(cfg_prefix))
+    # and in the common config specs
+    from datalad.interface.common_cfg import definitions
+    subst_keys.update(k for k in definitions if k.startswith(cfg_prefix))
     return [
         # decode the rule specifications
         get_replacement_dict(
@@ -371,12 +386,12 @@ def _get_url_mappings(cfg):
             ensure_list(
                 cfg.get(
                     k,
-                    default=[],
+                    # make sure to pull the default from the common config
+                    default=cfg.obtain(k),
                     # we specifically support declaration of multiple
                     # settings to build replacement chains
                     get_all=True)))
-        for k in cfg.keys()
-        if k.startswith('datalad.clone.url-substitute.')
+        for k in subst_keys
     ]
 
 
@@ -396,7 +411,8 @@ def _map_urls(cfg, urls):
         # try one mapping set at a time
         for mapping_spec in mapping_specs:
             # process all substitution patterns in the specification
-            mu = u
+            # always operate on strings (could be a Path instance too)
+            mu = str(u)
             matched = False
             for match_ex, subst_ex in mapping_spec.items():
                 if not matched:
@@ -416,6 +432,7 @@ def _map_urls(cfg, urls):
                 mapping_applied = True
         if not mapping_applied:
             # none of the mappings matches, go with the original URL
+            # (really original, not the stringified one)
             mapped.append(u)
     return mapped
 
