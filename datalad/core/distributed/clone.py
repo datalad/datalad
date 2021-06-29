@@ -125,22 +125,22 @@ class Clone(Interface):
     URL mapping configuration
 
     'clone' supports the transformation of URLs via (multi-part) substitution
-    specifications. Substitution specification is defined as a configuration
+    specifications. A substitution specification is defined as a configuration
     setting 'datalad.clone.url-substition.<seriesID>' with a string containing
     a match and substitution expression, each following Python's regular
     expression syntax. Both expressions are concatenated to a single string
     with an arbitrary delimiter character. The delimiter is defined by
-    prefixing the string with the delimiter. Prefix and delimiter are
-    stripped from the expressions (Example: ",^http://(.*)$,https://\\1").
-    This setting can be defined multiple times, using the same '<seriesID>'.
-    Substitutions will be applied incrementally, in order of their definition.
+    prefixing the string with the delimiter. Prefix and delimiter are stripped
+    from the expressions (Example: ",^http://(.*)$,https://\\1").  This setting
+    can be defined multiple times, using the same '<seriesID>'.  Substitutions
+    in a series will be applied incrementally, in order of their definition.
     The first substitution in such a series must match, otherwise no further
-    substitutions in a series will be considered. However, following the
-    first match all further substitutions in a series are processed,
-    regardless whether intermediate expressions match or not.
-
-    TODO continue once match preference (longest match?) is decided and
-    implemented.
+    substitutions in a series will be considered. However, following the first
+    match all further substitutions in a series are processed, regardless
+    whether intermediate expressions match or not. Substitution series themselves
+    have no particular order, each matching series will result in a candidate
+    clone URL. Consequently, the initial match specification in a series should
+    be as precise as possible to prevent inflation of candidate URLs.
 
     .. seealso::
 
@@ -379,6 +379,8 @@ def _get_url_mappings(cfg):
     # and in the common config specs
     from datalad.interface.common_cfg import definitions
     subst_keys.update(k for k in definitions if k.startswith(cfg_prefix))
+    # TODO a potential sorting of substitution series could be implemented
+    # here
     return [
         # decode the rule specifications
         get_replacement_dict(
