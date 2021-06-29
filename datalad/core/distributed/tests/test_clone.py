@@ -1637,6 +1637,12 @@ def test_url_mapping_specs():
             (_nomatch_map,
              'https://github.com/datalad/testrepo_gh/sub _1',
              'https://github.com/datalad/testrepo_gh-sub__1'),
+            # verify OSF mapping, but see
+            # https://github.com/datalad/datalad/issues/5769 for future
+            # implications
+            ({},
+             'https://osf.io/q8xnk/',
+             'osf://q8xnk'),
             ):
         with patch.dict(cfg._merged_store, m):
             eq_(_map_urls(cfg, [i]), [o])

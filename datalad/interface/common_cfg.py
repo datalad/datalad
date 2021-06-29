@@ -25,27 +25,24 @@ from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
 
+subst_rule_docs = """\
+A substitution specification is a string with a match and substitution
+expression, each following Python's regular expression syntax. Both expressions
+are concatenated to a single string with an arbitrary delimiter character. The
+delimiter is defined by prefixing the string with the delimiter. Prefix and
+delimiter are stripped from the expressions (Example:
+",^http://(.*)$,https://\\1").  This setting can be defined multiple times.
+Substitutions will be applied incrementally, in order of their definition. The
+first substitution in such a series must match, otherwise no further
+substitutions in a series will be considered. However, following the first
+match all further substitutions in a series are processed, regardless whether
+intermediate expressions match or not."""
 
 definitions = {
     'datalad.clone.url-substitute.github': {
         'ui': ('question', {
                'title': 'GitHub URL substitution rule',
-               'text': 'Substitution specification defined as a string with a '
-                       'match and substitution expression, each following '
-                       "Python's regular expression syntax. Both expressions "
-                       'are concatenated to a single string with an arbitrary '
-                       'delimiter character. The delimiter is defined by '
-                       'prefixing the string with the delimiter. Prefix and '
-                       'delimiter are stripped from the expressions '
-                       '(Example: ",^http://(.*)$,https://\\1"). '
-                       'This setting can be defined multiple times. '
-                       'Substitutions will be applied incrementally, in order '
-                       'of their definition. The first substitution in such '
-                       'a series must match, otherwise no further substitutions '
-                       'in a series will be considered. However, following the '
-                       'first match all further substitutions in a series are '
-                       'processed, regardless whether intermediate expressions '
-                       'match or not.'
+               'text': 'Mangling for GitHub-related URL. ' + subst_rule_docs
         }),
         'destination': 'global',
         'default': (
@@ -58,6 +55,21 @@ definitions = {
             r',\s+|(%2520)+|(%20)+,_',
             # rebuild functional project URL
             r',([^#]+)###(.*),https://github.com/\1/\2',
+        )
+    },
+    # TODO this one should migrate to the datalad-osf extension. however, right
+    # now extensions cannot provide default configuration
+    # https://github.com/datalad/datalad/issues/5769
+    'datalad.clone.url-substitute.osf': {
+        'ui': ('question', {
+               'title': 'Open Science Framework URL substitution rule',
+               'text': 'Mangling for OSF-related URLs. ' + subst_rule_docs
+        }),
+        'destination': 'global',
+        'default': (
+            # accept browser-provided URL and convert to those accepted by
+            # the datalad-osf extension
+            r',^https://osf.io/([^/]+)[/]*$,osf://\1',
         )
     },
     # this is actually used in downloaders, but kept cfg name original
