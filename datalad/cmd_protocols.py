@@ -83,7 +83,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         pass
 
     def _log_summary(self, fd, data):
-        fd_name = self.fd_infos[fd]
+        fd_name = self.fd_infos[fd][0]
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
                 len(data), self.process.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
