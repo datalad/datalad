@@ -80,6 +80,15 @@ definitions = {
         'destination': 'local',
         'type': bool,
     },
+    # this is actually used in downloaders, but kept cfg name original
+    'datalad.credentials.force-ask': {
+        'ui': ('yesno', {
+               'title': 'Force (re-)entry of credentials',
+               'text': 'Should DataLad prompt for credential (re-)entry? This '
+                       'can be used to update previously stored credentials.'}),
+        'type': bool,
+        'default': False,
+    },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
                'title': 'NDA database server',
