@@ -919,3 +919,41 @@ def test_relpath_semantics(path):
         sub = install(
             dataset='super', source='subsrc', path=op.join('super', 'sub'))
         eq_(sub.path, op.join(super.path, 'sub'))
+
+
+def _create_test_install_recursive_github(path):  # pragma: no cover
+    # to be ran once to populate a hierarchy of test datasets on github
+    # Making it a full round-trip would require github credentials on CI etc
+    ds = create(opj(path, "testrepo  gh"))
+    # making them with spaces and - to ensure that we consistently use the mapping
+    # for create and for get/clone/install
+    ds.create("sub _1")
+    ds.create("sub _1/d/sub_-  1")
+    import datalad.distribution.create_sibling_github  # to bind API
+    ds.create_sibling_github(
+        "testrepo  gh",
+        github_organization='datalad',
+        recursive=True,
+        # yarik forgot to push first, "replace" is not working in non-interactive IIRC
+        # existing='reconfigure'
+    )
+    return ds.push(recursive=True, to='github')
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_install_recursive_github(path):
+    # test recursive installation of a hierarchy of datasets created on github
+    # using datalad create-sibling-github.  Following invocation was used to poplate it
+    #
+    # out = _create_test_install_recursive_github(path)
+
+    # "testrepo  gh" was mapped by our sanitization in create_sibling_github to testrepo_gh, thus
+    for i, url in enumerate([
+        'https://github.com/datalad/testrepo_gh',
+        # optionally made available to please paranoids, but with all takes too long (22sec)
+        #'https://github.com/datalad/testrepo_gh.git',
+        #'git@github.com:datalad/testrepo_gh.git',
+    ]):
+        ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
+        eq_(len(ds.subdatasets(recursive=True, fulfilled=True)), 2)

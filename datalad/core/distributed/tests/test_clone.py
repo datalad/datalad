@@ -1564,3 +1564,85 @@ def test_clone_recorded_subds_reset(path):
     eq_(ds_b.subdatasets()[0]["gitshasum"],
         sub_repo.get_hexsha(
             sub_repo.get_corresponding_branch(branch) or branch))
+
+
+@with_tempfile
+@with_tempfile
+def test_clone_url_mapping(src_path, dest_path):
+    src = create(src_path)
+    dest = Dataset(dest_path)
+    # check that the impossible doesn't work
+    assert_raises(IncompleteResultsError, clone, 'rambo', dest_path)
+    # rather than adding test URL mapping here, consider
+    # test_url_mapping_specs(), it is cheaper there
+  
+    # anticipate windows test paths and escape them
+    escaped_subst = (r',rambo,%s' % src_path).replace('\\', '\\\\')
+    for specs in (
+            # we can clone with a simple substitution
+            {'datalad.clone.url-substitute.mike': escaped_subst},
+            # a prior match to a dysfunctional URL doesn't impact success
+            {
+                'datalad.clone.url-substitute.no': ',rambo,picknick',
+                'datalad.clone.url-substitute.mike': escaped_subst,
+            }):
+        try:
+            with patch.dict(dest.config._merged_store, specs):
+                clone('rambo', dest_path)
+        finally:
+            dest.remove(check=False)
+
+    # check submodule config impact
+    dest.create()
+    with patch.dict(dest.config._merged_store,
+                    {'datalad.clone.url-substitute.mike': escaped_subst}):
+        dest.clone('rambo', 'subds')
+    submod_rec = dest.repo.get_submodules()[0]
+    # we record the original-original URL
+    eq_(submod_rec['gitmodule_datalad-url'], 'rambo')
+    # and put the effective one as the primary URL
+    eq_(submod_rec['gitmodule_url'], src_path)
+
+
+_nomatch_map = {
+    'datalad.clone.url-substitute.nomatch': (
+        ',nomatch,NULL',
+    )
+}
+_windows_map = {
+    'datalad.clone.url-substitute.win': (
+        r',C:\\Users\\datalad\\from,D:\\to',
+    )
+}
+
+
+def test_url_mapping_specs():
+    from datalad.core.distributed.clone import _map_urls
+    cfg = ConfigManager()
+    for m, i, o in (
+            # path redirect on windows
+            (_windows_map,
+             r'C:\Users\datalad\from',
+             r'D:\to'),
+            # test standard github mapping, no pathc needed
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1',
+             'https://github.com/datalad/testrepo_gh-sub__1'),
+            # and on deep subdataset too
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1/d/sub_-  1',
+             'https://github.com/datalad/testrepo_gh-sub__1-d-sub_-_1'),
+            # test that the presence of another mapping spec doesn't ruin
+            # the outcome
+            (_nomatch_map,
+             'https://github.com/datalad/testrepo_gh/sub _1',
+             'https://github.com/datalad/testrepo_gh-sub__1'),
+            # verify OSF mapping, but see
+            # https://github.com/datalad/datalad/issues/5769 for future
+            # implications
+            ({},
+             'https://osf.io/q8xnk/',
+             'osf://q8xnk'),
+            ):
+        with patch.dict(cfg._merged_store, m):
+            eq_(_map_urls(cfg, [i]), [o])
