@@ -220,7 +220,7 @@ def test_script_shims():
         # relax
         get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
         # extract numeric portion
-        assert get_numeric_portion(version) # that my lambda is correctish
+        assert get_numeric_portion(version), f"Got no numeric portion from {version}"
         assert_equal(get_numeric_portion(__version__),
                      get_numeric_portion(version))
 
