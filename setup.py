@@ -62,6 +62,7 @@ requires = {
         'python-gitlab',     # required for create-sibling-gitlab
     ],
     'misc': [
+        'argcomplete',       # optional CLI completion
         'pyperclip',         # clipboard manipulations
         'python-dateutil',   # add support for more date formats to check_dates
     ],
