@@ -218,9 +218,9 @@ def test_script_shims():
         version = (out['stdout'] + out['stderr']).splitlines()[0].split(' ', 1)[1]
         # we can get git and non git .dev version... so for now
         # relax
-        get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
+        get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
         # extract numeric portion
-        assert get_numeric_portion(version) # that my lambda is correctish
+        assert get_numeric_portion(version), f"Got no numeric portion from {version}"
         assert_equal(get_numeric_portion(__version__),
                      get_numeric_portion(version))
 
