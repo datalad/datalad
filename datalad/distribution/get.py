@@ -111,20 +111,20 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     cost is given in parenthesis, higher values indicate higher cost, and
     thus lower priority:
 
-    - URL of any configured superdataset remote that is known to have the
-      desired submodule commit, with the submodule path appended to it.
-      There can be more than one candidate (cost 500).
-
     - A datalad URL recorded in `.gitmodules` (cost 590). This allows for
       datalad URLs that require additional handling/resolution by datalad, like
       ria-schemes (ria+http, ria+ssh, etc.)
 
     - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
 
+    - URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with the submodule path appended to it.
+      There can be more than one candidate (cost 650).
+
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
       desired submodule commit, with this relative path appended to it.
-      There can be more than one candidate (cost 500).
+      There can be more than one candidate (cost 650).
 
     - In case `.gitmodules` contains a relative path as a URL, the absolute
       path of the superdataset, appended with this relative path (cost 900).
@@ -218,7 +218,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                dict(cost=500, name=remote, url=url)
+                dict(cost=650, name=remote, url=url)
                 for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
                     sm_path_url, remote_url, alternate_suffix=False)
