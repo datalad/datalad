@@ -149,6 +149,8 @@ def setup_package():
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[datalad "log"]
+	exc = 1
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
