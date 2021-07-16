@@ -645,7 +645,7 @@ class HTTPRemoteIO(object):
         # to annexremote.dirhash from within IO classes
 
         url = self.base_url + "/annex/objects/" + str(key_path)
-        response = requests.head(url)
+        response = requests.head(url, allow_redirects=True)
         return response.status_code == 200
 
     def get(self, key_path, filename, progress_cb):
