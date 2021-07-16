@@ -663,7 +663,5 @@ def _parse_overrides_from_cmdline(cmdlineargs):
             "or value assignment (must be 'section.variable=value'): %s",
             noassign)
         sys.exit(3)
-    overrides = dict([
-        (o.split('=')[0], '='.join(o.split('=')[1:]))
-        for o in cmdlineargs.cfg_overrides])
+    overrides = dict(o.split('=', 1) for o in cmdlineargs.cfg_overrides)
     return overrides
