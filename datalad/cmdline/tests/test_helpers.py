@@ -10,11 +10,15 @@
 
 __docformat__ = 'restructuredtext'
 
+from io import StringIO
 from os import mkdir
 from os.path import (
     join as opj,
 )
-from ..helpers import get_repo_instance
+
+from nose.tools import assert_raises, assert_equal
+
+from ..helpers import get_repo_instance, fail_with_short_help, _fix_datalad_ri
 from ..helpers import strip_arg_from_argv
 
 from datalad.tests.utils import (
@@ -95,3 +99,49 @@ def test_strip_arg_from_argv():
     eq_(strip_arg_from_argv(
             ['cmd', '-s', 'value', '--more'], 'value', ('-s', '--long-s')),
             ['cmd',                '--more'])
+
+
+def test_fail_with_short_help():
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(exit_code=3, out=out)
+    assert_equal(cme.exception.code, 3)
+    assert_equal(out.getvalue(), "")
+
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(msg="Failed badly", out=out)
+    assert_equal(cme.exception.code, 1)
+    assert_equal(out.getvalue(), "error: Failed badly\n")
+
+    # Suggestions, hint, etc
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(
+            msg="Failed badly",
+            known=["mother", "mutter", "father", "son"],
+            provided="muther",
+            hint="You can become one",
+            exit_code=0,  # no one forbids
+            what="parent",
+            out=out)
+    assert_equal(cme.exception.code, 0)
+    assert_equal(out.getvalue(),
+                 "error: Failed badly\n"
+                 "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
+                 "Did you mean any of these?\n"
+                 "        mutter\n"
+                 "        mother\n"
+                 "        father\n"
+                 "Hint: You can become one\n")
+
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
