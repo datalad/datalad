@@ -75,6 +75,18 @@ def setup_parser(
         # manpages with extensions commands (that should appear in their own
         # docs, but not in the core datalad package docs)
         help_ignore_extensions=False):
+    """
+    The holy grail of establishing CLI for DataLad's Interfaces
+
+    Parameters
+    ----------
+    cmdlineargs:
+    formatter_class:
+    return_subparsers: bool, optional
+      is used ATM only by BuildManPage in _datalad_build_support
+    completing:
+    help_ignore_extensions:
+    """
     lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
