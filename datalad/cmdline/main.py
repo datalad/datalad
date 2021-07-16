@@ -92,6 +92,7 @@ def setup_parser(
     from ..interface.base import dedent_docstring, get_interface_groups, \
         get_cmdline_command_name, alter_interface_docs_for_cmdline, \
         load_interface, get_cmd_doc, get_cmd_ex
+
     # setup cmdline args parser
     parts = {}
     # main parser
@@ -110,21 +111,9 @@ def setup_parser(
         epilog='"Be happy!"',
         formatter_class=formatter_class,
         add_help=False)
+
     # common options
     helpers.parser_add_common_options(parser)
-    # yoh: atm we only dump to console.  Might adopt the same separation later on
-    #      and for consistency will call it --verbose-level as well for now
-    # log-level is set via common_opts ATM
-    # parser.add_argument('--log-level',
-    #                     choices=('critical', 'error', 'warning', 'info', 'debug'),
-    #                     dest='common_log_level',
-    #                     help="""level of verbosity in log files. By default
-    #                          everything, including debug messages is logged.""")
-    #parser.add_argument('-l', '--verbose-level',
-    #                    choices=('critical', 'error', 'warning', 'info', 'debug'),
-    #                    dest='common_verbose_level',
-    #                    help="""level of verbosity of console output. By default
-    #                         only warnings and errors are printed.""")
 
     # Before doing anything additional and possibly expensive see may be that
     # we have got the command already
@@ -295,9 +284,6 @@ def fail_with_short_help(parser=None,
             % (what, provided,))
         if provided not in known:
             out.write(get_suggestions_msg(provided, known))
-        # Too noisy
-        # sys.stderr.write(" All known %ss: %s\n"
-        #                   % (what, ", ".join(sorted(known))))
     if hint:
         out.write("Hint: %s\n" % hint)
     raise SystemExit(exit_code)
@@ -357,6 +343,7 @@ def add_entrypoints_to_interface_groups(interface_groups):
         except Exception as e:
             lgr.warning('Failed to load entrypoint %s: %s', ep.name, exc_str_old(e))
             continue
+
 
 def _fix_datalad_ri(s):
     """Fixup argument if it was a DataLadRI and had leading / removed
@@ -504,5 +491,6 @@ def main(args=None):
     except Exception as exc:
         lgr.error("Failed to render results due to %s", exc_str_old(exc))
         sys.exit(1)
+
 
 lgr.log(5, "Done importing cmdline.main")
