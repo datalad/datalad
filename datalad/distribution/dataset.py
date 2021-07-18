@@ -22,12 +22,8 @@ import wrapt
 
 from datalad import cfg
 from datalad.config import ConfigManager
-from datalad.core.local.repo import repo_from_path
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
-# DueCredit
-from datalad.support.due import due
-from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
@@ -53,7 +49,8 @@ from datalad.utils import (
     ensure_list,
     quote_cmdlinearg,
 )
-
+from datalad.interface.vcs import VCS
+from datalad.dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
@@ -143,10 +140,10 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         if isinstance(path, ut.PurePath):
             path = str(path)
         self._path = path
-        self._repo = None
         self._id = None
         self._cfg = None
         self._cfg_bound = None
+        self._vcs = VCS(self.pathobj)
 
     @property
     def pathobj(self):
@@ -211,13 +208,10 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         return super(Dataset, self).__getattribute__(attr)
 
     def close(self):
-        """Perform operations which would close any possible process using this Dataset
+        """Perform operations which would close any possible process using this
+        Dataset
         """
-        repo = self._repo
-        self._repo = None
-        if repo:
-            # might take care about lingering batched processes etc
-            del repo
+        self._vcs.close()
 
     @property
     def path(self):
@@ -241,67 +235,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         GitRepo or AnnexRepo
         """
 
-        # If we already got a *Repo instance, check whether it's still valid;
-        # Note, that this basically does part of the testing that would
-        # (implicitly) be done in the loop below again. So, there's still
-        # potential to speed up when we actually need to get a new instance
-        # (or none). But it's still faster for the vast majority of cases.
-        #
-        # TODO: Dig deeper into it and melt with new instance guessing. This
-        # should also involve to reduce redundancy of testing such things from
-        # within Flyweight.__call__, AnnexRepo.__init__ and GitRepo.__init__!
-        #
-        # Also note, that this could be forged into a single big condition, but
-        # that is hard to read and we should be well aware of the actual
-        # criteria here:
-        if self._repo is not None and self.pathobj.resolve() == self._repo.pathobj:
-            # we got a repo and path references still match
-            if isinstance(self._repo, AnnexRepo):
-                # it's supposed to be an annex
-                # Here we do the same validation that Flyweight would do beforehand if there was a call to AnnexRepo()
-                if self._repo is AnnexRepo._unique_instances.get(
-                        self._repo.path, None) and not self._repo._flyweight_invalid():
-                    # it's still the object registered as flyweight and it's a
-                    # valid annex repo
-                    return self._repo
-            elif isinstance(self._repo, GitRepo):
-                # it's supposed to be a plain git
-                # same kind of checks as for AnnexRepo above, but additionally check whether it was changed to have an
-                # annex now.
-                # TODO: Instead of is_with_annex, we might want the cheaper check for an actually initialized annex.
-                #       However, that's not completely clear. On the one hand, if it really changed to be an annex
-                #       it seems likely that this happened locally and it would also be an initialized annex. On the
-                #       other hand, we could have added (and fetched) a remote with an annex, which would turn it into
-                #       our current notion of an uninitialized annex. Question is whether or not such a change really
-                #       need to be detected. For now stay on the safe side and detect it.
-                if self._repo is GitRepo._unique_instances.get(
-                        self._repo.path, None) and not self._repo._flyweight_invalid() and not \
-                        self._repo.is_with_annex():
-                    # it's still the object registered as flyweight, it's a
-                    # valid git repo and it hasn't turned into an annex
-                    return self._repo
-
-        # Note: Although it looks like the "self._repo = None" assignments
-        # could be used instead of variable "valid", that's a big difference!
-        # The *Repo instances are flyweights, not singletons. self._repo might
-        # be the last reference, which would lead to those objects being
-        # destroyed and therefore the constructor call would result in an
-        # actually new instance. This is unnecessarily costly.
-        try:
-            self._repo = repo_from_path(self._path)
-        except ValueError:
-            lgr.log(5, "Failed to detect a valid repo at %s", self.path)
-            self._repo = None
-            return
-
-        if due.active:
-            # TODO: Figure out, when exactly this is needed. Don't think it
-            #       makes sense to do this for every dataset,
-            #       no matter what => we want .repo to be as cheap as it gets.
-            # Makes sense only on installed dataset - @never_fail'ed
-            duecredit_dataset(self)
-
-        return self._repo
+        return self._vcs._repository
 
     @property
     def id(self):
@@ -452,6 +386,52 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         # tries its best to not resolve symlinks now
 
         return Dataset(sds_path)
+
+    # TODO alternative: make them semi-commands in api/coreapi
+    @borrowdoc(GitRepo)
+    def call_git(self, args, files=None,
+                 expect_stderr=False, expect_fail=False, read_only=False):
+
+        return self._vcs.call_git(args, files=None, expect_stderr=False,
+                                  expect_fail=False, read_only=False)
+
+    @borrowdoc(GitRepo)
+    def call_git_items_(self, args, files=None, expect_stderr=False, sep=None,
+                        read_only=False):
+        return self._vcs.call_git_items_(args, files=None, expect_stderr=False,
+                                         sep=None, read_only=False)
+
+    @borrowdoc(GitRepo)
+    def call_git_oneline(self, args, files=None, expect_stderr=False,
+                         read_only=False):
+        return self._vcs.call_git_oneline(args, files=None, expect_stderr=False,
+                                          read_only=False)
+
+    @borrowdoc(GitRepo)
+    def call_git_success(self, args, files=None,
+                         expect_stderr=False, read_only=False):
+        return self._vcs.call_git_success(args, files=None, expect_stderr=False,
+                                          read_only=False)
+
+    @borrowdoc(AnnexRepo)
+    def call_annex_records(self, args, files=None):
+
+        return self._vcs.call_annex_records(args, files=None)
+
+    @borrowdoc(AnnexRepo)
+    def call_annex(self, args, files=None):
+
+        return self._vcs.call_annex(args, files=None)
+
+    @borrowdoc(AnnexRepo)
+    def call_annex_items_(self, args, files=None, sep=None):
+
+        return self._vcs.call_annex_items_(args, files=None, sep=None)
+
+    @borrowdoc(AnnexRepo)
+    def call_annex_oneline(self, args, files=None):
+
+        return self._vcs.call_annex_oneline(args, files=None)
 
 
 @optional_args
