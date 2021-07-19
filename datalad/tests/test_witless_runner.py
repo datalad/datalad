@@ -174,6 +174,17 @@ def test_runner_no_stdin_no_capture():
     )
 
 
+@timed(3)
+def test_runner_empty_stdin():
+    # Ensure a runner without stdin data and output capture progresses
+    runner = Runner()
+    runner.run(
+        ["cat"],
+        stdin=b"",
+        protocol=None
+    )
+
+
 def test_runner_parametrized_protocol():
     runner = Runner()
 

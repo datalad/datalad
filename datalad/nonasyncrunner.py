@@ -188,11 +188,13 @@ def run_command(cmd: Union[str, List],
         # indicate that there is nothing to write to stdin
         stdin_data = None
 
+    write_stdin = stdin_data is not None
+
     kwargs = {
         **kwargs,
         **dict(
             bufsize=0,
-            stdin=subprocess.PIPE if stdin_data else stdin,
+            stdin=subprocess.PIPE if write_stdin else stdin,
             stdout=subprocess.PIPE if catch_stdout else None,
             stderr=subprocess.PIPE if catch_stderr else None,
             shell=True if isinstance(cmd, str) else False
@@ -202,7 +204,7 @@ def run_command(cmd: Union[str, List],
     protocol = protocol(**protocol_kwargs)
 
     process = subprocess.Popen(cmd, **kwargs)
-    process_stdin_fileno = process.stdin.fileno() if stdin_data else None
+    process_stdin_fileno = process.stdin.fileno() if write_stdin else None
     process_stdout_fileno = process.stdout.fileno() if catch_stdout else None
     process_stderr_fileno = process.stderr.fileno() if catch_stderr else None
 
@@ -218,7 +220,7 @@ def run_command(cmd: Union[str, List],
         process_stderr_fileno: STDERR_FILENO
     }
 
-    if catch_stdout or catch_stderr or stdin_data:
+    if catch_stdout or catch_stderr or write_stdin:
 
         output_queue = queue.Queue()
         active_file_numbers = set()
@@ -230,7 +232,7 @@ def run_command(cmd: Union[str, List],
             active_file_numbers.add(process_stdout_fileno)
             stdout_reader_thread = _ReaderThread(process.stdout, output_queue, cmd)
             stdout_reader_thread.start()
-        if stdin_data:
+        if write_stdin:
             active_file_numbers.add(process_stdin_fileno)
             stdin_writer_thread = _StdinWriterThread(stdin_data, process, process_stdin_fileno, output_queue, cmd)
             stdin_writer_thread.start()
@@ -238,7 +240,7 @@ def run_command(cmd: Union[str, List],
         while True:
 
             file_number, data, time_stamp = output_queue.get()
-            if stdin_data and file_number == process_stdin_fileno:
+            if write_stdin and file_number == process_stdin_fileno:
                 # Input writing is transparent to the main thread,
                 # we just check whether the input writer is still running.
                 active_file_numbers.remove(process_stdin_fileno)
