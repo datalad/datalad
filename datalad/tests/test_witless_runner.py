@@ -18,6 +18,8 @@ from time import (
     sleep,
     time,
 )
+from nose.tools import timed
+
 
 from datalad.tests.utils import (
     assert_cwd_unchanged,
@@ -148,6 +150,28 @@ def test_runner_stdin(path):
         protocol=StdOutCapture,
     )
     assert_in(OBSCURE_FILENAME, res['stdout'])
+
+
+@timed(3)
+def test_runner_stdin_no_capture():
+    # Ensure that stdin writing alone progresses
+    runner = Runner()
+    runner.run(
+        py2cmd('import sys; print(sys.stdin.read())'),
+        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 10000).encode('utf-8'),
+        protocol=None
+    )
+
+
+@timed(3)
+def test_runner_no_stdin_no_capture():
+    # Ensure a runner without stdin data and output capture progresses
+    runner = Runner()
+    runner.run(
+        ["echo", "a", "b", "c"],
+        stdin=None,
+        protocol=None
+    )
 
 
 def test_runner_parametrized_protocol():

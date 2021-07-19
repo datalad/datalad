@@ -23,6 +23,7 @@ from .cmd_protocols import WitlessProtocol
 
 logger = logging.getLogger("datalad.runner")
 
+STDIN_FILENO = 0
 STDOUT_FILENO = 1
 STDERR_FILENO = 2
 
@@ -82,6 +83,58 @@ class _ReaderThread(threading.Thread):
             self.queue.put((self.file.fileno(), data, time.time()))
 
 
+class _StdinWriterThread(threading.Thread):
+    def __init__(self, stdin_data, process, stdin_fileno, q, command=""):
+        """
+        Parameters
+        ----------
+        stdin_data:
+          Data that should be written to the file given by `stdin_fileno´.
+        process:
+          a subprocess.Popen-instance. It is mainly used to access
+          popen._stdin_write(...)
+        q:
+          A queue into which the thread writes a None-data object to
+          indicate that all stdin_data was written.
+        command:
+          The command for which the thread was created. This
+          is mainly used to improve debug output messages.
+        """
+        super().__init__(daemon=True)
+        self.stdin_data = stdin_data
+        self.process = process
+        self.stdin_fileno = stdin_fileno
+        self.queue = q
+        self.command = command
+        self.quit = False
+
+    def __str__(self):
+        return f"WriterThread({self.stdin_data}, {self.process}, {self.stdin_fileno}, {self.command})"
+
+    def request_exit(self):
+        """
+        Request the thread to exit. This is not guaranteed to
+        have any effect, because the thread might be waiting in
+        `process._stdin_write(...)`.
+        """
+        self.quit = True
+
+    def run(self):
+        logger.debug("%s started", self)
+
+        try:
+            # (ab)use internal helper that takes care of a bunch of corner cases
+            # and closes stdin at the end
+            self.process._stdin_write(self.stdin_data)
+        except BrokenPipeError:
+            logger.debug(f"%s exiting (broken pipe)", self)
+            self.queue.put((self.stdin_fileno, None, time.time()))
+            return
+
+        logger.debug("%s exiting (write completed)", self)
+        self.queue.put((self.stdin_fileno, None, time.time()))
+
+
 def run_command(cmd: Union[str, List],
                 protocol: Type[WitlessProtocol],
                 stdin: Any,
@@ -130,17 +183,16 @@ def run_command(cmd: Union[str, List],
     if isinstance(stdin, (str, bytes)):
         # we got something that is not readily usable stdin, but must be
         # fed to the processes stdin
-        input = stdin
-        stdin = subprocess.PIPE
+        stdin_data = stdin
     else:
         # indicate that there is nothing to write to stdin
-        input = None
+        stdin_data = None
 
     kwargs = {
         **kwargs,
         **dict(
             bufsize=0,
-            stdin=stdin,
+            stdin=subprocess.PIPE if stdin_data else stdin,
             stdout=subprocess.PIPE if catch_stdout else None,
             stderr=subprocess.PIPE if catch_stderr else None,
             shell=True if isinstance(cmd, str) else False
@@ -150,6 +202,7 @@ def run_command(cmd: Union[str, List],
     protocol = protocol(**protocol_kwargs)
 
     process = subprocess.Popen(cmd, **kwargs)
+    process_stdin_fileno = process.stdin.fileno() if stdin_data else None
     process_stdout_fileno = process.stdout.fileno() if catch_stdout else None
     process_stderr_fileno = process.stderr.fileno() if catch_stderr else None
 
@@ -165,33 +218,39 @@ def run_command(cmd: Union[str, List],
         process_stderr_fileno: STDERR_FILENO
     }
 
-    if input is not None:
-        # (ab)use internal helper that takes care of a bunch of corner cases
-        # and closes stdin at the end
-        process._stdin_write(input)
-
-    if catch_stdout or catch_stderr:
+    if catch_stdout or catch_stderr or stdin_data:
 
         output_queue = queue.Queue()
         active_file_numbers = set()
         if catch_stderr:
+            active_file_numbers.add(process_stderr_fileno)
             stderr_reader_thread = _ReaderThread(process.stderr, output_queue, cmd)
             stderr_reader_thread.start()
-            active_file_numbers.add(process.stderr.fileno())
         if catch_stdout:
+            active_file_numbers.add(process_stdout_fileno)
             stdout_reader_thread = _ReaderThread(process.stdout, output_queue, cmd)
             stdout_reader_thread.start()
-            active_file_numbers.add(process.stdout.fileno())
+        if stdin_data:
+            active_file_numbers.add(process_stdin_fileno)
+            stdin_writer_thread = _StdinWriterThread(stdin_data, process, process_stdin_fileno, output_queue, cmd)
+            stdin_writer_thread.start()
 
         while True:
+
             file_number, data, time_stamp = output_queue.get()
-            if isinstance(data, bytes):
-                protocol.pipe_data_received(fileno_mapping[file_number], data)
+            if stdin_data and file_number == process_stdin_fileno:
+                # Input writing is transparent to the main thread,
+                # we just check whether the input writer is still running.
+                active_file_numbers.remove(process_stdin_fileno)
             else:
-                protocol.pipe_connection_lost(fileno_mapping[file_number], data)
-                active_file_numbers.remove(file_number)
-                if not active_file_numbers:
-                    break
+                if isinstance(data, bytes):
+                    protocol.pipe_data_received(fileno_mapping[file_number], data)
+                else:
+                    protocol.pipe_connection_lost(fileno_mapping[file_number], data)
+                    active_file_numbers.remove(file_number)
+
+            if not active_file_numbers:
+                break
 
     process.wait()
     result = protocol._prepare_result()
