@@ -11,7 +11,6 @@
 """
 
 import re
-import time
 import os
 import os.path as op
 
@@ -33,12 +32,7 @@ from os.path import (
 )
 
 import posixpath
-import threading
 from functools import wraps
-from weakref import (
-    finalize,
-    WeakValueDictionary
-)
 import warnings
 
 from datalad.log import log_progress
@@ -53,7 +47,6 @@ from datalad.cmd import (
     StdOutErrCapture,
 )
 from datalad.config import (
-    ConfigManager,
     parse_gitconfig_dump,
     write_config_section,
 )
@@ -79,11 +72,9 @@ from .external_versions import external_versions
 from .exceptions import (
     CommandError,
     FileNotInRepositoryError,
-    GitIgnoreError,
     InvalidGitReferenceError,
     InvalidGitRepositoryError,
     NoSuchPathError,
-    PathKnownToRepositoryError,
 )
 from .network import (
     RI,
