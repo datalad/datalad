@@ -104,8 +104,10 @@ def run_command(cmd: Union[str, List],
     protocol : WitlessProtocol class or subclass
       Protocol class to be instantiated for managing communication
       with the subprocess.
-    stdin : file-like, subprocess.PIPE or None
-      Passed to the subprocess as its standard input.
+    stdin : file-like, subprocess.PIPE, str, bytes or None
+      Passed to the subprocess as its standard input. In the case of a str
+      or bytes objects, the subprocess stdin is set to subprocess.PIPE
+      and the given input is written to it after the process has started.
     protocol_kwargs : dict, optional
        Passed to the Protocol class constructor.
     kwargs : Pass to `subprocess.Popen`, will typically be parameters
@@ -124,6 +126,15 @@ def run_command(cmd: Union[str, List],
 
     catch_stdout = protocol.proc_out is not None
     catch_stderr = protocol.proc_err is not None
+
+    if isinstance(stdin, (str, bytes)):
+        # we got something that is not readily usable stdin, but must be
+        # fed to the processes stdin
+        input = stdin
+        stdin = subprocess.PIPE
+    else:
+        # indicate that there is nothing to write to stdin
+        input = None
 
     kwargs = {
         **kwargs,
@@ -153,6 +164,11 @@ def run_command(cmd: Union[str, List],
         process_stdout_fileno: STDOUT_FILENO,
         process_stderr_fileno: STDERR_FILENO
     }
+
+    if input is not None:
+        # (ab)use internal helper that takes care of a bunch of corner cases
+        # and closes stdin at the end
+        process._stdin_write(input)
 
     if catch_stdout or catch_stderr:
 

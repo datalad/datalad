@@ -851,36 +851,30 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative
     # to this location
-    # XXX must not be a SpooledTemporaryFile -- dunno why, but doesn't work
-    # otherwise
-    with TemporaryFile() as file_list:
-        nbytes = 0
-        for c in to_transfer:
-            key = c['key']
-            if key in seen_keys:
-                repkey_paths.setdefault(key, []).append(c['path'])
-            else:
-                file_list.write(
-                    bytes(Path(c['path']).relative_to(ds.pathobj)))
-                file_list.write(b'\0')
-                nbytes += c['bytesize']
-                seen_keys.add(key)
-        lgr.debug('Counted %d bytes of annex data to transfer',
-                  nbytes)
+    file_list = b''
+    nbytes = 0
+    for c in to_transfer:
+        key = c['key']
+        if key in seen_keys:
+            repkey_paths.setdefault(key, []).append(c['path'])
+        else:
+            file_list += bytes(Path(c['path']).relative_to(ds.pathobj))
+            file_list += b'\0'
+            nbytes += c['bytesize']
+            seen_keys.add(key)
+    lgr.debug('Counted %d bytes of annex data to transfer',
+              nbytes)
 
-        # rewind stdin buffer
-        file_list.seek(0)
-
-        # and go
-        res = ds_repo._call_annex_records(
-            cmd,
-            stdin=file_list,
-            progress=True,
-            # tailor the progress protocol with the total number of files
-            # to be transferred
-            total_nbytes=nbytes)
-        for j in res:
-            yield annexjson2result(j, ds, type='file', **res_kwargs)
+    # and go
+    res = ds_repo._call_annex_records(
+        cmd,
+        stdin=file_list,
+        progress=True,
+        # tailor the progress protocol with the total number of files
+        # to be transferred
+        total_nbytes=nbytes)
+    for j in res:
+        yield annexjson2result(j, ds, type='file', **res_kwargs)
 
     for annex_key, paths in repkey_paths.items():
         for path in paths:

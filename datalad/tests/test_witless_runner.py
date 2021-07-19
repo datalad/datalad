@@ -141,6 +141,14 @@ def test_runner_stdin(path):
     )
     assert_in(OBSCURE_FILENAME, res['stdout'])
 
+    # we can do the same without a tempfile, too
+    res = runner.run(
+        py2cmd('import fileinput; print(fileinput.input().readline())'),
+        stdin=OBSCURE_FILENAME.encode('utf-8'),
+        protocol=StdOutCapture,
+    )
+    assert_in(OBSCURE_FILENAME, res['stdout'])
+
 
 def test_runner_parametrized_protocol():
     runner = Runner()

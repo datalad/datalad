@@ -109,8 +109,8 @@ class WitlessRunner(object):
           (e.g. output capture). A number of pre-crafted classes are
           provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
         stdin : byte stream, optional
-          File descriptor like, used as stdin for the process. Passed
-          verbatim to subprocess.Popen().
+          File descriptor like, or bytes objects used as stdin for the process.
+          Passed verbatim to run_command().
         cwd : path-like, optional
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise. Overrides
