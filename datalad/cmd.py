@@ -59,12 +59,6 @@ class WitlessRunner(object):
     """
     __slots__ = ['cwd', 'env']
 
-    # To workaround issues where parent process does not take care about proper
-    # new loop instantiation in a child process
-    # https://bugs.python.org/issue21998
-    _loop_pid = None
-    _loop_need_new = None
-
     def __init__(self, cwd=None, env=None):
         """
         Parameters
@@ -180,6 +174,7 @@ class WitlessRunner(object):
         # denoise, must be zero at this point
         results.pop('code', None)
         return results
+
 
 class GitRunnerBase(object):
     """
