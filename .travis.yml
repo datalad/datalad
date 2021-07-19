@@ -27,8 +27,6 @@ env:
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"
-    # The following is currently necessary as we test a lot of logging output in high detail:
-    - DATALAD_LOG_EXC=1
 
 matrix:
   include:

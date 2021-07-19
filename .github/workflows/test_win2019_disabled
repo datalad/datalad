@@ -6,9 +6,6 @@ jobs:
   test:
 
     runs-on: windows-2019
-    env:
-      # The following is currently necessary as we test a lot of logging output in high detail:
-      DATALAD_LOG_EXC: 1
 
     strategy:
       fail-fast: false

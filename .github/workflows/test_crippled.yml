@@ -6,9 +6,6 @@ jobs:
   test:
 
     runs-on: ubuntu-latest
-    env:
-      # The following is currently necessary as we test a lot of logging output in high detail:
-      DATALAD_LOG_EXC: 1
     steps:
     - name: Set up system
       shell: bash
