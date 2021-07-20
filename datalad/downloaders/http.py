@@ -21,6 +21,7 @@ from requests.utils import parse_dict_header
 import io
 from time import sleep
 
+from .. import __version__
 from ..utils import (
     ensure_list_from_str,
     ensure_dict_from_str,
@@ -49,6 +50,13 @@ from .base import BaseDownloader, DownloaderSession
 from logging import getLogger
 from ..log import LoggerHelper
 lgr = getLogger('datalad.http')
+
+# Following https://meta.wikimedia.org/wiki/User-Agent_policy to provide
+# extended and informative User-Agent string
+DEFAULT_USER_AGENT = \
+    f'DataLad/{__version__} ' \
+    '(https://datalad.org; team@datalad.org) ' \
+    f'python-requests/{requests.__version__}'
 
 try:
     import requests_ftp
@@ -543,6 +551,9 @@ class HTTPDownloader(BaseDownloader):
             headers = {}
         if 'Accept-Encoding' not in headers:
             headers['Accept-Encoding'] = ''
+        if 'user-agent' not in map(str.lower, headers):
+            headers['User-Agent'] = DEFAULT_USER_AGENT
+
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1
         for retry in range(1, nretries+1):
