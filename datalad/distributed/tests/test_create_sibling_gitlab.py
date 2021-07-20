@@ -77,15 +77,17 @@ def test_dryrun(path):
         site='dummy', sibling='dummy',
     )
     # now a working, fully manual call
-    res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
-        site='dummy', project='here',
-    )
-    assert_result_count(res, 1)
-    assert_result_count(
-        res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='dummy', sibling='dummy', project='here',
-    )
+    for p in (None, ctlg['root'].path):
+        res = ctlg['root'].create_sibling_gitlab(
+            dryrun=True, on_failure='ignore',
+            site='dummy', project='here',
+            path=p,
+        )
+        assert_result_count(res, 1)
+        assert_result_count(
+            res, 1, path=ctlg['root'].path, type='dataset', status='ok',
+            site='dummy', sibling='dummy', project='here',
+        )
 
     # now configure a default gitlab site
     ctlg['root'].config.set('datalad.gitlab-default-site', 'theone')
@@ -324,7 +326,7 @@ def test_fake_gitlab(path):
 
     # try recreation, the sibling is already configured, same setup, no error
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _ExistingProjectGitLab):
-        res = ds.create_sibling_gitlab(site='dummy', project='here')
+        res = ds.create_sibling_gitlab(path=ds.path, site='dummy', project='here')
         assert_result_count(res, 2)
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path,

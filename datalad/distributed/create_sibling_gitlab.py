@@ -237,13 +237,16 @@ class CreateSiblingGitlab(Interface):
         siteobjs = dict()
 
         # which datasets to process?
-        if path is None:
+        if path is None or ds.pathobj in path:
             for r in _proc_dataset(
                     ds, ds,
                     site, project, name, layout, existing, access,
                     dryrun, siteobjs, publish_depends, description):
                 yield r
-        if path or recursive:
+        # we need to find a subdataset when recursing, or when there is a path that
+        # could point to one, we have to exclude the parent dataset in this test
+        # to avoid undesired level-1 recursion into subdatasets
+        if any(p != ds.pathobj for p in (path or [])) or recursive:
             # also include any matching subdatasets
             for subds in ds.subdatasets(
                     path=path,
