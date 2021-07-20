@@ -106,32 +106,20 @@ class _StdinWriterThread(threading.Thread):
         self.stdin_fileno = stdin_fileno
         self.queue = q
         self.command = command
-        self.quit = False
 
     def __str__(self):
-        return f"WriterThread({self.stdin_data}, {self.process}, {self.stdin_fileno}, {self.command})"
-
-    def request_exit(self):
-        """
-        Request the thread to exit. This is not guaranteed to
-        have any effect, because the thread might be waiting in
-        `process._stdin_write(...)`.
-        """
-        self.quit = True
+        return (
+            f"WriterThread(stdin_data[0 ... {len(self.stdin_data) - 1}], "
+            f"{self.process}, {self.stdin_fileno}, {self.command})")
 
     def run(self):
         logger.debug("%s started", self)
 
-        try:
-            # (ab)use internal helper that takes care of a bunch of corner cases
-            # and closes stdin at the end
-            self.process._stdin_write(self.stdin_data)
-        except BrokenPipeError:
-            logger.debug(f"%s exiting (broken pipe)", self)
-            self.queue.put((self.stdin_fileno, None, time.time()))
-            return
+        # (ab)use internal helper that takes care of a bunch of corner cases
+        # and closes stdin at the end
+        self.process._stdin_write(self.stdin_data)
 
-        logger.debug("%s exiting (write completed)", self)
+        logger.debug("%s exiting (write completed or interrupted)", self)
         self.queue.put((self.stdin_fileno, None, time.time()))
 
 
