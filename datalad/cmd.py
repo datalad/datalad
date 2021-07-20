@@ -59,12 +59,6 @@ class WitlessRunner(object):
     """
     __slots__ = ['cwd', 'env']
 
-    # To workaround issues where parent process does not take care about proper
-    # new loop instantiation in a child process
-    # https://bugs.python.org/issue21998
-    _loop_pid = None
-    _loop_need_new = None
-
     def __init__(self, cwd=None, env=None):
         """
         Parameters
@@ -109,8 +103,8 @@ class WitlessRunner(object):
           (e.g. output capture). A number of pre-crafted classes are
           provided (e.g `KillOutput`, `NoCapture`, `GitProgress`).
         stdin : byte stream, optional
-          File descriptor like, used as stdin for the process. Passed
-          verbatim to subprocess.Popen().
+          File descriptor like, or bytes objects used as stdin for the process.
+          Passed verbatim to run_command().
         cwd : path-like, optional
           If given, commands are executed with this path as PWD,
           the PWD of the parent process is used otherwise. Overrides
@@ -180,6 +174,7 @@ class WitlessRunner(object):
         # denoise, must be zero at this point
         results.pop('code', None)
         return results
+
 
 class GitRunnerBase(object):
     """
