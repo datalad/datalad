@@ -29,7 +29,8 @@ from ..ui.utils import get_console_width
 from ..utils import (
     ensure_unicode,
     getpwd,
-    unlink, get_suggestions_msg,
+    unlink,
+    get_suggestions_msg,
 )
 from ..version import __version__, __full_version__
 from ..dochelpers import exc_str, exc_str_old
