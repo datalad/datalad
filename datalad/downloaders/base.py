@@ -171,10 +171,10 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 break
             except AccessDeniedError as e:
                 if isinstance(e, AnonymousAccessDeniedError):
-                    access_denied = "Anonymous"
+                    access_denied = "Anonymous access"
                 else:
-                    access_denied = "Authenticated"
-                lgr.debug("%s access was denied: %s", access_denied, exc_str(e))
+                    access_denied = "Access"
+                lgr.debug("%s was denied: %s", access_denied, exc_str(e))
                 supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
@@ -305,8 +305,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         DownloadError
           If no known credentials type or user refuses to update
         """
-        title = "{msg} access to {url} has failed.".format(
-            msg=denied_msg, url=url)
+        title = f"{denied_msg} to {url} has failed."
 
         if new_provider:
             # No credential was known, we need to create an
