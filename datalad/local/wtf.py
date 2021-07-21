@@ -241,6 +241,11 @@ def _describe_dataset(ds, sensitive):
             'repo': ds.repo.__class__.__name__ if ds.repo else None,
             'id': ds.id,
         }
+        # describe available branches and their states
+        branches = [
+            '%s@%s' % (b, next(ds.repo.get_branch_commits_(branch=b))[:7])
+            for b in ds.repo.get_branches()]
+        infos['branches'] = branches
         if not sensitive:
             infos['metadata'] = _HIDDEN
         elif ds.id:
