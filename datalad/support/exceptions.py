@@ -214,10 +214,10 @@ class MissingExternalDependency(RuntimeError):
         self.msg = msg
 
     def __str__(self):
-        to_str = str(self.name)
+        to_str = 'No working {} installation'.format(self.name)
         if self.ver:
             to_str += " of version >= %s" % self.ver
-        to_str += " is missing."
+        to_str += "."
         if self.msg:
             to_str += " %s" % self.msg
         return to_str
