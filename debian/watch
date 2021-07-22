@@ -1,4 +1,4 @@
 version=3
 
-opts="filenamemangle=s/(?:.*\/)?(\d[\d\.]+)\.tar\.gz/datalad-$1.tar.gz/" \
-https://github.com/datalad/datalad/releases (?:.*/)?(\d[\d\.]+)\.tar\.gz
+opts=uversionmangle=s/(rc|a|b|c)/~$1/ \
+http://pypi.debian.net/datalad/datalad-(.+)\.(?:zip|tgz|tbz|txz|(?:tar\.(?:gz|bz2|xz)))
