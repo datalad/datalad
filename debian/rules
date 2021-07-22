@@ -1,13 +1,6 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE = 1
 
-srcpkg = $(shell LC_ALL=C dpkg-parsechangelog | grep '^Source:' | cut -d ' ' -f 2,2)
-# this figures out the last merge point from 'master' into the Debian branch and
-# then described this commit relative to the last release tag (V...)
-# If this should make any sense the local master branch must track upstream's
-# master or whatever other source branch.
-gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match '[0-9].*' $$(git merge-base -a HEAD master) | sed -e 's/-/+git/')
-
 export DH_VERBOSE = 1
 export PYBUILD_NAME = datalad
 # Excluding test_basics as a dirty workaround
@@ -60,9 +53,3 @@ override_dh_auto_install:
 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
-
-# make orig tarball from repository content
-get-orig-source:
-	# orig tarball, turn directory into something nicer
-	git archive --format=tar --prefix=$(srcpkg)-$(gitver)/ HEAD | \
-		gzip -9 > $(srcpkg)_$(gitver).orig.tar.gz
