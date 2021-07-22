@@ -1,0 +1,17 @@
+[console_scripts]
+datalad = datalad.cmdline.main:main
+git-annex-remote-datalad = datalad.customremotes.datalad:main
+git-annex-remote-datalad-archives = datalad.customremotes.archives:main
+git-annex-remote-ora = datalad.distributed.ora_remote:main
+
+[datalad.metadata.extractors]
+annex = datalad.metadata.extractors.annex:MetadataExtractor
+audio = datalad.metadata.extractors.audio:MetadataExtractor
+datacite = datalad.metadata.extractors.datacite:MetadataExtractor
+datalad_core = datalad.metadata.extractors.datalad_core:MetadataExtractor
+datalad_rfc822 = datalad.metadata.extractors.datalad_rfc822:MetadataExtractor
+exif = datalad.metadata.extractors.exif:MetadataExtractor
+frictionless_datapackage = datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor
+image = datalad.metadata.extractors.image:MetadataExtractor
+xmp = datalad.metadata.extractors.xmp:MetadataExtractor
+
