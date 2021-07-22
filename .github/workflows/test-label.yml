@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'datalad/datalad'
     steps:
-      - name: Check that PR against master has "minor" or "internal" label
+      - name: Check that PR against master has "minor" or other misc label
         if: github.event.pull_request.base.label == 'datalad:master'
         run: |
           # This should evaluate to either `true` or `false`, which runs the
@@ -17,9 +17,10 @@ jobs:
           ${{
             contains(github.event.pull_request.labels.*.name, 'minor')
             || contains(github.event.pull_request.labels.*.name, 'internal')
+            || contains(github.event.pull_request.labels.*.name, 'tests')
           }}
 
-      - name: Check that PR against maint has "patch" or "internal" label
+      - name: Check that PR against maint has "patch" or other misc labels
         if: github.event.pull_request.base.label == 'datalad:maint'
         run: |
           # This should evaluate to either `true` or `false`, which runs the
@@ -27,6 +28,7 @@ jobs:
           ${{
             contains(github.event.pull_request.labels.*.name, 'patch')
             || contains(github.event.pull_request.labels.*.name, 'internal')
+            || contains(github.event.pull_request.labels.*.name, 'tests')
           }}
 
 # vim:set sts=2:
