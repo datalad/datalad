@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+
+from time import time
+import sys
+
+niter = int(sys.argv[1])
+load = {i: "x" * i for i in range(10)}
+
+for i in range(niter):
+    print("I am looping already for {} iterations. Load: {}".format(i, load))

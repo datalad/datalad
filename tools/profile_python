@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# A little helper to profile Python scripts and directly python code
+#
+#
+
+set -ue
+
+mktemp_() {
+    mktemp "${TMPDIR:-/tmp}/profile_pythonXXXXXX"
+}
+
+help() {
+    cat << EOF
+Helper to create profile graphs for Python scripts and code (via -c argument)
+
+$0 [--help] [--copyq] [-p|--prefix PREFIX] [-c "python code"|script] [ARGS]
+
+If copyq is available, will also copy to its clipboard while you are enjoying
+the view.
+
+If script file is not found, will try to locate it in the PATH, and proceed with
+it if found.
+EOF
+    exit 0
+}
+
+[ "$#" = 0 ] && help
+
+prefix=
+copyq=
+
+while [[ "$#" -gt 0 ]]; do case "$1" in
+  -h|--help)
+    help;;
+  -c)
+    echo "We are passed Python statement to profile."
+    shift
+    prefix=$(mktemp_)
+    pyfile="$prefix.py"
+    echo "$1" >| "$pyfile"
+    shift
+    #echo "Temporary script $pyfile will be removed after"
+    #trap "rm -f ${prefix}*" 0
+    break
+    ;;
+  -p|--prefix)
+    shift
+    prefix="$1"
+    echo "Prefix $prefix"
+    shift
+    ;;
+  --copyq)
+    shift
+    hash copyq 2>/dev/null || { echo "No copyq found"; exit 1; }
+    copyq=yes
+    ;;
+  *) # must be a script
+    pyfile="$1"
+    shift
+    break
+    ;;
+esac; done
+
+
+if [ -z "$prefix" ]; then
+    prefix=$(mktemp_ profile_pythonXXXXXX)
+fi
+
+pstatsfile="$prefix.pstats"
+pngfile="$prefix.png"
+statsfile="$prefix.stats"
+
+if [ ! -e "$pyfile" ]; then
+    echo "File $pyfile is not found. Is it a script in the PATH?"
+    pyfile_=$(command -v "$pyfile" 2>/dev/null)
+    if [ -n "$pyfile_" ]; then
+        echo " Found $pyfile_ which we will use instead"
+        pyfile="$pyfile_"
+    else
+        echo " No file found. Exiting"
+        exit 1
+    fi
+fi
+
+echo "Profiling $pyfile"
+python -m cProfile -s name -o "$pstatsfile" "$pyfile" "$@" || echo "E: Exited with $?"
+gprof2dot -f pstats "$pstatsfile" | dot -Tpng -o "$pngfile"
+
+echo "Stats file $statsfile"
+python -c "import pstats; pstats.Stats('$pstatsfile').sort_stats(pstats.SortKey.CUMULATIVE).print_stats()" >| "$statsfile"
+head -n 20 "$statsfile"
+
+echo "Showing $pngfile"
+xdg-open "$pngfile" &
+
+if [ -n "$copyq" ]; then
+    echo "Copying $statsfile to CopyQ clipboard"
+    copyq write text/plain - < "$statsfile" && copyq select 0
+
+    echo "Copying $pngfile to CopyQ clipboard"
+    copyq write image/png - < "$pngfile" && copyq select 0
+fi

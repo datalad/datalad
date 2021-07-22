@@ -1,0 +1,57 @@
+#!/usr/bin/python
+#emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+#ex: set sts=4 ts=4 sw=4 noet:
+"""Little helper to annotate logfile with difference between timestamps in consecutive lines
+
+It prints time estimated from previous line on the previous line, with 0 always printed as well
+so it becomes possible to sort -n the output to see from what line it took longest to the next
+"""
+
+import sys
+import re
+from datetime import datetime
+
+reg = re.compile('^\d{4}-\d{2}-\d{1,2} \d{1,2}:\d{1,2}:\d{1,2},\d{1,3}')
+prevt = None
+maxl = 0
+prevl = None
+
+if len(sys.argv) <= 1:
+    in_ = sys.stdin
+else:
+    in_ = open(sys.argv[1])
+
+trailer = []
+for l in in_:
+    res = reg.search(l)
+    dtstr = ''
+    if res:
+        end = res.end()
+        t = datetime.strptime(l[:end], '%Y-%m-%d %H:%M:%S,%f')
+        if prevt is not None:
+            dt = t - prevt
+            ms = dt.microseconds // 1000 + dt.seconds*1000
+            dtstr = ("%5d" % ms if ms else '    0')
+
+            maxl = max(maxl, len(dtstr))
+            dtstr = '%%%ds' % maxl % dtstr
+            prevl = "%s %s" % (dtstr, prevl)
+        prevt = t
+    else:
+        # no timestamp -- add to the trailer
+        trailer.append(l)
+        continue
+
+    if prevl is not None:
+        for l_ in trailer:
+            sys.stdout.write("    - " + l_)
+        trailer = []
+        sys.stdout.write(prevl)
+
+    if res:
+        prevl = l
+
+if prevl:
+    sys.stdout.write("----- " + prevl)
+for l_ in trailer:
+    sys.stdout.write("    - " + l_)

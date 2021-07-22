@@ -1,0 +1,73 @@
+FROM neurodebian:DL_DIST
+MAINTAINER Yaroslav Halchenko <yoh@datalad.org>
+
+USER root
+
+# Speed up installation using our apt cacher
+#RUN mkdir /etc/apt/apt.conf.d/
+COPY conf/etc/apt/apt.conf.d/99apt-cacher /etc/apt/apt.conf.d/99apt-cacher
+RUN chmod a+r /etc/apt/apt.conf.d/99apt-cacher
+
+# Make deb-src avail
+RUN sed -i -e 's,^deb\(.*\),deb\1\ndeb-src\1,g' /etc/apt/sources.list.d/neurodebian.sources.list /etc/apt/sources.list
+
+# Assure popcon doesn't kick in
+RUN bash -c "echo 'debconf debconf/frontend select noninteractive' | debconf-set-selections -"
+
+RUN apt-get update
+# Use bash for extended syntax
+RUN apt-get install -y -q eatmydata
+RUN bash -c "DL_APT"
+# Some rudimentary tools if we need to do anything within docker
+RUN bash -c "eatmydata apt-get install -y -q vim less man-db"
+RUN apt-get clean
+
+# Let's setup user matching user
+RUN groupadd --gid DL_GID -r DL_USER && useradd -m --uid DL_UID -g DL_USER DL_USER
+
+# Install and configure apache
+RUN eatmydata apt-get update && eatmydata apt-get install -y --force-yes apache2
+
+# Install and configure openssh server
+RUN eatmydata apt-get install -q -y openssh-server
+
+RUN chown DL_USER -R /var/www/html
+
+USER DL_USER
+
+WORKDIR /home/DL_USER
+# Prepare system for working with Git
+RUN git config --global user.email "DL_GIT_USER_EMAIL"
+RUN git config --global user.name "DL_GIT_USER_NAME"
+# RUN git clone git://github.com/datalad/datalad
+RUN mkdir datalad
+
+# WORKDIR /home/DL_USER/datalad
+
+#
+# Need to clone and install datalad system-wide but there is a problem that
+# we can't mount hostdir at build time:
+# https://github.com/docker/docker/issues/14080
+# http://stackoverflow.com/questions/26050899/how-to-mount-host-volumes-into-docker-containers-in-dockerfile-during-build
+# so this will not be done now but rather will be done once container started
+# from this image
+# Probably actually better so image could be reused for multiple instances of the container
+#
+
+# Fall back to root, so we have full control to start webserver etc
+USER root
+
+RUN mkdir /home/DL_USER/.ssh
+COPY conf/authorized_keys /home/DL_USER/.ssh/authorized_keys
+RUN bash -c "chown DL_USER -R /home/DL_USER/.ssh; chmod go-rwx -R /home/DL_USER/.ssh"
+
+# We will need a supervisor to run both apache and sshd
+# based on https://docs.docker.com/engine/admin/using_supervisord/
+RUN mkdir -p /var/lock/apache2 /var/run/apache2 /var/run/sshd /var/log/supervisor
+RUN eatmydata apt-get install -y -q supervisor
+COPY conf/apache-ssh-supervisor.conf /etc/supervisor/conf.d/supervisord.conf
+
+# ENTRYPOINT ["/usr/sbin/apache2ctl", "-D", "FOREGROUND"]
+RUN apt-get clean
+EXPOSE 22 80 443
+CMD ["/usr/bin/supervisord"]

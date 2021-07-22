@@ -1,0 +1,109 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+#
+#
+# COPYRIGHT: Yaroslav Halchenko 2014
+#
+# LICENSE: MIT
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in
+#  all copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+#  THE SOFTWARE.
+#
+
+set -eu
+
+depth=5
+# precreate associative array with directory names
+declare -A dirs
+dirs["0"]='.'
+dname=.
+for d in `eval echo {1..$depth}`; do
+	echo $dname
+	dname+="/d$d"
+	dirs["$d"]=$dname
+done
+
+function multi_branch {
+	branches=$1
+	files_per_branch=$2
+    annex=$3
+	echo "Creating $branches branches with $files_per_branch per branch. annex=$annex"
+	i=0
+	for b in `eval echo {1..$branches}`; do
+		git co -b b$b master &> /dev/null
+		for f in `eval echo {1..$files_per_branch}`; do
+			#echo -ne "\rFile $f"
+			fdepth=$(python -c "print $i%$depth")
+			dname=${dirs["$fdepth"]}
+			#[ -e $dname ] || mkdir -p $dname
+			fname=$dname/f$i.dat
+			echo "file $i" > $fname;
+			i=$(($i+1))
+		done
+        if [ $annex=1 ]; then
+            git annex add * > /dev/null;
+        else
+            git add * > /dev/null
+        fi
+		git commit -m "commit in branch $b" >/dev/null;
+	done
+	echo "Merging"
+	eval "git merge -m 'merging $branches together' b{1..$branches}" >/dev/null
+}
+
+function init_repo {
+	tdir_=$1
+	if [ -e $tdir_ ]; then
+		chmod +w -R $tdir_
+		rm -r $tdir_ || :
+	fi
+	mkdir -p $tdir_
+	cd $tdir_
+	git init
+	git annex init
+	touch .empty
+	git add .empty; git commit -m "initial commit just to avoid dances with empty branches"
+	# precreate directories
+	for d in ${dirs[*]}; do
+		mkdir -p $tdir_/$d
+	done
+}
+
+if [ $# -lt 2 ]; then
+	echo "Usage: $0  nfiles_per_branch nbranches [tempdir]"
+	exit 1
+fi
+
+filespb=$1
+br=$2
+files=$(python -c "print $filespb*$br")
+
+if [ $# -ge 3 ]; then
+	tdir=$3
+else
+	tdir=/tmp/testdir
+fi
+
+annex=0
+echo "Temp path $tdir"
+init_repo $tdir/branches;   cd $tdir/branches; time multi_branch $br $filespb $annex
+init_repo $tdir/nobranches; cd $tdir/nobranches; time multi_branch 1 $files $annex
+
+#init_repo
+#time singe_branch

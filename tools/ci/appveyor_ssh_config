@@ -1,0 +1,11 @@
+Host localhost
+	HostName 127.0.0.1
+	StrictHostKeyChecking no
+
+Host datalad-test
+	HostName 127.0.0.1
+	StrictHostKeyChecking no
+
+Host datalad-test2
+	HostName 127.0.0.1
+	StrictHostKeyChecking no

@@ -1,0 +1,44 @@
+#!/bin/sh
+
+set -eu
+
+usage () {
+    cat >&2 <<EOF
+usage: $0
+
+Create a CHANGELOG to-do list for items between the last commit that touched
+the CHANGELOG and the current commit.
+EOF
+}
+
+test $# -eq 0 || { usage; exit 1; }
+
+clog=CHANGELOG.md
+headrev=$(git rev-parse HEAD)
+
+lastrev=$(git rev-list --no-merges --first-parent -n1 HEAD -- ":(top)$clog")
+if test -z "$lastrev"
+then
+    echo >&2 "Could not determine last commit to touch $clog"
+    exit 1
+fi
+
+fmt="?  %s%n   %h^-1"
+range="$lastrev..$headrev"
+
+cat <<EOF
+Update $(git describe "HEAD:$clog")
+
+Generated with
+  git log --format="$fmt" --reverse --first-parent \\
+    $range
+
+?  = unprocessed and undecided
+-  = decided not to include
++  = included
++* = included, but might still be bits that should be added
+-----------------------------------------------------------
+
+EOF
+
+git log --format="$fmt" --reverse --first-parent "$range"

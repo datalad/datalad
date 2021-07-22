@@ -1,0 +1,41 @@
+FROM neurodebian:DL_DIST
+MAINTAINER Yaroslav Halchenko <yoh@datalad.org>
+
+USER root
+
+# Speed up installation using our apt cacher
+#RUN mkdir /etc/apt/apt.conf.d/
+COPY conf/etc/apt/apt.conf.d/99apt-cacher /etc/apt/apt.conf.d/99apt-cacher
+RUN chmod a+r /etc/apt/apt.conf.d/99apt-cacher
+
+# Make deb-src avail
+RUN sed -i -e 's,^deb\(.*\),deb\1\ndeb-src\1,g' /etc/apt/sources.list.d/neurodebian.sources.list /etc/apt/sources.list
+
+# Assure popcon doesn't kick in
+RUN bash -c "echo 'debconf debconf/frontend select noninteractive' | debconf-set-selections -"
+
+RUN apt-get update
+# Use bash for extended syntax
+RUN bash -c "DL_APT"
+# Some rudimentary tools if we need to do anything within docker
+RUN bash -c "apt-get install -y -q vim less"
+RUN apt-get clean
+
+# Let's setup user matching user
+RUN groupadd --gid DL_GID -r DL_USER && useradd -m --uid DL_UID -g DL_USER DL_USER
+
+USER DL_USER
+
+WORKDIR /home/DL_USER
+# Prepare system for working with Git
+RUN git config --global user.email "DL_GIT_USER_EMAIL"
+RUN git config --global user.name "DL_GIT_USER_NAME"
+# RUN git clone git://github.com/datalad/datalad
+RUN mkdir datalad
+
+WORKDIR /home/DL_USER/datalad
+
+# run outside so we could re-enter etc
+# RUN tox
+# Fall back to root, so we have full control happen we want to reuse it?
+# USER root

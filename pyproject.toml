@@ -1,0 +1,3 @@
+[build-system]
+# wheel to get more lightweight (not EASY-INSTALL) entry-points
+requires = ["setuptools>=40.8.0", "wheel"]

@@ -1,0 +1,23 @@
+# We use both `include`/`graft` and `exclude`/`prune` commands here so that the
+# MANIFEST.in will have the same effect with & without installing
+# setuptools_scm (which adds all files under source control to the source
+# distribution).
+
+include CHANGELOG.md CONTRIBUTING.md CONTRIBUTORS COPYING Gruntfile.js
+include Makefile asv.conf.json requirements-devel.txt requirements.txt
+include tox.ini .coveragerc
+include versioneer.py
+include datalad/_version.py
+
+graft _datalad_build_support
+graft benchmarks
+graft docs
+graft tools
+
+prune .github
+prune sandbox
+
+exclude .gitignore .gitmodules .mailmap .noannex .travis.yml .zenodo.json
+exclude CODE_OF_CONDUCT.md appveyor.yml readthedocs.yml
+
+global-exclude *.py[cod]

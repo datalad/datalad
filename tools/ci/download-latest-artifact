@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Based on https://raw.githubusercontent.com/RedHatInsights/policies-ui-frontend/master/.github/scripts/download-latest-openapi.sh
+# Apache 2.0 license 
+set -eu
+
+: "${TARGET_REPO:=datalad/datalad-extensions}"
+: "${TARGET_BRANCH:=master}"
+: "${TARGET_WORKFLOW:=build-git-annex.yaml}"
+: "${TARGET_PATH:=download}"  # Directory which will be created if doesn't exist
+: "${TARGET_ARTIFACT:=git-annex-debianstandalone-packages}"
+: "${GITHUB_TOKEN:=}" # will be taken from git config hub.oauthtoken or needs to be defined
+
+: "${CURL:=curl --silent}"
+
+: "${JOBS_DOWNLOAD:=$(mktemp -u)}"
+
+function definedOrExit {
+  if [[ -z "$1" ]]; then
+    echo "$2"
+    cat "$3"
+    exit 1
+  fi
+}
+
+if [ -z "$GITHUB_TOKEN" ]; then
+  if git config hub.oauthtoken >/dev/null; then
+    GITHUB_TOKEN=$(git config hub.oauthtoken)
+  else
+    echo "E: no GITHUB_TOKEN was specified and no hub.oauthtoken is in git config" >&2
+    exit 1
+  fi
+fi
+
+echo "Using curl as \"${CURL}\""
+
+function call_curl {
+  ${CURL} -H "Authorization: Bearer ${GITHUB_TOKEN}" "$@"
+}
+
+JOBS_URL="https://api.github.com/repos/${TARGET_REPO}/actions/workflows/${TARGET_WORKFLOW}/runs?status=success&branch=${TARGET_BRANCH}"
+
+echo "Getting artifacts_url from ${JOBS_URL} into '${JOBS_DOWNLOAD}'"
+call_curl "${JOBS_URL}" >| "${JOBS_DOWNLOAD}"
+ARTIFACTS_URL=$(jq --raw-output '.workflow_runs[0].artifacts_url | if . == null then "" else . end' < "${JOBS_DOWNLOAD}")
+definedOrExit "${ARTIFACTS_URL}" "Unable to get artifacts_url" "${JOBS_DOWNLOAD}"
+
+echo "Getting archive download url from ${ARTIFACTS_URL}"
+call_curl "${ARTIFACTS_URL}" >| "${JOBS_DOWNLOAD}"
+ARCHIVE_DOWNLOAD_URL=$(jq --raw-output --arg artifact "$TARGET_ARTIFACT" '[.artifacts | select(.name == $artifact)][0].archive_download_url | if . == null then "" else . end' < "${JOBS_DOWNLOAD}")
+definedOrExit "${ARCHIVE_DOWNLOAD_URL}" "Unable to get archive_download_url" "${JOBS_DOWNLOAD}"
+
+call_curl -i "${ARCHIVE_DOWNLOAD_URL}" >| "${JOBS_DOWNLOAD}"
+echo "Getting download url from ${ARCHIVE_DOWNLOAD_URL}"
+DOWNLOAD_URL=$(grep -ioP 'Location: \K.+' < "${JOBS_DOWNLOAD}")
+definedOrExit "${DOWNLOAD_URL}" "Unable to get Location header with download url" "${JOBS_DOWNLOAD}"
+DOWNLOAD_URL=${DOWNLOAD_URL%$'\r'}
+rm -f "${JOBS_DOWNLOAD}"
+
+echo "Downloading artifact package from ${DOWNLOAD_URL}"
+mkdir -p "${TARGET_PATH}"
+call_curl "${DOWNLOAD_URL}" >| ${TARGET_PATH}/.artifact.zip
+( cd "${TARGET_PATH}" && unzip .artifact.zip; )
+rm ${TARGET_PATH}/.artifact.zip

@@ -1,0 +1,91 @@
+#!/usr/bin/python
+#emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+#------------------------- =+- Python script -+= -------------------------
+"""
+  Yaroslav Halchenko                                            Dartmouth
+  web:     http://www.onerussian.com                              College
+  e-mail:  yoh@onerussian.com                              ICQ#: 60653192
+
+ DESCRIPTION (NOTES):
+
+ COPYRIGHT: Yaroslav Halchenko 2013
+
+ LICENSE: MIT
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+"""
+#-----------------\____________________________________/------------------
+
+__author__ = 'Yaroslav Halchenko'
+__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
+__license__ = 'MIT'
+
+import argparse
+import re, os, sys, urllib2
+
+from urlparse import urlsplit
+
+def main(cmdline=None):
+    args = make_parser().parse_args(cmdline)
+
+    for url in args.urls:
+        if args.print_filename:
+            print(get_filename(url))
+        else:
+            response = get_url(url)
+            # by default just dump all the information
+            print("URL: ", url)
+            if url != response.url:
+                print("REDIRECTED URL: ", response.url)
+            print(response.info())
+
+def make_parser():
+    parser = argparse.ArgumentParser('%prog: little tool to help gather information about URL(s)')
+    parser.add_argument('urls', nargs='*', help='URLs')
+    parser.add_argument('-f', '--print-filename', action='store_true',
+                        help='just print a content-disposition filename if present.'
+                             ' Otherwise the trailing portion of the URL')
+    return parser
+
+def get_filename(url):
+    response = get_url(url)
+    info = response.info()
+    if info.has_key('Content-Disposition'):
+        res = re.match('.* filename="(.*)"', info['Content-Disposition'])
+        return res.groups()[0]
+    else:
+        return os.path.basename(urllib2.unquote(urlsplit(response.url).path))
+
+def test_get_filename():
+    assert(get_filename('http://human.brain-map.org/api/v2/well_known_file_download/157722290') == 'T1.nii.gz')
+    assert(get_filename('https://raw.githubusercontent.com/datalad/datalad/master/README.md') == 'README.md')
+
+
+def get_url(url):
+    request = urllib2.Request(url)
+    request.add_header('Accept-encoding', 'gzip,deflate')
+    response = urllib2.urlopen(request)
+    return response
+
+if __name__ == '__main__':
+    # for some reason nose refused to load tests even with --exe
+    # test_get_filename()
+    sys.exit(main())
+

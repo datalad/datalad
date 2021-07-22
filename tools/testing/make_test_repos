@@ -1,0 +1,31 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
+# Script to generate all test repositories using make_test_repo 
+
+set -e
+#set -x
+set -u
+
+make_test_repo=$(dirname `which $0`)/make_test_repo
+
+create() {
+	  echo "II: $@"
+	  eval $make_test_repo "$@"
+}
+
+# Commands below "protocol" how those test repositories were created.
+#
+# Often it would be difficult if not impossible to recreate them
+# precisely (given the same version of git/annex/environment/etc),
+# so they are listed more for a historical perspective etc
+
+## was ran on Yarik's laptop with jessie/sid amd64
+# create basic r1

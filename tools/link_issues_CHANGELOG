@@ -1,0 +1,15 @@
+#!/bin/bash
+
+in=CHANGELOG.md
+
+# Replace them with Markdown references
+sed -i -e 's/(\(#[0-9]\+\))/([\1][])/g' "$in"
+
+# Populate references
+tr ' ,' '\n\n' < "$in" | sponge | sed -n -e 's/.*(\[#\([0-9]\+\)\]\(\[\]*\)).*/\1/gp' | sort | uniq \
+| while read issue; do
+    #echo "issue $issue"
+    # remove old one if exists
+    sed -i -e "/^\[#$issue\]:.*/d" "$in"
+    echo "[#$issue]: https://github.com/datalad/datalad/issues/$issue" >> "$in";
+done

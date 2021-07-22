@@ -1,0 +1,52 @@
+#
+# This container provides a full Python3-based installation of DataLad
+# (http://datalad.org) using DataLad's latest development state at the
+# time the container is built.
+#
+# Changelog
+# ---------
+# 0.12.6-611-g11932b3f4 (2020/04/28)
+#  - Added p7zip-full
+# 0.12.2-40-g4281360d7 (2020/03/15)
+#  - First maint branch build
+#
+#######################################################################
+
+
+Bootstrap:docker
+From:neurodebian:latest
+
+%post
+    echo "Configuring the environment"
+    apt-get -y update
+
+    # setup the container sources themselves
+    apt-get -y install eatmydata
+    eatmydata apt-get -y install gnupg wget locales
+
+    # we need a UTF locale for DataLad to work properly
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+    locale-gen
+
+    # bare essentials to pull everything else in
+    eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
+
+    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3 rclone git-annex-remote-rclone p7zip-full
+
+    # just for scrapy
+    eatmydata apt-get -y install --no-install-recommends python3-twisted
+
+    # little dance because pip cannot handle this url plus [full] in one go
+    wget https://github.com/datalad/datalad/archive/maint.zip
+    pip3 install --system maint.zip[full]
+    rm -f maint.zip
+
+    # clean up
+    apt-get clean
+
+
+%environments
+    unset PYTHONPATH
+
+%runscript
+    datalad "$@"

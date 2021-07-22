@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>DataLad Repository</title>
+        <link rel="icon" type="image/png" sizes="16x16" href=".git/datalad/web/assets/images/favicon-16x16.png?v=1">
+        <link rel="shortcut icon" href=".git/datalad/web/assets/images/favicon.ico?v=1">
+        <link rel="stylesheet" type="text/css" href=".git/datalad/web/assets/css/jquery.dataTables-1.10.12.css">
+        <link rel="stylesheet" type="text/css" href=".git/datalad/web/assets/css/main.css">
+    </head>
+    <body>
+        <div>
+            <div style="float: left; width: 196px;">
+                <a href="http://www.datalad.org" alt="DataLad website">
+                    <img src=".git/datalad/web/assets/images/logo_wide.svg" width="196" alt="DataLad Repository">
+                </a>
+            </div>
+            <div style="float: right; min-width: 50%; max-width: 80%;" id="installation">
+            </div>
+        </div>
+
+        <div id="content">
+            <div id="README"></div>
+        </div>
+	<noscript>
+	  <div style="border: 2px solid #E53B51; padding: 10px">
+	    <span style="font-weight:bold">Javascript is not enabled!</span>
+	  </div>
+	</noscript>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/jquery-2.2.4.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/jquery.dataTables-1.10.12.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/md5-2.3.0.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/showdown-1.8.5-33-g0c6ce94.js"></script>
+	<script type="text/javascript" charset="utf-8" src=".git/datalad/web/assets/js/main.js"></script>
+        <script>
+	  jQuery(document).ready(function() {
+	    var table = directory(jQuery, md5);  // construct table based on files in directory and their metadata
+	  });
+	</script>
+    </body>
+</html>

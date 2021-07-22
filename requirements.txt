@@ -1,0 +1,11 @@
+# If you want to develop, use requirements-devel.txt
+
+# Theoretically we don't want -e here but ATM pip would puke if just .[full] is provided
+# TODO -- figure it out and/or complain to pip folks
+# -e .[full]
+
+# this one should work but would copy entire . tree  so should be ran on a clean copy
+.[full]
+
+# doesn't install datalad itself
+# file://.#egg=datalad[full]

@@ -1,0 +1,256 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>DataLad WebUI Test</title>
+    <link rel="stylesheet" href="qunit/qunit-2.0.1.css">
+  </head>
+  <body>
+    <div id="qunit"></div>
+    <div id="qunit-fixture"></div>
+    <script src="../assets/js/jquery-2.2.4.js"></script>
+    <script src="../assets/js/jquery.dataTables-1.10.12.js"></script>
+    <script src="../assets/js/md5-2.3.0.js"></script>
+    <script src="../assets/js/main.js"></script>
+    <script src="qunit/sinon-1.17.5.js"></script>
+    <script src="qunit/sinon-qunit-1.0.0.js"></script>
+    <script src="qunit/qunit-2.0.1.js"></script>
+    <script>
+      QUnit.test("Parent URL", function(assert) {
+          assert.equal(parentUrl('root/child'), 'root/');
+          assert.equal(parentUrl('root/child/'), 'root/');
+          assert.equal(parentUrl('/root/child/'), '/root/');
+          assert.equal(parentUrl('/root'), '/');
+          assert.equal(parentUrl('root/'), '');
+          assert.equal(parentUrl('/root/'), '/');
+          assert.equal(parentUrl('/'), '');
+          assert.equal(parentUrl(''), '');
+      });
+
+      QUnit.test("Child URL", function(assert) {
+          assert.equal(childUrl('/root', 'child'), '/root/child');
+          assert.equal(childUrl('/root/', 'child'), '/root/child');
+          assert.equal(childUrl('root/', '/child'), 'root/child');
+          assert.equal(childUrl('/root/', 'child/'), '/root/child/');
+          assert.equal(childUrl('/root/', '/child/'), '/root/child/');
+          assert.equal(childUrl('/root', 'child/'), '/root/child/');
+          assert.equal(childUrl('/', '/root'), '/root');
+          assert.equal(childUrl('', 'root'), '/root');
+          //assert.equal('http://localhost:8000/?dir=MLd_cells/');
+      });
+      QUnit.test("Construct Absolute URL", function(assert) {
+          // mock out loc func with stub (normally returns window.location.pathname)
+          loc = sinon.stub().returns({pathname: 'example.com'});
+          assert.equal(absoluteUrl('/d1'), 'example.com/d1',
+                       'at domain root');
+
+          loc.returns({pathname: 'example.com/ds/'});
+          assert.equal(absoluteUrl('/d1/'), 'example.com/ds/d1/',
+                       'at subdirectory. no double forward slashes even if both paths with trailing slashes');
+
+          loc.returns({pathname: 'example.com/ds2/?dir=/'});
+          assert.equal(absoluteUrl('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
+                       'if root path(/) in GET parameter');
+
+          loc.returns({pathname: 'example.com/ds/?dir=d1/d2'});
+          assert.equal(absoluteUrl('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
+                       'if subpath in GET parameter');
+          assert.equal(absoluteUrl(), loc().pathname, 'if nothing passed return current location');
+      });
+      QUnit.test("Update Param or Path ?", function(assert) {
+          assert.equal(updateParamOrPath('/ds1/', 'dir'), true, 'param if next is a directory');
+          assert.equal(updateParamOrPath('/ds1/', 'file'), false, 'param if next is a file');
+          assert.equal(updateParamOrPath('/ds1/', 'link'), false, 'param if next is a link');
+          assert.equal(updateParamOrPath('/'), false, 'path if next is the root dataset');
+          assert.equal(updateParamOrPath(), false, 'path if next null/undefined/empty');
+          loc = sinon.stub().returns({pathname: '/ds1'});
+          assert.equal(updateParamOrPath('/ds1'), false, 'path if next is root of dataset at subfolder');
+      });
+
+      QUnit.test("Get Parameter by Name", function(assert) {
+          assert.equal(getParameterByName('dir'), null,
+                       'ok if no url passed');
+          assert.equal(getParameterByName('dir', 'example.com/d1?dir=/test'), '/test',
+                       'value if parameter has value');
+          assert.equal(getParameterByName('dir', 'example.com/d1/?dir='), null,
+                       'null if parameter value is empty');
+          assert.equal(getParameterByName('dir', 'example.com/d1/d2/d3'), null,
+                       'null if parameter does not exist');
+      });
+
+      QUnit.test("Click Handler", function(assert) {
+          loc = sinon.stub().returns({pathname: '/ds1/', href: '/ds1/?dir=/d1/'});
+          assert.deepEqual(clickHandler({name: '..', type: 'dir'}), {next: '/ds1/', type: 'assign'}, 'go to index.html root not domain root on param to path transition');
+          assert.deepEqual(clickHandler({name: '.', type: 'dir'}), {next: '?dir=/d1/', type: 'search'}, 'url does not change if click current node');
+          assert.deepEqual(clickHandler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
+          assert.deepEqual(clickHandler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
+      });
+
+      QUnit.test("Size Rendering", function(assert) {
+        assert.equal(sizeRenderer({ondisk: "0 Bytes", total: "1 Byte"}), "-/1 Byte", "ondisk size equals 0");
+        assert.equal(sizeRenderer({total: "1 Byte"}), "-/1 Byte", "ondisk size doesn't exist");
+        assert.equal(sizeRenderer({}), "-", "no sizes in sizes json");
+        assert.equal(sizeRenderer({ondisk: "1 Byte", total: "1 Byte"}), "1 Byte", "ondisk, total size exist and are identical");
+        assert.equal(sizeRenderer({ondisk: "1 Byte", total: "2 Byte"}), "1 Byte/2 Byte", "ondisk, total size exist and are not identical");
+      });
+
+      QUnit.test("parentMetadata", function(assert) {
+        // setup variables, mock method
+        loc = sinon.stub().returns({pathname: '/ds222/', href: '/ds222/?dir=/d1/'});
+        var metadataLoc = "/.git/datalad/metadata/6666cd76f96956469e7be39d750cc7d9";
+        //parentUrl = sinon.stub().returns('/ds1');
+        urlExists = sinon.stub().returns(true);
+        sinon.spy(jQuery, "ajax");
+        // function to test
+        nodeJson(jQuery, md5, true);
+        // spy
+        assert.ok(jQuery.ajax.calledOnce);
+        assert.equal(jQuery.ajax.getCall(0).args[0].url, "/ds222" + metadataLoc);
+        assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
+      });
+
+      // define global cache  (makes no difference here, left in for now)
+      var ntCache = {};
+      // and reset it for session???
+      // localStorage['ntCache'] = '';
+      var metadataLoc = "/.git/datalad/metadata/6666cd76f96956469e7be39d750cc7d9";
+      QUnit.test("Bread2crumbs", function(assert) {
+        loc = sinon.stub().returns({href: 'http://a.o', pathname: '/'});
+        // ntCache = {'/': {type: 'cwd', path: '/'}};
+        nodeJson = sinon.stub().returns(
+           {js: {
+                  path: '.',
+                  name: "a",
+                  type: "annex",
+                  nodes: [{path: 'ds1', type: "git"}]
+           }});
+        assert.deepEqual(bread2crumbs(jQuery, md5),
+                         ["<a href=http://a.o><span class=\"annex\">a.o</span></a>"],
+                         "base case, root directory in breadcrumbs");
+        assert.deepEqual(ntCache, {
+            //root one is not stored ATM
+            '/ds1': {
+               type: 'git'
+            },
+            // ds222 leaks from the previous test somehow!  TODO!!
+            '%PARENT%/ds222': {
+               metadata_path: "/ds222" + metadataLoc
+            }
+        });
+
+        loc = sinon.stub().returns({
+          href: 'http://a.o/ds1/',
+          pathname: '/ds1'
+        });
+        // TODO: with Yarik's replacing of '/' to '' things got hairy although
+        // it might well be that he just not getting smth, i.e. why ds1 class
+        // should be git if upstairs is the git... but below line "fixes" the
+        // test below
+        ntCache['/'] = {type: 'git'};
+        assert.deepEqual(bread2crumbs(jQuery, md5),
+                         ["<a href=http://a.o><span class=\"dir\">a.o</span></a>",
+                          "<a href=http://a.o/ds1><span class=\"git\">ds1</span></a>"],
+                         "breadcrumbs to server root even if root ds a subdirectory");
+        assert.deepEqual(ntCache, {
+          '/': {type: 'git'},
+          '/ds1': {
+               type: 'git'
+            },
+          // ds222 leaks from the previous test somehow!  TODO!!
+          '%PARENT%/ds222': {
+               metadata_path: "/ds222" + metadataLoc
+          }
+          });
+
+        loc = sinon.stub().returns({href: 'http://a.o/ds1/?dir=', pathname: '/ds1/', search: "?dir="});
+        assert.deepEqual(bread2crumbs(jQuery, md5),
+                         ["<a href=http://a.o><span class=\"dir\">a.o</span></a>",
+                          "<a href=http://a.o/ds1><span class=\"git\">ds1</span></a>"],
+                         "empty 'dir' get parameter");
+
+        loc = sinon.stub().returns({href: 'http://a.o/ds1/?dir=/d1', pathname: '/ds1/', search: "?dir=/d1"});
+        nodeJson = sinon.stub().returns({js: {path: ".", type: "annex", name: "b",
+                                              nodes: [
+                                                {path: ".", type: "annex"},
+                                                {path: "d1", type: "git"},
+                                                {path: "d1/d2", type: "test"}
+                                              ]}});
+
+        assert.deepEqual(bread2crumbs(jQuery, md5),
+                         ["<a href=http://a.o><span class=\"dir\">a.o</span></a>",
+                          "<a href=http://a.o/ds1><span class=\"git\">ds1</span></a>",
+                          "<a href=http://a.o/ds1/?dir=/d1><span class=\"annex\">d1</span></a>"],
+                         "single sub-directory in 'dir' get parameter, adds d1 but doesn't update ds1 as already in cache");
+
+        loc = sinon.stub().returns({href: 'http://a.o/ds1/?dir=/d1/d2', pathname: '/ds1/', search: "?dir=/d1/d2"});
+        ntCache = {};
+        assert.deepEqual(bread2crumbs(jQuery, md5),
+                         ["<a href=http://a.o><span class=\"dir\">a.o</span></a>",
+                          "<a href=http://a.o/ds1><span class=\"annex\">ds1</span></a>",
+                          "<a href=http://a.o/ds1/?dir=/d1><span class=\"git\">d1</span></a>",
+                          "<a href=http://a.o/ds1/?dir=/d1/d2><span class=\"test\">d2</span></a>"],
+                         "multiple sub-directories in 'dir' get parameter");
+
+      });
+
+      QUnit.test("Cache Node Type", function(assert) {
+        ntCache = {};  // init/reset cache to empty object
+        // handle null case
+        loc = sinon.stub().returns({
+          pathname: '/ds1/',
+          href: 'http://a/ds1/?dir=a/b',
+          search: "?dir=a/b"
+        });
+        nodeJson = sinon.stub().returns({});
+        assert.deepEqual(getNodeType(jQuery, md5, '', {}), "dir", "handle null case, return default type = directory");
+        assert.deepEqual(ntCache, {});
+
+        // test json with all normal relevant elements instantiated
+        nodeJson = sinon.stub().returns({
+          js: {
+            path: ".",
+            type: "annex",
+            name: "b",
+            nodes: [
+              {path: ".", type: "annex"},
+              {path: "c", type: "git"},
+              {path: "c/d", type: "dir"}
+         ]}});
+        // XXX Yarik:  for some reason current implementation stores full sub-hierarchy
+        //  of nodes underneath instead of just an immediate files/directories!
+        // TODO: store only current directory content since anyways switching to another one
+        //  leads reloading of the corresponding json
+        var cacheJson = {"a/b": {type: "annex"},
+                         "a/b/c": {type: "git"},
+                         "a/b/c/d": {type: "dir"}};
+        // TODO: internally dir= and cache keys starts with /
+        assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=a/b'), "annex", "returns correct type of current ds");
+        assert.deepEqual(ntCache, cacheJson, "updates cache");
+
+        // test adding new json to cache
+        var testJson = {js: {path: ".", name: "a", type: "git",
+                             nodes: [
+                               {path: ".", type: "git"},
+                               {path: "b", type: "git"}
+                             ]}}
+        nodeJson = sinon.stub().returns(testJson);
+        assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=a/b'), "annex", "returns already cached type for node");
+        assert.deepEqual(ntCache, cacheJson, "no cache updates as searched node already in cache");
+
+        assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=a'), "git", "returns new node type");
+        cacheJson["a"] = {type: "git"};
+        assert.deepEqual(ntCache, cacheJson, "adds new node but doesn't update node already in cache");
+        assert.deepEqual(getNodeType(jQuery, md5, ''), "dir", "returns default type(dir) if url outside root dataset boundary");
+
+        loc = sinon.stub().returns({pathname: '/ds1/', href: 'http://a/ds1/'});
+        testJson["type"] = "annex";
+        nodeJson = sinon.stub().returns(testJson);
+        //assert.deepEqual(getNodeType(jQuery, md5, '', testJson), "annex", "fallbacks to href to find current node url, returns its type from cache");
+        assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/', testJson), "git", "returns cached type of root dataset when base url, no dir param");
+        assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=', testJson), "git", "returns cached type of root_ds when empty dir param");
+        assert.deepEqual(getNodeType(jQuery, md5, 'http://a/ds1/?dir=/', testJson), "git", "returns cached type of root_ds when dir='/'");
+      });
+    </script>
+  </body>
+</html>
