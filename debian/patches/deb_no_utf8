@@ -150,7 +150,7 @@ Last-Update: 2018-06-05
          eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1482,7 +1482,9 @@ def with_parametric_batch(t):
+@@ -1489,7 +1489,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']

@@ -1,6 +1,6 @@
 --- a/setup.py
 +++ b/setup.py
-@@ -174,8 +174,7 @@ datalad_setup(
+@@ -187,8 +187,7 @@ datalad_setup(
      'datalad',
      description="data distribution geared toward scientific datasets",
      install_requires=
