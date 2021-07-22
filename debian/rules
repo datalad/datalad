@@ -7,7 +7,7 @@ export PYBUILD_NAME = datalad
 # for https://github.com/datalad/datalad/issues/4753
 # for https://github.com/datalad/datalad/issues/5379
 # test_script_shims - ideally addressed properly after verifying that pybuild does install scripts without EASY
-export PYBUILD_TEST_ARGS = -s -v -e 'test_(basics|proxying_open_testrepobased|script_shims)'
+export PYBUILD_TEST_ARGS = -s -v
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=
 export https_proxy=

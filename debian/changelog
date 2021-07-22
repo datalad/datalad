@@ -7,6 +7,8 @@ datalad (0.14.6-1) experimental; urgency=medium
   * due to upstream switching to use versioneer, we should package
     based on released upstream releases on pypi, not based on merged
     release tags.  debian-upstream branch will track releases from pypi
+  * d/rules
+    - trying to be optimistic and removing skipping some selected tests
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 22 Jul 2021 18:49:35 -0400
 
