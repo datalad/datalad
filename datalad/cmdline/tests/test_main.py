@@ -29,7 +29,10 @@ from datalad.ui.utils import (
     get_console_width,
     get_terminal_size,
 )
-from datalad.api import create
+from datalad.api import (
+    create,
+    Dataset,
+)
 from datalad.utils import (
     chpwd,
     Path,
@@ -47,6 +50,7 @@ from datalad.tests.utils import (
     slow,
     SkipTest,
 )
+from datalad.support.exceptions import CommandError
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -303,6 +307,7 @@ def test_fail_with_short_help():
                  "        father\n"
                  "Hint: You can become one\n")
 
+
 def test_fix_datalad_ri():
     assert_equal(_fix_datalad_ri('/'), '/')
     assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
@@ -312,3 +317,26 @@ def test_fix_datalad_ri():
     assert_equal(_fix_datalad_ri('///a'), '///a')
     assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
     assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+def test_commanderror_jsonmsgs(src, exp):
+    ds = Dataset(src).create()
+    (ds.pathobj / '123').write_text('123')
+    ds.save()
+    ds.repo.call_annex([
+        'initremote', 'expdir', 'type=directory',
+        'directory={}'.format(exp),
+        'encryption=none',
+        'exporttree=yes'
+    ])
+    #ds.repo.call_annex(['export', '--to=expdir', 'HEAD'])
+    # this must fail, because `push` cannot handle an export.
+    # when https://github.com/datalad/datalad/issues/3127 is implemented
+    # this test must be adjusted
+    with assert_raises(CommandError) as cme:
+        Runner(cwd=ds.path).run(
+            ['datalad', 'push', '--to', 'expdir'],
+            protocol=StdOutErrCapture)
+    in_('use `git-annex export`', cme.exception.stderr)
