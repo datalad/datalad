@@ -14,7 +14,7 @@ export https_proxy=
 
 # We need to copy .egg-info so entry points are discovered. And also need
 # to generate then per-Python version since some module requirements differ
-export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py develop --install-dir bin/;cp -rp datalad.egg-info {build_dir}/;
+export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py develop --install-dir bin/ && cp -rp datalad.egg-info {build_dir}/;
 
 
 %:
