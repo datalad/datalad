@@ -9,6 +9,9 @@ datalad (0.14.6-1) experimental; urgency=medium
     release tags.  debian-upstream branch will track releases from pypi
   * d/rules
     - trying to be optimistic and removing skipping some selected tests
+  * d/control
+    - add python3-importlib-metadata (for python3 < 3.8) to *depends
+      Note: that we do not have backports for it in neurodebian
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 22 Jul 2021 18:49:35 -0400
 
