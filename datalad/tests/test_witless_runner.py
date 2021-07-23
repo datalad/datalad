@@ -157,7 +157,7 @@ def test_runner_stdin_no_capture():
     # Ensure that stdin writing alone progresses
     runner = Runner()
     runner.run(
-        py2cmd('import sys; print(sys.stdin.read())'),
+        py2cmd('import sys; _ = sys.stdin.read()'),
         stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 10000).encode('utf-8'),
         protocol=None
     )
