@@ -1,4 +1,3 @@
-import os
 from unittest.mock import patch
 from nose.tools import assert_equal, assert_true
 from datalad.support.exceptions import CapturedException

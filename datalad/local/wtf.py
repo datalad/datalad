@@ -14,7 +14,6 @@ import logging
 import os
 import os.path as op
 from functools import partial
-from itertools import chain
 from collections import OrderedDict
 
 

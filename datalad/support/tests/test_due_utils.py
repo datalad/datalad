@@ -1,6 +1,5 @@
 from ...distribution import dataset as dataset_mod
 from ...distribution.dataset import Dataset
-from .. import due_utils
 from ..due_utils import duecredit_dataset
 
 from ..due import (
@@ -12,12 +11,6 @@ from ..due import (
 from ..external_versions import external_versions
 
 from ...tests.utils import (
-    assert_raises,
-    eq_,
-    integration,
-    ok_,
-    SkipTest,
-    skip_if_no_module,
     swallow_logs,
     with_tempfile,
 )

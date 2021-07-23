@@ -103,7 +103,6 @@ def test_invalid_call(origin, tdir):
 @with_tempfile
 def test_since_empty_and_unsupported(p1, p2):
     source = Dataset(p1).create()
-    from datalad.support.network import PathRI
     source.create_sibling(p2, name='target1')
     # see https://github.com/datalad/datalad/pull/4448#issuecomment-620847327
     # Test that it doesn't fail without a prior push
