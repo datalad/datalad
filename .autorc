@@ -1,0 +1,16 @@
+{
+    "onlyPublishWithReleaseLabel": true,
+    "baseBranch": "maint",
+    "author": "DataLad Bot <bot@datalad.org>",
+    "noVersionPrefix": true,
+    "plugins": [
+        "git-tag",
+        [
+            "exec",
+            {
+                "afterChangelog": "make update-changelog && git add docs/source/changelog.rst && git commit -m '[skip ci] Update RST changelog'",
+                "afterRelease": "python -m build && twine upload dist/*"
+            }
+        ]
+    ]
+}
