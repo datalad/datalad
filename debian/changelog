@@ -6,6 +6,8 @@ datalad (0.14.6-1) experimental; urgency=medium
     - refreshed patches
     - added 0001-RF-TST-do-not-test-for-no-EASY-and-pkg_resources-in-.patch
       submitted upstream: https://github.com/datalad/datalad/pull/5817
+    - added 0001-BF-import-importlib.metadata-not-importlib_metadata-.patch
+      to avoid requiring importlib_metadata backport package
   * due to upstream switching to use versioneer, we should package
     based on released upstream releases on pypi, not based on merged
     release tags.  debian-upstream branch will track releases from pypi
