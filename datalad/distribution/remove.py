@@ -120,6 +120,12 @@ class Remove(Interface):
             # act on the whole dataset if nothing else was specified
             # TODO i think that would happen automatically in annotation?
             path = refds_path
+        if path and len(path) == 1 and not os.path.isfile(path[0]) and \
+                not refds_path and GitRepo.is_valid_repo(path[0]):
+            # The path we were given is actually a dataset
+            refds_path = Interface.get_refds_path(path[0])
+            res_kwargs['refds'] = refds_path
+            path = None
 
         to_process = []
 
