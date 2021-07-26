@@ -36,7 +36,8 @@ from datalad.tests.utils import (
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
-    SSHRemoteIO
+    SSHRemoteIO,
+    _sanitize_key,
 )
 from datalad.support.exceptions import (
     CommandError,
@@ -665,3 +666,11 @@ def test_url_keys(dspath, storepath):
     # did not drop the file
     repo.call_annex(['fsck', '-f', 'ria'])
     assert_equal(len(ds.repo.whereis(filename)), 2)
+
+
+def test_sanitize_key():
+    for i, o in (
+                ('http://example.com/', 'http&c%%example.com%'),
+                ('/%&:', '%&s&a&c'),
+            ):
+        assert_equal(_sanitize_key(i), o)
