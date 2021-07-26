@@ -1425,7 +1425,9 @@ def _sanitize_key(key):
 def main():
     """cmdline entry point"""
     from annexremote import Master
+    from datalad.ui import ui
     master = Master()
     remote = RIARemote(master)
+    ui.set_backend('annex')  # interactive, stdin/stdout will be used for interactions with annex
     master.LinkRemote(remote)
     master.Listen()
