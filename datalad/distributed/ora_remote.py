@@ -188,6 +188,12 @@ class LocalIO(IOBase):
         )
 
     def get_from_archive(self, archive, src, dst, progress_cb):
+        # Upfront check to avoid cryptic error output
+        # https://github.com/datalad/datalad/issues/4336
+        if not self.exists(archive):
+            raise RIARemoteError("archive {arc} does not exist."
+                                 "".format(arc=archive))
+
         # this requires python 3.5
         with open(dst, 'wb') as target_file:
             subprocess.run([
