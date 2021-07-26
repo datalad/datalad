@@ -1176,7 +1176,7 @@ class RIARemote(SpecialRemote):
                    self.annex.dirhash(key) + "/" + key + "/" + key
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
-        return str(key_path) if self._local_io() \
+        return str(dsobj_dir / key_path) if self._local_io() \
             else '{}: {}:{}'.format(
                 self.storage_host,
                 self.remote_git_dir,
