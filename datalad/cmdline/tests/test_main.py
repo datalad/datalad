@@ -194,12 +194,6 @@ def test_incorrect_options():
 
 def test_script_shims():
     runner = Runner()
-    # The EASY-INSTALL checks below aren't valid for editable installs. Use the
-    # existence of setup.py as an indication that install is _probably_
-    # editable. The file should always exist for editable installs, but it can
-    # also exist for non-editable installs when the tests are being executed
-    # from the top of the source tree.
-    setup_exists = (Path(datalad.__file__).parent.parent / "setup.py").exists()
     for script in [
         'datalad',
         'git-annex-remote-datalad-archives',
@@ -213,10 +207,6 @@ def test_script_shims():
         else:
             from distutils.spawn import find_executable
             content = find_executable(script)
-
-        if not setup_exists:
-            assert_not_in('EASY', content) # NOTHING easy should be there
-            assert_not_in('pkg_resources', content)
 
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)

@@ -40,7 +40,11 @@ def get_version(name):
       Name of the folder (package) where from to read version.py
     """
     # delay import so we do not require it for a simple setup stage
-    from importlib_metadata import version as importlib_version
+    try:
+        from importlib.metadata import version as importlib_version
+    except ImportError:
+        # TODO - remove whenever python >= 3.8
+        from importlib_metadata import version as importlib_version
     return importlib_version(name)
 
 
