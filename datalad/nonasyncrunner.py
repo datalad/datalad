@@ -70,13 +70,13 @@ class _ReaderThread(threading.Thread):
         self.quit = True
 
     def run(self):
-        logger.debug("%s started", self)
+        logger.log(5, "%s started", self)
 
         while not self.quit:
 
             data = os.read(self.file.fileno(), 1024)
             if data == b"":
-                logger.debug("%s exiting (stream end)", self)
+                logger.log(5, "%s exiting (stream end)", self)
                 self.queue.put((self.file.fileno(), None, time.time()))
                 return
 
@@ -113,13 +113,13 @@ class _StdinWriterThread(threading.Thread):
             f"{self.process}, {self.stdin_fileno}, {self.command})")
 
     def run(self):
-        logger.debug("%s started", self)
+        logger.log(5, "%s started", self)
 
         # (ab)use internal helper that takes care of a bunch of corner cases
         # and closes stdin at the end
         self.process._stdin_write(self.stdin_data)
 
-        logger.debug("%s exiting (write completed or interrupted)", self)
+        logger.log(5, "%s exiting (write completed or interrupted)", self)
         self.queue.put((self.stdin_fileno, None, time.time()))
 
 
