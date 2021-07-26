@@ -40,7 +40,6 @@ from datalad.tests.utils import (
     ok_file_has_content,
     on_windows,
     patch_config,
-    skip_if,
     with_tempfile,
     with_tree,
 )
@@ -50,7 +49,6 @@ from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
 from datalad.api import run_procedure
-from datalad import cfg as dl_cfg
 
 
 @with_tempfile(mkdir=True)

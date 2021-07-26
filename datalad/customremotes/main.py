@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import argparse
 import os
 
-from .. import __doc__ as m__doc__, __version__ as m__version__
+from .. import __doc__ as m__doc__
 from ..log import lgr
 
 from ..cmdline import helpers

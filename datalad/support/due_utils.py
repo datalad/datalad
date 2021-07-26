@@ -5,7 +5,7 @@ Support functionality for using DueCredit
 """
 
 # Note Text was added/exposed only since DueCredit 0.6.5
-from .due import due, Doi, Url, Text
+from .due import due, Doi, Text
 from ..utils import never_fail, swallow_logs
 from ..dochelpers import exc_str
 

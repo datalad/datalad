@@ -12,7 +12,6 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import subprocess
 
 from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.common_opts import (

@@ -42,8 +42,6 @@ from datalad.tests.utils import (
     ok_archives_caches,
     ok_file_under_git,
     serve_path_via_http,
-    slow,
-    swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,

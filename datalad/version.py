@@ -9,7 +9,6 @@
 """Defines version to be imported in the module and obtained from setup.py
 """
 
-import sys
 from os.path import lexists, dirname, join as opj, curdir
 
 # Hard coded version, to be done by release process,

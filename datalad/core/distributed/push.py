@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 from collections import OrderedDict
 import logging
 import re
-from tempfile import TemporaryFile
 
 from datalad.interface.base import (
     Interface,
@@ -33,7 +32,6 @@ from datalad.interface.utils import (
 from datalad.interface.results import annexjson2result
 from datalad.log import log_progress
 from datalad.support.annexrepo import (
-    AnnexJsonProtocol,
     AnnexRepo,
 )
 from datalad.support.gitrepo import GitRepo
