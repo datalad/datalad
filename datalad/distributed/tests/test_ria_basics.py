@@ -11,6 +11,7 @@ import logging
 from datalad.api import (
     Dataset,
     clone,
+    create_sibling_ria,
 )
 from datalad.utils import Path
 from datalad.tests.utils import (
@@ -624,3 +625,43 @@ def test_push_url(storepath, dspath, blockfile):
     known_sources = ds.repo.whereis('one.txt')
     assert_in(here_uuid, known_sources)
     assert_in(store_uuid, known_sources)
+
+
+@known_failure_windows
+@with_tempfile
+@with_tempfile
+def test_url_keys(dspath, storepath):
+    ds = Dataset(dspath).create()
+    repo = ds.repo
+    filename = 'url_no_size.html'
+    # URL-type key without size
+    repo.call_annex([
+        'addurl', '--relaxed', '--raw', '--file', filename, 'http://example.com',
+    ])
+    ds.save()
+    # copy target
+    ds.create_sibling_ria(
+        name='ria',
+        url='ria+file://{}'.format(storepath),
+        storage_sibling='only',
+    )
+    ds.get(filename)
+    repo.call_annex(['copy', '--to', 'ria', filename])
+    ds.drop(filename)
+    # in the store and on the web
+    assert_equal(len(ds.repo.whereis(filename)), 2)
+    # try download, but needs special permissions to even be attempted
+    ds.config.set('annex.security.allow-unverified-downloads', 'ACKTHPPT', where='local')
+    repo.call_annex(['copy', '--from', 'ria', filename])
+    assert_equal(len(ds.repo.whereis(filename)), 3)
+    # smoke tests that execute the remaining pieces with the URL key
+    repo.call_annex(['fsck', '-f', 'ria'])
+    assert_equal(len(ds.repo.whereis(filename)), 3)
+    # mapped key in whereis output
+    assert_in('%%example', repo.call_annex(['whereis', filename]))
+
+    repo.call_annex(['move', '-f', 'ria', filename])
+    # check that it does not magically reappear, because it actually
+    # did not drop the file
+    repo.call_annex(['fsck', '-f', 'ria'])
+    assert_equal(len(ds.repo.whereis(filename)), 2)
