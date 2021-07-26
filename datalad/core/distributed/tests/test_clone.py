@@ -1103,7 +1103,6 @@ def test_ria_postclonecfg():
         raise SkipTest("Can't create symlinks")
 
     from datalad.utils import make_tempfile
-    from datalad.tests.utils import HTTPPath
 
     with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store, \
             make_tempfile(mkdir=True) as store2:

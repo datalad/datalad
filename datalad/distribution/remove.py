@@ -12,13 +12,14 @@
 
 __docformat__ = 'restructuredtext'
 
-import os
 import logging
 
-from os.path import exists
-from os.path import relpath
-from os.path import pardir
-from os.path import join as opj
+from os.path import (
+    exists,
+    join as opj,
+    pardir,
+    relpath,
+)
 from datalad.utils import rmdir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -29,20 +30,28 @@ from datalad.distribution.dataset import Dataset, \
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
-from datalad.interface.common_opts import if_dirty_opt
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import nosave_opt
-from datalad.interface.common_opts import save_message_opt
-from datalad.interface.utils import path_is_under
-from datalad.interface.utils import eval_results
+from datalad.interface.common_opts import (
+    if_dirty_opt,
+    nosave_opt,
+    recursion_flag,
+    save_message_opt,
+)
+from datalad.interface.utils import (
+    path_is_under,
+    eval_results,
+)
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.core.local.save import Save
-from datalad.distribution.drop import _drop_files
-from datalad.distribution.drop import dataset_argument
-from datalad.distribution.drop import check_argument
-from datalad.distribution.uninstall import _uninstall_dataset
-from datalad.distribution.uninstall import Uninstall
+from datalad.distribution.drop import (
+    check_argument,
+    dataset_argument,
+    _drop_files,
+)
+from datalad.distribution.uninstall import (
+    _uninstall_dataset,
+    Uninstall,
+)
 
 
 lgr = logging.getLogger('datalad.distribution.remove')

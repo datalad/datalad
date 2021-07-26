@@ -31,7 +31,6 @@ from ...tests.utils import (
     abspath,
     assert_equal,
     assert_false,
-    assert_is_instance,
     assert_not_equal,
     assert_not_in,
     assert_raises,
@@ -41,7 +40,6 @@ from ...tests.utils import (
     in_,
     known_failure_githubci_win,
     ok_,
-    ok_file_has_content,
     serve_path_via_http,
     swallow_logs,
     with_tempfile,
@@ -55,7 +53,6 @@ from datalad.cmd import (
 )
 from datalad.support.exceptions import CommandError
 from ...utils import (
-    _path_,
     unlink,
 )
 

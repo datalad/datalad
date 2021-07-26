@@ -18,7 +18,6 @@ import textwrap
 import os
 import sys
 import traceback
-from pathlib import Path
 
 from datalad.support.exceptions import CapturedException
 

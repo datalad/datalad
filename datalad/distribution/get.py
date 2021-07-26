@@ -15,8 +15,6 @@ import re
 
 import os.path as op
 
-from functools import partial
-
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -25,7 +23,6 @@ from datalad.interface.results import (
     get_status_dict,
     results_from_paths,
     annexjson2result,
-    count_results,
     success_status_map,
     results_from_annex_noinfo,
 )
@@ -60,9 +57,6 @@ from datalad.support.network import (
 )
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
-)
-from datalad.dochelpers import (
-    single_or_plural,
 )
 from datalad.utils import (
     unique,

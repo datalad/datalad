@@ -39,7 +39,6 @@ from datalad.distributed.ora_remote import (
 )
 from datalad.support.exceptions import (
     CommandError,
-    IncompleteResultsError
 )
 from datalad.distributed.tests.ria_utils import (
     get_all_files,

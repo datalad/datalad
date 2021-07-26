@@ -23,7 +23,6 @@ from datalad.api import (
 )
 from datalad.utils import (
     chpwd,
-    on_windows,
     Path,
     PurePosixPath,
 )

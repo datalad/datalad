@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-import os
 from os.path import join as opj
 
 
@@ -38,8 +37,6 @@ from datalad.tests.utils import (
     assert_cwd_unchanged,
     with_testrepos,
     with_tree,
-    on_windows,
-    skip_if,
     skip_if_root,
     slow,
     assert_in_results,

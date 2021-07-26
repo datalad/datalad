@@ -51,7 +51,6 @@ from datalad.utils import (
     Path,
     PurePath,
     ensure_list,
-    quote_cmdlinearg,
 )
 
 
@@ -405,7 +404,6 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         -------
         Dataset or None
         """
-        from datalad.coreapi import subdatasets
         path = self.path
         sds_path = path if topmost else None
 

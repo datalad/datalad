@@ -16,28 +16,37 @@ from collections import OrderedDict
 from os.path import join as opj
 
 from datalad import ssh_manager
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.annotate_paths import (
+    AnnotatePaths,
+    annotated2content_by_ds
+)
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.interface.utils import eval_results
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts, jobs_opt
 from datalad.interface.common_opts import missing_sibling_opt
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureChoice,
+    EnsureNone,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
-from datalad.support.network import URL, RI, SSHRI, is_ssh
+from datalad.support.network import (
+    is_ssh,
+    RI,
+    URL,
+)
 
 from datalad.utils import ensure_list
-from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import Dataset
