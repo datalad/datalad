@@ -188,6 +188,12 @@ class LocalIO(IOBase):
         )
 
     def get_from_archive(self, archive, src, dst, progress_cb):
+        # Upfront check to avoid cryptic error output
+        # https://github.com/datalad/datalad/issues/4336
+        if not self.exists(archive):
+            raise RIARemoteError("archive {arc} does not exist."
+                                 "".format(arc=archive))
+
         # this requires python 3.5
         with open(dst, 'wb') as target_file:
             subprocess.run([
@@ -1197,6 +1203,9 @@ class RIARemote(SpecialRemote):
     def transfer_store(self, key, filename):
         self._ensure_writeable()
 
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
+
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         key_path = dsobj_dir / key_path
 
@@ -1234,6 +1243,8 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def transfer_retrieve(self, key, filename):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         if isinstance(self.io, HTTPRemoteIO):
             self.io.get(PurePosixPath(self.annex.dirhash(key)) / key / key,
@@ -1259,6 +1270,8 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def checkpresent(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         if isinstance(self.io, HTTPRemoteIO):
             return self.io.checkpresent(
@@ -1278,6 +1291,9 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def remove(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
+
         self._ensure_writeable()
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
@@ -1304,6 +1320,8 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def whereis(self, key):
+        # we need a file-system compatible name for the key
+        key = _sanitize_key(key)
 
         if isinstance(self.io, HTTPRemoteIO):
             # display the URL for a request
@@ -1350,6 +1368,35 @@ class RIARemote(SpecialRemote):
             self._last_keypath[1]
 
     # TODO: implement method 'error'
+
+
+def _sanitize_key(key):
+    """Returns a sanitized key that is a suitable directory/file name
+
+    Documentation from the analog implementation in git-annex
+    Annex/Locations.hs
+
+    Converts a key into a filename fragment without any directory.
+
+    Escape "/" in the key name, to keep a flat tree of files and avoid
+    issues with keys containing "/../" or ending with "/" etc.
+
+    "/" is escaped to "%" because it's short and rarely used, and resembles
+        a slash
+    "%" is escaped to "&s", and "&" to "&a"; this ensures that the mapping
+        is one to one.
+    ":" is escaped to "&c", because it seemed like a good idea at the time.
+
+    Changing what this function escapes and how is not a good idea, as it
+    can cause existing objects to get lost.
+    """
+    esc = {
+        '/': '%',
+        '%': '&s',
+        '&': '&a',
+        ':': '&c',
+    }
+    return ''.join(esc.get(c, c) for c in key)
 
 
 def main():
