@@ -145,7 +145,7 @@ class WitlessRunner(object):
             cwd=cwd,
         )
 
-        lgr.debug('run:\n cwd=%s\n cmd=%s', cwd, cmd)
+        lgr.debug('Run %r (cwd=%s)', cmd, cwd)
         results = run_command(
             cmd,
             protocol,
@@ -156,7 +156,7 @@ class WitlessRunner(object):
         )
 
         # log before any exception is raised
-        lgr.log(8, "Finished running %r with status %s", cmd, results['code'])
+        lgr.debug("Finished %r with status %s", cmd, results['code'])
 
         # make it such that we always blow if a protocol did not report
         # a return code at all
