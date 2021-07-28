@@ -17,11 +17,12 @@ from unittest.mock import patch
 import os.path as op
 
 from datalad.support.globbedpaths import GlobbedPaths
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import eq_
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import (
+    assert_in,
+    eq_,
+    swallow_logs,
+    with_tree,
+)
 
 
 def test_globbedpaths_get_sub_patterns():

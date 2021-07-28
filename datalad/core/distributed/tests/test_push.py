@@ -50,6 +50,7 @@ from datalad.utils import (
     Path,
     chpwd,
     path_startswith,
+    swallow_outputs,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -966,3 +967,25 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     assert_not_in_results(
         clone_super.status(recursive=True),
         state='modified')
+
+
+@with_tempfile
+def test_push_custom_summary(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create()
+
+    sib = mk_push_target(ds, "sib", str(path / "sib"), bare=False, annex=False)
+    (sib.pathobj / "f1").write_text("f1")
+    sib.save()
+
+    (ds.pathobj / "f2").write_text("f2")
+    ds.save()
+
+    # These options are true by default and our tests usually run with a
+    # temporary home, but set them to be sure.
+    ds.config.set("advice.pushUpdateRejected", "true", where="local")
+    ds.config.set("advice.pushFetchFirst", "true", where="local")
+    with swallow_outputs() as cmo:
+        ds.push(to="sib", result_renderer="default", on_failure="ignore")
+        assert_in("Hints:", cmo.out)
+        assert_in("action summary:", cmo.out)

@@ -632,7 +632,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     ds = require_dataset(
         dataset, check_installed=True,
-        purpose='tracking outcomes of a command')
+        purpose='track command outcomes')
     ds_path = ds.path
 
     lgr.debug('tracking command output underneath %s', ds)

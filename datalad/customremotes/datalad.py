@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
-from ..utils import disable_logger
 from .base import AnnexCustomRemote
 from ..dochelpers import exc_str
 

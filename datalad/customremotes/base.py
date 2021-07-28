@@ -12,14 +12,16 @@ from __future__ import absolute_import
 
 __docformat__ = 'restructuredtext'
 
-import inspect
 import errno
 import os
 import sys
 
 from collections import Counter
 
-from ..support.path import exists, join as opj, dirname, lexists
+from ..support.path import (
+    join as opj,
+    lexists,
+)
 
 from urllib.parse import urlparse
 
@@ -32,9 +34,7 @@ from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
 from datalad.utils import (
-    ensure_unicode,
     getargspec,
-    Path,
 )
 
 URI_PREFIX = "dl"
@@ -320,7 +320,7 @@ class AnnexCustomRemote(object):
             try:
                 method(*req_load)
             except Exception as e:
-                self.error("Problem processing %r with parameters %r: %r"
+                self.error("Problem processing %r with parameters %r: %s"
                            % (req, req_load, exc_str(e)))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s", format_exc())

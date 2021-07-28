@@ -25,7 +25,6 @@ import sys
 
 from unittest.mock import patch
 
-from datalad import __version__
 from datalad.utils import (
     chpwd,
     ensure_unicode,

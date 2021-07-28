@@ -103,6 +103,8 @@ test_http_server = None
 def setup_package():
     import os
     from datalad.utils import on_osx
+    from datalad.tests import _TEMP_PATHS_GENERATED
+
     if on_osx:
         # enforce honoring TMPDIR (see gh-5307)
         import tempfile
@@ -133,10 +135,10 @@ def setup_package():
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
         set_envvar('HOME', os.environ['GIT_HOME'])
+        set_envvar('DATALAD_LOG_EXC', "1")
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile
-        from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
             pass
@@ -149,6 +151,8 @@ def setup_package():
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[datalad "log"]
+	exc = 1
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 

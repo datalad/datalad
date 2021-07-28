@@ -6,7 +6,6 @@ jobs:
   test:
 
     runs-on: ubuntu-latest
-
     steps:
     - name: Set up system
       shell: bash

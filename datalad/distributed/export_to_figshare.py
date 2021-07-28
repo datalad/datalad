@@ -251,7 +251,6 @@ class ExportToFigshare(Interface):
                  # TODO: support working with projects and articles within them
                  # project_id=None,
                  article_id=None):
-        import os
         import logging
         lgr = logging.getLogger('datalad.plugin.export_to_figshare')
 

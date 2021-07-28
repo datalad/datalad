@@ -18,6 +18,8 @@ from time import (
     sleep,
     time,
 )
+from nose.tools import timed
+
 
 from datalad.tests.utils import (
     assert_cwd_unchanged,
@@ -140,6 +142,47 @@ def test_runner_stdin(path):
         protocol=StdOutCapture,
     )
     assert_in(OBSCURE_FILENAME, res['stdout'])
+
+    # we can do the same without a tempfile, too
+    res = runner.run(
+        py2cmd('import fileinput; print(fileinput.input().readline())'),
+        stdin=OBSCURE_FILENAME.encode('utf-8'),
+        protocol=StdOutCapture,
+    )
+    assert_in(OBSCURE_FILENAME, res['stdout'])
+
+
+@timed(3)
+def test_runner_stdin_no_capture():
+    # Ensure that stdin writing alone progresses
+    runner = Runner()
+    runner.run(
+        py2cmd('import sys; print(sys.stdin.read()[-10:])'),
+        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 10000).encode('utf-8'),
+        protocol=None
+    )
+
+
+@timed(3)
+def test_runner_no_stdin_no_capture():
+    # Ensure a runner without stdin data and output capture progresses
+    runner = Runner()
+    runner.run(
+        ["echo", "a", "b", "c"],
+        stdin=None,
+        protocol=None
+    )
+
+
+@timed(3)
+def test_runner_empty_stdin():
+    # Ensure a runner without stdin data and output capture progresses
+    runner = Runner()
+    runner.run(
+        ["cat"],
+        stdin=b"",
+        protocol=None
+    )
 
 
 def test_runner_parametrized_protocol():

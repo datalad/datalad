@@ -9,13 +9,14 @@
 import sys
 import json
 
-from urllib.request import Request
-from urllib.request import urlopen
+from urllib.request import (
+    Request,
+    urlopen,
+)
 from urllib.error import HTTPError
 
 from datalad.support.exceptions import (
     AccessDeniedError,
-    AccessFailedError,
 )
 from datalad.utils import ensure_unicode
 
