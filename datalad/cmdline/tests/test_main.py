@@ -15,8 +15,10 @@ from unittest.mock import patch
 
 import datalad
 from ..main import (
+    _fix_datalad_ri,
     main,
 )
+from ..helpers import fail_with_short_help
 from datalad import __version__
 from datalad.cmd import (
     WitlessRunner as Runner,
@@ -26,7 +28,10 @@ from datalad.ui.utils import (
     get_console_width,
     get_terminal_size,
 )
-from datalad.api import create
+from datalad.api import (
+    create,
+    Dataset,
+)
 from datalad.utils import (
     chpwd,
     Path,
@@ -45,6 +50,7 @@ from datalad.tests.utils import (
     slow,
     with_tempfile,
 )
+from datalad.support.exceptions import CommandError
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -264,3 +270,118 @@ def test_incorrect_cfg_override():
     run_main(['-c', 'some=', 'wtf'], exit_code=3)
     run_main(['-c', 'some.var', 'wtf'], exit_code=3)
     run_main(['-c', 'some.var=', 'wtf'], exit_code=3)
+
+
+def test_fail_with_short_help():
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(exit_code=3, out=out)
+    assert_equal(cme.exception.code, 3)
+    assert_equal(out.getvalue(), "")
+
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(msg="Failed badly", out=out)
+    assert_equal(cme.exception.code, 1)
+    assert_equal(out.getvalue(), "error: Failed badly\n")
+
+    # Suggestions, hint, etc
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(
+            msg="Failed badly",
+            known=["mother", "mutter", "father", "son"],
+            provided="muther",
+            hint="You can become one",
+            exit_code=0,  # noone forbids
+            what="parent",
+            out=out)
+    assert_equal(cme.exception.code, 0)
+    assert_equal(out.getvalue(),
+                 "error: Failed badly\n"
+                 "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
+                 "Did you mean any of these?\n"
+                 "        mutter\n"
+                 "        mother\n"
+                 "        father\n"
+                 "Hint: You can become one\n")
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+def test_fail_with_short_help():
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(exit_code=3, out=out)
+    assert_equal(cme.exception.code, 3)
+    assert_equal(out.getvalue(), "")
+
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(msg="Failed badly", out=out)
+    assert_equal(cme.exception.code, 1)
+    assert_equal(out.getvalue(), "error: Failed badly\n")
+
+    # Suggestions, hint, etc
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(
+            msg="Failed badly",
+            known=["mother", "mutter", "father", "son"],
+            provided="muther",
+            hint="You can become one",
+            exit_code=0,  # noone forbids
+            what="parent",
+            out=out)
+    assert_equal(cme.exception.code, 0)
+    assert_equal(out.getvalue(),
+                 "error: Failed badly\n"
+                 "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
+                 "Did you mean any of these?\n"
+                 "        mutter\n"
+                 "        mother\n"
+                 "        father\n"
+                 "Hint: You can become one\n")
+
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+def test_commanderror_jsonmsgs(src, exp):
+    ds = Dataset(src).create()
+    (ds.pathobj / '123').write_text('123')
+    ds.save()
+    ds.repo.call_annex([
+        'initremote', 'expdir', 'type=directory',
+        'directory={}'.format(exp),
+        'encryption=none',
+        'exporttree=yes'
+    ])
+    #ds.repo.call_annex(['export', '--to=expdir', 'HEAD'])
+    # this must fail, because `push` cannot handle an export.
+    # when https://github.com/datalad/datalad/issues/3127 is implemented
+    # this test must be adjusted
+    with assert_raises(CommandError) as cme:
+        Runner(cwd=ds.path).run(
+            ['datalad', 'push', '--to', 'expdir'],
+            protocol=StdOutErrCapture)
+    if ds.repo.git_annex_version >= "8.20200309":
+        in_('use `git-annex export`', cme.exception.stderr)

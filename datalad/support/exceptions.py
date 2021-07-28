@@ -139,6 +139,35 @@ class CapturedException(object):
         return self.tb.exc_type.__qualname__ + '(' + str(self.tb) + ')'
 
 
+def _format_json_error_messages(recs):
+    # there could be many, condense
+    msgs = {}
+    for r in recs:
+        if r.get('success'):
+            continue
+        msg = '{}{}'.format(
+            ' {}\n'.format(r['note']) if r.get('note') else '',
+            '\n'.join(r.get('error-messages', [])),
+        )
+        if 'file' in r or 'key' in r:
+            occur = msgs.get(msg, 0)
+            occur += 1
+            msgs[msg] = occur
+
+    if not msgs:
+        return ''
+
+    return '\n>{}'.format(
+        '\n> '.join(
+            '{}{}'.format(
+                m,
+                ' [{} times]'.format(n) if n > 1 else '',
+            )
+            for m, n in msgs.items()
+        )
+    )
+
+
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
 
@@ -178,6 +207,15 @@ class CommandError(RuntimeError):
         if self.msg:
             # typically a command error has no specific idea
             to_str += " [{}]".format(ensure_unicode(self.msg))
+
+        if self.kwargs:
+            to_str += " [info keys: {}]".format(
+                ', '.join(self.kwargs.keys()))
+
+            if 'stdout_json' in self.kwargs:
+                to_str += _format_json_error_messages(
+                    self.kwargs['stdout_json'])
+
         if not include_output:
             return to_str
 
@@ -185,19 +223,7 @@ class CommandError(RuntimeError):
             to_str += " [out: '{}']".format(ensure_unicode(self.stdout).strip())
         if self.stderr:
             to_str += " [err: '{}']".format(ensure_unicode(self.stderr).strip())
-        if self.kwargs:
-            if 'stdout_json' in self.kwargs:
-                src_keys = ('note', 'error-messages')
-                from datalad.utils import unique
-                json_errors = unique(
-                    '; '.join(str(m[key]) for key in src_keys if m.get(key))
-                    for m in self.kwargs['stdout_json']
-                    if any(m.get(k) for k in src_keys)
-                )
-                if json_errors:
-                    to_str += " [errors from JSON records: {}]".format(json_errors)
-            to_str += " [info keys: {}]".format(
-                ', '.join(self.kwargs.keys()))
+
         return to_str
 
     def __str__(self):
