@@ -30,6 +30,7 @@ Dataset operations
    generated/man/datalad-get
    generated/man/datalad-install
    generated/man/datalad-publish
+   generated/man/datalad-push
    generated/man/datalad-remove
    generated/man/datalad-save
    generated/man/datalad-update
@@ -96,7 +97,6 @@ Plumbing commands
    generated/man/datalad-copy-file
    generated/man/datalad-create-test-dataset
    generated/man/datalad-diff
-   generated/man/datalad-push
    generated/man/datalad-sshrun
    generated/man/datalad-siblings
    generated/man/datalad-status
