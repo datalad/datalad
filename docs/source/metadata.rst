@@ -135,7 +135,7 @@ describe why any particular file (content) should not be redistributed:
   permissions to share (e.g., movie video files)
 
 Having annotated files this way, we could instruct git-annex
-to :ref:`publish <man_datalad-publish>` all but those restricted files to our
+to publish all but those restricted files to our
 server: ``git annex wanted datalad-public "not metadata=distribution-restrictions=*"``.
 
 .. warning::
