@@ -200,7 +200,6 @@ INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
 ...
 INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor bhanuprasad14 in .all-contributorsrc
 WARNING:tributors:allcontrib does not support updating from orcids.
 WARNING:tributors:allcontrib does not support updating from email.
 ```
