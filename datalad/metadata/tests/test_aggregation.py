@@ -252,7 +252,7 @@ def test_publish_aggregated(path):
         name="local_target",
         sshurl="ssh://datalad-test",
         target_dir=spath)
-    base.publish('.', to='local_target', transfer_data='all')
+    base.push('.', to='local_target', data='anything')
     remote = Dataset(spath)
     objpath = opj('.datalad', 'metadata', 'objects')
     objs = list(sorted(base.repo.find(objpath)))
