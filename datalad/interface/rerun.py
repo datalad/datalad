@@ -202,7 +202,7 @@ class Rerun(Interface):
 
         ds = require_dataset(
             dataset, check_installed=True,
-            purpose='rerunning a command')
+            purpose='rerun a command')
         ds_repo = ds.repo
 
         lgr.debug('rerunning command output underneath %s', ds)

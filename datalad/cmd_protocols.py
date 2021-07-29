@@ -83,7 +83,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         pass
 
     def _log_summary(self, fd, data):
-        fd_name = self.fd_infos[fd]
+        fd_name = self.fd_infos[fd][0]
         lgr.log(5, 'Read %i bytes from %i[%s]%s',
                 len(data), self.process.pid, fd_name, ':' if self._log_outputs else '')
         if self._log_outputs:
@@ -95,7 +95,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
 
     def connection_made(self, process):
         self.process = process
-        lgr.debug('Process %i started', self.process.pid)
+        lgr.log(8, 'Process %i started', self.process.pid)
 
     def pipe_data_received(self, fd, data):
         self._log(fd, data)
@@ -119,7 +119,8 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
             raise CommandError(
                 "Got None as a return_code for the process %i",
                 self.process.pid)
-        lgr.debug(
+        lgr.log(
+            8,
             'Process %i exited with return code %i',
             self.process.pid, return_code)
         # give captured process output back to the runner as string(s)

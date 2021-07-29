@@ -11,10 +11,8 @@
 """
 
 import logging
-import weakref
 
 from datalad.support.exceptions import InvalidInstanceRequestError
-from datalad.support import path as op
 from datalad.support.network import RI
 from datalad import utils as ut
 

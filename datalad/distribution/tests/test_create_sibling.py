@@ -12,7 +12,6 @@
 import os
 from os import chmod
 import stat
-import re
 import sys
 
 from os.path import join as opj, exists, basename
@@ -52,7 +51,6 @@ from datalad.tests.utils import (
     known_failure_windows,
     ok_,
     ok_endswith,
-    ok_exists,
     ok_file_has_content,
     ok_file_under_git,
     skip_if_on_windows,

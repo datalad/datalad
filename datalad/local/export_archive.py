@@ -83,7 +83,6 @@ class ExportArchive(Interface):
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import file_basename
         from datalad.support.annexrepo import AnnexRepo
-        from datalad.dochelpers import exc_str
 
         import logging
         lgr = logging.getLogger('datalad.local.export_archive')

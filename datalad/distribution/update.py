@@ -235,7 +235,7 @@ class Update(Interface):
         # Unbind `merge` to ensure that downstream code doesn't look at it.
         del merge
 
-        refds = require_dataset(dataset, check_installed=True, purpose='updating')
+        refds = require_dataset(dataset, check_installed=True, purpose='update')
 
         save_paths = []
         update_failures = set()

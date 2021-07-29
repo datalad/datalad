@@ -18,14 +18,12 @@ from datalad.utils import (
     ensure_list,
 )
 from datalad.tests.utils import (
-    assert_equal,
     assert_false,
     assert_in,
     assert_in_results,
     assert_not_in,
     assert_raises,
     assert_true,
-    eq_,
     skip_if_no_network,
     SkipTest,
     use_cassette as use_cassette_,

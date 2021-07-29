@@ -25,8 +25,53 @@ from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
 
+subst_rule_docs = """\
+A substitution specification is a string with a match and substitution
+expression, each following Python's regular expression syntax. Both expressions
+are concatenated to a single string with an arbitrary delimiter character. The
+delimiter is defined by prefixing the string with the delimiter. Prefix and
+delimiter are stripped from the expressions (Example:
+",^http://(.*)$,https://\\1").  This setting can be defined multiple times.
+Substitutions will be applied incrementally, in order of their definition. The
+first substitution in such a series must match, otherwise no further
+substitutions in a series will be considered. However, following the first
+match all further substitutions in a series are processed, regardless whether
+intermediate expressions match or not."""
 
 definitions = {
+    'datalad.clone.url-substitute.github': {
+        'ui': ('question', {
+               'title': 'GitHub URL substitution rule',
+               'text': 'Mangling for GitHub-related URL. ' + subst_rule_docs
+        }),
+        'destination': 'global',
+        'default': (
+            # take any github project URL apart into <org>###<identifier>
+            r',https?://github.com/([^/]+)/(.*)$,\1###\2',
+            # replace any (back)slashes with a single dash
+            r',[/\\]+,-',
+            # replace any whitespace (include urlquoted variant)
+            # with a single underscore
+            r',\s+|(%2520)+|(%20)+,_',
+            # rebuild functional project URL
+            r',([^#]+)###(.*),https://github.com/\1/\2',
+        )
+    },
+    # TODO this one should migrate to the datalad-osf extension. however, right
+    # now extensions cannot provide default configuration
+    # https://github.com/datalad/datalad/issues/5769
+    'datalad.clone.url-substitute.osf': {
+        'ui': ('question', {
+               'title': 'Open Science Framework URL substitution rule',
+               'text': 'Mangling for OSF-related URLs. ' + subst_rule_docs
+        }),
+        'destination': 'global',
+        'default': (
+            # accept browser-provided URL and convert to those accepted by
+            # the datalad-osf extension
+            r',^https://osf.io/([^/]+)[/]*$,osf://\1',
+        )
+    },
     # this is actually used in downloaders, but kept cfg name original
     'datalad.crawl.cache': {
         'ui': ('yesno', {
@@ -34,6 +79,15 @@ definitions = {
                'text': 'Should the crawler cache downloaded files?'}),
         'destination': 'local',
         'type': bool,
+    },
+    # this is actually used in downloaders, but kept cfg name original
+    'datalad.credentials.force-ask': {
+        'ui': ('yesno', {
+               'title': 'Force (re-)entry of credentials',
+               'text': 'Should DataLad prompt for credential (re-)entry? This '
+                       'can be used to update previously stored credentials.'}),
+        'type': bool,
+        'default': False,
     },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
@@ -57,6 +111,13 @@ definitions = {
                        'default dataset?'}),
         'destination': 'global',
         'default_fn': lambda: opj(expanduser('~'), 'datalad'),
+    },
+    'datalad.locations.locks': {
+        'ui': ('question', {
+               'title': 'Lockfile directory',
+               'text': 'Where should datalad store lock files?'}),
+        'destination': 'global',
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'locks')
     },
     'datalad.locations.sockets': {
         'ui': ('question', {
@@ -94,7 +155,7 @@ definitions = {
     },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
-               'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
+               'title': 'This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
     },
     'datalad.fake-dates': {
         'ui': ('yesno', {
@@ -247,6 +308,12 @@ definitions = {
     'datalad.log.traceback': {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
+    },
+    'datalad.log.exc': {
+        'ui': ('yesno', {
+               'title': 'Include exceptions and their traceback in log messages. If set, \'datalad.exc.str.tblimit\' applies.'}),
+        'default': False,
+        'type': EnsureBool(),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {

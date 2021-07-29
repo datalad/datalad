@@ -190,7 +190,7 @@ class CreateSiblingGithub(Interface):
 
         # what to operate on
         ds = require_dataset(
-            dataset, check_installed=True, purpose='create GitHub sibling')
+            dataset, check_installed=True, purpose='create GitHub sibling(s)')
 
         res_kwargs = dict(
             action='create_sibling_github [dry-run]' if dry_run else
@@ -241,7 +241,7 @@ class CreateSiblingGithub(Interface):
                 res,
                 **res_kwargs)
             if 'message' not in res:
-                res['message'] = ("project at %s", res['url'])
+                res['message'] = ("Dataset sibling '%s', project at %s", name, res['url'])
             # report to caller
             yield get_status_dict(**res)
             if res['status'] not in ('ok', 'notneeded'):

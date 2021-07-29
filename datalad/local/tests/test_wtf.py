@@ -36,6 +36,7 @@ from datalad.tests.utils import (
     SkipTest,
     swallow_outputs,
     with_tree,
+    DEFAULT_BRANCH
 )
 
 
@@ -62,6 +63,9 @@ def test_wtf(topdir):
         assert_in('## dataset', cmo.out)
         assert_in(u'path: {}'.format(ds.path),
                   ensure_unicode(cmo.out))
+        assert_in('branches', cmo.out)
+        assert_in(DEFAULT_BRANCH+'@', cmo.out)
+        assert_in('git-annex@', cmo.out)
 
     # and if we run with all sensitive
     for sensitive in ('some', True):

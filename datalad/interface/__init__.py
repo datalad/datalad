@@ -105,6 +105,7 @@ _group_plumbing = (
 _known_extension_commands = {
     'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
+    'datalad-deprecated': ('ls',),
     'datalad-neuroimaging': ('bids2scidata',)
 }
 

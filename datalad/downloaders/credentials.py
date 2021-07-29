@@ -32,6 +32,7 @@ from ..utils import auto_repr
 from ..support.network import iso8601_to_epoch
 
 from datalad import cfg as dlcfg
+from datalad.config import anything2bool
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.credentials')
@@ -157,8 +158,14 @@ class Credential(object):
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
         fields = {}
+        # check if we shall ask for credentials, even if some are on record
+        # already (but maybe they were found to need updating)
+        force_reentry = dlcfg.obtain(
+            'datalad.credentials.force-ask',
+            valtype=anything2bool)
         for f in self._FIELDS:
-            v = self._get_field_value(f)
+            # don't query for value if we need to get a new one
+            v = None if force_reentry else self._get_field_value(f)
             if not self._is_field_optional(f):
                 while v is None:  # was not known
                     v = self._ask_and_set(f)

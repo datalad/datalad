@@ -11,7 +11,6 @@
 
 import logging
 import re
-import requests
 from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
@@ -32,7 +31,6 @@ from datalad.cmd import (
     CommandError,
     GitWitlessRunner,
     StdOutCapture,
-    StdOutErrCapture,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -47,6 +45,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
+from datalad.support.strings import get_replacement_dict
 from datalad.support.network import (
     get_local_file_url,
     download_url,
@@ -62,6 +61,7 @@ from datalad.dochelpers import (
 )
 from datalad.utils import (
     ensure_bool,
+    ensure_list,
     knows_annex,
     make_tempfile,
     Path,
@@ -121,6 +121,26 @@ class Clone(Interface):
     an installed dataset, regardless of whether it was newly installed ('ok'
     result), or found already installed from the specified source ('notneeded'
     result).<< PYTHON ||
+
+    URL mapping configuration
+
+    'clone' supports the transformation of URLs via (multi-part) substitution
+    specifications. A substitution specification is defined as a configuration
+    setting 'datalad.clone.url-substition.<seriesID>' with a string containing
+    a match and substitution expression, each following Python's regular
+    expression syntax. Both expressions are concatenated to a single string
+    with an arbitrary delimiter character. The delimiter is defined by
+    prefixing the string with the delimiter. Prefix and delimiter are stripped
+    from the expressions (Example: ",^http://(.*)$,https://\\1").  This setting
+    can be defined multiple times, using the same '<seriesID>'.  Substitutions
+    in a series will be applied incrementally, in order of their definition.
+    The first substitution in such a series must match, otherwise no further
+    substitutions in a series will be considered. However, following the first
+    match all further substitutions in a series are processed, regardless
+    whether intermediate expressions match or not. Substitution series themselves
+    have no particular order, each matching series will result in a candidate
+    clone URL. Consequently, the initial match specification in a series should
+    be as precise as possible to prevent inflation of candidate URLs.
 
     .. seealso::
 
@@ -215,7 +235,7 @@ class Clone(Interface):
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
         ds = require_dataset(
-            dataset, check_installed=True, purpose='cloning') \
+            dataset, check_installed=True, purpose='clone') \
             if dataset is not None else dataset
         refds_path = ds.path if ds else None
 
@@ -306,18 +326,117 @@ class Clone(Interface):
         if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
+            actually_saved_subds = False
             for r in ds.save(
                     path,
+                    # Note, that here we know we don't save anything but a new
+                    # subdataset. Hence, don't go with default commit message,
+                    # but be more specific.
+                    message="[DATALAD] Added subdataset",
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
                     on_failure='ignore'):
+                actually_saved_subds = actually_saved_subds or (
+                        r['action'] == 'save' and
+                        r['type'] == 'dataset' and
+                        r['refds'] == ds.path and
+                        r['status'] == 'ok')
                 yield r
 
             # Modify .gitmodules to contain originally given url. This is
-            # particularly relevant for postclone routines on a later `get` for
-            # that subdataset. See gh-5256.
-            ds.subdatasets(path, set_property=[("datalad-url", source)])
+            # particularly relevant for postclone routines on a later `get`
+            # for that subdataset. See gh-5256.
+            if actually_saved_subds:
+                # New subdataset actually saved. Amend the modification
+                # of .gitmodules. Note, that we didn't allow to deviate
+                # from git default behavior WRT a submodule's name vs
+                # its path when we made this a new subdataset.
+                subds_name = path.relative_to(ds.pathobj)
+                ds.repo.call_git(
+                    ['config',
+                     '--file',
+                     '.gitmodules',
+                     '--replace-all',
+                     'submodule.{}.{}'.format(subds_name,
+                                              "datalad-url"),
+                     source]
+                )
+                yield from ds.save('.gitmodules',
+                                   amend=True, to_git=True)
+            else:
+                # We didn't really commit. Just call `subdatasets`
+                # in that case to have the modification included in the
+                # post-clone state (whatever that may be).
+                ds.subdatasets(path, set_property=[("datalad-url", source)])
+
+
+def _get_url_mappings(cfg):
+    cfg_prefix = 'datalad.clone.url-substitute.'
+    # figure out which keys we should be looking for
+    # in the active config
+    subst_keys = set(k for k in cfg.keys() if k.startswith(cfg_prefix))
+    # and in the common config specs
+    from datalad.interface.common_cfg import definitions
+    subst_keys.update(k for k in definitions if k.startswith(cfg_prefix))
+    # TODO a potential sorting of substitution series could be implemented
+    # here
+    return [
+        # decode the rule specifications
+        get_replacement_dict(
+            # one or more could come out
+            ensure_list(
+                cfg.get(
+                    k,
+                    # make sure to pull the default from the common config
+                    default=cfg.obtain(k),
+                    # we specifically support declaration of multiple
+                    # settings to build replacement chains
+                    get_all=True)))
+        for k in subst_keys
+    ]
+
+
+def _map_urls(cfg, urls):
+    mapping_specs = _get_url_mappings(cfg)
+    if not mapping_specs:
+        return urls
+
+    mapped = []
+    # we process the candidate in order to maintain any prioritization
+    # encoded in it (e.g. _get_flexible_source_candidates_for_submodule)
+    # if we have a matching mapping replace the URL in its position
+    for u in urls:
+        # we only permit a single match
+        # TODO we likely want to RF this to pick the longest match
+        mapping_applied = False
+        # try one mapping set at a time
+        for mapping_spec in mapping_specs:
+            # process all substitution patterns in the specification
+            # always operate on strings (could be a Path instance too)
+            mu = str(u)
+            matched = False
+            for match_ex, subst_ex in mapping_spec.items():
+                if not matched:
+                    matched = re.match(match_ex, mu) is not None
+                if not matched:
+                    break
+                # try to map, would return unchanged, if there is no match
+                mu = re.sub(match_ex, subst_ex, mu)
+            if mu != u:
+                lgr.debug("URL substitution: '%s' -> '%s'", u, mu)
+                mapped.append(mu)
+                # we could consider breaking after the for effective mapping
+                # specification. however, that would mean any generic
+                # definition of a broadly matching substitution would derail
+                # the entroe system. moreover, suddently order would matter
+                # substantially
+                mapping_applied = True
+        if not mapping_applied:
+            # none of the mappings matches, go with the original URL
+            # (really original, not the stringified one)
+            mapped.append(u)
+    return mapped
 
 
 def clone_dataset(
@@ -384,6 +503,11 @@ def clone_dataset(
         reckless = cfg.get('datalad.clone.reckless', None)
 
     dest_path = destds.pathobj
+
+    # check for configured URL mappings, either in the given config manager
+    # or in the one of the destination dataset, which is typically not existent
+    # yet and the process config manager is then used effectively
+    srcs = _map_urls(cfg or destds.config, srcs)
 
     # decode all source candidate specifications
     candidate_sources = [decode_source_spec(s, cfg=cfg) for s in srcs]

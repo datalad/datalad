@@ -27,7 +27,7 @@ from ..credentials import (
     CompositeCredential,
     UserPassword,
 )
-from datalad.config import ConfigManager
+from datalad import cfg as dlcfg
 
 
 @with_testsui(responses=[
@@ -59,7 +59,7 @@ def test_cred1_enter_new():
     assert_equal(keyring.get('name', 'user'), 'user2')
     assert_equal(keyring.get('name', 'password'), 'newpassword')
 
-@with_testsui(responses=['password1'])
+@with_testsui(responses=['password1', 'newuser', 'newpassword'])
 def test_cred1_call():
     keyring = MemoryKeyring()
     cred = UserPassword("name", keyring=keyring)
@@ -69,6 +69,13 @@ def test_cred1_call():
     assert_equal(keyring.get('name', 'user'), 'user1')
     assert_equal(cred(), {'user': 'user1', 'password': 'password1'})
     assert_equal(keyring.get('name', 'password'), 'password1')
+    # without intervention the same credentials will be reused
+    # in subsequent attempts
+    assert_equal(cred(), {'user': 'user1', 'password': 'password1'})
+    with patch.dict(dlcfg._merged_store, {'datalad.credentials.force-ask': 'yes'}):
+        assert_equal(cred(), {'user': 'newuser', 'password': 'newpassword'})
+    assert_equal(keyring.get('name', 'user'), 'newuser')
+    assert_equal(keyring.get('name', 'password'), 'newpassword')
 
 
 def test_keyring():

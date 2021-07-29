@@ -221,7 +221,7 @@ class Subdatasets(Interface):
             set_property=None,
             delete_property=None):
         ds = require_dataset(
-            dataset, check_installed=True, purpose='subdataset reporting/modification')
+            dataset, check_installed=True, purpose='report on subdataset(s)')
 
         paths = resolve_path(ensure_list(path), dataset, ds) if path else None
 

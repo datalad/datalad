@@ -10,15 +10,12 @@
 
 import os
 import re
-import sys
 from io import StringIO
 from unittest.mock import patch
 
 import datalad
 from ..main import (
     main,
-    fail_with_short_help,
-    _fix_datalad_ri,
 )
 from datalad import __version__
 from datalad.cmd import (
@@ -277,48 +274,3 @@ def test_incorrect_cfg_override():
     run_main(['-c', 'some=', 'wtf'], exit_code=3)
     run_main(['-c', 'some.var', 'wtf'], exit_code=3)
     run_main(['-c', 'some.var=', 'wtf'], exit_code=3)
-
-
-def test_fail_with_short_help():
-    out = StringIO()
-    with assert_raises(SystemExit) as cme:
-        fail_with_short_help(exit_code=3, out=out)
-    assert_equal(cme.exception.code, 3)
-    assert_equal(out.getvalue(), "")
-
-    out = StringIO()
-    with assert_raises(SystemExit) as cme:
-        fail_with_short_help(msg="Failed badly", out=out)
-    assert_equal(cme.exception.code, 1)
-    assert_equal(out.getvalue(), "error: Failed badly\n")
-
-    # Suggestions, hint, etc
-    out = StringIO()
-    with assert_raises(SystemExit) as cme:
-        fail_with_short_help(
-            msg="Failed badly",
-            known=["mother", "mutter", "father", "son"],
-            provided="muther",
-            hint="You can become one",
-            exit_code=0,  # no one forbids
-            what="parent",
-            out=out)
-    assert_equal(cme.exception.code, 0)
-    assert_equal(out.getvalue(),
-                 "error: Failed badly\n"
-                 "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
-                 "Did you mean any of these?\n"
-                 "        mutter\n"
-                 "        mother\n"
-                 "        father\n"
-                 "Hint: You can become one\n")
-
-def test_fix_datalad_ri():
-    assert_equal(_fix_datalad_ri('/'), '/')
-    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
-    assert_equal(_fix_datalad_ri('//'), '///')
-    assert_equal(_fix_datalad_ri('///'), '///')
-    assert_equal(_fix_datalad_ri('//a'), '///a')
-    assert_equal(_fix_datalad_ri('///a'), '///a')
-    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
-    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')

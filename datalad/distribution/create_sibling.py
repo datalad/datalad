@@ -591,7 +591,7 @@ class CreateSibling(Interface):
         # nothing without a base dataset
         #
         ds = require_dataset(dataset, check_installed=True,
-                             purpose='creating a sibling')
+                             purpose='create sibling(s)')
         refds_path = ds.path
 
         #
