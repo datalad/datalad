@@ -87,10 +87,16 @@ __docformat__ = 'restructuredtext'
 def process_www_authenticate(v):
     if not v:
         return []
+    # TODO: provide proper parsing/handling of this custom format and wider support:
+    #   <type> realm=<realm>[, charset="UTF-8"]
+    # More notes: https://github.com/datalad/datalad/issues/5846#issuecomment-890221053
+    # The most complete solution is from 2018 on https://stackoverflow.com/a/52462292/1265472
+    # relying on parsing it using pyparsing.
     supported_type = v.split(' ')[0].lower()
     our_type = {
         'basic': 'http_basic_auth',
         'digest': 'http_digest_auth',
+        # TODO: bearer_token_anon ?
     }.get(supported_type)
     return [our_type] if our_type else []
 
@@ -346,6 +352,18 @@ class HTTPAuthAuthenticator(HTTPRequestsAuthenticator):
         session.auth = authenticator
         response = session.post(post_url, data={},
                                 auth=authenticator)
+        auth_request = response.headers.get('www-authenticate')
+        if response.status_code == 401 and auth_request:
+            if auth_request.lower().split(' ', 1)[0] == 'basic':
+                if response.url != post_url:
+                    # was instructed to authenticate elsewhere
+                    # TODO: do we need to loop may be??
+                    response2 = session.get(response.url, auth=authenticator)
+                    return response2
+            else:
+                lgr.warning(
+                    f"{self} received response with www-authenticate={auth_request!r} "
+                    "which is not Basic, and thus it cannot handle ATM.")
         return response
 
 
@@ -396,6 +414,9 @@ class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
                 .format(status, url))
 
         lgr.debug("Requesting authorization token for %s", url)
+        # TODO: it is not RFC 2068 Section 2 format, but a custom
+        # <type> realm=<realm>[, charset="UTF-8"]
+        # see TODO/harmonize with  process_www_authenticate
         auth_parts = parse_dict_header(response.headers["www-authenticate"])
         auth_url = ("{}?service={}&scope={}"
                     .format(auth_parts["Bearer realm"],
