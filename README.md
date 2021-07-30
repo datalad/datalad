@@ -17,7 +17,7 @@
 [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials)
 [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-34-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-33-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 
@@ -172,7 +172,6 @@ project (NIH 1P41EB019936-01A1).
   </tr>
   <tr>
     <td align="center"><a href="https://github.com/yetanothertestuser"><img src="https://avatars0.githubusercontent.com/u/19335420?v=4?s=100" width="100px;" alt=""/><br /><sub><b>yetanothertestuser</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=yetanothertestuser" title="Code">💻</a></td>
-    <td align="center"><a href="https://github.com/bhanuprasad14"><img src="https://avatars3.githubusercontent.com/u/19843?v=4?s=100" width="100px;" alt=""/><br /><sub><b>bhanuprasad14</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bhanuprasad14" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/christian-monch"><img src="https://avatars.githubusercontent.com/u/17925232?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Christian Mönch</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=christian-monch" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/mattcieslak"><img src="https://avatars.githubusercontent.com/u/170026?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Matt Cieslak</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mattcieslak" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/mikapfl"><img src="https://avatars.githubusercontent.com/u/7226087?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Mika Pflüger</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mikapfl" title="Code">💻</a></td>

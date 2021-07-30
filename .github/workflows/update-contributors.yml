@@ -27,7 +27,7 @@ jobs:
           update_lookup: github
 
           # Skip these users (example)
-          skip_users: manbat
+          skip_users: manbat bhanuprasad14 yetanothertestuser
 
           # INFO, DEBUG, ERROR, WARNING, etc.
           log_level: DEBUG

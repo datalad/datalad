@@ -31,6 +31,7 @@ Dataset operations
    api.drop
    api.get
    api.install
+   api.push
    api.remove
    api.save
    api.update
@@ -76,7 +77,6 @@ Plumbing commands
    api.create_test_dataset
    api.diff
    api.download_url
-   api.push
    api.sshrun
    api.siblings
    api.subdatasets
