@@ -2836,7 +2836,7 @@ class GitRepo(CoreGitRepo):
                         attrline += ' -{}'.format(a)
                     else:
                         attrline += ' {}={}'.format(a, val)
-                f.write('\n{}'.format(attrline))
+                f.write('{}\n'.format(attrline))
 
     def get_content_info(self, paths=None, ref=None, untracked='all',
                          eval_file_type=True):
