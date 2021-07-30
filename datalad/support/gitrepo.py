@@ -2815,7 +2815,15 @@ class GitRepo(CoreGitRepo):
         attrdir = op.dirname(git_attributes_file)
         if not op.exists(attrdir):
             os.makedirs(attrdir)
-        with open(git_attributes_file, mode) as f:
+
+        with open(git_attributes_file, mode + '+') as f:
+            # for append, fix existing files that do not end with \n
+            if mode == 'a':
+                f.seek(0)
+                s = f.read()
+                if len(s) > 1 and s[-1] != '\n':
+                    f.write('\n')
+
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(
