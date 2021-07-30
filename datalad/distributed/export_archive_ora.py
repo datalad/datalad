@@ -75,6 +75,22 @@ class ExportArchiveORA(Interface):
             doc="""if an existing directory, an 'archive.7z' is placed into
             it, otherwise this is the path to the target archive""",
             constraints=EnsureStr() | EnsureNone()),
+        remote=Parameter(
+            args=("--for",),
+            metavar='LABEL',
+            doc="""name of the target sibling, wanted/preferred settings
+            will be used to filter the files added to the archives""",
+            constraints=EnsureStr() | EnsureNone()),
+        filters=Parameter(
+            args=("--filters",),
+            metavar="FILTERS",
+            doc="""git-annex-preferred-content expression for
+            git-annex find to filter files. Should start with
+            'or' or 'and' when used in combination with `--for`"""),
+        branch=Parameter(
+            args=("--branch",),
+            metavar="BRANCH",
+            doc="""a branch, or tree-ish to use to select files"""),
         opts=Parameter(
             args=("opts",),
             nargs=REMAINDER,
@@ -89,7 +105,10 @@ class ExportArchiveORA(Interface):
     def __call__(
             target,
             opts=None,
-            dataset=None):
+            dataset=None,
+            remote=None,
+            filters=None,
+            branch=None):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
             dataset, check_installed=True, purpose='export to ORA archive')
@@ -133,10 +152,31 @@ class ExportArchiveORA(Interface):
             )
             return
 
-        keypaths = [
-            k for k in annex_objs.glob(op.join('**', '*'))
-            if k.is_file()
-        ]
+        def expr_to_opts(expr):
+            opts = []
+            expr = expr.replace('(', ' ( ').replace(')', ' ) ')
+            for sub_expr in expr.split(' '):
+                if len(sub_expr):
+                    if sub_expr in '()':
+                        opts.append(f"-{sub_expr}")
+                    else:
+                        opts.append(f"--{sub_expr}")
+            return opts
+
+        find_filters = []
+        if remote:
+            find_filters = expr_to_opts(ds_repo.get_preferred_content('wanted', remote))
+        if filters:
+            find_filters.extend(expr_to_opts(filters))
+        if branch:
+            find_filters.append(f"--branch={branch}")
+
+        # need to be uniqued with set, as git-annex find will return duplicates if
+        # multiple symlinks point to the same key.
+        keypaths = set([annex_objs.joinpath(k) for k in ds_repo.call_annex_items_([
+            'find', *find_filters,
+            "--format=${hashdirmixed}${key}/${key}\\n"
+        ])])
 
         log_progress(
             lgr.info,
@@ -160,6 +200,7 @@ class ExportArchiveORA(Interface):
             keydir = exportdir / hashdir / key
             keydir.mkdir(parents=True, exist_ok=True)
             try:
+                print(str(keypath), str(keydir / key))
                 link_fx(str(keypath), str(keydir / key))
             except OSError:
                 lgr.warning(
