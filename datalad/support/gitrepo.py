@@ -2821,7 +2821,7 @@ class GitRepo(CoreGitRepo):
             if mode == 'a':
                 f.seek(0)
                 s = f.read()
-                if len(s) > 1 and s[-1] != '\n':
+                if s and not s.endswith('\n'):
                     f.write('\n')
 
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
