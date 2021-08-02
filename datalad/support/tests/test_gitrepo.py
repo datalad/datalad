@@ -1395,6 +1395,16 @@ def test_gitattributes(path):
     # mode='w' should replace the entire file:
     gr.set_gitattributes([('**', {'some': 'nonsense'})], mode='w')
     eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense'})
+    # mode='a' appends additional key/value
+    gr.set_gitattributes([('*', {'king': 'kong'})], mode='a')
+    eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense', 'king': 'kong'})
+    # handle files without trailing newline
+    with open(op.join(gr.path, '.gitattributes'), 'a+') as f:
+        f.seek(f.tell() - 1)
+        f.truncate()
+    gr.set_gitattributes([('*', {'ding': 'dong'})], mode='a')
+    eq_(gr.get_gitattributes('.')['.'],
+        {'some': 'nonsense', 'king': 'kong', 'ding': 'dong'})
 
 
 @with_tempfile(mkdir=True)

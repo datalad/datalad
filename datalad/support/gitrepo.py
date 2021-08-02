@@ -2818,10 +2818,9 @@ class GitRepo(CoreGitRepo):
 
         with open(git_attributes_file, mode + '+') as f:
             # for append, fix existing files that do not end with \n
-            if mode == 'a':
-                f.seek(0)
-                s = f.read()
-                if s and not s.endswith('\n'):
+            if mode == 'a' and f.tell():
+                f.seek(f.tell() - 1)
+                if f.read() != '\n':
                     f.write('\n')
 
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
