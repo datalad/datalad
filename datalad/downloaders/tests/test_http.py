@@ -129,7 +129,6 @@ def test_process_www_authenticate():
                  [])
 
 
-@known_failure_githubci_win
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_HTTPDownloader_basic(toppath, topurl):
@@ -525,7 +524,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
     content = read_file(fpath)
     assert_equal(content, "correct body")
 
-    # Unsuccesfull scenarios to test:
+    # Unsuccessful scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
 
 
@@ -594,7 +593,7 @@ def check_httpretty_authfail404(exp_called, d):
 def test_auth_bytes_content():
     # Our regexes are strings, but we can get content in bytes:
     # I am not sure yet either we shouldn't just skip then testing for regex,
-    # but we definetely should not crash.
+    # but we definitely should not crash.
     authenticator = HTTPBaseAuthenticator(failure_re="Failed")
     authenticator.check_for_auth_failure(b"bytes")
     # but ATM we do test bytes content, let's ENSURE that!
@@ -808,12 +807,11 @@ def test_lorisadapter(d, keyring):
     assert_equal(content, "correct body")
 
 
-@known_failure_githubci_win
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_download_url(toppath, topurl):
     furl = "%sfile.dat" % topurl
-    # fails if URL is disfunctional
+    # fails if URL is dysfunctional
     assert_raises(DownloadError, download_url, furl + 'magic', toppath)
 
     # working download

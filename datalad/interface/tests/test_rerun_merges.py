@@ -18,10 +18,10 @@ from datalad.tests.utils import (
     assert_false,
     DEFAULT_BRANCH,
     eq_,
-    known_failure_windows,
     neq_,
     ok_,
     slow,
+    skip_if_adjusted_branch,
     with_tempfile,
 )
 
@@ -41,7 +41,7 @@ from datalad.tests.utils import (
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_fastforwardable(path):
     ds = Dataset(path).create()
@@ -86,7 +86,7 @@ def test_rerun_fastforwardable(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_fastforwardable_mutator(path):
     ds = Dataset(path).create()
@@ -123,7 +123,7 @@ def test_rerun_fastforwardable_mutator(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_left_right_runs(path):
     ds = Dataset(path).create()
@@ -177,7 +177,7 @@ def test_rerun_left_right_runs(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_run_left_mutator_right(path):
     ds = Dataset(path).create()
@@ -207,7 +207,7 @@ def test_rerun_run_left_mutator_right(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_nonrun_left_run_right(path):
     ds = Dataset(path).create()
@@ -266,7 +266,7 @@ def test_rerun_nonrun_left_run_right(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_run_left_nonrun_right(path):
     ds = Dataset(path).create()
@@ -318,7 +318,7 @@ def test_rerun_run_left_nonrun_right(path):
 
 
 # @slow  # ~5sec on Yarik's laptop
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_mutator_left_nonrun_right(path):
     ds = Dataset(path).create()
@@ -351,7 +351,7 @@ def test_rerun_mutator_left_nonrun_right(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_mutator_stem_nonrun_merges(path):
     ds = Dataset(path).create()
@@ -413,7 +413,7 @@ def test_rerun_mutator_stem_nonrun_merges(path):
 
 
 # @slow  # ~4.5sec
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_exclude_side(path):
     ds = Dataset(path).create()
@@ -445,7 +445,7 @@ def test_rerun_exclude_side(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_run_left_nonrun_right(path):
     ds = Dataset(path).create()
@@ -493,7 +493,7 @@ def test_rerun_unrelated_run_left_nonrun_right(path):
 
 
 # @slow  # ~3.5sec on Yarik's laptop
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_mutator_left_nonrun_right(path):
     ds = Dataset(path).create()
@@ -522,7 +522,7 @@ def test_rerun_unrelated_mutator_left_nonrun_right(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_nonrun_left_run_right(path):
     ds = Dataset(path).create()
@@ -576,7 +576,7 @@ def test_rerun_unrelated_nonrun_left_run_right(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_unrelated_nonrun_left_mutator_right(path):
     ds = Dataset(path).create()
@@ -618,7 +618,7 @@ def test_rerun_unrelated_nonrun_left_mutator_right(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_multifork(path):
     ds = Dataset(path).create()
@@ -697,7 +697,7 @@ def test_rerun_multifork(path):
 
 
 @slow
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_octopus(path):
     ds = Dataset(path).create()

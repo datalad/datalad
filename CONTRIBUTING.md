@@ -156,6 +156,63 @@ pip install -r requirements-devel.txt
 and you will need to install recent git-annex using appropriate for your
 OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
 
+Contributor Files History
+-------------------------
+
+The original repository provided a [.zenodo.json](.zenodo.json)
+file, and we generate a [.contributors file](.all-contributorsrc) from that via:
+
+```bash
+pip install tributors
+tributors --version
+0.0.18
+```
+
+It helps to have a GitHub token to increase API limits:
+
+```bash
+export GITHUB_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Instructions for these environment variables can be found [here](https://con.github.io/tributors/docs/getting-started#2-environment). 
+Then update zenodo:
+
+```bash
+tributors update  zenodo
+INFO:    zenodo:Updating .zenodo.json
+INFO:    zenodo:Updating .tributors cache from .zenodo.json
+WARNING:tributors:zenodo does not support updating from names.
+```
+
+In the case that there is more than one orcid found for a user, you will be given a list
+to check. Others will be updated in the file. You can then curate the file as you see fit.
+We next want to add the .allcontributors file:
+
+```bash
+$ tributors init allcontrib
+INFO:allcontrib:Generating .all-contributorsrc for datalad/datalad
+$ tributors update allcontrib
+INFO:allcontrib:Updating .all-contributorsrc
+INFO:allcontrib:Updating .tributors cache from .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor glalteva in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor adswa in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
+...
+INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
+INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
+WARNING:tributors:allcontrib does not support updating from orcids.
+WARNING:tributors:allcontrib does not support updating from email.
+```
+
+We can then populate the shared .tributors file:
+
+```bash
+$ tributors update-lookup allcontrib
+```
+
+And then we can rely on the [GitHub action](.github/workflows/update-contributors.yml) to update contributors. The action is set to run on merges to master, meaning when the contributions are finalized. This means that we add new contributors, and we
+look for new orcids as we did above.
+
 
 ## Documentation
 
@@ -241,8 +298,25 @@ Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.in
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
 Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
-be used to establish a clean docker environment (based on any NeuroDebian-supported
+be used to establish a clean docker environment (based on any NtesteuroDebian-supported
 release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
+
+#### Test attributes
+
+[datalad/tests/utils.py]() defines many useful decorators. Some of those just to annotate tests
+for various aspects to allow for easy sub-selection.
+
+##### Speed
+
+Please annotate with following decorators
+- `@slow` if test runs over 10 seconds
+- `@turtle` if test runs over 120 seconds (those would not typically be ran on CIs)
+
+##### Purpose
+
+As those tests also usually tend to be slower, use in conjunction with `@slow` or `@turtle` when slow
+- `@integration` - tests verifying correct operation with external tools/services beyond git/git-annex
+- `@usecase` - represents some (user) use-case, and not necessarily a "unit-test" of functionality
 
 ### CI setup
 
@@ -439,6 +513,10 @@ We welcome and recognize all contributions from documentation to testing to code
 
 You can see a list of current contributors in our [zenodo file][link_zenodo].
 If you are new to the project, don't forget to add your name and affiliation there!
+We also have an .all-contributorsrc that is updated automatically on merges. Once it's
+merged, if you helped in a non standard way (e.g., a contribution other than code)
+you can open a pull request to add any [All Contributors Emoji][contrib_emoji] that
+match your contribution types.
 
 ## Thank you!
 
@@ -472,12 +550,6 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_DATASETS_TOPURL*:
   Used to point to an alternative location for `///` dataset. If running
   tests preferred to be set to http://datasets-tests.datalad.org
-- *DATALAD_LOG_CWD*:
-  Whether to log cwd where command to be executed
-- *DATALAD_LOG_ENV*:
-  If contains a digit (e.g. 1), would log entire environment passed into
-  the Runner.run's popen call.  Otherwise could be a comma separated list
-  of environment variables to log
 - *DATALAD_LOG_LEVEL*:
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_LOG_NAME*:
@@ -486,8 +558,6 @@ Refer datalad/config.py for information on how to add these environment variable
   Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
-- *DATALAD_LOG_STDIN*:
-  Whether to log stdin for the command
 - *DATALAD_LOG_TARGET*
   Where to log: `stderr` (default), `stdout`, or another filename
 - *DATALAD_LOG_TIMESTAMP*:
@@ -498,8 +568,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_LOG_VMEM*:
   Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
 - *DATALAD_EXC_STR_TBLIMIT*: 
-  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
-  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+  This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables
@@ -581,26 +650,31 @@ Refer datalad/config.py for information on how to add these environment variable
 - `update-changelog`: uses above `linkissues-changelog` and updates .rst changelog
 - `release-pypi`: ensures no `dist/` exists yet, creates a wheel and a source distribution and uploads to pypi.
 
-## Changelog section
+## Releasing with GitHub Actions, auto, and pull requests
 
-For the upcoming release use this template
+New releases of datalad are created via a GitHub Actions workflow built
+around [`auto`](https://github.com/intuit/auto).  Whenever a pull request is
+merged into `maint` that has the "`release`" label, `auto` updates the
+changelog based on the pull requests since the last release, commits the
+results, tags the new commit with the next version number, and creates a GitHub
+release for the tag.  This in turn triggers a job for building an sdist & wheel
+for the project and uploading them to PyPI.
 
-```markdown
-## 0.15.0 (??? ??, 2020) -- will be better than ever
+### Labelling pull requests
 
-bet we will fix some bugs and make a world even a better place.
+The section that `auto` adds to the changelog on a new release consists of the
+titles of all pull requests merged into master since the previous release,
+organized by label.  `auto` recognizes the following PR labels:
 
-### Major refactoring and deprecations
-
-- hopefully none
-
-### Fixes
-
-?
-
-### Enhancements and new features
-
-?
-```
+- `minor` — for changes corresponding to an increase in the minor version
+  component
+- `patch` — for changes corresponding to an increase in the patch/micro version
+  component; this is the default label for unlabelled PRs
+- `internal` — for changes only affecting the internal API
+- `documentation` — for changes only affecting the documentation
+- `tests` — for changes to tests
+- `dependencies` — for updates to dependency versions
+- `performance` — for performance improvements
 
 [link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
+[contrib_emoji]: https://allcontributors.org/docs/en/emoji-key

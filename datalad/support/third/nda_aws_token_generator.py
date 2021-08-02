@@ -25,7 +25,7 @@ class NDATokenGenerator(object):
     def __init__(self, url):
         assert url is not None
         self.url = url
-        logging.debug('constructed with url %s' % url)
+        logging.debug('constructed with url %s', url)
 
     def generate_token(self, username, password):
         logging.info('request to generate AWS token')
@@ -40,11 +40,11 @@ class NDATokenGenerator(object):
         digest_bytes = hasher.digest()
         byte_string = binascii.hexlify(digest_bytes)
         output = byte_string.decode('utf-8')
-        logging.debug('encoded password hash: %s' % output)
+        logging.debug('encoded password hash: %s', output)
         return output
 
     def __construct_request_xml(self, username, encoded_password):
-        logging.debug('constructing request with %s - %s' % (username, encoded_password))
+        logging.debug('constructing request with %s - %s', username, encoded_password)
         soap_schema = self.__schemas['soap']
         datamanager_schema = self.__schemas['data']
 
@@ -69,7 +69,7 @@ class NDATokenGenerator(object):
         return etree.tostring(element)
 
     def __make_request(self, request_message):
-        logging.debug('making post request to %s' % self.url)
+        logging.debug('making post request to %s', self.url)
 
         headers = {
             'SOAPAction': '"generateToken"',
@@ -88,7 +88,7 @@ class NDATokenGenerator(object):
         error = tree.find('.//errorMessage')
         if error is not None:
             error_msg = error.text
-            logging.error('response had error message: %s' % error_msg)
+            logging.error('response had error message: %s', error_msg)
             raise Exception(error_msg)
         generated_token = tree[0][0]
         token_elements = [e.text for e in generated_token[0:4]]

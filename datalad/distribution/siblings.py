@@ -240,7 +240,7 @@ class Siblings(Interface):
         worker = action_worker_map[action]
 
         dataset = require_dataset(
-            dataset, check_installed=False, purpose='sibling configuration')
+            dataset, check_installed=False, purpose='configure sibling')
         refds_path = dataset.path
 
         res_kwargs = dict(refds=refds_path, logger=lgr)
@@ -379,6 +379,9 @@ def _add_remote(
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    if as_common_datasrc == name:
+        raise ValueError('Sibling name ({}) and common data source name ({}) '
+                         'can not be identical.'.format(name, as_common_datasrc))
     if isinstance(RI(url), PathRI):
         # make sure any path URL is stored in POSIX conventions for consistency
         # with git's behavior (e.g. origin configured by clone)
@@ -421,7 +424,7 @@ def _configure_remote(
     if name != 'here':
         # do all configure steps that are not meaningful for the 'here' sibling
         # AKA the local repo
-        if name not in known_remotes:
+        if name not in known_remotes and url:
             # this remote is fresh: make it known
             # just minimalistic name and URL, the rest is coming from `configure`
             ds.repo.add_remote(name, url)
@@ -552,7 +555,7 @@ def _configure_remote(
                     "Could not enable annex remote %s. This is expected if %s "
                     "is a pure Git remote, or happens if it is not accessible.",
                     name, name)
-                lgr.debug("Exception was: %s" % exc_str(exc))
+                lgr.debug("Exception was: %s", exc_str(exc))
 
             if as_common_datasrc:
                 ri = RI(url)
@@ -564,13 +567,12 @@ def _configure_remote(
                     # XXX except it is not enough
 
                     # make special remote of type=git (see #335)
-                    ds.repo._run_annex_command(
+                    ds.repo.call_annex([
                         'initremote',
-                        annex_options=[
-                            as_common_datasrc,
-                            'type=git',
-                            'location={}'.format(url),
-                            'autoenable=true'])
+                        as_common_datasrc,
+                        'type=git',
+                        'location={}'.format(url),
+                        'autoenable=true'])
                 else:
                     yield dict(
                         status='impossible',
@@ -596,7 +598,7 @@ def _configure_remote(
             result_props['message'] = 'cannot set description of a plain Git repository'
             yield result_props
             return
-        ds.repo._run_annex_command('describe', annex_options=[name, description])
+        ds.repo.call_annex(['describe', name, description])
 
     # report all we know at once
     info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]

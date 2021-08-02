@@ -312,7 +312,7 @@ class Status(Interface):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
-        # disk as a contsraint (e.g. to figure out which subdataset a path is
+        # disk as a constraint (e.g. to figure out which subdataset a path is
         # in) `diff` cannot do that (everything need to be handled based on a
         # "virtual" representation of a dataset hierarchy).
         # MIH concludes that while `status` can be implemented as a special case
@@ -322,8 +322,8 @@ class Status(Interface):
         # come with evidence that speed does not suffer, and complexity stays
         # on a manageable level
         ds = require_dataset(
-            dataset, check_installed=True, purpose='status reporting')
-
+            dataset, check_installed=True, purpose='report status')
+        ds_path = ds.path
         paths_by_ds = OrderedDict()
         if path:
             # sort any path argument into the respective subdatasets
@@ -333,13 +333,21 @@ class Status(Interface):
                 # for further decision logic below
                 orig_path = str(p)
                 p = resolve_path(p, dataset)
+                # TODO(OPT)? YOH does not spot any optimization for paths under the same
+                # directory: if not isdir(path) - files would all have the same
+                # "root", and we could avoid doing full `get_dataset_root` check for
+                # those. Moreover, if some path points UNDER that path which isdir, and
+                # we have some other path already with the root above - we can just take
+                # the same. Altogether sounds like a logic duplicated with
+                # discover_dataset_trace_to_targets and even get_tree_roots
+                # of save.
                 root = get_dataset_root(str(p))
                 if root is None:
                     # no root, not possibly underneath the refds
                     yield dict(
                         action='status',
                         path=p,
-                        refds=ds.path,
+                        refds=ds_path,
                         status='error',
                         message='path not underneath this dataset',
                         logger=lgr)
@@ -347,7 +355,9 @@ class Status(Interface):
                 else:
                     if dataset and root == str(p) and \
                             not (orig_path.endswith(op.sep) or
-                                 orig_path == "."):
+                                 # Note: Compare to Dataset(root).path rather
+                                 # than root to get same path normalization.
+                                 Dataset(root).path == ds_path):
                         # the given path is pointing to a dataset
                         # distinguish rsync-link syntax to identify
                         # the dataset as whole (e.g. 'ds') vs its
@@ -386,7 +396,7 @@ class Status(Interface):
                 # there is only a single refds
                 yield dict(
                     path=str(qdspath),
-                    refds=ds.path,
+                    refds=ds_path,
                     action='status',
                     status='error',
                     message=(
@@ -420,7 +430,7 @@ class Status(Interface):
                     content_info_cache):
                 yield dict(
                     r,
-                    refds=ds.path,
+                    refds=ds_path,
                     action='status',
                     status='ok',
                 )

@@ -61,6 +61,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_in_results,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     ok_startswith,
     serve_path_via_http,
     swallow_logs,
@@ -72,7 +73,6 @@ from datalad.tests.utils import (
     slow,
     usecase,
     get_datasets_topdir,
-    known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
 )
@@ -174,7 +174,6 @@ def test_invalid_args(path):
 #    assert_in(crcns.path, ds.get_subdatasets(absolute=True))
 
 
-@known_failure_appveyor
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
@@ -229,6 +228,7 @@ def test_install_simple_local(src, path):
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
+        ok_(uuid_before)  # we actually have an uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
@@ -269,6 +269,7 @@ def test_install_dataset_from_instance(src, dst):
     assert_in('INFO.txt', clone.repo.get_indexed_files())
 
 
+@known_failure_githubci_win
 @with_testrepos(flavors=['network'])
 @with_tempfile
 def test_install_dataset_from_just_source_via_path(url, path):
@@ -307,9 +308,7 @@ def test_install_dataladri(src, topurl, path):
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
 @slow   # 46sec on Yarik's laptop and tripped Travis CI
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -348,8 +347,9 @@ def test_install_recursive(src, path_nr, path_r):
         ok_(subds.is_installed(),
             "Not installed: %s" % (subds,))
         # no content was installed:
-        ok_(not any(subds.repo.file_has_content(
-            subds.repo.get_annexed_files())))
+        ainfo = subds.repo.get_content_annexinfo(init=None,
+                                                 eval_availability=True)
+        assert_false(any(st["has_content"] for st in ainfo.values()))
     # no unfulfilled subdatasets:
     ok_(top_ds.subdatasets(recursive=True, fulfilled=False) == [])
 
@@ -382,12 +382,18 @@ def test_install_recursive_with_data(src, path):
     eq_(res[0]['path'], path)
     top_ds = YieldDatasets()(res[0])
     ok_(top_ds.is_installed())
+
+    def all_have_content(repo):
+        ainfo = repo.get_content_annexinfo(init=None, eval_availability=True)
+        return all(st["has_content"] for st in ainfo.values())
+
     if isinstance(top_ds.repo, AnnexRepo):
-        ok_(all(top_ds.repo.file_has_content(top_ds.repo.get_annexed_files())))
+        ok_(all_have_content(top_ds.repo))
+
     for subds in top_ds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subds.is_installed(), "Not installed: %s" % (subds,))
         if isinstance(subds.repo, AnnexRepo):
-            ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
+            ok_(all_have_content(subds.repo))
 
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
@@ -404,7 +410,7 @@ def test_install_into_dataset(source, top_path):
     ds = create(top_path)
     assert_repo_status(ds.path)
 
-    subds = ds.install("sub", source=source, save=False)
+    subds = ds.install("sub", source=source)
     ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
@@ -739,7 +745,9 @@ def test_install_noautoget_data(src, path):
     # there should only be datasets in the list of installed items,
     # and none of those should have any data for their annexed files yet
     for ds in cdss:
-        assert_false(any(ds.repo.file_has_content(ds.repo.get_annexed_files())))
+        ainfo = ds.repo.get_content_annexinfo(init=None,
+                                              eval_availability=True)
+        assert_false(any(st["has_content"] for st in ainfo.values()))
 
 
 @with_tempfile
@@ -884,7 +892,8 @@ def check_datasets_datalad_org(suffix, tdir):
     # Apparently things can break, especially with introduction of the
     # smart HTTP backend for apache2 etc
     ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w' + suffix)
-    eq_(ds.config.get('remote.origin.annex-ignore', None), None)
+    eq_(ds.config.get(f'remote.{DEFAULT_REMOTE}.annex-ignore', None),
+        None)
     # assert_result_count and not just assert_status since for some reason on
     # Windows we get two records due to a duplicate attempt (as res[1]) to get it
     # again, which is reported as "notneeded".  For the purpose of this test
@@ -910,3 +919,41 @@ def test_relpath_semantics(path):
         sub = install(
             dataset='super', source='subsrc', path=op.join('super', 'sub'))
         eq_(sub.path, op.join(super.path, 'sub'))
+
+
+def _create_test_install_recursive_github(path):  # pragma: no cover
+    # to be ran once to populate a hierarchy of test datasets on github
+    # Making it a full round-trip would require github credentials on CI etc
+    ds = create(opj(path, "testrepo  gh"))
+    # making them with spaces and - to ensure that we consistently use the mapping
+    # for create and for get/clone/install
+    ds.create("sub _1")
+    ds.create("sub _1/d/sub_-  1")
+    import datalad.distribution.create_sibling_github  # to bind API
+    ds.create_sibling_github(
+        "testrepo  gh",
+        github_organization='datalad',
+        recursive=True,
+        # yarik forgot to push first, "replace" is not working in non-interactive IIRC
+        # existing='reconfigure'
+    )
+    return ds.push(recursive=True, to='github')
+
+
+@skip_if_no_network
+@with_tempfile(mkdir=True)
+def test_install_recursive_github(path):
+    # test recursive installation of a hierarchy of datasets created on github
+    # using datalad create-sibling-github.  Following invocation was used to poplate it
+    #
+    # out = _create_test_install_recursive_github(path)
+
+    # "testrepo  gh" was mapped by our sanitization in create_sibling_github to testrepo_gh, thus
+    for i, url in enumerate([
+        'https://github.com/datalad/testrepo_gh',
+        # optionally made available to please paranoids, but with all takes too long (22sec)
+        #'https://github.com/datalad/testrepo_gh.git',
+        #'git@github.com:datalad/testrepo_gh.git',
+    ]):
+        ds = install(source=url, path=opj(path, "clone%i" % i), recursive=True)
+        eq_(len(ds.subdatasets(recursive=True, fulfilled=True)), 2)

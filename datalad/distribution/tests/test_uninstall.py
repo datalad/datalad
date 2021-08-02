@@ -31,7 +31,6 @@ from datalad.tests.utils import (
     ok_,
     eq_,
     with_testrepos,
-    SkipTest,
     assert_raises,
     assert_status,
     assert_in,
@@ -190,8 +189,6 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:509
-@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
@@ -202,14 +199,17 @@ def test_uninstall_subdataset(src, dst):
     for subds in ds.subdatasets(result_xfm='datasets'):
         ok_(subds.is_installed())
 
-        annexed_files = subds.repo.get_annexed_files()
-        subds.repo.get(annexed_files)
+        repo = subds.repo
+
+        annexed_files = repo.get_content_annexinfo(init=None)
+        repo.get([str(f) for f in annexed_files])
 
         # drop data of subds:
         res = ds.drop(path=subds.path, result_xfm='paths')
-
-        ok_(all([opj(subds.path, f) in res for f in annexed_files]))
-        ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
+        ok_(all(str(f) in res for f in annexed_files))
+        ainfo = repo.get_content_annexinfo(paths=annexed_files,
+                                           eval_availability=True)
+        ok_(all(not st["has_content"] for st in ainfo.values()))
         # subdataset is still known
         assert_in(subds.path, ds.subdatasets(result_xfm='paths'))
 
@@ -344,7 +344,7 @@ def test_uninstall_recursive(path):
     assert_result_values_cond(
         res, 'message',
         lambda x: "configured minimum number of copies not found" in x or
-        "Could only verify the existence of 0 out of 1 necessary copies" in x
+        "Could only verify the existence of 0 out of 1 necessary cop" in x
     )
 
     # this should do it
@@ -427,7 +427,7 @@ def test_kill(path):
     assert_result_values_cond(
         [err_result], 'message',
         lambda x: "configured minimum number of copies not found" in x or
-        "Could only verify the existence of 0 out of 1 necessary copies" in x
+        "Could only verify the existence of 0 out of 1 necessary cop" in x
     )
     eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
         [subds, ds])

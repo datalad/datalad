@@ -201,7 +201,7 @@ translate_annex_notes = {
 def annexjson2result(d, ds, **kwargs):
     """Helper to convert an annex JSON result to a datalad result dict
 
-    Info from annex is rather heterogenous, partly because some of it
+    Info from annex is rather heterogeneous, partly because some of it
     our support functions are faking.
 
     This helper should be extended with all needed special cases to
@@ -224,7 +224,7 @@ def annexjson2result(d, ds, **kwargs):
     res['status'] = 'ok' if d.get('success', False) is True else 'error'
     # we cannot rely on any of these to be available as the feed from
     # git annex (or its wrapper) is not always homogeneous
-    if 'file' in d:
+    if d.get('file'):
         res['path'] = str(ds.pathobj / PurePosixPath(d['file']))
     if 'command' in d:
         res['action'] = d['command']

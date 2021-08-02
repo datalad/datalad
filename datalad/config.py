@@ -9,6 +9,10 @@
 """
 """
 
+from collections import namedtuple
+
+import json
+import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
 import datalad
@@ -24,12 +28,19 @@ from datalad.dochelpers import exc_str
 import re
 import os
 from pathlib import Path
-from time import time
 
 import logging
 lgr = logging.getLogger('datalad.config')
 
-cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
+# git-config key syntax with a section and a subsection
+# see git-config(1) for syntax details
+cfg_k_regex = re.compile(r'([a-zA-Z0-9-.]+\.[^\0\n]+)$', flags=re.MULTILINE)
+# identical to the key regex, but with an additional group for a
+# value in a null-delimited git-config dump
+cfg_kv_regex = re.compile(
+    r'([a-zA-Z0-9-.]+\.[^\0\n]+)\n(.*)$',
+    flags=re.MULTILINE | re.DOTALL
+)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
@@ -48,6 +59,10 @@ _where_reload_doc = """
           modification. This can be disable to make multiple sequential
           modifications slightly more efficient.""".lstrip()
 
+# Selection of os.stat_result fields we care to collect/compare to judge
+# on either file has changed to warrant reload of configuration.
+_stat_result = namedtuple('_stat_result', 'st_ino st_size st_ctime st_mtime')
+
 
 # we cannot import external_versions here, as the cfg comes before anything
 # and we would have circular imports
@@ -65,32 +80,70 @@ def _where_reload(obj):
     return obj
 
 
-# TODO document and make "public" (used in GitRepo too)
-def _parse_gitconfig_dump(dump, cwd=None):
+def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
+    """Parse a dump-string from `git config -z --list`
+
+    This parser has limited support for discarding unrelated output
+    that may contaminate the given dump. It does so performing a
+    relatively strict matching of configuration key syntax, and discarding
+    lines in the output that are not valid git-config keys.
+
+    There is also built-in support for parsing outputs generated
+    with --show-origin (see return value).
+
+    Parameters
+    ----------
+    dump : str
+      Null-byte separated output
+    cwd : path-like, optional
+      Use this absolute path to convert relative paths for origin reports
+      into absolute paths. By default, the process working directory
+      PWD is used.
+    multi_value : bool, optional
+      If True, report values from multiple specifications of the
+      same key as a tuple of values assigned to this key. Otherwise,
+      the last configuration is reported.
+
+    Returns:
+    --------
+    dict, set
+      Configuration items are returned as key/value pairs in a dictionary.
+      The second tuple-item will be a set of path objects comprising all
+      source files, if origin information was included in the dump
+      (--show-origin). An empty set is returned otherwise.
+    """
     dct = {}
     fileset = set()
     for line in dump.split('\0'):
-        if not line:
+        # line is a null-delimited chunk
+        k = None
+        # in anticipation of output contamination, process within a loop
+        # where we can reject non syntax compliant pieces
+        while line:
+            if line.startswith('file:'):
+                # origin line
+                fname = Path(line[5:])
+                if not fname.is_absolute():
+                    fname = Path(cwd) / fname if cwd else Path.cwd() / fname
+                fileset.add(fname)
+                break
+            if line.startswith('command line:'):
+                # no origin that we could as a pathobj
+                break
+            # try getting key/value pair from the present chunk
+            k, v = _gitcfg_rec_to_keyvalue(line)
+            if k is not None:
+                # we are done with this chunk when there is a good key
+                break
+            # discard the first line and start over
+            ignore, line = line.split('\n', maxsplit=1)
+            lgr.debug('Non-standard git-config output, ignoring: %s', ignore)
+        if not k:
+            # nothing else to log, all ignored dump was reported before
             continue
-        if line.startswith('file:'):
-            # origin line
-            fname = Path(line[5:])
-            if not fname.is_absolute():
-                fname = Path(cwd) / fname if cwd else Path.cwd() / fname
-            fileset.add(fname)
-            continue
-        if line.startswith('command line:'):
-            # nothing we could handle
-            continue
-        kv_match = cfg_kv_regex.match(line)
-        if kv_match:
-            k, v = kv_match.groups()
-        else:
-            # could be just a key without = value, which git treats as True
-            # if asked for a bool
-            k, v = line, None
+        # multi-value reporting
         present_v = dct.get(k, None)
-        if present_v is None:
+        if present_v is None or not multi_value:
             dct[k] = v
         else:
             if isinstance(present_v, tuple):
@@ -100,12 +153,51 @@ def _parse_gitconfig_dump(dump, cwd=None):
     return dct, fileset
 
 
+# keep alias with previous name for now
+_parse_gitconfig_dump = parse_gitconfig_dump
+
+
+def _gitcfg_rec_to_keyvalue(rec):
+    """Helper for parse_gitconfig_dump()
+
+    Parameters
+    ----------
+    rec: str
+      Key/value specification string
+
+    Returns
+    -------
+    str, str
+      Parsed key and value. Key and/or value could be None
+      if not snytax-compliant (former) or absent (latter).
+    """
+    kv_match = cfg_kv_regex.match(rec)
+    if kv_match:
+        k, v = kv_match.groups()
+    elif cfg_k_regex.match(rec):
+        # could be just a key without = value, which git treats as True
+        # if asked for a bool
+        k, v = rec, None
+    else:
+        # no value, no good key
+        k = v = None
+    return k, v
+
+
 def _update_from_env(store):
+    overrides = {}
     dct = {}
     for k in os.environ:
-        if not k.startswith('DATALAD_'):
-            continue
-        dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
+        if k == "DATALAD_CONFIG_OVERRIDES_JSON":
+            try:
+                overrides = json.loads(os.environ[k])
+            except json.decoder.JSONDecodeError as exc:
+                lgr.warning("Failed to load DATALAD_CONFIG_OVERRIDES_JSON: %s",
+                            exc)
+        elif k.startswith('DATALAD_'):
+            dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
+    if overrides:
+        store.update(overrides)
     store.update(dct)
 
 
@@ -176,10 +268,17 @@ class ConfigManager(object):
 
     _checked_git_identity = False
 
+    # Lock for running changing operation across multiple threads.
+    # Since config itself to the same path could
+    # potentially be created independently in multiple threads, and we might be
+    # modifying global config as well, making lock static should not allow more than
+    # one thread to  write at a time, even if to different repositories.
+    _run_lock = threading.Lock()
+
     def __init__(self, dataset=None, overrides=None, source='any'):
         if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
-                'Unkown ConfigManager(source=) setting: {}'.format(source))
+                'Unknown ConfigManager(source=) setting: {}'.format(source))
         store = dict(
             # store in a simple dict
             # no subclassing, because we want to be largely read-only, and implement
@@ -188,12 +287,12 @@ class ConfigManager(object):
             # track the files that jointly make up the config in this store
             files=set(),
             # and their modification times to be able to avoid needless unforced reloads
-            mtimes=None,
+            stats=None,
         )
         self._stores = dict(
             # populated with info from git
             git=store,
-            # only populated with info from commited dataset config
+            # only populated with info from committed dataset config
             dataset=store.copy(),
         )
         # merged representation (the only one that existed pre datalad 0.14)
@@ -314,19 +413,14 @@ class ConfigManager(object):
         self._merged_store = merged
 
     def _need_reload(self, store):
-        if not store['mtimes']:
+        storestats = store['stats']
+        if not storestats:
             return True
+
         # we have read files before
         # check if any file we read from has changed
-        current_time = time()
-        curmtimes = {c: c.stat().st_mtime for c in store['files'] if c.exists()}
-        if all(curmtimes[c] == store['mtimes'].get(c) and
-               # protect against low-res mtimes (FAT32 has 2s, EXT3 has 1s!)
-               # if mtime age is less than worst resolution assume modified
-               (current_time - curmtimes[c]) > 2.0
-               for c in curmtimes):
-            return False
-        return True
+        curstats = self._get_stats(store)
+        return any(curstats[f] != storestats[f] for f in store['files'])
 
     def _reload(self, run_args):
         # query git-config
@@ -337,13 +431,24 @@ class ConfigManager(object):
             encoding='utf-8',
         )
         store = {}
-        store['cfg'], store['files'] = _parse_gitconfig_dump(
+        store['cfg'], store['files'] = parse_gitconfig_dump(
             stdout, cwd=self._runner.cwd)
 
-        # update mtimes of config files, they have just been discovered
+        # update stats of config files, they have just been discovered
         # and should still exist
-        store['mtimes'] = {c: c.stat().st_mtime for c in store['files']}
+        store['stats'] = self._get_stats(store)
         return store
+
+    @staticmethod
+    def _get_stats(store):
+        stats = {}
+        for f in store['files']:
+            if f.exists:
+                stat = f.stat()
+                stats[f] = _stat_result(stat.st_ino, stat.st_size, stat.st_ctime, stat.st_mtime)
+            else:
+                stats[f] = None
+        return stats
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
@@ -379,7 +484,7 @@ class ConfigManager(object):
           `text`.
         """
         # do local import, as this module is import prominently and the
-        # could theroetically import all kind of weired things for type
+        # could theoretically import all kind of weird things for type
         # conversion
         from datalad.interface.common_cfg import definitions as cfg_defs
         # fetch what we know about this variable
@@ -536,7 +641,7 @@ class ConfigManager(object):
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
 
-        If `source` is 'dataset', only the commited configuration is queried,
+        If `source` is 'dataset', only the committed configuration is queried,
         overrides are applied. In the case of 'local', the committed
         configuration is ignored, but overrides and configuration from
         environment variables are applied as usual.
@@ -695,10 +800,10 @@ class ConfigManager(object):
             lockfile = self._repo_dot_git / 'config.dataladlock'
         else:
             # follow pattern in downloaders for lockfile location
-            lockfile = Path(self.obtain('datalad.locations.cache')) \
-                / 'locks' / 'gitconfig.lck'
+            lockfile = Path(self.obtain('datalad.locations.locks')) \
+                       / 'gitconfig.lck'
 
-        with InterProcessLock(lockfile, logger=lgr):
+        with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)
 
         if reload:

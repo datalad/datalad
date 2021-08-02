@@ -84,7 +84,7 @@ class MetadataExtractor(BaseMetadataExtractor):
                         # MIH: I do not think it is worth going here
                         continue
                     if props['VALUE_IS_ARRAY']:
-                        # we'll catch the actuall array values later
+                        # we'll catch the actual array values later
                         continue
                     # normalize value
                     val = ensure_unicode(val)

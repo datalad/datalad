@@ -29,6 +29,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install ".[devel-docs]"
+        # the benchmarks use `ls`
+        pip install datalad_deprecated
     - name: Run benchmarks
       env:
         # fake environment to be able to reuse script for travis
@@ -39,3 +41,6 @@ jobs:
       run: |
         # Invocation from tools/ci/benchmark-travis-pr.sh for convenience
         asv compare refs/bm/merge-target refs/bm/pr
+    - name: Fail if any benchmarks have slowed down too much
+      run: |
+        ! asv compare --factor 1.2 --split refs/bm/merge-target refs/bm/pr | grep -q "got worse"

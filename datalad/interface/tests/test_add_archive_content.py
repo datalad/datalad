@@ -42,15 +42,16 @@ from datalad.tests.utils import (
     ok_archives_caches,
     ok_file_under_git,
     serve_path_via_http,
-    slow,
-    swallow_logs,
     swallow_outputs,
     with_tempfile,
     with_tree,
 )
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.support.exceptions import (
+    CommandError,
+    FileNotInRepositoryError,
+)
 from datalad.utils import (
     chpwd,
     find_files,
@@ -304,18 +305,18 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo.get(opj('1', '1 f.txt'))  # and should be able to get it again
 
     # bug was that dropping didn't work since archive was dropped first
-    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.call_annex(["drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
     repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
-    res = repo.drop(key_1tar, key=True)
-    assert_equal(res['success'], False)
-
-    assert_result_values_cond(
-        [res], 'note',
-        lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
-    )
+    with assert_raises(CommandError) as e:
+        repo.drop(key_1tar, key=True)
+        assert_equal(e.kwargs['stdout_json'][0]['success'], False)
+        assert_result_values_cond(
+            e.kwargs['stdout_json'], 'note',
+            lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
+        )
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
@@ -386,9 +387,9 @@ def test_add_archive_use_archive_dir(repo_path):
         with assert_raises(RuntimeError) as cmr:
             add_archive_content(archive_path)
         assert_re_in(
-            "You should run ['\"]datalad add 4u\\\\1\\.tar\\.gz['\"] first"
+            "You should run ['\"]datalad save 4u\\\\1\\.tar\\.gz['\"] first"
             if on_windows else
-            "You should run ['\"]datalad add 4u/1\\.tar\\.gz['\"] first",
+            "You should run ['\"]datalad save 4u/1\\.tar\\.gz['\"] first",
             str(cmr.exception), match=False
         )
         with swallow_outputs():
@@ -463,9 +464,8 @@ class TestAddArchiveOptions():
 
         # previous state of things:
         prev_files = list(find_files('.*', self.annex.path))
-        with assert_raises(Exception), \
-                swallow_logs():
-            self.annex.whereis(key1, key=True, output='full')
+        assert_equal(self.annex.whereis(key1, key=True, output='full'), {})
+
         commits_prior = list(self.annex.get_branch_commits_('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
         commits_after = list(self.annex.get_branch_commits_('git-annex'))

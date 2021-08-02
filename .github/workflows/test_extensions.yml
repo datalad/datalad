@@ -13,8 +13,9 @@ jobs:
         extension: [
             datalad-neuroimaging,
             datalad-container,
-            datalad-metalad,
             datalad-crawler,
+            datalad-deprecated,
+            datalad-hirni,
         ]
     steps:
     - name: Set up system
@@ -40,13 +41,18 @@ jobs:
     - name: Install ${{ matrix.extension }} extension
       run: |
         pip install https://github.com/datalad/${{ matrix.extension }}/archive/master.zip
+      if: matrix.extension != 'datalad-hirni'
+    - name: Install ${{ matrix.extension }} extension
+      run: |
+        pip install https://github.com/psychoinformatics-de/${{ matrix.extension }}/archive/master.zip
+      if: matrix.extension == 'datalad-hirni'
     - name: Install additional dependencies
       run: |
         pip install mock
       if: matrix.extension == 'datalad-crawler'
     - name: Install Singularity
       run: sudo eatmydata apt-get install singularity-container
-      if: matrix.extension == 'datalad-container'
+      if: matrix.extension == 'datalad-container' || matrix.extension == 'datalad-hirni'
     - name: WTF!?
       run: |
         datalad wtf

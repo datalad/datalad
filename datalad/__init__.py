@@ -22,8 +22,9 @@ if not __debug__:
 # For reproducible demos/tests
 import os
 _seed = os.environ.get('DATALAD_SEED', None)
-if _seed:
+if _seed is not None:
     import random
+    _seed = int(_seed)
     random.seed(_seed)
 
 import atexit
@@ -47,7 +48,12 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-from datalad.utils import get_encoding_info, get_envvars_info, getpwd
+from datalad.utils import (
+    get_encoding_info,
+    get_envvars_info,
+    get_home_envvars,
+    getpwd,
+)
 
 # To analyze/initiate our decision making on what current directory to return
 getpwd()
@@ -57,8 +63,6 @@ from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
-
-from .version import __version__
 
 
 def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
@@ -88,36 +92,56 @@ test.__test__ = False
 # To store settings which setup_package changes and teardown_package should return
 _test_states = {
     'loglevel': None,
-    'DATALAD_LOG_LEVEL': None,
-    'HOME': None,
+    'env': {},
 }
 
+# handle to an HTTP server instance that is used as part of the tests
+test_http_server = None
 
 def setup_package():
     import os
-    from datalad import consts
-    _test_states['HOME'] = os.environ.get('HOME', None)
-    _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
-    _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
-    os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    from datalad.utils import on_osx
+    from datalad.tests import _TEMP_PATHS_GENERATED
 
-    from datalad.tests.utils import DEFAULT_BRANCH
-    _test_states["GIT_CONFIG_PARAMETERS"] = os.environ.get(
-        "GIT_CONFIG_PARAMETERS")
-    os.environ["GIT_CONFIG_PARAMETERS"] = "'init.defaultBranch={}'".format(
-        DEFAULT_BRANCH)
+    if on_osx:
+        # enforce honoring TMPDIR (see gh-5307)
+        import tempfile
+        tempfile.tempdir = os.environ.get('TMPDIR', tempfile.gettempdir())
+
+    from datalad import consts
+
+    _test_states['env'] = {}
+
+    def set_envvar(v, val):
+        """Memoize and then set env var"""
+        _test_states['env'][v] = os.environ.get(v, None)
+        os.environ[v] = val
+
+    _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
+    consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
+
+    from datalad.tests.utils import (
+        DEFAULT_BRANCH,
+        DEFAULT_REMOTE,
+    )
+    set_envvar("GIT_CONFIG_PARAMETERS",
+               "'init.defaultBranch={}' 'clone.defaultRemoteName={}'"
+               .format(DEFAULT_BRANCH, DEFAULT_REMOTE))
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
-        os.environ['HOME'] = os.environ['GIT_HOME']
+        set_envvar('HOME', os.environ['GIT_HOME'])
+        set_envvar('DATALAD_LOG_EXC', "1")
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile
-        from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
-            os.environ['HOME'] = new_home
+            pass
+        for v, val in get_home_envvars(new_home).items():
+            set_envvar(v, val)
         if not os.path.exists(new_home):
             os.makedirs(new_home)
         with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
@@ -125,12 +149,19 @@ def setup_package():
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[datalad "log"]
+	exc = 1
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
     # Re-load ConfigManager, since otherwise it won't consider global config
     # from new $HOME (see gh-4153
     cfg.reload(force=True)
+
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    compute_cfg_defaults()
+    # datalad.locations.sockets has likely changed. Discard any cached values.
+    ssh_manager._socket_dir = None
 
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
@@ -155,8 +186,7 @@ def setup_package():
         lgr.setLevel(100)
 
         # And we should also set it within environ so underlying commands also stay silent
-        _test_states['DATALAD_LOG_LEVEL'] = DATALAD_LOG_LEVEL
-        os.environ['DATALAD_LOG_LEVEL'] = '100'
+        set_envvar('DATALAD_LOG_LEVEL', '100')
     else:
         # We are not overriding them, since explicitly were asked to have some log level
         _test_states['loglevel'] = None
@@ -181,6 +211,21 @@ def setup_package():
     capture.StringIO = StringIO
     multiprocess.StringIO = StringIO
     plugintest.StringIO = StringIO
+
+    # in order to avoid having to fiddle with rather uncommon
+    # file:// URLs in the tests, have a standard HTTP server
+    # that serves an 'httpserve' directory in the test HOME
+    # the URL will be available from datalad.test_http_server.url
+    from datalad.tests.utils import HTTPPath
+    import tempfile
+    global test_http_server
+    serve_path = tempfile.mkdtemp(
+        dir=cfg.get("datalad.tests.temp.dir"),
+        prefix='httpserve',
+    )
+    test_http_server = HTTPPath(serve_path)
+    test_http_server.start()
+    _TEMP_PATHS_GENERATED.append(serve_path)
 
     if cfg.obtain('datalad.tests.setup.testrepos'):
         lgr.debug("Pre-populating testrepos")
@@ -213,10 +258,9 @@ def teardown_package():
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
-        if _test_states['DATALAD_LOG_LEVEL'] is None:
-            os.environ.pop('DATALAD_LOG_LEVEL')
-        else:
-            os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
+
+    if test_http_server:
+        test_http_server.stop()
 
     from datalad.tests import _TEMP_PATHS_GENERATED
     if len(_TEMP_PATHS_GENERATED):
@@ -227,14 +271,12 @@ def teardown_package():
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
 
-    if _test_states['HOME'] is not None:
-        os.environ['HOME'] = _test_states['HOME']
-
-    git_config_params = _test_states["GIT_CONFIG_PARAMETERS"]
-    if git_config_params is None:
-        os.environ.pop("GIT_CONFIG_PARAMETERS")
-    else:
-        os.environ["GIT_CONFIG_PARAMETERS"] = git_config_params
+    # restore all the env variables
+    for v, val in _test_states['env'].items():
+        if val is not None:
+            os.environ[v] = val
+        else:
+            os.environ.pop(v)
 
     # Re-establish correct global config after changing $HOME.
     # Might be superfluous, since after teardown datalad.cfg shouldn't be
@@ -242,8 +284,10 @@ def teardown_package():
     # either way.
     cfg.reload(force=True)
 
-    if _test_states['DATASETS_TOPURL_ENV']:
-        os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
+    from datalad.interface.common_cfg import compute_cfg_defaults
+    compute_cfg_defaults()
+    ssh_manager._socket_dir = None
+
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
     from datalad.support.cookies import cookies_db
@@ -251,5 +295,18 @@ def teardown_package():
     from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
+
+from .version import __version__
+
+if str(__version__) == '0' or __version__.startswith('0+'):
+    lgr.warning(
+        "DataLad was not installed 'properly' so its version is an uninformative %r.\n"
+        "It can happen e.g. if datalad was installed via\n"
+        "  pip install https://github.com/.../archive/{commitish}.zip\n"
+        "instead of\n"
+        "  pip install git+https://github.com/...@{commitish} .\n"
+        "We advise to re-install datalad or downstream projects might not operate correctly.",
+        __version__
+    )
 
 lgr.log(5, "Done importing main __init__")

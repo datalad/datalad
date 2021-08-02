@@ -197,7 +197,7 @@ def _the_same_across_datasets(relpath, *dss):
         # TODO: or signal otherwise somehow that we just need to get at least some
         # of those files to do the check!...
         raise NeedContentError(
-            "Following paths are missing conent and have different annex "
+            "Following paths are missing content and have different annex "
             "backends: %s. Cannot determine here if the same or not!"
             % ", ".join(p for (p, b) in zip(paths, presents) if not b)
         )
@@ -271,10 +271,10 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         # hence hash would be same as for a plain GitRepo
         # and no, we cannot use the shasum of the annex branch,
         # because this will change even when no metadata has changed
-        timestamps, _ = aggfrom_ds.repo._run_annex_command(
+        timestamps, _ = aggfrom_ds.repo.call_annex_oneline([
             'metadata',
             '.',
-            '-g', 'lastchanged')
+            '-g', 'lastchanged'])
         objid += timestamps.strip()
 
     if not objid:
@@ -446,7 +446,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
     # get extractors to engage from source dataset
     nativetypes = ['datalad_core', 'annex'] + ensure_list(get_metadata_type(aggfrom_ds))
-    # store esssential extraction config in dataset record
+    # store essential extraction config in dataset record
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
 
@@ -465,7 +465,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
         'cn': (dict(contentmeta[k], path=k) for k in sorted(contentmeta))
     }
 
-    # inject the info which commmit we are describing into the core metadata
+    # inject the info which commit we are describing into the core metadata
     # this is done here in order to avoid feeding it all the way down
     coremeta = dsmeta.get('datalad_core', {})
     version = aggfrom_ds.repo.describe(commitish=refcommit)
@@ -629,7 +629,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     procds_paths = [ds.path] + subds_paths
     for dpath in procds_paths:
         ds_dbinfo = agginfo_db.get(dpath, {}).copy()
-        # relative path of the currect dataset within the dataset we are updating
+        # relative path of the current dataset within the dataset we are updating
         drelpath = op.relpath(dpath, start=ds.path)
         for loclabel in location_keys:
             # TODO filepath_info is obsolete

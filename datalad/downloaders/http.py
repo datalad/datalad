@@ -12,6 +12,8 @@
 import re
 import requests
 import requests.auth
+from requests.utils import parse_dict_header
+
 # at some point was trying to be too specific about which exceptions to
 # catch for a retry of a download.
 # from urllib3.exceptions import MaxRetryError, NewConnectionError
@@ -19,6 +21,7 @@ import requests.auth
 import io
 from time import sleep
 
+from .. import __version__
 from ..utils import (
     ensure_list_from_str,
     ensure_dict_from_str,
@@ -48,12 +51,19 @@ from logging import getLogger
 from ..log import LoggerHelper
 lgr = getLogger('datalad.http')
 
+# Following https://meta.wikimedia.org/wiki/User-Agent_policy to provide
+# extended and informative User-Agent string
+DEFAULT_USER_AGENT = \
+    f'DataLad/{__version__} ' \
+    '(https://datalad.org; team@datalad.org) ' \
+    f'python-requests/{requests.__version__}'
+
 try:
     import requests_ftp
     _FTP_SUPPORT = True
     requests_ftp.monkeypatch_session()
 except ImportError as e:
-    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s" % exc_str(e))
+    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s", exc_str(e))
     _FTP_SUPPORT = False
 
 if lgr.getEffectiveLevel() <= 1:
@@ -108,7 +118,7 @@ def check_response_status(response, err_prefix="", session=None):
     elif response.status_code in {200}:
         pass
     elif response.status_code in {301, 302, 307}:
-        # TODO: apparently tests do not excercise this one yet
+        # TODO: apparently tests do not exercise this one yet
         if session is None:
             raise AccessFailedError(err_msg + " no session was provided")
         redirs = list(session.resolve_redirects(response, response.request))
@@ -153,7 +163,7 @@ class HTTPBaseAuthenticator(Authenticator):
         credentials = credential()
 
         # The whole thing relies on server first spitting out 401
-        # and client GETing again with 'Authentication:' header
+        # and client getting again with 'Authentication:' header
         # So we need custom handling for those, while keeping track not
         # of cookies per se, but of 'Authentication:' header which is
         # to be used in subsequent GETs
@@ -364,6 +374,44 @@ class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
 
 
 @auto_repr
+class HTTPAnonBearerTokenAuthenticator(HTTPBearerTokenAuthenticator):
+    """Retrieve token via 401 response and add Authorization: Bearer header.
+    """
+
+    allows_anonymous = True
+
+    def authenticate(self, url, credential, session, update=False):
+        if credential:
+            lgr.warning(
+                "Argument 'credential' specified, but it will be ignored: %s",
+                credential)
+        response = session.head(url)
+        status = response.status_code
+        if status == 200:
+            lgr.debug("No authorization needed for %s", url)
+            return
+        if status != 401:
+            raise DownloadError(
+                "Expected 200 or 401 but got {} from {}"
+                .format(status, url))
+
+        lgr.debug("Requesting authorization token for %s", url)
+        auth_parts = parse_dict_header(response.headers["www-authenticate"])
+        auth_url = ("{}?service={}&scope={}"
+                    .format(auth_parts["Bearer realm"],
+                            auth_parts["service"],
+                            auth_parts["scope"]))
+        auth_response = session.get(auth_url)
+        try:
+            auth_info = auth_response.json()
+        except ValueError as e:
+            raise DownloadError(
+                "Failed to get information from {}: {}"
+                .format(auth_url, exc_str(e)))
+        session.headers['Authorization'] = "Bearer " + auth_info["token"]
+
+
+@auto_repr
 class HTTPDownloaderSession(DownloaderSession):
     def __init__(self, size=None, filename=None,  url=None, headers=None,
                  response=None, chunk_size=1024 ** 2):
@@ -503,6 +551,9 @@ class HTTPDownloader(BaseDownloader):
             headers = {}
         if 'Accept-Encoding' not in headers:
             headers['Accept-Encoding'] = ''
+        if 'user-agent' not in map(str.lower, headers):
+            headers['User-Agent'] = DEFAULT_USER_AGENT
+
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1
         for retry in range(1, nretries+1):

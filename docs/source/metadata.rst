@@ -41,7 +41,7 @@ Supported metadata sources
 
 This following sections provide an overview of included metadata extractors for
 particular types of data structures and file formats. Note that :ref:`DataLad
-extension packages <sec_extension_packages>`, such as the `neuroimaging extension
+extension packages <chap_customization>`, such as the `neuroimaging extension
 <https://github.com/datalad/datalad-neuroimaging>`_, can provide additional
 extractors for particular domains and formats.
 
@@ -215,7 +215,7 @@ Here is an example:
    A text with arbitrary length and content that can span multiple
    .
    paragraphs (this is a new one)
-  License: CC0
+  License: CC0-1.0
    The person who associated a work with this deed has dedicated the work to the
    public domain by waiving all of his or her rights to the work worldwide under
    copyright law, including all related and neighboring rights, to the extent
@@ -255,9 +255,11 @@ The following fields are supported:
   reports can be submitted.
 ``License``:
   A description of the license or terms of use for the dataset. The first
-  lines should contain a list of license labels (e.g. CC0, PPDL) for standard
-  licenses, if possible. Full license texts or term descriptions can be
-  included.
+  lines should be the SPDX License Identifier from the `SPDX License List <https://spdx.org/licenses/>`_
+  (e.g. "CC0-1.0" or "PPDL-1.0"). More complex licensing situation can be expressed
+  using
+  `SPDX License Expressions <https://spdx.github.io/spdx-spec/appendix-IV-SPDX-license-expressions/>`_.
+  Full license texts or term descriptions can be included.
 ``Maintainer``:
   Can be used in addition and analog to ``Author``, when authors (creators of
   the data) need to be distinguished from maintainers of the dataset.

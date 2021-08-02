@@ -56,7 +56,6 @@ if not DATASETS_TOPURL.endswith('/'):
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
-WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')
 
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
@@ -71,6 +70,7 @@ PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # git/datalad configuration item to provide a token for github
 CONFIG_HUB_TOKEN_FIELD = 'hub.oauthtoken'
 GITHUB_LOGIN_URL = 'https://github.com/login'
+GITHUB_TOKENS_URL = 'https://github.com/settings/tokens'
 
 # format of git-annex adjusted branch names
 ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\(.*\)$')

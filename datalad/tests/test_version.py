@@ -11,7 +11,6 @@ import re
 from distutils.version import LooseVersion
 
 from ..version import (
-    __hardcoded_version__,
     __version__,
 )
 from datalad.support import path as op
@@ -21,6 +20,7 @@ from datalad.tests.utils import (
     assert_greater,
     assert_in,
     assert_not_in,
+    ok_startswith,
     SkipTest,
 )
 
@@ -32,16 +32,14 @@ def test__version__():
         op.dirname(__file__), op.pardir, op.pardir, 'CHANGELOG.md')
     if not op.exists(CHANGELOG_filename):
         raise SkipTest("no %s found" % CHANGELOG_filename)
-    regex = re.compile(r'^## '
+    regex = re.compile(r'^# '
                        r'(?P<version>[0-9]+\.[0-9.abcrc~]+)\s+'
                        r'\((?P<date>.*)\)'
-                       r'\s+--\s+'
-                       r'(?P<codename>.+)'
                        )
     with open(CHANGELOG_filename, 'rb') as f:
         for line in f:
             line = line.rstrip()
-            if not line.startswith(b'## '):
+            if not line.startswith(b'# '):
                 # The first section header we hit, must be our changelog entry
                 continue
             reg = regex.match(ensure_unicode(line))
@@ -52,7 +50,7 @@ def test__version__():
             changelog_version = regd['version']
             lv_changelog_version = LooseVersion(changelog_version)
             # we might have a suffix - sanitize
-            san__version__ = __version__.rstrip('.devdirty')
+            san__version__ = __version__.rstrip('.dirty')
             lv__version__ = LooseVersion(san__version__)
             if '???' in regd['date'] and 'will be better than ever' in regd['codename']:
                 # we only have our template
@@ -62,18 +60,16 @@ def test__version__():
             else:
                 # should be a "release" record
                 assert_not_in('???', regd['date'])
-                assert_not_in('will be better than ever', regd['codename'])
-                assert_equal(__hardcoded_version__, changelog_version)
-                if __hardcoded_version__ != san__version__:
-                    # It was not tagged yet and Changelog should have its
-                    # template record for the next release
-                    assert_greater(lv_changelog_version, lv__version__)
-                    assert_in('.dev', san__version__)
+                ok_startswith(__version__, changelog_version)
+                if lv__version__ != changelog_version:
+                    # It was not tagged yet and Changelog has no new records
+                    # (they are composed by auto upon release)
+                    assert_greater(lv__version__, lv_changelog_version)
+                    assert_in('+', san__version__)  # we have build suffix
                 else:
                     # all is good, tagged etc
                     assert_equal(lv_changelog_version, lv__version__)
                     assert_equal(changelog_version, san__version__)
-                    assert_equal(__hardcoded_version__, san__version__)
             return
 
     raise AssertionError(

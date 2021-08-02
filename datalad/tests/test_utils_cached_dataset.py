@@ -25,6 +25,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_result_count,
     assert_true,
+    DEFAULT_REMOTE,
     known_failure_windows,
     skip_if_no_network,
     with_tempfile
@@ -174,10 +175,10 @@ def test_cached_dataset(cache_dir):
             # it's a clone in a temp. location, not within the cache
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
-                                name="origin",
+                                name=DEFAULT_REMOTE,
                                 url=str(cache_dir / name_in_cache))
             here = ds.config.get("annex.uuid")
-            origin = ds.config.get("remote.origin.annex-uuid")
+            origin = ds.config.get(f"remote.{DEFAULT_REMOTE}.annex-uuid")
             where = ds.repo.whereis(str(annexed_file))
             assert_not_in(here, where)
             assert_not_in(origin, where)
@@ -191,10 +192,10 @@ def test_cached_dataset(cache_dir):
             # it's a clone in a temp. location, not within the cache
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
-                                name="origin",
+                                name=DEFAULT_REMOTE,
                                 url=str(cache_dir / name_in_cache))
             here = ds.config.get("annex.uuid")
-            origin = ds.config.get("remote.origin.annex-uuid")
+            origin = ds.config.get(f"remote.{DEFAULT_REMOTE}.annex-uuid")
             where = ds.repo.whereis(str(annexed_file))
             assert_in(here, where)
             assert_in(origin, where)
@@ -208,13 +209,13 @@ def test_cached_dataset(cache_dir):
             # it's a clone in a temp. location, not within the cache
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
-                                name="origin",
+                                name=DEFAULT_REMOTE,
                                 url=str(cache_dir / name_in_cache))
             # origin is the same cached dataset, that got this content in
             # decorated_test2 before. Should still be there. But "here" we
             # didn't request it
             here = ds.config.get("annex.uuid")
-            origin = ds.config.get("remote.origin.annex-uuid")
+            origin = ds.config.get(f"remote.{DEFAULT_REMOTE}.annex-uuid")
             where = ds.repo.whereis(str(annexed_file))
             assert_not_in(here, where)
             assert_in(origin, where)
@@ -229,13 +230,13 @@ def test_cached_dataset(cache_dir):
             # it's a clone in a temp. location, not within the cache
             assert_not_in(cache_dir, ds.pathobj.parents)
             assert_result_count(ds.siblings(), 1, type="sibling",
-                                name="origin",
+                                name=DEFAULT_REMOTE,
                                 url=str(cache_dir / name_in_cache))
             # origin is the same cached dataset, that got this content in
             # decorated_test2 before. Should still be there. But "here" we
             # didn't request it
             here = ds.config.get("annex.uuid")
-            origin = ds.config.get("remote.origin.annex-uuid")
+            origin = ds.config.get(f"remote.{DEFAULT_REMOTE}.annex-uuid")
             where = ds.repo.whereis(str(annexed_file))
             assert_not_in(here, where)
             assert_in(origin, where)

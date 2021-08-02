@@ -10,6 +10,8 @@
 """
 
 import os
+import logging
+lgr = logging.getLogger('datalad.support.keyring')
 
 
 class Keyring(object):
@@ -23,7 +25,7 @@ class Keyring(object):
     @property
     def _keyring(self):
         if self.__keyring is None:
-            # Setup logging for keyring if we are debugging, althought keyring's logging
+            # Setup logging for keyring if we are debugging, although keyring's logging
             # is quite scarce ATM
             from datalad.log import lgr
             import logging
@@ -46,6 +48,7 @@ class Keyring(object):
     def get(self, name, field):
         # consult environment, might be provided there and should take precedence
         env_var = ('DATALAD_%s_%s' % (name, field)).replace('-', '_')
+        lgr.log(5, 'Credentials lookup attempt via env var %s', env_var)
         if env_var in os.environ:
             return os.environ[env_var]
         return self._keyring.get_password(self._get_service_name(name), field)

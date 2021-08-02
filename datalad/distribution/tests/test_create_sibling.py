@@ -12,7 +12,8 @@
 import os
 from os import chmod
 import stat
-import re
+import sys
+
 from os.path import join as opj, exists, basename
 
 from ..dataset import Dataset
@@ -25,13 +26,17 @@ from datalad.cmd import (
     WitlessRunner as Runner,
     StdOutErrCapture,
 )
+from datalad.distribution.create_sibling import _RunnerAdapter
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
 from datalad.tests.utils import (
+    DEFAULT_BRANCH,
+    SkipTest,
     assert_dict_equal,
     assert_false,
     assert_in,
+    assert_in_results,
     assert_no_errors_logged,
     assert_not_equal,
     assert_not_in,
@@ -40,18 +45,17 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     create_tree,
-    DEFAULT_BRANCH,
     eq_,
     get_mtimes_and_digests,
     get_ssh_port,
+    known_failure_windows,
     ok_,
     ok_endswith,
-    ok_exists,
     ok_file_has_content,
     ok_file_under_git,
     skip_if_on_windows,
-    skip_ssh,
     skip_if_root,
+    skip_ssh,
     slow,
     swallow_logs,
     with_tempfile,
@@ -73,42 +77,25 @@ import logging
 lgr = logging.getLogger('datalad.tests')
 
 
-def assert_publish_with_ui(target_path, rootds=False, flat=True):
+_have_webui = None
 
-    paths = [_path_(".git/hooks/post-update")]     # hooks enabled in all datasets
-    not_paths = []  # _path_(".git/datalad/metadata")]  # metadata only on publish
-                    # ATM we run post-update hook also upon create since it might
-                    # be a reconfiguration (TODO: I guess could be conditioned)
 
-    # web-interface html pushed to dataset root
-    web_paths = ['index.html', _path_(".git/datalad/web")]
-    if rootds:
-        paths += web_paths
-    # and not to subdatasets
-    elif not flat:
-        not_paths += web_paths
+def have_webui():
+    """Helper for a delayed import test to break circular imports from
+    deprecated extension, which gets its tests from the module too
+    """
+    global _have_webui
+    if _have_webui is not None:
+        return _have_webui
 
-    for path in paths:
-        ok_exists(opj(target_path, path))
-
-    for path in not_paths:
-        assert_false(exists(opj(target_path, path)))
-
-    hook_path = _path_(target_path, '.git/hooks/post-update')
-    # No longer the case -- we are no longer using absolute path in the
-    # script
-    # ok_file_has_content(hook_path,
-    #                     '.*\ndsdir="%s"\n.*' % target_path,
-    #                     re_=True,
-    #                     flags=re.DOTALL)
-    # No absolute path (so dataset could be moved) in the hook
-    with open(hook_path) as f:
-        assert_not_in(target_path, f.read())
-    # correct ls_json command in hook content (path wrapped in "quotes)
-    ok_file_has_content(hook_path,
-                        '.*datalad ls -a --json file \..*',
-                        re_=True,
-                        flags=re.DOTALL)
+    try:
+        import datalad_deprecated.sibling_webui
+        from datalad_deprecated.tests.test_create_sibling_webui \
+            import assert_publish_with_ui
+        _have_webui = True
+    except (ModuleNotFoundError, ImportError):
+        _have_webui = False
+    return _have_webui
 
 
 if lgr.getEffectiveLevel() > logging.DEBUG:
@@ -167,6 +154,10 @@ def test_invalid_call(path):
                 "sibling '%s' already configured (specify alternative name, or force reconfiguration via --existing",
                 'bogus'))
 
+    if not have_webui():
+        # need an extension package
+        assert_raises(RuntimeError, ds.create_sibling, '', ui=True)
+
 
 @slow  # 26sec on travis
 @skip_if_on_windows  # create_sibling incompatible with win servers
@@ -188,7 +179,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target",
             sshurl="ssh://datalad-test:{}".format(port),
             target_dir=target_path,
-            ui=True)
+            ui=have_webui())
         assert_not_in('enableremote local_target failed', cml.out)
 
     GitRepo(target_path, create=False)  # raises if not a git repo
@@ -238,7 +229,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
                 sshurl="ssh://datalad-test" + target_path,
                 publish_by_default=DEFAULT_BRANCH,
                 existing='replace',
-                ui=True,
+                ui=have_webui(),
             )
         interactive_assert_create_sshwebserver()
 
@@ -266,7 +257,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             target_dir=target_path,
             target_url=target_path,
             target_pushurl="ssh://datalad-test" + target_path,
-            ui=True,
+            ui=have_webui(),
         )
 
         @with_testsui(responses=['yes'])
@@ -284,7 +275,10 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         eq_("ssh://datalad-test" + target_path,
             source.repo.get_remote_url("local_target", push=True))
 
-        assert_publish_with_ui(target_path)
+        if have_webui():
+            from datalad_deprecated.tests.test_create_sibling_webui \
+                import assert_publish_with_ui
+            assert_publish_with_ui(target_path)
 
         # now, push should work:
         publish(dataset=source, to="local_target")
@@ -312,11 +306,16 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
                     digests.pop(f)
                     mtimes.pop(f)
             # and just pop some leftovers from annex
+            # and ignore .git/logs content (gh-5298)
             for f in list(digests):
-                if f.startswith('.git/annex/mergedrefs'):
+                if f.startswith('.git/annex/mergedrefs') \
+                        or f.startswith('.git/logs/'):
                     digests.pop(f)
                     mtimes.pop(f)
 
+        if not have_webui():
+            # the rest of the test assumed that we have uploaded a UI
+            return
         orig_digests, orig_mtimes = get_mtimes_and_digests(target_path)
         process_digests_mtimes(orig_digests, orig_mtimes)
 
@@ -376,7 +375,7 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
                 sshurl=sshurl,
                 target_dir=target_dir_tpl,
                 recursive=True,
-                ui=True)
+                ui=have_webui())
 
         # raise if git repos were not created
         for suffix in [sep + 'subm 1', sep + '2', '']:
@@ -384,7 +383,10 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
 
-            assert_publish_with_ui(target_dir, rootds=not suffix, flat=flat)
+            if have_webui():
+                from datalad_deprecated.tests.test_create_sibling_webui \
+                    import assert_publish_with_ui
+                assert_publish_with_ui(target_dir, rootds=not suffix, flat=flat)
 
         for repo in [source.repo, sub1.repo, sub2.repo]:
             assert_not_in("local_target", repo.get_remotes())
@@ -410,10 +412,10 @@ def check_target_ssh_recursive(use_ssh, origin, src_path, target_path):
                 target_dir=target_dir_tpl,
                 recursive=True,
                 existing='skip',
-                ui=True,
+                ui=have_webui(),
                 since=''
             )
-            assert_postupdate_hooks(target_path_, installed=True, flat=flat)
+            assert_postupdate_hooks(target_path_, installed=have_webui(), flat=flat)
         # so it was created on remote correctly and wasn't just skipped
         assert(Dataset(_path_(target_path_, ('prefix-' if flat else '') + sub3_name)).is_installed())
         publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
@@ -534,15 +536,25 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.save('sub.dat')
-    ds.create_sibling(url, ui=True)
+    try:
+        res = ds.create_sibling(url, ui=have_webui())
+    except UnicodeDecodeError:
+        if sys.version_info < (3, 7):
+            # observed test failing on ubuntu 18.04 with python 3.6
+            # (reproduced in conda env locally with python 3.6.10 when LANG=C
+            # We will just skip this tricky one
+            raise SkipTest("Known failure")
+        raise
+    assert_in_results(res, action="create_sibling", sibling_name=sibname)
     published = ds.publish(to=sibname, transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
-    # verify that hook runs and there is nothing in stderr
-    # since it exits with 0 exit even if there was a problem
-    out = Runner(cwd=opj(dst_path, '.git')).run([_path_('hooks/post-update')],
-                                                protocol=StdOutErrCapture)
-    assert_false(out['stdout'])
-    assert_false(out['stderr'])
+    if have_webui():
+        # verify that hook runs and there is nothing in stderr
+        # since it exits with 0 exit even if there was a problem
+        out = Runner(cwd=opj(dst_path, '.git')).run([_path_('hooks/post-update')],
+                                                    protocol=StdOutErrCapture)
+        assert_false(out['stdout'])
+        assert_false(out['stderr'])
 
     # Verify that we could replace and publish no problem
     # https://github.com/datalad/datalad/issues/1656
@@ -555,12 +567,12 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     # for the test below depending on it
     with assert_raises(RuntimeError):
         # but we cannot replace in non-interactive mode
-        ds.create_sibling(url, existing='replace', ui=True)
+        ds.create_sibling(url, existing='replace', ui=have_webui())
 
     # We don't have context manager like @with_testsui, so
     @with_testsui(responses=["yes"])
     def interactive_create_sibling():
-        ds.create_sibling(url, existing='replace', ui=True)
+        ds.create_sibling(url, existing='replace', ui=have_webui())
     interactive_create_sibling()
 
     published2 = ds.publish(to=sibname, transfer_data='all')
@@ -572,6 +584,10 @@ def check_replace_and_relative_sshpath(use_ssh, src_path, dst_path):
     ds.save('sub2.dat')
     published3 = ds.publish(to=sibname, transfer_data='none')  # we publish just git
     assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
+
+    if not have_webui():
+        return
+
     # now publish "with" data, which should also trigger the hook!
     # https://github.com/datalad/datalad/issues/1658
     from glob import glob
@@ -694,7 +710,7 @@ def test_target_ssh_inherit():
     # which is now closed but this one is failing ATM, thus leaving as TODO
     # yield _test_target_ssh_inherit, None      # no wanted etc
     # Takes too long so one will do with UI and another one without
-    yield skip_ssh(_test_target_ssh_inherit), 'manual', True, True  # manual -- no load should be annex copied
+    yield skip_ssh(_test_target_ssh_inherit), 'manual', have_webui(), True  # manual -- no load should be annex copied
     yield _test_target_ssh_inherit, 'backup', False, False  # backup -- all data files
 
 
@@ -835,3 +851,17 @@ def test_non_master_branch(src_path, target_path):
         "other-sub")
     eq_(get_branch(Dataset(target_path / "b" / "sub-b").repo),
         DEFAULT_BRANCH)
+
+
+@known_failure_windows  # https://github.com/datalad/datalad/issues/5287
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_preserve_attrs(src, dest):
+    create_tree(src, {"src": {"foo": {"bar": "This is test text."}}})
+    os.utime(opj(src, "src", "foo", "bar"), (1234567890, 1234567890))
+    _RunnerAdapter().put(opj(src, "src"), dest, recursive=True, preserve_attrs=True)
+    s = os.stat(opj(dest, "src", "foo", "bar"))
+    assert s.st_atime == 1234567890
+    assert s.st_mtime == 1234567890
+    with open(opj(dest, "src", "foo", "bar")) as fp:
+        assert fp.read() == "This is test text."

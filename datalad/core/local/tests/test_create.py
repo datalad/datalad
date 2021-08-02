@@ -26,7 +26,6 @@ from datalad.utils import (
 )
 from datalad.cmd import (
     WitlessRunner as Runner,
-    StdOutErrCapture,
 )
 
 from datalad.tests.utils import (
@@ -40,6 +39,7 @@ from datalad.tests.utils import (
     has_symlink_capability,
     OBSCURE_FILENAME,
     ok_,
+    ok_exists,
     swallow_outputs,
     with_tempfile,
     with_tree,
@@ -177,15 +177,16 @@ def test_create(probe, path):
     assert_repo_status(ds.path, annex=True)
 
     # check default backend
-    eq_(ds.config.get("annex.backends"), 'MD5E')
+    (ds.pathobj / "f1").write_text("1")
+    ds.save()
+    eq_(ds.repo.get_file_backend(["f1"]), ['MD5E'])
+
     if not ar.is_managed_branch():
         eq_(ds.config.get("core.sharedrepository"), '2')
-    runner = Runner()
     # check description in `info`
-    cmd = ['git', 'annex', 'info']
-    cmlout = runner.run(cmd, cwd=path, protocol=StdOutErrCapture)['stdout']
+    cmlout = ds.repo.call_annex(['info'])
     assert_in('funny [here]', cmlout)
-    # check datset ID
+    # check dataset ID
     eq_(ds.config.get_value('datalad.dataset', 'id'),
         ds.id)
 
@@ -205,7 +206,8 @@ def test_create_sub(path):
         'submodule.some/what/deeper.datalad-id={}'.format(
             subds.id),
         list(ds.repo.call_git_items_(['config', '--file', '.gitmodules',
-                                      '--list']))
+                                      '--list'],
+                                     read_only=True))
     )
 
     # subdataset is known to superdataset:
@@ -346,7 +348,7 @@ def test_nested_create(path):
     #              on_failure='ignore', result_xfm=None, result_filter=None),
     #    status='error', action='add')
     # only way to make it work is to unannex the content upfront
-    ds.repo._run_annex_command('unannex', annex_options=[op.join(lvl2relpath, 'file')])
+    ds.repo.call_annex(['unannex', op.join(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself, but only on v5
     ds.repo.commit()
     # still nothing without force
@@ -508,3 +510,24 @@ def test_gh2927(path, linkpath):
     ds.create('subds_clean')
     assert_status('ok', ds.create(op.join('subds_clean', 'subds_lvl1_clean'),
                                   result_xfm=None, return_type='list'))
+
+
+@with_tempfile(mkdir=True)
+def check_create_initopts_form(form, path):
+    path = Path(path)
+
+    template_dir = path / "templates"
+    template_dir.mkdir()
+    (template_dir / "foo").write_text("")
+
+    forms = {"list": [f"--template={template_dir}"],
+             "dict": {"template": str(template_dir)}}
+
+    ds = Dataset(path / "ds")
+    ds.create(initopts=forms[form])
+    ok_exists(ds.repo.dot_git / "foo")
+
+
+def test_create_initopts_form():
+    yield check_create_initopts_form, "dict"
+    yield check_create_initopts_form, "list"

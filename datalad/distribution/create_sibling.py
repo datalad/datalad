@@ -12,18 +12,15 @@
 __docformat__ = 'restructuredtext'
 
 from distutils.version import LooseVersion
-from glob import glob
 import logging
 import os
 from os.path import (
     curdir,
-    dirname,
     join as opj,
     normpath,
     relpath,
 )
 
-import datalad
 from datalad import ssh_manager
 
 from datalad.ui import ui
@@ -35,7 +32,6 @@ from datalad.cmd import (
 )
 from datalad.consts import (
     TIMESTAMP_FMT,
-    WEB_HTML_DIR,
     WEB_META_LOG
 )
 from datalad.dochelpers import exc_str
@@ -90,11 +86,15 @@ from datalad.utils import (
     _path_,
     slash_join,
     ensure_list,
-    quote_cmdlinearg,
 )
 from datalad.core.local.diff import diff_dataset
 
+from datalad.utils import on_windows
+
 lgr = logging.getLogger('datalad.distribution.create_sibling')
+# Window's own mkdir command creates intermediate directories by default
+# and does not take flags: https://github.com/datalad/datalad/issues/5211
+mkdir_cmd = "mkdir" if on_windows else "mkdir -p"
 
 
 class _RunnerAdapter(WitlessRunner):
@@ -115,7 +115,7 @@ class _RunnerAdapter(WitlessRunner):
         import shutil
         copy_fn = shutil.copy2 if preserve_attrs else shutil.copy
         if recursive:
-            args = source, destination
+            args = [source, destination]
             kwargs = {"copy_function": copy_fn}
             try:
                 shutil.copytree(*args, **kwargs)
@@ -127,7 +127,7 @@ class _RunnerAdapter(WitlessRunner):
                 cmd = ["cp", "-R"]
                 if preserve_attrs:
                     cmd.append("-p")
-                self(cmd + [quote_cmdlinearg(a) for a in args])
+                self(cmd + args)
         else:
             copy_fn(source, destination)
 
@@ -284,9 +284,8 @@ def _create_dataset_sibling(
                 raise ValueError(
                     "Do not know how to handle existing={}".format(
                         repr(existing)))
-
         if not path_exists:
-            shell("mkdir -p {}".format(sh_quote(remoteds_path)))
+            shell("{} {}".format(mkdir_cmd, sh_quote(remoteds_path)))
 
     delayed_super = _DelayedSuper(ds)
     if inherit and delayed_super.super:
@@ -302,8 +301,6 @@ def _create_dataset_sibling(
             # to install the hook, if super has it on remote
             install_postupdate_hook = CreateSibling._has_active_postupdate(
                 delayed_super, name, shell)
-
-
 
     if group:
         # Either repository existed before or a new directory was created for it,
@@ -433,8 +430,6 @@ class CreateSibling(Interface):
     mechanism is provided to produce a flat list of datasets (see
     --target-dir).
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         # TODO: Figure out, whether (and when) to use `sshurl` as push url
@@ -575,11 +570,28 @@ class CreateSibling(Interface):
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
                  inherit=False,
                  since=None):
+        if ui:
+            # the webui has been moved to the deprecated extension
+            try:
+                from datalad_deprecated.sibling_webui \
+                    import upload_web_interface
+            except Exception as e:
+                # we could just test for ModuleNotFoundError (which should be
+                # all that would happen with PY3.6+, but be a little more robust
+                # and use the pattern from duecredit
+                if type(e).__name__ not in ('ImportError', 'ModuleNotFoundError'):
+                    lgr.error("Failed to import datalad_deprecated.sibling_webui "
+                              "due to %s", str(e))
+                raise RuntimeError(
+                    "The DataLad web UI has been moved to an extension "
+                    "package. Please install the Python package "
+                    "`datalad_deprecated` to be able to deploy it."
+                )
         #
         # nothing without a base dataset
         #
         ds = require_dataset(dataset, check_installed=True,
-                             purpose='creating a sibling')
+                             purpose='create sibling(s)')
         refds_path = ds.path
 
         #
@@ -619,7 +631,7 @@ class CreateSibling(Interface):
                 )
             super_url = CreateSibling._get_remote_url(super_ds, name)
             # for now assuming hierarchical setup
-            # (TODO: to be able to destinguish between the two, probably
+            # (TODO: to be able to distinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
             sshurl = slash_join(super_url, relpath(refds_path, super_ds.path))
 
@@ -633,7 +645,7 @@ class CreateSibling(Interface):
 
         if not name:
             name = sibling_ri.hostname if ssh_sibling else "local"
-            lgr.debug(
+            lgr.info(
                 "No sibling name given. Using %s'%s' as sibling name",
                 "URL hostname " if ssh_sibling else "",
                 name)
@@ -705,6 +717,7 @@ class CreateSibling(Interface):
             if name in checkds_remotes and existing in ('error', 'skip'):
                 yield dict(
                     res,
+                    sibling_name=name,
                     status='error' if existing == 'error' else 'notneeded',
                     message=(
                         "sibling '%s' already configured (specify alternative "
@@ -782,6 +795,7 @@ class CreateSibling(Interface):
                 annex_groupwanted,
                 inherit
             )
+            currentds_ap["sibling_name"] = name
             if not path:
                 # nothing new was created
                 # TODO is 'notneeded' appropriate in this case?
@@ -794,9 +808,10 @@ class CreateSibling(Interface):
 
             # publish web-interface to root dataset on publication server
             if current_ds.path == refds_path and ui:
-                lgr.info("Uploading web interface to %s" % path)
+                from datalad_deprecated.sibling_webui import upload_web_interface
+                lgr.info("Uploading web interface to %s", path)
                 try:
-                    CreateSibling.upload_web_interface(path, shell, shared, ui)
+                    upload_web_interface(path, shell, shared, ui)
                 except CommandError as e:
                     currentds_ap['status'] = 'error'
                     currentds_ap['message'] = (
@@ -814,7 +829,7 @@ class CreateSibling(Interface):
             lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
                 shell("cd {} "
-                      "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                      "&& ( [ -x hooks/post-update ] && hooks/post-update || true )"
                       "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
@@ -947,7 +962,7 @@ class CreateSibling(Interface):
         # location of post-update hook file, logs folder on remote target
         hooks_remote_dir = opj(path, '.git', 'hooks')
         # make sure hooks directory exists (see #1251)
-        ssh('mkdir -p {}'.format(sh_quote(hooks_remote_dir)))
+        ssh('{} {}'.format(mkdir_cmd, sh_quote(hooks_remote_dir)))
         hook_remote_target = opj(hooks_remote_dir, 'post-update')
 
         # create json command for current dataset
@@ -990,53 +1005,3 @@ done
             ssh.put(tempf, hook_remote_target)
         # and make it executable
         ssh('chmod +x {}'.format(sh_quote(hook_remote_target)))
-
-    @staticmethod
-    def upload_web_interface(path, ssh, shared, ui):
-        # path to web interface resources on local
-        webui_local = opj(dirname(datalad.__file__), 'resources', 'website')
-        # local html to dataset
-        html_local = opj(webui_local, "index.html")
-
-        # name and location of web-interface html on target
-        html_targetname = {True: ui, False: "index.html"}[isinstance(ui, str)]
-        html_target = opj(path, html_targetname)
-
-        # upload ui html to target
-        ssh.put(html_local, html_target)
-
-        # upload assets to the dataset
-        webresources_local = opj(webui_local, 'assets')
-        webresources_remote = opj(path, WEB_HTML_DIR)
-        ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
-        ssh.put(webresources_local, webresources_remote, recursive=True)
-
-        # minimize and upload js assets
-        for js_file in glob(opj(webresources_local, 'js', '*.js')):
-            with open(js_file) as asset:
-                try:
-                    from jsmin import jsmin
-                    # jsmin = lambda x: x   # no minimization
-                    minified = jsmin(asset.read())                      # minify asset
-                except ImportError:
-                    lgr.warning(
-                        "Will not minify web interface javascript, no jsmin available")
-                    minified = asset.read()                             # no minify available
-                with make_tempfile(content=minified) as tempf:          # write minified to tempfile
-                    js_name = js_file.split('/')[-1]
-                    ssh.put(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
-
-        # explicitly make web+metadata dir of dataset world-readable, if shared set to 'all'
-        mode = None
-        if shared in (True, 'true', 'all', 'world', 'everybody'):
-            mode = 'a+rX'
-        elif shared == 'group':
-            mode = 'g+rX'
-        elif str(shared).startswith('0'):
-            mode = shared
-
-        if mode:
-            ssh('chmod -R {} {} {}'.format(
-                mode,
-                sh_quote(dirname(webresources_remote)),
-                sh_quote(opj(path, 'index.html'))))

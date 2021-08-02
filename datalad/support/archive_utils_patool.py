@@ -18,13 +18,11 @@ from .exceptions import MissingExternalDependency
 from .path import (
     basename,
     join as opj,
-    exists,
 )
 
 from datalad.utils import (
     ensure_bytes,
     chpwd,
-    rmdir,
 )
 
 import logging
@@ -37,7 +35,7 @@ import patoolib.util
 # Seems have managed with swallow_outputs
 #
 # def _patool_log(level, msg):
-#     lgr.log(level, "patool: %s" % msg)
+#     lgr.log(level, "patool: %s", msg)
 #
 # def _patool_log_info(msg, *args, **kwargs):
 #     _patool_log(logging.DEBUG, msg)
@@ -87,7 +85,7 @@ def _patool_run(cmd, verbosity=0, **kwargs):
     except CommandError as e:
         return e.code
     except Exception as e:
-        lgr.error("While invoking runner caught unexpected exception: %s" % e)
+        lgr.error("While invoking runner caught unexpected exception: %s", e)
         return 100  # unknown beast
 patoolib.util.run = _patool_run
 
@@ -165,9 +163,9 @@ def decompress_file(archive, dir_):
                                   outdir=outdir,
                                   verbosity=100)
         if cmo.out:
-            lgr.debug("patool gave stdout:\n%s" % cmo.out)
+            lgr.debug("patool gave stdout:\n%s", cmo.out)
         if cmo.err:
-            lgr.debug("patool gave stderr:\n%s" % cmo.err)
+            lgr.debug("patool gave stderr:\n%s", cmo.err)
 
     # Note: (ben) Experienced issue, where extracted tarball
     # lacked execution bit of directories, leading to not being
@@ -210,6 +208,6 @@ def compress_files(files, archive, path=None, overwrite=True):
                                      [unixify_path(f) for f in files],
                                      verbosity=100)
         if cmo.out:
-            lgr.debug("patool gave stdout:\n%s" % cmo.out)
+            lgr.debug("patool gave stdout:\n%s", cmo.out)
         if cmo.err:
-            lgr.debug("patool gave stderr:\n%s" % cmo.err)
+            lgr.debug("patool gave stderr:\n%s", cmo.err)

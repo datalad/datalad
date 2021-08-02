@@ -16,28 +16,37 @@ from collections import OrderedDict
 from os.path import join as opj
 
 from datalad import ssh_manager
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
+from datalad.interface.annotate_paths import (
+    AnnotatePaths,
+    annotated2content_by_ds
+)
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
 from datalad.interface.utils import eval_results
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
     recursion_limit, git_opts, annex_opts, jobs_opt
 from datalad.interface.common_opts import missing_sibling_opt
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureChoice,
+    EnsureNone,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
 )
-from datalad.support.network import URL, RI, SSHRI, is_ssh
+from datalad.support.network import (
+    is_ssh,
+    RI,
+    URL,
+)
 
 from datalad.utils import ensure_list
-from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import Dataset
@@ -396,7 +405,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
         # publishing of `remote` might depend on publishing other
         # remote(s) first:
         for d in publish_depends:
-            lgr.info("Publishing to configured dependency: '%s'" % d)
+            lgr.info("Publishing to configured dependency: '%s'", d)
             # call this again to take care of the dependency first,
             # but keep the paths the same, as the goal is to publish those
             # to the primary remote, and not anything elase to a dependency
@@ -585,13 +594,12 @@ class Publish(Interface):
       upload).
 
     .. note::
-      The `push` command (new in 0.13.0) provides an alternative interface.
-      Critical differences are that `push` transfers annexed data by default
-      and does not handle sibling creation (i.e. it does not have a `--missing`
-      option).
+      This command is deprecated. It will be removed from DataLad eventually,
+      but no earlier than the 0.15 release. The `push` command (new in 0.13.0)
+      provides an alternative interface. Critical differences are that `push`
+      transfers annexed data by default and does not handle sibling creation
+      (i.e. it does not have a `--missing` option).
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
     # TODO: Figure out, how to tell about tracking branch/upstream
     #      (and the respective remote)
     #      - it is used, when no destination is given
@@ -674,6 +682,10 @@ class Publish(Interface):
             jobs=None
     ):
 
+        import warnings
+        warnings.warn("`publish` is deprecated. Use `datalad push` instead.",
+                      DeprecationWarning)
+
         # if ever we get a mode, for "with-data" we would need this
         #if dataset and not path:
         #    # act on the whole dataset if nothing else was specified
@@ -682,7 +694,7 @@ class Publish(Interface):
         if not (isinstance(dataset, Dataset) or (dataset is None and path)):
             # try to find a dataset in PWD
             dataset = require_dataset(
-                dataset, check_installed=True, purpose='publishing')
+                dataset, check_installed=True, purpose='publish')
 
         if (since and since != '^') and not dataset:
             raise InsufficientArgumentsError(

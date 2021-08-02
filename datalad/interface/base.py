@@ -26,6 +26,7 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
+import warnings
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -38,8 +39,6 @@ from datalad.support.constraints import (
 )
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
-from datalad.plugin import _get_plugins
-from datalad.plugin import _load_plugin
 
 
 default_logchannels = {
@@ -72,16 +71,13 @@ def get_cmdline_command_name(intfspec):
 def get_interface_groups(include_plugins=False):
     """Return a list of command groups.
 
-    Parameters
-    ----------
-    include_plugins : bool, optional
-        Whether to include a group named 'plugins' that has a list of
-        discovered plugin commands.
-
     Returns
     -------
     A list of tuples with the form (GROUP_NAME, GROUP_DESCRIPTION, COMMANDS).
     """
+    if include_plugins:
+        warnings.warn("Plugins are no longer supported.", DeprecationWarning)
+
     from .. import interface as _interfaces
 
     grps = []
@@ -93,13 +89,6 @@ def get_interface_groups(include_plugins=False):
         grp_name = _item[7:]
         grp = getattr(_interfaces, _item)
         grps.append((grp_name,) + grp)
-    # TODO(yoh): see if we could retain "generator" for plugins
-    # ATM we need to make it explicit so we could check the command(s) below
-    # It could at least follow the same destiny as extensions so we would
-    # just do more iterative "load ups"
-
-    if include_plugins:
-        grps.append(('plugins', 'Plugins', list(_get_plugins())))
     return grps
 
 
@@ -145,25 +134,21 @@ def load_interface(spec):
     ----------
     spec : tuple
         For a standard interface, the first item is the datalad source module
-        and the second object name for the interface. For a plugin, the second
-        item should be a dictionary that maps 'file' to the path the of module.
+        and the second object name for the interface.
 
     Returns
     -------
     The interface class or, if importing the module fails, None.
     """
-    if isinstance(spec[1], dict):
-        intf = _load_plugin(spec[1]['file'], fail=False)
+    lgr.log(5, "Importing module %s ", spec[0])
+    try:
+        mod = import_module(spec[0], package='datalad')
+    except Exception as e:
+        lgr.error("Internal error, cannot import interface '%s': %s",
+                  spec[0], exc_str(e))
+        intf = None
     else:
-        lgr.log(5, "Importing module %s " % spec[0])
-        try:
-            mod = import_module(spec[0], package='datalad')
-        except Exception as e:
-            lgr.error("Internal error, cannot import interface '%s': %s",
-                      spec[0], exc_str(e))
-            intf = None
-        else:
-            intf = getattr(mod, spec[1])
+        intf = getattr(mod, spec[1])
     return intf
 
 
@@ -354,12 +339,12 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     # get the signature
     ndefaults = 0
     args, varargs, varkw, defaults = getargspec(func)
+    defaults = defaults or tuple()
     if add_args:
         add_argnames = sorted(add_args.keys())
         args.extend(add_argnames)
         defaults = defaults + tuple(add_args[k] for k in add_argnames)
-    if defaults is not None:
-        ndefaults = len(defaults)
+    ndefaults = len(defaults)
     # start documentation with what the callable brings with it
     doc = prefix if prefix else u''
     if len(args) > 1:
@@ -516,8 +501,8 @@ def build_doc(cls, **kwargs):
     spec = getattr(cls, '_params_', dict())
 
 
-    # update class attributes that may override defaults 
-    if hasattr(cls, '_no_eval_results'):
+    # update class attributes that may override defaults
+    if not _has_eval_results_call(cls):
         add_args = None
     else:
         add_args = {k: getattr(cls, k, v) for k, v in eval_defaults.items()}
@@ -649,10 +634,6 @@ class Interface(object):
     # mode would fall into the debugger
     _interrupted_exit_code = 1
 
-    _OLDSTYLE_COMMANDS = (
-        'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-        'CreateTestDataset', 'Export', 'Ls', 'SSHRun', 'Test')
-
     @classmethod
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
@@ -662,33 +643,49 @@ class Interface(object):
         # get the signature
         ndefaults = 0
         args, varargs, varkw, defaults = getargspec(cls.__call__)
-        if not defaults is None:
+        if defaults is not None:
             ndefaults = len(defaults)
+        default_offset = ndefaults - len(args)
+        prefix_chars = parser.prefix_chars
         for i, arg in enumerate(args):
             if not is_api_arg(arg):
                 continue
             param = cls._params_[arg]
-            defaults_idx = ndefaults - len(args) + i
+            defaults_idx = default_offset + i
             cmd_args = param.cmd_args
             if cmd_args == tuple():
                 # explicitly provided an empty sequence of argument names
                 # this shall not appear in the parser
                 continue
-            elif cmd_args is None:
-                cmd_args = []
-            if not len(cmd_args):
-                if defaults_idx >= 0:
-                    # dealing with a kwarg
-                    template = '--%s'
-                else:
-                    # positional arg
-                    template = '%s'
-                # use parameter name as default argument name
-                parser_args = (template % arg.replace('_', '-'),)
-            else:
-                parser_args = [c.replace('_', '-') for c in cmd_args]
+
             parser_kwargs = param.cmd_kwargs
-            if defaults_idx >= 0:
+            has_default = defaults_idx >= 0
+            if cmd_args:
+                if cmd_args[0][0] in prefix_chars:
+                    # TODO: All the Parameter(args=...) values in this code
+                    # base use hyphens, so there is no point in the below
+                    # conversion. If it looks like no extensions rely on this
+                    # behavior either, this could be dropped.
+                    parser_args = [c.replace('_', '-') for c in cmd_args]
+                else:
+                    # Argparse will not convert dashes to underscores for
+                    # arguments that don't start with a prefix character, so
+                    # the above substitution must be avoided so that
+                    # call_from_parser() can find the corresponding parameter.
+                    parser_args = cmd_args
+            elif has_default:
+                # Construct the option from the Python parameter name.
+                parser_args = ("--{}".format(arg.replace("_", "-")),)
+            else:
+                # If args= wasn't given and its a positional argument in the
+                # function, add a positional argument to argparse. If `dest` is
+                # specified, we need to remove it from the keyword arguments
+                # because add_argument() expects it as the first argument. Note
+                # that `arg` shouldn't have a dash here, but `metavar` can be
+                # used if a dash is preferred for the command-line help.
+                parser_args = (parser_kwargs.pop("dest", arg),)
+
+            if has_default:
                 parser_kwargs['default'] = defaults[defaults_idx]
             help = alter_interface_docs_for_cmdline(param._doc)
             if help and help.rstrip()[-1] != '.':
@@ -757,7 +754,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ not in Interface._OLDSTYLE_COMMANDS:
+        if _has_eval_results_call(cls):
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -765,8 +762,8 @@ class Interface(object):
             # allow commands to override the default, unless something other than
             # default is requested
             kwargs['result_renderer'] = \
-                args.common_output_format if args.common_output_format != 'default' \
-                else getattr(cls, 'result_renderer', args.common_output_format)
+                args.common_output_format if args.common_output_format != 'tailored' \
+                else getattr(cls, 'result_renderer', 'default')
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
                 kwargs['result_renderer'] = DefaultOutputRenderer(args.common_output_format)
@@ -830,7 +827,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     """Generate a kwargs dict from a call signature and *args, **kwargs
 
     Basically resolving the argnames for all positional arguments, and
-    resolvin the defaults for all kwargs that are not given in a kwargs
+    resolving the defaults for all kwargs that are not given in a kwargs
     dict
     """
     from datalad.utils import getargspec
@@ -853,3 +850,9 @@ def get_allargs_as_kwargs(call, args, kwargs):
     # from their signature...
     #assert (nargs == len(kwargs_))
     return kwargs_
+
+
+def _has_eval_results_call(cls):
+    """Return True if cls has a __call__ decorated with @eval_results
+    """
+    return getattr(getattr(cls, '__call__', None), '_eval_results', False)

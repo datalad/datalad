@@ -18,10 +18,12 @@ from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import (
     assert_dict_equal,
+    assert_false,
     assert_not_in,
     assert_repo_status,
     assert_result_count,
     assert_status,
+    assert_true,
     eq_,
     known_failure_githubci_win,
     skip_if_on_windows,
@@ -211,14 +213,17 @@ def test_aggregate_with_unavailable_objects_from_subds(path, target):
     clone = Dataset(opj(super.path, "base"))
     assert_repo_status(clone.path)
     objpath = opj('.datalad', 'metadata', 'objects')
-    objs = [o for o in sorted(clone.repo.get_annexed_files(with_content_only=False)) if o.startswith(objpath)]
+    objs = clone.repo.get_content_annexinfo(paths=[objpath], init=None,
+                                            eval_availability=True)
     eq_(len(objs), 6)
-    eq_(all(clone.repo.file_has_content(objs)), False)
+    assert_false(any(st["has_content"] for st in objs.values()))
 
     # now aggregate should get those metadata objects
     super.aggregate_metadata(recursive=True, update_mode='all',
                              force_extraction=False)
-    eq_(all(clone.repo.file_has_content(objs)), True)
+    objs_after = clone.repo.get_content_annexinfo(
+        paths=objs, init=None, eval_availability=True)
+    assert_true(all(st["has_content"] for st in objs_after.values()))
 
 
 # this is for gh-1987
@@ -335,7 +340,7 @@ def test_update_strategy(path):
         eq_(len(_get_contained_objs(ds)), 0)
     # aggregate the entire tree, but by default only updates
     # the top-level dataset with all objects, none of the leaf
-    # or intermediate datasets get's touched
+    # or intermediate datasets gets touched
     base.aggregate_metadata(recursive=True)
     eq_(len(_get_contained_objs(base)), 6)
     eq_(len(_get_referenced_objs(base)), 6)

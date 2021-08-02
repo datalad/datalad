@@ -10,10 +10,18 @@
 
 """
 
+import argparse
 import unittest.mock as mock
-from datalad.tests.utils import *
-from datalad.utils import (
+from datalad.tests.utils import (
+    assert_in,
+    assert_not_in,
+    eq_,
+    ok_,
+    patch_config,
     swallow_outputs,
+    with_tempfile,
+)
+from datalad.utils import (
     updated,
 )
 from datalad.cmd import (
@@ -26,6 +34,7 @@ from ..base import (
     nadict,
     nagen,
     NA_STRING,
+    update_docstring_with_parameters,
 )
 from argparse import Namespace
 
@@ -34,6 +43,10 @@ def _args(**kwargs):
     return Namespace(
         # ATM duplicates definitions done by cmdline.main and
         # required by code logic to be defined. (should they?)
+        #
+        # TODO: The common options are now added by
+        # cmdline.helpers.parser_add_common_options(), which can be reused by
+        # tests.
         **updated(
             dict(
                 common_output_format="default"
@@ -64,9 +77,8 @@ def test_call_from_parser_old_style():
         def __call__(arg=None):
             eq_(arg, "nothing")
             return "magical"
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', ('DummyOne',)):
-        val = DummyOne.call_from_parser(_args(arg="nothing"))
-        eq_(val, "magical")
+    val = DummyOne.call_from_parser(_args(arg="nothing"))
+    eq_(val, "magical")
 
 
 def test_call_from_parser_old_style_generator():
@@ -77,9 +89,8 @@ def test_call_from_parser_old_style_generator():
             eq_(arg, "nothing")
             yield "nothing is"
             yield "magical"
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', ('DummyOne',)):
-        val = DummyOne.call_from_parser(_args(arg="nothing"))
-        eq_(val, ["nothing is", "magical"])
+    val = DummyOne.call_from_parser(_args(arg="nothing"))
+    eq_(val, ["nothing is", "magical"])
 
 
 def test_call_from_parser_default_args():
@@ -92,15 +103,17 @@ def test_call_from_parser_default_args():
             eq_(kwargs['common_report_type'], None)
             # and even those we didn't pass
             eq_(kwargs['common_output_format'], "default")
-            eq_(kwargs['return_type'], "generator")
+            # with dissolution of _OLD_STYLE_COMMANDS yoh yet to find
+            # a real interface which had return_type (defined in
+            # eval_defaults and eval_params) but no @eval_results
+            # eq_(kwargs['return_type'], "generator")
             eq_(arg, "nothing")
             yield "nothing is"
             yield "magical"
 
     # just to be sure no evil spirits chase away our Dummy
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', tuple()):
-        val = DummyOne.call_from_parser(_new_args(arg="nothing"))
-        eq_(val, ["nothing is", "magical"])
+    val = DummyOne.call_from_parser(_new_args(arg="nothing"))
+    eq_(val, ["nothing is", "magical"])
 
 
 def test_call_from_parser_result_filter():
@@ -109,14 +122,17 @@ def test_call_from_parser_result_filter():
         def __call__(**kwargs):
             yield kwargs
 
-    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', tuple()):
-        # call_from_parser doesn't add result_filter to the keyword arguments
-        # unless a CLI option sets it to a non-None value.
-        assert_not_in("result_filter",
-                      DummyOne.call_from_parser(_new_args())[0])
-        assert_in("result_filter",
-                  DummyOne.call_from_parser(
-                      _new_args(common_report_type="dataset"))[0])
+    # call_from_parser doesn't add result_filter to the keyword arguments
+    assert_not_in("result_filter",
+                  DummyOne.call_from_parser(_new_args())[0])
+    # with dissolution of _OLD_STYLE_COMMANDS and just relying on having
+    # @eval_results, no result_filter is added, since those commands are
+    # not guaranteed to return/yield any record suitable for filtering.
+    # The effect is the same -- those "common" options are not really applicable
+    # to Interface's which do not return/yield expected records
+    assert_not_in("result_filter",
+              DummyOne.call_from_parser(
+                  _new_args(common_report_type="dataset"))[0])
 
 
 def test_get_result_filter_arg_vs_config():
@@ -171,16 +187,63 @@ def test_status_custom_summary_no_repeats(path):
     # command for this test, but it's at least a necessary condition.
     ok_(hasattr(Status, "custom_result_summary_renderer"))
 
-    # Note: This test was added on a branch without a60bf7274a (BF: Don't be
-    # silent in default renderer when everything is clean, 2020-01-30), but
-    # once merged into a branch with that commit, the block below and --annex
-    # could be dropped.
     ds = Dataset(path).create()
-    (ds.pathobj / "foo").write_text("foo content")
-    ds.save()
-
     out = WitlessRunner(cwd=path).run(
-        ["datalad", "--output-format=tailored", "status", "--annex"],
+        ["datalad", "--output-format=tailored", "status"],
         protocol=StdOutCapture)
     out_lines = out['stdout'].splitlines()
+    ok_(out_lines)
     eq_(len(out_lines), len(set(out_lines)))
+
+    with swallow_outputs() as cmo:
+        ds.status(return_type="list", result_renderer="tailored")
+        eq_(out_lines, cmo.out.splitlines())
+
+
+def test_update_docstring_with_parameters_no_kwds():
+    from datalad.support.param import Parameter
+
+    def fn(pos0):
+        "fn doc"
+
+    assert_not_in("3", fn.__doc__)
+    # Call doesn't crash when there are no keyword arguments.
+    update_docstring_with_parameters(
+        fn,
+        dict(pos0=Parameter(doc="pos0 param doc"),
+             pos1=Parameter(doc="pos1 param doc")),
+        add_args={"pos1": 3})
+    assert_in("3", fn.__doc__)
+
+
+def check_call_from_parser_pos_arg_underscore(how):
+    from datalad.cmdline.helpers import parser_add_common_options
+    from datalad.support.param import Parameter
+
+    kwds = {"doc": "pos_arg doc"}
+    if how == "dest":
+        kwds["dest"] = "pos_arg"
+    elif how == "args":
+        kwds["args"] = ("pos_arg",)
+    elif how != "bare":
+        raise AssertionError("Unrecognized how: {}".format(how))
+
+    class Cmd(Interface):
+
+        _params_ = dict(
+            pos_arg=Parameter(**kwds))
+
+        def __call__(pos_arg, **kwargs):
+            return pos_arg
+
+    parser = argparse.ArgumentParser()
+    parser_add_common_options(parser)
+    Cmd.setup_parser(parser)
+    args = parser.parse_args(["val"])
+    eq_(Cmd.call_from_parser(args),
+        "val")
+
+
+def test_call_from_parser_pos_arg_underscore():
+    for how in "bare", "dest", "args":
+        yield check_call_from_parser_pos_arg_underscore, how

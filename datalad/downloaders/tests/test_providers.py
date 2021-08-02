@@ -84,7 +84,7 @@ def test_Providers_default_ones():
 
 
 def test_Providers_process_credential():
-    # If uknown type -- raises ValueError
+    # If unknown type -- raises ValueError
     assert_raises(ValueError, Providers._process_credential, 'cred', {'type': '_unknown_'})
 
 
@@ -243,7 +243,7 @@ def test_providers_badre(path):
     """Test that a config with a bad regular expression doesn't crash
 
     Ensure that when a provider config has a bad url_re, there is no
-	exception thrown and a valid warning is provided.
+    exception thrown and a valid warning is provided.
     """
 
     providers = Providers.from_config_files(

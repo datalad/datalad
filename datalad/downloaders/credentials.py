@@ -31,6 +31,9 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..support.network import iso8601_to_epoch
 
+from datalad import cfg as dlcfg
+from datalad.config import anything2bool
+
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.credentials')
 
@@ -45,6 +48,7 @@ class Credential(object):
     _FIELDS = None
     _KNOWN_ATTRS = {
         'hidden',    # UI should not display the value
+        'repeat',    # UI should repeat entry or not. Set to False to override default logic
         'optional',  # Not mandatory thus not requested if not set
     }
 
@@ -81,19 +85,22 @@ class Credential(object):
     def _is_field_optional(self, f):
         return self._FIELDS[f].get('optional', False)
 
-    def _is_field_hidden(self, f):
-        return self._FIELDS[f].get('hidden', False)
-
     @property
     def is_known(self):
         """Return True if values for all fields of the credential are known"""
         try:
             return all(
-                self._is_field_optional(f) or self._keyring.get(self.name, f) is not None
+                self._is_field_optional(f) or self._get_field_value(f) is not None
                 for f in self._FIELDS)
         except Exception as exc:
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
+
+    def _get_field_value(self, field):
+        return dlcfg.get('datalad.credential.{name}.{field}'.format(
+            name=self.name,
+            field=field.replace('_', '-')
+        )) or self._keyring.get(self.name, field)
 
     def _ask_field_value(self, f, instructions=None):
         msg = instructions if instructions else \
@@ -101,10 +108,17 @@ class Credential(object):
                   (" %s provides information on how to gain access"
                    % self.url if self.url else ''))
 
+        # provide custom options only if set for the field
+        f_props = self._FIELDS[f]
+        kwargs = {}
+        for p in ('hidden', 'repeat'):
+            if p in f_props:
+                kwargs[p] = f_props[p]
         return ui.question(
             f,
             title=msg,
-            hidden=self._is_field_hidden(f))
+            **kwargs
+        )
 
     def _ask_and_set(self, f, instructions=None):
         v = self._ask_field_value(f, instructions=instructions)
@@ -143,10 +157,15 @@ class Credential(object):
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
-        name = self.name
         fields = {}
+        # check if we shall ask for credentials, even if some are on record
+        # already (but maybe they were found to need updating)
+        force_reentry = dlcfg.obtain(
+            'datalad.credentials.force-ask',
+            valtype=anything2bool)
         for f in self._FIELDS:
-            v = self._keyring.get(name, f)
+            # don't query for value if we need to get a new one
+            v = None if force_reentry else self._get_field_value(f)
             if not self._is_field_optional(f):
                 while v is None:  # was not known
                     v = self._ask_and_set(f)
@@ -169,7 +188,7 @@ class Credential(object):
             raise ValueError("Unknown field %s. Known are: %s"
                              % (f, self._FIELDS.keys()))
         try:
-            return self._keyring.get(self.name, f)
+            return self._get_field_value(f)
         except:  # MIH: what could even happen? _keyring not a dict?
             return default
 
@@ -191,7 +210,7 @@ class UserPassword(Credential):
 class Token(Credential):
     """Simple type of a credential which provides a single token"""
 
-    _FIELDS = OrderedDict([('token', {'hidden': True})])
+    _FIELDS = OrderedDict([('token', {'hidden': True, 'repeat': False})])
 
     is_expired = False  # no expiration provisioned
 
@@ -199,8 +218,8 @@ class Token(Credential):
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
 
-    _FIELDS = OrderedDict([('key_id', {}),
-                           ('secret_id', {'hidden': True}),
+    _FIELDS = OrderedDict([('key_id', {'repeat': False}),
+                           ('secret_id', {'hidden': True, 'repeat': False}),
                            ('session', {'optional': True}),
                            ('expiration', {'optional': True}),
                            ])

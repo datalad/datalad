@@ -51,7 +51,7 @@ definedOrExit "${ARCHIVE_DOWNLOAD_URL}" "Unable to get archive_download_url" "${
 
 call_curl -i "${ARCHIVE_DOWNLOAD_URL}" >| "${JOBS_DOWNLOAD}"
 echo "Getting download url from ${ARCHIVE_DOWNLOAD_URL}"
-DOWNLOAD_URL=$(grep -oP 'Location: \K.+' < "${JOBS_DOWNLOAD}")
+DOWNLOAD_URL=$(grep -ioP 'Location: \K.+' < "${JOBS_DOWNLOAD}")
 definedOrExit "${DOWNLOAD_URL}" "Unable to get Location header with download url" "${JOBS_DOWNLOAD}"
 DOWNLOAD_URL=${DOWNLOAD_URL%$'\r'}
 rm -f "${JOBS_DOWNLOAD}"

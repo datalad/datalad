@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Procedure to configure Git annex to add text files directly to Git"""
 
 import sys

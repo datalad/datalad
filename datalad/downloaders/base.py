@@ -114,10 +114,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
         self._lock = InterProcessLock(
-            op.join(
-                cfg.obtain('datalad.locations.cache'),
-                'locks',
-                'downloader-auth.lck'))
+            op.join(cfg.obtain('datalad.locations.locks'),
+                    'downloader-auth.lck')
+        )
 
     def access(self, method, url, allow_old_session=True, **kwargs):
         """Generic decorator to manage access to the URL via some method
@@ -165,16 +164,16 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
-                lgr.log(5, "Calling out into %s for %s" % (method, url))
+                lgr.log(5, "Calling out into %s for %s", method, url)
                 result = method(url, **kwargs)
                 # assume success if no puke etc
                 break
             except AccessDeniedError as e:
                 if isinstance(e, AnonymousAccessDeniedError):
-                    access_denied = "Anonymous"
+                    access_denied = "Anonymous access"
                 else:
-                    access_denied = "Authenticated"
-                lgr.debug("%s access was denied: %s", access_denied, exc_str(e))
+                    access_denied = "Access"
+                lgr.debug("%s was denied: %s", access_denied, exc_str(e))
                 supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
@@ -224,7 +223,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     # give up
                     raise
                 lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
-                # TODO: may be fail ealier than after 20 attempts in such a case?
+                # TODO: may be fail earlier than after 20 attempts in such a case?
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
@@ -305,8 +304,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
         DownloadError
           If no known credentials type or user refuses to update
         """
-        title = "{msg} access to {url} has failed.".format(
-            msg=denied_msg, url=url)
+        title = f"{denied_msg} to {url} has failed."
 
         if new_provider:
             # No credential was known, we need to create an
@@ -452,7 +450,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # eventually we might want to continue the download
                 lgr.warning(
                     "Temporary file %s from the previous download was found. "
-                    "It will be overriden" % temp_filepath)
+                    "It will be overridden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
             with open(temp_filepath, 'wb') as fp:
@@ -475,7 +473,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 os.utime(temp_filepath, (time.time(), status.mtime))
 
             # place successfully downloaded over the filepath
-            os.rename(temp_filepath, filepath)
+            os.replace(temp_filepath, filepath)
 
             if stats:
                 stats.downloaded += 1

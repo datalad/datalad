@@ -19,7 +19,6 @@ from datalad.interface.common_opts import (
     recursion_limit,
     location_description,
     jobs_opt,
-    nosave_opt,
     reckless_opt,
 )
 from datalad.interface.results import (
@@ -158,7 +157,6 @@ class Install(Interface):
         description=location_description,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
-        save=nosave_opt,
         reckless=reckless_opt,
         jobs=jobs_opt,
     )
@@ -174,7 +172,6 @@ class Install(Interface):
             description=None,
             recursive=False,
             recursion_limit=None,
-            save=True,
             reckless=None,
             jobs="auto"):
 
@@ -208,7 +205,7 @@ class Install(Interface):
         ds = None
         if dataset is not None:
             ds = require_dataset(dataset, check_installed=True,
-                                 purpose='installation')
+                                 purpose='install')
             common_kwargs['dataset'] = dataset
         # pre-compute for results below
         refds_path = Interface.get_refds_path(ds)
@@ -238,7 +235,6 @@ class Install(Interface):
                 for r in Install.__call__(
                         source=s,
                         description=description,
-                        save=save,
                         # we need to disable error handling in order to have it done at
                         # the very top, otherwise we are not able to order a global
                         # "ignore-and-keep-going"
@@ -249,7 +245,7 @@ class Install(Interface):
                         **common_kwargs):
                     # no post-processing of the installed content on disk
                     # should be necessary here, all done by code further
-                    # down that deals with an install from an actuall `source`
+                    # down that deals with an install from an actual `source`
                     # any necessary fixes should go there too!
                     r['refds'] = refds_path
                     yield r
@@ -292,7 +288,7 @@ class Install(Interface):
             # or we fucked up one of our internal calls
             raise ValueError(
                 "install needs a single PATH when source is provided.  "
-                "Was given mutliple PATHs: %s" % str(path))
+                "Was given multiple PATHs: %s" % str(path))
 
         # parameter constraints:
         if not source:
@@ -394,7 +390,7 @@ class Install(Interface):
                     **common_kwargs):
                 r['refds'] = refds_path
                 yield r
-        # at this point no futher post-processing should be necessary,
+        # at this point no further post-processing should be necessary,
         # `clone` and `get` must have done that (incl. parent handling)
         # if not, bugs should be fixed in those commands
         return

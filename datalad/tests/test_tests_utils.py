@@ -43,8 +43,8 @@ from datalad.tests.utils import (
     eq_,
     get_most_obscure_supported_name,
     ignore_nose_capturing_stdout,
-    known_failure_appveyor,
     known_failure_githubci_win,
+    known_failure_windows,
     local_testrepo_flavors,
     nok_startswith,
     OBSCURE_FILENAMES,
@@ -438,8 +438,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
 
 
 # just look at the path specs...
-@known_failure_appveyor
-@known_failure_githubci_win
+@known_failure_windows
 def test_serve_path_via_http():
     for test_fpath in ['test1.txt',
                        'test_dir/test2.txt',

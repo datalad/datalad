@@ -11,7 +11,6 @@
 
 import logging
 import re
-import requests
 from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
@@ -32,7 +31,6 @@ from datalad.cmd import (
     CommandError,
     GitWitlessRunner,
     StdOutCapture,
-    StdOutErrCapture,
 )
 from datalad.distributed.ora_remote import (
     LocalIO,
@@ -47,6 +45,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
+from datalad.support.strings import get_replacement_dict
 from datalad.support.network import (
     get_local_file_url,
     download_url,
@@ -62,6 +61,7 @@ from datalad.dochelpers import (
 )
 from datalad.utils import (
     ensure_bool,
+    ensure_list,
     knows_annex,
     make_tempfile,
     Path,
@@ -111,10 +111,36 @@ class Clone(Interface):
     URL for common cases (such as appending '.git' to the URL in case the
     accessing the base URL failed).
 
+    In case the clone is registered as a subdataset, the original URL passed to
+    `clone` is recorded in `.gitmodules` of the parent dataset in addition
+    to the resolved URL used internally for git-clone. This allows to preserve
+    datalad specific URLs like ria+ssh://... for subsequent calls to `get` if
+    the subdataset was locally removed later on.
+
     || PYTHON >>By default, the command returns a single Dataset instance for
     an installed dataset, regardless of whether it was newly installed ('ok'
     result), or found already installed from the specified source ('notneeded'
     result).<< PYTHON ||
+
+    URL mapping configuration
+
+    'clone' supports the transformation of URLs via (multi-part) substitution
+    specifications. A substitution specification is defined as a configuration
+    setting 'datalad.clone.url-substition.<seriesID>' with a string containing
+    a match and substitution expression, each following Python's regular
+    expression syntax. Both expressions are concatenated to a single string
+    with an arbitrary delimiter character. The delimiter is defined by
+    prefixing the string with the delimiter. Prefix and delimiter are stripped
+    from the expressions (Example: ",^http://(.*)$,https://\\1").  This setting
+    can be defined multiple times, using the same '<seriesID>'.  Substitutions
+    in a series will be applied incrementally, in order of their definition.
+    The first substitution in such a series must match, otherwise no further
+    substitutions in a series will be considered. However, following the first
+    match all further substitutions in a series are processed, regardless
+    whether intermediate expressions match or not. Substitution series themselves
+    have no particular order, each matching series will result in a candidate
+    clone URL. Consequently, the initial match specification in a series should
+    be as precise as possible to prevent inflation of candidate URLs.
 
     .. seealso::
 
@@ -209,7 +235,7 @@ class Clone(Interface):
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
         ds = require_dataset(
-            dataset, check_installed=True, purpose='cloning') \
+            dataset, check_installed=True, purpose='clone') \
             if dataset is not None else dataset
         refds_path = ds.path if ds else None
 
@@ -294,19 +320,123 @@ class Clone(Interface):
             cfg=None if ds is None else ds.config,
         )
 
-        # TODO handle any 'version' property handling and verification using a dedicated
-        # public helper
+        # TODO handle any 'version' property handling and verification using a
+        # dedicated public helper
 
         if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
+            actually_saved_subds = False
             for r in ds.save(
                     path,
+                    # Note, that here we know we don't save anything but a new
+                    # subdataset. Hence, don't go with default commit message,
+                    # but be more specific.
+                    message="[DATALAD] Added subdataset",
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
                     on_failure='ignore'):
+                actually_saved_subds = actually_saved_subds or (
+                        r['action'] == 'save' and
+                        r['type'] == 'dataset' and
+                        r['refds'] == ds.path and
+                        r['status'] == 'ok')
                 yield r
+
+            # Modify .gitmodules to contain originally given url. This is
+            # particularly relevant for postclone routines on a later `get`
+            # for that subdataset. See gh-5256.
+            if actually_saved_subds:
+                # New subdataset actually saved. Amend the modification
+                # of .gitmodules. Note, that we didn't allow to deviate
+                # from git default behavior WRT a submodule's name vs
+                # its path when we made this a new subdataset.
+                subds_name = path.relative_to(ds.pathobj)
+                ds.repo.call_git(
+                    ['config',
+                     '--file',
+                     '.gitmodules',
+                     '--replace-all',
+                     'submodule.{}.{}'.format(subds_name,
+                                              "datalad-url"),
+                     source]
+                )
+                yield from ds.save('.gitmodules',
+                                   amend=True, to_git=True)
+            else:
+                # We didn't really commit. Just call `subdatasets`
+                # in that case to have the modification included in the
+                # post-clone state (whatever that may be).
+                ds.subdatasets(path, set_property=[("datalad-url", source)])
+
+
+def _get_url_mappings(cfg):
+    cfg_prefix = 'datalad.clone.url-substitute.'
+    # figure out which keys we should be looking for
+    # in the active config
+    subst_keys = set(k for k in cfg.keys() if k.startswith(cfg_prefix))
+    # and in the common config specs
+    from datalad.interface.common_cfg import definitions
+    subst_keys.update(k for k in definitions if k.startswith(cfg_prefix))
+    # TODO a potential sorting of substitution series could be implemented
+    # here
+    return [
+        # decode the rule specifications
+        get_replacement_dict(
+            # one or more could come out
+            ensure_list(
+                cfg.get(
+                    k,
+                    # make sure to pull the default from the common config
+                    default=cfg.obtain(k),
+                    # we specifically support declaration of multiple
+                    # settings to build replacement chains
+                    get_all=True)))
+        for k in subst_keys
+    ]
+
+
+def _map_urls(cfg, urls):
+    mapping_specs = _get_url_mappings(cfg)
+    if not mapping_specs:
+        return urls
+
+    mapped = []
+    # we process the candidate in order to maintain any prioritization
+    # encoded in it (e.g. _get_flexible_source_candidates_for_submodule)
+    # if we have a matching mapping replace the URL in its position
+    for u in urls:
+        # we only permit a single match
+        # TODO we likely want to RF this to pick the longest match
+        mapping_applied = False
+        # try one mapping set at a time
+        for mapping_spec in mapping_specs:
+            # process all substitution patterns in the specification
+            # always operate on strings (could be a Path instance too)
+            mu = str(u)
+            matched = False
+            for match_ex, subst_ex in mapping_spec.items():
+                if not matched:
+                    matched = re.match(match_ex, mu) is not None
+                if not matched:
+                    break
+                # try to map, would return unchanged, if there is no match
+                mu = re.sub(match_ex, subst_ex, mu)
+            if mu != u:
+                lgr.debug("URL substitution: '%s' -> '%s'", u, mu)
+                mapped.append(mu)
+                # we could consider breaking after the for effective mapping
+                # specification. however, that would mean any generic
+                # definition of a broadly matching substitution would derail
+                # the entroe system. moreover, suddently order would matter
+                # substantially
+                mapping_applied = True
+        if not mapping_applied:
+            # none of the mappings matches, go with the original URL
+            # (really original, not the stringified one)
+            mapped.append(u)
+    return mapped
 
 
 def clone_dataset(
@@ -315,7 +445,8 @@ def clone_dataset(
         reckless=None,
         description=None,
         result_props=None,
-        cfg=None):
+        cfg=None,
+        checkout_gitsha=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -338,6 +469,12 @@ def clone_dataset(
     cfg : ConfigManager, optional
       Configuration for parent dataset. This will be queried instead
       of the global DataLad configuration.
+    checkout_gitsha : str, optional
+      If given, a specific commit, identified by shasum, will be checked out after
+      cloning. A dedicated follow-up fetch will be performed, if the initial clone
+      did not obtain the commit object. Should the checkout of the target commit
+      cause a detached HEAD, the previously active branch will be reset to the
+      target commit.
 
     Yields
     ------
@@ -360,6 +497,11 @@ def clone_dataset(
         reckless = cfg.get('datalad.clone.reckless', None)
 
     dest_path = destds.pathobj
+
+    # check for configured URL mappings, either in the given config manager
+    # or in the one of the destination dataset, which is typically not existent
+    # yet and the process config manager is then used effectively
+    srcs = _map_urls(cfg or destds.config, srcs)
 
     # decode all source candidate specifications
     candidate_sources = [decode_source_spec(s, cfg=cfg) for s in srcs]
@@ -436,7 +578,7 @@ def clone_dataset(
             clone_opts['branch'] = cand['version']
         try:
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
-            # doesn't make it happen seemlessly
+            # doesn't make it happen seamlessly
             GitRepo.clone(
                 path=str(dest_path),
                 url=cand['giturl'],
@@ -516,8 +658,23 @@ def clone_dataset(
             **result_props)
         return
 
+    dest_repo = destds.repo
+
+    remotes = dest_repo.get_remotes(with_urls_only=True)
+    nremotes = len(remotes)
+    if nremotes == 1:
+        remote = remotes[0]
+        lgr.debug("Determined %s to be remote of %s", remote, destds)
+    elif remotes > 1:
+        lgr.warning(
+            "Fresh clone %s unexpected has multiple remotes: %s. Using %s",
+            destds.path, remotes, remotes[0])
+        remote = remotes[0]
+    else:
+        raise RuntimeError("bug: fresh clone has zero remotes")
+
     if not cand.get("version"):
-        postclone_check_head(destds)
+        postclone_check_head(destds, remote=remote)
 
     # act on --reckless=shared-...
     # must happen prior git-annex-init, where we can cheaply alter the repo
@@ -526,15 +683,43 @@ def clone_dataset(
         lgr.debug('Reinit %s to enable shared access permissions', destds)
         destds.repo.call_git(['init', '--shared={}'.format(reckless[7:])])
 
+    # In case of RIA stores we need to prepare *before* annex is called at all
+    if result_props['source']['type'] == 'ria':
+        postclone_preannex_cfg_ria(destds, remote=remote)
+
     yield from postclonecfg_annexdataset(
         destds,
         reckless,
-        description)
+        description,
+        remote=remote)
+
+    if checkout_gitsha and \
+       dest_repo.get_hexsha(dest_repo.get_corresponding_branch()) != checkout_gitsha:
+        try:
+            postclone_checkout_commit(dest_repo, checkout_gitsha,
+                                      remote=remote)
+        except Exception as e:
+            yield get_status_dict(
+                status='error',
+                message=str(e),
+                **result_props,
+            )
+
+            # We were supposed to clone a particular version but failed to.
+            # This is particularly pointless in case of subdatasets and
+            # potentially fatal with current implementation of recursion.
+            # see gh-5387
+            lgr.debug("Failed to checkout %s, removing this clone attempt at %s", checkout_gitsha, dest_path)
+            # TODO stringification can be removed once pathlib compatible
+            # or if PY35 is no longer supported
+            rmtree(str(dest_path), children_only=dest_path_existed)
+            return
 
     # perform any post-processing that needs to know details of the clone
     # source
     if result_props['source']['type'] == 'ria':
-        yield from postclonecfg_ria(destds, result_props['source'])
+        yield from postclonecfg_ria(destds, result_props['source'],
+                                    remote=remote)
 
     if reckless:
         # store the reckless setting in the dataset to make it
@@ -543,6 +728,12 @@ def clone_dataset(
             'datalad.clone.reckless', reckless,
             where='local',
             reload=True)
+    else:
+        # We would still want to reload configuration to ensure that any of the
+        # above git invocations could have potentially changed the config
+        # TODO: might no longer be necessary if 0.14.0 adds reloading upon
+        # non-readonly commands invocation
+        destds.config.reload()
 
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
@@ -550,7 +741,73 @@ def clone_dataset(
     yield get_status_dict(status='ok', **result_props)
 
 
-def postclone_check_head(ds):
+def postclone_checkout_commit(repo, target_commit, remote="origin"):
+    """Helper to check out a specific target commit in a fresh clone.
+
+    Will not check (again) if current commit and target commit are already
+    the same!
+    """
+    # record what branch we were on right after the clone
+    active_branch = repo.get_active_branch()
+    corr_branch = repo.get_corresponding_branch(branch=active_branch)
+    was_adjusted = bool(corr_branch)
+    repo_orig_branch = corr_branch or active_branch
+    # if we are on a branch this hexsha will be the tip of that branch
+    repo_orig_hexsha = repo.get_hexsha(repo_orig_branch)
+    # make sure we have the desired commit locally
+    # expensive and possibly error-prone fetch conditional on cheap
+    # local check
+    if not repo.commit_exists(target_commit):
+        try:
+            repo.fetch(remote=remote, refspec=target_commit)
+        except CommandError:
+            pass
+        # instead of inspecting the fetch results for possible ways
+        # with which it could failed to produced the desired result
+        # let's verify the presence of the commit directly, we are in
+        # expensive-land already anyways
+        if not repo.commit_exists(target_commit):
+            # there is nothing we can do about this
+            # MIH thinks that removing the clone is not needed, as a likely
+            # next step will have to be a manual recovery intervention
+            # and not another blind attempt
+            raise ValueError(
+                'Target commit %s does not exist in the clone, and '
+                'a fetch that commit from remote failed'
+                % target_commit[:8])
+    # checkout the desired commit
+    repo.call_git(['checkout', target_commit])
+    # did we detach?
+    if repo_orig_branch and not repo.get_active_branch():
+        # trace if current state is a predecessor of the branch_hexsha
+        lgr.debug(
+            "Detached HEAD after resetting worktree of %s "
+            "(original branch: %s)", repo, repo_orig_branch)
+        if repo.get_merge_base(
+                [repo_orig_hexsha, target_commit]) == target_commit:
+            # we assume the target_commit to be from the same branch,
+            # because it is an ancestor -- update that original branch
+            # to point to the target_commit, and update HEAD to point to
+            # that location
+            lgr.info(
+                "Reset branch '%s' to %s (from %s) to "
+                "avoid a detached HEAD",
+                repo_orig_branch, target_commit[:8], repo_orig_hexsha[:8])
+            branch_ref = 'refs/heads/%s' % repo_orig_branch
+            repo.update_ref(branch_ref, target_commit)
+            repo.update_ref('HEAD', branch_ref, symbolic=True)
+            if was_adjusted:
+                # Note: The --force is needed because the adjust branch already
+                # exists.
+                repo.adjust(options=["--unlock", "--force"])
+        else:
+            lgr.warning(
+                "%s has a detached HEAD, because the target commit "
+                "%s has no unique ancestor with branch '%s'",
+                repo, target_commit[:8], repo_orig_branch)
+
+
+def postclone_check_head(ds, remote="origin"):
     repo = ds.repo
     if not repo.commit_exists("HEAD"):
         # HEAD points to an unborn branch. A likely cause of this is that the
@@ -566,16 +823,17 @@ def postclone_check_head(ds):
         remote_branches = (
             b["refname:strip=2"] for b in repo.for_each_ref_(
                 fields="refname:strip=2", sort="-committerdate",
-                pattern="refs/remotes/origin"))
+                pattern="refs/remotes/" + remote))
         for rbranch in remote_branches:
-            if rbranch in ["origin/git-annex", "HEAD"]:
+            if rbranch in [remote + "/git-annex", "HEAD"]:
                 continue
-            if rbranch.startswith("origin/adjusted/"):
+            if rbranch.startswith(remote + "/adjusted/"):
                 # If necessary for this file system, a downstream
                 # git-annex-init call will handle moving into an
                 # adjusted state.
                 continue
-            repo.call_git(["checkout", "-b", rbranch[7:],  # drop "origin/"
+            repo.call_git(["checkout", "-b",
+                           rbranch[len(remote) + 1:],  # drop "<remote>/"
                            "--track", rbranch])
             lgr.debug("Checked out local branch from %s", rbranch)
             return
@@ -583,61 +841,40 @@ def postclone_check_head(ds):
                     "with commits", ds.path)
 
 
-def postclonecfg_ria(ds, props):
+def postclone_preannex_cfg_ria(ds, remote="origin"):
+
+    # We need to annex-ignore the remote before annex-init is called on the clone,
+    # due to issues 5186 and 5253 (and we would have done it afterwards anyway).
+    # annex/objects in RIA stores is special for several reasons.
+    # 1. the remote doesn't know about it (no actual local annex for the remote)
+    # 2. RIA may use hashdir mixed, copying data to it via git-annex (if cloned
+    #    via ssh or local) would make it see a bare repo and establish a
+    #    hashdir lower annex object tree.
+    # 3. We want the ORA remote to receive all data for the store, so its
+    #    objects could be moved into archives (the main point of a RIA store).
+
+    # Note, that this function might need an enhancement as theoretically a RIA
+    # store could also hold simple standard annexes w/o an intended ORA remote.
+    # This needs the introduction of a new version label in RIA datasets, making
+    # the following call conditional.
+    ds.config.set(f'remote.{remote}.annex-ignore', 'true', where='local')
+
+
+def postclonecfg_ria(ds, props, remote="origin"):
     """Configure a dataset freshly cloned from a RIA store"""
     repo = ds.repo
-    # RIA uses hashdir mixed, copying data to it via git-annex (if cloned via
-    # ssh) would make it see a bare repo and establish a hashdir lower annex
-    # object tree.
-    # Moreover, we want the ORA remote to receive all data for the store, so its
-    # objects could be moved into archives (the main point of a RIA store).
-    RIA_REMOTE_NAME = 'origin'  # don't hardcode everywhere
-    ds.config.set(
-        'remote.{}.annex-ignore'.format(RIA_REMOTE_NAME), 'true',
-        where='local')
 
-    # chances are that if this dataset came from a RIA store, its subdatasets
-    # may live there too. Place a subdataset source candidate config that makes
-    # get probe this RIA store when obtaining subdatasets
-    ds.config.set(
-        # we use the label 'origin' for this candidate in order to not have to
-        # generate a complicated name from the actual source specification.
-        # we pick a cost of 200 to sort it before datalad's default candidates
-        # for non-RIA URLs, because they prioritize hierarchical layouts that
-        # cannot be found in a RIA store
-        'datalad.get.subdataset-source-candidate-200origin',
-        # use the entire original URL, up to the fragment + plus dataset ID
-        # placeholder, this should make things work with any store setup we
-        # support (paths, ports, ...)
-        props['source'].split('#', maxsplit=1)[0] + '#{id}',
-        where='local')
-
-    # setup publication dependency, if a corresponding special remote exists
-    # and was enabled (there could be RIA stores that actually only have repos)
-    # make this function be a generator
-    ora_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
-                   if s.get('annex-externaltype') == 'ora']
-    if not ora_remotes and any(
-            r.get('externaltype') == 'ora'
-            for r in (repo.get_special_remotes().values()
-                      if hasattr(repo, 'get_special_remotes')
-                      else [])):
-        # no ORA remote autoenabled, but configuration known about at least one.
-        # Let's check origin's config for datalad.ora-remote.uuid as stored by
-        # create-sibling-ria and enable try enabling that one.
-        lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
-                  "up in source config ...")
-
+    def get_uuid_from_store(store_url):
         # First figure whether we cloned via SSH, HTTP or local path and then
         # get that config file the same way:
         config_content = None
-        scheme = props['giturl'].split(':', 1)[0]
+        scheme = store_url.split(':', 1)[0]
         if scheme in ['http', 'https']:
             try:
                 config_content = download_url(
                     "{}{}config".format(
-                        props['giturl'],
-                        '/' if not props['giturl'].endswith('/') else ''))
+                        store_url,
+                        '/' if not store_url.endswith('/') else ''))
             except DownloadError as e:
                 lgr.debug("Failed to get config file from source:\n%s",
                           exc_str(e))
@@ -645,9 +882,9 @@ def postclonecfg_ria(ds, props):
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
             # changed with command abstractions). So we need to get that part to
-            # have a valid path to origin's config file:
-            cfg_path = PurePosixPath(URL(props['giturl']).path) / 'config'
-            op = SSHRemoteIO(props['giturl'])
+            # have a valid path to the remote's config file:
+            cfg_path = PurePosixPath(URL(store_url).path) / 'config'
+            op = SSHRemoteIO(store_url)
             try:
                 config_content = op.read_file(cfg_path)
             except RIARemoteError as e:
@@ -657,7 +894,7 @@ def postclonecfg_ria(ds, props):
         elif scheme == 'file':
             # TODO: switch the following to proper command abstraction:
             op = LocalIO()
-            cfg_path = Path(URL(props['giturl']).localpath) / 'config'
+            cfg_path = Path(URL(store_url).localpath) / 'config'
             try:
                 config_content = op.read_file(cfg_path)
             except (RIARemoteError, OSError) as e:
@@ -667,8 +904,8 @@ def postclonecfg_ria(ds, props):
             lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
                       "FILE scheme URLs.", scheme, props['source'])
 
-        # 3. And read it
-        org_uuid = None
+        # And read it
+        uuid = None
         if config_content:
             # TODO: We might be able to spare the saving to a file.
             #       "git config -f -" is not explicitly documented but happens
@@ -682,17 +919,73 @@ def postclonecfg_ria(ds, props):
                          'datalad.ora-remote.uuid'],
                         protocol=StdOutCapture
                     )
-                    org_uuid = result['stdout'].strip()
+                    uuid = result['stdout'].strip()
                 except CommandError as e:
                     # doesn't contain what we are looking for
                     lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", RIA_REMOTE_NAME, exc_str(e))
+                              "'%s' (%s)", remote, exc_str(e))
+
+        return uuid
+
+
+
+
+    # chances are that if this dataset came from a RIA store, its subdatasets
+    # may live there too. Place a subdataset source candidate config that makes
+    # get probe this RIA store when obtaining subdatasets
+    ria_store_url = props['source'].split('#', maxsplit=1)[0]
+    ds.config.set(
+        # we use the label 'origin' for this candidate in order to not have to
+        # generate a complicated name from the actual source specification.
+        # we pick a cost of 200 to sort it before datalad's default candidates
+        # for non-RIA URLs, because they prioritize hierarchical layouts that
+        # cannot be found in a RIA store
+        'datalad.get.subdataset-source-candidate-200origin',
+        # use the entire original URL, up to the fragment + plus dataset ID
+        # placeholder, this should make things work with any store setup we
+        # support (paths, ports, ...)
+        ria_store_url + '#{id}',
+        where='local')
+
+    # setup publication dependency, if a corresponding special remote exists
+    # and was enabled (there could be RIA stores that actually only have repos)
+    # make this function be a generator
+    ora_remotes = [s for s in ds.siblings('query', result_renderer='disabled')
+                   if s.get('annex-externaltype') == 'ora']
+    # get full special remotes' config for access to stored URL
+    srs = repo.get_special_remotes() \
+        if hasattr(repo, 'get_special_remotes') else dict()
+
+    has_only_disabled_ora = \
+        not ora_remotes and \
+        any(r.get('externaltype') == 'ora' for r in srs.values())
+
+    def match_in_urls(special_remote_cfg, url_to_match):
+        # Figure whether either `url` or `push-url` in an ORA remote's config
+        # match a given URL (to a RIA store).
+        return special_remote_cfg['url'].startswith(url_to_match) or \
+               (special_remote_cfg['push-url'].startswith(url_to_match)
+                if 'push-url' in special_remote_cfg else False)
+
+    no_enabled_ora_matches_url = \
+        all(not match_in_urls(srs[r['annex-uuid']], ria_store_url)
+            for r in ora_remotes)
+
+    if has_only_disabled_ora or no_enabled_ora_matches_url:
+
+        # No ORA remote autoenabled, but configuration known about at least one,
+        # or enabled ORA remotes seem to not match clone URL.
+        # Let's check the remote's config for datalad.ora-remote.uuid as stored
+        # by create-sibling-ria and try enabling that one.
+        lgr.debug("Found no autoenabled ORA special remote. Trying to look it "
+                  "up in source config ...")
+
+        org_uuid = get_uuid_from_store(props['giturl'])
 
         # Now, enable it. If annex-init didn't fail to enable it as stored, we
         # wouldn't end up here, so enable with store URL as suggested by the URL
         # we cloned from.
         if org_uuid:
-            srs = repo.get_special_remotes()
             if org_uuid in srs.keys():
                 # TODO: - Double-check autoenable value and only do this when
                 #         true?
@@ -719,24 +1012,67 @@ def postclonecfg_ria(ds, props):
                               exc_str(e))
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
-                          RIA_REMOTE_NAME, org_uuid)
+                          remote, org_uuid)
+
+    # Set publication dependency for `remote` on the respective ORA remote:
     if ora_remotes:
-        if len(ora_remotes) == 1:
+        url_matching_remotes = [r for r in ora_remotes
+                                if srs[r['annex-uuid']]['url'] == ria_store_url]
+
+        if len(url_matching_remotes) == 1:
+            # We have exactly one ORA remote with the same store URL we used for
+            # cloning (includes previously reconfigured remote).
+            # Set publication dependency:
             yield from ds.siblings('configure',
-                                   name=RIA_REMOTE_NAME,
-                                   publish_depends=ora_remotes[0]['name'],
+                                   name=remote,
+                                   publish_depends=url_matching_remotes[0]['name'],
                                    result_filter=None,
                                    result_renderer='disabled')
+
+        elif not url_matching_remotes:
+            # No matches but we have successfully autoenabled ORA remotes. Could
+            # be the same store accessed by different method (cloning via HTTP
+            # but special remote access via SSH). We can confidently set
+            # publication dependency if the store knows the UUID.
+            org_uuid = get_uuid_from_store(props['giturl'])
+            uuid_matching_remotes = [r for r in ora_remotes
+                                     if r['annex-uuid'] == org_uuid]
+            if uuid_matching_remotes:
+                # Multiple uuid matches are actually possible via same-as.
+                # However, in that case we can't decide which one is supposed to
+                # be used with publishing to `remote`.
+                if len(uuid_matching_remotes) == 1:
+                    yield from ds.siblings(
+                        'configure',
+                        name=remote,
+                        publish_depends=uuid_matching_remotes[0]['name'],
+                        result_filter=None,
+                        result_renderer='disabled')
+                else:
+                    lgr.warning(
+                        "Found multiple matching ORA remotes. Couldn't decide "
+                        "which one publishing to '%s' should depend on: %s."
+                        " Consider running 'datalad siblings configure -s "
+                        "%s --publish-depends ORAREMOTENAME' to set "
+                        "publication dependency manually.",
+                        remote,
+                        [r['name'] for r in uuid_matching_remotes],
+                        remote)
+
         else:
-            lgr.warning("Found multiple ORA remotes. Couldn't decide which "
-                        "publishing to 'origin' should depend on: %s. Consider "
-                        "running 'datalad siblings configure -s origin "
-                        "--publish-depends ORAREMOTENAME' to set publication "
-                        "dependency manually.",
-                        [r['name'] for r in ora_remotes])
+            # We have multiple ORA remotes with the same store URL we cloned
+            # from.
+            lgr.warning("Found multiple matching ORA remotes. Couldn't decide "
+                        "which one publishing to '%s' should depend on: %s."
+                        " Consider running 'datalad siblings configure -s "
+                        "%s --publish-depends ORAREMOTENAME' to set "
+                        "publication dependency manually.",
+                        remote,
+                        [r['name'] for r in url_matching_remotes],
+                        remote)
 
 
-def postclonecfg_annexdataset(ds, reckless, description=None):
+def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
     """If ds "knows annex" -- annex init it, set into reckless etc
 
     Provides additional tune up to a possibly an annex repo, e.g.
@@ -767,13 +1103,13 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
     if not repo.is_initialized() or description:
         repo._init(description=description)
     if reckless == 'auto' or (reckless and reckless.startswith('shared-')):
-        repo._run_annex_command('untrust', annex_options=['here'])
+        repo.call_annex(['untrust', 'here'])
 
     elif reckless == 'ephemeral':
         # with ephemeral we declare 'here' as 'dead' right away, whenever
-        # we symlink origin's annex, since availability from 'here' should
+        # we symlink the remote's annex, since availability from 'here' should
         # not be propagated for an ephemeral clone when we publish back to
-        # origin.
+        # the remote.
         # This will cause stuff like this for a locally present annexed file:
         # % git annex whereis d1
         # whereis d1 (0 copies) failed
@@ -782,9 +1118,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
         # % git annex find . --in here
         # d1
 
-        # we don't want annex copy-to origin
+        # we don't want annex copy-to <remote>
         ds.config.set(
-            'remote.origin.annex-ignore', 'true',
+            f'remote.{remote}.annex-ignore', 'true',
             where='local')
 
         ds.repo.set_remote_dead('here')
@@ -793,7 +1129,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                                     ds.repo.dot_git / 'dl_target_test'):
             # symlink the annex to avoid needless copies in an ephemeral clone
             annex_dir = ds.repo.dot_git / 'annex'
-            origin_annex_url = ds.config.get("remote.origin.url", None)
+            origin_annex_url = ds.config.get(f"remote.{remote}.url", None)
             origin_git_path = None
             if origin_annex_url:
                 try:
@@ -816,9 +1152,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                     # symlinking .git/annex. It might still make sense to
                     # have an ephemeral clone that doesn't propagate its avail.
                     # info. Therefore don't fail altogether.
-                    lgr.warning("reckless=ephemeral mode: origin doesn't seem "
+                    lgr.warning("reckless=ephemeral mode: %s doesn't seem "
                                 "local: %s\nno symlinks being used",
-                                origin_annex_url)
+                                remote, origin_annex_url)
             if origin_git_path:
                 # TODO make sure that we do not delete any unique data
                 rmtree(str(annex_dir)) \
@@ -826,7 +1162,7 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
                 annex_dir.symlink_to(origin_git_path / 'annex',
                                      target_is_directory=True)
         else:
-            # TODO: What level? + note, that annex-dead is independ
+            # TODO: What level? + note, that annex-dead is independent
             lgr.warning("reckless=ephemeral mode: Unable to create symlinks on "
                         "this file system.")
 
@@ -906,36 +1242,38 @@ def postclonecfg_annexdataset(ds, reckless, description=None):
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
 
-    # we have just cloned the repo, so it has 'origin', configure any
+    # we have just cloned the repo, so it has a remote `remote`, configure any
     # reachable origin of origins
-    yield from configure_origins(ds, ds)
+    yield from configure_origins(ds, ds, remote=remote)
 
 
 _handle_possible_annex_dataset = postclonecfg_annexdataset
 
 
-def configure_origins(cfgds, probeds, label=None):
-    """Configure any discoverable local dataset 'origin' sibling as a remote
+def configure_origins(cfgds, probeds, label=None, remote="origin"):
+    """Configure any discoverable local dataset sibling as a remote
 
     Parameters
     ----------
     cfgds : Dataset
       Dataset to receive the remote configurations
     probeds : Dataset
-      Dataset to start looking for 'origin' remotes. May be identical with
+      Dataset to start looking for `remote` remotes. May be identical with
       `cfgds`.
     label : int, optional
-      Each discovered 'origin' will be configured as a remote under the name
-      'origin-<label>'. If no label is given, '2' will be used by default,
-      given that there is typically a 'origin' remote already.
+      Each discovered remote will be configured as a remote under the name
+      '<remote>-<label>'. If no label is given, '2' will be used by default,
+      given that there is typically a remote named `remote` already.
+    remote : str, optional
+      Name of the default remote on clone.
     """
     if label is None:
         label = 1
     # let's look at the URL for that remote and see if it is a local
     # dataset
-    origin_url = probeds.config.get('remote.origin.url')
+    origin_url = probeds.config.get(f'remote.{remote}.url')
     if not origin_url:
-        # no origin, nothing to do
+        # no remote with default name, nothing to do
         return
     if not cfgds.config.obtain(
             'datalad.install.inherit-local-origin',
@@ -946,7 +1284,7 @@ def configure_origins(cfgds, probeds, label=None):
         # not local path
         return
 
-    # no need to reconfigure original/direct origin again
+    # no need to reconfigure original/direct remote again
     if cfgds != probeds:
         # prevent duplicates
         known_remote_urls = set(
@@ -959,7 +1297,7 @@ def configure_origins(cfgds, probeds, label=None):
                 'configure',
                 # no chance for conflict, can only be the second configured
                 # remote
-                name='origin-{}'.format(label),
+                name='{}-{}'.format(remote, label),
                 url=origin_url,
                 # fetch to get all annex info
                 fetch=True,
@@ -968,12 +1306,13 @@ def configure_origins(cfgds, probeds, label=None):
             )
     # and dive deeper
     # given the clone source is a local dataset, we can have a
-    # cheap look at it, and configure its own 'origin' as a remote
+    # cheap look at it, and configure its own `remote` as a remote
     # (if there is any), and benefit from additional annex availability
     yield from configure_origins(
         cfgds,
         Dataset(probeds.pathobj / origin_url),
-        label=label + 1)
+        label=label + 1,
+        remote=remote)
 
 
 def _get_tracking_source(ds):
@@ -1081,7 +1420,7 @@ def decode_source_spec(spec, cfg=None):
             raise ValueError(
                 'RIA URI not recognized, no valid dataset ID or other supported '
                 'scheme: {}'.format(spec))
-        # now we cancel the fragment in the original URL, but keep everthing else
+        # now we cancel the fragment in the original URL, but keep everything else
         # in order to be able to support the various combinations of ports, paths,
         # and everything else
         source_ri.fragment = ''

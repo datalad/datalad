@@ -78,6 +78,11 @@ def _get_proc_config(name, ds=None):
     """
     # figure what ConfigManager to ask
     cm = cfg if ds is None else ds.config
+    # ConfigManager may not be up-to-date, particularly if we are in a
+    # subdataset due to recursion in `_get_procedure_implementation` where
+    # outside caller operates (and reloads) on superdataset only. With
+    # force=False, this shouldn't be expensive.
+    cm.reload()
     # ConfigManager might return a tuple for different reasons.
     # The config might have been defined multiple times in the same location
     # (within .datalad/config for example) or there are multiple values for
@@ -96,21 +101,20 @@ def _get_proc_config(name, ds=None):
 
 
 def _get_procedure_implementation(name='*', ds=None):
-    """get potential procedure path and configuration
+    """get potential procedures: path, name, configuration, and a help message
 
-    Order of consideration is user-level, system-level, dataset,
-    datalad extensions, datalad. First one found according to this order is the
-    one to be returned. Therefore local definitions/configurations take
+    The order of consideration is user-level, system-level, extra locations, dataset,
+    datalad extensions, datalad. Therefore local definitions/configurations take
     precedence over ones, that come from outside (via a datalad-extension or a
     dataset with its .datalad/config). If a dataset had precedence (as it was
     before), the addition (or just an update) of a (sub-)dataset would otherwise
-    surprisingly cause you do execute code different from what you defined
+    surprisingly cause you to execute code different from what you defined
     within ~/.gitconfig or your local repository's .git/config.
     So, local definitions take precedence over remote ones and more specific
     ones over more general ones.
 
-    Returns
-    -------
+    Yields
+    ------
     tuple
       path, name, format string, help message
     """
@@ -119,7 +123,8 @@ def _get_procedure_implementation(name='*', ds=None):
 
     # 1. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
-                cfg.obtain('datalad.locations.system-procedures')):
+                cfg.obtain('datalad.locations.system-procedures'),
+                cfg.get('datalad.locations.extra-procedures', get_all=True)):
         for dir in ensure_list(loc):
             for m, n in _get_file_match(dir, name):
                 yield (m, n,) + _get_proc_config(n)

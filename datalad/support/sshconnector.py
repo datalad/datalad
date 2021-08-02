@@ -423,7 +423,11 @@ class MultiplexSSHConnection(BaseSSHConnection):
         ]
         self.ctrl_path = Path(ctrl_path)
         self._opened_by_us = False
-        self._lock = threading.Lock()
+        # used by @fasteners.locked
+        self._lock = [
+            threading.Lock(),
+            fasteners.process_lock.InterProcessLock(self.ctrl_path.with_suffix('.lck'))
+        ]
 
     def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
@@ -478,7 +482,7 @@ class MultiplexSSHConnection(BaseSSHConnection):
             return False
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
-        lgr.debug("Checking %s by calling %s" % (self, cmd))
+        lgr.debug("Checking %s by calling %s", self, cmd)
         try:
             # expect_stderr since ssh would announce to stderr
             # "Master is running" and that is normal, not worthy warning about
@@ -698,8 +702,7 @@ class MultiplexSSHManager(BaseSSHManager):
         if self._socket_dir is not None:
             return
         from datalad import cfg
-        self._socket_dir = \
-            Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
+        self._socket_dir = Path(cfg.obtain('datalad.locations.sockets'))
         self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
             os.chmod(str(self._socket_dir), 0o700)
@@ -788,7 +791,7 @@ class MultiplexSSHManager(BaseSSHManager):
                         and (not ctrl_paths
                              or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
-                lgr.debug("Closing %d SSH connections..." % len(to_close))
+                lgr.debug("Closing %d SSH connections...", len(to_close))
             for cnct in to_close:
                 f = self._connections[cnct].close
                 if allow_fail:

@@ -98,6 +98,8 @@ from . import _TEMP_PATHS_GENERATED
 from datalad.cmd import (
     GitWitlessRunner,
     KillOutput,
+    StdOutErrCapture,
+    WitlessRunner,
 )
 
 # temp paths used by clones
@@ -113,6 +115,13 @@ if external_versions["cmd:git"] >= "2.28":
     DEFAULT_BRANCH = "dl-test-branch"  # Set by setup_package().
 else:
     DEFAULT_BRANCH = "master"
+
+if external_versions["cmd:git"] >= "2.30.0":
+    # The specific value here doesn't matter, but it should not be the default
+    # from any Git version to test that we work with custom values.
+    DEFAULT_REMOTE = "dl-test-remote"  # Set by setup_package().
+else:
+    DEFAULT_REMOTE = "origin"
 
 # additional shortcuts
 neq_ = assert_not_equal
@@ -293,31 +302,6 @@ def skip_nomultiplex_ssh(func):
         return func(*args, **kwargs)
     return  _wrap_skip_nomultiplex_ssh
 
-
-@optional_args
-def skip_v6_or_later(func, method='raise'):
-    """Skip tests if v6 or later will be used as the default repo version.
-
-    The default repository version is controlled by the configured value of
-    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
-    installed git-annex.
-    """
-
-    from datalad.support.annexrepo import AnnexRepo
-
-    version = dl_cfg.obtain("datalad.repo.version")
-    info = AnnexRepo.check_repository_versions()
-
-    @skip_if(version >= 6 or 5 not in info["supported"],
-             msg="Skip test in v6+ test run", method=method)
-    @wraps(func)
-    @attr('skip_v6_or_later')
-    @attr('v6_or_later')
-    def  _wrap_skip_v6_or_later(*args, **kwargs):
-        return func(*args, **kwargs)
-    return  _wrap_skip_v6_or_later
-
-
 #
 # Addition "checkers"
 #
@@ -414,7 +398,7 @@ def _prep_file_under_git(path, filename):
     # do absolute() in addition to always get an absolute path
     # even with non-existing paths on windows
     path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
-    file_repo_dir = op.relpath(path, repo.path)
+    file_repo_dir = relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
 
@@ -593,7 +577,7 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         if self._silent:
             return
-        lgr.debug("HTTP: " + format % args)
+        lgr.debug("HTTP: " + format, *args)
 
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
@@ -817,39 +801,6 @@ def known_failure(func):
     return  _wrap_known_failure
 
 
-def known_failure_v6_or_later(func):
-    """Test decorator marking a test as known to fail in a v6+ test run
-
-    If the default repository version is 6 or later behaves like `known_failure`.
-    Otherwise the original (undecorated) function is returned.
-    The default repository version is controlled by the configured value of
-    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
-    installed git-annex.
-    """
-
-    from datalad.support.annexrepo import AnnexRepo
-
-    version = dl_cfg.obtain("datalad.repo.version")
-    info = AnnexRepo.check_repository_versions()
-
-    if (version and version >= 6) or 5 not in info["supported"]:
-
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_v6_or_later')
-        @attr('v6_or_later')
-        def v6_func(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return v6_func
-
-    return func
-
-
-# TODO: Remove once the released version of datalad-crawler no longer uses it.
-known_failure_v6 = known_failure_v6_or_later
-
-
 def known_failure_direct_mode(func):
     """DEPRECATED.  Stop using.  Does nothing
 
@@ -889,20 +840,6 @@ def known_failure_windows(func):
     return func
 
 
-def known_failure_appveyor(func):
-    """Test decorator marking a test as known to fail on AppVeyor.
-    """
-    if 'APPVEYOR' in os.environ:
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_appveyor')
-        @attr('appveyor')
-        def dm_func(*args, **kwargs):
-            return func(*args, **kwargs)
-        return dm_func
-    return func
-
-
 def known_failure_githubci_win(func):
     """Test decorator for a known test failure on Github's Windows CI
     """
@@ -930,6 +867,19 @@ def known_failure_githubci_osx(func):
         return dm_func
     return func
 
+
+def known_failure_osx(func):
+    """Test decorator for a known test failure on macOS
+    """
+    if on_osx:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_osx')
+        @attr('osx')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
 
 # ### ###
 # END known failure decorators
@@ -1063,8 +1013,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     def  _wrap_with_testrepos(*arg, **kw):
         # addurls with our generated file:// URLs doesn't work on appveyor
         # https://ci.appveyor.com/project/mih/datalad/builds/29841505/job/330rwn2a3cvtrakj
-        if 'APPVEYOR' in os.environ:
-            raise SkipTest("Testrepo setup is broken on AppVeyor")
+        #if 'APPVEYOR' in os.environ:
+        #    raise SkipTest("Testrepo setup is broken on AppVeyor")
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1085,7 +1035,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 break
             ntested += 1
             if __debug__:
-                lgr.debug('Running %s on %s' % (t.__name__, uri))
+                lgr.debug('Running %s on %s', t.__name__, uri)
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
@@ -1142,14 +1092,7 @@ def with_sameas_remote(func, autoenabled=False):
         if autoenabled:
             options.append("autoenable=true")
         options.append("--sameas=r_dir")
-
-        try:
-            repo.init_remote("r_rsync", options=options)
-        except CommandError:
-            if repo.git_annex_version < "7.20191017":
-                raise SkipTest("git-annex lacks --sameas support")
-            # This should have --sameas support.
-            raise
+        repo.init_remote("r_rsync", options=options)
         return func(*(fn_args + (repo,)), **kwargs)
     return  _wrap_with_sameas_remote
 
@@ -1363,24 +1306,31 @@ def assert_result_count(results, n, **kwargs):
                 _format_res(results)))
 
 
-def assert_in_results(results, **kwargs):
-    """Verify that the particular combination of keys and values is found in
-    one of the results"""
+def _check_results_in(should_contain, results, **kwargs):
     found = False
     for r in ensure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    if not found:
-        raise AssertionError(
-            "Desired result\n{}\nnot found among\n{}"
-            .format(_format_res(kwargs), _format_res(results)))
+            break
+    if found ^ should_contain:
+        if should_contain:
+            msg = "Desired result\n{}\nnot found among\n{}"
+        else:
+            msg = "Result\n{}\nunexpectedly found among\n{}"
+        raise AssertionError(msg.format(_format_res(kwargs),
+                                        _format_res(results)))
+
+
+def assert_in_results(results, **kwargs):
+    """Verify that the particular combination of keys and values is found in
+    one of the results"""
+    _check_results_in(True, results, **kwargs)
 
 
 def assert_not_in_results(results, **kwargs):
     """Verify that the particular combination of keys and values is not in any
     of the results"""
-    for r in ensure_list(results):
-        assert any(k not in r or r[k] != v for k, v in kwargs.items())
+    _check_results_in(False, results, **kwargs)
 
 
 def assert_result_values_equal(results, prop, values):
@@ -1393,7 +1343,7 @@ def assert_result_values_equal(results, prop, values):
 
 def assert_result_values_cond(results, prop, cond):
     """Verify that the values of all results for a given key in the status dicts
-    fullfill condition `cond`.
+    fulfill condition `cond`.
 
     Parameters
     ----------
@@ -1674,12 +1624,12 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
 def get_convoluted_situation(path, repocls=AnnexRepo):
     from datalad.api import create
 
-    if 'APPVEYOR' in os.environ:
-        # issue only happens on appveyor, Python itself implodes
-        # cannot be reproduced on a real windows box
-        raise SkipTest(
-            'get_convoluted_situation() causes appveyor to crash, '
-            'reason unknown')
+    #if 'APPVEYOR' in os.environ:
+    #    # issue only happens on appveyor, Python itself implodes
+    #    # cannot be reproduced on a real windows box
+    #    raise SkipTest(
+    #        'get_convoluted_situation() causes appveyor to crash, '
+    #        'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
     ds = Dataset(path).create(force=True)
@@ -1729,26 +1679,26 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
         ds.save(to_git=True)
         ds.drop([
             'file_dropped_clean',
-            op.join('subdir', 'file_dropped_clean')],
+            opj('subdir', 'file_dropped_clean')],
             check=False)
     # clean and proper subdatasets
     ds.create('subds_clean')
-    ds.create(op.join('subdir', 'subds_clean'))
+    ds.create(opj('subdir', 'subds_clean'))
     ds.create('subds_unavailable_clean')
-    ds.create(op.join('subdir', 'subds_unavailable_clean'))
+    ds.create(opj('subdir', 'subds_unavailable_clean'))
     # uninstall some subdatasets (still clean)
     ds.uninstall([
         'subds_unavailable_clean',
-        op.join('subdir', 'subds_unavailable_clean')],
+        opj('subdir', 'subds_unavailable_clean')],
         check=False)
     assert_repo_status(ds.path)
     # make a dirty subdataset
     ds.create('subds_modified')
-    ds.create(op.join('subds_modified', 'someds'))
-    ds.create(op.join('subds_modified', 'someds', 'dirtyds'))
+    ds.create(opj('subds_modified', 'someds'))
+    ds.create(opj('subds_modified', 'someds', 'dirtyds'))
     # make a subdataset with additional commits
-    ds.create(op.join('subdir', 'subds_modified'))
-    pdspath = op.join(ds.path, 'subdir', 'subds_modified', 'progressedds')
+    ds.create(opj('subdir', 'subds_modified'))
+    pdspath = opj(ds.path, 'subdir', 'subds_modified', 'progressedds')
     ds.create(pdspath)
     create_tree(
         pdspath,
@@ -1757,10 +1707,10 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     Dataset(pdspath).save()
     assert_repo_status(pdspath)
     # staged subds, and files
-    create(op.join(ds.path, 'subds_added'))
+    create(opj(ds.path, 'subds_added'))
     ds.repo.add_submodule('subds_added')
-    create(op.join(ds.path, 'subdir', 'subds_added'))
-    ds.repo.add_submodule(op.join('subdir', 'subds_added'))
+    create(opj(ds.path, 'subdir', 'subds_added'))
+    ds.repo.add_submodule(opj('subdir', 'subds_added'))
     # some more untracked files
     create_tree(
         ds.path,
@@ -1783,18 +1733,18 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
             },
         }
     )
-    ds.repo.add(['file_added', op.join('subdir', 'file_added')])
+    ds.repo.add(['file_added', opj('subdir', 'file_added')])
     # untracked subdatasets
-    create(op.join(ds.path, 'subds_untracked'))
-    create(op.join(ds.path, 'subdir', 'subds_untracked'))
+    create(opj(ds.path, 'subds_untracked'))
+    create(opj(ds.path, 'subdir', 'subds_untracked'))
     # deleted files
-    os.remove(op.join(ds.path, 'file_deleted'))
-    os.remove(op.join(ds.path, 'subdir', 'file_deleted'))
+    os.remove(opj(ds.path, 'file_deleted'))
+    os.remove(opj(ds.path, 'subdir', 'file_deleted'))
     # staged deletion
     ds.repo.remove('file_staged_deleted')
     # modified files
     if isinstance(ds.repo, AnnexRepo):
-        ds.repo.unlock(['file_modified', op.join('subdir', 'file_modified')])
+        ds.repo.unlock(['file_modified', opj('subdir', 'file_modified')])
         create_tree(
             ds.path,
             {
@@ -1850,7 +1800,7 @@ def get_deeply_nested_structure(path):
     # a subtree of datasets
     subds = ds.create('subds_modified')
     # another dataset, plus an additional dir in it
-    ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
+    ds.create(opj('subds_modified', 'subds_lvl1_modified'))
     create_tree(
         ds.path,
         {
@@ -1880,16 +1830,25 @@ def get_deeply_nested_structure(path):
     (ds.pathobj / 'link2dir').symlink_to('subdir')
     # upwards pointing symlink to directory within the same dataset
     (ds.pathobj / 'directory_untracked' / 'link2dir').symlink_to(
-        op.join('..', 'subdir'))
+        opj('..', 'subdir'))
     # symlink pointing to a subdataset mount in the same dataset
     (ds.pathobj / 'link2subdsroot').symlink_to('subds_modified')
     # symlink to a dir in a subdataset (across dataset boundaries)
     (ds.pathobj / 'link2subdsdir').symlink_to(
-        op.join('subds_modified', 'subdir'))
+        opj('subds_modified', 'subdir'))
     # symlink to a dir in a superdataset (across dataset boundaries)
     (ut.Path(subds.path) / 'link2superdsdir').symlink_to(
-        op.join('..', 'subdir'))
+        opj('..', 'subdir'))
     return ds
+
+
+def maybe_adjust_repo(repo):
+    """Put repo into an adjusted branch if it is not already.
+    """
+    if not repo.is_managed_branch():
+        repo.call_annex(["upgrade"])
+        repo.config.reload(force=True)
+        repo.adjust()
 
 
 @with_tempfile
@@ -1916,6 +1875,29 @@ def skip_wo_symlink_capability(func):
     return  _wrap_skip_wo_symlink_capability
 
 
+_TESTS_ADJUSTED_TMPDIR = None
+
+
+def skip_if_adjusted_branch(func):
+    """Skip test if adjusted branch is used by default on TMPDIR file system.
+    """
+    @wraps(func)
+    @attr('skip_if_adjusted_branch')
+    def _wrap_skip_if_adjusted_branch(*args, **kwargs):
+        global _TESTS_ADJUSTED_TMPDIR
+        if _TESTS_ADJUSTED_TMPDIR is None:
+            @with_tempfile
+            def _check(path):
+                ds = Dataset(path).create(force=True)
+                return ds.repo.is_managed_branch()
+            _TESTS_ADJUSTED_TMPDIR = _check()
+
+        if _TESTS_ADJUSTED_TMPDIR:
+            raise SkipTest("Test incompatible with adjusted branch default")
+        return func(*args, **kwargs)
+    return _wrap_skip_if_adjusted_branch
+
+
 def get_ssh_port(host):
     """Get port of `host` in ssh_config.
 
@@ -1939,8 +1921,11 @@ def get_ssh_port(host):
     SkipTest if port cannot be found.
     """
     out = ''
+    runner = WitlessRunner()
     try:
-        out, err = Runner()(["ssh", "-G", host])
+        res = runner.run(["ssh", "-G", host], protocol=StdOutErrCapture)
+        out = res["stdout"]
+        err = res["stderr"]
     except Exception as exc:
         err = str(exc)
 

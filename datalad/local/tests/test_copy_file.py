@@ -27,6 +27,7 @@ from datalad.tests.utils import (
     chpwd,
     eq_,
     nok_,
+    ok_,
     ok_file_has_content,
     serve_path_via_http,
     slow,
@@ -54,9 +55,11 @@ def test_copy_file(workdir, webdir, weburl):
     ok_file_has_content(src_ds.pathobj / 'myfile1.txt', '123')
     # now create a fresh dataset
     dest_ds = Dataset(workdir / 'dest').create()
-    if not dest_ds.repo.is_managed_branch():
+    if dest_ds.repo._check_version_kludges("fromkey-supports-unlocked") or \
+       not dest_ds.repo.is_managed_branch():
         # unless we have a target ds on a cripples FS (where `annex fromkey`
-        # doesn't work), we can even drop the file content in the source repo
+        # doesn't work until after 8.20210428), we can even drop the file
+        # content in the source repo
         src_ds.drop('myfile1.txt', check=False)
         nok_(src_ds.repo.file_has_content('myfile1.txt'))
     # copy the file from the source dataset into it.
@@ -113,7 +116,7 @@ def test_copy_file_errors(dspath1, dspath2, nondspath):
         ds1.copy_file('somepath', target_dir=dspath2, on_failure='ignore'))
 
     # attempt to copy from a directory, but no recursion is enabled.
-    # use no reference ds to excercise a different code path
+    # use no reference ds to exercise a different code path
     assert_status(
         'impossible', copy_file([nondspath, dspath1], on_failure='ignore'))
 
@@ -337,6 +340,31 @@ def test_copy_file_prevent_dotgit_placement(srcpath, destpath):
     assert_in_results(
         dest.copy_file(
             [sub.pathobj / '.git' / 'config',
-             dest.pathobj / 'some', '.git'], on_failure='ignore'),
+             dest.pathobj / 'some' / '.git'], on_failure='ignore'),
         status='impossible',
         action='copy_file')
+
+    # The last path above wasn't treated as a target directory because it
+    # wasn't an existing directory. We also guard against a '.git' in the
+    # target directory code path, though the handling is different.
+    with assert_raises(ValueError):
+        dest.copy_file([sub.pathobj / '.git' / 'config',
+                        dest.pathobj / '.git'])
+
+    # A source path can have a leading .git/ if the destination is outside of
+    # .git/.
+    nok_((dest.pathobj / "config").exists())
+    dest.copy_file(sub.pathobj / '.git' / 'config')
+    ok_((dest.pathobj / "config").exists())
+
+    target = dest.pathobj / 'some'
+    nok_(target.exists())
+    dest.copy_file([sub.pathobj / '.git' / 'config', target])
+    ok_(target.exists())
+
+    # But we only waste so many cycles trying to prevent foot shooting. This
+    # next one sneaks by because only .name, not all upstream parts, is checked
+    # for each destination that comes out of _yield_specs().
+    badobj = dest.pathobj / '.git' / 'objects' / 'i-do-not-exist'
+    dest.copy_file([sub.pathobj / '.git' / 'config', badobj])
+    ok_(badobj.exists())

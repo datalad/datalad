@@ -9,7 +9,6 @@
 
 import collections
 from collections.abc import Callable
-import hashlib
 import re
 import builtins
 import time
@@ -19,6 +18,7 @@ import shutil
 import os
 import sys
 import tempfile
+from tempfile import NamedTemporaryFile
 import platform
 import gc
 import glob
@@ -29,6 +29,8 @@ import subprocess
 import warnings
 import wrapt
 
+import os.path as op
+
 from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import (
@@ -38,16 +40,29 @@ from functools import (
 from time import sleep
 import inspect
 from itertools import tee
+# this import is required because other modules import opj from here.
+from os.path import join as opj
+from os.path import (
+    abspath,
+    basename,
+    commonprefix,
+    curdir,
+    dirname,
+    exists,
+    expanduser,
+    expandvars,
+    isabs,
+    isdir,
+    islink,
+    lexists,
+    normpath,
+    pardir,
+    relpath,
+    sep,
+    split,
+    splitdrive
+)
 
-import os.path as op
-from os.path import sep as dirsep
-from os.path import commonprefix
-from os.path import curdir, basename, exists, islink, join as opj
-from os.path import isabs, normpath, expandvars, expanduser, abspath, sep
-from os.path import isdir
-from os.path import relpath
-from os.path import dirname
-from os.path import split as psplit
 import posixpath
 
 from shlex import (
@@ -168,7 +183,7 @@ def get_func_kwargs_doc(func):
 
 
 def any_re_search(regexes, value):
-    """Return if any of regexes (list or str) searches succesfully for value"""
+    """Return if any of regexes (list or str) searches successfully for value"""
     for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
             return True
@@ -182,6 +197,27 @@ def not_supported_on_windows(msg=None):
     if on_windows:
         raise NotImplementedError("This functionality is not yet implemented for Windows OS"
                                   + (": %s" % msg if msg else ""))
+
+
+def get_home_envvars(new_home):
+    """Return dict with env variables to be adjusted for a new HOME
+
+    Only variables found in current os.environ are adjusted.
+
+    Parameters
+    ----------
+    new_home: str
+      New home path, in native to OS "schema"
+    """
+    environ = os.environ
+    out = {'HOME': new_home}
+    if on_windows:
+        # requires special handling, since it has a number of relevant variables
+        # and also Python changed its behavior and started to respect USERPROFILE only
+        # since python 3.8: https://bugs.python.org/issue36264
+        out['USERPROFILE'] = new_home
+        out['HOMEDRIVE'], out['HOMEPATH'] = splitdrive(new_home)
+    return {v: val for v, val in out.items() if v in os.environ}
 
 
 def shortened_repr(value, l=30):
@@ -279,11 +315,11 @@ def md5sum(filename):
 
 
 # unused in -core
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
+def sorted_files(path):
+    """Return a (sorted) list of files under path
     """
-    return sorted(sum([[opj(r, f)[len(dout) + 1:] for f in files]
-                       for r, d, files in os.walk(dout)
+    return sorted(sum([[op.join(r, f)[len(path) + 1:] for f in files]
+                       for r, d, files in os.walk(path)
                        if not '.git' in r], []))
 
 _encoded_dirsep = r'\\'  if on_windows else r'/'
@@ -315,9 +351,9 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
         # TODO: might want to uniformize on windows to use '/'
-        paths = (opj(dirpath, name) for name in names)
+        paths = (op.join(dirpath, name) for name in names)
         for path in filter(re.compile(regex).search, paths):
-            path = path.rstrip(dirsep)
+            path = path.rstrip(sep)
             if exclude and re.search(exclude, path):
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):
@@ -347,7 +383,7 @@ def posix_relpath(path, start=None):
     return posixpath.join(
         # split and relpath native style
         # python2.7 ntpath implementation of relpath cannot handle start=None
-        *psplit(
+        *split(
             relpath(path, start=start if start is not None else '')))
 
 
@@ -392,7 +428,7 @@ def rotree(path, ro=True, chmod_files=True):
     for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
-                fullf = opj(root, f)
+                fullf = op.join(root, f)
                 # might be the "broken" symlink which would fail to stat etc
                 if exists(fullf):
                     chmod(fullf)
@@ -426,13 +462,19 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     assert_no_open_files(path)
 
     if children_only:
-        if not os.path.isdir(path):
+        if not isdir(path):
             raise ValueError("Can remove children only of directories")
         for p in os.listdir(path):
             rmtree(op.join(path, p))
         return
-    if not (os.path.islink(path) or not os.path.isdir(path)):
+    if not (islink(path) or not isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
+        if on_windows:
+            # shutil fails to remove paths that exceed 260 characters on Windows machines
+            # that did not enable long path support. A workaround to remove long paths
+            # anyway is to preprend \\?\ to the path.
+            # https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file?redirectedfrom=MSDN#win32-file-namespaces
+            path = r'\\?\ '.strip() + path
         _rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
@@ -519,16 +561,16 @@ def rmtemp(f, *args, **kwargs):
     """
     if not os.environ.get('DATALAD_TESTS_TEMP_KEEP'):
         if not os.path.lexists(f):
-            lgr.debug("Path %s does not exist, so can't be removed" % f)
+            lgr.debug("Path %s does not exist, so can't be removed", f)
             return
-        lgr.log(5, "Removing temp file: %s" % f)
+        lgr.log(5, "Removing temp file: %s", f)
         # Can also be a directory
-        if os.path.isdir(f):
+        if isdir(f):
             rmtree(f, *args, **kwargs)
         else:
             unlink(f)
     else:
-        lgr.info("Keeping temp file: %s" % f)
+        lgr.info("Keeping temp file: %s", f)
 
 
 def file_basename(name, return_ext=False):
@@ -598,15 +640,15 @@ else:
 
         Works only on linux and OSX ATM
         """
-        from .cmd import Runner
+        from .cmd import WitlessRunner
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
-        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        WitlessRunner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
         filepath = Path(filepath)
         rfilepath = filepath.resolve()
         if filepath.is_symlink() and rfilepath.exists():
-            # trust noone - adjust also of the target file
+            # trust no one - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
             lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
@@ -927,7 +969,7 @@ def generate_chunks(container, size):
 
 
 def generate_file_chunks(files, cmd=None):
-    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+    """Given a list of files, generate chunks of them to avoid exceeding cmdline length
 
     Parameters
     ----------
@@ -1095,7 +1137,7 @@ def collect_method_callstats(func):
     memo = defaultdict(lambda: defaultdict(int))  # it will be a dict of lineno: count
     # gross timing
     times = []
-    toppath = op.dirname(__file__) + op.sep
+    toppath = dirname(__file__) + sep
 
     @wraps(func)
     def  _wrap_collect_method_callstats(*args, **kwargs):
@@ -1105,7 +1147,7 @@ def collect_method_callstats(func):
             caller = stack[-2]
             stack_sig = \
                 "{relpath}:{s.name}".format(
-                    s=caller, relpath=op.relpath(caller.filename, toppath))
+                    s=caller, relpath=relpath(caller.filename, toppath))
             sig = (id(self), stack_sig)
             # we will count based on id(self) + wherefrom
             memo[sig][caller.lineno] += 1
@@ -1193,8 +1235,8 @@ def swallow_outputs():
         def __init__(self):
             kw = get_tempfile_kwargs({}, prefix="outputs")
 
-            self._out = open(tempfile.mktemp(**kw), 'w')
-            self._err = open(tempfile.mktemp(**kw), 'w')
+            self._out = NamedTemporaryFile(delete=False, mode='w', **kw)
+            self._err = NamedTemporaryFile(delete=False, mode='w', **kw)
 
         def _read(self, h):
             with open(h.name) as f:
@@ -1294,11 +1336,11 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         def __init__(self):
             if file_ is None:
                 kw = get_tempfile_kwargs({}, prefix="logs")
-                out_file = tempfile.mktemp(**kw)
+                self._out = NamedTemporaryFile(mode='a', delete=False, **kw)
             else:
                 out_file = file_
-            # PY3 requires clearly one or another.  race condition possible
-            self._out = open(out_file, 'a')
+                # PY3 requires clearly one or another.  race condition possible
+                self._out = open(out_file, 'a')
             self._final_out = None
 
         def _read(self, h):
@@ -1375,10 +1417,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
     # we want to log levelname so we could test against it
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
-    # Inherit filters
-    from datalad.log import ProgressHandler
-    swallow_handler.filters = sum([h.filters for h in old_handlers
-                                   if not isinstance(h, ProgressHandler)],
+    swallow_handler.filters = sum([h.filters for h in old_handlers],
                                   [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
@@ -1470,7 +1509,7 @@ def ensure_dir(*args):
     Joins the list of arguments to an os-specific path to the desired
     directory and creates it, if it not exists yet.
     """
-    dirname = opj(*args)
+    dirname = op.join(*args)
     if not exists(dirname):
         os.makedirs(dirname)
     return dirname
@@ -1603,7 +1642,7 @@ class chpwd(object):
             return
 
         if not isabs(path):
-            path = normpath(opj(pwd, path))
+            path = normpath(op.join(pwd, path))
         if not os.path.exists(path) and mkdir:
             self._mkdir = True
             os.mkdir(path)
@@ -1635,7 +1674,7 @@ def dlabspath(path, norm=False):
     """
     if not isabs(path):
         # if not absolute -- relative to pwd
-        path = opj(getpwd(), path)
+        path = op.join(getpwd(), path)
     return normpath(path) if norm else path
 
 
@@ -1766,6 +1805,9 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    # MIH: not clear to me why we need to perform this (possibly expensive)
+    # resolve. It was already part of the original implementation
+    # 008d9ab8cc3e0170c0a9b8479e80dee9ffe6eb7f
     filename = Path(filename).resolve()
 
     if content:
@@ -1777,14 +1819,18 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     filename = str(filename)
 
     if __debug__:
-        # TODO mkdir
-        lgr.debug('Created temporary thing named %s"' % filename)
+        lgr.debug(
+            'Created temporary %s named %s',
+            'directory' if mkdir else 'file',
+            filename)
     try:
         yield filename
     finally:
         # glob here for all files with the same name (-suffix)
         # would be useful whenever we requested .img filename,
         # and function creates .hdr as well
+        # MIH: this is undocumented behavior, and undesired in the general
+        # case. it should be made conditional and explicit
         lsuffix = len(tkwargs_.get('suffix', ''))
         filename_ = lsuffix and filename[:-lsuffix] or filename
         filenames = glob.glob(filename_ + '*')
@@ -1803,10 +1849,10 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 def _path_(*p):
     """Given a path in POSIX" notation, regenerate one in native to the env one"""
     if on_windows:
-        return opj(*map(lambda x: opj(*x.split('/')), p))
+        return op.join(*map(lambda x: op.join(*x.split('/')), p))
     else:
         # Assume that all others as POSIX compliant so nothing to be done
-        return opj(*p)
+        return op.join(*p)
 
 
 def get_timestamp_suffix(time_=None, prefix='-'):
@@ -1832,7 +1878,7 @@ def get_logfilename(dspath, cmd='datalad'):
     assert(exists(dspath))
     assert(isdir(dspath))
     ds_logdir = ensure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
-    return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
+    return op.join(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
 def get_trace(edges, start, end, trace=None):
@@ -1914,22 +1960,22 @@ def get_dataset_root(path):
     path = str(path)
     suffix = '.git'
     altered = None
-    if op.islink(path) or not op.isdir(path):
+    if islink(path) or not isdir(path):
         altered = path
-        path = op.dirname(path)
-    apath = op.abspath(path)
+        path = dirname(path)
+    apath = abspath(path)
     # while we can still go up
-    while op.split(apath)[1]:
-        if op.exists(op.join(path, suffix)):
+    while split(apath)[1]:
+        if exists(op.join(path, suffix)):
             return path
         # new test path in the format we got it
-        path = op.normpath(op.join(path, os.pardir))
+        path = normpath(op.join(path, os.pardir))
         # no luck, next round
-        apath = op.abspath(path)
+        apath = abspath(path)
     # if we applied dirname() at the top, we give it another go with
     # the actual path, if it was itself a symlink, it could be the
     # top-level dataset itself
-    if altered and op.exists(op.join(altered, suffix)):
+    if altered and exists(op.join(altered, suffix)):
         return altered
 
     return None
@@ -2055,20 +2101,6 @@ def slash_join(base, extension):
         (base.rstrip('/'),
          extension.lstrip('/')))
 
-
-def safe_print(s):
-    """Print with protection against UTF-8 encoding errors"""
-    # A little bit of dance to be able to test this code
-    print_f = getattr(builtins, "print")
-    try:
-        print_f(s)
-    except UnicodeEncodeError:
-        # failed to encode so let's do encoding while ignoring errors
-        # to print at least something
-        # explicit `or ascii` since somehow on buildbot it seemed to return None
-        s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
-            if hasattr(s, 'encode') else s
-        print_f(s.decode())
 
 #
 # IO Helpers
@@ -2341,8 +2373,8 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     if archives_leading_dir:
         compress_files([dirname], name, path=path, overwrite=overwrite)
     else:
-        compress_files(list(map(op.basename, glob.glob(opj(full_dirname, '*')))),
-                       opj(op.pardir, name),
+        compress_files(list(map(basename, glob.glob(op.join(full_dirname, '*')))),
+                       op.join(pardir, name),
                        path=op.join(path, dirname),
                        overwrite=overwrite)
     # remove original tree
@@ -2356,7 +2388,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     with that content and place it into the tree if name ends with .tar.gz
     """
     lgr.log(5, "Creating a tree under %s", path)
-    if not op.exists(path):
+    if not exists(path):
         os.makedirs(path)
 
     if isinstance(tree, dict):
@@ -2370,7 +2402,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             executable = False
             name = file_
         full_name = op.join(path, name)
-        if remove_existing and op.lexists(full_name):
+        if remove_existing and lexists(full_name):
             rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
@@ -2567,7 +2599,7 @@ def check_symlink_capability(path, target):
     assume to be able to write to tmpfile and also not import a whole lot from
     datalad's test machinery. Finally, we want to know, whether we can create a
     symlink at a specific location, not just somewhere. Therefore use
-    arbitrary path to test-build a symlink and delete afterwards. Suiteable
+    arbitrary path to test-build a symlink and delete afterwards. Suitable
     location can therefore be determined by high lever code.
 
     Parameters

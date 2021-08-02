@@ -7,8 +7,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import (
+    dirname,
     join as opj,
 )
+import sys
+
+# This is needed for versioneer to be importable when building with PEP 517.
+# See <https://github.com/warner/python-versioneer/issues/193> and links
+# therein for more information.
+sys.path.append(dirname(__file__))
+
+import versioneer
 
 from _datalad_build_support.setup import (
     BuildConfigInfo,
@@ -29,6 +38,7 @@ requires = {
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
+        'importlib-metadata; python_version < "3.8"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
@@ -47,10 +57,11 @@ requires = {
         'requests_ftp',
     ],
     'publish': [
-        'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
+        'python-gitlab',     # required for create-sibling-gitlab
     ],
     'misc': [
+        'argcomplete',       # optional CLI completion
         'pyperclip',         # clipboard manipulations
         'python-dateutil',   # add support for more date formats to check_dates
     ],
@@ -84,7 +95,7 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx>=1.7.8',
+        'sphinx>=1.7.8, !=4.0.0',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
@@ -169,6 +180,9 @@ classifiers = [
     'Topic :: Utilities',
 ]
 setup_kwargs['classifiers'] = classifiers
+
+setup_kwargs["version"] = versioneer.get_version()
+cmdclass.update(versioneer.get_cmdclass())
 
 datalad_setup(
     'datalad',

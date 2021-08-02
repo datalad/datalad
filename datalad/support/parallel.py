@@ -530,7 +530,8 @@ class ProducerConsumerProgressLog(ProducerConsumer):
         log_progress(lgr_.info, pid,
                      "%s: starting", self.label,
                      # will become known only later total=len(items),
-                     label=self.label, unit=" " + self.unit)
+                     label=self.label, unit=" " + self.unit,
+                     noninteractive_level=5)
         counts = defaultdict(int)
         total_announced = None  # self.total
         for res in super().__iter__():
@@ -545,7 +546,8 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                     total=self.total,
                     # unfortunately of no effect, so we cannot inform that more items to come
                     # unit=("+" if not it.finished else "") + " " + unit,
-                    update=0  # not None, so it does not stop
+                    update=0,  # not None, so it does not stop
+                    noninteractive_level=5
                 )
                 total_announced = self.total
 
@@ -567,9 +569,11 @@ class ProducerConsumerProgressLog(ProducerConsumer):
                     pid,
                     "%s: processed result%s", self.label,
                     " for " + res["path"] if "path" in res else "",
-                    label=label, update=1, increment=True)
+                    label=label, update=1, increment=True,
+                    noninteractive_level=5)
             yield res
-        log_progress(lgr_.info, pid, "%s: done", self.label)
+        log_progress(lgr_.info, pid, "%s: done", self.label,
+                     noninteractive_level=5)
 
 
 class _FinalShutdown(Exception):

@@ -10,22 +10,35 @@
 """
 
 import os
+import signal
 import sys
+import unittest.mock
+
+from time import (
+    sleep,
+    time,
+)
+from nose.tools import timed
+
 
 from datalad.tests.utils import (
     assert_cwd_unchanged,
     assert_in,
     assert_raises,
     eq_,
+    integration,
     OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
+    SkipTest,
     with_tempfile,
 )
 from datalad.cmd import (
-    StdOutErrCapture,
-    WitlessRunner as Runner,
+    readline_rstripped,
     StdOutCapture,
+    StdOutErrCapture,
+    WitlessProtocol,
+    WitlessRunner as Runner,
 )
 from datalad.utils import (
     on_windows,
@@ -35,7 +48,7 @@ from datalad.support.exceptions import CommandError
 
 
 def py2cmd(code):
-    """Helper to invoke some Python code through a cmdline invokation of
+    """Helper to invoke some Python code through a cmdline invocation of
     the Python interpreter.
 
     This should be more portable in some cases.
@@ -120,7 +133,7 @@ def test_runner_cwd_encoding(path):
 def test_runner_stdin(path):
     runner = Runner()
     fakestdin = Path(path) / 'io'
-    # go for diffcult content
+    # go for difficult content
     fakestdin.write_text(OBSCURE_FILENAME)
 
     res = runner.run(
@@ -130,15 +143,56 @@ def test_runner_stdin(path):
     )
     assert_in(OBSCURE_FILENAME, res['stdout'])
 
+    # we can do the same without a tempfile, too
+    res = runner.run(
+        py2cmd('import fileinput; print(fileinput.input().readline())'),
+        stdin=OBSCURE_FILENAME.encode('utf-8'),
+        protocol=StdOutCapture,
+    )
+    assert_in(OBSCURE_FILENAME, res['stdout'])
+
+
+@timed(3)
+def test_runner_stdin_no_capture():
+    # Ensure that stdin writing alone progresses
+    runner = Runner()
+    runner.run(
+        py2cmd('import sys; print(sys.stdin.read()[-10:])'),
+        stdin=('ABCDEFGHIJKLMNOPQRSTUVWXYZ-' * 10000).encode('utf-8'),
+        protocol=None
+    )
+
+
+@timed(3)
+def test_runner_no_stdin_no_capture():
+    # Ensure a runner without stdin data and output capture progresses
+    runner = Runner()
+    runner.run(
+        ["echo", "a", "b", "c"],
+        stdin=None,
+        protocol=None
+    )
+
+
+@timed(3)
+def test_runner_empty_stdin():
+    # Ensure a runner without stdin data and output capture progresses
+    runner = Runner()
+    runner.run(
+        ["cat"],
+        stdin=b"",
+        protocol=None
+    )
+
 
 def test_runner_parametrized_protocol():
     runner = Runner()
 
     # protocol returns a given value whatever it receives
     class ProtocolInt(StdOutCapture):
-        def __init__(self, done_future, value):
+        def __init__(self, value):
             self.value = value
-            super().__init__(done_future)
+            super().__init__()
 
         def pipe_data_received(self, fd, data):
             super().pipe_data_received(fd, self.value)
@@ -150,3 +204,103 @@ def test_runner_parametrized_protocol():
         value=b'5',
     )
     eq_(res['stdout'], '5')
+
+
+@integration  # ~3 sec
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_asyncio_loop_noninterference1(path1, path2):
+    if on_windows and sys.version_info < (3, 8):
+        raise SkipTest(
+            "get_event_loop() raises "
+            "RuntimeError: There is no current event loop in thread 'MainThread'.")
+    # minimalistic use case provided by Dorota
+    import datalad.api as dl
+    src = dl.create(path1)
+    reproducer = src.pathobj/ "reproducer.py"
+    reproducer.write_text(f"""\
+import asyncio
+asyncio.get_event_loop()
+import datalad.api as datalad
+ds = datalad.clone(path=r'{path2}', source=r"{path1}")
+loop = asyncio.get_event_loop()
+assert loop
+# simulate outside process closing the loop
+loop.close()
+# and us still doing ok
+ds.status()
+""")
+    Runner().run([sys.executable, str(reproducer)])  # if Error -- the test failed
+
+
+@with_tempfile
+def test_asyncio_forked(temp):
+    # temp will be used to communicate from child either it succeeded or not
+    temp = Path(temp)
+    runner = Runner()
+    import os
+    try:
+        pid = os.fork()
+    except BaseException as exc:
+        # .fork availability is "Unix", and there are cases where it is "not supported"
+        # so we will just skip if no forking is possible
+        raise SkipTest(f"Cannot fork: {exc}")
+    # if does not fail (in original or in a fork) -- we are good
+    if sys.version_info < (3, 8) and pid != 0:
+        # for some reason it is crucial to sleep a little (but 0.001 is not enough)
+        # in the master process with older pythons or it takes forever to make the child run
+        sleep(0.1)
+    try:
+        runner.run([sys.executable, '--version'], protocol=StdOutCapture)
+        if pid == 0:
+            temp.write_text("I rule")
+    except:
+        if pid == 0:
+            temp.write_text("I suck")
+    if pid != 0:
+       # parent: look after the child
+       t0 = time()
+       try:
+           while not temp.exists() or temp.stat().st_size < 6:
+               if time() - t0 > 5:
+                   raise AssertionError("Child process did not create a file we expected!")
+       finally:
+           # kill the child
+           os.kill(pid, signal.SIGTERM)
+       # see if it was a good one
+       eq_(temp.read_text(), "I rule")
+    else:
+       # sleep enough so parent just kills me the kid before I continue doing bad deeds
+       sleep(10)
+
+
+def test_done_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = WitlessProtocol("done")
+        warn_mock.assert_called_once()
+
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = WitlessProtocol()
+        warn_mock.assert_not_called()
+
+
+def test_readline_rstripped_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        class StdoutMock:
+            def readline(self):
+                return "abc\n"
+        readline_rstripped(StdoutMock())
+        warn_mock.assert_called_once()
+
+
+def test_faulty_poll_detection():
+
+    class PopenMock:
+        pid = 666
+
+        def poll(self):
+            return None
+
+    protocol = WitlessProtocol()
+    protocol.process = PopenMock()
+    assert_raises(CommandError, protocol._prepare_result)

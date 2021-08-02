@@ -101,6 +101,10 @@ class Save(Interface):
         dict(text="Tag the most recent saved state of a dataset",
              code_py="save(version_tag='bestyet')",
              code_cmd="datalad save --version-tag 'bestyet'"),
+        dict(text="Save a specific change but integrate into last commit keeping "
+                  "the already recorded commit message",
+             code_py="save(path='myfile.txt', amend=True)",
+             code_cmd="datalad save myfile.txt --amend")
     ]
 
     _params_ = dict(
@@ -147,6 +151,15 @@ class Save(Interface):
             (see https://git-annex.branchable.com/tips/largefiles).
             """),
         jobs=jobs_opt,
+        amend=Parameter(
+            args=('--amend',),
+            action='store_true',
+            doc="""if set, changes are not recorded in a new, separate
+            commit, but are integrated with the changeset of the previous
+            commit, and both together are recorded by replacing that
+            previous commit. This is mutually exclusive with recursive
+            operation.
+            """),
     )
 
     @staticmethod
@@ -159,10 +172,14 @@ class Save(Interface):
                  message_file=None,
                  to_git=None,
                  jobs=None,
+                 amend=False,
                  ):
         if message and message_file:
             raise ValueError(
                 "Both a message and message file were specified for save()")
+
+        if amend and recursive:
+            raise ValueError("Cannot amend a commit recursively.")
 
         path = ensure_list(path)
 
@@ -200,7 +217,7 @@ class Save(Interface):
         #   This avoids complex annotation loops and hierarchy tracking.
         # - any modification upwards from the root dataset
 
-        ds = require_dataset(dataset, check_installed=True, purpose='saving')
+        ds = require_dataset(dataset, check_installed=True, purpose='save')
 
         # use status() to do all discovery and annotation of paths
         paths_by_ds = {}
@@ -255,12 +272,8 @@ class Save(Interface):
                 for subds in subdss:
                     subds_path = ut.Path(subds)
                     sub_status = superds_status.get(subds_path, {})
-                    if not (sub_status.get("state") == "untracked" and
-                            sub_status.get("type") == "directory"):
-                        # ^ If the subdataset is already untracked directory,
-                        # let it go through the normal "add submodules"
-                        # handling of repo.save_().
-
+                    if not (sub_status.get("state") == "clean" and
+                            sub_status.get("type") == "dataset"):
                         # TODO actually start from an entry that may already
                         # exist in the status record
                         superds_status[subds_path] = dict(
@@ -285,7 +298,8 @@ class Save(Interface):
                 pds_repo.pathobj / p.relative_to(pdspath): props
                 for p, props in paths.items()}
             start_commit = pds_repo.get_hexsha()
-            if not all(p['state'] == 'clean' for p in pds_status.values()):
+            if not all(p['state'] == 'clean' for p in pds_status.values()) or \
+                    (amend and message):
                 for res in pds_repo.save_(
                         message=message,
                         # make sure to have the `path` arg be None, as we want
@@ -298,7 +312,8 @@ class Save(Interface):
                         # we are supplying the full status already, do not
                         # detect anything else
                         untracked='no',
-                        _status=pds_status):
+                        _status=pds_status,
+                        amend=amend):
                     # TODO remove stringification when datalad-core can handle
                     # path objects, or when PY3.6 is the lowest supported
                     # version
@@ -344,6 +359,22 @@ class Save(Interface):
                     status='error',
                     message=('cannot tag this version: %s', e.stderr.strip()))
                 yield dsres
+
+        if not paths_by_ds:
+            # Special case: empty repo. There's either an empty commit only or
+            # none at all. An empty one we can amend otherwise there's nothing
+            # to do.
+            if amend and ds.repo.get_hexsha():
+                yield from save_ds((ds.pathobj, dict()), version_tag=version_tag)
+
+            else:
+                yield dict(action='save',
+                           type='dataset',
+                           path=ds.path,
+                           refds=ds.path,
+                           status='notneeded',
+                           logger=lgr)
+            return
 
         # TODO: in principle logging could be improved to go not by a dataset
         # but by path(s) within subdatasets. That should provide a bit better ETA

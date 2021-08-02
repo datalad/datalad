@@ -74,7 +74,7 @@ def _parse_git_submodules(ds, paths, cache):
                 # it.
                 paths = None
             else:
-                # we had path contraints, but none matched this dataset
+                # we had path constraints, but none matched this dataset
                 return
     # can we use the reported as such, or do we need to recode wrt to the
     # query context dataset?
@@ -108,8 +108,7 @@ class Subdatasets(Interface):
         SHA1 of the subdataset commit recorded in the parent dataset
 
     "state"
-        Condition of the subdataset: 'clean', 'modified', 'absent', 'conflict'
-        as reported by `git submodule`
+        Condition of the subdataset: 'absent', 'present'
 
     "gitmodule_url"
         URL of the subdataset recorded in the parent
@@ -134,6 +133,12 @@ class Subdatasets(Interface):
         is recursively installing its superdataset. However, the subdataset
         remains installable when explicitly requested, and no other features
         are impaired.
+
+    "datalad-url"
+        If a subdataset was originally established by cloning, 'datalad-url'
+        records the URL that was used to do so. This might be different from
+        'url' if the URL contains datalad specific pieces like any URL of the
+        form "ria+<some protocol>...".
     """
     _params_ = dict(
         dataset=Parameter(
@@ -216,7 +221,7 @@ class Subdatasets(Interface):
             set_property=None,
             delete_property=None):
         ds = require_dataset(
-            dataset, check_installed=True, purpose='subdataset reporting/modification')
+            dataset, check_installed=True, purpose='report on subdataset(s)')
 
         paths = resolve_path(ensure_list(path), dataset, ds) if path else None
 
@@ -306,6 +311,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         # not matching `contains`
         if not sm_path.exists() or not GitRepo.is_valid_repo(sm_path):
             sm['state'] = 'absent'
+        else:
+            assert 'state' not in sm
+            sm['state'] = 'present'
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \

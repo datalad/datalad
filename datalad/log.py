@@ -175,6 +175,11 @@ class ColorFormatter(logging.Formatter):
         # safety guard if None was provided
         if record.msg is None:
             record.msg = ""
+        else:
+            # to avoid our logger puking on receiving exception instances etc.
+            # .getMessage, used to interpolate it, would cast it to str anyways
+            # and thus not puke
+            record.msg = str(record.msg)
         if record.msg.startswith('| '):
             # If we already log smth which supposed to go without formatting, like
             # output for running a command, just return the message and be done
@@ -368,7 +373,8 @@ def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
         label = base_label
         log_progress(lgr.info, pid,
                      "%s: starting", label,
-                     total=len(items), label=label, unit=unit)
+                     total=len(items), label=label, unit=unit,
+                     noninteractive_level=5)
 
         for res in fn(items, *args, **kwargs):
             if not (log_filter and not log_filter(res)):
@@ -386,9 +392,11 @@ def with_result_progress(fn, label="Total", unit=" Files", log_filter=None):
                     pid,
                     "%s: processed result%s", base_label,
                     " for " + res["path"] if "path" in res else "",
-                    label=label, update=1, increment=True)
+                    label=label, update=1, increment=True,
+                    noninteractive_level=5)
             yield res
-        log_progress(lgr.info, pid, "%s: done", base_label)
+        log_progress(lgr.info, pid, "%s: done", base_label,
+                     noninteractive_level=5)
 
     def _wrap_with_result_progress(items, *args, **kwargs):
         return list(_wrap_with_result_progress_(items, *args, **kwargs))
@@ -421,7 +429,8 @@ def with_progress(items, lgrcall=None, label="Total", unit=" Files"):
     label = base_label
     log_progress(lgrcall, pid,
                  "%s: starting", label,
-                 total=len(items), label=label, unit=unit)
+                 total=len(items), label=label, unit=unit,
+                 noninteractive_level=5)
 
     for item in items:
         # Since we state "processed", and actual processing might be happening
@@ -431,8 +440,9 @@ def with_progress(items, lgrcall=None, label="Total", unit=" Files"):
             lgrcall,
             pid,
             "%s: processed", base_label,
-            label=label, update=1, increment=True)
-    log_progress(lgr.info, pid, "%s: done", base_label)
+            label=label, update=1, increment=True,
+            noninteractive_level=5)
+    log_progress(lgr.info, pid, "%s: done", base_label, noninteractive_level=5)
 
 
 class LoggerHelper(object):
@@ -550,6 +560,7 @@ class LoggerHelper(object):
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         if is_interactive():
             phandler = ProgressHandler(other_handler=loghandler)
+            phandler.filters.extend(loghandler.filters)
             self.lgr.addHandler(phandler)
         else:
             loghandler.addFilter(partial(filter_noninteractive_progress,

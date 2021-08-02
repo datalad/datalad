@@ -61,7 +61,7 @@ class ExportArchiveORA(Interface):
 
       <dataset location>/archives/archive.7z
 
-    Enables the ORA special remote to locate and retrieve all key contained
+    Enables the ORA special remote to locate and retrieve all keys contained
     in the archive.
     """
     _params_ = dict(
@@ -94,7 +94,7 @@ class ExportArchiveORA(Interface):
             dataset=None):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
-            dataset, check_installed=True, purpose='ORA archive export')
+            dataset, check_installed=True, purpose='export to ORA archive')
         ds_repo = ds.repo
 
         annex_objs = ds_repo.dot_git / 'annex' / 'objects'

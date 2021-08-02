@@ -135,7 +135,7 @@ def test_siblings(origin, repo_path, local_clone_path):
         source.repo.get_remote_url("test-remote"))
 
     # no longer a use case, I would need additional convincing that
-    # this is anyhow useful other then tripple checking other peoples
+    # this is anyhow useful other then triple checking other peoples
     # errors. for an actual check use 'query'
     # maybe it could be turned into a set of warnings when `configure`
     # alters an existing setting, but then why call configure, if you
@@ -242,6 +242,10 @@ def test_siblings(origin, repo_path, local_clone_path):
                          relpath(str(r['path']), source.path))))
         # https://github.com/datalad/datalad/issues/3951
         ok_(not pushurl)  # no pushurl should be defined
+    # 5621: Users shouldn't pass identical names for remote & common data source
+    assert_raises(ValueError, siblings, 'add', dataset=source, name='howdy',
+                  url=httpurl1, as_common_datasrc='howdy')
+
 
 @with_tempfile(mkdir=True)
 def test_here(path):
@@ -279,7 +283,7 @@ def test_here(path):
     res.pop('annex-description', None)
     # volatile prop
     res.pop('available_local_disk_space', None)
-    ds.repo._run_annex_command('dead', annex_options=['here'])
+    ds.repo.call_annex(['dead', 'here'])
     newres = ds.siblings('query', name='here', return_type='item-or-list')
     newres.pop('available_local_disk_space', None)
     eq_(res, newres)
@@ -370,4 +374,23 @@ def test_sibling_path_is_posix(basedir, otherpath):
     # path URL should come out POSIX as if `git clone` had configured it for origin
     # https://github.com/datalad/datalad/issues/3972
     eq_(res['url'], Path(otherpath).as_posix())
-     
+
+
+@with_tempfile()
+def test_bf3733(path):
+    ds = create(path)
+    # call siblings configure for an unknown sibling without a URL
+    # doesn't work, but also doesn't crash
+    assert_result_count(
+        ds.siblings(
+            'configure',
+            name='imaginary',
+            publish_depends='doesntmatter',
+            url=None,
+            on_failure='ignore'),
+        1,
+        status='error',
+        action="configure-sibling",
+        name="imaginary",
+        path=ds.path,
+    )

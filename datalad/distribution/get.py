@@ -15,8 +15,6 @@ import re
 
 import os.path as op
 
-from functools import partial
-
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -25,7 +23,6 @@ from datalad.interface.results import (
     get_status_dict,
     results_from_paths,
     annexjson2result,
-    count_results,
     success_status_map,
     results_from_annex_noinfo,
 )
@@ -60,9 +57,6 @@ from datalad.support.network import (
 )
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
-)
-from datalad.dochelpers import (
-    single_or_plural,
 )
 from datalad.utils import (
     unique,
@@ -107,19 +101,24 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
 def _get_flexible_source_candidates_for_submodule(ds, sm):
     """Assemble candidate locations from where to clone a submodule
 
-    The following locations candidates are considered. For each candidate a
-    cost is given in parenthesis, lower values indicate higher cost:
+    The following location candidates are considered. For each candidate a
+    cost is given in parenthesis, higher values indicate higher cost, and
+    thus lower priority:
+
+    - A datalad URL recorded in `.gitmodules` (cost 590). This allows for
+      datalad URLs that require additional handling/resolution by datalad, like
+      ria-schemes (ria+http, ria+ssh, etc.)
+
+    - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
 
     - URL of any configured superdataset remote that is known to have the
       desired submodule commit, with the submodule path appended to it.
-      There can be more than one candidate (cost 500).
-
-    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+      There can be more than one candidate (cost 650).
 
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
       desired submodule commit, with this relative path appended to it.
-      There can be more than one candidate (cost 500).
+      There can be more than one candidate (cost 650).
 
     - In case `.gitmodules` contains a relative path as a URL, the absolute
       path of the superdataset, appended with this relative path (cost 900).
@@ -147,8 +146,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     is the configured remote name.
 
     Lastly, all candidates are sorted according to their cost (lower values
-    first, and duplicate URLs are stripped, while preserving the first item in the
+    first), and duplicate URLs are stripped, while preserving the first item in the
     candidate list.
+
+    More information on this feature can be found at
+    http://handbook.datalad.org/r.html?clone-priority
 
     Parameters
     ----------
@@ -164,9 +166,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
       Names are not unique and either derived from the name of the respective
       remote, template configuration variable, or 'local'.
     """
+
     # short cuts
     ds_repo = ds.repo
     sm_url = sm.get('gitmodule_url', None)
+    sm_datalad_url = sm.get('gitmodule_datalad-url', None)
     sm_path = op.relpath(sm['path'], start=sm['parentds'])
 
     clone_urls = []
@@ -208,7 +212,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                dict(cost=500, name=remote, url=url)
+                dict(cost=650, name=remote, url=url)
                 for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
                     sm_path_url, remote_url, alternate_suffix=False)
@@ -226,6 +230,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         remote_url,
                         alternate_suffix=False)
                 )
+
     cost_candidate_expr = re.compile('[0-9][0-9][0-9].*')
     candcfg_prefix = 'datalad.get.subdataset-source-candidate-'
     for name, tmpl in [(c[len(candcfg_prefix):],
@@ -256,6 +261,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 alternate_suffix=False)
             # avoid inclusion of submodule location itself
             if url != sm['path']
+        )
+
+    # Consider original datalad URL in .gitmodules before any URL that is meant
+    # to be consumed by git:
+    if sm_datalad_url:
+        clone_urls.append(
+            dict(cost=590, name='dl-url', url=sm_datalad_url)
         )
 
     # sort all candidates by their label, thereby allowing a
@@ -306,95 +318,15 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             clone_urls_,
             Dataset(dest_path),
             cfg=ds.config,
+            checkout_gitsha=sm['gitshasum'],
             **kwargs):
-        # make sure to fix a detached HEAD before yielding the install success
-        # result. The resetting of the branch would undo any change done
-        # to the repo by processing in response to the result
         if res.get('action', None) == 'install' and \
                 res.get('status', None) == 'ok' and \
                 res.get('type', None) == 'dataset' and \
                 res.get('path', None) == dest_path:
             _fixup_submodule_dotgit_setup(ds, sm_path)
 
-            target_commit = sm['gitshasum']
-            lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
             section_name = 'submodule.{}'.format(sm['gitmodule_name'])
-            # do not use `git-submodule update --init`, it would make calls
-            # to git-config which will not obey datalad inter-process locks for
-            # modifying .git/config
-            sub = GitRepo(res['path'])
-            # record what branch we were on right after the clone
-            # TODO instead of the active branch, this should first consider
-            # a configured branch in the submodule record of the superdataset
-            sub_orig_branch = sub.get_active_branch()
-            # if we are on a branch this hexsha will be the tip of that branch
-            sub_orig_hexsha = sub.get_hexsha()
-            if sub_orig_hexsha != target_commit:
-                # make sure we have the desired commit locally
-                # expensive and possibly error-prone fetch conditional on cheap
-                # local check
-                if not sub.commit_exists(target_commit):
-                    try:
-                        sub.fetch(remote='origin', refspec=target_commit)
-                    except CommandError:
-                        pass
-                    # instead of inspecting the fetch results for possible ways
-                    # with which it could failed to produced the desired result
-                    # let's verify the presence of the commit directly, we are in
-                    # expensive-land already anyways
-                    if not sub.commit_exists(target_commit):
-                        res.update(
-                            status='error',
-                            message=(
-                                'Target commit %s does not exist in the clone, and '
-                                'a fetch that commit from origin failed',
-                                target_commit[:8]),
-                        )
-                        yield res
-                        # there is nothing we can do about this
-                        # MIH thinks that removing the clone is not needed, as a likely
-                        # next step will have to be a manual recovery intervention
-                        # and not another blind attempt
-                        continue
-                # checkout the desired commit
-                sub.call_git(['checkout', target_commit])
-                # did we detach?
-                # XXX: This is a less generic variant of a part of
-                # GitRepo.update_submodule(). It makes use of already available
-                # information and trusts the existence of the just cloned repo
-                # and avoids (redoing) some safety checks
-                if sub_orig_branch and not sub.get_active_branch():
-                    # trace if current state is a predecessor of the branch_hexsha
-                    lgr.debug(
-                        "Detached HEAD after updating submodule %s "
-                        "(original branch: %s)", sub, sub_orig_branch)
-                    if sub.get_merge_base(
-                            [sub_orig_hexsha, target_commit]) == target_commit:
-                        # TODO: config option?
-                        # MIH: There is no real need here. IMHO this should all not
-                        # happen, unless the submodule record has a branch
-                        # configured. And Datalad should leave such a record, when
-                        # a submodule is registered.
-
-                        # we assume the target_commit to be from the same branch,
-                        # because it is an ancestor -- update that original branch
-                        # to point to the target_commit, and update HEAD to point to
-                        # that location -- this readies the subdataset for
-                        # further modification
-                        lgr.info(
-                            "Reset subdataset branch '%s' to %s (from %s) to "
-                            "avoid a detached HEAD",
-                            sub_orig_branch, target_commit[:8], sub_orig_hexsha[:8])
-                        branch_ref = 'refs/heads/%s' % sub_orig_branch
-                        sub.update_ref(branch_ref, target_commit)
-                        sub.update_ref('HEAD', branch_ref, symbolic=True)
-                    else:
-                        lgr.warning(
-                            "%s has a detached HEAD, because the recorded "
-                            "subdataset state %s has no unique ancestor with "
-                            "branch '%s'",
-                            sub, target_commit[:8], sub_orig_branch)
-
             # register the submodule as "active" in the superdataset
             ds.config.set(
                 '{}.active'.format(section_name),
@@ -502,7 +434,7 @@ def _install_necessary_subdatasets(
                                      on_failure='ignore',
                                      result_filter=is_ok_dataset)
         if not subds_trail:
-            # no (newly available) subdataset get's us any closer
+            # no (newly available) subdataset gets us any closer
             return
         # next round
         cur_subds = subds_trail[-1]
@@ -512,9 +444,6 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                  refds_path=None, description=None, jobs=None, producer_only=False):
     if isinstance(recursion_limit, int) and recursion_limit <= 0:
         return
-    if jobs == "auto":
-        # be safe -- there might be ssh logins etc. So no parallel
-        jobs = 0
     # install using helper that give some flexibility regarding where to
     # get the module from
 
@@ -713,10 +642,17 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
             yield r
         return
     respath_by_status = {}
-    for res in ds_repo.get(
+    try:
+        results = ds_repo.get(
             content,
             options=['--from=%s' % source] if source else [],
-            jobs=jobs):
+            jobs=jobs)
+    except CommandError as exc:
+        results = exc.kwargs.get("stdout_json")
+        if not results:
+            raise
+
+    for res in results:
         res = annexjson2result(res, ds, type='file', logger=lgr,
                                refds=refds_path)
         success = success_status_map[res['status']]
@@ -748,7 +684,7 @@ class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
 
     This command only operates on dataset content. To obtain a new independent
-    dataset from some source use the `install` command.
+    dataset from some source use the `clone` command.
 
     By default this command operates recursively within a dataset, but not
     across potential subdatasets, i.e. if a directory is provided, all files in
@@ -760,6 +696,55 @@ class Get(Interface):
     obtained from some available location (according to git-annex configuration
     and possibly assigned remote priorities), unless a specific source is
     specified.
+
+    *Getting subdatasets*
+
+    Just as DataLad supports getting file content from more than one location,
+    the same is supported for subdatasets, including a ranking of individual
+    sources for prioritization.
+
+    The following location candidates are considered. For each candidate a
+    cost is given in parenthesis, higher values indicate higher cost, and thus
+    lower priority:
+
+    - URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with the submodule path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - In case `.gitmodules` contains a relative path instead of a URL,
+      the URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with this relative path appended to it.
+      There can be more than one candidate (cost 500).
+
+    - A URL or absolute path recorded in `.gitmodules` (cost 600).
+
+    - In case `.gitmodules` contains a relative path as a URL, the absolute
+      path of the superdataset, appended with this relative path (cost 900).
+
+    Additional candidate URLs can be generated based on templates specified as
+    configuration variables with the pattern
+
+      `datalad.get.subdataset-source-candidate-<name>`
+
+    where `name` is an arbitrary identifier. If `name` starts with three digits
+    (e.g. '400myserver') these will be interpreted as a cost, and the
+    respective candidate will be sorted into the generated candidate list
+    according to this cost. If no cost is given, a default of 700 is used.
+
+    A template string assigned to such a variable can utilize the Python format
+    mini language and may reference a number of properties that are inferred
+    from the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respective `.gitmodules`
+    record. For convenience, an existing `datalad-id` record is made available
+    under the shortened name `id`.
+
+    Additionally, the URL of any configured remote that contains the respective
+    submodule commit is available as `remote-<name>` properties, where `name`
+    is the configured remote name.
+
+    Lastly, all candidates are sorted according to their cost (lower values
+    first), and duplicate URLs are stripped, while preserving the first item in the
+    candidate list.
 
     .. note::
       Power-user info: This command uses :command:`git annex get` to fulfill

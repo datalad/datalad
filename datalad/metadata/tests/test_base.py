@@ -36,6 +36,7 @@ from datalad.tests.utils import (
     assert_dict_equal,
     assert_equal,
     assert_in,
+    assert_in_results,
     assert_raises,
     assert_re_in,
     assert_repo_status,
@@ -138,9 +139,8 @@ def test_aggregation(path):
     res = ds.aggregate_metadata(recursive=True, update_mode='all')
     # we get success report for both subdatasets and the superdataset,
     # and they get saved
-    assert_result_count(res, 6)
     assert_result_count(res, 3, status='ok', action='aggregate_metadata')
-    assert_result_count(res, 3, status='ok', action='save')
+    assert_in_results(res, action='save', status="ok")
     # nice and tidy
     assert_repo_status(ds.path)
 
@@ -181,7 +181,7 @@ def test_aggregation(path):
     assert_result_count(cloneres, 1, type='file')
 
     # now loop over the previous results from the direct metadata query of
-    # origin and make sure we get the extact same stuff from the clone
+    # origin and make sure we get the extract same stuff from the clone
     _compare_metadata_helper(origres, clone)
 
     # now obtain a subdataset in the clone, should make no difference

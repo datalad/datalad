@@ -25,8 +25,53 @@ from datalad.utils import on_windows
 
 dirs = AppDirs("datalad", "datalad.org")
 
+subst_rule_docs = """\
+A substitution specification is a string with a match and substitution
+expression, each following Python's regular expression syntax. Both expressions
+are concatenated to a single string with an arbitrary delimiter character. The
+delimiter is defined by prefixing the string with the delimiter. Prefix and
+delimiter are stripped from the expressions (Example:
+",^http://(.*)$,https://\\1").  This setting can be defined multiple times.
+Substitutions will be applied incrementally, in order of their definition. The
+first substitution in such a series must match, otherwise no further
+substitutions in a series will be considered. However, following the first
+match all further substitutions in a series are processed, regardless whether
+intermediate expressions match or not."""
 
 definitions = {
+    'datalad.clone.url-substitute.github': {
+        'ui': ('question', {
+               'title': 'GitHub URL substitution rule',
+               'text': 'Mangling for GitHub-related URL. ' + subst_rule_docs
+        }),
+        'destination': 'global',
+        'default': (
+            # take any github project URL apart into <org>###<identifier>
+            r',https?://github.com/([^/]+)/(.*)$,\1###\2',
+            # replace any (back)slashes with a single dash
+            r',[/\\]+,-',
+            # replace any whitespace (include urlquoted variant)
+            # with a single underscore
+            r',\s+|(%2520)+|(%20)+,_',
+            # rebuild functional project URL
+            r',([^#]+)###(.*),https://github.com/\1/\2',
+        )
+    },
+    # TODO this one should migrate to the datalad-osf extension. however, right
+    # now extensions cannot provide default configuration
+    # https://github.com/datalad/datalad/issues/5769
+    'datalad.clone.url-substitute.osf': {
+        'ui': ('question', {
+               'title': 'Open Science Framework URL substitution rule',
+               'text': 'Mangling for OSF-related URLs. ' + subst_rule_docs
+        }),
+        'destination': 'global',
+        'default': (
+            # accept browser-provided URL and convert to those accepted by
+            # the datalad-osf extension
+            r',^https://osf.io/([^/]+)[/]*$,osf://\1',
+        )
+    },
     # this is actually used in downloaders, but kept cfg name original
     'datalad.crawl.cache': {
         'ui': ('yesno', {
@@ -34,6 +79,15 @@ definitions = {
                'text': 'Should the crawler cache downloaded files?'}),
         'destination': 'local',
         'type': bool,
+    },
+    # this is actually used in downloaders, but kept cfg name original
+    'datalad.credentials.force-ask': {
+        'ui': ('yesno', {
+               'title': 'Force (re-)entry of credentials',
+               'text': 'Should DataLad prompt for credential (re-)entry? This '
+                       'can be used to update previously stored credentials.'}),
+        'type': bool,
+        'default': False,
     },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
@@ -48,7 +102,7 @@ definitions = {
                'title': 'Cache directory',
                'text': 'Where should datalad cache files?'}),
         'destination': 'global',
-        'default': dirs.user_cache_dir,
+        'default_fn': lambda: dirs.user_cache_dir,
     },
     'datalad.locations.default-dataset': {
         'ui': ('question', {
@@ -56,35 +110,41 @@ definitions = {
                'text': 'Where should datalad should look for (or install) a '
                        'default dataset?'}),
         'destination': 'global',
-        'default': opj(expanduser('~'), 'datalad'),
+        'default_fn': lambda: opj(expanduser('~'), 'datalad'),
     },
-    'datalad.locations.system-plugins': {
+    'datalad.locations.locks': {
         'ui': ('question', {
-               'title': 'System plugin directory',
-               'text': 'Where should datalad search for system plugins?'}),
+               'title': 'Lockfile directory',
+               'text': 'Where should datalad store lock files?'}),
         'destination': 'global',
-        'default': opj(dirs.site_config_dir, 'plugins'),
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'locks')
     },
-    'datalad.locations.user-plugins': {
+    'datalad.locations.sockets': {
         'ui': ('question', {
-               'title': 'User plugin directory',
-               'text': 'Where should datalad search for user plugins?'}),
+               'title': 'Socket directory',
+               'text': 'Where should datalad store socket files?'}),
         'destination': 'global',
-        'default': opj(dirs.user_config_dir, 'plugins'),
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'sockets'),
     },
     'datalad.locations.system-procedures': {
         'ui': ('question', {
                'title': 'System procedure directory',
                'text': 'Where should datalad search for system procedures?'}),
         'destination': 'global',
-        'default': opj(dirs.site_config_dir, 'procedures'),
+        'default_fn': lambda: opj(dirs.site_config_dir, 'procedures'),
     },
     'datalad.locations.user-procedures': {
         'ui': ('question', {
                'title': 'User procedure directory',
                'text': 'Where should datalad search for user procedures?'}),
         'destination': 'global',
-        'default': opj(dirs.user_config_dir, 'procedures'),
+        'default_fn': lambda: opj(dirs.user_config_dir, 'procedures'),
+    },
+    'datalad.locations.extra-procedures': {
+        'ui': ('question', {
+            'title': 'Extra procedure directory',
+            'text': 'Where should datalad search for some additional procedures?'}),
+        'destination': 'global',
     },
     'datalad.locations.dataset-procedures': {
         'ui': ('question', {
@@ -95,7 +155,7 @@ definitions = {
     },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
-               'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
+               'title': 'This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
     },
     'datalad.fake-dates': {
         'ui': ('yesno', {
@@ -130,12 +190,6 @@ definitions = {
     'datalad.tests.noteardown': {
         'ui': ('yesno', {
                'title': 'Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set'}),
-        'type': EnsureBool(),
-    },
-    'datalad.tests.protocolremote': {
-        'ui': ('yesno', {
-            'title': 'Binary flag to specify whether to test protocol '
-                     'interactions of custom remote with annex'}),
         'type': EnsureBool(),
     },
     'datalad.tests.dataladremote': {
@@ -175,7 +229,7 @@ definitions = {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
         'type': EnsureStr(),
-        'default': environ.get('TMPDIR'),
+        'default_fn': lambda: environ.get('TMPDIR'),
     },
     'datalad.tests.temp.keep': {
         'ui': ('yesno', {
@@ -206,7 +260,7 @@ definitions = {
             'title': 'Cache directory for tests',
             'text': 'Where should datalad cache test files?'}),
         'destination': 'global',
-        'default': opj(dirs.user_cache_dir, 'tests')
+        'default_fn': lambda: opj(dirs.user_cache_dir, 'tests')
     },
     'datalad.log.level': {
         'ui': ('question', {
@@ -255,13 +309,11 @@ definitions = {
         'ui': ('question', {
                'title': 'Runs TraceBack function with collide set to True, if this flag is set to "collide". This replaces any common prefix between current traceback log and previous invocation with "..."'}),
     },
-    'datalad.cmd.protocol': {
-        'ui': ('question', {
-               'title': 'Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. "externals-time" for ExecutionTimeExternalsProtocol, "time" for ExecutionTimeProtocol and "null" for NullProtocol. Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface'}),
-    },
-    'datalad.cmd.protocol.prefix': {
-        'ui': ('question', {
-               'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
+    'datalad.log.exc': {
+        'ui': ('yesno', {
+               'title': 'Include exceptions and their traceback in log messages. If set, \'datalad.exc.str.tblimit\' applies.'}),
+        'default': False,
+        'type': EnsureBool(),
     },
     'datalad.ssh.identityfile': {
         'ui': ('question', {
@@ -305,7 +357,7 @@ definitions = {
                'title': 'git-annex repository version',
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
-        'default': 5,
+        'default': 8,
     },
     'datalad.metadata.maxfieldsize': {
         'ui': ('question', {
@@ -406,6 +458,41 @@ definitions = {
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
     },
+    'datalad.ui.suppress-similar-results': {
+        'ui': ('question', {
+            'title': 'Suppress rendering of similar repetitive results',
+            'text': "If enabled, after a certain number of subsequent "
+                    "results that are identical regarding key properties, "
+                    "such as 'status', 'action', and 'type', additional "
+                    "similar results are not rendered by the common result "
+                    "renderer anymore. Instead, a count "
+                    "of suppressed results is displayed. If disabled, or "
+                    "when not running in an interactive terminal, all results "
+                    "are rendered."}),
+        'default': True,
+        'type': EnsureBool(),
+    },
+    'datalad.ui.suppress-similar-results-threshold': {
+        'ui': ('question', {
+            'title': 'Threshold for suppressing similar repetitive results',
+            'text': "Minimum number of similar results to occur before "
+                    "suppression is considered. "
+                    "See 'datalad.ui.suppress-similar-results' for more "
+                    "information."}),
+        'default': 10,
+        'type': EnsureInt(),
+    },
+    'datalad.save.no-message': {
+        'ui': ('question', {
+            'title': 'Commit message handling',
+            'text': 'When no commit message was provided: '
+                    'attempt to obtain one interactively (interactive); '
+                    'or use a generic commit message (generic). '
+                    'NOTE: The interactive option is experimental. The '
+                    'behavior may change in backwards-incompatible ways.'}),
+        'default': 'generic',
+        'type': EnsureChoice('interactive', 'generic'),
+    },
     'datalad.install.inherit-local-origin': {
         'ui': ('question', {
             'title': 'Inherit local origin of dataset source',
@@ -413,8 +500,26 @@ definitions = {
                     "clone source is configured as an 'origin-2' remote "
                     "to make its annex automatically available. The process "
                     "is repeated recursively for any further qualifying "
-                    "'origin' dataset thereof."}),
+                    "'origin' dataset thereof."
+                    "Note that if clone.defaultRemoteName is configured "
+                    "to use a name other than 'origin', that name will be "
+                    "used instead."}),
         'default': True,
         'type': EnsureBool(),
     },
 }
+
+
+def compute_cfg_defaults():
+    """Compute dynamic defaults for configuration options.
+
+    These are options that depend on things like $HOME that change under our
+    testing setup.
+    """
+    for key, value in definitions.items():
+        def_fn = value.get("default_fn")
+        if def_fn:
+            value['default'] = def_fn()
+
+
+compute_cfg_defaults()

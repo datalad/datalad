@@ -19,6 +19,7 @@ from os import (
 )
 
 from io import StringIO
+import sys
 from unittest.mock import patch
 
 from datalad.utils import (
@@ -59,19 +60,24 @@ from datalad.tests.utils import (
     ok_file_under_git,
     create_tree,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
     eq_,
     neq_,
     assert_status,
     assert_result_count,
     assert_in,
     assert_not_in,
+    assert_not_in_results,
     swallow_logs,
     swallow_outputs,
-    known_failure_appveyor,
     known_failure_windows,
     known_failure_githubci_win,
     slow,
+    skip_if_adjusted_branch,
+    SkipTest,
 )
+
+from datalad.core.local.tests.test_run import last_commit_msg
 
 
 @slow  # 17.1880s
@@ -100,7 +106,7 @@ def test_rerun(path, nodspath):
     eq_('xx\n', open(probe_path).read())
 
     # Rerunning from a subdataset skips the command.
-    _, sub_info = get_run_info(ds, sub.repo.format_commit("%B"))
+    _, sub_info = get_run_info(ds, last_commit_msg(sub.repo))
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
@@ -120,13 +126,13 @@ def test_rerun(path, nodspath):
         f.write("foo")
     ds.save("nonrun-file")
     # Now rerun the buried command.
-    ds.rerun(revision="HEAD~", message="rerun buried")
+    ds.rerun(revision=DEFAULT_BRANCH + "~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
-    eq_(ds.repo.format_commit("%B").splitlines()[0],
+    eq_(last_commit_msg(ds.repo).splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
-    ds.rerun(since="HEAD~3")
+    ds.rerun(since=DEFAULT_BRANCH + "~3")
     eq_('xxxxx\n', open(probe_path).read())
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
@@ -168,6 +174,11 @@ def test_rerun_empty_branch(path):
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(onto="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
+
     # Make sure we have more than one commit. The one commit case is checked
     # elsewhere.
     ds.repo.commit(msg="noop commit", options=["--allow-empty"])
@@ -249,23 +260,27 @@ def test_rerun_chain(path):
 
     with swallow_outputs():
         ds.run('echo x$(cat grows) > grows')
-    ds.repo.tag("first-run")
+    ds.repo.tag("first-run", commit=DEFAULT_BRANCH)
 
     for _ in range(3):
-        commits.append(ds.repo.get_hexsha())
+        commits.append(ds.repo.get_hexsha(DEFAULT_BRANCH))
         ds.rerun()
-        _, info = get_run_info(ds, ds.repo.format_commit("%B"))
-        assert info["chain"] == commits
+        _, info = get_run_info(ds, last_commit_msg(ds.repo))
+        eq_(info["chain"], commits)
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds, ds.repo.format_commit("%B"))
-    assert info["chain"] == commits[:1]
+    _, info = get_run_info(ds, last_commit_msg(ds.repo))
+    eq_(info["chain"], commits[:1])
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
+
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo.call_git(["reset", "--hard"])
     ds.repo.config.reload()
@@ -338,10 +353,13 @@ def test_run_failure(path):
     assert_false(op.exists(msgfile))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_branch(path):
     ds = Dataset(path).create()
+    if ds.repo.is_managed_branch():
+        assert_status('impossible',
+                      ds.rerun(branch="triggers-abort", on_failure="ignore"))
+        raise SkipTest("Test incompatible with adjusted branch")
 
     ds.repo.tag("prerun")
 
@@ -388,7 +406,7 @@ def test_rerun_branch(path):
                   ds.rerun, since="prerun", branch="rerun2")
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
@@ -404,13 +422,13 @@ def test_rerun_cherry_pick(path):
         assert_in_results(results, status='ok', rerun_action=action)
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_rerun_invalid_merge_run_commit(path):
     ds = Dataset(path).create()
     ds.run("echo foo >>foo")
     ds.run("echo invalid >>invalid")
-    run_msg = ds.repo.format_commit("%B")
+    run_msg = last_commit_msg(ds.repo)
     run_hexsha = ds.repo.get_hexsha()
     ds.repo.call_git(["reset", "--hard", DEFAULT_BRANCH + "~"])
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
@@ -438,14 +456,14 @@ def test_rerun_outofdate_tree(path):
     with open(input_file, "w") as f:
         f.write("abc\ndef")
     ds.save("foo", to_git=True)
-    # Create inital run.
+    # Create initial run.
     ds.run('grep def foo > out')
     eq_('def\n', open(output_file).read())
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
     with swallow_outputs():
-        assert_raises(CommandError, ds.rerun, revision="HEAD~")
+        assert_raises(CommandError, ds.rerun, revision=DEFAULT_BRANCH + "~")
 
 
 @known_failure_windows
@@ -453,10 +471,10 @@ def test_rerun_outofdate_tree(path):
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
-    ds.repo.tag("ambig")
+    ds.repo.tag("ambig", commit=DEFAULT_BRANCH)
     # Don't fail when "ambig" refers to both a file and revision.
-    ds.rerun(since="", revision="ambig", branch="rerun")
-    eq_(len(ds.repo.get_revisions("rerun")),
+    ds.rerun(since="", revision="ambig")
+    eq_(len(ds.repo.get_revisions(DEFAULT_BRANCH)),
         len(ds.repo.get_revisions("ambig")))
 
 
@@ -479,7 +497,7 @@ def test_rerun_subdir(path):
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
-    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
+    rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -495,7 +513,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     assert_repo_status(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
-    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
+    rec_msg, runinfo = get_run_info(ds, last_commit_msg(ds.repo))
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -560,7 +578,7 @@ def test_rerun_script(path):
     # a run record sidecar file was added with the last commit
     assert(any(d['path'].startswith(op.join(ds.path, '.datalad', 'runinfo'))
                for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
-    bar_hexsha = ds.repo.get_hexsha()
+    bar_hexsha = ds.repo.get_hexsha(DEFAULT_BRANCH)
 
     script_file = op.join(path, "commands.sh")
 
@@ -590,10 +608,12 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
-@known_failure_githubci_win
-@known_failure_appveyor
+@known_failure_windows
 # ^ Issue only happens on appveyor, Python itself implodes. Cannot be
 #   reproduced on a real win7 box
+# Comment above looks outdated. Last trial on Appveyor failed, but seems related
+# to unresolved globs:
+# https://ci.appveyor.com/project/mih/datalad/builds/37951288/job/yxx47i3vtola2wek
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
@@ -642,16 +662,12 @@ def test_run_inputs_outputs(src, path):
     ok_(ds.repo.file_has_content("input.dat"))
     ok_(ds.repo.file_has_content("extra-input.dat"))
 
-    with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("cd .> dummy", inputs=["not-there"])
-        assert_in("Input does not exist: ", cml.out)
-
     # Test different combinations of globs and explicit files.
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
     create_tree(ds.path, {i: i for i in inputs})
 
     ds.save()
-    ds.repo.copy_to(inputs, remote="origin")
+    ds.repo.copy_to(inputs, remote=DEFAULT_REMOTE)
     ds.repo.drop(inputs, options=["--force"])
 
     test_cases = [(["*.dat"], ["a.dat", "b.dat"]),
@@ -664,14 +680,14 @@ def test_run_inputs_outputs(src, path):
         ds.run("cd .> dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
-        assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
+        assert_in(inputs_arg[0], last_commit_msg(ds.repo))
         ds.repo.drop(inputs, options=["--force"])
 
     # --input can be passed a subdirectory.
     create_tree(ds.path, {"subdir": {"a": "subdir a",
                                      "b": "subdir b"}})
     ds.save("subdir")
-    ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
+    ds.repo.copy_to(["subdir/a", "subdir/b"], remote=DEFAULT_REMOTE)
     ds.repo.drop("subdir", options=["--force"])
     ds.run("cd .> subdir-dummy", inputs=[op.join(ds.path, "subdir")])
     ok_(all(ds.repo.file_has_content(op.join("subdir", f)) for f in ["a", "b"]))
@@ -690,9 +706,9 @@ def test_run_inputs_outputs(src, path):
     # time of the run.
     create_tree(ds.path, {"after-dot-run": "after-dot-run content"})
     ds.save()
-    ds.repo.copy_to(["after-dot-run"], remote="origin")
+    ds.repo.copy_to(["after-dot-run"], remote=DEFAULT_REMOTE)
     ds.repo.drop(["after-dot-run"], options=["--force"])
-    ds.rerun("HEAD^")
+    ds.rerun(DEFAULT_BRANCH + "^")
     ds.repo.file_has_content("after-dot-run")
 
     # --output will unlock files that are present.
@@ -710,19 +726,11 @@ def test_run_inputs_outputs(src, path):
             eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
-    ds.repo.call_git(["reset", "--hard", "HEAD~2"])
     ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
     if not on_windows:
         # MIH doesn't yet understand how to port this
         with open(op.join(path, "a.dat")) as fh:
-            eq_(fh.read(), "a.dat appended\n")
-
-    if not on_windows:
-        # see datalad#2606
-        with swallow_logs(new_level=logging.DEBUG) as cml:
-            with swallow_outputs():
-                ds.run("echo blah", outputs=["not-there"])
-                assert_in("Filtered out non-existing path: ", cml.out)
+            eq_(fh.read(), " appended\n appended\n")
 
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")
@@ -732,14 +740,14 @@ def test_run_inputs_outputs(src, path):
 
     # --input/--output globs can be stored in expanded form.
     ds.run("cd .> expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
-    assert_in("a.dat", ds.repo.format_commit("%B"))
-    assert_in("b.dat", ds.repo.format_commit("%B"))
+    assert_in("a.dat", last_commit_msg(ds.repo))
+    assert_in("b.dat", last_commit_msg(ds.repo))
 
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
-    # We install subdatasets to fully resolve globs.
+    # We uninstall subdatasets to fully resolve globs.
     ds.uninstall("s0")
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
@@ -759,16 +767,17 @@ def test_run_inputs_outputs(src, path):
 
 
 @known_failure_windows
-@with_tempfile(mkdir=True)
+@with_tree({"foo": "foo"})
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(annex=False)
+    ds = Dataset(path).create(annex=False, force=True)
+    ds.save()
     # Running --input in a plain Git repo doesn't fail.
     ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
     ds.rerun()
 
 
-@known_failure_windows
+@skip_if_adjusted_branch
 @with_tree(tree={"to_modify": "to_modify"})
 def test_rerun_explicit(path):
     ds = Dataset(path).create(force=True)
@@ -776,7 +785,7 @@ def test_rerun_explicit(path):
     ds.run("echo o >> foo", explicit=True, outputs=["foo"])
     with open(op.join(ds.path, "foo")) as ifh:
         orig_content = ifh.read()
-        orig_head = ds.repo.get_hexsha()
+        orig_head = ds.repo.get_hexsha(DEFAULT_BRANCH)
 
     # Explicit rerun is allowed in a dirty tree.
     ok_(ds.repo.dirty)
@@ -809,6 +818,33 @@ def test_rerun_explicit(path):
 
     with assert_raises(CommandError):
         ds.rerun(onto="", since="", explicit=True)
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_assume_ready(path):
+    ds = Dataset(path).create()
+    repo = ds.repo
+    (repo.pathobj / "f1").write_text("f1\n")
+    ds.save()
+
+    def double_in_both_cmd(src, dest1, dest2):
+        return [
+            sys.executable, "-c",
+            "import sys; import os; import os.path as op; "
+            "content = open(sys.argv[-3]).read() * 2; "
+            "d1 = sys.argv[-2]; d2 = sys.argv[-1]; "
+            "op.lexists(d1) and os.unlink(d1); "
+            "op.lexists(d2) and os.unlink(d2); "
+            "open(d1, 'w').write(content); open(d2, 'w').write(content)",
+            src, dest1, dest2]
+
+    ds.run(double_in_both_cmd("f1", "out1", "out2"), outputs=["out1"])
+    # Drop the content so that we remove instead of unlock, making the test is
+    # more meaningful on an adjusted branch.
+    ds.drop(["out1", "out2"], check=False)
+    # --assume-ready affects both explicitly specified and automatic outputs.
+    res = ds.rerun(assume_ready="outputs")
+    assert_not_in_results(res, action="remove")
 
 
 # underlying code cannot deal with adjusted branches
@@ -845,7 +881,7 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(op.join(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
-    eq_(get_run_info(ds, ds.repo.format_commit("%B"))[1]["pwd"],
+    eq_(get_run_info(ds, last_commit_msg(ds.repo))[1]["pwd"],
         "subdir")
 
     # Double brackets can be used to escape placeholders.

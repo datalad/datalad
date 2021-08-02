@@ -13,7 +13,6 @@
 import hashlib
 import os
 import tempfile
-from urllib.parse import unquote as urlunquote
 import string
 import random
 import logging
@@ -82,7 +81,7 @@ def decompress_file(archive, dir_, leading_directories='strip'):
       and that leading directory will be removed.
     """
     if not exists(dir_):
-        lgr.debug("Creating directory %s to extract archive into" % dir_)
+        lgr.debug("Creating directory %s to extract archive into", dir_)
         os.makedirs(dir_)
 
     _decompress_file(archive, dir_)
@@ -92,7 +91,7 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         if not len(files) and len(dirs) == 1:
             # move all the content under dirs[0] up 1 level
             widow_dir = opj(dir_, dirs[0])
-            lgr.debug("Moving content within %s upstairs" % widow_dir)
+            lgr.debug("Moving content within %s upstairs", widow_dir)
             subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
             for f in subdirs_ + files_:
                 os.rename(opj(subdir, f), opj(dir_, f))
@@ -137,7 +136,6 @@ class ArchivesCache(object):
     # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
     #       all up
     def __init__(self, toppath=None, persistent=False):
-
         self._toppath = toppath
         if toppath:
             path = opj(toppath, ARCHIVES_TEMP_DIR)
@@ -146,10 +144,30 @@ class ArchivesCache(object):
                 lgr.debug("For non-persistent archives using %s suffix for path %s",
                           tempsuffix, path)
                 path += tempsuffix
+            # TODO: begging for a race condition
+            if not exists(path):
+                lgr.debug("Initiating clean cache for the archives under %s",
+                          path)
+                try:
+                    self._made_path = True
+                    os.makedirs(path)
+                    lgr.debug("Cache initialized")
+                except Exception:
+                    lgr.error("Failed to initialize cached under %s", path)
+                    raise
+            else:
+                lgr.debug(
+                    "Not initiating existing cache for the archives under %s",
+                    path)
+                self._made_path = False
         else:
             if persistent:
-                raise ValueError("%s cannot be persistent since no toppath was provided" % self)
-            path = tempfile.mktemp(**get_tempfile_kwargs())
+                raise ValueError(
+                    "%s cannot be persistent, because no toppath was provided"
+                    % self)
+            path = tempfile.mkdtemp(**get_tempfile_kwargs())
+            self._made_path = True
+
         self._path = path
         self.persistent = persistent
         # TODO?  ensure that it is absent or we should allow for it to persist a bit?
@@ -159,16 +177,16 @@ class ArchivesCache(object):
 
         # TODO: begging for a race condition
         if not exists(path):
-            lgr.debug("Initiating clean cache for the archives under %s" % self.path)
+            lgr.debug("Initiating clean cache for the archives under %s", self.path)
             try:
                 self._made_path = True
                 os.makedirs(path)
                 lgr.debug("Cache initialized")
             except Exception as e:
-                lgr.error("Failed to initialize cached under %s" % path)
+                lgr.error("Failed to initialize cached under %s", path)
                 raise
         else:
-            lgr.debug("Not initiating existing cache for the archives under %s" % self.path)
+            lgr.debug("Not initiating existing cache for the archives under %s", self.path)
             self._made_path = False
 
     @property
@@ -181,10 +199,10 @@ class ArchivesCache(object):
             del self._archives[aname]
         # Probably we should not rely on _made_path and not bother if persistent removing it
         # if ((not self.persistent) or force) and self._made_path:
-        #     lgr.debug("Removing the entire archives cache under %s" % self.path)
+        #     lgr.debug("Removing the entire archives cache under %s", self.path)
         #     rmtemp(self.path)
         if (not self.persistent) or force:
-            lgr.debug("Removing the entire archives cache under %s" % self.path)
+            lgr.debug("Removing the entire archives cache under %s", self.path)
             rmtemp(self.path)
 
     def _get_normalized_archive_path(self, archive):
@@ -408,7 +426,7 @@ class ExtractedArchive(object):
         self.assure_extracted()
         path = self.get_extracted_filename(afile)
         # TODO: make robust
-        lgr.log(2, "Verifying that %s exists" % abspath(path))
+        lgr.log(2, "Verifying that %s exists", abspath(path))
         assert exists(path), "%s must exist" % path
         return path
 

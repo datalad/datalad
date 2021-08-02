@@ -22,6 +22,7 @@ from .base import NoneAuthenticator, NotImplementedAuthenticator
 
 from .http import (
     HTMLFormAuthenticator,
+    HTTPAnonBearerTokenAuthenticator,
     HTTPAuthAuthenticator,
     HTTPBasicAuthAuthenticator,
     HTTPDigestAuthAuthenticator,
@@ -30,7 +31,7 @@ from .http import (
 )
 from .s3 import S3Authenticator, S3Downloader
 from .shub import SHubDownloader
-from ..support.configparserinc import SafeConfigParserWithIncludes
+from configparser import ConfigParser as SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..support.network import RI
 from ..support import path
@@ -50,6 +51,7 @@ AUTHENTICATION_TYPES = {
     'http_basic_auth': HTTPBasicAuthAuthenticator,
     'http_digest_auth': HTTPDigestAuthAuthenticator,
     'bearer_token': HTTPBearerTokenAuthenticator,
+    'bearer_token_anon': HTTPAnonBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
     'nda-s3': S3Authenticator,
     'loris-token': HTTPBearerTokenAuthenticator,
@@ -132,7 +134,7 @@ class Provider(object):
             # we need to create a new one
             Downloader = self._get_downloader_class(url)
             # we might need to provide it with credentials and authenticator
-            # Let's do via kwargs so we could accomodate cases when downloader does not necessarily
+            # Let's do via kwargs so we could accommodate cases when downloader does not necessarily
             # cares about those... duck typing or what it is in action
             kwargs = kwargs.copy()
             if self.credential:
@@ -243,7 +245,7 @@ class Providers(object):
                 items = {
                     o: config.get(section, o) for o in config.options(section)
                 }
-                # side-effect -- items get poped
+                # side-effect -- items get popped
                 locals().get(type_ + "s")[name] = getattr(
                     cls, '_process_' + type_)(name, items)
                 if len(items):
@@ -252,7 +254,7 @@ class Providers(object):
                 lgr.warning("Do not know how to treat section %s here" % section)
 
         # link credentials into providers
-        lgr.debug("Assigning credentials into %d providers" % len(providers))
+        lgr.debug("Assigning credentials into %d providers", len(providers))
         for provider in providers.values():
             if provider.credential:
                 if provider.credential not in credentials:
@@ -354,7 +356,7 @@ class Providers(object):
         # protocols
         scheme = Provider.get_scheme_from_url(url)
         if scheme not in self._default_providers:
-            lgr.debug("Initializing default provider for %s" % scheme)
+            lgr.debug("Initializing default provider for %s", scheme)
             self._default_providers[scheme] = Provider(name="", url_res=["%s://.*" % scheme])
         provider = self._default_providers[scheme]
         lgr.debug("No dedicated provider, returning default one for %s: %s",

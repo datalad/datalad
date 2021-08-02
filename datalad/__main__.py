@@ -10,7 +10,6 @@
 
 import sys
 from . import __version__
-from .auto import AutomagicIO
 from .log import lgr
 
 
@@ -73,6 +72,21 @@ def main(argv=None):
             sys.stdout.write("datalad %s\n" % __version__)
             sys.exit(0)
 
+    try:
+        from datalad_deprecated.auto import AutomagicIO
+    except Exception as e:
+        # we could just test for ModuleNotFoundError (which should be
+        # all that would happen with PY3.6+, but be a little more robust
+        # and use the pattern from duecredit
+        if type(e).__name__ not in ('ImportError', 'ModuleNotFoundError'):
+            lgr.error("Failed to import datalad_deprecated.auto "
+                      "due to %s", str(e))
+        sys.stderr.write("{}\n".format(
+            "The DataLad AutomagicIO functionality has been moved to an "
+            "extension package. Please install the Python package "
+            "`datalad_deprecated` to be able to use it."))
+        sys.exit(1)
+
     sys.argv = prog_argv
     progname = prog_argv[0]
     sys.path[0] = os.path.split(progname)[0]
@@ -93,10 +107,11 @@ def main(argv=None):
         runctx(code, globs, globs)
         # TODO: see if we could hide our presence from the final tracebacks if execution fails
     except IOError as err:
-        lgr.error("Cannot run file %r because: %s" % (sys.argv[0], err))
+        lgr.error("Cannot run file %r because: %s", sys.argv[0], err)
         sys.exit(1)
     except SystemExit:
         pass
+
 
 if __name__ == '__main__':
     main()

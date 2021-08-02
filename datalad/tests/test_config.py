@@ -31,6 +31,7 @@ from datalad.tests.utils import (
     with_tree,
 )
 from datalad.utils import (
+    get_home_envvars,
     swallow_logs,
     Path
 )
@@ -39,6 +40,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.config import (
     ConfigManager,
+    parse_gitconfig_dump,
     rewrite_url,
     write_config_section,
 )
@@ -62,10 +64,57 @@ myint = 3
 findme = 5.0
 """
 
+gitcfg_dump = """\
+core.withdot
+true\0just.a.key\0annex.version
+8\0filter.with2dots.some
+long\ntext with\nnewlines\0annex.something
+abcdef\0"""
+
+
+# include a "command line" origin
+gitcfg_dump_w_origin = """\
+file:.git/config\0core.withdot
+true\0file:.git/config\0just.a.key\0file:/home/me/.gitconfig\0annex.version
+8\0file:.git/config\0filter.with2dots.some
+long\ntext with\nnewlines\0file:.git/config\0command line:\0annex.something
+abcdef\0"""
+
+
+gitcfg_parsetarget = {
+    'core.withdot': 'true',
+    'just.a.key': None,
+    'annex.version': '8',
+    'filter.with2dots.some': 'long\ntext with\nnewlines',
+    'annex.something': 'abcdef',
+}
+
+
 _dataset_config_template = {
     'ds': {
         '.datalad': {
             'config': _config_file_content}}}
+
+
+def test_parse_gitconfig_dump():
+    # simple case, no origin info, clean output
+    parsed, files = parse_gitconfig_dump(gitcfg_dump)
+    assert_equal(files, set())
+    assert_equal(gitcfg_parsetarget, parsed)
+    # now with origin information in the dump
+    parsed, files = parse_gitconfig_dump(gitcfg_dump_w_origin, cwd='ROOT')
+    assert_equal(
+        files,
+        # the 'command line:' origin is ignored
+        set((Path('ROOT/.git/config'), Path('/home/me/.gitconfig'))))
+    assert_equal(gitcfg_parsetarget, parsed)
+
+    # now contaminate the output with a prepended error message
+    # https://github.com/datalad/datalad/issues/5502
+    # must work, but really needs the trailing newline
+    parsed, files = parse_gitconfig_dump(
+        "unfortunate stdout\non more lines\n" + gitcfg_dump_w_origin)
+    assert_equal(gitcfg_parsetarget, parsed)
 
 
 @with_tree(tree=_dataset_config_template)
@@ -128,7 +177,7 @@ def test_something(path, new_home):
     # gitpython-style access
     assert_equal(cfg.get('something.myint'), cfg.get_value('something', 'myint'))
     assert_equal(cfg.get_value('doesnot', 'exist', default='oohaaa'), 'oohaaa')
-    # weired, but that is how it is
+    # weird, but that is how it is
     assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
 
     # modification follows
@@ -141,7 +190,7 @@ def test_something(path, new_home):
     cfg.rename_section('something', 'this')
     assert_true(cfg.has_section('this'))
     assert_false(cfg.has_section('something'))
-    # direct comparision would fail, because of section prefix
+    # direct comparison would fail, because of section prefix
     assert_equal(len(cfg.items('this')), len(comp))
     # fail if no such section
     with swallow_logs():
@@ -181,8 +230,9 @@ def test_something(path, new_home):
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
     # lame datalad unittest sections in his precious ~/.gitconfig
+    env = get_home_envvars(new_home)
     with patch.dict('os.environ',
-                    {'HOME': new_home, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
+                    dict(get_home_envvars(new_home), DATALAD_SNEAKY_ADDITION='ignore')):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
         globalcfg = ConfigManager()
@@ -272,7 +322,7 @@ def test_obtain(path):
     #
     @with_testsui()
     def ask():
-        # fail on unkown dialog type
+        # fail on unknown dialog type
         assert_raises(ValueError, cfg.obtain, dummy, dialog_type='Rorschach_test')
     ask()
 
@@ -357,6 +407,46 @@ def test_from_env():
                     {'DATALAD_CRAZY_OVERRIDE': 'fromenv'}):
         cfg.reload()
         assert_equal(cfg['datalad.crazy.override'], 'fromenv')
+
+
+def test_from_env_overrides():
+    cfg = ConfigManager()
+    assert_not_in("datalad.FoO", cfg)
+
+    # Some details, like case and underscores, cannot be handled by the direct
+    # environment variable mapping.
+    with patch.dict("os.environ",
+                    {"DATALAD_FOO": "val"}):
+        cfg.reload()
+        assert_not_in("datalad.FoO", cfg)
+        assert_equal(cfg["datalad.foo"], "val")
+
+    # But they can be handled via DATALAD_CONFIG_OVERRIDES_JSON.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"datalad.FoO": "val"}'}):
+        cfg.reload()
+        assert_equal(cfg["datalad.FoO"], "val")
+
+    # DATALAD_CONFIG_OVERRIDES_JSON isn't limited to datalad variables.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"a.b.c": "val"}'}):
+        cfg.reload()
+        assert_equal(cfg["a.b.c"], "val")
+
+    # Explicitly provided DATALAD_ variables take precedence over those in
+    # DATALAD_CONFIG_OVERRIDES_JSON.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{"datalad.foo": "val"}',
+                     "DATALAD_FOO": "val-direct"}):
+        cfg.reload()
+        assert_equal(cfg["datalad.foo"], "val-direct")
+
+    # JSON decode errors don't lead to crash.
+    with patch.dict("os.environ",
+                    {"DATALAD_CONFIG_OVERRIDES_JSON": '{'}):
+        with swallow_logs(logging.WARNING) as cml:
+            cfg.reload()
+        assert_in("Failed to load DATALAD_CONFIG_OVERRIDE", cml.out)
 
 
 def test_overrides():
@@ -517,7 +607,7 @@ def test_global_config():
 
     # from within tests, global config should be read from faked $HOME (see
     # setup_package)
-    glb_cfg_file = Path(os.environ['HOME']) / '.gitconfig'
+    glb_cfg_file = Path(os.path.expanduser('~')) / '.gitconfig'
     assert any(glb_cfg_file.samefile(Path(p)) for p in dl_cfg._stores['git']['files'])
     assert_equal(dl_cfg.get("user.name"), "DataLad Tester")
     assert_equal(dl_cfg.get("user.email"), "test@example.com")
@@ -573,3 +663,28 @@ def test_write_config_section(path):
         for testcase in tc[3]:
             assert_in(testcase[0], gr.config)
             assert_equal(testcase[1], gr.config[testcase[0]])
+
+
+@with_tempfile()
+def test_external_modification(path):
+    from datalad.cmd import WitlessRunner as Runner
+    runner = Runner(cwd=path)
+    repo = GitRepo(path, create=True)
+    config = repo.config
+
+    key = 'sec.sub.key'
+    assert_not_in(key, config)
+    config.set(key, '1', where='local')
+    assert_equal(config[key], '1')
+
+    # we pick up the case where we modified so size changed
+    runner.run(['git', 'config', '--local', '--replace-all', key, '10'])
+    # unfortunately we do not react for .get unless reload. But here
+    # we will test if reload is correctly decides to reload without force
+    config.reload()
+    assert_equal(config[key], '10')
+
+    # and no size change
+    runner.run(['git', 'config', '--local', '--replace-all', key, '11'])
+    config.reload()
+    assert_equal(config[key], '11')

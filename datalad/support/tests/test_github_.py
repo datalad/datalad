@@ -33,6 +33,8 @@ from .. import github_
 from ..github_ import (
     _gen_github_entity,
     _get_github_cred,
+    _gh_exception,
+    _token_str,
     get_repo_url,
 )
 
@@ -55,7 +57,6 @@ def test_get_repo_url():
 
 def test__make_github_repos():
     github_login = 'test'
-    github_passwd = 'fake'
     github_organization = 'fakeorg'
     rinfo = [
         # (ds, reponame) pairs
@@ -68,7 +69,6 @@ def test__make_github_repos():
     dryrun = False
     args = (
             github_login,
-            github_passwd,
             github_organization,
             rinfo,
             existing,
@@ -79,56 +79,50 @@ def test__make_github_repos():
 
     # with default mock, no attempts would be made and an exception will be raised
     with mock.patch.object(github_, '_gen_github_entity'):
-        assert_raises(RuntimeError, github_._make_github_repos, *args)
+        assert_raises(RuntimeError, list, github_._make_github_repos_(*args))
 
     def _gen_github_entity(*args):
         return [("entity1", "cred1")]
 
     with mock.patch.object(github_, '_gen_github_entity', _gen_github_entity), \
             mock.patch.object(github_, '_make_github_repo'):
-        res = github_._make_github_repos(*args)
+        res = list(github_._make_github_repos_(*args))
     eq_(len(res), 2)
-    # first entries are our datasets
-    eq_(res[0][0], "/fakeds1")
-    eq_(res[1][0], "/fakeds2")
-    assert(all(len(x) > 1 for x in res))  # there is more than just a dataset
 
     #
-    # Now test the logic whenever first credential fails and we need to get
+    # Now test the logic whenever first token fails and we need to get
     # to the next one
     #
-    class FakeCred:
-        def __init__(self, name):
-            self.name = name
-
     # Let's test not blowing up whenever first credential is not good enough
     def _gen_github_entity(*args):
         return [
-            ("entity1", FakeCred("cred1")),
-            ("entity2", FakeCred("cred2")),
-            ("entity3", FakeCred("cred3"))
+            ("entity%d" % i, _token_str("%dtokensomethinglong" % i))
+            for i in range(1, 4)
         ]
 
     def _make_github_repo(github_login, entity, reponame, *args):
         if entity == 'entity1':
-            raise gh.BadCredentialsException("very bad status", "some data")
-        return reponame
+            raise _gh_exception(gh.BadCredentialsException,
+                                "very bad status", "some data")
+        return dict(status='ok')
 
     with mock.patch.object(github_, '_gen_github_entity', _gen_github_entity), \
             mock.patch.object(github_, '_make_github_repo', _make_github_repo), \
             swallow_logs(new_level=logging.INFO) as cml:
-        res = github_._make_github_repos(*args)
-        assert_in('Authentication failed using cred1', cml.out)
-        eq_(res, [('/fakeds1', 'fakeds1'), ('/fakeds2', 'fakeds2')])
+        res = list(github_._make_github_repos_(*args))
+        assert_in('Failed to create repository while using token 1to...: very bad status', cml.out)
+        eq_(res,
+            [dict(status='ok', ds='/fakeds1'), dict(status='ok', ds='/fakeds2')])
 
     def _make_github_repo(github_login, entity, reponame, *args):
         # Always throw an exception
-        raise gh.BadCredentialsException("very bad status", "some data")
+        raise _gh_exception(gh.BadCredentialsException,
+                            "very bad status", "some data")
 
     with mock.patch.object(github_, '_gen_github_entity', _gen_github_entity), \
             mock.patch.object(github_, '_make_github_repo', _make_github_repo):
         with assert_raises(AccessDeniedError) as cme:
-            github_._make_github_repos(*args)
+            list(github_._make_github_repos_(*args))
         assert_in("Tried 3 times", str(cme.exception))
 
 
@@ -138,7 +132,7 @@ def test__gen_github_entity_organization():
     # to test effectiveness of the fix, we need to provide some
     # token which would not work
     with patch_config({CONFIG_HUB_TOKEN_FIELD: "ed51111111111111111111111111111111111111"}):
-        org_cred = next(_gen_github_entity(None, None, 'datalad-collection-1'))
+        org_cred = next(_gen_github_entity(None, 'datalad-collection-1'))
     assert len(org_cred) == 2, "we return organization and credential"
     org, _ = org_cred
     assert org

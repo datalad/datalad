@@ -203,7 +203,9 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                             indexer.name,
                             str(indexer.dist),
                             exc_str(e))
-        lgr.info('Falling back to standard indexer for metadata format: %s', metadata_format_name)
+        lgr.debug(
+            'Falling back to standard indexer for metadata format: %s',
+            metadata_format_name)
         return lambda metadata: _deep_kv('', metadata)
 
     if val2str:
@@ -253,7 +255,7 @@ def _search_from_virgin_install(dataset, query):
             raise NoDatasetFound(
                 "No DataLad dataset found. Specify a dataset to be "
                 "searched, or run interactively to get assistance "
-                "installing a queriable superdataset."
+                "installing a queryable superdataset."
             )
         # none was provided so we could ask user whether he possibly wants
         # to install our beautiful mega-duper-super-dataset?
@@ -396,7 +398,7 @@ class _WhooshSearch(_Search):
         from whoosh import index as widx
         from .metadata import get_ds_aggregate_db_locations
         dbloc, db_base_path = get_ds_aggregate_db_locations(self.ds)
-        # what is the lastest state of aggregated metadata
+        # what is the latest state of aggregated metadata
         metadata_state = self.ds.repo.get_last_commit_hexsha(relpath(dbloc, start=self.ds.path))
         # use location common to all index types, they would all invalidate
         # simultaneously
@@ -749,7 +751,7 @@ class _AutofieldSearch(_WhooshSearch):
         parser.add_plugin(qparse.FuzzyTermPlugin())
         parser.add_plugin(qparse.GtLtPlugin())
         parser.add_plugin(qparse.SingleQuotePlugin())
-        # replace field defintion to allow for colons to be part of a field's name:
+        # replace field definition to allow for colons to be part of a field's name:
         parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
         self.parser = parser
 
@@ -1203,7 +1205,7 @@ class Search(Interface):
       indexed datasets) which either have a field starting with "age" or
       "gender"::
 
-        % datalad search --mode autofield --show-keys name '\.age' '\.gender'
+        % datalad search --mode autofield --show-keys name '\\.age' '\\.gender'
 
       Fuzzy search for datasets with an author that is specified in a particular
       metadata field::

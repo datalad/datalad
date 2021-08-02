@@ -98,6 +98,13 @@ class DownloadURL(Interface):
              code_py="download_url(urls='s3://bucket/file2.dat', message='added a file', path='myfile.dat')",
              code_cmd="""datalad download-url -m 'added a file' -O myfile.dat \\
                          s3://bucket/file2.dat"""),
+        dict(text="Append a trailing slash to the target path "
+                  "to download into a specified directory",
+             code_py="download_url(['http://example.com/file.dat'], path='data/')",
+             code_cmd="datalad download-url --path=data/ http://example.com/file.dat"),
+        dict(text="Leave off the trailing slash to download into a regular file",
+             code_py="download_url(['http://example.com/file.dat'], path='data')",
+             code_cmd="datalad download-url --path=data http://example.com/file.dat"),
     ]
 
     @staticmethod
@@ -105,6 +112,7 @@ class DownloadURL(Interface):
     @eval_results
     def __call__(urls, dataset=None, path=None, overwrite=False,
                  archive=False, save=True, message=None):
+        from ..downloaders.http import HTTPDownloader
         from ..downloaders.providers import Providers
 
         ds = None
@@ -112,7 +120,7 @@ class DownloadURL(Interface):
             try:
                 ds = require_dataset(
                     dataset, check_installed=True,
-                    purpose='downloading urls')
+                    purpose='download urls')
             except NoDatasetFound:
                 pass
 
@@ -170,12 +178,12 @@ class DownloadURL(Interface):
         providers = Providers.from_config_files()
         downloaded_paths = []
         path_urls = {}
+        need_datalad_remote = False
         for url in urls:
             # somewhat "ugly"
-            # providers.get_provider(url).get_downloader(url).download(url, path=path)
-            # for now -- via sugaring
+            downloader = providers.get_provider(url).get_downloader(url)
             try:
-                downloaded_path = providers.download(url, path=path, overwrite=overwrite)
+                downloaded_path = downloader.download(url, path=path, overwrite=overwrite)
             except Exception as e:
                 yield get_status_dict(
                     status="error",
@@ -185,6 +193,10 @@ class DownloadURL(Interface):
                     exception=e,
                     **common_report)
             else:
+                if not need_datalad_remote \
+                   and (downloader.authenticator or downloader.credential or
+                        type(downloader) != HTTPDownloader):
+                    need_datalad_remote = True
                 downloaded_paths.append(downloaded_path)
                 path_urls[downloaded_path] = url
                 yield get_status_dict(
@@ -210,7 +222,13 @@ URLs:
                             on_failure="ignore"):
                 yield r
 
-            if isinstance(ds.repo, AnnexRepo):
+            ds_repo = ds.repo
+            if isinstance(ds_repo, AnnexRepo):
+                if need_datalad_remote:
+                    from datalad.customremotes.base import ensure_datalad_remote
+                    ensure_datalad_remote(
+                        ds_repo, autoenable=True, encryption=None)
+
                 if got_ds_instance:
                     # Paths in `downloaded_paths` are already relative to the
                     # dataset.
@@ -231,7 +249,7 @@ URLs:
                                         orig_path, ds)
                 annex_paths = [p for p, annexed in
                                zip(rpaths,
-                                   ds.repo.is_under_annex(list(rpaths.keys())))
+                                   ds_repo.is_under_annex(list(rpaths.keys())))
                                if annexed]
                 if annex_paths:
                     for path in annex_paths:
@@ -239,7 +257,7 @@ URLs:
                         try:
                             # The file is already present. This is just to
                             # register the URL.
-                            ds.repo.add_url_to_file(
+                            ds_repo.add_url_to_file(
                                 path,
                                 url,
                                 # avoid batch mode for single files
@@ -254,4 +272,4 @@ URLs:
                     if archive:
                         from datalad.api import add_archive_content
                         for path in annex_paths:
-                            add_archive_content(path, annex=ds.repo, delete=True)
+                            add_archive_content(path, annex=ds_repo, delete=True)

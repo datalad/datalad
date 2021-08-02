@@ -12,7 +12,7 @@ from datalad.tests.utils import (
     assert_result_count,
     known_failure_windows,
     serve_path_via_http,
-    SkipTest,
+    skip_if_adjusted_branch,
     with_tempfile
 )
 from datalad.distributed.ora_remote import (
@@ -69,12 +69,18 @@ def test_initremote(store_path, store_url, ds_path):
     #   - url
     #   - common_init_opts
     #   - archive_id (which equals ds id)
-    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'])
+    remote_log = ds.repo.call_git(['cat-file', 'blob', 'git-annex:remote.log'],
+                                  read_only=True)
     assert_in("url={}".format(url), remote_log)
     [assert_in(c, remote_log) for c in common_init_opts]
     assert_in("archive-id={}".format(ds.id), remote_log)
 
 
+# TODO: on crippled FS copytree to populate store doesn't seem to work.
+#       Or may be it's just the serving via HTTP that doesn't work.
+#       Either way, after copytree and fsck, whereis doesn't report
+#       the store as an available source.
+@skip_if_adjusted_branch
 @known_failure_windows  # see gh-4469
 @with_tempfile(mkdir=True)
 @serve_path_via_http
@@ -84,13 +90,6 @@ def test_read_access(store_path, store_url, ds_path):
     ds = Dataset(ds_path).create()
     populate_dataset(ds)
     ds.save()
-
-    if ds.repo.is_managed_branch():
-        # TODO: on crippled FS copytree to populate store doesn't seem to work.
-        #       Or may be it's just the serving via HTTP that doesn't work.
-        #       Either way, after copytree and fsck, whereis doesn't report
-        #       the store as an available source.
-        raise SkipTest("Skip on crippled FS")
 
     files = [Path('one.txt'), Path('subdir') / 'two']
     store_path = Path(store_path)

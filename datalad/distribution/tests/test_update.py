@@ -15,11 +15,17 @@ from os.path import (
     join as opj,
     exists,
 )
+from unittest.mock import patch
+
 from ..dataset import Dataset
 from datalad.api import (
+    clone,
     install,
     update,
     remove,
+)
+from datalad.distribution.update import (
+    _process_how_args,
 )
 from datalad.utils import (
     knows_annex,
@@ -31,6 +37,7 @@ from datalad.support.gitrepo import (
     GitRepo,
 )
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import (
     with_tempfile,
     assert_in,
@@ -41,19 +48,25 @@ from datalad.tests.utils import (
     assert_is_instance,
     ok_,
     create_tree,
+    maybe_adjust_repo,
     ok_file_has_content,
     assert_status,
+    assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_in_results,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
+    skip_if_adjusted_branch,
     SkipTest,
     slow,
     known_failure_windows,
+    neq_,
 )
 from datalad import cfg as dl_cfg
 
 # https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
+# At least one aspect of the failure is a more general adjusted branch issue.
 @known_failure_windows
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -63,9 +76,13 @@ def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
     source = install(src_path, source=origin, recursive=True)
-    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
-    source.repo.remove_remote("origin")
+    source.repo.remove_remote(DEFAULT_REMOTE)
+    # also forget the declared absolute location of the submodules, and turn them
+    # relative to this/a clone
+    for sub in source.subdatasets(result_xfm=lambda x: x['gitmodule_name']):
+        source.subdatasets(path=sub, set_property=[('url', './{}'.format(sub))])
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())
@@ -85,7 +102,7 @@ def test_update_simple(origin, src_path, dst_path):
     assert_status('ok', dest.update())
     assert_repo_status(dst_path)
 
-    # modify origin:
+    # modify remote:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
     source.save(path="update.txt", message="Added update.txt")
@@ -96,8 +113,9 @@ def test_update_simple(origin, src_path, dst_path):
     # modification is not known to active branch:
     assert_not_in("update.txt",
                   dest.repo.get_files(dest.repo.get_active_branch()))
-    # modification is known to branch origin/<default branch>
-    assert_in("update.txt", dest.repo.get_files("origin/" + DEFAULT_BRANCH))
+    # modification is known to branch <default remote>/<default branch>
+    assert_in("update.txt",
+              dest.repo.get_files(DEFAULT_REMOTE + "/" + DEFAULT_BRANCH))
 
     # merge:
     assert_status('ok', dest.update(merge=True))
@@ -176,7 +194,7 @@ def test_update_simple(origin, src_path, dst_path):
         dest.update(merge=True, recursive=True), 2,
         action='update', status='ok', type='dataset')
     # and now we can get new file
-    dest.get('2/load.dat')
+    dest.get(opj('2', 'load.dat'))
     ok_file_has_content(opj(dest.path, '2', 'load.dat'), 'heavy')
 
 
@@ -196,31 +214,30 @@ def test_update_git_smoke(src_path, dst_path):
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
-# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:606
-@known_failure_windows
-@slow  # 20.6910s
-@with_testrepos('.*annex.*', flavors=['clone'])
+@slow  # ~9s
 @with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_update_fetch_all(src, remote_1, remote_2):
-    rmt1 = AnnexRepo.clone(src, remote_1)
-    rmt2 = AnnexRepo.clone(src, remote_2)
+def test_update_fetch_all(path):
+    path = Path(path)
+    remote_1 = str(path / "remote_1")
+    remote_2 = str(path / "remote_2")
 
-    ds = Dataset(src)
+    ds = Dataset(path / "src").create()
+    src = ds.repo.path
+
+    ds_rmt1 = clone(source=src, path=remote_1)
+    ds_rmt2 = clone(source=src, path=remote_2)
+
     ds.siblings('add', name="sibling_1", url=remote_1)
     ds.siblings('add', name="sibling_2", url=remote_2)
 
     # modify the remotes:
-    with open(opj(remote_1, "first.txt"), "w") as f:
-        f.write("some file load")
-    rmt1.add("first.txt")
-    rmt1.commit()
+    (ds_rmt1.pathobj / "first.txt").write_text("some file load")
+    ds_rmt1.save()
+
     # TODO: Modify an already present file!
 
-    with open(opj(remote_2, "second.txt"), "w") as f:
-        f.write("different file load")
-    rmt2.add("second.txt", git=True)
-    rmt2.commit(msg="Add file to git.")
+    (ds_rmt2.pathobj / "second.txt").write_text("different file load")
+    ds_rmt2.save()
 
     # Let's init some special remote which we couldn't really update/fetch
     if not dl_cfg.get('datalad.tests.dataladremote'):
@@ -260,7 +277,6 @@ def test_update_fetch_all(src, remote_1, remote_2):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_newthings_coming_down(originpath, destpath):
@@ -271,7 +287,7 @@ def test_newthings_coming_down(originpath, destpath):
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
     assert_is_instance(ds.repo, GitRepo)
-    assert_in('origin', ds.repo.get_remotes())
+    assert_in(DEFAULT_REMOTE, ds.repo.get_remotes())
     # turn origin into an annex
     origin = AnnexRepo(originpath, create=True)
     # clone doesn't know yet
@@ -308,23 +324,30 @@ def test_newthings_coming_down(originpath, destpath):
     # for now this should simply not fail (see gh-793), later might be enhanced to a
     # graceful downgrade
     before_branches = ds.repo.get_branches()
+    ok_(any("git-annex" in b
+            for b in ds.repo.get_remote_branches()))
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(before_branches, ds.repo.get_branches())
     # annex branch got pruned
-    eq_(['origin/HEAD', 'origin/' + DEFAULT_BRANCH],
-        ds.repo.get_remote_branches())
+    assert_false(any("git-annex" in b
+                     for b in ds.repo.get_remote_branches()))
     # check that a new tag comes down even if repo types mismatch
     origin.tag('second!')
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
+    repo = origin.repo
+    if repo.is_managed_branch() and repo.git_annex_version <= "8.20201129":
+        # Fails before git-annex's fd161da2c (adjustTree: Consider submodule
+        # deletions, 2021-01-06).
+        raise SkipTest(
+            "On adjusted branch, test requires fix in more recent git-annex")
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -404,7 +427,6 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     assert_repo_status(ds.path)
 
 
-@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_reobtain_data(originpath, destpath):
@@ -464,15 +486,14 @@ def test_multiway_merge(path):
     assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
 
 
+# `git annex sync REMOTE` rather than `git merge TARGET` is used on an
+# adjusted branch, so we don't give an error if TARGET can't be
+# determined.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_no_merge_target(path):
     path = Path(path)
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` rather than `git merge TARGET` is used on an
-        # adjusted branch, so we don't give an error if TARGET can't be
-        # determined.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     assert_repo_status(ds_src.path)
@@ -481,15 +502,14 @@ def test_merge_no_merge_target(path):
     assert_in_results(res, status="impossible", action="update")
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge TARGET` being used.
+@skip_if_adjusted_branch
 @slow  # 17sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge TARGET` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_src_s0 = ds_src.create("s0")
     ds_src_s1 = ds_src.create("s1")
     ds_src.save()
@@ -536,15 +556,14 @@ def test_merge_conflict(path):
                        modified=[ds_clone_s0.path, ds_clone_s1.path])
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge TARGET` being used.
+@skip_if_adjusted_branch
 @slow  # 13sec on Yarik's laptop
 @with_tempfile(mkdir=True)
 def test_merge_conflict_in_subdataset_only(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge TARGET` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
     ds_src_sub_conflict = ds_src.create("sub_conflict")
     ds_src_sub_noconflict = ds_src.create("sub_noconflict")
     ds_src.save()
@@ -577,18 +596,16 @@ def test_merge_conflict_in_subdataset_only(path):
     assert_repo_status(ds_clone_sub_noconflict.path)
     # ... but the one with the conflict leaves it for the caller to handle.
     ok_(ds_clone_sub_conflict.repo.call_git(
-        ["ls-files", "--unmerged", "--", "foo"]).strip())
+        ["ls-files", "--unmerged", "--", "foo"], read_only=True).strip())
 
 
+# `git annex sync REMOTE` is used on an adjusted branch, but this error
+# depends on `git merge --ff-only ...` being used.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_ff_only(path):
     path = Path(path)
     ds_src = Dataset(path / "src").create()
-    if ds_src.repo.is_managed_branch():
-        # `git annex sync REMOTE` is used on an adjusted branch, but this error
-        # depends on `git merge --ff-only ...` being used.
-        raise SkipTest("Test depends on non-adjusted branch")
-
     ds_clone_ff = install(source=ds_src.path, path=path / "clone_ff",
                           result_xfm="datasets")
 
@@ -651,33 +668,19 @@ def test_merge_follow_parentds_subdataset_other_branch(path):
         eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
-def _adjust(repo):
-    """Put `repo` into an adjusted branch, upgrading if needed.
-    """
-    # This can be removed once GIT_ANNEX_MIN_VERSION is at least
-    # 7.20190912.
-    if not repo.supports_unlocked_pointers:
-        repo.call_git(["annex", "upgrade"])
-        repo.config.reload(force=True)
-    repo.adjust()
-
-
+# This test depends on the source repo being an un-adjusted branch.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     path = Path(path)
 
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        raise SkipTest(
-            "This test depends on the source repo being "
-            "an un-adjusted branch")
-
     ds_src_subds = ds_src.create("subds")
 
     ds_clone = install(source=ds_src.path, path=path / "clone",
                        recursive=True, result_xfm="datasets")
     ds_clone_subds = Dataset(ds_clone.pathobj / "subds")
-    _adjust(ds_clone_subds.repo)
+    maybe_adjust_repo(ds_clone_subds.repo)
     # Note: Were we to save ds_clone here, we would get a merge conflict in the
     # top repo for the submodule (even if using 'git annex sync' rather than
     # 'git merge').
@@ -696,8 +699,16 @@ def test_merge_follow_parentds_subdataset_adjusted_warning(path):
     eq_(ds_clone.repo.get_hexsha(), ds_src.repo.get_hexsha())
 
 
+# Skip non-adjusted case for systems that only support adjusted branches.
+@skip_if_adjusted_branch
 @with_tempfile(mkdir=True)
 def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
+    if on_adjusted and DEFAULT_REMOTE != "origin" and \
+       external_versions['cmd:annex'] <= "8.20210330":
+        raise SkipTest(
+            "'git annex init' with adjusted branch currently fails "
+            "due to hard-coded 'origin'")
+
     # Note: For the adjusted case, this is not much more than a smoke test that
     # on an adjusted branch we fail sensibly. The resulting state is not easy
     # to reason about nor desirable.
@@ -706,10 +717,6 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     # The additional dataset level is to gain some confidence that this works
     # for nested datasets.
     ds_src = Dataset(path / "source").create()
-    if ds_src.repo.is_managed_branch():
-        if not on_adjusted:
-            raise SkipTest("System only supports adjusted branches. "
-                           "Skipping non-adjusted test")
     ds_src_s0 = ds_src.create("s0")
     ds_src_s1 = ds_src_s0.create("s1")
     ds_src.save(recursive=True)
@@ -719,7 +726,7 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
         # crash when there are submodules and an adjusted branch is checked
         # out, 2019-10-23).
         for ds in [ds_src, ds_src_s0, ds_src_s1]:
-            _adjust(ds.repo)
+            maybe_adjust_repo(ds.repo)
         ds_src.save(recursive=True)
     assert_repo_status(ds_src.path)
 
@@ -827,3 +834,273 @@ def test_update_unborn_master(path):
     assert_status("ok",
                   ds_b.update(merge=True, on_failure="ignore"))
     eq_(ds_a.repo.get_hexsha(), ds_b.repo.get_hexsha())
+
+
+@slow  # ~25s
+@with_tempfile(mkdir=True)
+def test_update_follow_parentds_lazy(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    ds_src_s0 = ds_src.create("s0")
+    ds_src_s0_s0 = ds_src_s0.create("s0")
+    ds_src_s0.create("s1")
+    ds_src_s1 = ds_src.create("s1")
+    ds_src.create("s2")
+    ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_clone_s0 = Dataset(ds_clone.pathobj / "s0")
+    ds_clone_s0_s0 = Dataset(ds_clone.pathobj / "s0" / "s0")
+    ds_clone_s0_s1 = Dataset(ds_clone.pathobj / "s0" / "s1")
+    ds_clone_s1 = Dataset(ds_clone.pathobj / "s1")
+    ds_clone_s2 = Dataset(ds_clone.pathobj / "s2")
+
+    (ds_src_s0_s0.pathobj / "foo").write_text("in s0 s0")
+    ds_src_s0_s0.save()
+    (ds_src_s1.pathobj / "foo").write_text("in s1")
+    ds_src.save(recursive=True)
+    # State:
+    # .
+    # |-- s0
+    # |   |-- s0
+    # |   `-- s1  * matches registered commit
+    # |-- s1
+    # `-- s2      * matches registered commit
+    res = ds_clone.update(follow="parentds-lazy", merge=True, recursive=True,
+                          on_failure="ignore")
+    on_adjusted = ds_clone.repo.is_managed_branch()
+    # For adjusted branches, follow=parentds* bails with an impossible result,
+    # so the s0 update doesn't get brought in and s0_s0 also matches the
+    # registered commit.
+    n_notneeded_expected = 3 if on_adjusted else 2
+    assert_result_count(res, n_notneeded_expected,
+                        action="update", status="notneeded")
+    assert_in_results(res, action="update", status="notneeded",
+                      path=ds_clone_s0_s1.repo.path)
+    assert_in_results(res, action="update", status="notneeded",
+                      path=ds_clone_s2.repo.path)
+    if on_adjusted:
+        assert_in_results(res, action="update", status="notneeded",
+                          path=ds_clone_s0_s0.repo.path)
+        assert_repo_status(ds_clone.path,
+                           modified=[ds_clone_s0.repo.path,
+                                     ds_clone_s1.repo.path])
+    else:
+        assert_repo_status(ds_clone.path)
+
+
+@slow  # ~10s
+@with_tempfile(mkdir=True)
+def test_update_follow_parentds_lazy_other_branch(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    ds_src_sub = ds_src.create("sub")
+    ds_src_sub.repo.checkout(DEFAULT_BRANCH, options=["-bother"])
+    (ds_src_sub.pathobj / "foo").write_text("on other branch")
+    ds_src_sub.save()
+    ds_src_sub.repo.checkout(DEFAULT_BRANCH)
+    ds_src.save(recursive=True)
+    assert_repo_status(ds_src.path)
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    ds_src_sub.repo.checkout("other")
+    ds_src.save(recursive=True)
+
+    with patch("datalad.support.gitrepo.GitRepo.fetch") as fetch_cmd:
+        ds_clone.update(follow="parentds", merge="ff-only",
+                        recursive=True, on_failure="ignore")
+        eq_(fetch_cmd.call_count, 2)
+
+    # With parentds-lazy, an unneeded fetch call in the subdataset is dropped.
+    with patch("datalad.support.gitrepo.GitRepo.fetch") as fetch_cmd:
+        ds_clone.update(follow="parentds-lazy", merge="ff-only",
+                        recursive=True, on_failure="ignore")
+        eq_(fetch_cmd.call_count, 1)
+
+    if not ds_clone.repo.is_managed_branch():
+        # Now the real thing.
+        ds_clone.update(follow="parentds-lazy", merge="ff-only",
+                        recursive=True)
+        ok_(op.lexists(str(ds_clone.pathobj / "sub" / "foo")))
+
+
+@with_tempfile(mkdir=True)
+def test_update_adjusted_incompatible_with_ff_only(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    maybe_adjust_repo(ds_clone.repo)
+
+    assert_in_results(
+        ds_clone.update(merge="ff-only", on_failure="ignore"),
+        action="update", status="impossible")
+    assert_in_results(
+        ds_clone.update(on_failure="ignore"),
+        action="update", status="ok")
+
+
+@slow  # ~10s
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def check_update_how_subds_different(follow, action, path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    ds_src_sub = ds_src.create("sub")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+    (ds_clone.pathobj / "foo").write_text("foo")
+    ds_clone.save()
+    ds_clone_sub = Dataset(ds_clone.pathobj / "sub")
+
+    (ds_src_sub.pathobj / "bar").write_text("bar")
+    ds_src.save(recursive=True)
+
+    # Add unrecorded state to make --follow=sibling/parentds differ.
+    (ds_src_sub.pathobj / "baz").write_text("baz")
+    ds_src_sub.save()
+
+    ds_clone_repo = ds_clone.repo
+    ds_clone_hexsha_pre = ds_clone_repo.get_hexsha()
+
+    ds_clone_sub_repo = ds_clone_sub.repo
+    ds_clone_sub_branch_pre = ds_clone_sub_repo.get_active_branch()
+
+    res = ds_clone.update(follow=follow, how="merge", how_subds=action,
+                          recursive=True)
+
+    assert_result_count(res, 1, action="merge", status="ok",
+                        path=ds_clone.path)
+    assert_result_count(res, 1, action=f"update.{action}", status="ok",
+                        path=ds_clone_sub.path)
+
+    ds_clone_hexsha_post = ds_clone_repo.get_hexsha()
+    neq_(ds_clone_hexsha_pre, ds_clone_hexsha_post)
+    neq_(ds_src.repo.get_hexsha(), ds_clone_hexsha_post)
+    ok_(ds_clone_repo.is_ancestor(ds_clone_hexsha_pre, ds_clone_hexsha_post))
+
+    eq_(ds_clone_sub.repo.get_hexsha(),
+        ds_src_sub.repo.get_hexsha(None if follow == "sibling" else "HEAD~"))
+    ds_clone_sub_branch_post = ds_clone_sub_repo.get_active_branch()
+
+    if action == "checkout":
+        neq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
+        assert_false(ds_clone_sub_branch_post)
+    else:
+        eq_(ds_clone_sub_branch_pre, ds_clone_sub_branch_post)
+
+
+def test_update_how_subds_different():
+    # Ideally each combination would be checked, but this test is a bit slow.
+    yield check_update_how_subds_different, "parentds", "reset"
+    yield check_update_how_subds_different, "sibling", "checkout"
+
+
+@slow  # ~15s
+@skip_if_adjusted_branch
+@with_tempfile(mkdir=True)
+def test_update_reset_dirty(path):
+    path = Path(path)
+    ds_src = Dataset(path / "source").create()
+    ds_src_s1 = ds_src.create("s1")
+    ds_src_s2 = ds_src.create("s2")
+    ds_src.save()
+
+    ds_clone = install(source=ds_src.path, path=path / "clone",
+                       recursive=True, result_xfm="datasets")
+
+    (ds_src_s1.pathobj / "foo").write_text("foo")
+    (ds_src_s2.pathobj / "bar").write_text("bar")
+    ds_src.save(recursive=True)
+
+    ds_clone_s1 = Dataset(ds_clone.pathobj / "s1")
+    ds_clone_s2 = Dataset(ds_clone.pathobj / "s2")
+    (ds_clone_s1.pathobj / "dirt").write_text("")
+
+    res = ds_clone.update(follow="sibling", how="reset", recursive=True,
+                          on_failure="ignore")
+
+    assert_result_count(res, 1, path=ds_clone.path,
+                        action=f"update.reset", status="error")
+    assert_result_count(res, 1, path=ds_clone_s1.path,
+                        action=f"update.reset", status="error")
+    assert_result_count(res, 1, path=ds_clone_s2.path,
+                        action=f"update.reset", status="ok")
+
+    # s2 was reset...
+    eq_(ds_src_s2.repo.get_hexsha(), ds_clone_s2.repo.get_hexsha())
+    # ... but s1 and the top-level dataset stayed behind due to the dirty tree.
+    eq_(ds_src.repo.get_hexsha("HEAD~"), ds_clone.repo.get_hexsha())
+    eq_(ds_src_s1.repo.get_hexsha("HEAD~"), ds_clone_s1.repo.get_hexsha())
+
+    assert_repo_status(ds_clone.path,
+                       modified=[ds_clone_s1.repo.path,
+                                 ds_clone_s2.repo.path])
+
+
+def test_process_how_args():
+    # --merge maps onto --how values. It has no equivalent of --how-subds,
+    # --which just gets set to --how's value when unspecified.
+    eq_(_process_how_args(merge=False, how=None, how_subds=None),
+        (None, None))
+    eq_(_process_how_args(merge=True, how=None, how_subds=None),
+        ("merge", "merge"))
+    eq_(_process_how_args(merge="any", how=None, how_subds=None),
+        ("merge", "merge"))
+    eq_(_process_how_args(merge="ff-only", how=None, how_subds=None),
+        ("ff-only", "ff-only"))
+
+    # Values other than the default --merge=False can not be mixed with
+    # non-default how values.
+    with assert_raises(ValueError):
+        _process_how_args(merge=True, how="merge", how_subds=None)
+    with assert_raises(ValueError):
+        _process_how_args(merge=True, how=None, how_subds="merge")
+
+    # --how-subds inherits the value of --how...
+    eq_(_process_how_args(merge=False, how="fetch", how_subds=None),
+        (None, None))
+    eq_(_process_how_args(merge=False, how="merge", how_subds=None),
+        ("merge", "merge"))
+    eq_(_process_how_args(merge=False, how="ff-only", how_subds=None),
+        ("ff-only", "ff-only"))
+    # ... unless --how-subds is explicitly specified.
+    eq_(_process_how_args(merge=False, how="merge", how_subds="fetch"),
+        ("merge", None))
+
+
+@with_tempfile(mkdir=True)
+def test_update_fetch_failure(path):
+    path = Path(path)
+
+    ds_a = Dataset(path / "ds_a").create()
+    s1 = ds_a.create("s1")
+    ds_a.create("s2")
+
+    ds_b = install(source=ds_a.path, path=str(path / "ds-b"), recursive=True)
+
+    # Rename s1 to make fetch fail.
+    s1.pathobj.rename(s1.pathobj.parent / "s3")
+
+    res = ds_b.update(recursive=True, on_failure="ignore")
+    assert_in_results(
+        res,
+        status="error",
+        path=str(ds_b.pathobj / "s1"),
+        action="update")
+    assert_in_results(
+        res,
+        status="ok",
+        path=str(ds_b.pathobj / "s2"),
+        action="update")
+    assert_in_results(
+        res,
+        status="ok",
+        path=ds_b.path,
+        action="update")

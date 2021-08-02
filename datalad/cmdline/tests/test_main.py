@@ -10,39 +10,47 @@
 
 import os
 import re
-import sys
 from io import StringIO
 from unittest.mock import patch
 
 import datalad
 from ..main import (
-    main,
-    fail_with_short_help,
     _fix_datalad_ri,
+    main,
 )
+from ..helpers import fail_with_short_help
 from datalad import __version__
 from datalad.cmd import (
     WitlessRunner as Runner,
     StdOutErrCapture,
 )
-from datalad.ui.utils import get_console_width
-from datalad.api import create
+from datalad.ui.utils import (
+    get_console_width,
+    get_terminal_size,
+)
+from datalad.api import (
+    create,
+    Dataset,
+)
 from datalad.utils import (
     chpwd,
     Path,
 )
 from datalad.tests.utils import (
-    on_windows,
-    with_tempfile,
+    SkipTest,
     assert_equal,
+    assert_in,
+    assert_not_in,
     assert_raises,
+    assert_re_in,
+    eq_,
     in_,
     ok_startswith,
-    assert_in,
-    assert_re_in,
-    assert_not_in,
+    on_windows,
     slow,
+    with_tempfile,
 )
+from datalad.support.exceptions import CommandError
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -82,16 +90,23 @@ def run_main(args, exit_code=0, expect_stderr=False):
 
 # TODO: switch to stdout for --version output
 def test_version():
+    # we just get a version if not asking for a version of some command
     stdout, stderr = run_main(['--version'], expect_stderr=True)
+    eq_(stdout.rstrip(), "datalad %s" % datalad.__version__)
 
-    # and output should contain our version, copyright, license
-
-    # https://hg.python.org/cpython/file/default/Doc/whatsnew/3.4.rst#l1952
-    out = stdout if sys.version_info >= (3, 4) else stderr
-    ok_startswith(out, 'datalad %s\n' % datalad.__version__)
+    stdout, stderr = run_main(['clone', '--version'], expect_stderr=True)
+    ok_startswith(stdout, 'datalad %s\n' % datalad.__version__)
     # since https://github.com/datalad/datalad/pull/2733 no license in --version
-    assert_not_in("Copyright", out)
-    assert_not_in("Permission is hereby granted", out)
+    assert_not_in("Copyright", stdout)
+    assert_not_in("Permission is hereby granted", stdout)
+
+    try:
+        import datalad_container
+    except ImportError:
+        pass  # not installed, cannot test with extension
+    else:
+        stdout, stderr = run_main(['containers-list', '--version'], expect_stderr=True)
+        eq_(stdout, 'datalad_container %s\n' % datalad_container.__version__)
 
 
 def test_help_np():
@@ -111,8 +126,12 @@ def test_help_np():
               'General information',
               'Global options',
               'Plumbing commands',
-              'Plugins'}:
+              }:
         assert_in(s, sections)
+
+    if not get_terminal_size()[0] or 0:
+        raise SkipTest(
+            "Could not determine terminal size, skipping the rest of the test")
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
@@ -181,12 +200,6 @@ def test_incorrect_options():
 
 def test_script_shims():
     runner = Runner()
-    # The EASY-INSTALL checks below aren't valid for editable installs. Use the
-    # existence of setup.py as an indication that install is _probably_
-    # editable. The file should always exist for editable installs, but it can
-    # also exist for non-editable installs when the tests are being executed
-    # from the top of the source tree.
-    setup_exists = (Path(datalad.__file__).parent.parent / "setup.py").exists()
     for script in [
         'datalad',
         'git-annex-remote-datalad-archives',
@@ -201,18 +214,16 @@ def test_script_shims():
             from distutils.spawn import find_executable
             content = find_executable(script)
 
-        if not setup_exists:
-            assert_not_in('EASY', content) # NOTHING easy should be there
-            assert_not_in('pkg_resources', content)
-
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)
-        version = (out['stdout'] + out['stderr']).splitlines()[0].split(' ', 1)[1]
+        version = out['stdout'].rstrip()
+        mod, version = version.split(' ', 1)
+        assert_equal(mod, 'datalad')
         # we can get git and non git .dev version... so for now
         # relax
-        get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
+        get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
         # extract numeric portion
-        assert get_numeric_portion(version) # that my lambda is correctish
+        assert get_numeric_portion(version), f"Got no numeric portion from {version}"
         assert_equal(get_numeric_portion(__version__),
                      get_numeric_portion(version))
 
@@ -282,7 +293,7 @@ def test_fail_with_short_help():
             known=["mother", "mutter", "father", "son"],
             provided="muther",
             hint="You can become one",
-            exit_code=0,  # noone forbids
+            exit_code=0,  # nobody forbids
             what="parent",
             out=out)
     assert_equal(cme.exception.code, 0)
@@ -304,3 +315,73 @@ def test_fix_datalad_ri():
     assert_equal(_fix_datalad_ri('///a'), '///a')
     assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
     assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+def test_fail_with_short_help():
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(exit_code=3, out=out)
+    assert_equal(cme.exception.code, 3)
+    assert_equal(out.getvalue(), "")
+
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(msg="Failed badly", out=out)
+    assert_equal(cme.exception.code, 1)
+    assert_equal(out.getvalue(), "error: Failed badly\n")
+
+    # Suggestions, hint, etc
+    out = StringIO()
+    with assert_raises(SystemExit) as cme:
+        fail_with_short_help(
+            msg="Failed badly",
+            known=["mother", "mutter", "father", "son"],
+            provided="muther",
+            hint="You can become one",
+            exit_code=0,  # nobody forbids
+            what="parent",
+            out=out)
+    assert_equal(cme.exception.code, 0)
+    assert_equal(out.getvalue(),
+                 "error: Failed badly\n"
+                 "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
+                 "Did you mean any of these?\n"
+                 "        mutter\n"
+                 "        mother\n"
+                 "        father\n"
+                 "Hint: You can become one\n")
+
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+def test_commanderror_jsonmsgs(src, exp):
+    ds = Dataset(src).create()
+    (ds.pathobj / '123').write_text('123')
+    ds.save()
+    ds.repo.call_annex([
+        'initremote', 'expdir', 'type=directory',
+        'directory={}'.format(exp),
+        'encryption=none',
+        'exporttree=yes'
+    ])
+    #ds.repo.call_annex(['export', '--to=expdir', 'HEAD'])
+    # this must fail, because `push` cannot handle an export.
+    # when https://github.com/datalad/datalad/issues/3127 is implemented
+    # this test must be adjusted
+    with assert_raises(CommandError) as cme:
+        Runner(cwd=ds.path).run(
+            ['datalad', 'push', '--to', 'expdir'],
+            protocol=StdOutErrCapture)
+    if ds.repo.git_annex_version >= "8.20200309":
+        in_('use `git-annex export`', cme.exception.stderr)

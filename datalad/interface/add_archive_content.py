@@ -240,7 +240,7 @@ class AddArchiveContent(Interface):
         if archive in annex.untracked_files:
             raise RuntimeError(
                 "The archive is not under annex yet. You should run 'datalad "
-                "add {}' first".format(archive))
+                "save {}' first".format(archive))
 
         if not allow_dirty and annex.dirty:
             # already saved me once ;)
@@ -286,7 +286,7 @@ class AddArchiveContent(Interface):
         if extract_rpath == curdir:
             extract_rpath = None  # no special relpath from top of the repo
 
-        # and operate from now on the key or whereever content available "canonically"
+        # and operate from now on the key or wherever content available "canonically"
         try:
             key_rpath = annex.get_contentlocation(key)  # , relative_to_top=True)
         except:
@@ -432,7 +432,7 @@ class AddArchiveContent(Interface):
                             target_file_path_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
                             if not lexists(target_file_path_new):
                                 break
-                            lgr.debug("File %s already exists" % target_file_path_new)
+                            lgr.debug("File %s already exists", target_file_path_new)
                             i += 1
                             suf = '.%d' % i
                         target_file_path = target_file_path_new
@@ -496,7 +496,7 @@ class AddArchiveContent(Interface):
                 # force=True since some times might still be staged and fail
                 annex.remove(archive_rpath, force=True)
 
-            lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
+            lgr.info("Finished adding %s: %s", archive, stats.as_str(mode='line'))
 
             if outside_stats:
                 outside_stats += stats

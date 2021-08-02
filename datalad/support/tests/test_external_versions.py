@@ -54,6 +54,11 @@ def test_external_versions_basic():
     assert_equal(ev[our_module], __version__)
     # and it could be compared
     assert_greater_equal(ev[our_module], __version__)
+    # We got some odd failure in this test not long are after switching to versionner
+    # https://github.com/datalad/datalad/issues/5785.  Verify that we do get expected
+    # data types
+    our_version = ev[our_module].version
+    assert isinstance(our_version, (str, list)), f"Got {our_version!r} of type {type(our_version)}"
     assert_greater(ev[our_module], '0.1')
     assert_equal(list(ev.keys()), [our_module])
     assert_true(our_module in ev)
@@ -119,7 +124,7 @@ def test_external_versions_popular_packages():
     ev = ExternalVersions()
 
     for modname in ('scipy', 'numpy', 'mvpa2', 'sklearn', 'statsmodels', 'pandas',
-                    'matplotlib', 'psychopy'):
+                    'matplotlib', 'psychopy', 'github'):
         yield _test_external, ev, modname
 
     # more of a smoke test

@@ -25,7 +25,6 @@ from datalad.tests.utils import (
     assert_raises,
     eq_,
     with_tempfile,
-    known_failure_githubci_win,
 )
 
 
@@ -77,15 +76,17 @@ def test_dryrun(path):
         site='dummy', sibling='dummy',
     )
     # now a working, fully manual call
-    res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
-        site='dummy', project='here',
-    )
-    assert_result_count(res, 1)
-    assert_result_count(
-        res, 1, path=ctlg['root'].path, type='dataset', status='ok',
-        site='dummy', sibling='dummy', project='here',
-    )
+    for p in (None, ctlg['root'].path):
+        res = ctlg['root'].create_sibling_gitlab(
+            dryrun=True, on_failure='ignore',
+            site='dummy', project='here',
+            path=p,
+        )
+        assert_result_count(res, 1)
+        assert_result_count(
+            res, 1, path=ctlg['root'].path, type='dataset', status='ok',
+            site='dummy', sibling='dummy', project='here',
+        )
 
     # now configure a default gitlab site
     ctlg['root'].config.set('datalad.gitlab-default-site', 'theone')
@@ -154,7 +155,7 @@ def test_dryrun(path):
         # which implies each dataset is in its own group
         # project itself is placed at '_repo'_ to give URLs like
         # http://site/dir/dir/dir/_repo_.git
-        # as a balance between readibility and name conflict minimization
+        # as a balance between readability and name conflict minimization
         project='secret/{}/_repo_'.format(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj).as_posix()),
     )
@@ -303,7 +304,6 @@ class _CreateFailureGitLab(_FakeGitLab):
 @with_tempfile
 def test_fake_gitlab(path):
     from unittest.mock import patch
-    import datalad.distributed.create_sibling_gitlab
     ds = Dataset(path).create()
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _NewProjectGitLab):
         res = ds.create_sibling_gitlab(site='dummy', project='here', description='thisisit')
@@ -324,7 +324,7 @@ def test_fake_gitlab(path):
 
     # try recreation, the sibling is already configured, same setup, no error
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _ExistingProjectGitLab):
-        res = ds.create_sibling_gitlab(site='dummy', project='here')
+        res = ds.create_sibling_gitlab(path=ds.path, site='dummy', project='here')
         assert_result_count(res, 2)
         assert_result_count(
             res, 1, action='create_sibling_gitlab', path=path,
