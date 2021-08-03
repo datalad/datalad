@@ -18,6 +18,7 @@ from datalad.customremotes.ria_utils import (
     UnknownLayoutVersion,
     verify_ria_url,
 )
+from datalad.config import anything2bool
 
 
 lgr = logging.getLogger('datalad.customremotes.ria_remote')
@@ -672,8 +673,6 @@ def handle_errors(func):
     in a broken pipe by default handling.
     """
 
-    # TODO: configurable on remote end (flag within layout_version!)
-
     @wraps(func)
     def _wrap_handle_errors(self, *args, **kwargs):
         try:
@@ -736,8 +735,16 @@ class RIARemote(SpecialRemote):
             self.configs['url'] = "RIA store to use"
             self.configs['push-url'] = "URL for pushing to the RIA store. " \
                                        "Optional."
-            self.configs['archive-id'] = "Dataset ID. Should be set " \
-                                         "automatically by datalad"
+            self.configs['archive-id'] = "Dataset ID (fallback: annex uuid. " \
+                                         "Should be set automatically by " \
+                                         "datalad"
+        self.gitdir = None
+        self.name = None  # name of the special remote
+        self.gitcfg_name = None # name in respective git remote
+
+        self.ria_store_url = None
+        self.ria_store_pushurl = None
+
         # machine to SSH-log-in to access/store the data
         # subclass must set this
         self.storage_host = None
@@ -748,8 +755,11 @@ class RIARemote(SpecialRemote):
         self.store_base_path_push = None
         # by default we can read and write
         self.read_only = False
+        # Whether or not to force writing to the remote. Currently used to
+        # overrule write protection due to layout version mismatch.
         self.force_write = None
         self.uuid = None
+        # whether to ignore config flags set at the remote end
         self.ignore_remote_config = None
         self.remote_log_enabled = None
         self.remote_dataset_tree_version = None
@@ -766,6 +776,9 @@ class RIARemote(SpecialRemote):
         # cache obj_locations:
         self._last_archive_path = None
         self._last_keypath = (None, None)
+
+        # SSH "streaming" buffer
+        self.buffer_size = DEFAULT_BUFFER_SIZE
 
     def verify_store(self):
         """Check whether the store exists and reports a layout version we
@@ -857,41 +870,170 @@ class RIARemote(SpecialRemote):
             else:
                 raise NoLayoutVersion
 
-    def _load_cfg(self, gitdir, name):
-        # Whether or not to force writing to the remote. Currently used to
-        # overrule write protection due to layout version mismatch.
-        self.force_write = _get_gitcfg(
-            gitdir, 'annex.ora-remote.{}.force-write'.format(name))
+    def _load_local_cfg(self):
 
-        # whether to ignore config flags set at the remote end
-        self.ignore_remote_config = \
-            _get_gitcfg(gitdir,
-                        'annex.ora-remote.{}.ignore-remote-config'.format(name))
+        cfg_map = {"ora-force-write": "force_write",
+                   "ora-ignore-ria-config": "ignore_remote_config",
+                   "ora-buffer-size": "buffer_size",
+                   "ora-url": "ria_store_url",
+                   "ora-push-url": "ria_store_pushurl"
+                   }
 
-        # buffer size for reading files over HTTP and SSH
-        self.buffer_size = _get_gitcfg(gitdir,
-                                       "remote.{}.ora-buffer-size"
-                                       "".format(name))
-        if self.buffer_size:
-            self.buffer_size = int(self.buffer_size)
+        if self.gitcfg_name:
+            git_remote_entries = \
+                _get_gitcfg(self.gitdir,
+                            "^remote\." + self.gitcfg_name + "\..*",
+                            regex=True).splitlines()
+            for entry in git_remote_entries:
+                key, value = entry.split()
+                try:
+                    self.__setattr__(cfg_map[key.split('.')[-1]], value)
+                    if key == "ora-url" and value:
+                        self.ria_store_url_source = 'local'
+                    elif key == "ora-push-url" and value:
+                        self.ria_store_pushurl_source = 'local'
+                except KeyError:
+                    # config not in map -> not for us
+                    pass
+            if self.buffer_size:
+                try:
+                    self.buffer_size = int(self.buffer_size)
+                except ValueError:
+                    self.message("Invalid value of config "
+                                 "'remote.{}.ora-buffer-size': {}"
+                                 "".format(self.gitcfg_name, self.buffer_size))
 
-    def _verify_config(self, gitdir, fail_noid=True):
-        # try loading all needed info from (git) config
-        name = self.annex.getconfig('name')
-        if not name:
-            name = self.annex.getconfig('sameas-name')
-        if not name:
+        if self.name:
+            # Consider deprecated configs if there's no value yet
+            if self.force_write is None:
+                self.force_write = \
+                    _get_gitcfg(self.gitdir,
+                                "annex.ora-remote.{}.force-write"
+                                "".format(self.name))
+                if self.force_write:
+                    self.message("WARNING: config "
+                                 "'annex.ora-remote.{}.force-write' is "
+                                 "deprecated. Use 'remote.{}.ora-force-write' "
+                                 "instead.".format(self.name, self.gitcfg_name))
+                    try:
+                        self.force_write = anything2bool(self.force_write)
+                    except TypeError:
+                        raise RIARemoteError("Invalid value of config "
+                                             "'annex.ora-remote.{}.force-write'"
+                                             ": {}".format(self.name,
+                                                           self.force_write))
+
+            if self.ignore_remote_config is None:
+                self.ignore_remote_config = \
+                    _get_gitcfg(self.gitdir,
+                                "annex.ora-remote.{}.ignore-remote-config"
+                                "".format(self.name))
+                if self.ignore_remote_config:
+                    self.message("WARNING: config "
+                                 "'annex.ora-remote.{}.ignore-remote-config' is"
+                                 " deprecated. Use "
+                                 "'remote.{}.ora-ignore-ria-config' instead."
+                                 "".format(self.name, self.gitcfg_name))
+                    try:
+                        self.ignore_remote_config = \
+                            anything2bool(self.ignore_remote_config)
+                    except TypeError:
+                        raise RIARemoteError(
+                            "Invalid value of config "
+                            "'annex.ora-remote.{}.ignore-remote-config': {}"
+                            "".format(self.name, self.ignore_remote_config))
+
+    def _load_committed_cfg(self, fail_noid=True):
+
+        # go look for an ID
+        self.archive_id = self.annex.getconfig('archive-id')
+        if fail_noid and not self.archive_id:
+
+            # TODO: Message! "archive ID" is confusing. dl-id or annex-uuid
+            raise RIARemoteError(
+                "No archive ID configured. This should not happen.")
+
+        # which repo are we talking about
+        self.gitdir = self.annex.getgitdir()
+        # what is our uuid?
+        self.uuid = self.annex.getuuid()
+
+        # RIA store URL(s)
+        self.ria_store_url = self.annex.getconfig('url')
+        if self.ria_store_url:
+            self.ria_store_url_source = 'annex'
+        self.ria_store_pushurl = self.annex.getconfig('push-url')
+        if self.ria_store_pushurl:
+            self.ria_store_pushurl_source = 'annex'
+
+        # TODO: This should prob. not be done! Would only have an effect if
+        #       force-write was committed annex-special-remote-config and this
+        #       is likely a bad idea.
+        self.force_write = self.annex.getconfig('force-write')
+        if self.force_write == "":
+            self.force_write = None
+
+        # Get the special remote name
+        self.name = self.annex.getconfig('name')
+        if not self.name:
+            self.name = self.annex.getconfig('sameas-name')
+        if not self.name:
+            # TODO: Do we need to crash? Not necessarily, I think. We could
+            #       still find configs and if not - might work out.
             raise RIARemoteError(
                 "Cannot determine special remote name, got: {}".format(
-                    repr(name)))
-        # get store url(s):
-        self.ria_store_url = self.annex.getconfig('url')
-        self.ria_store_pushurl = self.annex.getconfig('push-url')
+                    repr(self.name)))
+        # Get the name of the remote entry in .git/config.
+        # Note, that this by default is the same as the stored name of the
+        # special remote, but can be different (for example after
+        # git-remote-rename). The actual connection is the uuid of the special
+        # remote, not the name.
+        try:
+            self.gitcfg_name = self.annex.getgitremotename()
+        except (ProtocolError, AttributeError):
+            # GETGITREMOTENAME not supported by annex version or by annexremote
+            # version.
+            # Lets try to find ourselves: Find remote with matching annex uuid
+            response = _get_gitcfg(self.gitdir,
+                                   "^remote\..*\.annex-uuid",
+                                   regex=True)
+            response = response.splitlines() if response else []
+            candidates = set()
+            for line in response:
+                k, v = line.split()
+                if v == self.annex.getuuid():  # TODO: Where else? self.uuid?
+                    candidates.add(''.join(k.split('.')[1:-1]))
+            num_candidates = len(candidates)
+            if num_candidates == 1:
+                self.gitcfg_name = candidates.pop()
+            elif num_candidates > 1:
+                self.message("Found multiple used remote names in git "
+                             "config: %s" % str(candidates))
+                # try same name:
+                if self.name in candidates:
+                    self.gitcfg_name = self.name
+                    self.message("Choose '%s'" % self.name)
+                else:
+                    self.gitcfg_name = None
+                    self.message("Ignore git config")
+            else:
+                # No entry found.
+                # Possible if we are in "initremote".
+                self.gitcfg_name = None
+
+    def _verify_config(self, fail_noid=True):
+        # try loading all needed info from (git) config
+
+        # first load committed config
+        self._load_committed_cfg(fail_noid=fail_noid)
+        # now local configs (possible overwrite of committed)
+        self._load_local_cfg()
+
         # Support URL rewrite without talking to a DataLad ConfigManager,
         # because of additional import cost otherwise. Remember that this is a
         # special remote not a "real" datalad process.
         url_cfgs = dict()
-        url_cfgs_raw = _get_gitcfg(gitdir, "^url.*", regex=True)
+        url_cfgs_raw = _get_gitcfg(self.gitdir, "^url.*", regex=True)
         if url_cfgs_raw:
             for line in url_cfgs_raw.splitlines():
                 k, v = line.split()
@@ -902,29 +1044,46 @@ class RIARemote(SpecialRemote):
                 verify_ria_url(self.ria_store_url, url_cfgs)
 
         else:
-            # for now still accept the configs, if no ria-URL is known, but
-            # issue deprecation warning:
-            host = _get_gitcfg(gitdir,
-                               'annex.ora-remote.{}.ssh-host'.format(name)) or \
-                   self.annex.getconfig('ssh-host')
+            # There's one exception to the precedence of local configs:
+            # Age-old "ssh-host" + "base-path" configs are only considered,
+            # if there was no RIA URL (local or committed). However, issue
+            # deprecation warning, if that situation is encountered:
+            host = None
+            path = None
+
+            if self.name:
+                host = _get_gitcfg(self.gitdir,
+                                   'annex.ora-remote.{}.ssh-host'
+                                   ''.format(self.name))
+                path = _get_gitcfg(self.gitdir,
+                                   'annex.ora-remote.{}.base-path'
+                                   ''.format(self.name))
+
+            if not host:
+                host = self.annex.getconfig('ssh-host')
             # Note: Special value '0' is replaced by None only after checking
             # the repository's annex config. This is to uniformly handle '0' and
             # None later on, but let a user's config '0' overrule what's
             # stored by git-annex.
             self.storage_host = None if host == '0' else host
 
-            path = _get_gitcfg(gitdir,
-                               'annex.ora-remote.{}.base-path'.format(name)) or \
-                   self.annex.getconfig('base-path')
+            if not path:
+                path = self.annex.getconfig('base-path')
             self.store_base_path = path.strip() if path else path
 
             if path or host:
                 self.message("WARNING: base-path + ssh-host configs are "
                              "deprecated and won't be considered in the future."
-                             " Use 'git annex enableremote {} "
-                             "url=<RIA-URL-TO-STORE>' to store a ria+<scheme>:"
-                             "//... URL in the special remote's config."
-                             "".format(name))
+                             " Use 'git annex enableremote {name} "
+                             "url=ria+{scheme}://{host}/{path} to store a RIA "
+                             "URL in the special remote's config or use 'git "
+                             "config' to store that url locally in the config "
+                             "variable 'remote.{name}.ora-url'."
+                             "".format(name=self.name if self.name else 'NAME',
+                                       scheme='ssh' if host else 'file',
+                                       host=host,
+                                       path=path)
+                             )
 
         if not self.store_base_path:
             raise RIARemoteError(
@@ -935,7 +1094,7 @@ class RIARemote(SpecialRemote):
         self.store_base_path = PurePosixPath(self.store_base_path)
         if not self.store_base_path.is_absolute():
             raise RIARemoteError(
-                'Non-absolute object tree base path configuration: %s'
+                'Non-absolute RIA store base path configuration: %s'
                 '' % str(self.store_base_path))
 
         if self.ria_store_pushurl:
@@ -947,23 +1106,8 @@ class RIARemote(SpecialRemote):
                 self.ria_store_pushurl = verify_ria_url(self.ria_store_pushurl,
                                                         url_cfgs)
 
-        # TODO duplicates call to `git-config` after RIA url rewrite
-        self._load_cfg(gitdir, name)
-
-        # go look for an ID
-        self.archive_id = self.annex.getconfig('archive-id')
-        if fail_noid and not self.archive_id:
-            raise RIARemoteError(
-                "No archive ID configured. This should not happen.")
-
-        # TODO: This should prob. not be done! Would only have an effect if
-        #       force-write was committed annex-special-remote-config and this
-        #       is likely a bad idea.
-        if not self.force_write:
-            self.force_write = self.annex.getconfig('force-write')
-
     def _get_version_config(self, path):
-        """ Get version and config flags from remote file
+        """ Get version and config flags from RIA store's layout file
         """
 
         file_content = self.io.read_file(path).strip().split('|')
@@ -1038,14 +1182,13 @@ class RIARemote(SpecialRemote):
 
     @handle_errors
     def initremote(self):
-        # which repo are we talking about
-        gitdir = self.annex.getgitdir()
-        self._verify_config(gitdir, fail_noid=False)
+        self._verify_config(fail_noid=False)
+
         if not self.archive_id:
-            self.archive_id = _get_datalad_id(gitdir)
+            self.archive_id = _get_datalad_id(self.gitdir)
             if not self.archive_id:
                 # fall back on the UUID for the annex remote
-                self.archive_id = self.annex.getuuid()
+                self.archive_id = self.uuid
 
         if not isinstance(self.io, HTTPRemoteIO):
             self.get_store()
@@ -1055,9 +1198,11 @@ class RIARemote(SpecialRemote):
         #       sure the store exists from within initremote
 
         self.annex.setconfig('archive-id', self.archive_id)
-        # make sure, we store the potentially rewritten URL
-        self.annex.setconfig('url', self.ria_store_url)
-        if self.ria_store_pushurl:
+        # Make sure, we store the potentially rewritten URL. But only, if the
+        # source was annex as opposed to a local config.
+        if self.ria_store_url and self.ria_store_url_source == 'annex':
+            self.annex.setconfig('url', self.ria_store_url)
+        if self.ria_store_pushurl and self.ria_store_pushurl_source == 'annex':
             self.annex.setconfig('push-url', self.ria_store_pushurl)
 
     def _local_io(self):
@@ -1069,8 +1214,6 @@ class RIARemote(SpecialRemote):
         # is a remote host configured
         #return self.store_base_path.is_dir()
 
-        # TODO: Isn't that wrong with HTTP anyway?
-        #       + just isinstance(LocalIO)?
         return not self.storage_host
 
     def debug(self, msg):
@@ -1112,14 +1255,10 @@ class RIARemote(SpecialRemote):
                 self._io = HTTPRemoteIO(self.ria_store_url,
                                         self.archive_id,
                                         self.buffer_size)
-            elif self.storage_host:
+            else:
                 self._io = SSHRemoteIO(self.storage_host, self.buffer_size)
                 from atexit import register
                 register(self._io.close)
-            else:
-                raise RIARemoteError(
-                    "Local object tree base path does not exist, and no SSH"
-                    "host configuration found.")
         return self._io
 
     @property
@@ -1180,9 +1319,7 @@ class RIARemote(SpecialRemote):
     @handle_errors
     def prepare(self):
 
-        gitdir = self.annex.getgitdir()
-        self.uuid = self.annex.getuuid()
-        self._verify_config(gitdir)
+        self._verify_config()
 
         if not isinstance(self.io, HTTPRemoteIO):
             self.get_store()
