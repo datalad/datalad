@@ -248,7 +248,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             raise ValueError(
                 f"There are multiple URL templates for submodule clone "
                 f"candidate '{name}', but only one is allowed. "
-                f"Check your configuration!"
+                f"Check datalad.get.subdataset-source-candidate-* configuration!"
             )
         url = tmpl.format(**sm_candidate_props)
         # we don't want "flexible_source_candidates" here, this is
