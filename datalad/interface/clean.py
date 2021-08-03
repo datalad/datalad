@@ -10,11 +10,12 @@
 __docformat__ = 'restructuredtext'
 
 
-from os.path import join as opj
-from glob import glob
 import itertools
 from .base import Interface
-from ..utils import rmtree
+from ..utils import (
+    rmtree,
+    Path
+)
 from ..support.param import Parameter
 from ..consts import (
     ARCHIVES_TEMP_DIR,
@@ -23,7 +24,6 @@ from ..consts import (
     SEARCH_INDEX_DOTGITDIR,
 )
 
-from datalad.support.gitrepo import GitRepo
 from datalad.support.constraints import (
     EnsureNone,
 )
@@ -50,14 +50,34 @@ import datalad.distribution.subdatasets
 class Clean(Interface):
     """Clean up after DataLad (possible temporary files etc.)
 
-    Removes extracted temporary archives, etc.
+    Removes temporary files and directories left behind by DataLad and
+    git-annex in a dataset.
 
-    Examples:
-
-      $ datalad clean
     """
 
     result_renderer = 'tailored'
+
+    _examples_ = [
+        dict(text="Clean all known temporary locations of a dataset",
+             code_py="clean()",
+             code_cmd="datalad clean"),
+        dict(text="Report on all existing temporary locations of a dataset",
+             code_py="clean(dry_run=True)",
+             code_cmd="datalad clean --dry-run"),
+        dict(text="Clean all known temporary locations of a dataset and all "
+                  "its subdatasets",
+             code_py="clean(recursive=True)",
+             code_cmd="datalad clean -r"),
+        dict(text="Clean only the archive extraction caches of a dataset and "
+                  "all its subdatasets",
+             code_py="clean(what='cached-archives', recursive=True)",
+             code_cmd="datalad clean --what cached-archives -r"),
+        dict(text="Report on existing annex transfer files of a dataset and "
+                  "all its subdatasets",
+             code_py="clean(what='annex-transfer', recursive=True, "
+                     "dry_run=True)",
+             code_cmd="datalad clean --what annex-transfer -r --dry-run"),
+    ]
 
     _params_ = dict(
         dataset=Parameter(
@@ -66,7 +86,7 @@ class Clean(Interface):
                 no dataset is given, an attempt is made to identify the dataset
                 in current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
-        dry_run = Parameter(
+        dry_run=Parameter(
             args=("--dry-run",),
             doc="""Report on cleanable locations - not actually cleaning up
             anything.""",
@@ -102,41 +122,57 @@ class Clean(Interface):
                 return_type='generator',
                 result_renderer='disabled',
                 result_xfm='datasets') if recursive else []):
-            d = wds.path
-            gitdir = GitRepo.get_git_dir(d)
+            d = wds.pathobj
+            gitdir = wds.repo.dot_git
             DIRS_PLURAL = ("directory", "directories")
             FILES_PLURAL = ("file", "files")
+            discover_or_remove = "Discovered" if dry_run else "Removed"
+
             for dirpath, flag, msg, sing_pl in [
-                (ARCHIVES_TEMP_DIR, "cached-archives",
+                (Path(ARCHIVES_TEMP_DIR), "cached-archives",
                  "temporary archive", DIRS_PLURAL),
-                (ANNEX_TEMP_DIR, "annex-tmp",
+                (Path(ANNEX_TEMP_DIR), "annex-tmp",
                  "temporary annex", FILES_PLURAL),
-                (ANNEX_TRANSFER_DIR, "annex-transfer",
+                (Path(ANNEX_TRANSFER_DIR), "annex-transfer",
                  "annex temporary transfer", DIRS_PLURAL),
-                (opj(gitdir, SEARCH_INDEX_DOTGITDIR), 'search-index',
+                (gitdir / Path(SEARCH_INDEX_DOTGITDIR), 'search-index',
                  "metadata search index", FILES_PLURAL),
             ]:
-                topdir = opj(d, dirpath)
+                topdir = wds.pathobj / dirpath
                 lgr.debug("Considering to clean %s:%s", d, dirpath)
                 if not ((what is None) or (flag in what)):
                     yield get_status_dict(
-                        path=topdir, status='notneeded', type='directory', **res_kwargs)
+                        path=str(topdir), status='notneeded', type='directory',
+                        **res_kwargs)
                     continue
-                paths = glob(opj(topdir, '*'))
+
+                paths = [p for p in topdir.glob('*')]
                 if not paths:
-                    yield get_status_dict(
-                        path=topdir, status='notneeded', type='directory', **res_kwargs)
-                    continue
-                pl = len(paths) > 1
-                message = ("%s %d %s %s: %s",
-                           "Discovered" if dry_run else "Removed",
-                           len(paths), msg, sing_pl[int(pl)],
-                           ", ".join(sorted([x[len(topdir) + 1:] for x in paths])))
+                    if not topdir.exists():
+                        yield get_status_dict(
+                            path=str(topdir), status='notneeded',
+                            type='directory', **res_kwargs)
+                        continue
+                    else:
+                        # we empty topdir only
+                        message = ("%s empty %s directory",
+                                   discover_or_remove,
+                                   msg)
+                else:
+                    pl = len(paths) > 1
+                    message = ("%s %d %s %s: %s",
+                               discover_or_remove,
+                               len(paths), msg, sing_pl[int(pl)],
+                               ", ".join(sorted([str(p.relative_to(topdir))
+                                                 for p in paths if p != topdir]
+                                                )
+                                         )
+                               )
 
                 if not dry_run:
-                    rmtree(topdir)
+                    rmtree(str(topdir))
 
-                yield get_status_dict(path=topdir,
+                yield get_status_dict(path=str(topdir),
                                       status='ok',
                                       type='directory',
                                       message=message,
@@ -187,3 +223,13 @@ class Clean(Interface):
         else:
             # Any other status than 'ok' is reported the default way.
             return default_result_renderer(res)
+
+    @staticmethod
+    def custom_result_summary_renderer(results):
+        # Since 'notneeded' results aren't rendered by default, give
+        # a nothing-to-clean-message if all results were "notneeded",
+        # to not remain entirely silent.
+
+        if all(r['status'] == 'notneeded' for r in results):
+            from datalad.ui import ui
+            ui.message("nothing to clean, no temporary locations present.")
