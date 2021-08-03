@@ -104,10 +104,21 @@ def split_ext(filename):
     >>> split_ext("filename.above4chars.ext")
     ('filename.above4chars', '.ext')
     """
+    # needs to be delayed due to circular
+    # . > config -> cmd -> path -> exernal_version -> log -> ansi_colors -> .
+    from .external_versions import external_versions
+
     parts = filename.split(".")
     if len(parts) == 1:
         return filename, ""
-
+    # stay in sync with annex'es treatment of .dot files to not consider them
+    # having only an extension, and thus including in the key name for E backends
+    # Change in behavior introduced in 8.20210803-2-g899983058
+    if (
+        external_versions['cmd:annex'] > '8.20210803' and
+        len(parts) == 2 and not parts[0]
+    ):
+        return filename, ""
     tail = list(dropwhile(lambda x: len(x) < 5,
                           reversed(parts[1:])))
 

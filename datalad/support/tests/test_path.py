@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+from ..external_versions import external_versions
 from ..path import (
     abspath,
     curdir,
@@ -57,6 +58,13 @@ def test_split_ext():
     eq_(split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
 
     eq_(split_ext("file.a.b..c"), ("file", ".a.b..c"))
+    if external_versions['cmd:annex'] > '8.20210803':
+        eq_(split_ext(".dot"), (".dot", ""))
+        eq_(split_ext(".dot.ext"), (".dot", ".ext"))
+    else:
+        eq_(split_ext(".dot"), ("", ".dot"))
+        eq_(split_ext(".dot.ext"), ("", ".dot.ext"))
+
 
 
 def test_get_parent_paths():
