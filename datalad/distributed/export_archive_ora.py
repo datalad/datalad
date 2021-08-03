@@ -77,20 +77,23 @@ class ExportArchiveORA(Interface):
             constraints=EnsureStr() | EnsureNone()),
         remote=Parameter(
             args=("--for",),
+            dest="remote",
             metavar='LABEL',
             doc="""name of the target sibling, wanted/preferred settings
             will be used to filter the files added to the archives""",
             constraints=EnsureStr() | EnsureNone()),
-        filters=Parameter(
-            args=("--filters",),
+        annex_wanted=Parameter(
+            args=("--annex-wanted",),
             metavar="FILTERS",
             doc="""git-annex-preferred-content expression for
             git-annex find to filter files. Should start with
             'or' or 'and' when used in combination with `--for`"""),
-        branch=Parameter(
-            args=("--branch",),
-            metavar="BRANCH",
-            doc="""a branch, or tree-ish to use to select files"""),
+        froms=Parameter(
+            args=("--from",),
+            dest="froms",
+            metavar="FROM",
+            nargs="+",
+            doc="""one or multiple tree-ish from which to select files"""),
         opts=Parameter(
             args=("opts",),
             nargs=REMAINDER,
@@ -107,8 +110,8 @@ class ExportArchiveORA(Interface):
             opts=None,
             dataset=None,
             remote=None,
-            filters=None,
-            branch=None):
+            annex_wanted=None,
+            froms=None):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
             dataset, check_installed=True, purpose='export to ORA archive')
@@ -165,18 +168,22 @@ class ExportArchiveORA(Interface):
 
         find_filters = []
         if remote:
-            find_filters = expr_to_opts(ds_repo.get_preferred_content('wanted', remote))
-        if filters:
-            find_filters.extend(expr_to_opts(filters))
-        if branch:
-            find_filters.append(f"--branch={branch}")
-
-        # need to be uniqued with set, as git-annex find will return duplicates if
-        # multiple symlinks point to the same key.
-        keypaths = set([annex_objs.joinpath(k) for k in ds_repo.call_annex_items_([
-            'find', *find_filters,
-            "--format=${hashdirmixed}${key}/${key}\\n"
-        ])])
+            find_filters = ['-('] + expr_to_opts(ds_repo.get_preferred_content('wanted', remote)) + ['-)']
+        if annex_wanted:
+            find_filters.extend(expr_to_opts(annex_wanted))
+        # git-annex find results need to be uniqued with set, as git-annex find
+        # will return duplicates if multiple symlinks point to the same key.
+        if froms:
+            keypaths = set([
+                annex_objs.joinpath(k) for treeish in froms for k in ds_repo.call_annex_items_([
+                'find', *find_filters, f"--branch={treeish}",
+                "--format=${hashdirmixed}${key}/${key}\\n"])
+                ])
+        else:
+            keypaths = set(annex_objs.joinpath(k) for k in ds_repo.call_annex_items_([
+                'find', *find_filters,
+                "--format=${hashdirmixed}${key}/${key}\\n"
+            ]))
 
         log_progress(
             lgr.info,
@@ -200,12 +207,16 @@ class ExportArchiveORA(Interface):
             keydir = exportdir / hashdir / key
             keydir.mkdir(parents=True, exist_ok=True)
             try:
-                print(str(keypath), str(keydir / key))
                 link_fx(str(keypath), str(keydir / key))
+            except FileNotFoundError as e:
+                lgr.error(
+                    'File not found in annex %s',
+                    str(keypath))
+                return
             except OSError:
                 lgr.warning(
                     'No hard links supported at %s, will copy files instead',
-                    str(keydir))
+                    str(keypath))
                 # no hard links supported
                 # switch function after first error
                 link_fx = shutil.copyfile
