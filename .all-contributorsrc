@@ -372,6 +372,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/1301158?v=4"
             ]
+        },
+        {
+            "login": "AKSoo",
+            "name": "Sin Kim",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://orcid.org/0000-0003-4652-3758",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/7570456?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
