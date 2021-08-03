@@ -1399,8 +1399,10 @@ def test_gitattributes(path):
     gr.set_gitattributes([('*', {'king': 'kong'})], mode='a')
     eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense', 'king': 'kong'})
     # handle files without trailing newline
-    with open(op.join(gr.path, '.gitattributes'), 'a+') as f:
-        f.seek(f.tell() - 1)
+    with open(op.join(gr.path, '.gitattributes'), 'r+') as f:
+        s = f.read()
+        f.seek(0)
+        f.write(s.rstrip())
         f.truncate()
     gr.set_gitattributes([('*', {'ding': 'dong'})], mode='a')
     eq_(gr.get_gitattributes('.')['.'],
