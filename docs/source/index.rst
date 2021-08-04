@@ -29,7 +29,7 @@ Concepts and technologies
    basics
    metadata
    customization
-   designpatterns
+   design/index
    glossary
 
 Commands and API
