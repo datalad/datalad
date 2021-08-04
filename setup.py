@@ -192,6 +192,11 @@ datalad_setup(
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
     python_requires='>=3.6',
+    project_urls={'Homepage': 'https://www.datalad.org',
+                  'Developer docs': 'http://docs.datalad.org/en/stable',
+                  'User handbook': 'http://handbook.datalad.org',
+                  'Source': 'https://github.com/datalad/datalad',
+                  'Bug Tracker': 'https://github.com/datalad/datalad/issues'},
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={
