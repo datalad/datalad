@@ -162,31 +162,6 @@ Finally, DataLad supports SSH login style resource identifiers, such as ``me@loc
 
 ``datalad install me@localhost:/path``
 
-`--dataset` argument
---------------------
-
-All commands which operate with/on datasets (practically all commands) have a
-``dataset`` argument (``-d`` or ``--dataset`` for the command line API) which takes a
-path to the dataset that the command should operate on. If a dataset is
-identified this way then any relative path that is provided as an argument to
-the command will be interpreted as being relative to the topmost directory of that
-dataset.  If no dataset argument is provided, relative paths are considered to be
-relative to the current directory.
-
-There are also some useful pre-defined "shortcut" values for dataset arguments:
-
-``///``
-   refers to the "default" dataset located under `$HOME/datalad/`.
-   So running ``datalad install -d/// crcns`` will install the ``crcns`` subdataset
-   under ``$HOME/datalad/crcns``.  This is the same as running
-   ``datalad install $HOME/datalad/crcns``.
-``^``
-   topmost superdataset containing the dataset the current directory is part of.
-   For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
-   to search metadata of the entire superdataset you are under (in this case
-   ``///``), run ``datalad search -d^ [something to search]``.
-``^.``
-   the dataset the current directory is part of.
 
 Commands `install` vs `get`
 ---------------------------
