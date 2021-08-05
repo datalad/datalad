@@ -31,6 +31,7 @@ from datalad.interface.results import (
 from datalad.interface.utils import eval_results
 from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
@@ -100,6 +101,16 @@ class ExportArchiveORA(Interface):
             metavar="...",
             doc="""list of options for 7z to replace the default '-mx0' to
             generate an uncompressed archive"""),
+        missing_content=Parameter(
+            args=("--missing-content",),
+            doc="""By default, any discovered file with missing content will
+            result in an error and the export is aborted. Setting this to
+            'continue' will issue warnings instead of failing on error. The
+            value 'ignore' will only inform about problem at the 'debug' log
+            level. The latter two can be helpful when generating a TAR archive
+            from a dataset where some file content is not available
+            locally.""",
+            constraints=EnsureChoice("error", "continue", "ignore")),
     )
 
     @staticmethod
@@ -111,7 +122,8 @@ class ExportArchiveORA(Interface):
             dataset=None,
             remote=None,
             annex_wanted=None,
-            froms=None):
+            froms=None,
+            missing_content='error',):
         # only non-bare repos have hashdirmixed, so require one
         ds = require_dataset(
             dataset, check_installed=True, purpose='export to ORA archive')
@@ -194,6 +206,11 @@ class ExportArchiveORA(Interface):
             unit=' Keys',
         )
 
+        if missing_content == 'continue':
+            missing_file_lgr_func = lgr.warning
+        elif missing_content == 'ignore':
+            missing_file_lgr_func = lgr.debug
+
         link_fx = os.link
         for keypath in keypaths:
             key = keypath.name
@@ -209,10 +226,11 @@ class ExportArchiveORA(Interface):
             try:
                 link_fx(str(keypath), str(keydir / key))
             except FileNotFoundError as e:
-                lgr.error(
-                    'File not found in annex %s',
+                if missing_content == 'error':
+                    raise IOError('Key %s has no content available' % keypath)
+                missing_file_lgr_func(
+                    'Key %s has no content available',
                     str(keypath))
-                return
             except OSError:
                 lgr.warning(
                     'No hard links supported at %s, will copy files instead',
