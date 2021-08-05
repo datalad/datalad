@@ -119,7 +119,12 @@ def test_basic_scenario(d, d2):
     in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
     assert_false(annex.file_has_content(fn_extracted))
-    annex.get(fn_extracted)
+
+    with swallow_logs(new_level=logging.INFO) as cml:
+        annex.get(fn_extracted)
+        # Hint users to the extraction cache (and to datalad clean)
+        cml.assert_logged(msg="datalad-archives special remote is using an "
+                              "extraction", level="INFO", regex=False)
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
