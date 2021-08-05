@@ -7,6 +7,10 @@
 ``dataset`` argument
 ********************
 
+.. topic:: Specification scope and status
+
+   This specification describes the current implementation.
+
 All commands which operate on datasets have a ``dataset`` argument (``-d`` or
 ``--dataset`` for the command line API) to identify a single dataset as the
 context of an operation.
