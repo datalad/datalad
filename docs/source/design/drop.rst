@@ -7,6 +7,10 @@
 Drop dataset components
 ***********************
 
+.. topic:: Specification scope and status
+
+   This specification is a proposal, subject to review and further discussion.
+
 §1 The :command:`drop` command is the antagonist of :command:`get`. Whatever a
 `drop` can do, should be undoable by a subsequent :command:`get` (given
 unchanged remote availability).
