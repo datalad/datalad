@@ -567,10 +567,14 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetFound(
-                "No dataset found at '{}'.  Specify a dataset to work with "
+                "No dataset found at '{}'{}.  Specify a dataset to work with "
                 "by providing its path via the `dataset` option, "
                 "or change the current working directory to be in a "
-                "dataset.".format(getpwd()))
+                "dataset.".format(
+                    getpwd(),
+                    " for the purpose {!r}".format(purpose) if purpose else ''
+                )
+            )
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
