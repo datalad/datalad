@@ -176,6 +176,13 @@ matrix:
     - KNOWN2FAIL: 1
 
 
+# do not run the CI if only documentation changes were made
+# documentation builds are tested elsewhere and cheaper
+skip_commits:
+  files:
+    - docs/
+
+
 # tests need specific hostnames to be available
 # note, this is insufficient on MacOS, and needs to be reflected
 # in the SSH config too (tools/ci/appveyor_ssh_config)
