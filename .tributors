@@ -155,7 +155,8 @@
     "mattcieslak": {
         "name": "Matt Cieslak",
         "bio": "Senior Scientist at UPenn Brain & Behavior Lab. Diffusion imaging enthusiast.",
-        "blog": "https://github.com/mattcieslak"
+        "blog": "https://github.com/mattcieslak",
+        "email": "mattcieslak@gmail.com"
     },
     "ypid": {
         "name": "Robin Schneider",
