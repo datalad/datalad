@@ -995,9 +995,10 @@ def postclonecfg_ria(ds, props, remote="origin"):
                 # we only need the store:
                 new_url = props['source'].split('#')[0]
                 try:
-                    repo.enable_remote(srs[org_uuid]['name'],
-                                       options=['url={}'.format(new_url)]
-                                       )
+                    # local config to overwrite committed URL
+                    repo.config.set(f"remote.{srs[org_uuid]['name']}.ora-url",
+                                    new_url, where='local')
+                    repo.enable_remote(srs[org_uuid]['name'])
                     lgr.info("Reconfigured %s for %s",
                              srs[org_uuid]['name'], new_url)
                     # update ora_remotes for considering publication dependency
@@ -1010,6 +1011,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
                 except CommandError as e:
                     lgr.debug("Failed to reconfigure ORA special remote: %s",
                               exc_str(e))
+                    repo.config.unset(f"remote.{srs[org_uuid]['name']}.ora-url",
+                                      where='local')
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
                           remote, org_uuid)
