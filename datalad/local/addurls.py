@@ -81,7 +81,7 @@ class Formatter(string.Formatter):
 
     def format(self, format_string, *args, **kwargs):
         if not isinstance(args[0], Mapping):
-            raise ValueError("First positional argument should be mapping")
+            raise ValueError(f"First positional argument should be mapping, got {args[0]!r}")
         return super(Formatter, self).format(format_string, *args, **kwargs)
 
     def get_value(self, key, args, kwargs):
