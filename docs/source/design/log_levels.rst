@@ -7,6 +7,12 @@
 Log levels
 **********
 
+.. topic:: Specification scope and status
+
+   This specification provides a partial overview of the current
+   implementation.
+
+
 Log messages are emitted by a wide range of operations within DataLad. They are
 categorized into distinct levels. While some levels have self-explanatory
 descriptions (e.g. ``warning``, ``error``), others are less specific (e.g.
