@@ -25,7 +25,7 @@ Use cases
 Command execution
 -----------------
 
-For the non-async Runner and its protocols the following log levels are used:
+For the :class:`~datalad.cmd.WitlessRunner` and its protocols the following log levels are used:
 
 - High-level execution -> ``debug``
 - Process start/finish -> ``8``
