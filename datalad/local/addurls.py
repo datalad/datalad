@@ -32,6 +32,10 @@ from datalad.dochelpers import (
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.interface.utils import (
+    default_result_renderer,
+    render_action_summary,
+)
 from datalad.interface.results import annexjson2result, get_status_dict
 from datalad.interface.common_opts import (
     jobs_opt,
@@ -1286,6 +1290,8 @@ class Addurls(Interface):
             rows."""),
     )
 
+    result_renderer = "tailored"
+
     @staticmethod
     @datasetmethod(name='addurls')
     @eval_results
@@ -1428,9 +1434,12 @@ class Addurls(Interface):
                     "Not creating subdataset at existing path: %s",
                     subds_path)
             else:
-                yield from subds.create(result_xfm=None,
+                for res in subds.create(result_xfm=None,
                                         cfg_proc=cfg_proc,
-                                        return_type='generator')
+                                        return_type='generator'):
+                    if res.get("action") == "create":
+                        res["addurls.refds"] = ds_path
+                    yield res
                 created_subds.append(subpath)
             repo = subds.repo  # "expensive" so we get it once
 
@@ -1542,3 +1551,16 @@ filename_format='{filenameformat}'"""
                 message=message_addurls,
                 jobs=jobs,
                 return_type='generator')
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        refds = res.get("addurls.refds")
+        if refds:
+            res = dict(res, refds=refds)
+        default_result_renderer(res)
+
+    custom_result_summary_renderer_pass_summary = True
+
+    @staticmethod
+    def custom_result_summary_renderer(_, action_summary):
+        render_action_summary(action_summary)
