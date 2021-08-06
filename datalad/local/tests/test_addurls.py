@@ -91,8 +91,10 @@ def test_formatter_no_idx_map():
 
 def test_formatter_no_mapping_arg():
     fmt = au.Formatter({})
-    assert_raises(ValueError, fmt.format, "{0}", "not a mapping")
-
+    with assert_raises(ValueError) as cme:
+        fmt.format("{0}", "not a mapping")
+    # we provide that detail/element in a message
+    assert_in("not a mapping", str(cme.exception))
 
 def test_formatter_placeholder_with_spaces():
     fmt = au.Formatter({})
