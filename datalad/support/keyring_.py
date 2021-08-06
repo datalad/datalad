@@ -37,7 +37,12 @@ class Keyring(object):
             lgr.debug("Importing keyring")
             import keyring
             self.__keyring = keyring
-
+            the_keyring = keyring.get_keyring()
+            if the_keyring.name.lower().startswith('null '):
+                lgr.warning(
+                    "Keyring module returned '%s', no credentials will be provided",
+                    the_keyring.name
+                )
         return self.__keyring
 
     @classmethod
