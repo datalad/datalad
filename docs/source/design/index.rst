@@ -14,4 +14,5 @@ subsystems in DataLad.
    :maxdepth: 2
 
    dataset_argument
+   log_levels
    miscpatterns
