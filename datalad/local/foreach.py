@@ -98,7 +98,11 @@ class ForEach(Interface):
     path of a temporary directory.
     << REFLOW ||
     """
-    # TODO:     _examples_ = [], # see e.g. run
+    _examples_ = [
+         dict(text="Aggressively  git clean  all datasets, running 5 parallel jobs",
+              code_py="foreach(['git', 'clean', '-dfx'], recursive=True, jobs=5)",
+              code_cmd="datalad foreach -r -J 5 git clean -dfx"),
+     ]
 
     _params_ = dict(
         cmd=Parameter(
@@ -153,9 +157,12 @@ class ForEach(Interface):
             just 'pass-through' to the screen (and thus absent from returned record)."""),
         chpwd=Parameter(
             args=("--chpwd",),
-            constraints=EnsureBool(),
-            doc="""whether to change working directory to the corresponding dataset. Note that for Python
-            commands, due to use of threads, we do not allow to be used with jobs > 1.
+            constraints=EnsureChoice('ds', 'pwd'),
+            doc="""'ds' will change working directory to the top of the corresponding dataset. With 'pwd'
+            no change of working directory will happen.
+            Note that for Python commands, due to use of threads, we do not allow chdir=ds to be used
+            with jobs > 1. Hint: use `ds` and `refds` objects' methods to execute commands in the context
+            of those datasets.
             """),
         jobs=jobs_opt,
         # TODO: might want explicit option to either worry about 'safe_to_consume' setting for parallel
@@ -176,7 +183,7 @@ class ForEach(Interface):
             bottomup=False,
             subdatasets_only=False,
             output_streams='pass-through',
-            chpwd=True,  # as the most common case/scenario
+            chpwd='ds',  # as the most common case/scenario
             jobs=None
             ):
         if not cmd:
@@ -269,7 +276,7 @@ class ForEach(Interface):
                         # all placeholders are passed as kwargs to the function
                         cmd_f, cmd_a, cmd_kw = cmd, [], placeholders
 
-                    cm = chpwd_cm(ds.path) if chpwd else nothing_cm()
+                    cm = chpwd_cm(ds.path) if chpwd == 'ds' else nothing_cm()
                     with cm:
                         if output_streams == 'pass-through':
                             res = cmd_f(*cmd_a, **cmd_kw)
@@ -299,7 +306,7 @@ class ForEach(Interface):
                     # TODO: avoid use of _git_runner? why?
                     out = ds.repo._git_runner.run(
                         cmd_expanded,
-                        cwd=ds.path if chpwd else pwd,
+                        cwd=ds.path if chpwd == 'ds' else pwd,
                         protocol=protocol)
                 if output_streams == 'capture':
                     status_rec.update(out)
@@ -332,7 +339,7 @@ class ForEach(Interface):
             effective_jobs = pc_class.get_effective_jobs(jobs)
             if effective_jobs > 1:
                 warning = ""
-                if chpwd:
+                if chpwd == 'ds':
                     warning += \
                         "Execution of Python commands in parallel threads while changing directory " \
                         "is not thread-safe. "
