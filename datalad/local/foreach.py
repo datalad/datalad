@@ -161,7 +161,7 @@ class ForEach(Interface):
             doc="""'ds' will change working directory to the top of the corresponding dataset. With 'pwd'
             no change of working directory will happen.
             Note that for Python commands, due to use of threads, we do not allow chdir=ds to be used
-            with jobs > 1. Hint: use `ds` and `refds` objects' methods to execute commands in the context
+            with jobs > 1. Hint: use 'ds' and 'refds' objects' methods to execute commands in the context
             of those datasets.
             """),
         jobs=jobs_opt,
