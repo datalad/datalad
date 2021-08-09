@@ -517,9 +517,20 @@ class HTTPDownloader(BaseDownloader):
     """
 
     @borrowkwargs(BaseDownloader)
-    def __init__(self, headers={}, **kwargs):
+    def __init__(self, headers=None, **kwargs):
+        """
+
+        Parameters
+        ----------
+        headers: dict, optional
+          Header fields to be provided to the session. Unless User-Agent provided, a custom
+          one, available in `DEFAULT_USER_AGENT` constant of this module will be used.
+        """
         super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
+        headers = headers.copy() if headers else {}
+        if 'user-agent' not in map(str.lower, headers):
+            headers['User-Agent'] = DEFAULT_USER_AGENT
         self._headers = headers
 
     def _establish_session(self, url, allow_old=True):
@@ -555,6 +566,7 @@ class HTTPDownloader(BaseDownloader):
 
         lgr.debug("http session: Creating brand new session")
         self._session = requests.Session()
+        self._session.headers.update(self._headers)
         if self.authenticator:
             self.authenticator.authenticate(url, self.credential, self._session)
 
@@ -572,8 +584,6 @@ class HTTPDownloader(BaseDownloader):
             headers = {}
         if 'Accept-Encoding' not in headers:
             headers['Accept-Encoding'] = ''
-        if 'user-agent' not in map(str.lower, headers):
-            headers['User-Agent'] = DEFAULT_USER_AGENT
 
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1
