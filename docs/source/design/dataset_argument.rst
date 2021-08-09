@@ -13,7 +13,10 @@
 
 All commands which operate on datasets have a ``dataset`` argument (``-d`` or
 ``--dataset`` for the :term:`CLI`) to identify a single dataset as the
-If ``--dataset`` argument is not provided, the context of an operation is operation-specific (e.g., for `clone` command -- the dataset which is being cloned), but typically - a dataset which current working directory belongs to.
+context of an operation.
+If ``--dataset`` argument is not provided, the context of an operation is command-specific.
+For example, `clone` command will consider the :term:`dataset` which is being cloned to be the context.
+But typically, a dataset which current working directory belongs to is the context of an operation.
 In the latter case, if operation (e.g., `get`) does not find a dataset in current working directory, operation fails with an ``NoDatasetFound`` error.
 
 
