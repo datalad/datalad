@@ -48,13 +48,14 @@ from datalad.support.constraints import (
 from datalad.support.exceptions import DownloadError
 from datalad.support.param import Parameter
 from datalad.support.network import (
-    get_local_file_url,
-    download_url,
-    is_url,
-    URL,
-    RI,
     DataLadRI,
     PathRI,
+    RI,
+    SSHRI,
+    URL,
+    download_url,
+    get_local_file_url,
+    is_url,
 )
 from datalad.dochelpers import (
     exc_str,
@@ -1206,7 +1207,7 @@ def _get_installationpath_from_url(url):
     from a URL, analog to what `git clone` does.
     """
     ri = RI(url)
-    if isinstance(ri, (URL, DataLadRI)):  # decode only if URL
+    if isinstance(ri, (URL, DataLadRI, SSHRI)):  # decode only if URL
         path = ri.path.rstrip('/')
         path = urlunquote(path) if path else ri.hostname
         if '/' in path:
