@@ -92,10 +92,9 @@ class ForEach(Interface):
     [CMD: --cmd-type external CMD][PY: cmd_type='external' PY]: A few placeholders are
     supported in the command via Python format
     specification. "{pwd}" will be replaced with the full path of the current
-    working directory. "{ds}" and "{refds}" will provide instances of the dataset currently opreplaced with the full
-    path
-    of the
-    dataset that run is invoked on. "{tmpdir}" will be replaced with the full
+    working directory. "{ds}" and "{refds}" will provide instances of the dataset currently
+    operated on and the reference "context" dataset which was provided via ``dataset``
+    argument to ``foreach``. "{tmpdir}" will be replaced with the full
     path of a temporary directory.
     << REFLOW ||
     """

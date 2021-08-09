@@ -9,20 +9,39 @@
 
 import sys
 
+from pathlib import Path
+
+from datalad.api import create
 from datalad.distribution.dataset import Dataset
 from datalad.tests.utils import (
-    get_deeply_nested_structure,
+    assert_false,
+    assert_greater,
     assert_in,
     assert_not_in,
-    assert_greater,
+    assert_status,
     eq_,
+    get_deeply_nested_structure,
+    ok_clean_git,
     with_tempfile,
 )
+
+
+def _without_command(results):
+    """A helper to tune up results so that they lack 'command'
+    which is guaranteed to differ between different cmd types
+    """
+    out = []
+    for r in results:
+        r = r.copy()
+        r.pop('command')
+        out.append(r)
+    return out
 
 
 @with_tempfile(mkdir=True)
 def check_basic_resilience(populator, path):
     ds = populator(path)
+    ds.save()
     kwargs = dict(recursive=True)
 
     res_external = ds.foreach(
@@ -30,19 +49,47 @@ def check_basic_resilience(populator, path):
         **kwargs)
     res_python = ds.foreach("ds.path", cmd_type='eval', **kwargs)
 
+    # a sample python function to pass to foreach
+    def get_path(ds, **kwargs):
+        return ds.path
+
+    res_python_func = ds.foreach(get_path, **kwargs)
+
+    assert_status('ok', res_external)
+    assert_status('ok', res_python)
+
     # consistency checks
     eq_(len(res_external), len(res_python))
+    eq_(len(res_external), len(res_python_func))
+    eq_(_without_command(res_python), _without_command(res_python_func))
 
     # Test correct order for bottom-up vs top-down
-    eq_([ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, bottomup=False),
-        [_['result'] for _ in res_python])
+    topdown_dss = [ds.path] + ds.subdatasets(result_xfm='paths', bottomup=False, **kwargs)
+    eq_(topdown_dss, [_['result'] for _ in res_python])
 
-    eq_(ds.subdatasets(result_xfm='paths', recursive=True, bottomup=True) + [ds.path],
-        [_['result'] for _ in ds.foreach("ds.path", bottomup=True, cmd_type='eval', **kwargs)])
-    pass
+    bottomup_dss = ds.subdatasets(result_xfm='paths', recursive=True, bottomup=True) + [ds.path]
+    eq_(bottomup_dss, [_['result'] for _ in ds.foreach("ds.path", bottomup=True, cmd_type='eval', **kwargs)])
+
+    # more radical example - cleanup
+    # Make all datasets dirty
+    for d in bottomup_dss:
+        (Path(d) / "dirt").write_text("")
+    res_clean = ds.foreach(['git', 'clean', '-f'], jobs=10, **kwargs)
+    assert_status('ok', res_clean)
+    # no dirt should be left
+    for d in bottomup_dss:
+        assert_false((Path(d) / "dirt").exists())
+
+    if populator is get_deeply_nested_structure:
+        ok_clean_git(ds.path, index_modified=[ds.pathobj / 'subds_modified'])
+    else:
+        ok_clean_git(ds.path)
 
 
 def test_basic_resilience():
+    # empty dataset
+    yield check_basic_resilience, create
+    # ver much not empty dataset
     yield check_basic_resilience, get_deeply_nested_structure
 
 
