@@ -330,17 +330,6 @@
             ]
         },
         {
-            "login": "bhanuprasad14",
-            "name": "bhanuprasad14",
-            "contributions": [
-                "code"
-            ],
-            "profile": "https://github.com/bhanuprasad14",
-            "avatar_url": [
-                "https://avatars3.githubusercontent.com/u/19843?v=4"
-            ]
-        },
-        {
             "login": "christian-monch",
             "name": "Christian Mönch",
             "contributions": [
@@ -382,6 +371,17 @@
             "profile": "https://me.ypid.de/",
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/1301158?v=4"
+            ]
+        },
+        {
+            "login": "AKSoo",
+            "name": "Sin Kim",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://orcid.org/0000-0003-4652-3758",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/7570456?v=4"
             ]
         }
     ],

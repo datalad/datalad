@@ -398,7 +398,7 @@ def _prep_file_under_git(path, filename):
     # do absolute() in addition to always get an absolute path
     # even with non-existing paths on windows
     path = str(Path(path).resolve().absolute())  # intentional realpath to match GitRepo behavior
-    file_repo_dir = op.relpath(path, repo.path)
+    file_repo_dir = relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
 
@@ -1679,26 +1679,26 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
         ds.save(to_git=True)
         ds.drop([
             'file_dropped_clean',
-            op.join('subdir', 'file_dropped_clean')],
+            opj('subdir', 'file_dropped_clean')],
             check=False)
     # clean and proper subdatasets
     ds.create('subds_clean')
-    ds.create(op.join('subdir', 'subds_clean'))
+    ds.create(opj('subdir', 'subds_clean'))
     ds.create('subds_unavailable_clean')
-    ds.create(op.join('subdir', 'subds_unavailable_clean'))
+    ds.create(opj('subdir', 'subds_unavailable_clean'))
     # uninstall some subdatasets (still clean)
     ds.uninstall([
         'subds_unavailable_clean',
-        op.join('subdir', 'subds_unavailable_clean')],
+        opj('subdir', 'subds_unavailable_clean')],
         check=False)
     assert_repo_status(ds.path)
     # make a dirty subdataset
     ds.create('subds_modified')
-    ds.create(op.join('subds_modified', 'someds'))
-    ds.create(op.join('subds_modified', 'someds', 'dirtyds'))
+    ds.create(opj('subds_modified', 'someds'))
+    ds.create(opj('subds_modified', 'someds', 'dirtyds'))
     # make a subdataset with additional commits
-    ds.create(op.join('subdir', 'subds_modified'))
-    pdspath = op.join(ds.path, 'subdir', 'subds_modified', 'progressedds')
+    ds.create(opj('subdir', 'subds_modified'))
+    pdspath = opj(ds.path, 'subdir', 'subds_modified', 'progressedds')
     ds.create(pdspath)
     create_tree(
         pdspath,
@@ -1707,10 +1707,10 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     Dataset(pdspath).save()
     assert_repo_status(pdspath)
     # staged subds, and files
-    create(op.join(ds.path, 'subds_added'))
+    create(opj(ds.path, 'subds_added'))
     ds.repo.add_submodule('subds_added')
-    create(op.join(ds.path, 'subdir', 'subds_added'))
-    ds.repo.add_submodule(op.join('subdir', 'subds_added'))
+    create(opj(ds.path, 'subdir', 'subds_added'))
+    ds.repo.add_submodule(opj('subdir', 'subds_added'))
     # some more untracked files
     create_tree(
         ds.path,
@@ -1733,18 +1733,18 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
             },
         }
     )
-    ds.repo.add(['file_added', op.join('subdir', 'file_added')])
+    ds.repo.add(['file_added', opj('subdir', 'file_added')])
     # untracked subdatasets
-    create(op.join(ds.path, 'subds_untracked'))
-    create(op.join(ds.path, 'subdir', 'subds_untracked'))
+    create(opj(ds.path, 'subds_untracked'))
+    create(opj(ds.path, 'subdir', 'subds_untracked'))
     # deleted files
-    os.remove(op.join(ds.path, 'file_deleted'))
-    os.remove(op.join(ds.path, 'subdir', 'file_deleted'))
+    os.remove(opj(ds.path, 'file_deleted'))
+    os.remove(opj(ds.path, 'subdir', 'file_deleted'))
     # staged deletion
     ds.repo.remove('file_staged_deleted')
     # modified files
     if isinstance(ds.repo, AnnexRepo):
-        ds.repo.unlock(['file_modified', op.join('subdir', 'file_modified')])
+        ds.repo.unlock(['file_modified', opj('subdir', 'file_modified')])
         create_tree(
             ds.path,
             {
@@ -1800,7 +1800,7 @@ def get_deeply_nested_structure(path):
     # a subtree of datasets
     subds = ds.create('subds_modified')
     # another dataset, plus an additional dir in it
-    ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
+    ds.create(opj('subds_modified', 'subds_lvl1_modified'))
     create_tree(
         ds.path,
         {
@@ -1830,15 +1830,15 @@ def get_deeply_nested_structure(path):
     (ds.pathobj / 'link2dir').symlink_to('subdir')
     # upwards pointing symlink to directory within the same dataset
     (ds.pathobj / 'directory_untracked' / 'link2dir').symlink_to(
-        op.join('..', 'subdir'))
+        opj('..', 'subdir'))
     # symlink pointing to a subdataset mount in the same dataset
     (ds.pathobj / 'link2subdsroot').symlink_to('subds_modified')
     # symlink to a dir in a subdataset (across dataset boundaries)
     (ds.pathobj / 'link2subdsdir').symlink_to(
-        op.join('subds_modified', 'subdir'))
+        opj('subds_modified', 'subdir'))
     # symlink to a dir in a superdataset (across dataset boundaries)
     (ut.Path(subds.path) / 'link2superdsdir').symlink_to(
-        op.join('..', 'subdir'))
+        opj('..', 'subdir'))
     return ds
 
 

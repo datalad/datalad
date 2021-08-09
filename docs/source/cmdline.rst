@@ -30,6 +30,7 @@ Dataset operations
    generated/man/datalad-get
    generated/man/datalad-install
    generated/man/datalad-publish
+   generated/man/datalad-push
    generated/man/datalad-remove
    generated/man/datalad-save
    generated/man/datalad-update

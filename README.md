@@ -5,6 +5,7 @@
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                   Read me
 
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.03262/status.svg)](https://doi.org/10.21105/joss.03262)
 [![Travis tests status](https://travis-ci.com/datalad/datalad.png?branch=master)](https://travis-ci.com/datalad/datalad)
 [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master)
 [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
@@ -171,11 +172,11 @@ project (NIH 1P41EB019936-01A1).
   </tr>
   <tr>
     <td align="center"><a href="https://github.com/yetanothertestuser"><img src="https://avatars0.githubusercontent.com/u/19335420?v=4?s=100" width="100px;" alt=""/><br /><sub><b>yetanothertestuser</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=yetanothertestuser" title="Code">💻</a></td>
-    <td align="center"><a href="https://github.com/bhanuprasad14"><img src="https://avatars3.githubusercontent.com/u/19843?v=4?s=100" width="100px;" alt=""/><br /><sub><b>bhanuprasad14</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=bhanuprasad14" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/christian-monch"><img src="https://avatars.githubusercontent.com/u/17925232?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Christian Mönch</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=christian-monch" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/mattcieslak"><img src="https://avatars.githubusercontent.com/u/170026?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Matt Cieslak</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mattcieslak" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/mikapfl"><img src="https://avatars.githubusercontent.com/u/7226087?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Mika Pflüger</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=mikapfl" title="Code">💻</a></td>
     <td align="center"><a href="https://me.ypid.de/"><img src="https://avatars.githubusercontent.com/u/1301158?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Robin Schneider</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=ypid" title="Code">💻</a></td>
+    <td align="center"><a href="https://orcid.org/0000-0003-4652-3758"><img src="https://avatars.githubusercontent.com/u/7570456?v=4?s=100" width="100px;" alt=""/><br /><sub><b>Sin Kim</b></sub></a><br /><a href="https://github.com/datalad/datalad/commits?author=AKSoo" title="Code">💻</a></td>
   </tr>
 </table>
 

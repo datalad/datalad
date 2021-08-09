@@ -7,8 +7,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import (
+    dirname,
     join as opj,
 )
+import sys
+
+# This is needed for versioneer to be importable when building with PEP 517.
+# See <https://github.com/warner/python-versioneer/issues/193> and links
+# therein for more information.
+sys.path.append(dirname(__file__))
+
+import versioneer
 
 from _datalad_build_support.setup import (
     BuildConfigInfo,
@@ -29,6 +38,7 @@ requires = {
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
         'distro; python_version >= "3.8"',
+        'importlib-metadata; python_version < "3.8"',
         'iso8601',
         'humanize',
         'fasteners>=0.14',
@@ -48,8 +58,10 @@ requires = {
     ],
     'publish': [
         'PyGithub',          # nice to have
+        'python-gitlab',     # required for create-sibling-gitlab
     ],
     'misc': [
+        'argcomplete',       # optional CLI completion
         'pyperclip',         # clipboard manipulations
         'python-dateutil',   # add support for more date formats to check_dates
     ],
@@ -169,6 +181,9 @@ classifiers = [
 ]
 setup_kwargs['classifiers'] = classifiers
 
+setup_kwargs["version"] = versioneer.get_version()
+cmdclass.update(versioneer.get_cmdclass())
+
 datalad_setup(
     'datalad',
     description="data distribution geared toward scientific datasets",
@@ -176,6 +191,11 @@ datalad_setup(
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
     python_requires='>=3.6',
+    project_urls={'Homepage': 'https://www.datalad.org',
+                  'Developer docs': 'https://docs.datalad.org/en/stable',
+                  'User handbook': 'https://handbook.datalad.org',
+                  'Source': 'https://github.com/datalad/datalad',
+                  'Bug Tracker': 'https://github.com/datalad/datalad/issues'},
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={

@@ -121,7 +121,10 @@ def mk_push_target(ds, name, path, annex=True, bare=True):
         # commit for the managed branch.
         # the only sane approach is to let git-annex establish a shared
         # history
-        ds.repo.call_annex(['sync'])
+        if AnnexRepo.git_annex_version > "8.20210631":
+            ds.repo.call_annex(['sync', '--allow-unrelated-histories'])
+        else:
+            ds.repo.call_annex(['sync'])
         ds.repo.call_annex(['sync', '--cleanup'])
     return target
 
@@ -987,5 +990,5 @@ def test_push_custom_summary(path):
     ds.config.set("advice.pushFetchFirst", "true", where="local")
     with swallow_outputs() as cmo:
         ds.push(to="sib", result_renderer="default", on_failure="ignore")
-        assert_in("Potential hints to solve", cmo.out)
+        assert_in("Hints:", cmo.out)
         assert_in("action summary:", cmo.out)

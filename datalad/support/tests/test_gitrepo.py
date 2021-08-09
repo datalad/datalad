@@ -1395,6 +1395,18 @@ def test_gitattributes(path):
     # mode='w' should replace the entire file:
     gr.set_gitattributes([('**', {'some': 'nonsense'})], mode='w')
     eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense'})
+    # mode='a' appends additional key/value
+    gr.set_gitattributes([('*', {'king': 'kong'})], mode='a')
+    eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense', 'king': 'kong'})
+    # handle files without trailing newline
+    with open(op.join(gr.path, '.gitattributes'), 'r+') as f:
+        s = f.read()
+        f.seek(0)
+        f.write(s.rstrip())
+        f.truncate()
+    gr.set_gitattributes([('*', {'ding': 'dong'})], mode='a')
+    eq_(gr.get_gitattributes('.')['.'],
+        {'some': 'nonsense', 'king': 'kong', 'ding': 'dong'})
 
 
 @with_tempfile(mkdir=True)
@@ -1685,7 +1697,7 @@ def test_gitrepo_push_default_first_kludge(path):
                                            DEFAULT_BRANCH + ":a-oneshot",
                                            DEFAULT_BRANCH + ":c-oneshot"])
     cmds_oneshot = [ln for ln in cml.out.splitlines()
-                    if "cmd" in ln and "push" in ln and DEFAULT_BRANCH in ln]
+                    if "Run" in ln and "push" in ln and DEFAULT_BRANCH in ln]
     eq_(len(cmds_oneshot), 1)
     assert_in(":a-oneshot", cmds_oneshot[0])
     assert_in(":b-oneshot", cmds_oneshot[0])
@@ -1701,7 +1713,7 @@ def test_gitrepo_push_default_first_kludge(path):
                                            DEFAULT_BRANCH + ":a-twoshot",
                                            DEFAULT_BRANCH + ":c-twoshot"])
     cmds_twoshot = [ln for ln in cml.out.splitlines()
-                    if "cmd" in ln and "push" in ln and DEFAULT_BRANCH in ln]
+                    if "Run" in ln and "push" in ln and DEFAULT_BRANCH in ln]
     # ... there are instead two git-push calls.
     eq_(len(cmds_twoshot), 2)
     # The first is for the first item of the refspec.

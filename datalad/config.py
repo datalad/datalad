@@ -800,8 +800,8 @@ class ConfigManager(object):
             lockfile = self._repo_dot_git / 'config.dataladlock'
         else:
             # follow pattern in downloaders for lockfile location
-            lockfile = Path(self.obtain('datalad.locations.cache')) \
-                / 'locks' / 'gitconfig.lck'
+            lockfile = Path(self.obtain('datalad.locations.locks')) \
+                       / 'gitconfig.lck'
 
         with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)

@@ -240,7 +240,7 @@ class Siblings(Interface):
         worker = action_worker_map[action]
 
         dataset = require_dataset(
-            dataset, check_installed=False, purpose='sibling configuration')
+            dataset, check_installed=False, purpose='configure sibling')
         refds_path = dataset.path
 
         res_kwargs = dict(refds=refds_path, logger=lgr)
@@ -379,6 +379,9 @@ def _add_remote(
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    if as_common_datasrc == name:
+        raise ValueError('Sibling name ({}) and common data source name ({}) '
+                         'can not be identical.'.format(name, as_common_datasrc))
     if isinstance(RI(url), PathRI):
         # make sure any path URL is stored in POSIX conventions for consistency
         # with git's behavior (e.g. origin configured by clone)

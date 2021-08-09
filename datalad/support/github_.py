@@ -16,8 +16,10 @@ from ..consts import (
 from ..dochelpers import exc_str
 from ..downloaders.credentials import Token
 from ..ui import ui
-from ..utils import unique, ensure_list, ensure_tuple_or_list
-
+from ..utils import (
+    ensure_list,
+    unique,
+)
 from .exceptions import (
     AccessDeniedError,
     MissingExternalDependency,

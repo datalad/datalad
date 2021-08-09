@@ -27,7 +27,6 @@ from datalad.cmd import (
 )
 from datalad.utils import (
     Path,
-    on_windows,
 )
 from datalad.tests.utils import (
     assert_in,

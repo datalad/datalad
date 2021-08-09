@@ -162,7 +162,7 @@ class Uninstall(Interface):
             check=True,
             if_dirty='save-before'):
         refds = require_dataset(dataset, check_installed=True,
-                                purpose='uninstalling')
+                                purpose='uninstall')
         res_kwargs = dict(action='uninstall', logger=lgr, refds=refds.path)
         if not path:
             # if no path is given, ie. refds is supposed to be uninstalled

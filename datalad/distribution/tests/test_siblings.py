@@ -242,6 +242,10 @@ def test_siblings(origin, repo_path, local_clone_path):
                          relpath(str(r['path']), source.path))))
         # https://github.com/datalad/datalad/issues/3951
         ok_(not pushurl)  # no pushurl should be defined
+    # 5621: Users shouldn't pass identical names for remote & common data source
+    assert_raises(ValueError, siblings, 'add', dataset=source, name='howdy',
+                  url=httpurl1, as_common_datasrc='howdy')
+
 
 @with_tempfile(mkdir=True)
 def test_here(path):

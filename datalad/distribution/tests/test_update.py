@@ -79,6 +79,10 @@ def test_update_simple(origin, src_path, dst_path):
     # forget we cloned it by removing remote, which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote(DEFAULT_REMOTE)
+    # also forget the declared absolute location of the submodules, and turn them
+    # relative to this/a clone
+    for sub in source.subdatasets(result_xfm=lambda x: x['gitmodule_name']):
+        source.subdatasets(path=sub, set_property=[('url', './{}'.format(sub))])
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())
@@ -190,7 +194,7 @@ def test_update_simple(origin, src_path, dst_path):
         dest.update(merge=True, recursive=True), 2,
         action='update', status='ok', type='dataset')
     # and now we can get new file
-    dest.get('2/load.dat')
+    dest.get(opj('2', 'load.dat'))
     ok_file_has_content(opj(dest.path, '2', 'load.dat'), 'heavy')
 
 

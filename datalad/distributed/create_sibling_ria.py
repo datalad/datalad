@@ -12,7 +12,6 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import subprocess
 
 from datalad.cmd import WitlessRunner as Runner
 from datalad.interface.common_opts import (
@@ -284,7 +283,7 @@ class CreateSiblingRia(Interface):
             )
 
         ds = require_dataset(
-            dataset, check_installed=True, purpose='create sibling RIA')
+            dataset, check_installed=True, purpose='create RIA sibling(s)')
         res_kwargs = dict(
             ds=ds,
             action="create-sibling-ria",

@@ -11,7 +11,6 @@
 """
 
 import re
-import time
 import os
 import os.path as op
 
@@ -33,12 +32,7 @@ from os.path import (
 )
 
 import posixpath
-import threading
 from functools import wraps
-from weakref import (
-    finalize,
-    WeakValueDictionary
-)
 import warnings
 
 from datalad.log import log_progress
@@ -53,7 +47,6 @@ from datalad.cmd import (
     StdOutErrCapture,
 )
 from datalad.config import (
-    ConfigManager,
     parse_gitconfig_dump,
     write_config_section,
 )
@@ -79,11 +72,9 @@ from .external_versions import external_versions
 from .exceptions import (
     CommandError,
     FileNotInRepositoryError,
-    GitIgnoreError,
     InvalidGitReferenceError,
     InvalidGitRepositoryError,
     NoSuchPathError,
-    PathKnownToRepositoryError,
 )
 from .network import (
     RI,
@@ -2824,7 +2815,14 @@ class GitRepo(CoreGitRepo):
         attrdir = op.dirname(git_attributes_file)
         if not op.exists(attrdir):
             os.makedirs(attrdir)
-        with open(git_attributes_file, mode) as f:
+
+        with open(git_attributes_file, mode + '+') as f:
+            # for append, fix existing files that do not end with \n
+            if mode == 'a' and f.tell():
+                f.seek(max(0, f.tell() - len(os.linesep)))
+                if not f.read().endswith('\n'):
+                    f.write('\n')
+
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(
@@ -2845,7 +2843,7 @@ class GitRepo(CoreGitRepo):
                         attrline += ' -{}'.format(a)
                     else:
                         attrline += ' {}={}'.format(a, val)
-                f.write('\n{}'.format(attrline))
+                f.write('{}\n'.format(attrline))
 
     def get_content_info(self, paths=None, ref=None, untracked='all',
                          eval_file_type=True):

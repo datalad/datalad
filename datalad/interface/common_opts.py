@@ -334,6 +334,7 @@ eval_params = dict(
         value is returned instead of a one-item return value list, or a
         list in case of multiple return values. `None` is return in case
         of an empty list.""",
+        default='list',
         constraints=EnsureChoice('generator', 'list', 'item-or-list')),
     result_filter=Parameter(
         doc="""if given, each to-be-returned
@@ -365,13 +366,11 @@ eval_params = dict(
         'impossible' or 'error'. Raised exception is an IncompleteResultsError
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
+        default='continue',
         constraints=EnsureChoice('ignore', 'continue', 'stop')),
 )
 
-eval_defaults = dict(
-    return_type='list',
-    result_filter=None,
-    result_renderer=None,
-    result_xfm=None,
-    on_failure='continue',
-)
+eval_defaults = {
+    k: p.cmd_kwargs.get('default', None)
+    for k, p in eval_params.items()
+}

@@ -15,8 +15,6 @@ import re
 
 import os.path as op
 
-from functools import partial
-
 from datalad.config import ConfigManager
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -25,7 +23,6 @@ from datalad.interface.results import (
     get_status_dict,
     results_from_paths,
     annexjson2result,
-    count_results,
     success_status_map,
     results_from_annex_noinfo,
 )
@@ -61,13 +58,11 @@ from datalad.support.network import (
 from datalad.support.parallel import (
     ProducerConsumerProgressLog,
 )
-from datalad.dochelpers import (
-    single_or_plural,
-)
 from datalad.utils import (
     unique,
     Path,
     get_dataset_root,
+    shortened_repr,
 )
 
 from datalad.local.subdatasets import Subdatasets
@@ -111,20 +106,20 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     cost is given in parenthesis, higher values indicate higher cost, and
     thus lower priority:
 
-    - URL of any configured superdataset remote that is known to have the
-      desired submodule commit, with the submodule path appended to it.
-      There can be more than one candidate (cost 500).
-
     - A datalad URL recorded in `.gitmodules` (cost 590). This allows for
       datalad URLs that require additional handling/resolution by datalad, like
       ria-schemes (ria+http, ria+ssh, etc.)
 
     - A URL or absolute path recorded for git in `.gitmodules` (cost 600).
 
+    - URL of any configured superdataset remote that is known to have the
+      desired submodule commit, with the submodule path appended to it.
+      There can be more than one candidate (cost 650).
+
     - In case `.gitmodules` contains a relative path instead of a URL,
       the URL of any configured superdataset remote that is known to have the
       desired submodule commit, with this relative path appended to it.
-      There can be more than one candidate (cost 500).
+      There can be more than one candidate (cost 650).
 
     - In case `.gitmodules` contains a relative path as a URL, the absolute
       path of the superdataset, appended with this relative path (cost 900).
@@ -218,7 +213,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                dict(cost=500, name=remote, url=url)
+                dict(cost=650, name=remote, url=url)
                 for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
                     sm_path_url, remote_url, alternate_suffix=False)
@@ -243,6 +238,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         ds_repo.config[c])
                        for c in ds_repo.config.keys()
                        if c.startswith(candcfg_prefix)]:
+        # ensure that there is only one template of the same name
+        if type(tmpl) == tuple and len(tmpl) > 1:
+            raise ValueError(
+                f"There are multiple URL templates for submodule clone "
+                f"candidate '{name}', but only one is allowed. "
+                f"Check datalad.get.subdataset-source-candidate-* configuration!"
+            )
         url = tmpl.format(**sm_candidate_props)
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
@@ -839,7 +841,7 @@ class Get(Interface):
 
         # we have to have a single dataset to operate on
         refds = require_dataset(
-            dataset, check_installed=True, purpose='get content')
+            dataset, check_installed=True, purpose='get content of %s' % shortened_repr(path))
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not

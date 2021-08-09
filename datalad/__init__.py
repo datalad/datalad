@@ -64,8 +64,6 @@ ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
 
-from .version import __version__
-
 
 def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
     """A helper to run datalad's tests.  Requires nose
@@ -103,6 +101,8 @@ test_http_server = None
 def setup_package():
     import os
     from datalad.utils import on_osx
+    from datalad.tests import _TEMP_PATHS_GENERATED
+
     if on_osx:
         # enforce honoring TMPDIR (see gh-5307)
         import tempfile
@@ -133,10 +133,10 @@ def setup_package():
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
         set_envvar('HOME', os.environ['GIT_HOME'])
+        set_envvar('DATALAD_LOG_EXC', "1")
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile
-        from datalad.tests import _TEMP_PATHS_GENERATED
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
             pass
@@ -149,6 +149,8 @@ def setup_package():
 [user]
 	name = DataLad Tester
 	email = test@example.com
+[datalad "log"]
+	exc = 1
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
@@ -293,5 +295,18 @@ def teardown_package():
     from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
+
+from .version import __version__
+
+if str(__version__) == '0' or __version__.startswith('0+'):
+    lgr.warning(
+        "DataLad was not installed 'properly' so its version is an uninformative %r.\n"
+        "It can happen e.g. if datalad was installed via\n"
+        "  pip install https://github.com/.../archive/{commitish}.zip\n"
+        "instead of\n"
+        "  pip install git+https://github.com/...@{commitish} .\n"
+        "We advise to re-install datalad or downstream projects might not operate correctly.",
+        __version__
+    )
 
 lgr.log(5, "Done importing main __init__")

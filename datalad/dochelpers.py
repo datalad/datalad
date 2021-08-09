@@ -19,6 +19,7 @@ import os
 import sys
 import traceback
 
+from datalad.support.exceptions import CapturedException
 
 lgr = logging.getLogger("datalad.docutils")
 
@@ -314,7 +315,7 @@ def borrowkwargs(cls=None, methodname=None, exclude=None):
 
 
 # TODO: make limit respect config/environment parameter
-def exc_str(exc=None, limit=None, include_str=True):
+def exc_str_old(exc=None, limit=None, include_str=True):
     """Enhanced str for exceptions.  Should include original location
 
     Parameters
@@ -372,3 +373,14 @@ def exc_str(exc=None, limit=None, include_str=True):
         # https://docs.python.org/2/library/sys.html#sys.exc_info
         del tb
     return out
+
+
+def exc_str(exc=None, limit=None, include_str=True):
+    """Temporary test shim, for finding issues re refactoring for
+    using CapturedException instead.
+
+    See gh-5716
+    """
+
+    return str(CapturedException(exc))
+

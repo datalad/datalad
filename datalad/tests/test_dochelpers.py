@@ -15,7 +15,7 @@ from ..dochelpers import (
     single_or_plural,
     borrowdoc,
     borrowkwargs,
-    exc_str,
+    exc_str_old,
 )
 
 from datalad.tests.utils import (
@@ -145,13 +145,13 @@ def test_borrow_kwargs():
     assert_true('boguse' in B.met_excludes.__doc__)
 
 
-def test_exc_str():
+def test_exc_str_old():
     try:
         raise Exception("my bad")
     except Exception as e:
-        estr = exc_str(e)
-        estr_tb_only = exc_str(e, include_str=False)
-    assert_re_in("my bad \[test_dochelpers.py:test_exc_str:...\]", estr)
+        estr = exc_str_old(e)
+        estr_tb_only = exc_str_old(e, include_str=False)
+    assert_re_in("my bad \[test_dochelpers.py:test_exc_str_old:...\]", estr)
     assert_re_in("^\[.*\]", estr_tb_only)  # only traceback
 
     def f():
@@ -162,15 +162,15 @@ def test_exc_str():
         f()
     except Exception as e:
         # default one:
-        estr2 = exc_str(e, 2)
-        estr1 = exc_str(e, 1)
+        estr2 = exc_str_old(e, 2)
+        estr1 = exc_str_old(e, 1)
         # and we can control it via environ by default
         with patch.dict('os.environ', {'DATALAD_EXC_STR_TBLIMIT': '3'}):
-            estr3 = exc_str(e)
+            estr3 = exc_str_old(e)
         with patch.dict('os.environ', {}, clear=True):
-            estr_ = exc_str()
+            estr_ = exc_str_old()
 
-    assert_re_in("my bad again \[test_dochelpers.py:test_exc_str:...,test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr3)
+    assert_re_in("my bad again \[test_dochelpers.py:test_exc_str_old:...,test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr3)
     assert_re_in("my bad again \[test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr2)
     assert_re_in("my bad again \[test_dochelpers.py:f2:...\]", estr1)
     assert_equal(estr_, estr1)
@@ -178,4 +178,4 @@ def test_exc_str():
     try:
         raise NotImplementedError
     except Exception as e:
-        assert_re_in("NotImplementedError\(\) \[test_dochelpers.py:test_exc_str:...\]", exc_str(e))
+        assert_re_in("NotImplementedError\(\) \[test_dochelpers.py:test_exc_str_old:...\]", exc_str_old(e))

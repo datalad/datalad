@@ -662,7 +662,7 @@ class Interface(object):
             has_default = defaults_idx >= 0
             if cmd_args:
                 if cmd_args[0][0] in prefix_chars:
-                    # TODO: All the Paramteter(args=...) values in this code
+                    # TODO: All the Parameter(args=...) values in this code
                     # base use hyphens, so there is no point in the below
                     # conversion. If it looks like no extensions rely on this
                     # behavior either, this could be dropped.
@@ -827,7 +827,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     """Generate a kwargs dict from a call signature and *args, **kwargs
 
     Basically resolving the argnames for all positional arguments, and
-    resolvin the defaults for all kwargs that are not given in a kwargs
+    resolving the defaults for all kwargs that are not given in a kwargs
     dict
     """
     from datalad.utils import getargspec

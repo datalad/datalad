@@ -3,9 +3,9 @@
 
 .. _chap_designpatterns:
 
-***************
-Design patterns
-***************
+**********************
+Miscellaneous patterns
+**********************
 
 DataLad is the result of a distributed and collaborative development effort
 over many years.  During this time the scope of the project has changed

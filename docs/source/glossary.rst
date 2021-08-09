@@ -44,6 +44,10 @@ them to the corresponding Git_/git-annex_ concepts.
     operations significantly and impair handling of such repositories in
     general).
 
+  CLI
+    A `Command Line Interface`_. Could be used interactively by executing
+    commands in a `shell`_, or as a programmable API for shell scripts.
+
   DataLad extension
     A Python package, developed outside of the core DataLad codebase, which
     (when installed) typically either provides additional top level `datalad`
@@ -54,3 +58,5 @@ them to the corresponding Git_/git-annex_ concepts.
 
 .. _Git: https://git-scm.com
 .. _Git-annex: http://git-annex.branchable.com
+.. _`Command Line Interface`: https://en.wikipedia.org/wiki/Command-line_interface
+.. _shell: https://en.wikipedia.org/wiki/Shell_(computing)

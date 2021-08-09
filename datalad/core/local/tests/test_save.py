@@ -14,7 +14,6 @@ import os.path as op
 from datalad.utils import (
     ensure_list,
     Path,
-    on_windows,
     rmtree,
 )
 from datalad.tests.utils import (

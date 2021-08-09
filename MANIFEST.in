@@ -6,6 +6,8 @@
 include CHANGELOG.md CONTRIBUTING.md CONTRIBUTORS COPYING Gruntfile.js
 include Makefile asv.conf.json requirements-devel.txt requirements.txt
 include tox.ini .coveragerc
+include versioneer.py
+include datalad/_version.py
 
 graft _datalad_build_support
 graft benchmarks

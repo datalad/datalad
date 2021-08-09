@@ -275,7 +275,9 @@ def test_clone_into_dataset(source_path, top_path):
     source = Dataset(source_path).create()
     ds = create(top_path)
     assert_repo_status(ds.path)
-
+    # Note, we test against the produced history in DEFAULT_BRANCH, not what it
+    # turns into in an adjusted branch!
+    hexsha_before = ds.repo.get_hexsha(DEFAULT_BRANCH)
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
     ok_((subds.pathobj / '.git').is_dir())
@@ -289,6 +291,13 @@ def test_clone_into_dataset(source_path, top_path):
     sds = ds.subdatasets("sub")
     assert_result_count(sds, 1, action='subdataset')
     eq_(sds[0]['gitmodule_datalad-url'], source.path)
+    # Clone produced one commit including the addition to .gitmodule:
+    commits = list(ds.repo.get_branch_commits_(
+        branch=DEFAULT_BRANCH,
+        stop=hexsha_before
+    ))
+    assert_not_in(hexsha_before, commits)
+    eq_(len(commits), 1)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
@@ -629,8 +638,7 @@ def test_cfg_originorigin(path):
     with chpwd(path), swallow_logs(new_level=logging.DEBUG) as cml:
         clone_lev3 = clone('clone_lev2', 'clone_lev3')
         # we called git-annex-init; see gh-4367:
-        cml.assert_logged(msg=r"[^[]*run:\n cwd=.*\n"
-                              r" cmd=\[('git',.*'annex'|'git-annex'), 'init'",
+        cml.assert_logged(msg=r"[^[]*Run \[('git',.*'annex'|'git-annex'), 'init'",
                           match=False,
                           level='DEBUG')
     assert_result_count(
@@ -1094,7 +1102,6 @@ def test_ria_postclonecfg():
         raise SkipTest("Can't create symlinks")
 
     from datalad.utils import make_tempfile
-    from datalad.tests.utils import HTTPPath
 
     with make_tempfile(mkdir=True) as lcl, make_tempfile(mkdir=True) as store, \
             make_tempfile(mkdir=True) as store2:
@@ -1555,3 +1562,85 @@ def test_clone_recorded_subds_reset(path):
     eq_(ds_b.subdatasets()[0]["gitshasum"],
         sub_repo.get_hexsha(
             sub_repo.get_corresponding_branch(branch) or branch))
+
+
+@with_tempfile
+@with_tempfile
+def test_clone_url_mapping(src_path, dest_path):
+    src = create(src_path)
+    dest = Dataset(dest_path)
+    # check that the impossible doesn't work
+    assert_raises(IncompleteResultsError, clone, 'rambo', dest_path)
+    # rather than adding test URL mapping here, consider
+    # test_url_mapping_specs(), it is cheaper there
+  
+    # anticipate windows test paths and escape them
+    escaped_subst = (r',rambo,%s' % src_path).replace('\\', '\\\\')
+    for specs in (
+            # we can clone with a simple substitution
+            {'datalad.clone.url-substitute.mike': escaped_subst},
+            # a prior match to a dysfunctional URL doesn't impact success
+            {
+                'datalad.clone.url-substitute.no': ',rambo,picknick',
+                'datalad.clone.url-substitute.mike': escaped_subst,
+            }):
+        try:
+            with patch.dict(dest.config._merged_store, specs):
+                clone('rambo', dest_path)
+        finally:
+            dest.remove(check=False)
+
+    # check submodule config impact
+    dest.create()
+    with patch.dict(dest.config._merged_store,
+                    {'datalad.clone.url-substitute.mike': escaped_subst}):
+        dest.clone('rambo', 'subds')
+    submod_rec = dest.repo.get_submodules()[0]
+    # we record the original-original URL
+    eq_(submod_rec['gitmodule_datalad-url'], 'rambo')
+    # and put the effective one as the primary URL
+    eq_(submod_rec['gitmodule_url'], src_path)
+
+
+_nomatch_map = {
+    'datalad.clone.url-substitute.nomatch': (
+        ',nomatch,NULL',
+    )
+}
+_windows_map = {
+    'datalad.clone.url-substitute.win': (
+        r',C:\\Users\\datalad\\from,D:\\to',
+    )
+}
+
+
+def test_url_mapping_specs():
+    from datalad.core.distributed.clone import _map_urls
+    cfg = ConfigManager()
+    for m, i, o in (
+            # path redirect on windows
+            (_windows_map,
+             r'C:\Users\datalad\from',
+             r'D:\to'),
+            # test standard github mapping, no pathc needed
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1',
+             'https://github.com/datalad/testrepo_gh-sub__1'),
+            # and on deep subdataset too
+            ({},
+             'https://github.com/datalad/testrepo_gh/sub _1/d/sub_-  1',
+             'https://github.com/datalad/testrepo_gh-sub__1-d-sub_-_1'),
+            # test that the presence of another mapping spec doesn't ruin
+            # the outcome
+            (_nomatch_map,
+             'https://github.com/datalad/testrepo_gh/sub _1',
+             'https://github.com/datalad/testrepo_gh-sub__1'),
+            # verify OSF mapping, but see
+            # https://github.com/datalad/datalad/issues/5769 for future
+            # implications
+            ({},
+             'https://osf.io/q8xnk/',
+             'osf://q8xnk'),
+            ):
+        with patch.dict(cfg._merged_store, m):
+            eq_(_map_urls(cfg, [i]), [o])

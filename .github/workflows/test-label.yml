@@ -1,0 +1,39 @@
+name: Test for semver label
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.repository == 'datalad/datalad'
+    steps:
+      - name: Check that PR does not use "major" since we aren't brave enough
+        run: |
+          # This should evaluate to either `true` or `false`, which runs the
+          # command of the same name.
+          ${{
+            !contains(github.event.pull_request.labels.*.name, 'major')
+          }}
+      - name: Check that PR against "maint" branch does not have "minor"
+        if: github.event.pull_request.base.label == 'datalad:maint'
+        run: |
+          ${{
+            !contains(github.event.pull_request.labels.*.name, 'minor')
+          }}
+      - name: Check that PR uses one of the standard "auto" labels
+        run: |
+          # major is included to stay optimistic, and to not forget later
+          ${{
+            contains(github.event.pull_request.labels.*.name, 'major')
+            || contains(github.event.pull_request.labels.*.name, 'minor')
+            || contains(github.event.pull_request.labels.*.name, 'patch')
+            || contains(github.event.pull_request.labels.*.name, 'dependencies')
+            || contains(github.event.pull_request.labels.*.name, 'documentation')
+            || contains(github.event.pull_request.labels.*.name, 'internal')
+            || contains(github.event.pull_request.labels.*.name, 'performance')
+            || contains(github.event.pull_request.labels.*.name, 'tests')
+          }}
+
+# vim:set sts=2:

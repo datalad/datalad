@@ -120,7 +120,7 @@ def test_annotate_paths(dspath, nodspath):
         # multiple rediscoveries of the subdatasets
         with swallow_logs(new_level=logging.DEBUG) as cml:
             annotate_paths(path=['a', 'b'])
-            eq_(cml.out.count('Resolved dataset for subdataset reporting/modification'), 1)
+            eq_(cml.out.count('Resolved dataset to report on subdataset(s)'), 1)
 
     # now do it again, pointing to the ds directly
     res = ds.annotate_paths(on_failure='ignore')
