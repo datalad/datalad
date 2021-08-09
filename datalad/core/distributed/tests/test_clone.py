@@ -582,6 +582,8 @@ def test_installationpath_from_url():
     # and the hostname alone
     eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
     eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
+    # and .git to survive in the middle
+    eq_(_get_installationpath_from_url("myprecious.gitthing/"), 'myprecious.gitthing')
 
 
 # https://github.com/datalad/datalad/issues/3958

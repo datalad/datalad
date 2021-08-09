@@ -1207,20 +1207,32 @@ def _get_installationpath_from_url(url):
     from a URL, analog to what `git clone` does.
     """
     ri = RI(url)
-    if isinstance(ri, (URL, DataLadRI, SSHRI)):  # decode only if URL
-        path = ri.path.rstrip('/')
-        path = urlunquote(path) if path else ri.hostname
-        if '/' in path:
-            path = path.split('/')
-            if path[-1] == '.git':
-                path = path[-2]
-            else:
-                path = path[-1]
+
+    def get_last_path(url):
+        "Return the latest part of the Path(url) which is not .git"
+        for part in Path(url).parts[::-1]:
+            if part != '.git':
+                return part
+        return ''
+
+    # consider path from RI, if degenerate - hostname, and if that
+    # one is not known -- URL itself as if it was a Path, but only
+    # the last (non .git) component
+    for cand in (
+        urlunquote(getattr(ri, 'path', '')),
+        getattr(ri, 'hostname', ''),
+        get_last_path(url)
+    ):
+        path = re.sub('/?(\.git)?/?$', '', cand)
+        if not path:
+            # nothing left, proceed to the next one
+            continue
+        path = path.rsplit('/', 1)[-1]
+        if path:
+            # we got a candidate!
+            return path
     else:
-        path = Path(url).parts[-1]
-    if path.endswith('.git'):
-        path = path[:-4]
-    return path
+        raise ValueError(f"Cannot deduce installation path for {url}")
 
 
 def decode_source_spec(spec, cfg=None):
