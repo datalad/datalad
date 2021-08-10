@@ -9,12 +9,16 @@
 """ datalad exceptions
 """
 
+import logging
 import re
 import sys
 import traceback
 from os import linesep
 from pathlib import Path
 from pprint import pformat
+
+
+lgr = logging.getLogger('datalad.support.exceptions')
 
 
 class CapturedException(object):
@@ -26,7 +30,8 @@ class CapturedException(object):
     reporting.
     """
 
-    def __init__(self, exc=None, limit=None, capture_locals=False):
+    def __init__(self, exc=None, limit=None, capture_locals=False,
+                 level=8, logger=None):
         """Capture an exception and its traceback for logging.
 
         Clears the exception's traceback frame references afterwards.
@@ -62,6 +67,10 @@ class CapturedException(object):
             )
             traceback.clear_frames(exc.__traceback__)
 
+        # log the captured exception
+        logger = logger or lgr
+        logger.log(level, "%r", self)
+
     def format_oneline_tb(self, limit=None, include_str=True):
         """Format an exception traceback as a one-line summary
 
@@ -76,21 +85,11 @@ class CapturedException(object):
         from datalad import cfg
 
         if include_str:
-            # try exc message
-            leading = str(self.tb)
-            if not leading:
-                # go with type
-                leading = self.tb.exc_type.__qualname__
+            # try exc message else exception type
+            leading = self.message() or self.name()
             out = "{} ".format(leading)
         else:
             out = ""
-
-        if limit is None:
-            # TODO: config logging.exceptions.traceback_levels = 1
-            #       ^ This is taken from exc_str(). What exactly does it mean?
-            #         Controlling the tblimit differently for logging, result
-            #         reporting, whatever else?
-            limit = int(cfg.obtain('datalad.exc.str.tblimit', default=1))
 
         entries = []
         entries.extend(self.tb.stack)
@@ -99,6 +98,9 @@ class CapturedException(object):
         elif self.tb.__context__ and not self.tb.__suppress_context__:
             entries.extend(self.tb.__context__.stack)
 
+        if limit is None:
+            limit = int(cfg.obtain('datalad.exc.str.tblimit',
+                                   default=len(entries)))
         if entries:
             tb_str = "[%s]" % (','.join(
                 "{}:{}:{}".format(
@@ -112,31 +114,51 @@ class CapturedException(object):
         return out
 
     def format_standard(self):
-        """Gives python's standard traceback output"""
-        # TODO: intended for introducing a decent debug mode later;
-        #       for now: a one-liner is free ;-)
+        """Returns python's standard formatted traceback output
 
+        Returns
+        -------
+        str
+        """
+        # TODO: Intended for introducing a decent debug mode later when this
+        #       can be used fromm within log formatter / result renderer.
+        #       For now: a one-liner is free
         return ''.join(self.tb.format())
 
-    def __str__(self):
-        """String representation
+    def format_short(self):
+        """Returns a short representation of the original exception
 
-        This is intended to be used via logging Formatters, which is why
-        its behavior is controlled by 'datalad.log.exc'. If that config is false
-        (default), an empty string is returned.
+        Form: ExceptionName(exception message)
+
+        Returns
+        -------
+        str
         """
-        # Note: No import at module level, since ConfigManager imports
-        # dochelpers -> circular import when creating datalad.cfg instance at
-        # startup.
-        from datalad import cfg
+        return self.name() + '(' + self.message() + ')'
 
-        if cfg.obtain('datalad.log.exc'):
-            return self.format_oneline_tb(limit=None, include_str=True)
-        else:
-            return ""
+    def message(self):
+        """Returns only the message of the original exception
+
+        Returns
+        -------
+        str
+        """
+        return str(self.tb)
+
+    def name(self):
+        """Returns the class name of the original exception
+
+        Returns
+        -------
+        str
+        """
+        return self.tb.exc_type.__qualname__
+
+    def __str__(self):
+        return self.format_short()
 
     def __repr__(self):
-        return self.tb.exc_type.__qualname__ + '(' + str(self.tb) + ')'
+        return self.format_oneline_tb(limit=None, include_str=True)
 
 
 def _format_json_error_messages(recs):
