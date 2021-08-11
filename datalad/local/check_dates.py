@@ -93,7 +93,9 @@ class CheckDates(Interface):
             to_render = {k: v for k, v in res.items()
                          if k not in ["status", "message", "logger"]}
         if to_render:
-            ui.message(json.dumps(to_render, sort_keys=True, indent=2))
+            ui.message(json.dumps(to_render, sort_keys=True, indent=2,
+                                  default=str)
+                       )
 
     _params_ = dict(
         paths=Parameter(
