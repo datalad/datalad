@@ -5,8 +5,10 @@ from fasteners import (
 from contextlib import contextmanager
 
 from .path import exists
+from ..dochelpers import exc_str
 from ..utils import (
     ensure_unicode,
+    get_open_files,
     unlink,
 )
 
@@ -132,6 +134,23 @@ def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_un
 
     # could be bytes, making formatting trickier
     lock_path = ensure_unicode(lock.path)
+
+    def get_pids_msg():
+        try:
+            pids = get_open_files(lock_path)
+            if pids:
+                proc = pids[lock_path]
+                return f'Check following process: PID={proc.pid} CWD={proc.cwd()} CMDLINE={proc.cmdline()}.'
+            else:
+                return 'Stale lock? I found no processes using it.'
+        except Exception as exc:
+            lgr.debug(
+                "Failed to get a list of processes which 'posses' the file %s: %s",
+                lock_path,
+                exc_str(exc)
+            )
+            return 'Another process is using it (failed to determine one)?'
+
     lgr.debug("Acquiring a currently %s lock%s. If stalls - check which process holds %s",
               ("existing" if lock.exists() else "absent"),
               purpose,
@@ -150,8 +169,8 @@ def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_un
                         msg = " Will proceed without locking."
                     else:
                         msg = ""
-                lgr.info("Failed to acquire lock%s at %s in %4g seconds. Another process is using it?%s",
-                         purpose, lock_path, timeout, msg)
+                lgr.info("Failed to acquire lock%s at %s in %4g seconds. %s%s",
+                         purpose, lock_path, timeout, get_pids_msg(), msg)
             else:
                 yield True
                 return
@@ -161,8 +180,8 @@ def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_un
                 yield False
             else:
                 raise RuntimeError(
-                    "Failed to acquire lock%s at %s in %d attempts. Check if no other process is using it"
-                    % (purpose, lock_path, len(timeouts)))
+                    "Failed to acquire lock%s at %s in %d attempts.%s"
+                    % (purpose, lock_path, len(timeouts), get_pids_msg()))
     finally:
         if was_locked:
             lock.release()

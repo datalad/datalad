@@ -147,6 +147,9 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         assert_in(f'Failed to acquire lock at {lock_path} in 0.15', res['stderr'])
         assert_in('proceed without locking', res['stderr'])
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
+        # PID does not correspond
+        assert_in('Check following process: PID=', res['stderr'])
+        assert_in(f'CWD={os.getcwd()} CMDLINE=', res['stderr'])
 
         # in 2nd case, lets try without proceeding unlocked
         script1.write_text(script1_fmt.format(proceed_unlocked=False))
@@ -164,3 +167,4 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
     res = runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
     assert_in('Lock acquired=True', res['stdout'])
     assert_not_in(f'Failed to acquire lock', res['stderr'])
+    assert_not_in('PID', res['stderr'])
