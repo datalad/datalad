@@ -1,33 +1,40 @@
 #emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
 #ex: set sts=4 ts=4 sw=4 noet:
-"""
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
-"""
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+import os
 import os.path as op
-from ..locking import lock_if_check_fails
+import sys
+
+from fasteners import InterProcessLock
+from pathlib import Path
+from time import time
+
+from ...cmd import (
+    CommandError,
+    StdOutErrCapture,
+    WitlessRunner,
+)
+from ..locking import (
+    lock_if_check_fails,
+    try_lock_informatively,
+)
+from ...utils import ensure_unicode
 from datalad.tests.utils import (
+    assert_false,
+    assert_greater,
+    assert_true,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    eq_,
+    ok_,
     ok_exists,
     with_tempfile,
-    ok_,
-    eq_,
     known_failure_windows,
 )
 
@@ -98,3 +105,62 @@ def test_lock_if_check_fails(tempfile):
     p.start()
     ok_(q.get())
     p.join()
+
+
+@with_tempfile
+def test_try_lock_informatively(tempfile):
+    lock = InterProcessLock(tempfile + '.lck')
+    lock_path = ensure_unicode(lock.path)  # can be bytes, complicates string formattingetc
+    t0 = time()
+    with try_lock_informatively(lock, purpose="happy life") as acquired:
+        assert_true(lock.acquired)
+        assert_true(acquired)
+        assert_greater(2, time() - t0)  # should not take any notable time, we cannot be blocking
+
+        """
+        # InterProcessLock is not re-entrant so nesting should not be used, will result
+        # in exception on release
+        with try_lock_informatively(lock, timeouts=[dt, dt*2], proceed_unlocked=True) as acquired:
+            assert_true(lock.acquired)  # due to outer cm
+            assert_true(acquired)       # lock is reentrant apparently
+        """
+        # Let's try in a completely different subprocess
+        runner = WitlessRunner(env=dict(os.environ, DATALAD_LOG_LEVEL='info', DATALAD_LOG_TARGET='stderr'))
+
+        script1 = Path(tempfile + "-script1.py")
+        script1_fmt = f"""
+from fasteners import InterProcessLock
+from time import time
+
+from datalad.support.locking import try_lock_informatively
+
+lock = InterProcessLock({lock_path!r})
+
+with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proceed_unlocked}}) as acquired:
+    print("Lock acquired=%s" % acquired)
+"""
+        script1.write_text(script1_fmt.format(proceed_unlocked=True))
+        t0 = time()
+        res = runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
+        assert_in('Lock acquired=False', res['stdout'])
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.05', res['stderr'])
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.15', res['stderr'])
+        assert_in('proceed without locking', res['stderr'])
+        assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
+
+        # in 2nd case, lets try without proceeding unlocked
+        script1.write_text(script1_fmt.format(proceed_unlocked=False))
+        t0 = time()
+        with assert_raises(CommandError) as cme:
+            runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
+        assert_in(f"Failed to acquire lock at {lock_path} in 2 attempts.", str(cme.exception))
+        assert_in(f"RuntimeError", str(cme.exception))
+        assert_false(cme.exception.stdout)  # nothing there since print should not happen
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.05', cme.exception.stderr)
+        assert_in(f'Failed to acquire lock at {lock_path} in 0.15', cme.exception.stderr)
+        assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
+
+    # now that we left context, should work out just fine
+    res = runner.run([sys.executable, str(script1)], protocol=StdOutErrCapture)
+    assert_in('Lock acquired=True', res['stdout'])
+    assert_not_in(f'Failed to acquire lock', res['stderr'])

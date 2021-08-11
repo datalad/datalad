@@ -5,7 +5,10 @@ from fasteners import (
 from contextlib import contextmanager
 
 from .path import exists
-from ..utils import unlink
+from ..utils import (
+    ensure_unicode,
+    unlink,
+)
 
 import logging
 lgr = logging.getLogger('datalad.locking')
@@ -108,3 +111,58 @@ def lock_if_check_fails(
             lock.release()
             if exists(lock_filename):
                 unlink(lock_filename)
+
+
+@contextmanager
+def try_lock_informatively(lock, purpose=None, timeouts=(5, 60, 240), proceed_unlocked=False):
+    """Try to acquire lock (while blocking) multiple times while logging INFO messages on failure
+
+    Primary use case is for operations which are user-visible and thus should not lock
+    indefinetely or for long period of times (so user would just Ctrl-C if no update is provided)
+    without "feedback".
+
+    Parameters
+    ----------
+    lock: fasteners._InterProcessLock
+    purpose: str, optional
+    timeouts: tuple or list, optional
+    proceed_unlocked: bool, optional
+    """
+    purpose = " to " + str(purpose) if purpose else ''
+
+    # could be bytes, making formatting trickier
+    lock_path = ensure_unicode(lock.path)
+    lgr.debug("Acquiring a currently %s lock%s. If stalls - check which process holds %s",
+              ("existing" if lock.exists() else "absent"),
+              purpose,
+              lock_path)
+
+    was_locked = False  # name of var the same as of within fasteners.try_lock
+    assert timeouts  # we expect non-empty timeouts
+    try:
+        for trial, timeout in enumerate(timeouts):
+            was_locked = lock.acquire(blocking=True, timeout=timeout)
+            if not was_locked:
+                if trial < len(timeouts) - 1:
+                    msg = " Will try again and wait for up to %4g seconds." % (timeouts[trial+1],)
+                else:  # It was the last attempt
+                    if proceed_unlocked:
+                        msg = " Will proceed without locking."
+                    else:
+                        msg = ""
+                lgr.info("Failed to acquire lock%s at %s in %4g seconds. Another process is using it?%s",
+                         purpose, lock_path, timeout, msg)
+            else:
+                yield True
+                return
+        else:
+            assert not was_locked
+            if proceed_unlocked:
+                yield False
+            else:
+                raise RuntimeError(
+                    "Failed to acquire lock%s at %s in %d attempts. Check if no other process is using it"
+                    % (purpose, lock_path, len(timeouts)))
+    finally:
+        if was_locked:
+            lock.release()
