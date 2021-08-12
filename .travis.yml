@@ -275,6 +275,7 @@ after_success:
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
       cd __testhome__;
       coverage combine -a /tmp/.coverage-entrypoints-*;
+      coverage report;
       codecov;
     fi
 
