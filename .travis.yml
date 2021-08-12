@@ -262,7 +262,7 @@ script:
   # Run tests
   - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
-    $NOSE_WRAPPER `which nosetests` "${NOSE_OPTS[@]}"
+    $NOSE_WRAPPER python -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
       --with-doctest
       --with-cov --cover-package datalad
@@ -274,8 +274,8 @@ after_success:
   # cron jobs test more and then PRs will be falling behind since they would not
   # trigger some codepaths.  So submit coverage only from non-cron jobs, but report for all
   - cd __testhome__;
-  - coverage combine -a /tmp/.coverage-entrypoints-*;
-  - coverage report;
+  - python -m coverage combine -a /tmp/.coverage-entrypoints-*;
+  - python -m coverage report;
   - if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
       codecov;
     fi
