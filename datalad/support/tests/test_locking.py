@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     eq_,
     ok_,
     ok_exists,
+    on_osx,
     with_tempfile,
     known_failure_windows,
 )
@@ -147,9 +148,17 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         assert_in(f'Failed to acquire lock at {lock_path} in 0.15', res['stderr'])
         assert_in('proceed without locking', res['stderr'])
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
-        # PID does not correspond
-        assert_in('Check following process: PID=', res['stderr'])
-        assert_in(f'CWD={os.getcwd()} CMDLINE=', res['stderr'])
+        try:
+            # PID does not correspond
+            assert_in('Check following process: PID=', res['stderr'])
+            assert_in(f'CWD={os.getcwd()} CMDLINE=', res['stderr'])
+        except AssertionError:
+            # we must have had the other one then
+            assert_in('failed to determine one', res['stderr'])
+            if not on_osx:
+                # so far we had only OSX reporting failing to get PIDs information
+                # but if it is something else -- re-raise original exception
+                raise
 
         # in 2nd case, lets try without proceeding unlocked
         script1.write_text(script1_fmt.format(proceed_unlocked=False))
