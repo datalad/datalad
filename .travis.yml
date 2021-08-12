@@ -23,7 +23,7 @@ env:
     # running on Travis.
     - NOSE_SELECTION="integration or usecase or slow or network"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
-    - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
+    - DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org
     # How/which git-annex we install.  conda's build would be the fastest, but it must not
     # get ahead in PATH to not shadow travis' python
     - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20201007 -m conda"

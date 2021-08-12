@@ -549,7 +549,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 - *DATALAD_DATASETS_TOPURL*:
   Used to point to an alternative location for `///` dataset. If running
-  tests preferred to be set to http://datasets-tests.datalad.org
+  tests preferred to be set to https://datasets-tests.datalad.org
 - *DATALAD_LOG_LEVEL*:
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_LOG_NAME*:

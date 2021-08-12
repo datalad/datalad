@@ -18,7 +18,7 @@ say "1. Host the data file at some publicly accessible location"
 say "2. Configure DataLad to make sure that getting data from GitHub transparently requests from this other location instead"
 
 say "Here we use a personal webserver with SSH access, but, in principle, any hosting solution supported by git-annex is equally suitable"
-say "We create a remote sibling of our dataset under the name 'myserver' via SSH, and tell datalad to track it as a common data source that is available for any future installation of this dataset. Access to this location will happen via the given http:// URL, and --ui true tells to install DataLad web UI as on http://datasets.datalad.org. Note that /.git in the URL most likely to be necessary in your case."
+say "We create a remote sibling of our dataset under the name 'myserver' via SSH, and tell datalad to track it as a common data source that is available for any future installation of this dataset. Access to this location will happen via the given http:// URL, and --ui true tells to install DataLad web UI as on https://datasets.datalad.org. Note that /.git in the URL most likely to be necessary in your case."
 run "datalad create-sibling -s myserver demo.datalad.org:public_html/publish-demo --ui true --as-common-datasrc demo-server --target-url http://demo.datalad.org/publish-demo/.git"
 
 say "With this configuration in place, we can now create a repository on GitHub, and configure the remote sibling on the SSH server as a publication dependency"

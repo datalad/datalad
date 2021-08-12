@@ -3385,7 +3385,7 @@ Enhancements and new features
 -  ``annex`` metadata extractor now extracts ``annex.key`` metadata
    record. Should allow now to identify uses of specific files etc
    (`#2952 <https://github.com/datalad/datalad/issues/2952>`__)
--  Test that we can install from http://datasets.datalad.org
+-  Test that we can install from https://datasets.datalad.org
 -  Proper rendering of ``CommandError`` (e.g. in case of “out of space”
    error) (`#2958 <https://github.com/datalad/datalad/issues/2958>`__)
 
@@ -3917,7 +3917,7 @@ Enhancements and new features
 -  AutomagicIO: Added proxying of isfile, lzma.LZMAFile and io.open
 -  Testing:
 
-   -  added DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org to
+   -  added DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org to
       run tests against another website to not obscure access stats
    -  tests run against temporary HOME to avoid side-effects
    -  better unit-testing of interactions with special remotes
@@ -4250,7 +4250,7 @@ Enhancements and new features
    removed from the interface
 -  Web frontend got proper coloring for the breadcrumbs and some
    additional caching to speed up interactions. See
-   http://datasets.datalad.org
+   https://datasets.datalad.org
 -  Small improvements to the online documentation. See e.g. `summary of
    differences between
    git/git-annex/datalad <http://docs.datalad.org/en/latest/related.html#git-git-annex-datalad>`__
@@ -4553,7 +4553,7 @@ Enhancements and new features
 
 Lots of everything, including but not limited to
 
--  enhanced index viewer, as the one on http://datasets.datalad.org
+-  enhanced index viewer, as the one on https://datasets.datalad.org
 -  initial new data providers support:
    `Kaggle <https://www.kaggle.com>`__,
    `BALSA <http://balsa.wustl.edu>`__,
@@ -4580,7 +4580,7 @@ Lots of everything, including but not limited to
 
 New features and bugfix release
 
--  support of /// urls to point to http://datasets.datalad.org
+-  support of /// urls to point to https://datasets.datalad.org
 -  variety of fixes and enhancements throughout
 
 0.2.2 (Jun 20, 2016) – OHBM we are coming!
