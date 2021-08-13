@@ -15,9 +15,13 @@ from datalad.tests.utils import (
     assert_in,
     assert_raises,
     assert_true,
+    ok_file_has_content,
     SkipTest,
+    skip_if,
+    with_tempfile,
     with_testsui,
 )
+from datalad.support.external_versions import external_versions
 from datalad.support.keyring_ import (
     Keyring,
     MemoryKeyring,
@@ -57,6 +61,7 @@ def test_cred1_enter_new():
     cred.enter_new(user='user2')
     assert_equal(keyring.get('name', 'user'), 'user2')
     assert_equal(keyring.get('name', 'password'), 'newpassword')
+
 
 @with_testsui(responses=['password1'])
 def test_cred1_call():
@@ -132,3 +137,32 @@ def test_credentials_from_env():
             assert_equal(cred.get('secret_id'), '2')
             assert_true(cred.is_known)
         assert_false(cred.is_known)  # no memory of the past
+
+
+@skip_if(not external_versions['keyrings.alt'])
+@with_tempfile
+def test_delete_not_crashing(path):
+    # although in above test we just use/interact with Keyring without specifying
+    # any custom one, there we do not change it so I guess it is ok. Here we want
+    # a real keyring backend which we will alter
+    from keyrings.alt.file import PlaintextKeyring
+    kb = PlaintextKeyring()
+    kb.filename = path
+
+    keyring = Keyring(keyring_backend=kb)
+    cred = UserPassword("test1", keyring=keyring)
+
+    cred.set(user="user1", password="password")
+    ok_file_has_content(path, ".*test1.*", re_=True)  # keyring backend saves where we expect
+
+    # manually delete one component of the credential
+    cred._keyring.delete(cred.name, next(iter(cred._FIELDS)))
+
+    # now delete entire credential -- we must not crash
+    cred.delete()
+    try:
+        ok_file_has_content(path, ".*test1.*", re_=True)  # keyring backend saves where we expect
+        raise AssertionError("keyring still has our key")
+    except AssertionError:
+        pass
+
