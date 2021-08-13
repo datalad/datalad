@@ -537,24 +537,41 @@ def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
 
 
 def test_installationpath_from_url():
-    cases = (
+    # cases for all OSes
+    cases = [
         'http://example.com/lastbit',
         'http://example.com/lastbit.git',
         'http://lastbit:8000',
-    ) + (
+        # SSH
+        'hostname:lastbit',
+        'hostname:lastbit/',
+        'hostname:subd/lastbit',
+        'hostname:/full/path/lastbit',
+        'hostname:lastbit/.git',
+        'hostname:lastbit/.git/',
+        'hostname:/full/path/lastbit/.git',
+        'full.hostname.com:lastbit/.git',
+        'user@full.hostname.com:lastbit/.git',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit/',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit/.git',
+    ]
+    # OS specific cases
+    cases += [
         'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit',
         'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit\\',
         'Temp\\lastbit',
         'Temp\\lastbit\\',
         'lastbit.git',
         'lastbit.git\\',
-    ) if on_windows else (
+    ] if on_windows else [
         'lastbit',
         'lastbit/',
         '/lastbit',
         'lastbit.git',
         'lastbit.git/',
-    )
+    ]
+
     for p in cases:
         eq_(_get_installationpath_from_url(p), 'lastbit')
     # we need to deal with quoted urls
