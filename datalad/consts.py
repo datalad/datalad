@@ -49,7 +49,7 @@ ANNEX_TRANSFER_DIR = join('.git', 'annex', 'transfer')
 SEARCH_INDEX_DOTGITDIR = join('datalad', 'search_index')
 
 DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
-                  or "http://datasets.datalad.org/"
+                  or "https://datasets.datalad.org/"
 # safeguard
 if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'

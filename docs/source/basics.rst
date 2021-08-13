@@ -115,16 +115,16 @@ API principles
 You can use DataLad's ``install`` command to download datasets. The command accepts
 URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
 to obtain a first dataset is downloading the default :term:`superdataset` from
-http://datasets.datalad.org/ using a shortcut.
+https://datasets.datalad.org/ using a shortcut.
 
 Downloading DataLad's default superdataset
 --------------------------------------------
 
-http://datasets.datalad.org provides a super-dataset consisting of datasets
+https://datasets.datalad.org provides a super-dataset consisting of datasets
 from various portals and sites.  Many of them were crawled, and periodically
 updated, using `datalad-crawler <https://github.com/datalad/datalad-crawler>`__
 extension.  The argument ``///`` can be used
-as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
+as a shortcut that points to the superdataset located at https://datasets.datalad.org/. 
 Here are three common examples in command line notation:
 
 ``datalad install ///``
@@ -188,7 +188,7 @@ might differ;
 In how both commands operate on provided paths, it could be said that ``install
 == get -n``, and ``install -g == get``.  But ``install`` also has ability to
 install new datasets from remote locations given their URLs (e.g.,
-``http://datasets.datalad.org/`` for our super-dataset) and SSH targets (e.g.,
+``https://datasets.datalad.org/`` for our super-dataset) and SSH targets (e.g.,
 ``[login@]host:path``) if they are provided as the argument to its call or
 explicitly as ``--source`` option.  If ``datalad install --source URL
 DESTINATION`` (command line example) is used, then dataset from URL gets

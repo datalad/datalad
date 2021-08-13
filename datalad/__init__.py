@@ -118,7 +118,7 @@ def setup_package():
         os.environ[v] = val
 
     _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
-    consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
+    consts.DATASETS_TOPURL = 'https://datasets-tests.datalad.org/'
     set_envvar('DATALAD_DATASETS_TOPURL', consts.DATASETS_TOPURL)
 
     from datalad.tests.utils import (
