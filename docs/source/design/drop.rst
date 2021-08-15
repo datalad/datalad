@@ -18,14 +18,14 @@ unchanged remote availability).
 §2 Like :command:`get`, :command:`drop` primarily operates on a mandatory path
 specification (to discover relevant files and sudatasets to operate on).
 
-§3 :command:`drop` has ``--type`` parameter that serves as an extensible
+§3 :command:`drop` has ``--what`` parameter that serves as an extensible
 "mode-switch" to cover all relevant scenarios, like 'drop all file content in
-the work-tree' (e.g. ``--type files``, default, `#5858
+the work-tree' (e.g. ``--what files``, default, `#5858
 <https://github.com/datalad/datalad/issues/5858>`__), 'drop all keys from any
-branch' (i.e. ``--type allkeys``, `#2328
+branch' (i.e. ``--what allkeys``, `#2328
 <https://github.com/datalad/datalad/issues/2328>`__), but also '"drop" AKA
-uninstall entire subdataset hierarchies' (e.g. ``--type all``), or drop
-preferred content (``--type preferred-content``, `#3122
+uninstall entire subdataset hierarchies' (e.g. ``--what all``), or drop
+preferred content (``--what preferred-content``, `#3122
 <https://github.com/datalad/datalad/issues/3122>`__).
 
 §4 :command:`drop` prevents data loss by default (`#4750
@@ -98,28 +98,28 @@ Unless explicitly stated, all command are assumed to be executed in the root of 
 
    Drop all file content from the entire `subB` (`fileB`)
 
-- U4: ``datalad drop subB --type all``
+- U4: ``datalad drop subB --what all``
 
-   Same as above (default ``--type files``), because it is not operating in the
+   Same as above (default ``--what files``), because it is not operating in the
    context of a superdataset (no automatic upward lookups). Possibly hint at
    next usage pattern).
 
-- U5: ``datalad drop -d . subB --type all``
+- U5: ``datalad drop -d . subB --what all``
 
   Drop all from the superdataset under this path. I.e. drop all from the
   subdataset and drop the subdataset itself (AKA uninstall)
 
-- U6: ``datalad drop subA --type all``
+- U6: ``datalad drop subA --what all``
 
   Error: "``subA`` contains subdatasets, forgot --recursive?"
 
-- U7: ``datalad drop -d . subA -r --type all``
+- U7: ``datalad drop -d . subA -r --what all``
 
   Drop all content from the subdataset (``fileA``) and its subdatasets
   (``fileC``), uninstall the subdataset (``subA``) and its subdatasets
   (``subsubC``, ``subsubD``)
 
-- U8: ``datalad drop subA -r --type all``
+- U8: ``datalad drop subA -r --what all``
 
   Same as above, but keep ``subA`` installed
 
@@ -128,7 +128,7 @@ Unless explicitly stated, all command are assumed to be executed in the root of 
    Drop all content from the subdataset and its subdatasets (``fileA``,
    ``fileC``)
 
-- U10: ``datalad drop . -r --type all``
+- U10: ``datalad drop . -r --what all``
 
   Drops all file content and subdatasets, but leaves the superdataset
   repository behind
