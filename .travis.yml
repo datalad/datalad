@@ -105,6 +105,7 @@ script:
   # Run tests
   - http_proxy=
     DATALAD_LOG_LEVEL=5
+    DATALAD_LOG_OUTPUTS=1
     PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER python -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
