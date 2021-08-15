@@ -20,6 +20,10 @@ echo "I: mounting $mntorig under $mntpoint via $fs"
 mkdir -p "$mntpoint"
 mkdir -p "$mntorig"
 
+if ! dpkg -l nfs-kernel-server | grep '^ii.*nfs-kernel-server'; then
+    sudo apt-get install -y nfs-kernel-server
+fi
+
 sudo exportfs -o rw "localhost:$mntorig"
 sudo mount -t "$fs" "localhost:$mntorig" "$mntpoint"
 
