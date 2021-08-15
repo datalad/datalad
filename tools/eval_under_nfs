@@ -31,9 +31,8 @@ sudo mount -t "$fs" "localhost:$mntorig" "$mntpoint"
 sudo mount | grep "$mntpoint" | sed -e 's,^,I: ,g'
 
 # Run the actual command
-echo "I: running $*"
-set +e
-TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" eval "$@"
+echo "I: running ${@@Q}"
+TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" eval "${@@Q}"
 ret=$?
 
 echo "I: done, unmounting"
