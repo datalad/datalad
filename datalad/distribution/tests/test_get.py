@@ -173,6 +173,17 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
          for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
     )
 
+    # check #5839: two source configs with the same name should raise an error
+    clone3.config.add(
+        f"datalad.get.subdataset-source-candidate-{DEFAULT_REMOTE}",
+        "should-not-work"
+    )
+    clone3.config.add(
+        f"datalad.get.subdataset-source-candidate-{DEFAULT_REMOTE}",
+        "should-really-not-work"
+    )
+    assert_raises(ValueError, clone3.get, 'sub')
+
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
 

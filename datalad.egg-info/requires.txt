@@ -14,6 +14,7 @@ msgpack
 requests>=1.2
 jsmin
 PyGithub
+python-gitlab
 simplejson
 whoosh
 
@@ -64,6 +65,8 @@ requests>=1.2
 requests_ftp
 jsmin
 PyGithub
+python-gitlab
+argcomplete
 pyperclip
 python-dateutil
 BeautifulSoup4
@@ -95,6 +98,8 @@ requests>=1.2
 requests_ftp
 jsmin
 PyGithub
+python-gitlab
+argcomplete
 pyperclip
 python-dateutil
 BeautifulSoup4
@@ -173,6 +178,8 @@ requests>=1.2
 requests_ftp
 jsmin
 PyGithub
+python-gitlab
+argcomplete
 pyperclip
 python-dateutil
 BeautifulSoup4
@@ -209,12 +216,14 @@ python-xmp-toolkit
 Pillow
 
 [misc]
+argcomplete
 pyperclip
 python-dateutil
 
 [publish]
 jsmin
 PyGithub
+python-gitlab
 
 [tests]
 BeautifulSoup4

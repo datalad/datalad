@@ -263,6 +263,17 @@ def teardown_package():
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
 
-lgr.log(5, "Done importing main __init__")
-
 from .version import __version__
+
+if str(__version__) == '0' or __version__.startswith('0+'):
+    lgr.warning(
+        "DataLad was not installed 'properly' so its version is an uninformative %r.\n"
+        "It can happen e.g. if datalad was installed via\n"
+        "  pip install https://github.com/.../archive/{commitish}.zip\n"
+        "instead of\n"
+        "  pip install git+https://github.com/...@{commitish} .\n"
+        "We advise to re-install datalad or downstream projects might not operate correctly.",
+        __version__
+    )
+
+lgr.log(5, "Done importing main __init__")
