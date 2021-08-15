@@ -34,6 +34,7 @@ matrix:
     # Test under NFS mount  (full, only in master)
     env:
     - NOSE_WRAPPER=../tools/eval_under_nfs
+    - _DL_ANNEX_INSTALL_SCENARIO="miniconda --batch git-annex=8.20210803 -m conda"
 
 before_install:
   - NOSE_OPTS=( -s -v )
