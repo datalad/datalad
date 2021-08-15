@@ -1,3 +1,13 @@
+datalad (0.14.7-1) unstable; urgency=medium
+
+  * Fresh upstream release. Upload to unstable celebrate bullseye release
+  * d/control
+    - add python3-gitlab to *Depends
+  * d/patches
+    - CPed 00* patches dropped
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 15 Aug 2021 15:31:36 -0400
+
 datalad (0.14.6-1) experimental; urgency=medium
 
   * Fresh upstream release
