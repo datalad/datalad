@@ -31,7 +31,6 @@ Dataset operations
    api.drop
    api.get
    api.install
-   api.publish
    api.push
    api.remove
    api.save

@@ -25,7 +25,6 @@ _group_dataset = (
         ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
-        ('datalad.distribution.publish', 'Publish'),
         ('datalad.core.distributed.push', 'Push', 'push'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
         ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),

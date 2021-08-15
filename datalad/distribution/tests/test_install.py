@@ -872,7 +872,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1.create_sibling('ssh://datalad-test%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
 
         # print("Creating clone2")
-        clone1.publish(to=clone2_)
+        clone1.push(to=clone2_)
         clone2 = Dataset(clone2_)
         # print("Initiating subdataset")
         clone2.create('subds1')
