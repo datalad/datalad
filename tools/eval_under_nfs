@@ -39,7 +39,10 @@ TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" "$@"
 ret=$?
 
 echo "I: done, unmounting"
-sudo umount "$mntpoint"
+if ! sudo umount "$mntpoint"; then
+  fuser -V || sudo apt-get install -t psmisc
+  fuser -v "$mntpoint"
+fi
 sudo exportfs -u "localhost:$mntorig"
 
 rm -rf "$mntpoint" "$mntorig"
