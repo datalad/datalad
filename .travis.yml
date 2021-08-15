@@ -33,7 +33,7 @@ matrix:
   - python: 3.6
     # Test under NFS mount  (full, only in master)
     env:
-    - _DL_TMPDIR="/tmp/nfsmount"
+    - NOSE_WRAPPER=../tools/eval_under_nfs
 
 before_install:
   - NOSE_OPTS=( -s -v )
@@ -68,7 +68,6 @@ before_install:
   # Configure _DL_TMPDIR before trying install git-annex -- script might use it
   - if [[ "${_DL_TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $_DL_TMPDIR"; ln -s /tmp "$_DL_TMPDIR"; fi
   - if [[ "${_DL_TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR"; fi
-  - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then echo "mkdir $_DL_TMPDIR"; mkdir -p "$_DL_TMPDIR" "${_DL_TMPDIR}_"; echo "/tmp/nfsmount_ localhost(rw)" | sudo bash -c 'cat - > /etc/exports'; sudo apt-get install -y nfs-kernel-server; sudo exportfs -a; sudo mount -t nfs localhost:/tmp/nfsmount_ /tmp/nfsmount; fi
   # Maybe build install custom git.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then source tools/ci/install-upstream-git.sh; fi
   - if [ ! -z "${_DL_MIN_GIT:-}" ]; then tools/ci/install-minimum-git.sh; fi
@@ -86,7 +85,7 @@ install:
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # git-annex workaround. TODO: remove - should not be needed
-  - if [[ "${_DL_TMPDIR:-}" =~ .*/nfsmount ]]; then sudo git config --system annex.pidlock true ; fi
+  - if [[ "${NOSE_WRAPPER:-}" =~ .*/eval_under_nfs ]]; then sudo git config --system annex.pidlock true ; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit@^4.0.0
