@@ -636,13 +636,12 @@ class HTTPRemoteIO(object):
     # NOTE: For now read-only. Not sure yet whether an IO class is the right
     # approach.
 
-    def __init__(self, ria_url, dsid, buffer_size=DEFAULT_BUFFER_SIZE):
-        assert ria_url.startswith("ria+http")
-        self.base_url = ria_url[4:]
-        if self.base_url[-1] == '/':
-            self.base_url = self.base_url[:-1]
+    def __init__(self, url, buffer_size=DEFAULT_BUFFER_SIZE):
+        if not url.startswith("http"):
+            raise RIARemoteError("Expected HTTP URL, but got {}".format(url))
 
-        self.base_url += "/" + dsid[:3] + '/' + dsid[3:]
+        self.store_url = url.rstrip('/')
+
         # make sure default is used when None was passed, too.
         self.buffer_size = buffer_size if buffer_size else DEFAULT_BUFFER_SIZE
 
@@ -650,17 +649,32 @@ class HTTPRemoteIO(object):
         # Note, that we need the path with hash dirs, since we don't have access
         # to annexremote.dirhash from within IO classes
 
-        url = self.base_url + "/annex/objects/" + str(key_path)
-        response = requests.head(url, allow_redirects=True)
-        return response.status_code == 200
+        return self.exists(key_path)
 
     def get(self, key_path, filename, progress_cb):
         # Note, that we need the path with hash dirs, since we don't have access
         # to annexremote.dirhash from within IO classes
 
-        url = self.base_url + "/annex/objects/" + str(key_path)
+        url = self.store_url + str(key_path)
         from datalad.support.network import download_url
         download_url(url, filename, overwrite=True)
+
+    def exists(self, path):
+        # use same signature as in SSH and Local IO, although validity is
+        # limited in case of HTTP.
+        url = self.store_url + path.as_posix()
+        try:
+            response = requests.head(url, allow_redirects=True)
+        except Exception as e:
+            raise RIARemoteError(str(e))
+
+        return response.status_code == 200
+
+    def read_file(self, file_path):
+
+        from datalad.support.network import download_url
+        content = download_url(self.store_url + file_path.as_posix())
+        return content
 
 
 def handle_errors(func):
@@ -1047,12 +1061,7 @@ class RIARemote(SpecialRemote):
                 # fall back on the UUID for the annex remote
                 self.archive_id = self.annex.getuuid()
 
-        if not isinstance(self.io, HTTPRemoteIO):
-            self.get_store()
-
-        # else:
-        # TODO: consistency with SSH and FILE behavior? In those cases we make
-        #       sure the store exists from within initremote
+        self.get_store()
 
         self.annex.setconfig('archive-id', self.archive_id)
         # make sure, we store the potentially rewritten URL
@@ -1109,9 +1118,18 @@ class RIARemote(SpecialRemote):
             if self._local_io():
                 self._io = LocalIO()
             elif self.ria_store_url.startswith("ria+http"):
-                self._io = HTTPRemoteIO(self.ria_store_url,
-                                        self.archive_id,
-                                        self.buffer_size)
+                # TODO: That construction of "http(s)://host/" should probably
+                #       be moved, so that we get that when we determine
+                #       self.storage_host. In other words: Get the parsed URL
+                #       instead and let HTTPRemoteIO + SSHRemoteIO deal with it
+                #       uniformly. Also: Don't forget about a possible port.
+
+                url_parts = self.ria_store_url[4:].split('/')
+                # we expect parts: ("http(s):", "", host:port, path)
+                self._io = HTTPRemoteIO(
+                    url_parts[0] + "//" + url_parts[2],
+                    self.buffer_size
+                )
             elif self.storage_host:
                 self._io = SSHRemoteIO(self.storage_host, self.buffer_size)
                 from atexit import register
@@ -1184,8 +1202,7 @@ class RIARemote(SpecialRemote):
         self.uuid = self.annex.getuuid()
         self._verify_config(gitdir)
 
-        if not isinstance(self.io, HTTPRemoteIO):
-            self.get_store()
+        self.get_store()
 
         # report active special remote configuration/status
         self.info = {
@@ -1246,12 +1263,6 @@ class RIARemote(SpecialRemote):
         # we need a file-system compatible name for the key
         key = _sanitize_key(key)
 
-        if isinstance(self.io, HTTPRemoteIO):
-            self.io.get(PurePosixPath(self.annex.dirhash(key)) / key / key,
-                        filename,
-                        self.annex.progress)
-            return
-
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
         # sadly we have no idea what type of source gave checkpresent->true
@@ -1272,10 +1283,6 @@ class RIARemote(SpecialRemote):
     def checkpresent(self, key):
         # we need a file-system compatible name for the key
         key = _sanitize_key(key)
-
-        if isinstance(self.io, HTTPRemoteIO):
-            return self.io.checkpresent(
-                PurePosixPath(self.annex.dirhash(key)) / key / key)
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
         abs_key_path = dsobj_dir / key_path
