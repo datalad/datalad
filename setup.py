@@ -59,8 +59,10 @@ requires = {
     'publish': [
         'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
+        'python-gitlab',     # required for create-sibling-gitlab
     ],
     'misc': [
+        'argcomplete',       # optional CLI completion
         'pyperclip',         # clipboard manipulations
         'python-dateutil',   # add support for more date formats to check_dates
     ],

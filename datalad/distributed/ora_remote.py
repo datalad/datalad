@@ -1172,11 +1172,11 @@ class RIARemote(SpecialRemote):
         if isinstance(self.io, HTTPRemoteIO):
             # display the URL for a request
             # TODO: method of HTTPRemoteIO
-            return self.ria_store_url[4:] + "/annex/objects" + \
-                   self.annex.dirhash(key) + "/" + key + "/" + key
+            return self.ria_store_url[4:] + "/annex/objects/" + \
+                   self.annex.dirhash(key) + key + "/" + key
 
         dsobj_dir, archive_path, key_path = self._get_obj_location(key)
-        return str(key_path) if self._local_io() \
+        return str(dsobj_dir / key_path) if self._local_io() \
             else '{}: {}:{}'.format(
                 self.storage_host,
                 self.remote_git_dir,

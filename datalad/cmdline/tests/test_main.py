@@ -29,7 +29,10 @@ from datalad.ui.utils import (
     get_console_width,
     get_terminal_size,
 )
-from datalad.api import create
+from datalad.api import (
+    create,
+    Dataset,
+)
 from datalad.utils import (
     chpwd,
     Path,
@@ -47,6 +50,7 @@ from datalad.tests.utils import (
     slow,
     SkipTest,
 )
+from datalad.support.exceptions import CommandError
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -189,12 +193,6 @@ def test_incorrect_options():
 
 def test_script_shims():
     runner = Runner()
-    # The EASY-INSTALL checks below aren't valid for editable installs. Use the
-    # existence of setup.py as an indication that install is _probably_
-    # editable. The file should always exist for editable installs, but it can
-    # also exist for non-editable installs when the tests are being executed
-    # from the top of the source tree.
-    setup_exists = (Path(datalad.__file__).parent.parent / "setup.py").exists()
     for script in [
         'datalad',
         'git-annex-remote-datalad-archives',
@@ -209,18 +207,14 @@ def test_script_shims():
             from distutils.spawn import find_executable
             content = find_executable(script)
 
-        if not setup_exists:
-            assert_not_in('EASY', content) # NOTHING easy should be there
-            assert_not_in('pkg_resources', content)
-
         # and let's check that it is our script
         out = runner.run([script, '--version'], protocol=StdOutErrCapture)
         version = (out['stdout'] + out['stderr']).splitlines()[0].split(' ', 1)[1]
         # we can get git and non git .dev version... so for now
         # relax
-        get_numeric_portion = lambda v: [x for x in v.split('.') if x.isdigit()]
+        get_numeric_portion = lambda v: [x for x in re.split('[+.]', v) if x.isdigit()]
         # extract numeric portion
-        assert get_numeric_portion(version) # that my lambda is correctish
+        assert get_numeric_portion(version), f"Got no numeric portion from {version}"
         assert_equal(get_numeric_portion(__version__),
                      get_numeric_portion(version))
 
@@ -303,6 +297,7 @@ def test_fail_with_short_help():
                  "        father\n"
                  "Hint: You can become one\n")
 
+
 def test_fix_datalad_ri():
     assert_equal(_fix_datalad_ri('/'), '/')
     assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
@@ -312,3 +307,27 @@ def test_fix_datalad_ri():
     assert_equal(_fix_datalad_ri('///a'), '///a')
     assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
     assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+def test_commanderror_jsonmsgs(src, exp):
+    ds = Dataset(src).create()
+    (ds.pathobj / '123').write_text('123')
+    ds.save()
+    ds.repo.call_annex([
+        'initremote', 'expdir', 'type=directory',
+        'directory={}'.format(exp),
+        'encryption=none',
+        'exporttree=yes'
+    ])
+    #ds.repo.call_annex(['export', '--to=expdir', 'HEAD'])
+    # this must fail, because `push` cannot handle an export.
+    # when https://github.com/datalad/datalad/issues/3127 is implemented
+    # this test must be adjusted
+    with assert_raises(CommandError) as cme:
+        Runner(cwd=ds.path).run(
+            ['datalad', 'push', '--to', 'expdir'],
+            protocol=StdOutErrCapture)
+    if ds.repo.git_annex_version >= "8.20200309":
+        in_('use `git-annex export`', cme.exception.stderr)

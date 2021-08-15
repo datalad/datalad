@@ -152,6 +152,7 @@ datalad/downloaders/configs/kaggle.cfg
 datalad/downloaders/configs/loris.cfg
 datalad/downloaders/configs/nda.cfg
 datalad/downloaders/configs/nitrc.cfg
+datalad/downloaders/configs/nsidc.cfg
 datalad/downloaders/configs/openfmri.cfg
 datalad/downloaders/configs/providers.cfg
 datalad/downloaders/tests/__init__.py

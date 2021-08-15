@@ -1,3 +1,37 @@
+# 0.14.7 (Tue Aug 03 2021)
+
+#### 🐛 Bug Fix
+
+- UX: When two or more clone URL templates are found, error out more gracefully [#5839](https://github.com/datalad/datalad/pull/5839) ([@adswa](https://github.com/adswa))
+- BF: http_auth - follow redirect (just 1) to re-authenticate after initial attempt [#5852](https://github.com/datalad/datalad/pull/5852) ([@yarikoptic](https://github.com/yarikoptic))
+- addurls Formatter - provide value repr in exception [#5850](https://github.com/datalad/datalad/pull/5850) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH: allow for "patch" level semver for "master" branch [#5839](https://github.com/datalad/datalad/pull/5839) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: Report info from annex JSON error message in CommandError [#5809](https://github.com/datalad/datalad/pull/5809) ([@mih](https://github.com/mih))
+- RF(TST): do not test for no EASY and pkg_resources in shims [#5817](https://github.com/datalad/datalad/pull/5817) ([@yarikoptic](https://github.com/yarikoptic))
+- http downloaders: Provide custom informative User-Agent, do not claim to be "Authenticated access" [#5802](https://github.com/datalad/datalad/pull/5802) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH(UX,DX): inform user with a warning if version is 0+unknown [#5787](https://github.com/datalad/datalad/pull/5787) ([@yarikoptic](https://github.com/yarikoptic))
+- shell-completion: add argcomplete to 'misc' extra_depends, log an ERROR if argcomplete fails to import [#5781](https://github.com/datalad/datalad/pull/5781) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH (UX): add python-gitlab dependency [#5776](https://github.com/datalad/datalad/pull/5776) (s.heunis@fz-juelich.de)
+
+#### 🏠 Internal
+
+- BF: Fix reported paths in ORA remote [#5821](https://github.com/datalad/datalad/pull/5821) ([@adswa](https://github.com/adswa))
+- BF: import importlib.metadata not importlib_metadata whenever available [#5818](https://github.com/datalad/datalad/pull/5818) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🧪 Tests
+
+- TST: set --allow-unrelated-histories in the mk_push_target setup for Windows [#5855](https://github.com/datalad/datalad/pull/5855) ([@adswa](https://github.com/adswa))
+- Tests: Allow for version to contain + as a separator and provide more information for version related comparisons [#5786](https://github.com/datalad/datalad/pull/5786) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 4
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Stephan Heunis ([@jsheunis](https://github.com/jsheunis))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.14.6 (Sun Jun 27 2021)
 
 #### 🏠 Internal
