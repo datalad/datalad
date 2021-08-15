@@ -537,24 +537,41 @@ def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
 
 
 def test_installationpath_from_url():
-    cases = (
+    # cases for all OSes
+    cases = [
         'http://example.com/lastbit',
         'http://example.com/lastbit.git',
         'http://lastbit:8000',
-    ) + (
+        # SSH
+        'hostname:lastbit',
+        'hostname:lastbit/',
+        'hostname:subd/lastbit',
+        'hostname:/full/path/lastbit',
+        'hostname:lastbit/.git',
+        'hostname:lastbit/.git/',
+        'hostname:/full/path/lastbit/.git',
+        'full.hostname.com:lastbit/.git',
+        'user@full.hostname.com:lastbit/.git',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit/',
+        'ssh://user:passw@full.hostname.com/full/path/lastbit/.git',
+    ]
+    # OS specific cases
+    cases += [
         'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit',
         'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit\\',
         'Temp\\lastbit',
         'Temp\\lastbit\\',
         'lastbit.git',
         'lastbit.git\\',
-    ) if on_windows else (
+    ] if on_windows else [
         'lastbit',
         'lastbit/',
         '/lastbit',
         'lastbit.git',
         'lastbit.git/',
-    )
+    ]
+
     for p in cases:
         eq_(_get_installationpath_from_url(p), 'lastbit')
     # we need to deal with quoted urls
@@ -813,7 +830,7 @@ def test_ria_http(lcl, storepath, url):
     # now advance the source dataset
     (ds.pathobj / 'newfile.txt').write_text('new')
     ds.save()
-    ds.publish(to='store')
+    ds.push(to='store')
     Runner(cwd=storeds_loc).run(['git', 'update-server-info'])
     # re-clone as before
     riaclone2 = clone(
@@ -1340,8 +1357,8 @@ def test_ephemeral(origin_path, bare_path,
                       where="local")
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
-    clone1.publish(to=DEFAULT_REMOTE,
-                   transfer_data='none' if can_symlink else 'auto')
+    clone1.push(to=DEFAULT_REMOTE,
+                   data='nothing' if can_symlink else 'auto')
     if not origin.repo.is_managed_branch():
         # test logic cannot handle adjusted branches
         eq_(origin.repo.get_hexsha(), clone1.repo.get_hexsha())

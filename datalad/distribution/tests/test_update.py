@@ -478,8 +478,10 @@ def test_multiway_merge(path):
     r2 = GitRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
     ds.siblings(action='add', name='r1', url=r1.path)
     ds.siblings(action='add', name='r2', url=r2.path)
-    assert_status('ok', ds.publish(to='r1'))
-    assert_status('ok', ds.publish(to='r2'))
+    assert_status('ok', ds.push(to='r1'))
+    # push unlike publish reports on r2 not being an annex remote with a
+    # 'notneeded'
+    assert_status(('ok', 'notneeded'), ds.push(to='r2'))
     # just a fetch should be no issue
     assert_status('ok', ds.update())
     # ATM we do not support multi-way merges

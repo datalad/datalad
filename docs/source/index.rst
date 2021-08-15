@@ -2,7 +2,7 @@ DataLad |---| data management and publication multitool
 *******************************************************
 
 Welcome to DataLad's **technical documentation**. Information here is targeting
-software developers and is focused on the Python and command line APIs, as well
+software developers and is focused on the Python API and :term:`CLI`, as well
 as software design, employed technologies, and key features.  Comprehensive
 **user documentation** with information on installation, basic operation,
 support, and (advanced) use case descriptions is available in the `DataLad

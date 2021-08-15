@@ -2,8 +2,81 @@
 
 Change log
 **********
+0.14.7 (Tue Aug 03 2021)
+========================
+
+Bug Fix
+-------
+
+-  UX: When two or more clone URL templates are found, error out more
+   gracefully `#5839 <https://github.com/datalad/datalad/pull/5839>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  BF: http_auth - follow redirect (just 1) to re-authenticate after
+   initial attempt
+   `#5852 <https://github.com/datalad/datalad/pull/5852>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  addurls Formatter - provide value repr in exception
+   `#5850 <https://github.com/datalad/datalad/pull/5850>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  ENH: allow for “patch” level semver for “master” branch
+   `#5839 <https://github.com/datalad/datalad/pull/5839>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: Report info from annex JSON error message in CommandError
+   `#5809 <https://github.com/datalad/datalad/pull/5809>`__
+   (`@mih <https://github.com/mih>`__)
+-  RF(TST): do not test for no EASY and pkg_resources in shims
+   `#5817 <https://github.com/datalad/datalad/pull/5817>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  http downloaders: Provide custom informative User-Agent, do not claim
+   to be “Authenticated access”
+   `#5802 <https://github.com/datalad/datalad/pull/5802>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  ENH(UX,DX): inform user with a warning if version is 0+unknown
+   `#5787 <https://github.com/datalad/datalad/pull/5787>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  shell-completion: add argcomplete to ‘misc’ extra_depends, log an
+   ERROR if argcomplete fails to import
+   `#5781 <https://github.com/datalad/datalad/pull/5781>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  ENH (UX): add python-gitlab dependency
+   `#5776 <https://github.com/datalad/datalad/pull/5776>`__
+   (s.heunis@fz-juelich.de)
+
+Internal
+--------
+
+-  BF: Fix reported paths in ORA remote
+   `#5821 <https://github.com/datalad/datalad/pull/5821>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  BF: import importlib.metadata not importlib_metadata whenever
+   available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Tests
+-----
+
+-  TST: set –allow-unrelated-histories in the mk_push_target setup for
+   Windows `#5855 <https://github.com/datalad/datalad/pull/5855>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Tests: Allow for version to contain + as a separator and provide more
+   information for version related comparisons
+   `#5786 <https://github.com/datalad/datalad/pull/5786>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 4
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Stephan Heunis (`@jsheunis <https://github.com/jsheunis>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.14.6 (Sun Jun 27 2021)
 ========================
+
+.. _internal-1:
 
 Internal
 --------
@@ -23,6 +96,8 @@ Authors: 2
 
 0.14.5 (Mon Jun 21 2021)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -108,7 +183,7 @@ Pushed to ``maint``
 
 -  MNT: Post-release dance (`@kyleam <https://github.com/kyleam>`__)
 
-.. _internal-1:
+.. _internal-2:
 
 Internal
 --------
@@ -121,6 +196,8 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
+.. _tests-1:
+
 Tests
 -----
 
@@ -131,6 +208,8 @@ Tests
    git-annex failure”
    `#5651 <https://github.com/datalad/datalad/pull/5651>`__
    (`@kyleam <https://github.com/kyleam>`__)
+
+.. _authors-4-1:
 
 Authors: 4
 ----------
@@ -3306,7 +3385,7 @@ Enhancements and new features
 -  ``annex`` metadata extractor now extracts ``annex.key`` metadata
    record. Should allow now to identify uses of specific files etc
    (`#2952 <https://github.com/datalad/datalad/issues/2952>`__)
--  Test that we can install from http://datasets.datalad.org
+-  Test that we can install from https://datasets.datalad.org
 -  Proper rendering of ``CommandError`` (e.g. in case of “out of space”
    error) (`#2958 <https://github.com/datalad/datalad/issues/2958>`__)
 
@@ -3838,7 +3917,7 @@ Enhancements and new features
 -  AutomagicIO: Added proxying of isfile, lzma.LZMAFile and io.open
 -  Testing:
 
-   -  added DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org to
+   -  added DATALAD_DATASETS_TOPURL=https://datasets-tests.datalad.org to
       run tests against another website to not obscure access stats
    -  tests run against temporary HOME to avoid side-effects
    -  better unit-testing of interactions with special remotes
@@ -4171,7 +4250,7 @@ Enhancements and new features
    removed from the interface
 -  Web frontend got proper coloring for the breadcrumbs and some
    additional caching to speed up interactions. See
-   http://datasets.datalad.org
+   https://datasets.datalad.org
 -  Small improvements to the online documentation. See e.g. `summary of
    differences between
    git/git-annex/datalad <http://docs.datalad.org/en/latest/related.html#git-git-annex-datalad>`__
@@ -4474,7 +4553,7 @@ Enhancements and new features
 
 Lots of everything, including but not limited to
 
--  enhanced index viewer, as the one on http://datasets.datalad.org
+-  enhanced index viewer, as the one on https://datasets.datalad.org
 -  initial new data providers support:
    `Kaggle <https://www.kaggle.com>`__,
    `BALSA <http://balsa.wustl.edu>`__,
@@ -4501,7 +4580,7 @@ Lots of everything, including but not limited to
 
 New features and bugfix release
 
--  support of /// urls to point to http://datasets.datalad.org
+-  support of /// urls to point to https://datasets.datalad.org
 -  variety of fixes and enhancements throughout
 
 0.2.2 (Jun 20, 2016) – OHBM we are coming!

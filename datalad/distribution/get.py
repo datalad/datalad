@@ -62,6 +62,7 @@ from datalad.utils import (
     unique,
     Path,
     get_dataset_root,
+    shortened_repr,
 )
 
 from datalad.local.subdatasets import Subdatasets
@@ -237,6 +238,13 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                         ds_repo.config[c])
                        for c in ds_repo.config.keys()
                        if c.startswith(candcfg_prefix)]:
+        # ensure that there is only one template of the same name
+        if type(tmpl) == tuple and len(tmpl) > 1:
+            raise ValueError(
+                f"There are multiple URL templates for submodule clone "
+                f"candidate '{name}', but only one is allowed. "
+                f"Check datalad.get.subdataset-source-candidate-* configuration!"
+            )
         url = tmpl.format(**sm_candidate_props)
         # we don't want "flexible_source_candidates" here, this is
         # configuration that can be made arbitrarily precise from the
@@ -833,7 +841,7 @@ class Get(Interface):
 
         # we have to have a single dataset to operate on
         refds = require_dataset(
-            dataset, check_installed=True, purpose='get content')
+            dataset, check_installed=True, purpose='get content of %s' % shortened_repr(path))
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not

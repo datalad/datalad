@@ -13,5 +13,7 @@ subsystems in DataLad.
 .. toctree::
    :maxdepth: 2
 
+   dataset_argument
+   log_levels
    drop
    miscpatterns
