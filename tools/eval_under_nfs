@@ -17,6 +17,8 @@ mntpoint="$tmp.nfs"
 
 echo "I: mounting $mntorig under $mntpoint via $fs"
 
+set -x
+
 mkdir -p "$mntpoint"
 mkdir -p "$mntorig"
 
@@ -31,8 +33,8 @@ sudo mount -t "$fs" "localhost:$mntorig" "$mntpoint"
 sudo mount | grep "$mntpoint" | sed -e 's,^,I: ,g'
 
 # Run the actual command
-echo "I: running ${@@Q}"
-TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" eval "${@@Q}"
+echo "I: running $@"
+TMPDIR="$mntpoint" DATALAD_TESTS_TEMP_DIR="$mntpoint" "$@"
 ret=$?
 
 echo "I: done, unmounting"
