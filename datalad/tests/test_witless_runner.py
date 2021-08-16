@@ -168,7 +168,7 @@ def test_runner_no_stdin_no_capture():
     # Ensure a runner without stdin data and output capture progresses
     runner = Runner()
     runner.run(
-        ["echo", "a", "b", "c"],
+        (["cmd.exe", "/c"] if on_windows else []) + ["echo", "a", "b", "c"],
         stdin=None,
         protocol=None
     )

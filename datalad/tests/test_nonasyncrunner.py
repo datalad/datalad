@@ -15,11 +15,26 @@ import signal
 import subprocess
 from time import sleep
 
-from datalad.tests.utils import assert_false, assert_true, eq_, \
-    known_failure_windows, known_failure_osx, with_tempfile
+from datalad.tests.utils import (
+    assert_false,
+    assert_true,
+    eq_,
+    known_failure_windows,
+    known_failure_osx,
+    with_tempfile,
+)
 
-from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
-from ..nonasyncrunner import _ReaderThread, run_command
+from datalad.cmd import (
+    StdOutCapture,
+    WitlessProtocol,
+    WitlessRunner,
+)
+from datalad.nonasyncrunner import (
+    _ReaderThread,
+    run_command,
+)
+
+from datalad.utils import on_windows
 
 
 @known_failure_windows  # Windows uses different signals and commands
@@ -135,11 +150,13 @@ def test_thread_exit():
 def test_inside_async():
     async def main():
         runner = WitlessRunner()
-        return runner.run(["echo", "abc"], StdOutCapture)
+        return runner.run(
+            (["cmd.exe", "/c"] if on_windows else []) + ["echo", "abc"],
+            StdOutCapture)
 
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(main())
-    eq_(result["stdout"], "abc\n")
+    eq_(result["stdout"], "abc" + os.linesep)
 
 
 @known_failure_osx
