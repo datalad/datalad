@@ -61,12 +61,6 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.core.local.create')
 
 
-# Used for handling the no_annex -> annex option transition
-# remove when done
-class _NoAnnexDefault(object):
-    pass
-
-
 @build_doc
 class Create(Interface):
     """Create a new dataset from scratch.
