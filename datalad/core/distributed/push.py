@@ -866,6 +866,11 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # and go
     res = ds_repo._call_annex_records(
         cmd,
+        git_options=[
+            "-c",
+            "annex.retry={}".format(
+                ds_repo.config.obtain("datalad.annex.retry"))]
+            if ds_repo.config.get("annex.retry") else None,
         stdin=file_list,
         progress=True,
         # tailor the progress protocol with the total number of files
