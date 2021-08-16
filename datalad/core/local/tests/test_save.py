@@ -876,7 +876,7 @@ def test_save_amend(dspath):
     file_in_sub = dspath / 'subds' / 'file_in_sub'
 
     # test on a hierarchy including a plain git repo:
-    ds = Dataset(dspath).create(force=True, no_annex=True)
+    ds = Dataset(dspath).create(force=True, annex=False)
     subds = ds.create('subds', force=True)
     ds.save(recursive=True)
     assert_repo_status(ds.repo)
