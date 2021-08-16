@@ -5,6 +5,7 @@ from datalad.distributed.ora_remote import (
 from datalad.customremotes.ria_utils import (
     create_store,
     create_ds_in_store,
+    verify_ria_url,
     UnknownLayoutVersion
 )
 from datalad.utils import (
@@ -122,3 +123,23 @@ def test_setup_ds_in_store():
         raise SkipTest('ora_remote.SSHRemoteIO stalls on Windows')
 
     yield skip_ssh(_test_setup_ds_in_store), SSHRemoteIO, ['datalad-test']
+
+
+def test_verify_ria_url():
+    # unsupported protocol
+    assert_raises(ValueError, verify_ria_url, 'ria+ftp://localhost/tmp/this', {})
+    # bunch of caes that should work
+    cases = {
+        'ria+file:///tmp/this': (None, '/tmp/this'),
+        # no normalization
+        'ria+file:///tmp/this/': (None, '/tmp/this/'),
+        # with hosts
+        'ria+ssh://localhost/tmp/this': ('localhost', '/tmp/this'),
+        'ria+http://localhost/tmp/this': ('localhost', '/tmp/this'),
+        'ria+https://localhost/tmp/this': ('localhost', '/tmp/this'),
+        # with username
+        'ria+ssh://humbug@localhost/tmp/this': ('humbug@localhost', '/tmp/this'),
+    }
+    for i, o in cases.items():
+        # we are not testing the URL rewriting here
+        assert_equal(o, verify_ria_url(i, {})[:2])
