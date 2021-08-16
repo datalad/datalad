@@ -159,7 +159,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             try:
                 # Try to lock since it might desire to ask for credentials, but still allow to time out at 5 minutes
                 # while providing informative message on what other process might be holding it.
-                with try_lock_informatively(self._lock, purpose="establish download session", proceed_unlocked=True):
+                with try_lock_informatively(self._lock, purpose="establish download session", proceed_unlocked=False):
                     used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
