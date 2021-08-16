@@ -79,6 +79,8 @@ def verify_ria_url(url, cfg):
     -------
     tuple
       (host, base-path, rewritten url)
+      `host` is not just a hostname, but may also contain username, password,
+      and port, if specified in a given URL.
     """
     from datalad.config import rewrite_url
     from datalad.support.network import URL
@@ -99,7 +101,16 @@ def verify_ria_url(url, cfg):
                          "Supported: ssh, file, http(s)" %
                          protocol)
 
-    return url_ri.hostname if protocol != 'file' else None, \
+    host = '{user}{pdelim}{passwd}{udelim}{hostname}{portdelim}{port}'.format(
+        user=url_ri.username or '',
+        pdelim=':' if url_ri.password else '',
+        passwd=url_ri.password or '',
+        udelim='@' if url_ri.username else '',
+        hostname=url_ri.hostname or '',
+        portdelim=':' if url_ri.port else '',
+        port=url_ri.port or '',
+    )
+    return host if protocol != 'file' else None, \
         url_ri.path if url_ri.path else '/', \
         url
 

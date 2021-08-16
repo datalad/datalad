@@ -139,6 +139,14 @@ def test_verify_ria_url():
         'ria+https://localhost/tmp/this': ('localhost', '/tmp/this'),
         # with username
         'ria+ssh://humbug@localhost/tmp/this': ('humbug@localhost', '/tmp/this'),
+        # with port
+        'ria+ssh://humbug@localhost:2222/tmp/this': ('humbug@localhost:2222', '/tmp/this'),
+        'ria+ssh://localhost:2200/tmp/this': ('localhost:2200', '/tmp/this'),
+        # with password
+        'ria+https://humbug:1234@localhost:8080/tmp/this': ('humbug:1234@localhost:8080', '/tmp/this'),
+        # document a strange (MIH thinks undesirable), but pre-existing behavior
+        # an 'ssh example.com' would end up in the user HOME, not in '/'
+        'ria+ssh://example.com': ('example.com', '/')
     }
     for i, o in cases.items():
         # we are not testing the URL rewriting here
