@@ -383,5 +383,5 @@ def test_commanderror_jsonmsgs(src, exp):
         Runner(cwd=ds.path).run(
             ['datalad', 'push', '--to', 'expdir'],
             protocol=StdOutErrCapture)
-    if ds.repo.git_annex_version >= "8.20200309":
+    if ds.repo.git_annex_version >= "8.20201129":
         in_('use `git-annex export`', cme.exception.stderr)
