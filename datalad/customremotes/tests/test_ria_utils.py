@@ -127,26 +127,32 @@ def test_setup_ds_in_store():
 
 def test_verify_ria_url():
     # unsupported protocol
-    assert_raises(ValueError, verify_ria_url, 'ria+ftp://localhost/tmp/this', {})
+    assert_raises(ValueError,
+                  verify_ria_url, 'ria+ftp://localhost/tmp/this', {})
     # bunch of caes that should work
     cases = {
         'ria+file:///tmp/this': (None, '/tmp/this'),
         # no normalization
         'ria+file:///tmp/this/': (None, '/tmp/this/'),
         # with hosts
-        'ria+ssh://localhost/tmp/this': ('localhost', '/tmp/this'),
-        'ria+http://localhost/tmp/this': ('localhost', '/tmp/this'),
-        'ria+https://localhost/tmp/this': ('localhost', '/tmp/this'),
+        'ria+ssh://localhost/tmp/this': ('ssh://localhost', '/tmp/this'),
+        'ria+http://localhost/tmp/this': ('http://localhost', '/tmp/this'),
+        'ria+https://localhost/tmp/this': ('https://localhost', '/tmp/this'),
         # with username
-        'ria+ssh://humbug@localhost/tmp/this': ('humbug@localhost', '/tmp/this'),
+        'ria+ssh://humbug@localhost/tmp/this':
+            ('ssh://humbug@localhost', '/tmp/this'),
         # with port
-        'ria+ssh://humbug@localhost:2222/tmp/this': ('humbug@localhost:2222', '/tmp/this'),
-        'ria+ssh://localhost:2200/tmp/this': ('localhost:2200', '/tmp/this'),
+        'ria+ssh://humbug@localhost:2222/tmp/this':
+            ('ssh://humbug@localhost:2222', '/tmp/this'),
+        'ria+ssh://localhost:2200/tmp/this':
+            ('ssh://localhost:2200', '/tmp/this'),
         # with password
-        'ria+https://humbug:1234@localhost:8080/tmp/this': ('humbug:1234@localhost:8080', '/tmp/this'),
-        # document a strange (MIH thinks undesirable), but pre-existing behavior
-        # an 'ssh example.com' would end up in the user HOME, not in '/'
-        'ria+ssh://example.com': ('example.com', '/')
+        'ria+https://humbug:1234@localhost:8080/tmp/this':
+            ('https://humbug:1234@localhost:8080', '/tmp/this'),
+        # document a strange (MIH thinks undesirable), but pre-existing
+        # behavior an 'ssh example.com' would end up in the user HOME,
+        # not in '/'
+        'ria+ssh://example.com': ('ssh://example.com', '/')
     }
     for i, o in cases.items():
         # we are not testing the URL rewriting here
