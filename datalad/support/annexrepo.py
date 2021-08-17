@@ -301,12 +301,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
 
-        if config.get("annex.retry") is None:
-            self._annex_common_options.extend(
-                ["-c",
-                 "annex.retry={}".format(
-                     config.obtain("datalad.annex.retry"))])
-
         # will be evaluated lazily
         self._n_auto_jobs = None
 
@@ -1381,6 +1375,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         files : list of dict
         """
         options = options[:] if options else []
+
+        if self.config.get("annex.retry") is None:
+            options.extend(
+                ["-c",
+                 "annex.retry={}".format(
+                     self.config.obtain("datalad.annex.retry"))])
 
         if remote:
             if remote not in self.get_remotes():
