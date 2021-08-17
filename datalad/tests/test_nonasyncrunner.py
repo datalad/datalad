@@ -15,14 +15,28 @@ import signal
 import subprocess
 from time import sleep
 
-from datalad.tests.utils import assert_false, assert_true, eq_, \
-    known_failure_windows, known_failure_osx, with_tempfile
+from datalad.tests.utils import (
+    assert_false,
+    assert_true,
+    eq_,
+    known_failure_windows,
+    known_failure_osx,
+    with_tempfile,
+)
 
-from ..cmd import WitlessProtocol, WitlessRunner, StdOutCapture
-from ..nonasyncrunner import _ReaderThread, run_command
+from datalad.cmd import (
+    StdOutCapture,
+    WitlessProtocol,
+    WitlessRunner,
+)
+from datalad.nonasyncrunner import (
+    _ReaderThread,
+    run_command,
+)
+
+from datalad.utils import on_windows
 
 
-@known_failure_windows  # Windows uses different signals and commands
 def test_subprocess_return_code_capture():
 
     class KillProtocol(WitlessProtocol):
@@ -45,16 +59,20 @@ def test_subprocess_return_code_capture():
         def process_exited(self):
             self.result_pool["process_exited_called"] = True
 
-    signal_to_send = signal.SIGINT
+    # windows doesn't support SIGINT but would need a Ctrl-C
+    signal_to_send = signal.SIGTERM if on_windows else signal.SIGINT
     result_pool = dict()
-    result = run_command(["sleep", "10000"],
+    result = run_command(['timeout', '3'] if on_windows else ["sleep", "10000"],
                          KillProtocol,
                          None,
                          {
                              "signal_to_send": signal_to_send,
                              "result_pool": result_pool
                          })
-    eq_(result["code"], -signal_to_send)
+    if not on_windows:
+        # this one specifically tests the SIGINT case, which is not supported
+        # on windows
+        eq_(result["code"], -signal_to_send)
     assert_true(result_pool["connection_lost_called"][0])
     assert_true(result_pool["process_exited_called"])
 
@@ -135,13 +153,17 @@ def test_thread_exit():
 def test_inside_async():
     async def main():
         runner = WitlessRunner()
-        return runner.run(["echo", "abc"], StdOutCapture)
+        return runner.run(
+            (["cmd.exe", "/c"] if on_windows else []) + ["echo", "abc"],
+            StdOutCapture)
 
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(main())
-    eq_(result["stdout"], "abc\n")
+    eq_(result["stdout"], "abc" + os.linesep)
 
 
+# Both Windows and OSX suffer from wrapt's object proxy insufficiency
+# NotImplementedError: object proxy must define __reduce_ex__()
 @known_failure_osx
 @known_failure_windows
 @with_tempfile(mkdir=True)
