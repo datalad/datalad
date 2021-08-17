@@ -17,3 +17,4 @@ subsystems in DataLad.
    log_levels
    drop
    miscpatterns
+   python_interface
