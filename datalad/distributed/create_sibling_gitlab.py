@@ -150,7 +150,7 @@ class CreateSiblingGitlab(Interface):
         project=Parameter(
             args=('--project',),
             metavar='NAME/LOCATION',
-            doc="""project path at the GitLab site. If a subdataset of the
+            doc="""project name/location at the GitLab site. If a subdataset of the
             reference dataset is processed, its project path is automatically
             determined by the `layout` configuration, by default.
             """,
@@ -388,7 +388,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
         yield dict(
             res_kwargs,
             status='error',
-            message='No project path specified, and no configuration '
+            message='No project name/location specified, and no configuration '
                     'to derive one',
         )
         return
