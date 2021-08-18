@@ -57,6 +57,7 @@ from datalad.interface.common_opts import (
     inherit_opt,
     location_description,
 )
+from datalad.interface.utils import default_result_renderer
 from datalad.downloaders.credentials import UserPassword
 from datalad.distribution.dataset import (
     require_dataset,
@@ -311,7 +312,7 @@ class Siblings(Interface):
             )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
-            # logging complained about this already
+            default_result_renderer(res)
             return
         path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
