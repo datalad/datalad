@@ -433,7 +433,7 @@ def _maybe_get_single_subparser(cmdlineargs, parser, interface_groups,
         if not unparsed_args and getattr(parsed_args, 'version', None):
             parsed_args.version()  # will exit with 0
         if not (completing or unparsed_args):
-            fail_handler(parser, msg="too few arguments", exit_code=2)
+            fail_handler(parser, msg="too few arguments, run with --help to get more information.", exit_code=2)
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
                   __full_version__, parsed_args, unparsed_args)
     except Exception as exc:
