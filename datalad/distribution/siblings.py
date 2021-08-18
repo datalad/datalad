@@ -148,9 +148,8 @@ class Siblings(Interface):
         action=Parameter(
             args=('action',),
             nargs='?',
-            metavar='ACTION',
             doc="""command action selection (see general documentation)""",
-            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable') | EnsureNone()),
+            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable')),
         url=Parameter(
             args=('--url',),
             doc="""the URL of or path to the dataset sibling named by
