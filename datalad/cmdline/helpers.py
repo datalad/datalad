@@ -591,6 +591,7 @@ def fail_with_short_help(parser=None,
         out.write("error: %s\n" % msg)
     if not known:
         if parser:
+            parser_add_common_opt(parser, 'help')
             # just to appear in print_usage also consistent with --help output
             parser.add_argument("command [command-opts]")
             parser.print_usage(file=out)
