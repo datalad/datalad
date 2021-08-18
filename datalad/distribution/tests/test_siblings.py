@@ -565,3 +565,18 @@ def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
     eq_('likemagic', (testbed.pathobj / 'testfile').read_text())
     # and the other one
     assert_status('ok', testbed.get('testfile2'))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_specialremote(dspath, remotepath):
+    ds = Dataset(dspath).create()
+    ds.repo.call_annex(
+        ['initremote', 'myremote', 'type=directory',
+         f'directory={remotepath}', 'encryption=none'])
+    res = ds.siblings('query', result_renderer=None)
+    assert_in_results(
+        res,
+        **{'name': 'myremote',
+           'annex-type': 'directory',
+           'annex-directory': remotepath})

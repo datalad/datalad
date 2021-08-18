@@ -633,7 +633,8 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
     res_kwargs = res_kwargs or {}
     annex_info = {}
     available_space = None
-    if get_annex_info and isinstance(repo, AnnexRepo):
+    want_annex_info = get_annex_info and isinstance(repo, AnnexRepo)
+    if want_annex_info:
         # pull repo info from annex
         try:
             # need to do in safety net because of gh-1560
@@ -652,6 +653,11 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
                 annex_info[uuid] = ainfo
     # treat the local repo as any other remote using 'here' as a label
     remotes = [name] if name else ['here'] + known_remotes
+    special_remote_info = None
+    if want_annex_info:
+        # query it once here, and inspect per-remote further down
+        special_remote_info = repo.get_special_remotes()
+
     for remote in remotes:
         info = get_status_dict(
             action='query-sibling',
@@ -690,7 +696,7 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description
-        if get_annex_info and isinstance(repo, AnnexRepo):
+        if want_annex_info:
             if not repo.is_remote_annex_ignored(remote):
                 try:
                     for prop in ('wanted', 'required', 'group'):
@@ -718,6 +724,12 @@ def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
                         raise
             else:
                 info['annex-ignore'] = True
+
+        if special_remote_info:
+            # pull out special remote info for this remote, if there is any
+            for k, v in special_remote_info.get(
+                    info.get('annex-uuid'), {}).items():
+                info[f'annex-{k}'] = v
 
         info['status'] = 'ok'
         yield info
