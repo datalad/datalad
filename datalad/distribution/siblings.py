@@ -251,12 +251,15 @@ class Siblings(Interface):
         # give fastest possible response, for the precise of a long-all
         # function call
         ds = dataset
+        # minimize expensive calls to .repo
+        ds_repo = ds.repo
 
         # prepare parameterization package for all worker calls
         worker_kwargs = dict(
             ds=ds,
+            repo=ds_repo,
             name=name,
-            known_remotes=ds.repo.get_remotes(),
+            known_remotes=ds_repo.get_remotes(),
             # for top-level dataset there is no layout questions
             url=_mangle_urls(url, ds_name),
             pushurl=_mangle_urls(pushurl, ds_name),
@@ -283,11 +286,12 @@ class Siblings(Interface):
         replicate_local_structure = url and "%NAME" not in url
 
         subds_pushurl = None
-        for subds in dataset.subdatasets(
+        for subds in ds.subdatasets(
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
-            subds_name = op.relpath(subds.path, start=dataset.path)
+            subds_repo = subds.repo
+            subds_name = op.relpath(subds.path, start=ds.path)
             if replicate_local_structure:
                 subds_url = slash_join(url, subds_name)
                 if pushurl:
@@ -299,7 +303,8 @@ class Siblings(Interface):
                     _mangle_urls(pushurl, '/'.join([ds_name, subds_name]))
             worker_kwargs.update(
                 ds=subds,
-                known_remotes=subds.repo.get_remotes(),
+                repo=subds_repo,
+                known_remotes=subds_repo.get_remotes(),
                 url=subds_url,
                 pushurl=subds_pushurl,
             )
@@ -339,7 +344,7 @@ class Siblings(Interface):
 
 
 # always copy signature from above to avoid bugs
-def _add_remote(ds, name, known_remotes, url, pushurl, as_common_datasrc,
+def _add_remote(ds, repo, name, known_remotes, url, pushurl, as_common_datasrc,
                 res_kwargs, **unused_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
     #       create-sibling already does it -- generalize/use
@@ -395,11 +400,11 @@ def _add_remote(ds, name, known_remotes, url, pushurl, as_common_datasrc,
         url = Path(url).as_posix()
     # this remote is fresh: make it known
     # just minimalistic name and URL, the rest is coming from `configure`
-    ds.repo.add_remote(name, url)
+    repo.add_remote(name, url)
     known_remotes.append(name)
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds=ds, name=name, known_remotes=known_remotes, url=url,
+            ds=ds, repo=repo, name=name, known_remotes=known_remotes, url=url,
             pushurl=pushurl, as_common_datasrc=as_common_datasrc,
             res_kwargs=res_kwargs, **unused_kwargs):
         if r['action'] == 'configure-sibling':
@@ -408,7 +413,7 @@ def _add_remote(ds, name, known_remotes, url, pushurl, as_common_datasrc,
 
 
 def _configure_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
+        ds, repo, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit, res_kwargs, **unused_kwargs):
@@ -430,24 +435,24 @@ def _configure_remote(
         if name not in known_remotes and url:
             # this remote is fresh: make it known
             # just minimalistic name and URL, the rest is coming from `configure`
-            ds.repo.add_remote(name, url)
+            repo.add_remote(name, url)
             known_remotes.append(name)
         elif url:
             # not new, override URl if given
-            ds.repo.set_remote_url(name, url)
+            repo.set_remote_url(name, url)
 
         # make sure we have a configured fetch expression at this point
         fetchvar = 'remote.{}.fetch'.format(name)
-        if fetchvar not in ds.repo.config:
+        if fetchvar not in repo.config:
             # place default fetch refspec in config
             # same as `git remote add` would have added
-            ds.repo.config.add(
+            repo.config.add(
                 fetchvar,
                 '+refs/heads/*:refs/remotes/{}/*'.format(name),
                 where='local')
 
         if pushurl:
-            ds.repo.set_remote_url(name, pushurl, push=True)
+            repo.set_remote_url(name, pushurl, push=True)
 
         if publish_depends:
             # Check if all `deps` remotes are known to the `repo`
@@ -480,7 +485,7 @@ def _configure_remote(
                 r.update(res_kwargs)
                 yield r
 
-        delayed_super = _DelayedSuper(ds.repo)
+        delayed_super = _DelayedSuper(repo)
         if inherit and delayed_super.super is not None:
             # Adjust variables which we should inherit
             publish_depends = _inherit_config_var(
@@ -490,7 +495,7 @@ def _configure_remote(
             # Copy relevant annex settings for the sibling
             # makes sense only if current AND super are annexes, so it is
             # kinda a boomer, since then forbids having a super a pure git
-            if isinstance(ds.repo, AnnexRepo) and \
+            if isinstance(repo, AnnexRepo) and \
                     isinstance(delayed_super.repo, AnnexRepo) and \
                     name in delayed_super.repo.get_remotes():
                 if annex_wanted is None:
@@ -534,8 +539,8 @@ def _configure_remote(
                 ds.config.add(dfltvar, refspec, 'local')
             ds.config.reload()
 
-        assert isinstance(ds.repo, GitRepo)  # just against silly code
-        if isinstance(ds.repo, AnnexRepo):
+        assert isinstance(repo, GitRepo)  # just against silly code
+        if isinstance(repo, AnnexRepo):
             # we need to check if added sibling an annex, and try to enable it
             # another part of the fix for #463 and #432
             try:
@@ -545,7 +550,7 @@ def _configure_remote(
                         default=False,
                         valtype=EnsureBool(),
                         store=False):
-                    ds.repo.enable_remote(name)
+                    repo.enable_remote(name)
             except (CommandError, DownloadError) as exc:
                 # TODO yield
                 # this is unlikely to ever happen, now done for AnnexRepo
@@ -570,7 +575,7 @@ def _configure_remote(
                     # XXX except it is not enough
 
                     # make special remote of type=git (see #335)
-                    ds.repo.call_annex([
+                    repo.call_annex([
                         'initremote',
                         as_common_datasrc,
                         'type=git',
@@ -586,39 +591,39 @@ def _configure_remote(
     #
     # place configure steps that also work for 'here' below
     #
-    if isinstance(ds.repo, AnnexRepo):
+    if isinstance(repo, AnnexRepo):
         for prop, var in (('wanted', annex_wanted),
                           ('required', annex_required),
                           ('group', annex_group)):
             if var is not None:
-                ds.repo.set_preferred_content(prop, var, '.' if name =='here' else name)
+                repo.set_preferred_content(prop, var, '.' if name =='here' else name)
         if annex_groupwanted:
-            ds.repo.set_groupwanted(annex_group, annex_groupwanted)
+            repo.set_groupwanted(annex_group, annex_groupwanted)
 
     if description:
-        if not isinstance(ds.repo, AnnexRepo):
+        if not isinstance(repo, AnnexRepo):
             result_props['status'] = 'impossible'
             result_props['message'] = 'cannot set description of a plain Git repository'
             yield result_props
             return
-        ds.repo.call_annex(['describe', name, description])
+        repo.call_annex(['describe', name, description])
 
     # report all we know at once
-    info = list(_query_remotes(ds, name, known_remotes, **unused_kwargs))[0]
+    info = list(_query_remotes(ds, repo, name, known_remotes, **unused_kwargs))[0]
     info.update(dict(status='ok', **result_props))
     yield info
 
 
-def _query_remotes(ds, name, known_remotes, get_annex_info=True,
+def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
                    res_kwargs=None, **unused_kwargs):
     res_kwargs = res_kwargs or {}
     annex_info = {}
     available_space = None
-    if get_annex_info and isinstance(ds.repo, AnnexRepo):
+    if get_annex_info and isinstance(repo, AnnexRepo):
         # pull repo info from annex
         try:
             # need to do in safety net because of gh-1560
-            raw_info = ds.repo.repo_info(fast=True)
+            raw_info = repo.repo_info(fast=True)
         except CommandError:
             raw_info = {}
         available_space = raw_info.get('available local disk space', None)
@@ -671,15 +676,15 @@ def _query_remotes(ds, name, known_remotes, get_annex_info=True,
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description
-        if get_annex_info and isinstance(ds.repo, AnnexRepo):
-            if not ds.repo.is_remote_annex_ignored(remote):
+        if get_annex_info and isinstance(repo, AnnexRepo):
+            if not repo.is_remote_annex_ignored(remote):
                 try:
                     for prop in ('wanted', 'required', 'group'):
-                        var = ds.repo.get_preferred_content(
+                        var = repo.get_preferred_content(
                             prop, '.' if remote == 'here' else remote)
                         if var:
                             info['annex-{}'.format(prop)] = var
-                    groupwanted = ds.repo.get_groupwanted(remote)
+                    groupwanted = repo.get_groupwanted(remote)
                     if groupwanted:
                         info['annex-groupwanted'] = groupwanted
                 except CommandError as exc:
@@ -689,8 +694,8 @@ def _query_remotes(ds, name, known_remotes, get_annex_info=True,
                         msg = "Could not detect whether %s carries an annex. " \
                               "If %s is a pure Git remote, this is expected. " %\
                               (remote, remote)
-                        ds.repo.config.reload()
-                        if ds.repo.is_remote_annex_ignored(remote):
+                        repo.config.reload()
+                        if repo.is_remote_annex_ignored(remote):
                             msg += "Remote was marked by annex as annex-ignore. " \
                                    "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
                         lgr.warning(msg)
@@ -704,7 +709,7 @@ def _query_remotes(ds, name, known_remotes, get_annex_info=True,
         yield info
 
 
-def _remove_remote(ds, name, res_kwargs, **unused_kwargs):
+def _remove_remote(ds, repo, name, res_kwargs, **unused_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
         raise InsufficientArgumentsError("no sibling name given")
@@ -716,7 +721,7 @@ def _remove_remote(ds, name, res_kwargs, **unused_kwargs):
         **res_kwargs)
     try:
         # failure can happen and is OK
-        ds.repo.remove_remote(name)
+        repo.remove_remote(name)
     except RemoteNotAvailableError as e:
         yield get_status_dict(
             # result-oriented! given remote is absent already
@@ -729,7 +734,7 @@ def _remove_remote(ds, name, res_kwargs, **unused_kwargs):
         **result_props)
 
 
-def _enable_remote(ds, name, res_kwargs, **unused_kwargs):
+def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
     result_props = dict(
         action='enable-sibling',
         path=ds.path,
@@ -737,7 +742,7 @@ def _enable_remote(ds, name, res_kwargs, **unused_kwargs):
         name=name,
         **res_kwargs)
 
-    if not isinstance(ds.repo, AnnexRepo):
+    if not isinstance(repo, AnnexRepo):
         yield dict(
             result_props,
             status='impossible',
@@ -752,7 +757,7 @@ def _enable_remote(ds, name, res_kwargs, **unused_kwargs):
         return
 
     # get info on special remote
-    sp_remotes = {v['name']: dict(v, uuid=k) for k, v in ds.repo.get_special_remotes().items()}
+    sp_remotes = {v['name']: dict(v, uuid=k) for k, v in repo.get_special_remotes().items()}
     remote_info = sp_remotes.get(name, None)
 
     if remote_info is None:
@@ -798,7 +803,7 @@ def _enable_remote(ds, name, res_kwargs, **unused_kwargs):
                 WEBDAV_PASSWORD=creds['password'])
 
     try:
-        ds.repo.enable_remote(name, env=env)
+        repo.enable_remote(name, env=env)
         result_props['status'] = 'ok'
     except AccessDeniedError as e:
         # credentials are wrong, wipe them out
