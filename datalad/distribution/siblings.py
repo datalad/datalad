@@ -178,7 +178,13 @@ class Siblings(Interface):
             args=("--fetch",),
             action="store_true",
             doc="""fetch the sibling after configuration"""),
-        as_common_datasrc=as_common_datasrc,
+        as_common_datasrc=Parameter(
+            args=("--as-common-datasrc",),
+            metavar='NAME',
+            doc="""configure a sibling as a common data source of the
+            dataset that can be automatically used by all consumers of the
+            dataset. The sibling must be a regular Git remote with a
+            configured HTTP(S) URL."""),
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
         annex_wanted=annex_wanted_opt,
@@ -393,6 +399,8 @@ def _add_remote(ds, repo, name, known_remotes, url, pushurl, as_common_datasrc,
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    # XXX this check better be done in configure too
+    # see https://github.com/datalad/datalad/issues/5914
     if as_common_datasrc == name:
         raise ValueError('Sibling name ({}) and common data source name ({}) '
                          'can not be identical.'.format(name, as_common_datasrc))
@@ -568,7 +576,11 @@ def _configure_remote(
                 lgr.debug("Exception was: %s", exc_str(exc))
 
             if as_common_datasrc:
-                ri = RI(url)
+                # we need a fully configured remote here
+                # do not re-use `url`, but ask for the remote config
+                # that git-annex will use too
+                remote_url = repo.config.get(f'remote.{name}.url')
+                ri = RI(remote_url)
                 if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
                     # XXX what if there is already a special remote
                     # of this name? Above check for remotes ignores special
@@ -581,12 +593,11 @@ def _configure_remote(
                         'initremote',
                         as_common_datasrc,
                         'type=git',
-                        'location={}'.format(url),
+                        'location={}'.format(remote_url),
                         'autoenable=true'])
                 else:
                     yield dict(
                         status='impossible',
-                        name=name,
                         message='cannot configure as a common data source, '
                                 'URL protocol is not http or https',
                         **result_props)

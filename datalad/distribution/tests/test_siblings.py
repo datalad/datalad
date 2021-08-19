@@ -40,7 +40,9 @@ from datalad.tests.utils import (
     with_sameas_remote,
     eq_,
     ok_,
+    serve_path_via_http,
     DEFAULT_BRANCH,
+    DEFAULT_REMOTE,
 )
 
 from datalad.utils import Path
@@ -496,3 +498,62 @@ def test_bf3733(path):
         name="imaginary",
         path=ds.path,
     )
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@serve_path_via_http
+def test_as_common_datasource(testbed, viapath, viaurl, remotepath, url):
+    ds = Dataset(remotepath).create()
+    (ds.pathobj / 'testfile').write_text('likemagic')
+    (ds.pathobj / 'testfile2').write_text('likemagic2')
+    ds.save()
+
+    # make clonable via HTTP
+    ds.repo.call_git(['update-server-info'])
+
+    # this does not work for remotes that have path URLs
+    ds_frompath = clone(source=remotepath, path=viapath)
+    res = ds_frompath.siblings(
+        'configure',
+        name=DEFAULT_REMOTE,
+        as_common_datasrc='mike',
+        on_failure='ignore',
+        result_renderer=None,
+    )
+    assert_in_results(
+        res,
+        status='impossible',
+        message='cannot configure as a common data source, URL protocol '
+                'is not http or https',
+    )
+
+    # but it works for HTTP
+    ds_fromurl = clone(source=url, path=viaurl)
+    res = ds_fromurl.siblings(
+        'configure',
+        name=DEFAULT_REMOTE,
+        as_common_datasrc='mike2',
+        result_renderer=None,
+    )
+    assert_status('ok', res)
+    # same thing should be possible by adding a fresh remote
+    res = ds_fromurl.siblings(
+        'add',
+        name='fresh',
+        url=url,
+        as_common_datasrc='fresh-sr',
+        result_renderer=None,
+    )
+    assert_status('ok', res)
+
+    # now try if it works. we will clone the clone, and get a repo that does
+    # not know its ultimate origin. still, we should be able to pull data
+    # from it via the special remote
+    testbed = clone(source=ds_fromurl, path=testbed)
+    assert_status('ok', testbed.get('testfile'))
+    eq_('likemagic', (testbed.pathobj / 'testfile').read_text())
+    # and the other one
+    assert_status('ok', testbed.get('testfile2'))
