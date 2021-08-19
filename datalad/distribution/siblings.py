@@ -262,7 +262,7 @@ class Siblings(Interface):
                 as_common_datasrc, publish_depends, publish_by_default,
                 annex_wanted, annex_required, annex_group, annex_groupwanted,
                 inherit, get_annex_info,
-                **res_kwargs):
+                res_kwargs):
             yield r
         if not recursive:
             return
@@ -297,7 +297,7 @@ class Siblings(Interface):
                     as_common_datasrc, publish_depends, publish_by_default,
                     annex_wanted, annex_required, annex_group, annex_groupwanted,
                     inherit, get_annex_info,
-                    **res_kwargs):
+                    res_kwargs):
                 yield r
 
     @staticmethod
@@ -338,7 +338,7 @@ def _add_remote(
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit, get_annex_info,
-        **res_kwargs):
+        res_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
     #       create-sibling already does it -- generalize/use
     #  Actually we could even inherit/deduce name from the super by checking
@@ -396,7 +396,7 @@ def _add_remote(
             as_common_datasrc, publish_depends, publish_by_default,
             annex_wanted, annex_required, annex_group, annex_groupwanted,
             inherit, get_annex_info,
-            **res_kwargs):
+            res_kwargs):
         if r['action'] == 'configure-sibling':
             r['action'] = 'add-sibling'
         yield r
@@ -408,7 +408,7 @@ def _configure_remote(
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit, get_annex_info,
-        **res_kwargs):
+        res_kwargs):
     result_props = dict(
         action='configure-sibling',
         path=ds.path,
@@ -612,7 +612,8 @@ def _query_remotes(
         as_common_datasrc=None, publish_depends=None, publish_by_default=None,
         annex_wanted=None, annex_required=None, annex_group=None, annex_groupwanted=None,
         inherit=None, get_annex_info=True,
-        **res_kwargs):
+        res_kwargs=None):
+    res_kwargs = res_kwargs or {}
     annex_info = {}
     available_space = None
     if get_annex_info and isinstance(ds.repo, AnnexRepo):
@@ -710,7 +711,7 @@ def _remove_remote(
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit, get_annex_info,
-        **res_kwargs):
+        res_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
         raise InsufficientArgumentsError("no sibling name given")
@@ -741,7 +742,7 @@ def _enable_remote(
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
         inherit, get_annex_info,
-        **res_kwargs):
+        res_kwargs):
     result_props = dict(
         action='enable-sibling',
         path=ds.path,
