@@ -251,18 +251,29 @@ class Siblings(Interface):
         # give fastest possible response, for the precise of a long-all
         # function call
         ds = dataset
-        for r in worker(
-                # always copy signature to below to avoid bugs!
-                ds, name,
-                ds.repo.get_remotes(),
-                # for top-level dataset there is no layout questions
-                _mangle_urls(url, ds_name),
-                _mangle_urls(pushurl, ds_name),
-                fetch, description,
-                as_common_datasrc, publish_depends, publish_by_default,
-                annex_wanted, annex_required, annex_group, annex_groupwanted,
-                inherit, get_annex_info,
-                res_kwargs):
+
+        # prepare parameterization package for all worker calls
+        worker_kwargs = dict(
+            ds=ds,
+            name=name,
+            known_remotes=ds.repo.get_remotes(),
+            # for top-level dataset there is no layout questions
+            url=_mangle_urls(url, ds_name),
+            pushurl=_mangle_urls(pushurl, ds_name),
+            fetch=fetch,
+            description=description,
+            as_common_datasrc=as_common_datasrc,
+            publish_depends=publish_depends,
+            publish_by_default=publish_by_default,
+            annex_wanted=annex_wanted,
+            annex_required=annex_required,
+            annex_group=annex_group,
+            annex_groupwanted=annex_groupwanted,
+            inherit=inherit,
+            get_annex_info=get_annex_info,
+            res_kwargs=res_kwargs,
+        )
+        for r in worker(**worker_kwargs):
             yield r
         if not recursive:
             return
@@ -286,18 +297,13 @@ class Siblings(Interface):
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))
                 subds_pushurl = \
                     _mangle_urls(pushurl, '/'.join([ds_name, subds_name]))
-            for r in worker(
-                    # always copy signature from above to avoid bugs
-                    subds, name,
-                    subds.repo.get_remotes(),
-                    subds_url,
-                    subds_pushurl,
-                    fetch,
-                    description,
-                    as_common_datasrc, publish_depends, publish_by_default,
-                    annex_wanted, annex_required, annex_group, annex_groupwanted,
-                    inherit, get_annex_info,
-                    res_kwargs):
+            worker_kwargs.update(
+                ds=subds,
+                known_remotes=subds.repo.get_remotes(),
+                url=subds_url,
+                pushurl=subds_pushurl,
+            )
+            for r in worker(**worker_kwargs):
                 yield r
 
     @staticmethod
@@ -333,12 +339,8 @@ class Siblings(Interface):
 
 
 # always copy signature from above to avoid bugs
-def _add_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
-        as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        res_kwargs):
+def _add_remote(ds, name, known_remotes, url, pushurl, as_common_datasrc,
+                res_kwargs, **unused_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
     #       create-sibling already does it -- generalize/use
     #  Actually we could even inherit/deduce name from the super by checking
@@ -392,23 +394,19 @@ def _add_remote(
     known_remotes.append(name)
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds, name, known_remotes, url, pushurl, fetch, description,
-            as_common_datasrc, publish_depends, publish_by_default,
-            annex_wanted, annex_required, annex_group, annex_groupwanted,
-            inherit, get_annex_info,
-            res_kwargs):
+            ds=ds, name=name, known_remotes=known_remotes, url=url,
+            pushurl=pushurl, as_common_datasrc=as_common_datasrc,
+            res_kwargs=res_kwargs, **unused_kwargs):
         if r['action'] == 'configure-sibling':
             r['action'] = 'add-sibling'
         yield r
 
 
-# always copy signature from above to avoid bugs
 def _configure_remote(
         ds, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        res_kwargs):
+        inherit, res_kwargs, **unused_kwargs):
     result_props = dict(
         action='configure-sibling',
         path=ds.path,
@@ -601,18 +599,13 @@ def _configure_remote(
         ds.repo.call_annex(['describe', name, description])
 
     # report all we know at once
-    info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]
+    info = list(_query_remotes(ds, name, known_remotes, **unused_kwargs))[0]
     info.update(dict(status='ok', **result_props))
     yield info
 
 
-# always copy signature from above to avoid bugs
-def _query_remotes(
-        ds, name, known_remotes, url=None, pushurl=None, fetch=None, description=None,
-        as_common_datasrc=None, publish_depends=None, publish_by_default=None,
-        annex_wanted=None, annex_required=None, annex_group=None, annex_groupwanted=None,
-        inherit=None, get_annex_info=True,
-        res_kwargs=None):
+def _query_remotes(ds, name, known_remotes, get_annex_info=True,
+                   res_kwargs=None, **unused_kwargs):
     res_kwargs = res_kwargs or {}
     annex_info = {}
     available_space = None
@@ -706,12 +699,7 @@ def _query_remotes(
         yield info
 
 
-def _remove_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
-        as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        res_kwargs):
+def _remove_remote(ds, name, res_kwargs, **unused_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
         raise InsufficientArgumentsError("no sibling name given")
@@ -736,13 +724,7 @@ def _remove_remote(
         **result_props)
 
 
-# always copy signature from above to avoid bugs
-def _enable_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
-        as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        res_kwargs):
+def _enable_remote(ds, name, res_kwargs, **unused_kwargs):
     result_props = dict(
         action='enable-sibling',
         path=ds.path,
