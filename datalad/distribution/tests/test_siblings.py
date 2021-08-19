@@ -32,6 +32,7 @@ from datalad.tests.utils import (
     with_tempfile, with_testrepos,
     assert_false,
     assert_in,
+    assert_in_results,
     assert_not_in,
     assert_raises,
     assert_status,
@@ -39,6 +40,7 @@ from datalad.tests.utils import (
     with_sameas_remote,
     eq_,
     ok_,
+    DEFAULT_BRANCH,
 )
 
 from datalad.utils import Path
@@ -114,6 +116,24 @@ def test_siblings(origin, repo_path, local_clone_path):
                    url=httpurl1, on_failure='ignore',
                    result_renderer=None)
     assert_status('ok', res)
+
+    # add another remove with a publication dependency
+    # again pre-pollute config
+    depvar = 'remote.test-remote2.datalad-publish-depends'
+    pushvar = 'remote.test-remote2.push'
+    source.config.add(depvar, 'stupid', where='local')
+    source.config.add(pushvar, 'senseless', where='local')
+    res = siblings('configure', dataset=source, name="test-remote2",
+                   url=httpurl2, on_failure='ignore',
+                   publish_depends='test-remote',
+                   # just for smoke testing
+                   publish_by_default=DEFAULT_BRANCH,
+                   result_renderer=None)
+    assert_status('ok', res)
+    # config replaced with new setup
+    #source.config.reload(force=True)
+    eq_(source.config.get(depvar, None), 'test-remote')
+    eq_(source.config.get(pushvar, None), DEFAULT_BRANCH)
 
     # add to another remote automagically taking it from the url
     # and being in the dataset directory
@@ -264,6 +284,14 @@ def test_here(path):
     assert_in('annex-bare', here)
     assert_in('available_local_disk_space', here)
 
+    # unknown sibling query errors
+    res = ds.siblings(
+        'query',
+        name='notthere',
+        on_failure='ignore',
+        result_renderer=None)
+    assert_status('error', res)
+
     # set a description
     res = ds.siblings(
         'configure',
@@ -289,6 +317,28 @@ def test_here(path):
     eq_(res, newres)
 
 
+@with_tempfile(mkdir=True)
+def test_no_annex(path):
+    # few smoke tests regarding the 'here' sibling
+    ds = create(path, annex=False)
+    res = ds.siblings(
+        'configure',
+        name='here',
+        description='very special',
+        on_failure='ignore',
+        result_renderer=None)
+    assert_status('impossible', res)
+
+    res = ds.siblings(
+        'enable',
+        name='doesnotmatter',
+        on_failure='ignore',
+        result_renderer=None)
+    assert_in_results(
+        res, status='impossible',
+        message='cannot enable sibling of non-annex dataset')
+
+
 @with_tempfile()
 @with_tempfile()
 def test_arg_missing(path, path2):
@@ -304,6 +354,33 @@ def test_arg_missing(path, path2):
         'ok',
         ds.siblings(
             'add', url=path2, name='somename'))
+    # trigger some name guessing functionality that will still not
+    # being able to end up using a hostnames-spec despite being
+    # given a URL
+    assert_raises(
+        InsufficientArgumentsError,
+        ds.siblings,
+        'add',
+        url=f'file://{path2}',
+    )
+
+    # there is no name guessing with 'configure'
+    assert_in_results(
+        ds.siblings('configure', url='http://somename', on_failure='ignore'),
+        status='error',
+        message='need sibling `name` for configuration')
+
+    # needs a URL
+    assert_raises(
+        InsufficientArgumentsError, ds.siblings, 'add', name='somename')
+    # just pushurl is OK
+    assert_status('ok', ds.siblings('add', pushurl=path2, name='somename2'))
+
+    # needs group with groupwanted
+    assert_raises(
+        InsufficientArgumentsError,
+        ds.siblings, 'add', url=path2, name='somename',
+        annex_groupwanted='whatever')
 
 
 @with_sameas_remote
@@ -318,6 +395,26 @@ def test_sibling_enable_sameas(repo, clone_path):
     ds_cloned = clone(ds.path, clone_path)
 
     assert_false(ds_cloned.repo.file_has_content("f0"))
+    # does not work without a name
+    res = ds_cloned.siblings(
+        action="enable",
+        result_renderer=None,
+        on_failure='ignore',
+    )
+    assert_in_results(
+        res, status='error', message='require `name` of sibling to enable')
+    # does not work with the wrong name
+    res = ds_cloned.siblings(
+        action="enable",
+        name='wrong',
+        result_renderer=None,
+        on_failure='ignore',
+    )
+    assert_in_results(
+        res, status='impossible',
+        message=("cannot enable sibling '%s', not known", 'wrong')
+    )
+    # works with the right name
     res = ds_cloned.siblings(action="enable", name="r_rsync")
     assert_status("ok", res)
     ds_cloned.get(path=["f0"])
