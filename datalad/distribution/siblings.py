@@ -57,6 +57,7 @@ from datalad.interface.common_opts import (
     inherit_opt,
     location_description,
 )
+from datalad.interface.utils import default_result_renderer
 from datalad.downloaders.credentials import UserPassword
 from datalad.distribution.dataset import (
     require_dataset,
@@ -148,9 +149,8 @@ class Siblings(Interface):
         action=Parameter(
             args=('action',),
             nargs='?',
-            metavar='ACTION',
             doc="""command action selection (see general documentation)""",
-            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable') | EnsureNone()),
+            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable')),
         url=Parameter(
             args=('--url',),
             doc="""the URL of or path to the dataset sibling named by
@@ -312,7 +312,7 @@ class Siblings(Interface):
             )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
-            # logging complained about this already
+            default_result_renderer(res)
             return
         path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
