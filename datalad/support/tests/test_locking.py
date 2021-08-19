@@ -149,9 +149,12 @@ with try_lock_informatively(lock, timeouts=[0.05, 0.15], proceed_unlocked={{proc
         assert_in('proceed without locking', res['stderr'])
         assert_greater(time() - t0, 0.19999)  # should wait for at least 0.2
         try:
+            import psutil
             # PID does not correspond
             assert_in('Check following process: PID=', res['stderr'])
             assert_in(f'CWD={os.getcwd()} CMDLINE=', res['stderr'])
+        except ImportError:
+            pass  # psutil was not installed, cannot get list of files
         except AssertionError:
             # we must have had the other one then
             assert_in('failed to determine one', res['stderr'])
