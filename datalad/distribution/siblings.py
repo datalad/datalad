@@ -12,71 +12,72 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-
 import os
 import os.path as op
-
 from urllib.parse import urlparse
 
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import (
-    EnsureStr,
-    EnsureChoice,
-    EnsureNone,
-    EnsureBool,
-)
-from datalad.support.param import Parameter
-from datalad.support.exceptions import (
-    CommandError,
-    InsufficientArgumentsError,
-    AccessDeniedError,
-    AccessFailedError,
-    RemoteNotAvailableError,
-    DownloadError,
-)
-from datalad.support.network import (
-    RI,
-    PathRI,
-    URL,
-)
-from datalad.support.gitrepo import GitRepo
-from datalad.interface.common_opts import (
-    recursion_flag,
-    recursion_limit,
-    as_common_datasrc,
-    publish_depends,
-    publish_by_default,
-    annex_wanted_opt,
-    annex_required_opt,
-    annex_group_opt,
-    annex_groupwanted_opt,
-    inherit_opt,
-    location_description,
-)
-from datalad.interface.utils import default_result_renderer
-from datalad.downloaders.credentials import UserPassword
+import datalad.support.ansi_colors as ac
 from datalad.distribution.dataset import (
-    require_dataset,
     Dataset,
+    require_dataset,
 )
 from datalad.distribution.update import Update
+from datalad.dochelpers import exc_str
+from datalad.downloaders.credentials import UserPassword
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.common_opts import (
+    annex_group_opt,
+    annex_groupwanted_opt,
+    annex_required_opt,
+    annex_wanted_opt,
+    as_common_datasrc,
+    inherit_opt,
+    location_description,
+    publish_by_default,
+    publish_depends,
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import (
+    default_result_renderer,
+    eval_results,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    AccessDeniedError,
+    AccessFailedError,
+    CommandError,
+    DownloadError,
+    InsufficientArgumentsError,
+    RemoteNotAvailableError,
+)
+from datalad.support.gitrepo import GitRepo
+from datalad.support.network import (
+    RI,
+    URL,
+    PathRI,
+)
+from datalad.support.param import Parameter
 from datalad.utils import (
+    Path,
     ensure_list,
     slash_join,
-    Path,
 )
-from datalad.dochelpers import exc_str
 
 from .dataset import (
     EnsureDataset,
     datasetmethod,
 )
-import datalad.support.ansi_colors as ac
-
 
 lgr = logging.getLogger('datalad.distribution.siblings')
 
@@ -314,6 +315,7 @@ class Siblings(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+
         # should we attempt to remove an unknown sibling, complain like Git does
         if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
             ui.message(
