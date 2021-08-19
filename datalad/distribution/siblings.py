@@ -246,18 +246,21 @@ class Siblings(Interface):
         # at the top-level and vice versa
         worker = action_worker_map[action]
 
-        dataset = require_dataset(
-            dataset, check_installed=False, purpose='configure sibling')
-        refds_path = dataset.path
+        ds = require_dataset(
+            dataset,
+            # it makes no sense to use this command without a dataset
+            check_installed=True,
+            purpose='configure sibling')
+        refds_path = ds.path
 
         res_kwargs = dict(refds=refds_path, logger=lgr)
 
-        ds_name = op.basename(dataset.path)
+        ds_name = op.basename(ds.path)
 
         # do not form single list of datasets (with recursion results) to
         # give fastest possible response, for the precise of a long-all
         # function call
-        ds = dataset
+
         # minimize expensive calls to .repo
         ds_repo = ds.repo
 
