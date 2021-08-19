@@ -1825,7 +1825,7 @@ class GitRepo(CoreGitRepo):
         try:
             self.call_git(['remote', 'remove', name])
         except CommandError as e:
-            if 'fatal: No such remote' in e.stderr:
+            if 'No such remote' in e.stderr:
                 raise RemoteNotAvailableError(name,
                                               cmd="git remote remove",
                                               msg="No such remote",

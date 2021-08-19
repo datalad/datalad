@@ -112,6 +112,11 @@ def test_siblings(origin, repo_path, local_clone_path):
                    result_renderer=None)
     assert_status('ok', res)
     assert_not_in("test-remote", source.repo.get_remotes())
+    # remove again (with result renderer to smoke-test a renderer
+    # special case for this too)
+    res = siblings('remove', dataset=source, name="test-remote")
+    assert_status('notneeded', res)
+
     res = siblings('add', dataset=source, name="test-remote",
                    url=httpurl1, on_failure='ignore',
                    result_renderer=None)
