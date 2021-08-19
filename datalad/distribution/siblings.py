@@ -353,6 +353,11 @@ def _add_remote(ds, name, known_remotes, url, pushurl, as_common_datasrc,
         raise InsufficientArgumentsError(
             """insufficient information to add a sibling
             (needs at least a dataset, and any URL).""")
+
+    # a pushurl should always be able to fill in for a not
+    # specified url, however, only when adding new remotes,
+    # not when configuring existing remotes (to avoid undesired
+    # overwriting of configurations), hence done here only
     if url is None:
         url = pushurl
 
