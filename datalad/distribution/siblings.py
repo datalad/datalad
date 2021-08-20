@@ -286,8 +286,7 @@ class Siblings(Interface):
             get_annex_info=get_annex_info,
             res_kwargs=res_kwargs,
         )
-        for r in worker(**worker_kwargs):
-            yield r
+        yield from worker(**worker_kwargs)
         if not recursive:
             return
 
@@ -318,8 +317,7 @@ class Siblings(Interface):
                 url=subds_url,
                 pushurl=subds_pushurl,
             )
-            for r in worker(**worker_kwargs):
-                yield r
+            yield from worker(**worker_kwargs)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
