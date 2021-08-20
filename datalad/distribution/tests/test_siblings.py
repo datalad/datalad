@@ -45,7 +45,10 @@ from datalad.tests.utils import (
     DEFAULT_REMOTE,
 )
 
-from datalad.utils import Path
+from datalad.utils import (
+    on_windows,
+    Path,
+)
 
 
 # work on cloned repos to be safer
@@ -364,12 +367,17 @@ def test_arg_missing(path, path2):
     # trigger some name guessing functionality that will still not
     # being able to end up using a hostnames-spec despite being
     # given a URL
-    assert_raises(
-        InsufficientArgumentsError,
-        ds.siblings,
-        'add',
-        url=f'file://{path2}',
-    )
+    if not on_windows:
+        # the trick with the file:// URL creation only works on POSIX
+        # the underlying tested code here is not about paths, though,
+        # so it is good enough to run this on POSIX system to be
+        # reasonably sure that things work
+        assert_raises(
+            InsufficientArgumentsError,
+            ds.siblings,
+            'add',
+            url=f'file://{path2}',
+        )
 
     # there is no name guessing with 'configure'
     assert_in_results(
