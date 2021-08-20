@@ -433,7 +433,10 @@ def _maybe_get_single_subparser(cmdlineargs, parser, interface_groups,
         if not unparsed_args and getattr(parsed_args, 'version', None):
             parsed_args.version()  # will exit with 0
         if not (completing or unparsed_args):
-            fail_handler(parser, msg="too few arguments", exit_code=2)
+            fail_handler(
+                parser,
+                msg="too few arguments, run with --help or visit https://handbook.datalad.org",
+                exit_code=2)
         lgr.debug("Command line args 1st pass for DataLad %s. Parsed: %s Unparsed: %s",
                   __full_version__, parsed_args, unparsed_args)
     except Exception as exc:
@@ -591,6 +594,7 @@ def fail_with_short_help(parser=None,
         out.write("error: %s\n" % msg)
     if not known:
         if parser:
+            parser_add_common_opt(parser, 'help')
             # just to appear in print_usage also consistent with --help output
             parser.add_argument("command [command-opts]")
             parser.print_usage(file=out)
