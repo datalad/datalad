@@ -264,15 +264,9 @@ class Siblings(Interface):
         # minimize expensive calls to .repo
         ds_repo = ds.repo
 
-        # prepare parameterization package for all worker calls
+        # prepare common parameterization package for all worker calls
         worker_kwargs = dict(
-            ds=ds,
-            repo=ds_repo,
             name=name,
-            known_remotes=ds_repo.get_remotes(),
-            # for top-level dataset there is no layout questions
-            url=_mangle_urls(url, ds_name),
-            pushurl=_mangle_urls(pushurl, ds_name),
             fetch=fetch,
             description=description,
             as_common_datasrc=as_common_datasrc,
@@ -286,7 +280,14 @@ class Siblings(Interface):
             get_annex_info=get_annex_info,
             res_kwargs=res_kwargs,
         )
-        yield from worker(**worker_kwargs)
+        yield from worker(
+            ds=ds,
+            repo=ds_repo,
+            known_remotes=ds_repo.get_remotes(),
+            # for top-level dataset there is no layout questions
+            url=_mangle_urls(url, ds_name),
+            pushurl=_mangle_urls(pushurl, ds_name),
+            **worker_kwargs)
         if not recursive:
             return
 
@@ -310,14 +311,13 @@ class Siblings(Interface):
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))
                 subds_pushurl = \
                     _mangle_urls(pushurl, '/'.join([ds_name, subds_name]))
-            worker_kwargs.update(
+            yield from worker(
                 ds=subds,
                 repo=subds_repo,
                 known_remotes=subds_repo.get_remotes(),
                 url=subds_url,
                 pushurl=subds_pushurl,
-            )
-            yield from worker(**worker_kwargs)
+                **worker_kwargs)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
