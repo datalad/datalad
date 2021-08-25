@@ -11,6 +11,7 @@
 import glob
 import gzip
 import inspect
+import lzma
 import shutil
 import stat
 from json import dumps
@@ -538,6 +539,8 @@ def ok_file_has_content(path, content, strip=False, re_=False,
     if decompress:
         if path.suffix == '.gz':
             open_func = gzip.open
+        elif path.suffix in ('.xz', '.lzma'):
+            open_func = lzma.open
         else:
             raise NotImplementedError("Don't know how to decompress %s" % path)
     else:
