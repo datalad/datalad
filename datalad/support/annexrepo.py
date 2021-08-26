@@ -3503,11 +3503,14 @@ class AnnexJsonProtocol(WitlessProtocol):
         pbar_id = self._get_pbar_id(j)
         known_pbar = pbar_id in self._pbars
         action = j.get('action')
-        if action:
+
+        is_progress = action and 'byte-progress' in j
+        # ignore errors repeatedly reported in progress messages. Final message
+        # will contain them
+        if action and not is_progress:
             for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
 
-        is_progress = action and 'byte-progress' in j
         if known_pbar and (not is_progress or
                            j.get('byte-progress') == j.get('total-size')):
             # take a known pbar down, completion or broken report
