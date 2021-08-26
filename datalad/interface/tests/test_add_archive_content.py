@@ -417,23 +417,26 @@ def test_add_archive_use_archive_dir(repo_path):
 
 @with_tree(
     tree={
-        '1.gz': '1',
-        '2.xz': '2',
-        '3.lzma': '3',
-        # TODO: add any other stream compression we might be supporting via 7zip or patool?
+        'archives': {
+            '1.gz': '1',
+            '2.xz': '2',
+            '3.lzma': '3',
+            # TODO: add any other stream compression we might be supporting via 7zip or patool?
+        },
     }
 )
 def test_add_archive_single_file(repo_path):
     repo = AnnexRepo(repo_path, create=True)
     with chpwd(repo_path):
-        archives = glob('*')
+        archives = glob('archives/*')
         repo.add(archives)
         repo.commit('Added archives')
 
         for archive in archives:
             archive_name = os.path.splitext(archive)[0]
+            archive_content = os.path.basename(archive_name)
             add_archive_content(archive)
-            ok_file_has_content(archive_name, archive_name)
+            ok_file_has_content(archive_name, archive_content)
 
 
 class TestAddArchiveOptions():
