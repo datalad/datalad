@@ -43,6 +43,7 @@ from .helpers import (
     parser_add_common_opt,
     strip_arg_from_argv,
 )
+from datalad.dochelpers import exc_str
 
 
 # TODO:  OPT look into making setup_parser smarter to become faster
