@@ -63,18 +63,5 @@ class Test(Interface):
             module.extend(ep.module_name for ep in iter_entry_points('datalad.tests'))
         module = ensure_list(module)
         lgr.info('Starting test run for module(s): %s', module)
-
-        # Exception (traceback) logging is disabled by default. However, as of
-        # now we do test logging output in (too) great detail. Therefore enable
-        # it here, so `datalad-test` doesn't fail by default.
-        # Can be removed whenever the tests don't require it.
-        from datalad import cfg as dlcfg
-        from datalad.tests.utils import patch
-        try:
-            with patch.dict('os.environ', {'DATALAD_LOG_EXC': '1'}):
-                dlcfg.reload()
-                for mod in module:
-                    datalad.test(module=mod, verbose=verbose,
-                                 nocapture=nocapture, pdb=pdb, stop=stop)
-        finally:
-            dlcfg.reload()
+        for mod in module:
+            datalad.test(module=mod, verbose=verbose, nocapture=nocapture, pdb=pdb, stop=stop)
