@@ -22,7 +22,6 @@ import os
 
 import datalad
 
-from ..dochelpers import exc_str_old
 from ..support.exceptions import (
     InsufficientArgumentsError,
     IncompleteResultsError,
@@ -44,6 +43,7 @@ from .helpers import (
     parser_add_common_opt,
     strip_arg_from_argv,
 )
+from datalad.dochelpers import exc_str
 
 
 # TODO:  OPT look into making setup_parser smarter to become faster
@@ -216,7 +216,7 @@ def main(args=None):
                 ret = cmdlineargs.func(cmdlineargs)
             except InsufficientArgumentsError as exc:
                 # if the func reports inappropriate usage, give help output
-                lgr.error('%s (%s)', exc_str_old(exc), exc.__class__.__name__)
+                lgr.error('%s (%s)', exc_str(exc), exc.__class__.__name__)
                 cmdlineargs.subparser.print_usage(sys.stderr)
                 sys.exit(2)
             except IncompleteResultsError as exc:
@@ -228,7 +228,7 @@ def main(args=None):
                 # in general we do not want to see the error again, but
                 # present in debug output
                 lgr.debug('could not perform all requested actions: %s',
-                          exc_str_old(exc))
+                          exc_str(exc))
                 sys.exit(1)
             except CommandError as exc:
                 # behave as if the command ran directly, importantly pass
@@ -247,7 +247,7 @@ def main(args=None):
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)
             except Exception as exc:
-                lgr.error('%s (%s)', exc_str_old(exc), exc.__class__.__name__)
+                lgr.error('%s (%s)', exc_str(exc), exc.__class__.__name__)
                 sys.exit(1)
     else:
         # just let argparser spit out its error, since there is smth wrong
@@ -261,7 +261,7 @@ def main(args=None):
         if hasattr(cmdlineargs, 'result_renderer'):
             cmdlineargs.result_renderer(ret, cmdlineargs)
     except Exception as exc:
-        lgr.error("Failed to render results due to %s", exc_str_old(exc))
+        lgr.error("Failed to render results due to %s", exc_str(exc))
         sys.exit(1)
 
 
