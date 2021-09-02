@@ -11,29 +11,28 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
-import subprocess
-import sys
+import asyncio
+import functools
 import logging
 import os
-import functools
+import subprocess
+import sys
 import tempfile
+from collections import namedtuple
 from locale import getpreferredencoding
-import asyncio
-from collections import (
-    namedtuple,
-)
 
-from .consts import GIT_SSH_COMMAND
-from .dochelpers import (
+from datalad.consts import GIT_SSH_COMMAND
+from datalad.dochelpers import (
     borrowdoc,
     exc_str,
 )
-from .support import path as op
-from .support.exceptions import CommandError
-from .utils import (
+from datalad.support import path as op
+from datalad.support.exceptions import CommandError
+from datalad.utils import (
     auto_repr,
     ensure_unicode,
     generate_file_chunks,
+    on_windows,
     try_multiple,
     unlink,
 )
@@ -91,10 +90,19 @@ async def run_async_cmd(loop, cmd, protocol, stdin, protocol_kwargs=None,
         stdout=asyncio.subprocess.PIPE if protocol.proc_out else None,
         stderr=asyncio.subprocess.PIPE if protocol.proc_err else None,
     )
-    if isinstance(cmd, str):
-        proc = loop.subprocess_shell(factory, cmd, **kwargs)
+    # encode command as utf-8 since on systems with locale not utf-8
+    # (e.g. CentOS based discovery HPC) encoding might fail although
+    # if encoded explicitly - works just fine
+    if on_windows:
+        # but windows does not allow for bytes here, so we are doomed to not
+        # do that: TypeError: bytes args is not allowed on Windows
+        encode_ = lambda s: s
     else:
-        proc = loop.subprocess_exec(factory, *cmd, **kwargs)
+        encode_ = lambda s: s.encode('utf-8')
+    if isinstance(cmd, str):
+        proc = loop.subprocess_shell(factory, encode_(cmd), **kwargs)
+    else:
+        proc = loop.subprocess_exec(factory, *map(encode_, cmd), **kwargs)
     transport = None
     result = None
     try:
@@ -515,6 +523,7 @@ class GitRunnerBase(object):
         """
         if GitRunnerBase._GIT_PATH is None:
             from distutils.spawn import find_executable
+
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
             if (os.environ.get('DATALAD_USE_DEFAULT_GIT', '0').lower()
