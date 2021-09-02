@@ -75,16 +75,6 @@ def test_CapturedException():
     # ...
     assert_equal(full_display[-1].strip(), "RuntimeError: new message")
 
-    # CapturedException.__str__ now independent of log config:
-    try:
-        with patch.dict('os.environ', {'DATALAD_LOG_EXC': '1'}):
-            cfg.reload()
-            assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",
-                         str(captured_exc))
-
-        with patch.dict('os.environ', {'DATALAD_LOG_EXC': '0'}):
-            cfg.reload()
-            assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",
-                         str(captured_exc))
-    finally:
-        cfg.reload()  # make sure we don't have a side effect on other tests
+    # CapturedException.__repr__:
+    assert_re_in(r".*test_captured_exception.py:f2:[0-9]+\]$",
+                 captured_exc.__repr__())

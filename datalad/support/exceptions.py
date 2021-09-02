@@ -9,12 +9,16 @@
 """ datalad exceptions
 """
 
+import logging
 import re
 import sys
 import traceback
 from os import linesep
 from pathlib import Path
 from pprint import pformat
+
+
+lgr = logging.getLogger('datalad.support.exceptions')
 
 
 class CapturedException(object):
@@ -26,7 +30,8 @@ class CapturedException(object):
     reporting.
     """
 
-    def __init__(self, exc=None, limit=None, capture_locals=False):
+    def __init__(self, exc=None, limit=None, capture_locals=False,
+                 level=8, logger=None):
         """Capture an exception and its traceback for logging.
 
         Clears the exception's traceback frame references afterwards.
@@ -61,6 +66,10 @@ class CapturedException(object):
                 capture_locals=capture_locals
             )
             traceback.clear_frames(exc.__traceback__)
+
+        # log the captured exception
+        logger = logger or lgr
+        logger.log(level, "%r", self)
 
     def format_oneline_tb(self, limit=None, include_str=True):
         """Format an exception traceback as a one-line summary
@@ -146,63 +155,10 @@ class CapturedException(object):
         return self.tb.exc_type.__qualname__
 
     def __str__(self):
-        return self.format_oneline_tb(limit=None, include_str=True)
-
-    def __repr__(self):
         return self.format_short()
 
-    def log(self, logger, level, msg="", *args, **kwargs):
-        """Log the captured exception
-
-        This enhanced the given `msg` (if any) with an exception log including
-        the exception's traceback (`format_oneline`), if the config
-        `datalad.log.exc` evaluates to true. Otherwise, only the given `msg` is
-        logged. If `msg` is left empty, nothing will be logged w/o that config.
-
-        The intention is to separate the technical information about an
-        exception from messaging that is meaningful w/o exploring datalad's
-        source code.
-
-        Parameters
-        ----------
-        logger: logging.Logger
-        level: int
-        msg: str
-          log message (format string). This message is the part that can't be
-          turned off. Will be enhanced if `datalad.log.exc` is set.
-        args:
-          passed to logger.log
-        kwargs:
-          passed to logger.log
-
-        Returns
-        -------
-        str
-        """
-
-        # Note: Not importing datalad.cfg at module level, since ConfigManager
-        # imports dochelpers -> circular import when creating datalad.cfg
-        # instance at startup.
-        from datalad import cfg
-
-        log_message = msg
-        if cfg.obtain('datalad.log.exc'):
-            exc_str = self.format_oneline_tb(limit=None, include_str=True)
-            if log_message:
-                log_message += linesep + "Reason for message above: %s"
-            else:
-                log_message = "Exception occurred: %s"
-
-            # Note, that a string representation of an exception isn't sure to
-            # be compatible w/ being a part of a format string! It could contain
-            # parts like '%s', which may be part of a filename, url, or whatever
-            # the exception is reporting on. Hence, do not include it directly
-            # in the message but defer the inclusion to logger in order to not
-            # have it interpreted and possibly expect additional arguments.
-            args = (*args, exc_str)
-
-        if log_message:
-            logger.log(level, log_message, *args, **kwargs)
+    def __repr__(self):
+        return self.format_oneline_tb(limit=None, include_str=True)
 
 
 def _format_json_error_messages(recs):
