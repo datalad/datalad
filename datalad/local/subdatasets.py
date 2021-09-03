@@ -25,7 +25,10 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.param import Parameter
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
@@ -367,12 +370,12 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     # variable name validity is checked before and Git
                     # replaces the file completely, resolving any permission
                     # issues, if the file could be read (already done above)
+                    ce = CapturedException(e)
                     yield get_status_dict(
                         'subdataset',
                         status='error',
-                        message=(
-                            "Failed to set property '%s': %s",
-                            prop, exc_str(e)),
+                        message=("Failed to set property '%s': %s", prop, ce),
+                        exception=ce,
                         type='dataset',
                         logger=lgr,
                         **sm)

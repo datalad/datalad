@@ -30,6 +30,7 @@ from ..support.constraints import (
     EnsureNone,
     EnsureStr,
 )
+from datalad.support.exceptions import CapturedException
 from ..utils import (
     ensure_list,
 )
@@ -419,11 +420,13 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
                 status='ok',
             )
         except Exception as e:
+            ce = CapturedException(e)
             yield dict(
                 res_kwargs,
                 # relay all attributes
                 status='error',
-                message=('Failed to create GitLab project: %s', exc_str(e))
+                message=('Failed to create GitLab project: %s', ce),
+                exception=ce
             )
             return
     else:

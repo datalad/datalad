@@ -18,6 +18,7 @@ from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.exceptions import (
+    CapturedException,
     InvalidGitRepositoryError,
     MissingExternalDependency,
 )
@@ -157,9 +158,11 @@ class CheckDates(Interface):
             ref_ts = _parse_date(reference_date)
         except ValueError as exc:
             lgr.error("Could not parse '%s' as a date", reference_date)
+            ce = CapturedException(exc)
             yield get_status_dict("check_dates",
                                   status="error",
-                                  message=exc_str(exc))
+                                  message=("%s", ce),
+                                  exception=ce)
             return
 
         lgr.info("Searching for dates %s than %s",
