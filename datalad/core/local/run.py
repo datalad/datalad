@@ -42,7 +42,10 @@ import datalad.support.ansi_colors as ac
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError
+)
 from datalad.support.globbedpaths import GlobbedPaths
 from datalad.support.param import Parameter
 from datalad.support.json_py import dump2stream
@@ -481,8 +484,10 @@ def _unlock_or_remove(dset_path, paths):
             try:
                 os.unlink(res["path"])
             except OSError as exc:
+                ce = CapturedException(exc)
                 yield dict(res, action="run.remove", status="error",
-                           message=("Removing file failed: %s", exc_str(exc)))
+                           message=("Removing file failed: %s", ce),
+                           exception=ce)
             else:
                 yield dict(res, action="run.remove", status="ok",
                            message="Removed file")

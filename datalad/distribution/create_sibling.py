@@ -70,6 +70,7 @@ from datalad.support.constraints import (
     EnsureStr,
 )
 from datalad.support.exceptions import (
+    CapturedException,
     InsufficientArgumentsError,
     MissingExternalDependency,
 )
@@ -813,10 +814,12 @@ class CreateSibling(Interface):
                 try:
                     upload_web_interface(path, shell, shared, ui)
                 except CommandError as e:
+                    ce = CapturedException(e)
                     currentds_ap['status'] = 'error'
                     currentds_ap['message'] = (
                         "failed to push web interface to the remote datalad repository (%s)",
-                        exc_str(e))
+                        ce)
+                    currentds_ap['exception'] = ce
                     yield currentds_ap
                     yielded.add(currentds_ap['path'])
                     continue
@@ -832,10 +835,12 @@ class CreateSibling(Interface):
                       "&& ( [ -x hooks/post-update ] && hooks/post-update || true )"
                       "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
+                ce = CapturedException(e)
                 currentds_ap['status'] = 'error'
                 currentds_ap['message'] = (
                     "failed to run post-update hook under remote path %s (%s)",
-                    path, exc_str(e))
+                    path, ce)
+                currentds_ap['exception'] = ce
                 yield currentds_ap
                 yielded.add(currentds_ap['path'])
                 continue

@@ -28,6 +28,7 @@ from datalad.utils import (
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     InvalidGitRepositoryError,
 )
@@ -99,9 +100,10 @@ def _describe_annex():
         out = runner.run(
             ['git', 'annex', 'version'], protocol=StdOutErrCapture)
     except CommandError as e:
+        ce = CapturedException(e)
         return dict(
             version='not available',
-            message=exc_str(e),
+            message=ce.format_short(),
         )
     info = {}
     for line in out['stdout'].split(os.linesep):
@@ -184,7 +186,8 @@ def _describe_extensions():
             mod = import_module(e.module_name, package='datalad')
             info['version'] = getattr(mod, '__version__', None)
         except Exception as e:
-            info['load_error'] = exc_str(e)
+            ce = CapturedException(e)
+            info['load_error'] = ce.format_short()
             continue
         info['entrypoints'] = entry_points = {}
         for ep in ext[1]:
@@ -198,7 +201,8 @@ def _describe_extensions():
                 import_module(ep[0], package='datalad')
                 ep_info['load_error'] = None
             except Exception as e:
-                ep_info['load_error'] = exc_str(e)
+                ce = CapturedException(e)
+                ep_info['load_error'] = ce.format_short()
                 continue
     return infos
 
@@ -219,7 +223,8 @@ def _describe_metadata_elements(group):
             e.load()
             info['load_error'] = None
         except Exception as e:
-            info['load_error'] = exc_str(e)
+            ce = CapturedException(e)
+            info['load_error'] = ce.format_short()
             continue
     return infos
 
@@ -261,7 +266,8 @@ def _describe_dataset(ds, sensitive):
                 infos['metadata'] = None
         return infos
     except InvalidGitRepositoryError as e:
-        return {"invalid": exc_str(e)}
+        ce = CapturedException(e)
+        return {"invalid": ce.message()}
 
 
 def _describe_location(res):

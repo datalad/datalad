@@ -89,7 +89,9 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
     if message is not None:
         d['message'] = message
     if exception is not None:
-        d['exception_traceback'] = exc_str(exception, limit=1000, include_str=False)
+        d['exception'] = exception
+        d['exception_traceback'] = \
+            exception.format_oneline_tb(limit=1000, include_str=False)
     if kwargs:
         d.update(kwargs)
     return d

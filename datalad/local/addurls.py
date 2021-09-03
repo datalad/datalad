@@ -41,7 +41,10 @@ from datalad.interface.common_opts import (
     jobs_opt,
     nosave_opt,
 )
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CapturedException,
+    CommandError,
+)
 from datalad.support.itertools import groupby_sorted
 from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
@@ -825,11 +828,13 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
         out_json = repo.add_url_to_file(filename, row["url"],
                                         batch=True, options=options)
     except CommandError as exc:
+        ce = CapturedException(exc)
         yield get_status_dict(action="addurls",
                               ds=ds,
                               type="file",
                               path=filename_abs,
-                              message=exc_str(exc),
+                              message=str(ce),
+                              exception=ce,
                               status="error")
         return
 
@@ -851,7 +856,9 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
             repo.drop_key(res_addurls['annexkey'], batch=True)
             st_kwargs = dict(status="ok")
         except (AssertionError, CommandError) as exc:
-            st_kwargs = dict(message=exc_str(exc),
+            ce = CapturedException(exc)
+            st_kwargs = dict(message=str(ce),
+                             exception=ce,
                              status="error")
         yield get_status_dict(action="drop",
                               ds=ds,
@@ -894,13 +901,17 @@ class RegisterUrl(object):
             fname.parent.mkdir(exist_ok=True, parents=True)
             fname.write_text(ek_info["objectpointer"])
         except Exception as exc:
-            message = exc_str(exc)
+            ce = CapturedException(exc)
+            message = str(ce)
             status = "error"
+            exception = ce
         else:
             message = "registered URL"
             status = "ok"
+            exception = None
         return get_status_dict(action="addurls", ds=self.ds, type="file",
-                               status=status, message=message)
+                               status=status, message=message,
+                               exception=exception)
 
     def __call__(self, row):
         filename = row["ds_filename"]
@@ -931,9 +942,11 @@ class RegisterUrl(object):
                 if not res.get("message"):
                     res["message"] = "registered URL"
         except CommandError as exc:
+            ce = CapturedException(exc)
             yield dict(self._err_res,
                        path=row["filename_abs"],
-                       message=exc_str(exc))
+                       message=str(ce),
+                       exception=ce)
         else:
             yield res
 
@@ -1342,10 +1355,12 @@ class Addurls(Interface):
                 records, colidx_to_name = _read_from_file(
                     url_file, input_type)
             except ValueError as exc:
+                ce = CapturedException(exc)
                 yield get_status_dict(action="addurls",
                                       ds=ds,
                                       status="error",
-                                      message=exc_str(exc))
+                                      message=str(ce),
+                                      exception=ce)
                 return
             displayed_source = "'{}'".format(urlfile)
         else:
@@ -1362,7 +1377,9 @@ class Addurls(Interface):
                                          dry_run,
                                          missing_value)
             except (ValueError, RequestException) as exc:
-                yield dict(st_dict, status="error", message=exc_str(exc))
+                ce = CapturedException(exc)
+                yield dict(st_dict, status="error", message=str(ce),
+                           exception=ce)
                 return
 
         if not rows:

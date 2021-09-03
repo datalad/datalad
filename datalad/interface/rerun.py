@@ -35,6 +35,7 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.param import Parameter
 from datalad.support.json_py import load_stream
+from datalad.support.exceptions import CapturedException
 
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -313,7 +314,9 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     try:
         results = _revrange_as_results(dset, revrange)
     except ValueError as exc:
-        yield get_status_dict("run", status="error", message=exc_str(exc))
+        ce = CapturedException(exc)
+        yield get_status_dict("run", status="error", message=str(ce),
+                              exception=ce)
         return
 
     ds_repo = dset.repo
