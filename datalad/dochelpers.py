@@ -320,5 +320,4 @@ def exc_str(exc=None, limit=None, include_str=True):
     The CapturedException should be available and be used directly instead.
     """
 
-    return CapturedException(exc).format_oneline_tb(limit=limit,
-                                                    include_str=include_str)
+    return str(CapturedException(exc))
