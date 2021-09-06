@@ -315,7 +315,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         results = _revrange_as_results(dset, revrange)
     except ValueError as exc:
         ce = CapturedException(exc)
-        yield get_status_dict("run", status="error", message=("%s", ce),
+        yield get_status_dict("run", status="error", message=str(ce),
                               exception=ce)
         return
 

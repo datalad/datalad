@@ -530,7 +530,7 @@ def _try_command(record, fn, *args, **kwargs):
         fn(*args, **kwargs)
     except CommandError as exc:
         ce = CapturedException(exc)
-        return dict(record, status="error", message=("%s", ce))
+        return dict(record, status="error", message=str(ce))
     else:
         return dict(record, status="ok")
 

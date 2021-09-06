@@ -189,7 +189,7 @@ class DownloadURL(Interface):
                 ce = CapturedException(e)
                 yield get_status_dict(
                     status="error",
-                    message=("%s", ce),
+                    message=str(ce),
                     type="file",
                     path=path,
                     exception=ce,

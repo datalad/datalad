@@ -833,7 +833,7 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
                               ds=ds,
                               type="file",
                               path=filename_abs,
-                              message=("%s", ce),
+                              message=str(ce),
                               exception=ce,
                               status="error")
         return
@@ -857,7 +857,7 @@ def _add_url(row, ds, repo, options=None, drop_after=False):
             st_kwargs = dict(status="ok")
         except (AssertionError, CommandError) as exc:
             ce = CapturedException(exc)
-            st_kwargs = dict(message=("%s", ce),
+            st_kwargs = dict(message=str(ce),
                              exception=ce,
                              status="error")
         yield get_status_dict(action="drop",
@@ -902,7 +902,7 @@ class RegisterUrl(object):
             fname.write_text(ek_info["objectpointer"])
         except Exception as exc:
             ce = CapturedException(exc)
-            message = ("%s", ce)
+            message = str(ce)
             status = "error"
             exception = ce
         else:
@@ -945,7 +945,7 @@ class RegisterUrl(object):
             ce = CapturedException(exc)
             yield dict(self._err_res,
                        path=row["filename_abs"],
-                       message=("%s", ce),
+                       message=str(ce),
                        exception=ce)
         else:
             yield res
@@ -1359,7 +1359,7 @@ class Addurls(Interface):
                 yield get_status_dict(action="addurls",
                                       ds=ds,
                                       status="error",
-                                      message=("%s", ce),
+                                      message=str(ce),
                                       exception=ce)
                 return
             displayed_source = "'{}'".format(urlfile)
@@ -1378,7 +1378,7 @@ class Addurls(Interface):
                                          missing_value)
             except (ValueError, RequestException) as exc:
                 ce = CapturedException(exc)
-                yield dict(st_dict, status="error", message=("%s", ce),
+                yield dict(st_dict, status="error", message=str(ce),
                            exception=ce)
                 return
 

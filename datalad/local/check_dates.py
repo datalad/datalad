@@ -161,7 +161,7 @@ class CheckDates(Interface):
             ce = CapturedException(exc)
             yield get_status_dict("check_dates",
                                   status="error",
-                                  message=("%s", ce),
+                                  message=str(ce),
                                   exception=ce)
             return
 
