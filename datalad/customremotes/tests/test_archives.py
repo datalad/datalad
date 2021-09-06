@@ -234,7 +234,7 @@ def test_interactions(tdir):
             ('VALUE dl+archive://somekey3#path', None),
             ('VALUE',
              re.compile(
-                 'TRANSFER-FAILURE RETRIEVE somekey Failed to fetch any '
+                 'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to fetch any '
                  'archive containing somekey. Tried: \[\]')
              )
         ],
