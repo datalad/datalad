@@ -92,7 +92,7 @@ def test_interactions(tdir):
     fetch_scenarios.append(
         ('VALUE',
          re.compile(
-             'TRANSFER-FAILURE RETRIEVE somekey Failed to download from any')))
+             'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to download from any')))
 
     for scenario in BASE_INTERACTION_SCENARIOS + [
         [

@@ -110,7 +110,7 @@ def test__make_github_repos():
             mock.patch.object(github_, '_make_github_repo', _make_github_repo), \
             swallow_logs(new_level=logging.INFO) as cml:
         res = list(github_._make_github_repos_(*args))
-        assert_in('Failed to create repository while using token 1to...: very bad status', cml.out)
+        assert_in('Failed to create repository while using token 1to...: BadCredentialsException(very bad status', cml.out)
         eq_(res,
             [dict(status='ok', ds='/fakeds1'), dict(status='ok', ds='/fakeds2')])
 
