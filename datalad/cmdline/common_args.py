@@ -50,7 +50,7 @@ pbs_runner = (
     'pbs-runner', ('--pbs-runner',),
     dict(choices=['condor'],
          default=None,
-         help="""execute command by scheduling it via available PBS.  For settings, config file will be consulted""")
+         help="""DEPRECATED, will be removed in a future release.""")
 )
 
 change_path = (
