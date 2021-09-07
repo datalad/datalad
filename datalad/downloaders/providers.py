@@ -96,6 +96,19 @@ class Provider(object):
         self.authenticator = authenticator
         self._downloader = downloader
 
+    @classmethod
+    def _extend_from_entry_points(cls):
+        from pkg_resources import iter_entry_points
+        # TODO: it seems we are hitting this multiple times, why?
+        for ep in iter_entry_points('datalad.downloaders'):
+            # TODO: might need to be able to pass 'externals', as attribute or some "extras"?
+            downloader = {'class': ep.resolve()}
+            if ep.name in cls.DOWNLOADERS:
+                lgr.debug(
+                    "Overloading already known downloader %s for %s with a new one %s",
+                    cls.DOWNLOADERS[ep.name], ep.name, downloader)
+            cls.DOWNLOADERS[ep.name] = downloader
+
     @property
     def downloader(self):
         return self._downloader
@@ -110,6 +123,11 @@ class Provider(object):
     @classmethod
     def _get_downloader_class(cls, url):
         key = cls.get_scheme_from_url(url)
+
+        if not getattr(cls, '_extended_from_entry_points', False):
+            cls._extend_from_entry_points()
+            cls._extended_from_entry_points = True
+
         if key in cls.DOWNLOADERS:
             entry = cls.DOWNLOADERS[key]
             klass = entry['class']
