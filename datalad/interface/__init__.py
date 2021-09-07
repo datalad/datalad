@@ -45,6 +45,8 @@ _group_dataset = (
          'CreateSiblingGogs'),
         ('datalad.distributed.create_sibling_gin',
          'CreateSiblingGin'),
+        ('datalad.distributed.create_sibling_gitea',
+         'CreateSiblingGitea'),
         ('datalad.distributed.create_sibling_ria',
          'CreateSiblingRia',
          'create-sibling-ria'),
