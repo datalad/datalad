@@ -313,6 +313,10 @@ def strip_arg_from_argv(args, value, opt_names):
 
 
 def run_via_pbs(args, pbs):
+    warnings.warn("Job submission via --pbs-runner is deprecated."
+                  "Use something like condor_run",
+                  DeprecationWarning)
+
     assert(pbs in ('condor',))  # for now
 
     # TODO: RF to support multiple backends, parameters, etc, for now -- just condor, no options
