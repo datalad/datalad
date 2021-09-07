@@ -108,9 +108,13 @@ CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
     CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
     assert CMD_MAX_ARG > 0
-    if sys.version_info[:2] == (3, 4):
+    if CMD_MAX_ARG > CMD_MAX_ARG_HARDCODED * 1e6:
         # workaround for some kind of a bug which comes up with python 3.4
         # see https://github.com/datalad/datalad/issues/3150
+        # or on older CentOS with conda and python as new as 3.9
+        # see https://github.com/datalad/datalad/issues/5943
+        # TODO: let Yarik know that the world is a paradise now whenever 1e6
+        # is not large enough
         CMD_MAX_ARG = min(CMD_MAX_ARG, CMD_MAX_ARG_HARDCODED)
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
