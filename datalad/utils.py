@@ -107,9 +107,6 @@ def get_linux_distribution():
     return result
 
 
-# TODO: deprecated, remove in 0.15
-# Wheezy EOLed 2 years ago, no new datalad builds from neurodebian
-on_debian_wheezy = False
 # Those weren't used for any critical decision making, thus we just set them to None
 # Use get_linux_distribution() directly where needed
 linux_distribution_name = linux_distribution_release = None
