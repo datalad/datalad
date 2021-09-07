@@ -595,7 +595,7 @@ def _process_results(
                 res_lgr = getattr(
                     res_lgr,
                     default_logchannels[res['status']]
-                    if result_log_level is 'match-status'
+                    if result_log_level == 'match-status'
                     else result_log_level)
             msg = res['message']
             msgargs = None
