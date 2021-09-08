@@ -11,10 +11,13 @@
 
 from collections import namedtuple
 
+from functools import wraps
 import json
 import threading
 from fasteners import InterProcessLock
 from functools import lru_cache
+import warnings
+
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
@@ -45,8 +48,8 @@ cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
 
-_where_reload_doc = """
-        where : {'dataset', 'local', 'global', 'override'}, optional
+_scope_reload_doc = """
+        scope : {'branch', 'local', 'global', 'override'}, optional
           Indicator which configuration file to modify. 'dataset' indicates the
           persistent configuration in .datalad/config of a dataset; 'local'
           the configuration of a dataset's Git repository in .git/config;
@@ -54,6 +57,9 @@ _where_reload_doc = """
           a single repository (usually in $USER/.gitconfig); 'override'
           limits the modification to the ConfigManager instance, and the
           assigned value overrides any setting from any other source.
+          Note: 'dataset' is being DEPRECATED in favor of 'branch'.
+        where: {'branch', 'local', 'global', 'override'}, optional
+          DEPRECATED, use 'scope'.
         reload : bool
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
@@ -74,10 +80,33 @@ def get_git_version(runner=None):
                       protocol=StdOutErrCapture)['stdout'].split()[2]
 
 
-def _where_reload(obj):
+def _scope_reload(obj):
     """Helper decorator to simplify providing repetitive docstring"""
-    obj.__doc__ = obj.__doc__ % _where_reload_doc
+    obj.__doc__ = obj.__doc__ % _scope_reload_doc
     return obj
+
+
+#
+# TODO: remove in/after 0.16.0
+#
+def _where_to_scope(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if 'where' in kwargs:
+            if 'scope' in kwargs:
+                raise ValueError("Do not specify both 'scope' and DEPRECATED 'wraps'")
+            kwargs = kwargs.copy()
+            where = kwargs.pop('where')
+            if where == 'dataset':
+                warnings.warn("'where=\"dataset\"' is being deprecated as of 0.15. Use 'scope=\"branch\"' instead",
+                              DeprecationWarning)
+                where = 'branch'
+            else:
+                warnings.warn("'where' is being deprecated as of 0.15. Use 'scope' instead",
+                              DeprecationWarning)
+            kwargs['scope'] = where
+        return func(*args, **kwargs)
+    return wrapper
 
 
 def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
@@ -118,7 +147,7 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
         # line is a null-delimited chunk
         k = None
         # in anticipation of output contamination, process within a loop
-        # where we can reject non syntax compliant pieces
+        # scope we can reject non syntax compliant pieces
         while line:
             if line.startswith('file:'):
                 # origin line
@@ -265,6 +294,7 @@ class ConfigManager(object):
       not global or system configuration are considered; if 'any'
       all possible sources of configuration are considered.
     """
+    # TODO: above dataset* -> branch*?
 
     _checked_git_identity = False
 
@@ -276,6 +306,7 @@ class ConfigManager(object):
     _run_lock = threading.Lock()
 
     def __init__(self, dataset=None, overrides=None, source='any'):
+        # TODO?
         if source not in ('any', 'local', 'dataset', 'dataset-local'):
             raise ValueError(
                 'Unknown ConfigManager(source=) setting: {}'.format(source))
@@ -372,7 +403,7 @@ class ConfigManager(object):
         # 2-step strategy:
         #   - load datalad dataset config from dataset
         #   - load git config from all supported by git sources
-        # in doing so we always stay compatible with where Git gets its
+        # in doing so we always stay compatible with scope Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
 
@@ -450,7 +481,8 @@ class ConfigManager(object):
                 stats[f] = None
         return stats
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
                store=False, scope=None, reload=True, **kwargs):
         """
@@ -545,9 +577,9 @@ class ConfigManager(object):
 
         # configure storage destination, if needed
         if store:
-            if where is None and 'destination' in cdef:
-                where = cdef['destination']
-            if where is None:
+            if scope is None and 'destination' in cdef:
+                scope = cdef['destination']
+            if scope is None:
                 raise ValueError(
                     "request to store configuration item '{}', but no "
                     "storage destination specified".format(var))
@@ -581,7 +613,7 @@ class ConfigManager(object):
             # anyway
             # needs string conversion nevertheless, because default could come
             # in as something else
-            self.add(var, '{}'.format(_value), scope=where, reload=reload)
+            self.add(var, '{}'.format(_value), scope=scope, reload=reload)
         return value
 
     def __repr__(self):
@@ -770,7 +802,7 @@ class ConfigManager(object):
     #
     # Modify configuration (proxy respective git-config call)
     #
-    @_where_reload
+    @_scope_reload
     def _run(self, args, scope=None, reload=False, **kwargs):
         """Centralized helper to run "git config" calls
 
@@ -782,8 +814,8 @@ class ConfigManager(object):
         **kwargs
           Keywords arguments for Runner's call
         """
-        if where:
-            args = self._get_location_args(where) + args
+        if scope:
+            args = self._get_location_args(scope) + args
         if '-l' in args:
             # we are just reading, no need to reload, no need to lock
             out = self._runner.run(self._config_cmd + args, **kwargs)
@@ -810,28 +842,29 @@ class ConfigManager(object):
             self.reload()
         return out['stdout'], out['stderr']
 
-    def _get_location_args(self, where, args=None):
+    def _get_location_args(self, scope, args=None):
         if args is None:
             args = []
-        cfg_labels = ('dataset', 'local', 'global', 'override')
-        if where not in cfg_labels:
+        cfg_labels = ('branch', 'local', 'global', 'override')
+        if scope not in cfg_labels:
             raise ValueError(
                 "unknown configuration label '{}' (not in {})".format(
-                    where, cfg_labels))
-        if where == 'dataset':
+                    scope, cfg_labels))
+        if scope == 'branch':
             if not self._repo_pathobj:
                 raise ValueError(
                     'ConfigManager cannot store configuration to dataset, '
                     'none specified')
             dataset_cfgfile = self._repo_pathobj / DATASET_CONFIG_FILE
             args.extend(['--file', str(dataset_cfgfile)])
-        elif where == 'global':
+        elif scope == 'global':
             args.append('--global')
-        elif where == 'local':
+        elif scope == 'local':
             args.append('--local')
         return args
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def add(self, var, value, scope='branch', reload=True):
         """Add a configuration variable and value
 
@@ -843,7 +876,7 @@ class ConfigManager(object):
         value : str
           Variable value
         %s"""
-        if where == 'override':
+        if scope == 'override':
             from datalad.utils import ensure_list
             val = ensure_list(self.overrides.pop(var, None))
             val.append(value)
@@ -852,10 +885,11 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--add', var, value], scope=where, reload=reload,
+        self._run(['--add', var, value], scope=scope, reload=reload,
                   protocol=StdOutErrCapture)
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def set(self, var, value, scope='branch', reload=True, force=False):
         """Set a variable to a value.
 
@@ -874,7 +908,7 @@ class ConfigManager(object):
           given `value`. Otherwise raise if multiple entries for `var` exist
           already
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides[var] = value
             if reload:
                 self.reload(force=True)
@@ -883,9 +917,10 @@ class ConfigManager(object):
         from datalad.support.gitrepo import to_options
 
         self._run(to_options(replace_all=force) + [var, value],
-                  scope=where, reload=reload, protocol=StdOutErrCapture)
+                  scope=scope, reload=reload, protocol=StdOutErrCapture)
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def rename_section(self, old, new, scope='branch', reload=True):
         """Rename a configuration section
 
@@ -896,7 +931,7 @@ class ConfigManager(object):
         new : str
           Name of the section to rename to.
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides = {
                 (new + k[len(old):]) if k.startswith(old + '.') else k: v
                 for k, v in self.overrides.items()
@@ -905,9 +940,10 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--rename-section', old, new], scope=where, reload=reload)
+        self._run(['--rename-section', old, new], scope=scope, reload=reload)
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def remove_section(self, sec, scope='branch', reload=True):
         """Rename a configuration section
 
@@ -916,7 +952,7 @@ class ConfigManager(object):
         sec : str
           Name of the section to remove.
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides = {
                 k: v
                 for k, v in self.overrides.items()
@@ -926,9 +962,10 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--remove-section', sec], scope=where, reload=reload)
+        self._run(['--remove-section', sec], scope=scope, reload=reload)
 
-    @_where_reload
+    @_scope_reload
+    @_where_to_scope
     def unset(self, var, scope='branch', reload=True):
         """Remove all occurrences of a variable
 
@@ -937,14 +974,14 @@ class ConfigManager(object):
         var : str
           Name of the variable to remove
         %s"""
-        if where == 'override':
+        if scope == 'override':
             self.overrides.pop(var, None)
             if reload:
                 self.reload(force=True)
             return
 
         # use unset all as it is simpler for now
-        self._run(['--unset-all', var], scope=where, reload=reload)
+        self._run(['--unset-all', var], scope=scope, reload=reload)
 
 
 def rewrite_url(cfg, url):

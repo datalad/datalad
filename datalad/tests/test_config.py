@@ -361,7 +361,7 @@ def test_obtain(path):
     ask()
 
     # fixup destination
-    cfg_defs[dummy]['destination'] = 'dataset'
+    cfg_defs[dummy]['destination'] = 'branch'
 
     @with_testsui(responses='5.3')
     def ask():
