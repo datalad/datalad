@@ -291,7 +291,8 @@ class Clone(Interface):
             # we are running on -- we don't care if the path actually
             # exists at this point, but we want to abort early if the path
             # spec is determined to be useless
-            path.exists()
+            # we can do strict=False since we are 3.6+
+            path.resolve(strict=False)
         except OSError as e:
             yield get_status_dict(
                 status='error',
