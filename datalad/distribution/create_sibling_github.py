@@ -16,6 +16,9 @@ import logging
 import requests
 import warnings
 
+from urllib.parse import (
+    urljoin,
+)
 from datalad.interface.base import (
     build_doc,
     Interface,
@@ -25,6 +28,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
+    EnsureChoice,
 )
 from datalad.distribution.dataset import (
     datasetmethod,
@@ -99,6 +103,18 @@ class _GitHub(_GitHubLike):
         # catch-all
         raise RuntimeError(f'Unexpected host response: {response}')
 
+    def repo_delete_request(self, orguser, reponame):
+        r = requests.delete(
+            urljoin(
+                self.api_url,
+                self.get_repo_info_endpoint.format(
+                    user=orguser,
+                    repo=reponame)),
+            headers=self.request_headers,
+        )
+        # make sure any error-like situation causes noise
+        r.raise_for_status()
+
 
 @build_doc
 class CreateSiblingGithub(Interface):
@@ -121,6 +137,18 @@ class CreateSiblingGithub(Interface):
     """
 
     _params_ = _GitHub.create_sibling_params
+    _params_['api']._doc = """\
+        URL of the GitHub instance API"""
+    # special casing for deprecated mode
+    _params_['existing'].constraints = EnsureChoice(
+        'skip', 'error', 'reconfigure', 'replace')
+    _params_['existing']._doc += """\
+        DEPRECATED DANGER ZONE: With 'replace', an existing repository will be
+        irreversibly removed, re-initialized, and the sibling
+        (re-)configured (thus implies 'reconfigure').
+        `replace` could lead to data loss! In interactive sessions a
+        confirmation prompt is shown, an exception is raised in non-interactive
+        sessions. The 'replace' mode will be removed in a future release."""
     # deprecated options
     _params_.update(
         github_login=Parameter(
@@ -184,9 +212,9 @@ class CreateSiblingGithub(Interface):
                     'os.environ',
                     {'DATALAD_CREDENTIAL_GITHUBLOGINARG_TOKEN': github_login}):
                 platform = _GitHub(
-                    api, 'githubloginarg', require_token=not dry_run),
+                    api, 'githubloginarg', require_token=not dry_run)
         else:
-            platform = _GitHub(api, credential, require_token=not dry_run),
+            platform = _GitHub(api, credential, require_token=not dry_run)
 
         if github_organization:
             warnings.warn(

@@ -77,6 +77,7 @@ from urllib.parse import (
 )
 import requests
 
+from datalad.ui import ui
 from datalad.downloaders.credentials import Token
 from datalad.downloaders.http import DEFAULT_USER_AGENT
 from datalad.support.param import Parameter
@@ -137,16 +138,10 @@ class _GitHubLike(object):
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice(
-                'skip', 'error', 'reconfigure', 'replace'),
+                'skip', 'error', 'reconfigure'),
             doc="""behavior when already existing or configured
             siblings are discovered: skip the dataset ('skip'), update the
-            configuration ('reconfigure'), or fail ('error').
-            DANGER ZONE: With 'replace', an existing repository will be
-            irreversibly removed, re-initialized, and the sibling
-            (re-)configured (thus implies 'reconfigure').
-            `replace` could lead to data loss! In interactive a confirmation
-            prompt is shown, an exception is raised in non-interactive
-            sessions.""",),
+            configuration ('reconfigure'), or fail ('error').""",),
         credential=Parameter(
             args=('--credential',),
             constraints=EnsureStr() | EnsureNone(),
@@ -239,7 +234,8 @@ class _GitHubLike(object):
         toprocess = []
         toyield = []
         for d in dss:
-            if name in d.repo.get_remotes():
+            if existing not in ('reconfigure', 'replace') and \
+                    name in d.repo.get_remotes():
                 toyield.append(get_status_dict(
                     ds=d,
                     status='error' if existing == 'error' else 'notneeded',
@@ -278,34 +274,79 @@ class _GitHubLike(object):
         res = self.repo_create_request(
             reponame, organization, private, dry_run)
 
-        if existing == 'reconfigure' \
-                and res.get('status') == 'impossible' and \
-                res.get('preexisted'):
-            # query information on the existing repo and use that
-            # to complete the task
+        if res.get('status') == 'impossible' and res.get('preexisted'):
+            # we cannot create, because there is something in the target
+            # spot
             orguser = organization or self.authenticated_user['login']
-            r = requests.get(
-                urljoin(
-                    self.api_url,
-                    self.get_repo_info_endpoint.format(
-                        user=orguser,
-                        repo=reponame)),
-                headers=self.request_headers,
-            )
-            # make sure any error-like situation causes noise
-            r.raise_for_status()
-            response = r.json()
-            res.update(
-                status='notneeded',
-                # return in full
-                host_response=response,
-                # perform some normalization
-                **self.normalize_repo_properties(response)
-            )
+
+            if existing == 'reconfigure':
+                # we want to use the existing one instead
+                # query properties, report, and be done
+                repo_props = self.repo_get_request(orguser, reponame)
+                res.update(
+                    status='notneeded',
+                    # return in full
+                    host_response=repo_props,
+                    # perform some normalization
+                    **self.normalize_repo_properties(repo_props)
+                )
+            elif existing == 'replace':
+                # only implemented for backward compat with
+                # create-sibling-github
+                _msg = ('repository "%s" already exists', reponame)
+                if ui.is_interactive:
+                    remove = ui.yesno(
+                        "Do you really want to remove it?",
+                        title=_msg[0] % _msg[1],
+                        default=False
+                    )
+                else:
+                    return dict(
+                        res,
+                        status='impossible',
+                        message=(
+                            _msg[0] + " Remove it manually first or "
+                            "rerun DataLad in an interactive shell "
+                            "to confirm this action.",
+                            _msg[1]),
+                    )
+                if not remove:
+                    return dict(
+                        res,
+                        status='impossible',
+                        message=_msg,
+                    )
+                # remove the beast in cold blood
+                self.repo_delete_request(
+                    organization or self.authenticated_user['login'],
+                    reponame)
+                # try creating now
+                return self.create_repo(
+                    ds, reponame, organization, private, dry_run,
+                    existing)
 
         # TODO intermediate error handling?
 
         return res
+
+    def repo_get_request(self, orguser, reponame):
+        # query information on the existing repo and use that
+        # to complete the task
+        r = requests.get(
+            urljoin(
+                self.api_url,
+                self.get_repo_info_endpoint.format(
+                    user=orguser,
+                    repo=reponame)),
+            headers=self.request_headers,
+        )
+        # make sure any error-like situation causes noise
+        r.raise_for_status()
+        return r.json()
+
+    def repo_delete_request(self, orguser, reponame):
+        """Perform request to delete a named repo on the platform"""
+        raise NotImplementedError
 
     def create_repos(self, dsrepo_map, siblingname, organization,
                      private, dry_run, res_kwargs,
