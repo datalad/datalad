@@ -34,6 +34,19 @@ class _GIN(_GOGS):
     fullname = 'GIN'
     response_code_unauthorized = 401
 
+    def normalize_repo_properties(self, response):
+        """Normalize the essential response properties for the result record
+        """
+        return dict(
+            reponame=response.get('name'),
+            private=response.get('private'),
+            # GIN reports the SSH URL as 'clone_url', but we need
+            # a HTML URL (without .git suffix) for setting up a
+            # type-git special remote (if desired)
+            clone_url=response.get('html_url'),
+            ssh_url=response.get('ssh_url'),
+            html_url=response.get('html_url'),
+        )
 
 @build_doc
 class CreateSiblingGin(Interface):

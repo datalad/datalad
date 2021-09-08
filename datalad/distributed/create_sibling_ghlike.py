@@ -300,7 +300,7 @@ class _GitHubLike(object):
                 # return in full
                 host_response=response,
                 # perform some normalization
-                **_response2repoprops(response)
+                **self.normalize_repo_properties(response)
             )
 
         # TODO intermediate error handling?
@@ -417,7 +417,7 @@ class _GitHubLike(object):
                 # return in full
                 host_response=response,
                 # perform some normalization
-                **_response2repoprops(response)
+                **self.normalize_repo_properties(response)
             )
         elif r.status_code == requests.codes.unprocessable and \
                 'already exist' in response.get('message', ''):
@@ -436,17 +436,16 @@ class _GitHubLike(object):
         # catch-all
         raise RuntimeError(f'Unexpected host response: {response}')
 
-
-def _response2repoprops(response):
-    """
-    """
-    return dict(
-        reponame=response.get('name'),
-        private=response.get('private'),
-        clone_url=response.get('clone_url'),
-        ssh_url=response.get('ssh_url'),
-        html_url=response.get('html_url'),
-    )
+    def normalize_repo_properties(self, response):
+        """Normalize the essential response properties for the result record
+        """
+        return dict(
+            reponame=response.get('name'),
+            private=response.get('private'),
+            clone_url=response.get('clone_url'),
+            ssh_url=response.get('ssh_url'),
+            html_url=response.get('html_url'),
+        )
 
 
 def _create_sibling(
