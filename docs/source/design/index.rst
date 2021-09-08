@@ -18,3 +18,4 @@ subsystems in DataLad.
    drop
    python_imports
    miscpatterns
+   exception_handling
