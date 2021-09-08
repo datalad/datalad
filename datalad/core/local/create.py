@@ -367,7 +367,7 @@ class Create(Interface):
         if id_var in tbds_config:
             # make sure we reset this variable completely, in case of a
             # re-create
-            tbds_config.unset(id_var, where='dataset')
+            tbds_config.unset(id_var, scope='branch')
 
         if _seed is None:
             # just the standard way
@@ -379,7 +379,7 @@ class Create(Interface):
         tbds_config.add(
             id_var,
             tbds_id if tbds_id is not None else uuid_id,
-            where='dataset',
+            scope='branch',
             reload=False)
 
         # make config overrides permanent in the repo config

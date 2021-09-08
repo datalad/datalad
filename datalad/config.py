@@ -832,7 +832,7 @@ class ConfigManager(object):
         return args
 
     @_where_reload
-    def add(self, var, value, where='dataset', reload=True):
+    def add(self, var, value, scope='branch', reload=True):
         """Add a configuration variable and value
 
         Parameters
@@ -856,7 +856,7 @@ class ConfigManager(object):
                   protocol=StdOutErrCapture)
 
     @_where_reload
-    def set(self, var, value, where='dataset', reload=True, force=False):
+    def set(self, var, value, scope='branch', reload=True, force=False):
         """Set a variable to a value.
 
         In opposition to `add`, this replaces the value of `var` if there is
@@ -886,7 +886,7 @@ class ConfigManager(object):
                   where=where, reload=reload, protocol=StdOutErrCapture)
 
     @_where_reload
-    def rename_section(self, old, new, where='dataset', reload=True):
+    def rename_section(self, old, new, scope='branch', reload=True):
         """Rename a configuration section
 
         Parameters
@@ -908,7 +908,7 @@ class ConfigManager(object):
         self._run(['--rename-section', old, new], where=where, reload=reload)
 
     @_where_reload
-    def remove_section(self, sec, where='dataset', reload=True):
+    def remove_section(self, sec, scope='branch', reload=True):
         """Rename a configuration section
 
         Parameters
@@ -929,7 +929,7 @@ class ConfigManager(object):
         self._run(['--remove-section', sec], where=where, reload=reload)
 
     @_where_reload
-    def unset(self, var, where='dataset', reload=True):
+    def unset(self, var, scope='branch', reload=True):
         """Remove all occurrences of a variable
 
         Parameters

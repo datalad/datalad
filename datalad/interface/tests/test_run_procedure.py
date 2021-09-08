@@ -144,7 +144,7 @@ def test_procedure_discovery(path, super_path):
     ds.config.add(
         'datalad.locations.dataset-procedures',
         'code',
-        where='dataset')
+        scope='branch')
     ds.save(op.join('.datalad', 'config'))
 
     # run discovery on the dataset:
@@ -228,7 +228,7 @@ def test_configs(path):
     ds.config.add(
         'datalad.locations.dataset-procedures',
         'code',
-        where='dataset')
+        scope='branch')
 
     # 1. run procedure based on execution guessing by run_procedure:
     ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
@@ -240,12 +240,12 @@ def test_configs(path):
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
         u'%s {script} {ds} {{mysub}} {args}' % quote_cmdlinearg(sys.executable),
-        where='dataset'
+        scope='branch'
     )
     ds.config.add(
         'datalad.run.substitutions.mysub',
         'dataset-call-config',
-        where='dataset'
+        scope='branch'
     )
     # TODO: Should we allow for --inputs/--outputs arguments for run_procedure
     #       (to be passed into run)?
@@ -277,7 +277,7 @@ def test_configs(path):
     ds.config.add(
         'datalad.procedures.datalad_test_proc.help',
         "This is a help message",
-        where='dataset'
+        scope='branch'
     )
 
     r = ds.run_procedure('datalad_test_proc', help_proc=True)
@@ -306,7 +306,7 @@ def test_spaces(path):
     ds.config.add(
         'datalad.locations.dataset-procedures',
         'code',
-        where='dataset')
+        scope='branch')
     # 1. run procedure based on execution guessing by run_procedure:
     ds.run_procedure(spec=['datalad_test_proc', 'with spaces', 'unrelated'])
     # check whether file has name with spaces
@@ -327,7 +327,7 @@ def test_quoting(path):
     # procedure arguments (so the script itself receives 3). Check a few cases
     # from the Python API and CLI.
     ds.config.add("datalad.locations.dataset-procedures", "code",
-                  where="dataset")
+                  scope='branch')
     with swallow_outputs():
         ds.run_procedure(spec=["just2args", "with ' sing", 'with " doub'])
         with assert_raises(CommandError):

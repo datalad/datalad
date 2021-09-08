@@ -49,7 +49,7 @@ target = {
 @with_tempfile(mkdir=True)
 def test_xmp(path):
     ds = Dataset(path).create()
-    ds.config.add('datalad.metadata.nativetype', 'xmp', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'xmp', scope='branch')
     copy(
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'xmp.pdf'),
         path)
