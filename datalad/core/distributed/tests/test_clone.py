@@ -1354,7 +1354,7 @@ def test_ephemeral(origin_path, bare_path,
     (clone1.pathobj / 'addition.txt').write_text("even more")
     clone1.save()
     origin.config.set("receive.denyCurrentBranch", "updateInstead",
-                      where="local")
+                      scope="local")
     # Note, that the only thing to test is git-annex-dead here,
     # if we couldn't symlink:
     clone1.push(to=DEFAULT_REMOTE,

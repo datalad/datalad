@@ -71,7 +71,7 @@ def test_siblings(origin, repo_path, local_clone_path):
     source = install(repo_path, source=origin, recursive=True)
     # pollute config
     depvar = 'remote.test-remote.datalad-publish-depends'
-    source.config.add(depvar, 'stupid', where='local')
+    source.config.add(depvar, 'stupid', scope='local')
 
     # cannot configure unknown remotes as dependencies
     res = siblings(
@@ -131,8 +131,8 @@ def test_siblings(origin, repo_path, local_clone_path):
     # again pre-pollute config
     depvar = 'remote.test-remote2.datalad-publish-depends'
     pushvar = 'remote.test-remote2.push'
-    source.config.add(depvar, 'stupid', where='local')
-    source.config.add(pushvar, 'senseless', where='local')
+    source.config.add(depvar, 'stupid', scope='local')
+    source.config.add(pushvar, 'senseless', scope='local')
     res = siblings('configure', dataset=source, name="test-remote2",
                    url=httpurl2, on_failure='ignore',
                    publish_depends='test-remote',

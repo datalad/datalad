@@ -182,16 +182,16 @@ def test_AnnexRepo_crippled_filesystem(dst):
     ar.config.set(
         "annex.crippledfilesystem",
         'true',
-        where='local')
+        scope='local')
     ok_(ar.is_crippled_fs())
     ar.config.set(
         "annex.crippledfilesystem",
         'false',
-        where='local')
+        scope='local')
     assert_false(ar.is_crippled_fs())
     # since we can't remove the entry, just rename it to fake its absence:
-    ar.config.rename_section("annex", "removed", where='local')
-    ar.config.set("annex.something", "value", where='local')
+    ar.config.rename_section("annex", "removed", scope='local')
+    ar.config.set("annex.something", "value", scope='local')
     assert_false(ar.is_crippled_fs())
 
 
@@ -2090,7 +2090,7 @@ def test_is_special(path):
     ok_(ar.is_special_annex_remote("imspecial"))
 
     # With a mis-configured remote, give warning and return false.
-    ar.config.unset(f"remote.{DEFAULT_REMOTE}.url", where="local")
+    ar.config.unset(f"remote.{DEFAULT_REMOTE}.url", scope="local")
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_false(ar.is_special_annex_remote(DEFAULT_REMOTE))
         cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)

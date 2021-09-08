@@ -260,7 +260,7 @@ def test_configs(path):
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
         u'%s {script} {ds} local {args}' % quote_cmdlinearg(sys.executable),
-        where='local'
+        scope='local'
     )
     ds.unlock("fromproc.txt")
     # run again:

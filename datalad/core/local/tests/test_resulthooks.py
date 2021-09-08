@@ -43,23 +43,23 @@ def test_basics(src, dst):
         'datalad.result-hook.alwaysbids.call-json',
         # string substitutions based on the result record are supported
         'run_procedure {{"dataset":"{path}","spec":"cfg_metadatatypes bids dicom"}}',
-        where='local',
+        scope='local',
     )
     # config on which kind of results this hook should operate
     clone.config.set(
         'datalad.result-hook.alwaysbids.match-json',
         # any successfully installed dataset
         '{"type":"dataset","action":"install","status":["eq", "ok"]}',
-        where='local',
+        scope='local',
     )
     # a smoke test to see if a hook definition without any call args works too
     clone.config.set('datalad.result-hook.wtf.call-json',
                      'wtf {{"result_renderer": "disabled"}}',
-                     where='local')
+                     scope='local')
     clone.config.set(
         'datalad.result-hook.wtf.match-json',
         '{"type":"dataset","action":"install","status":["eq", "ok"]}',
-        where='local',
+        scope='local',
     )
     # configure another one that will unlock any obtained file
     # {dsarg} is substituted by the dataset arg of the command that
@@ -70,12 +70,12 @@ def test_basics(src, dst):
     clone.config.set(
         'datalad.result-hook.unlockfiles.call-json',
         'unlock {{"dataset":"{dsarg}","path":"{path}"}}',
-        where='local',
+        scope='local',
     )
     clone.config.set(
         'datalad.result-hook.unlockfiles.match-json',
         '{"type":"file","action":"get","status":"ok"}',
-        where='local',
+        scope='local',
     )
     if not on_windows:
         # and one that runs a shell command on any notneeded file-get
@@ -83,12 +83,12 @@ def test_basics(src, dst):
             'datalad.result-hook.annoy.call-json',
             'run {{"cmd":"touch {path}_annoyed",'
             '"dataset":"{dsarg}","explicit":true}}',
-            where='local',
+            scope='local',
         )
         clone.config.set(
             'datalad.result-hook.annoy.match-json',
             '{"type":["in", ["file"]],"action":"get","status":"notneeded"}',
-            where='local',
+            scope='local',
         )
     # setup done, now see if it works
     clone.get('subds')

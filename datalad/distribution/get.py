@@ -339,7 +339,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             ds.config.set(
                 '{}.active'.format(section_name),
                 'true',
-                reload=False, force=True, where='local',
+                reload=False, force=True, scope='local',
             )
             ds.config.set(
                 '{}.url'.format(section_name),
@@ -348,7 +348,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                 # like ds.repo.update_submodule() would do (does not
                 # accept a URL)
                 res['source']['giturl'],
-                reload=True, force=True, where='local',
+                reload=True, force=True, scope='local',
             )
         yield res
 
@@ -374,7 +374,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
                       'datalad.get.subdataset-source-candidate-{}'.format(
                           rec['name'])):
                 if c in super_cfg.keys():
-                    subds.config.set(c, super_cfg.get(c), where='local',
+                    subds.config.set(c, super_cfg.get(c), scope='local',
                                      reload=False)
                     need_reload = True
                     break

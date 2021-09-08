@@ -186,19 +186,19 @@ def test_sidecar(path):
     ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    ds.config.set("datalad.run.record-sidecar", "false", where="local")
+    ds.config.set("datalad.run.record-sidecar", "false", scope="local")
     ds.run("cd .> dummy1", message="sidecar config")
 
     assert_in('"cmd":', last_commit_msg(ds.repo))
 
-    ds.config.set("datalad.run.record-sidecar", "true", where="local")
+    ds.config.set("datalad.run.record-sidecar", "true", scope="local")
     ds.run("cd .> dummy2", message="sidecar config")
     assert_not_in('"cmd":', last_commit_msg(ds.repo))
 
     # Don't break when config.get() returns multiple values. Here it's two
     # values in .gitconfig, but a more realistic scenario is a value in
     # $repo/.git/config that overrides a setting in ~/.config/git/config.
-    ds.config.add("datalad.run.record-sidecar", "false", where="local")
+    ds.config.add("datalad.run.record-sidecar", "false", scope="local")
     ds.run("cd .> dummy3", message="sidecar config")
     assert_in('"cmd":', last_commit_msg(ds.repo))
 

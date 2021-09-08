@@ -452,7 +452,7 @@ class ConfigManager(object):
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
-               store=False, where=None, reload=True, **kwargs):
+               store=False, scope=None, reload=True, **kwargs):
         """
         Convenience method to obtain settings interactively, if needed
 
@@ -581,7 +581,7 @@ class ConfigManager(object):
             # anyway
             # needs string conversion nevertheless, because default could come
             # in as something else
-            self.add(var, '{}'.format(_value), where=where, reload=reload)
+            self.add(var, '{}'.format(_value), scope=where, reload=reload)
         return value
 
     def __repr__(self):
@@ -771,7 +771,7 @@ class ConfigManager(object):
     # Modify configuration (proxy respective git-config call)
     #
     @_where_reload
-    def _run(self, args, where=None, reload=False, **kwargs):
+    def _run(self, args, scope=None, reload=False, **kwargs):
         """Centralized helper to run "git config" calls
 
         Parameters
@@ -852,7 +852,7 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--add', var, value], where=where, reload=reload,
+        self._run(['--add', var, value], scope=where, reload=reload,
                   protocol=StdOutErrCapture)
 
     @_where_reload
@@ -883,7 +883,7 @@ class ConfigManager(object):
         from datalad.support.gitrepo import to_options
 
         self._run(to_options(replace_all=force) + [var, value],
-                  where=where, reload=reload, protocol=StdOutErrCapture)
+                  scope=where, reload=reload, protocol=StdOutErrCapture)
 
     @_where_reload
     def rename_section(self, old, new, scope='branch', reload=True):
@@ -905,7 +905,7 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--rename-section', old, new], where=where, reload=reload)
+        self._run(['--rename-section', old, new], scope=where, reload=reload)
 
     @_where_reload
     def remove_section(self, sec, scope='branch', reload=True):
@@ -926,7 +926,7 @@ class ConfigManager(object):
                 self.reload(force=True)
             return
 
-        self._run(['--remove-section', sec], where=where, reload=reload)
+        self._run(['--remove-section', sec], scope=where, reload=reload)
 
     @_where_reload
     def unset(self, var, scope='branch', reload=True):
@@ -944,7 +944,7 @@ class ConfigManager(object):
             return
 
         # use unset all as it is simpler for now
-        self._run(['--unset-all', var], where=where, reload=reload)
+        self._run(['--unset-all', var], scope=where, reload=reload)
 
 
 def rewrite_url(cfg, url):

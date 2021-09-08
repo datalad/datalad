@@ -552,7 +552,7 @@ def test_GitRepo_fetch(orig_path, clone_path):
 
     # create a remote without an URL:
     origin.add_remote('not-available', 'git://example.com/not/existing')
-    origin.config.unset('remote.not-available.url', where='local')
+    origin.config.unset('remote.not-available.url', scope='local')
 
     # fetch without provided URL
     assert_raises(CommandError, origin.fetch, 'not-available')
@@ -845,16 +845,16 @@ def test_GitRepo_dirty(path):
     ok_(repo.dirty)
 
     # User configuration doesn't affect .dirty's answer.
-    repo.config.set("diff.ignoreSubmodules", "all", where="local")
+    repo.config.set("diff.ignoreSubmodules", "all", scope="local")
     ok_(repo.dirty)
     # GitRepo.commit currently can't handle this setting, so remove it for the
     # save() calls below.
-    repo.config.unset("diff.ignoreSubmodules", where="local")
+    repo.config.unset("diff.ignoreSubmodules", scope="local")
     subm.save()
     repo.save()
     ok_(not repo.dirty)
 
-    repo.config.set("status.showUntrackedFiles", "no", where="local")
+    repo.config.set("status.showUntrackedFiles", "no", scope="local")
     create_tree(repo.path, {"untracked_dir": {"a": "a"}})
     ok_(repo.dirty)
 
@@ -1213,7 +1213,7 @@ def test_GitRepo_set_remote_url(path):
     gr.add_remote('some-without-url', url2)
     eq_(gr.config['remote.some-without-url.url'], url2)
     # "remove" it
-    gr.config.unset('remote.some-without-url.url', where='local')
+    gr.config.unset('remote.some-without-url.url', scope='local')
     with assert_raises(KeyError):
         gr.config['remote.some-without-url.url']
     eq_(set(gr.get_remotes()), {'some', 'some-without-url'})
@@ -1578,7 +1578,7 @@ def test_gitrepo_push_default_first_kludge(path):
 
     # But if datalad-push-default-first is set...
     cfg_var = f"remote.{DEFAULT_REMOTE}.datalad-push-default-first"
-    repo_b.config.set(cfg_var, "true", where="local")
+    repo_b.config.set(cfg_var, "true", scope="local")
     with swallow_logs(new_level=logging.DEBUG) as cml:
         res_twoshot = repo_b.push(remote=DEFAULT_REMOTE,
                                   refspec=[DEFAULT_BRANCH + ":b-twoshot",

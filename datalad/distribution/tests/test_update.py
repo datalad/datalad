@@ -773,11 +773,11 @@ def check_merge_follow_parentds_subdataset_detached(on_adjusted, path):
     ds_src_s1.repo.checkout(DEFAULT_BRANCH)
     # This is the default, but just in case:
     ds_src_s1.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
-                              where="local")
+                              scope="local")
     # Configure the fetcher to use v0 because Git defaults to v2 as of
     # v2.26.0, which allows fetching unadvertised objects regardless
     # of the value of uploadpack.allowAnySHA1InWant.
-    ds_clone_s1.repo.config.set("protocol.version", "0", where="local")
+    ds_clone_s1.repo.config.set("protocol.version", "0", scope="local")
     res = ds_clone.update(merge=True, recursive=True, follow="parentds",
                           on_failure="ignore")
     # The fetch with the explicit ref fails because it isn't advertised.

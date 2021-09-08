@@ -678,14 +678,14 @@ def test_get_subdataset_direct_fetch(path):
     # Tweak the configuration of s0 to make the direct fetch fail.
     # Disallow direct oid fetch (default).
     s0.repo.config.set("uploadpack.allowAnySHA1InWant", "false",
-                       where="local")
+                       scope="local")
     # Configure the fetcher to avoid v2, which allows fetching unadvertised
     # objects regardless of the value of uploadpack.allowAnySHA1InWant.
-    s0.repo.config.set("protocol.version", "0", where="local")
+    s0.repo.config.set("protocol.version", "0", scope="local")
 
     # Configure s1 to succeed with direct fetch.
     s1.repo.config.set("uploadpack.allowAnySHA1InWant", "true",
-                       where="local")
+                       scope="local")
 
     clone = install(
         str(path / "clone"),

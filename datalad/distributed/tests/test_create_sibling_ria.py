@@ -53,14 +53,14 @@ def with_store_insteadof(func):
                        ''.format(prot='ssh' if host else 'file',
                                  host=host if host else '',
                                  path=base_path),
-                       'ria+ssh://test-store:', where='global', reload=True)
+                       'ria+ssh://test-store:', scope='global', reload=True)
             return func(*args, **kwargs)
         finally:
             dl_cfg.unset('url.ria+{prot}://{host}{path}.insteadOf'
                          ''.format(prot='ssh' if host else 'file',
                                    host=host if host else '',
                                    path=base_path),
-                         where='global', reload=True)
+                         scope='global', reload=True)
     return _wrap_with_store_insteadof
 
 

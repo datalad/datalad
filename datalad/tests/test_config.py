@@ -225,7 +225,7 @@ def test_something(path, new_home):
     assert_equal(cfg['mike.should.have'], 'a beer')
 
     # fails unknown location
-    assert_raises(ValueError, cfg.add, 'somesuch', 'shit', where='umpalumpa')
+    assert_raises(ValueError, cfg.add, 'somesuch', 'shit', scope='umpalumpa')
 
     # very carefully test non-local config
     # so carefully that even in case of bad weather Yarik doesn't find some
@@ -238,7 +238,7 @@ def test_something(path, new_home):
         globalcfg = ConfigManager()
         assert_not_in('datalad.unittest.youcan', globalcfg)
         assert_in('datalad.sneaky.addition', globalcfg)
-        cfg.add('datalad.unittest.youcan', 'removeme', where='global')
+        cfg.add('datalad.unittest.youcan', 'removeme', scope='global')
         assert(exists(global_gitconfig))
         # it did not go into the dataset's config!
         assert_not_in('datalad.unittest.youcan', cfg)
@@ -250,9 +250,9 @@ def test_something(path, new_home):
                 CommandError,
                 globalcfg.unset,
                 'datalad.unittest.youcan',
-                where='local')
+                scope='local')
         assert(globalcfg.has_section('datalad.unittest'))
-        globalcfg.unset('datalad.unittest.youcan', where='global')
+        globalcfg.unset('datalad.unittest.youcan', scope='global')
         # but after we unset the only value -- that section is no longer listed
         assert (not globalcfg.has_section('datalad.unittest'))
         assert_not_in('datalad.unittest.youcan', globalcfg)
@@ -400,7 +400,7 @@ def test_from_env():
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
-    cfg.set('datalad.crazy.override', 'fromoverride', where='override')
+    cfg.set('datalad.crazy.override', 'fromoverride', scope='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
     with patch.dict('os.environ',
@@ -454,30 +454,30 @@ def test_overrides():
     # any sensible (and also our CI) test environment(s) should have this
     assert_in('user.name', cfg)
     # set
-    cfg.set('user.name', 'myoverride', where='override')
+    cfg.set('user.name', 'myoverride', scope='override')
     assert_equal(cfg['user.name'], 'myoverride')
     # unset just removes override, not entire config
-    cfg.unset('user.name', where='override')
+    cfg.unset('user.name', scope='override')
     assert_in('user.name', cfg)
     assert_not_equal('user.name', 'myoverride')
     # add
     # there is no initial increment
-    cfg.add('user.name', 'myoverride', where='override')
+    cfg.add('user.name', 'myoverride', scope='override')
     assert_equal(cfg['user.name'], 'myoverride')
     # same as with add, not a list
     assert_equal(cfg['user.name'], 'myoverride')
     # but then there is
-    cfg.add('user.name', 'myother', where='override')
+    cfg.add('user.name', 'myother', scope='override')
     assert_equal(cfg['user.name'], ['myoverride', 'myother'])
     # rename
     assert_not_in('ups.name', cfg)
-    cfg.rename_section('user', 'ups', where='override')
+    cfg.rename_section('user', 'ups', scope='override')
     # original variable still there
     assert_in('user.name', cfg)
     # rename of override in effect
     assert_equal(cfg['ups.name'], ['myoverride', 'myother'])
     # remove entirely by section
-    cfg.remove_section('ups', where='override')
+    cfg.remove_section('ups', scope='override')
     from datalad.utils import Path
     assert_not_in(
         'ups.name', cfg,
@@ -532,7 +532,7 @@ def test_rewrite_url():
 @with_tempfile()
 def test_no_leaks(path1, path2):
     ds1 = Dataset(path1).create()
-    ds1.config.set('i.was.here', 'today', where='local')
+    ds1.config.set('i.was.here', 'today', scope='local')
     assert_in('i.was.here', ds1.config.keys())
     ds1.config.reload()
     assert_in('i.was.here', ds1.config.keys())
@@ -565,7 +565,7 @@ def test_no_local_write_if_no_dataset(path):
     with chpwd(path):
         cfg = ConfigManager()
         with assert_raises(CommandError):
-            cfg.set('a.b.c', 'd', where='local')
+            cfg.set('a.b.c', 'd', scope='local')
 
 
 @with_tempfile
@@ -625,7 +625,7 @@ def test_bare(path):
     obscure_key = 'sec.reallyobscurename!@@.key'
     assert_not_in(obscure_key, gr.config)
     # to the local config, which is easily accessible
-    gr.config.set(obscure_key, 'myvalue', where='local')
+    gr.config.set(obscure_key, 'myvalue', scope='local')
     assert_equal(gr.config.get(obscure_key), 'myvalue')
     # now make sure the config is where we think it is
     assert_in(obscure_key.split('.')[1], (gr.pathobj / 'config').read_text())
@@ -674,7 +674,7 @@ def test_external_modification(path):
 
     key = 'sec.sub.key'
     assert_not_in(key, config)
-    config.set(key, '1', where='local')
+    config.set(key, '1', scope='local')
     assert_equal(config[key], '1')
 
     # we pick up the case where we modified so size changed
