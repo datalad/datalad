@@ -100,8 +100,6 @@ class _GitHub(_GitHubLike):
         raise RuntimeError(f'Unexpected host response: {response}')
 
 
-
-
 @build_doc
 class CreateSiblingGithub(Interface):
     """Create dataset sibling on GitHub.
@@ -166,7 +164,7 @@ class CreateSiblingGithub(Interface):
             name='github',
             existing='error',
             github_login=None,
-            auth=None,
+            credential=None,
             github_organization=None,
             access_protocol='https',
             publish_depends=None,
@@ -184,13 +182,13 @@ class CreateSiblingGithub(Interface):
             dry_run = dryrun
 
         # TODO robustify the deprecation mappings
-        auth = auth or github_login
+        credential = credential or github_login
 
         if github_organization:
             reponame = f'{github_organization}/{reponame}'
 
         yield from _create_sibling(
-            platform=_GitHub(api, auth=auth),
+            platform=_GitHub(api, credential, require_token=not dry_run),
             reponame=reponame,
             dataset=dataset,
             recursive=recursive,

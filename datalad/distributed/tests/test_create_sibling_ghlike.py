@@ -42,13 +42,14 @@ def test_invalid_call(path):
     # unsupported name
     assert_raises(
         ValueError,
-        ds.create_sibling_gin, 'bo  gus', auth='sometoken')
+        ds.create_sibling_gin, 'bo  gus', credential='some')
 
     # conflicting sibling name
     ds.siblings('add', name='gin', url='http://example.com',
                 result_renderer=None)
     res = ds.create_sibling_gin(
-        'bogus', name='gin', auth='sometoken', on_failure='ignore')
+        'bogus', name='gin', credential='some', on_failure='ignore',
+        dry_run=True)
     assert_status('error', res)
     assert_in_results(
         res,
@@ -60,14 +61,14 @@ def test_invalid_call(path):
 def test_dryrun(path):
     ds = Dataset(path).create()
     # see that the correct request would be made
-    res = ds.create_sibling_gin('bogus', auth='sometoken', dry_run=True)
+    res = ds.create_sibling_gin('bogus', credential='some', dry_run=True)
     assert_result_count(res, 1)
     res = res[0]
     eq_(res['request_url'], 'https://gin.g-node.org/api/v1/user/repos')
     # we dont care much which user-agent, but there should be one
     assert_in('user-agent', res['request_headers'])
-    # and the token makes it into the request
-    assert_in('sometoken', res['request_headers']['authorization'])
+    # only a placeholder no-token makes it into the request
+    assert_in('NO-TOKEN-AVAILABLE', res['request_headers']['authorization'])
     # correct name
     eq_(res['request_data']['name'], 'bogus')
     # public by default
@@ -77,7 +78,7 @@ def test_dryrun(path):
     eq_(res['request_data']['auto_init'], False)
 
     # org repo
-    res = ds.create_sibling_gin('strangeorg/bogus', auth='sometoken',
+    res = ds.create_sibling_gin('strangeorg/bogus', credential='some',
                                 dry_run=True)
     assert_result_count(res, 1)
     res = res[0]
@@ -88,29 +89,30 @@ def test_dryrun(path):
     # recursive name, building
     subds = ds.create('subds')
     res = ds.create_sibling_gin(
-        'bogus', recursive=True, auth='sometoken', dry_run=True)
+        'bogus', recursive=True, credential='some', dry_run=True)
     eq_(res[-1]['request_data']['name'], 'bogus-subds')
 
     # ignore unavailable datasets
     ds.uninstall('subds')
     res = ds.create_sibling_gin(
-        'bogus', recursive=True, auth='sometoken', dry_run=True)
+        'bogus', recursive=True, credential='some', dry_run=True)
     eq_(len(res), 1)
 
 
-def check4real(testcmd, testdir, token_var, api, delete_endpoint):
+def check4real(testcmd, testdir, credential, api, delete_endpoint):
+    token_var = f'DATALAD_CREDENTIAL_{credential.upper()}_TOKEN'
     if token_var not in os.environ:
-        raise SkipTest('No GOGS access token available')
+        raise SkipTest(f'No {credential} access token available')
 
     ds = Dataset(testdir).create()
-    res = testcmd(
+    assert_raises(
+        ValueError,
+        testcmd,
         'somerepo',
         dataset=ds,
         api=api,
-        auth='bogus',
-        on_failure='ignore',
+        credential='bogus',
     )
-    assert_status('error', res)
 
     reponame = basename(testdir).replace('datalad_temp_test', 'dltst')
     try:
@@ -118,6 +120,7 @@ def check4real(testcmd, testdir, token_var, api, delete_endpoint):
             reponame,
             dataset=ds,
             api=api,
+            credential=credential,
             name='ghlike-sibling',
         )
         assert_in_results(
@@ -133,9 +136,10 @@ def check4real(testcmd, testdir, token_var, api, delete_endpoint):
             name='ghlike-sibling',
         )
         # now do it again
-        ds.siblings('remove', name='gogs-sibling', result_renderer=None)
+        ds.siblings('remove', name='ghlike-sibling', result_renderer=None)
         res = testcmd(
-            reponame, dataset=ds, api=api, on_failure='ignore')
+            reponame, dataset=ds, api=api, credential=credential,
+            on_failure='ignore')
         assert_result_count(res, 1)
         assert_in_results(
             res,
@@ -146,7 +150,7 @@ def check4real(testcmd, testdir, token_var, api, delete_endpoint):
         # existing=skip must not "fix" this:
         # https://github.com/datalad/datalad/issues/5941
         res = testcmd(reponame, dataset=ds, api=api, existing='skip',
-                      on_failure='ignore')
+                      credential=credential, on_failure='ignore')
         assert_result_count(res, 1)
         assert_in_results(
             res,
@@ -154,7 +158,8 @@ def check4real(testcmd, testdir, token_var, api, delete_endpoint):
             preexisted=True,
         )
         # but existing=reconfigure does
-        res = testcmd(reponame, dataset=ds, api=api, existing='reconfigure')
+        res = testcmd(reponame, dataset=ds, api=api, existing='reconfigure',
+                      credential=credential)
         assert_result_count(res, 2)
         assert_in_results(
             res,
@@ -169,7 +174,7 @@ def check4real(testcmd, testdir, token_var, api, delete_endpoint):
     finally:
         token = os.environ[token_var]
         requests.delete(
-            '{}/{}'.format(api,delete_endpoint.format(reponame=reponame)),
+            '{}/{}'.format(api, delete_endpoint.format(reponame=reponame)),
             headers={
                 'user-agent': DEFAULT_USER_AGENT,
                 'authorization':

@@ -95,14 +95,14 @@ class CreateSiblingGitea(Interface):
             name='gitea',
             existing='error',
             api='https://gitea.com',
-            auth=None,
+            credential='gitea',
             access_protocol='https',
             publish_depends=None,
             private=False,
             dry_run=False):
 
         yield from _create_sibling(
-            platform=_Gitea(api, auth=auth),
+            platform=_Gitea(api, credential, require_token=not dry_run),
             reponame=reponame,
             dataset=dataset,
             recursive=recursive,

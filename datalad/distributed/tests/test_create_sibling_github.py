@@ -18,11 +18,11 @@ from .test_create_sibling_ghlike import check4real
 
 @skip_if_no_network
 @with_tempfile
-def test_gin(path):
+def test_github(path):
     check4real(
         create_sibling_github,
         path,
-        'DATALAD_CREDENTIAL_API_GITHUB_COM_TOKEN',
+        'github',
         'https://api.github.com',
         'repos/dataladtester/{reponame}',
     )

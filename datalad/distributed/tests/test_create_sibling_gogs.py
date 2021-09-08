@@ -34,7 +34,7 @@ def test_gogs(path):
     check4real(
         create_sibling_gogs,
         path,
-        'DATALAD_CREDENTIAL_TRY_GOGS_IO_TOKEN',
+        'gogs',
         'https://try.gogs.io',
         'api/v1/repos/dataladtester/{reponame}',
     )

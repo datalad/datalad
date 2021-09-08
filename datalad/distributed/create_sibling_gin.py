@@ -53,14 +53,14 @@ class CreateSiblingGin(Interface):
             name='gin',
             existing='error',
             api='https://gin.g-node.org',
-            auth=None,
+            credential='gin',
             access_protocol='https',
             publish_depends=None,
             private=False,
             dry_run=False):
 
         yield from _create_sibling(
-            platform=_GIN(api, auth=auth),
+            platform=_GIN(api, credential, require_token=not dry_run),
             reponame=reponame,
             dataset=dataset,
             recursive=recursive,

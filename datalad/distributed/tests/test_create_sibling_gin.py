@@ -22,7 +22,7 @@ def test_gin(path):
     check4real(
         create_sibling_gin,
         path,
-        'DATALAD_CREDENTIAL_GIN_G__NODE_ORG_TOKEN',
+        'gin',
         'https://gin.g-node.org',
         'api/v1/repos/dataladtester/{reponame}',
     )

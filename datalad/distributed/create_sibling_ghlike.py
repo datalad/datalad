@@ -147,11 +147,16 @@ class _GitHubLike(object):
             `replace` could lead to data loss! In interactive a confirmation
             prompt is shown, an exception is raised in non-interactive
             sessions.""",),
-        auth=Parameter(
-            args=('--auth',),
+        credential=Parameter(
+            args=('--credential',),
             constraints=EnsureStr() | EnsureNone(),
-            metavar='TOKEN',
-            doc="""personal access token"""),
+            metavar='NAME',
+            doc="""name of the credential providing a personal access token
+            to be used for authorization. The token can be supplied via
+            configuration setting 'datalad.credential.<name>.token', or
+            environment variable DATALAD_CREDENTIAL_<NAME>_TOKEN, or will
+            be queried from the active credential store using the provided
+            name."""),
         api=Parameter(
             args=('--api',),
             constraints=EnsureStr() | EnsureNone(),
@@ -178,28 +183,27 @@ class _GitHubLike(object):
             are reported for all relevant datasets"""),
     )
 
-    def __init__(self, url, auth=None):
+    def __init__(self, url, credential, require_token=True):
         if not url:
             raise ValueError(f'API URL required for {self.fullname}')
 
         self.api_url = url
-        self.auth = auth
         self._user_info = None
 
-        # maybe a token can be retrieved?
-        if not self.auth:
-            token_name = urlparse(url).netloc
-            try:
-                # TODO platform-specific doc URL for token generation
-                self.auth = Token(token_name, url=url)()['token']
-            except Exception as e:
-                lgr.debug('Token retrieval failed: %s', e)
-                lgr.warning(
-                    'Cannot determine authorization token for %s, '
-                    'none given, none known', token_name)
-
-        if not self.auth:
-            raise ValueError(f'Authorization required for {self.fullname}')
+        try:
+            # TODO platform-specific doc URL for token generation
+            self.auth = Token(credential, url=url)()['token']
+        except Exception as e:
+            lgr.debug('Token retrieval failed: %s', e)
+            lgr.warning(
+                'Cannot determine authorization token for %s', credential)
+            if require_token:
+                raise ValueError(
+                    f'Authorization required for {self.fullname}, '
+                    f'cannot find token for a credential {credential}.')
+            else:
+                lgr.warning("No token found for credential '%s'", credential)
+                self.auth = 'NO-TOKEN-AVAILABLE'
 
         self.request_headers = {
             'user-agent': DEFAULT_USER_AGENT,

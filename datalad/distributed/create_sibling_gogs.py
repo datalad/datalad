@@ -10,8 +10,9 @@
 """
 
 import logging
-from urllib.parse import urljoin
-import requests
+from urllib.parse import (
+    urlparse,
+)
 
 from datalad.interface.base import (
     build_doc,
@@ -37,6 +38,13 @@ class _GOGS(_GitHubLike):
     get_authenticated_user_endpoint = 'api/v1/user'
     get_repo_info_endpoint = 'api/v1/repos/{user}/{repo}'
 
+    def __init__(self, url, credential, require_token=True):
+        if not url:
+            raise ValueError(f'API URL required for {self.fullname}')
+        if credential is None:
+            credential = urlparse(url).netloc
+        return super().__init__(url, credential, require_token=require_token)
+
 
 @build_doc
 class CreateSiblingGogs(Interface):
@@ -59,14 +67,14 @@ class CreateSiblingGogs(Interface):
             recursion_limit=None,
             name=None,
             existing='error',
-            auth=None,
+            credential=None,
             access_protocol='https',
             publish_depends=None,
             private=False,
             dry_run=False):
 
         yield from _create_sibling(
-            platform=_GOGS(api, auth=auth),
+            platform=_GOGS(api, credential, require_token=not dry_run),
             reponame=reponame,
             dataset=dataset,
             recursive=recursive,

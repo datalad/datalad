@@ -22,7 +22,7 @@ def test_gitea(path):
     check4real(
         create_sibling_gitea,
         path,
-        'DATALAD_CREDENTIAL_TRY_GITEA_IO_TOKEN',
+        'gitea',
         'https://try.gitea.io',
         'api/v1/repos/dataladtester/{reponame}',
     )
