@@ -25,14 +25,17 @@ apply:
           ce = CapturedException(e)
 
   First, this ensures a low-level (8) log entry including the traceback of that
-  exception. Second, it deletes the frame stack references of the exception and
-  keeps textual information only, in order to avoid circular references, where
-  an object (whose method raised the exception) isn't going to be picked by the
-  generational garbage collection. This can be particularly troublesome if that
-  object holds a reference to a subprocess for example. However, it's not easy
-  to see in what situation this would really be needed and we never need
-  anything other than the textual information about what happened. Making the
-  reference cleaning a general rule is easiest to write, maintain and review.
+  exception. The depth of the included traceback can be limited by setting the
+  ``datalad.exc.str.tb_limit`` config accordingly.
+
+  Second, it deletes the frame stack references of the exception and keeps
+  textual information only, in order to avoid circular references, where an
+  object (whose method raised the exception) isn't going to be picked by the
+  garbage collection. This can be particularly troublesome if that object holds
+  a reference to a subprocess for example. However, it's not easy to see in what
+  situation this would really be needed and we never need anything other than
+  the textual information about what happened. Making the reference cleaning a
+  general rule is easiest to write, maintain and review.
 
 - if we raise, neither a log entry nor such a
   :class:`~datalad.support.exceptions.CapturedException` instance is to be
