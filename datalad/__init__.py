@@ -296,7 +296,9 @@ def teardown_package():
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
 
-from .version import __version__
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 
 if str(__version__) == '0' or __version__.startswith('0+'):
     lgr.warning(
