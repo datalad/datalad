@@ -10,6 +10,8 @@ jobs:
   auto-release:
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'ci skip') && !contains(github.event.head_commit.message, 'skip ci')"
+    outputs:
+      auto-version: ${{ steps.auto-version.outputs.version }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
@@ -22,13 +24,13 @@ jobs:
           wget -O- "$auto_download_url" | gunzip > ~/auto
           chmod a+x ~/auto
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '^3.8'
-
-      - name: Install Python dependencies
-        run: python -m pip install build twine
+      - name: Check whether a release is due
+        id: auto-version
+        run: |
+          version="$(~/auto version)"
+          echo "::set-output name=version::$version"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install pandoc
         run: sudo apt-get update && sudo apt-get install -y pandoc
@@ -51,9 +53,74 @@ jobs:
           then echo "[ERROR] Could not compare new version '$new_version' to changelog version '$changelog_version'"
                exit 1
           fi
+
+          git config --global user.email "test@github.land"
+          git config --global user.name "GitHub Almighty"
+
+          if [ "x$opts" = "x--no-changelog" ]
+          then
+              # Update the rST changelog outside of auto, thereby avoiding
+              # failure due to the E2BIG problem.  See
+              # <https://github.com/datalad/datalad/issues/5972>.
+
+              perl -pli -e 's/(?<!#)"afterChangelog"/#"afterChangelog"/' .autorc
+              # We need to commit the change or else auto will fail due to the
+              # repo being dirty.
+              if ! git diff --quiet --cached
+              then git commit -m '[skip ci] Disable afterChangelog'
+              fi
+
+              make update-changelog
+              git add docs/source/changelog.rst
+              git commit -m '[skip ci] Update RST changelog'
+          else
+              sed -i -e 's/#"afterChangelog"/"afterChangelog"/' .autorc
+              # We need to commit the change or else auto will fail due to the
+              # repo being dirty.
+              if ! git diff --quiet --cached
+              then git commit -m '[skip ci] Enable afterChangelog'
+              fi
+          fi
+
           ~/auto shipit $opts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+   pypi:
+     runs-on: ubuntu-latest
+     needs: auto-release
+     if: "needs.auto-release.outputs.auto-version != ''"
+     steps:
+       # By default, actions/checkout will checkout the commit that that was
+       # pushed to master and triggered the workflow, but this does not include
+       # the commit & tag created by `auto`.  In order to get that, we need to
+       # look up the tag for the latest release.
+       - name: Get tag of latest release
+         id: latest-release
+         run: |
+           latest_tag="$(curl -fsSL https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest | jq -r .tag_name)"
+           echo "::set-output name=tag::$latest_tag"
+
+       - name: Checkout source
+         uses: actions/checkout@v2
+         with:
+           fetch-depth: 0
+           ref: ${{ steps.latest-release.outputs.tag }}
+
+       - name: Set up Python
+         uses: actions/setup-python@v2
+         with:
+           python-version: '^3.8'
+
+       - name: Install build & twine
+         run: python -m pip install build twine
+
+       - name: Build
+         run: python -m build
+
+       - name: Upload
+         run: twine upload dist/*
+         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 
