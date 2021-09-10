@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     known_failure_windows,
     ok_,
     ok_archives_caches,
+    ok_file_has_content,
     ok_file_under_git,
     serve_path_via_http,
     slow,
@@ -412,6 +413,30 @@ def test_add_archive_use_archive_dir(repo_path):
         add_archive_content(opj('4u', 'sub.tar.gz'))
         ok_file_under_git(repo.path, opj('4u', 'sub', '2 f.txt'), annexed=True)
         ok_archives_caches(repo.path, 0)
+
+
+@with_tree(
+    tree={
+        'archives': {
+            '1.gz': '1',
+            '2.xz': '2',
+            '3.lzma': '3',
+            # TODO: add any other stream compression we might be supporting via 7zip or patool?
+        },
+    }
+)
+def test_add_archive_single_file(repo_path):
+    repo = AnnexRepo(repo_path, create=True)
+    with chpwd(repo_path):
+        archives = glob('archives/*')
+        repo.add(archives)
+        repo.commit('Added archives')
+
+        for archive in archives:
+            archive_name = os.path.splitext(archive)[0]
+            archive_content = os.path.basename(archive_name)
+            add_archive_content(archive)
+            ok_file_has_content(archive_name, archive_content)
 
 
 class TestAddArchiveOptions():

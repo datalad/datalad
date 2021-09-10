@@ -2421,6 +2421,9 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             open_func = open
             if full_name.endswith('.gz'):
                 open_func = gzip.open
+            elif full_name.split('.')[-1] in ('xz', 'lzma'):
+                import lzma
+                open_func = lzma.open
             with open_func(full_name, "wb") as f:
                 f.write(ensure_bytes(load, 'utf-8'))
         if executable:
