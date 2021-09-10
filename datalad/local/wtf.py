@@ -267,7 +267,7 @@ def _describe_dataset(ds, sensitive):
         return infos
     except InvalidGitRepositoryError as e:
         ce = CapturedException(e)
-        return {"invalid": ce.message()}
+        return {"invalid": ce.message}
 
 
 def _describe_location(res):

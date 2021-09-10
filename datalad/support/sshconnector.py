@@ -803,7 +803,7 @@ class MultiplexSSHManager(BaseSSHManager):
                     except Exception as exc:
                         ce = CapturedException(exc)
                         lgr.debug("Failed to close a connection: "
-                                  "%s", ce.message())
+                                  "%s", ce.message)
             self._connections = dict()
 
 

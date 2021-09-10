@@ -30,7 +30,7 @@ class CapturedException(object):
     reporting.
     """
 
-    def __init__(self, exc=None, limit=None, capture_locals=False,
+    def __init__(self, exc, limit=None, capture_locals=False,
                  level=8, logger=None):
         """Capture an exception and its traceback for logging.
 
@@ -38,8 +38,7 @@ class CapturedException(object):
 
         Parameters
         ----------
-        exc: Exception or None
-          If None, rely on sys.exc_info() to get the latest.
+        exc: Exception
         limit: int
           Note, that this is limiting the capturing of the exception's
           traceback depth. Formatting for output comes with it's own limit.
@@ -49,23 +48,13 @@ class CapturedException(object):
         # Note, that with lookup_lines=False the lookup is deferred,
         # not disabled. Unclear to me ATM, whether that means to keep frame
         # references around, but prob. not. TODO: Test that.
-        if exc is None:
-            exctype, value, tb = sys.exc_info()
-            self.tb = traceback.TracebackException(
-                exctype, value, tb,
-                limit=limit,
-                lookup_lines=True,
-                capture_locals=capture_locals
-            )
-            traceback.clear_frames(tb)
-        else:
-            self.tb = traceback.TracebackException.from_exception(
-                exc,
-                limit=limit,
-                lookup_lines=True,
-                capture_locals=capture_locals
-            )
-            traceback.clear_frames(exc.__traceback__)
+        self.tb = traceback.TracebackException.from_exception(
+            exc,
+            limit=limit,
+            lookup_lines=True,
+            capture_locals=capture_locals
+        )
+        traceback.clear_frames(exc.__traceback__)
 
         # log the captured exception
         logger = logger or lgr
@@ -86,7 +75,7 @@ class CapturedException(object):
 
         if include_str:
             # try exc message else exception type
-            leading = self.message() or self.name()
+            leading = self.message or self.name
             out = "{} ".format(leading)
         else:
             out = ""
@@ -134,8 +123,9 @@ class CapturedException(object):
         -------
         str
         """
-        return self.name() + '(' + self.message() + ')'
+        return self.name + '(' + self.message + ')'
 
+    @property
     def message(self):
         """Returns only the message of the original exception
 
@@ -145,6 +135,7 @@ class CapturedException(object):
         """
         return str(self.tb)
 
+    @property
     def name(self):
         """Returns the class name of the original exception
 

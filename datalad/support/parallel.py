@@ -431,7 +431,7 @@ class ProducerConsumer:
                             lgr.warning("Interrupted via Ctrl-C.  Forcing the exit")
                             self.shutdown(force=True, exception=exc)
                         else:
-                            lgr.warning("One more exception was received while trying to finish gracefully: %s", exc_str())
+                            lgr.warning("One more exception was received while trying to finish gracefully: %s", exc_str(exc))
                             # and we go back into the loop until we finish or there is Ctrl-C
                     else:
                         interrupted_by_exception = exc
