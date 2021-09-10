@@ -11,17 +11,21 @@
 
 __docformat__ = 'restructuredtext'
 
-from itertools import product
 import logging
-from unittest.mock import patch
 import os.path as op
+from itertools import product
+from unittest.mock import patch
 
-from datalad.support.globbedpaths import GlobbedPaths
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import eq_
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    assert_in,
+    eq_,
+    known_failure_windows,
+    swallow_logs,
+    with_tree,
+)
+
+from ..globbedpaths import GlobbedPaths
 
 
 def test_globbedpaths_get_sub_patterns():
@@ -49,11 +53,13 @@ def test_globbedpaths_get_sub_patterns():
         eq_(gp._get_sub_patterns(pat), expected)
 
 
+bOBSCURE_FILENAME = f"b{OBSCURE_FILENAME}.dat"
+
+
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",
-                 # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
-                 u"bβ.dat": "",
+                 bOBSCURE_FILENAME: "",
                  "subdir": {"1.txt": "", "2.txt": ""}})
 def test_globbedpaths(path):
     dotdir = op.curdir + op.sep
@@ -61,9 +67,9 @@ def test_globbedpaths(path):
     for patterns, expected in [
             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
             ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
-            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
+            (["*.txt", "*.dat"], {"1.txt", "2.dat", bOBSCURE_FILENAME, "3.txt"}),
             ([dotdir + "*.txt", "*.dat"],
-             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
+             {dotdir + "1.txt", "2.dat", bOBSCURE_FILENAME, dotdir + "3.txt"}),
             ([op.join("subdir", "*.txt")],
              {op.join("subdir", "1.txt"), op.join("subdir", "2.txt")}),
             (["subdir" + op.sep], {"subdir" + op.sep}),
@@ -93,12 +99,12 @@ def test_globbedpaths(path):
 
     # Full patterns still get returned as relative to pwd.
     gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
-    eq_(gp.expand(), ["2.dat", u"bβ.dat"])
+    eq_(gp.expand(), ["2.dat", bOBSCURE_FILENAME])
 
     # "." gets special treatment.
     gp = GlobbedPaths([".", "*.dat"], pwd=path)
-    eq_(set(gp.expand()), {"2.dat", u"bβ.dat", "."})
-    eq_(gp.expand(dot=False), ["2.dat", u"bβ.dat"])
+    eq_(set(gp.expand()), {"2.dat", bOBSCURE_FILENAME, "."})
+    eq_(gp.expand(dot=False), ["2.dat", bOBSCURE_FILENAME])
     gp = GlobbedPaths(["."], pwd=path, expand=False)
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
@@ -111,7 +117,7 @@ def test_globbedpaths(path):
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
     # glob expansion for paths property is determined by expand argument.
-    for expand, expected in [(True, ["2.dat", u"bβ.dat"]),
+    for expand, expected in [(True, ["2.dat", bOBSCURE_FILENAME]),
                              (False, ["*.dat"])]:
         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
         eq_(gp.paths, expected)

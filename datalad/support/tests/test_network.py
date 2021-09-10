@@ -8,47 +8,20 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-
 import os
 import sys
-
-from os.path import (
-    join as opj,
-    isabs,
-)
 from collections import OrderedDict
+from os.path import isabs
+from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-
-from datalad.utils import (
-    Path,
-    PurePosixPath,
-    on_windows,
-)
-
-from datalad.tests.utils import (
-    eq_,
-    neq_,
-    ok_,
-    nok_,
-    assert_raises,
-    skip_if_on_windows,
-    swallow_logs,
-    assert_in,
-    get_most_obscure_supported_name,
-    SkipTest,
-    known_failure_githubci_win,
-    with_tempfile,
-    assert_status,
-)
-
 from datalad.support.network import (
-    DataLadRI,
-    GitTransportRI,
-    PathRI,
     RI,
     SSHRI,
     URL,
+    DataLadRI,
+    GitTransportRI,
+    PathRI,
     _split_colon,
     dlurljoin,
     get_local_file_url,
@@ -61,6 +34,28 @@ from datalad.support.network import (
     iso8601_to_epoch,
     parse_url_opts,
     same_website,
+    urlquote,
+)
+from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
+    assert_in,
+    assert_raises,
+    assert_status,
+    eq_,
+    get_most_obscure_supported_name,
+    known_failure_githubci_win,
+    neq_,
+    nok_,
+    ok_,
+    skip_if_on_windows,
+    swallow_logs,
+    with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    on_windows,
 )
 
 
@@ -109,6 +104,8 @@ def test_get_url_straight_filename():
     yield _test_get_url_straight_filename, '?param=1&another=/'
 
 from ..network import rfc2822_to_epoch
+
+
 def test_rfc2822_to_epoch():
     eq_(rfc2822_to_epoch("Thu, 16 Oct 2014 01:16:17 EDT"), 1413436577)
 
@@ -461,10 +458,7 @@ def test_get_local_file_url():
             ) + (
                 ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
             ) if on_windows else (
-                # static copy of "most_obscore_name"
-                (' "\';a&b&cΔЙקم๗あ `| ',
-                 # and translation by google chrome
-                 "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
+                (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME)),
                 ('/a', 'file:///a'),
                 ('/a/b/c', 'file:///a/b/c'),
                 ('/a~', 'file:///a~'),
