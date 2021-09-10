@@ -43,7 +43,10 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureKeyChoice,
 )
-from datalad.support.exceptions import DownloadError
+from datalad.support.exceptions import (
+    CapturedException,
+    DownloadError,
+)
 from datalad.support.param import Parameter
 from datalad.support.strings import get_replacement_dict
 from datalad.support.network import (
@@ -294,10 +297,12 @@ class Clone(Interface):
             # we can do strict=False since we are 3.6+
             path.resolve(strict=False)
         except OSError as e:
+            ce = CapturedException(e)
             yield get_status_dict(
                 status='error',
                 path=path,
-                message=('cannot handle target path: %s', exc_str(e)),
+                message=('cannot handle target path: %s', ce),
+                exception=ce,
                 **result_props)
             return
 
@@ -588,11 +593,12 @@ def clone_dataset(
                 create=True)
 
         except CommandError as e:
+            ce = CapturedException(e)
             e_stderr = e.stderr
 
             error_msgs[cand['giturl']] = e
             lgr.debug("Failed to clone from URL: %s (%s)",
-                      cand['giturl'], exc_str(e))
+                      cand['giturl'], ce)
             if dest_path.exists():
                 lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                           dest_path)
@@ -642,7 +648,7 @@ def clone_dataset(
                 error_msg = "Failed to clone from any candidate source URL. " \
                             "Encountered errors per each url were:\n- %s"
                 error_args = '\n- '.join(
-                    '{}\n  {}'.format(url, exc_str(exc))
+                    '{}\n  {}'.format(url, exc.to_str())
                     for url, exc in error_msgs.items()
                 )
         else:

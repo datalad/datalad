@@ -34,6 +34,7 @@ from ..support.annexrepo import AnnexRepo
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..support.exceptions import (
+    CapturedException,
     CommandError,
     NoDatasetFound,
 )
@@ -185,12 +186,13 @@ class DownloadURL(Interface):
             try:
                 downloaded_path = downloader.download(url, path=path, overwrite=overwrite)
             except Exception as e:
+                ce = CapturedException(e)
                 yield get_status_dict(
                     status="error",
-                    message=exc_str(e),
+                    message=str(ce),
                     type="file",
                     path=path,
-                    exception=e,
+                    exception=ce,
                     **common_report)
             else:
                 if not need_datalad_remote \

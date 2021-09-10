@@ -34,6 +34,7 @@ from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
 )
+from datalad.support.exceptions import CapturedException
 from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
@@ -188,11 +189,13 @@ class ExportArchiveORA(Interface):
                 status='ok',
                 **res_kwargs)
         except Exception as e:
+            ce = CapturedException(e)
             yield get_status_dict(
                 path=str(archive),
                 type='file',
                 status='error',
-                message=('7z failed: %s', exc_str(e)),
+                message=('7z failed: %s', ce),
+                exception=ce,
                 **res_kwargs)
             return
         finally:

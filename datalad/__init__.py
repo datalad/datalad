@@ -133,7 +133,6 @@ def setup_package():
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
         set_envvar('HOME', os.environ['GIT_HOME'])
-        set_envvar('DATALAD_LOG_EXC', "1")
     else:
         # we setup our own new HOME, the BEST and HUGE one
         from datalad.utils import make_tempfile

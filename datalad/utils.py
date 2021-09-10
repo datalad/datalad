@@ -2220,9 +2220,10 @@ def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug
                 pkg)
             mods_loaded.append(mod)
         except Exception as exc:
-            from datalad.dochelpers import exc_str
+            from datalad.support.exceptions import CapturedException
+            ce = CapturedException(exc)
             log((msg + ': {exception}').format(
-                module=modname, package=pkg, exception=exc_str(exc)))
+                module=modname, package=pkg, exception=ce.message))
     return mods_loaded
 
 
