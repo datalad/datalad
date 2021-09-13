@@ -83,8 +83,8 @@ def _process_how_args(merge, how, how_subds):
     return how, how_subds
 
 
-_how_constraints = EnsureNone() | EnsureChoice(
-    "fetch", "merge", "ff-only", "reset", "checkout")
+_how_constraints = EnsureChoice(
+    "fetch", "merge", "ff-only", "reset", "checkout", None)
 
 
 @build_doc
@@ -162,7 +162,6 @@ class Update(Interface):
             how="ff-only" PY]."""),
         how=Parameter(
             args=("--how",),
-            metavar="ACTION",
             nargs="?",
             constraints=_how_constraints,
             doc="""how to update the dataset. The default ("fetch") simply
@@ -179,7 +178,6 @@ class Update(Interface):
             `how_subds` PY]."""),
         how_subds=Parameter(
             args=("--how-subds",),
-            metavar="ACTION",
             nargs="?",
             constraints=_how_constraints,
             doc="""Override the behavior of [CMD: --how CMD][PY: `how` PY] in
