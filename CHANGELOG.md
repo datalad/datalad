@@ -1,3 +1,48 @@
+# 0.14.8 (Sun Sep 12 2021)
+
+#### 🐛 Bug Fix
+
+- BF: add-archive-content on .xz and other non-.gz stream compressed files [#5930](https://github.com/datalad/datalad/pull/5930) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(UX): do not keep logging ERROR possibly present in progress records [#5936](https://github.com/datalad/datalad/pull/5936) ([@yarikoptic](https://github.com/yarikoptic))
+- Annotate datalad_core as not needing actual data -- just uses annex whereis [#5971](https://github.com/datalad/datalad/pull/5971) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: limit CMD_MAX_ARG if obnoxious value is encountered. [#5945](https://github.com/datalad/datalad/pull/5945) ([@yarikoptic](https://github.com/yarikoptic))
+- Download session/credentials locking -- inform user if locking is "failing" to be obtained, fail upon ~5min timeout [#5884](https://github.com/datalad/datalad/pull/5884) ([@yarikoptic](https://github.com/yarikoptic))
+- Render siblings()'s non-ok results with the default renderer [#5915](https://github.com/datalad/datalad/pull/5915) ([@mih](https://github.com/mih))
+- BF: do not crash, just skip whenever trying to delete non existing field in the underlying keyring [#5892](https://github.com/datalad/datalad/pull/5892) ([@yarikoptic](https://github.com/yarikoptic))
+- Fix argument-spec for `siblings` and improve usage synopsis [#5913](https://github.com/datalad/datalad/pull/5913) ([@mih](https://github.com/mih))
+- Clarify error message re unspecified gitlab project [#5907](https://github.com/datalad/datalad/pull/5907) ([@mih](https://github.com/mih))
+- Support username, password and port specification in RIA URLs [#5902](https://github.com/datalad/datalad/pull/5902) ([@mih](https://github.com/mih))
+- BF: take path from SSHRI, test URLs not only on Windows [#5881](https://github.com/datalad/datalad/pull/5881) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH(UX): warn user if keyring returned a "null" keyring [#5875](https://github.com/datalad/datalad/pull/5875) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH(UX): state original purpose in NoDatasetFound exception + detail it for get [#5708](https://github.com/datalad/datalad/pull/5708) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### ⚠️ Pushed to `maint`
+
+- Merge branch 'bf-http-headers-agent' into maint ([@yarikoptic](https://github.com/yarikoptic))
+- RF(BF?)+DOC: provide User-Agent to entire session headers + use those if provided ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
+- Pass `--no-changelog` to `auto shipit` if changelog already has entry [#5952](https://github.com/datalad/datalad/pull/5952) ([@jwodder](https://github.com/jwodder))
+- Add isort config to match current convention + run isort via pre-commit (if configured) [#5923](https://github.com/datalad/datalad/pull/5923) ([@jwodder](https://github.com/jwodder))
+- .travis.yml: use python -m {nose,coverage} invocations, and always show combined report [#5888](https://github.com/datalad/datalad/pull/5888) ([@yarikoptic](https://github.com/yarikoptic))
+- Add project URLs into the package metadata for convenience links on Pypi [#5866](https://github.com/datalad/datalad/pull/5866) ([@adswa](https://github.com/adswa) [@yarikoptic](https://github.com/yarikoptic))
+
+#### 🧪 Tests
+
+- BF: do use OBSCURE_FILENAME instead of hardcoded unicode [#5944](https://github.com/datalad/datalad/pull/5944) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(TST): Skip testing for having PID listed if no psutil [#5920](https://github.com/datalad/datalad/pull/5920) ([@yarikoptic](https://github.com/yarikoptic))
+- BF(TST): Boost version of git-annex to 8.20201129 to test an error message [#5894](https://github.com/datalad/datalad/pull/5894) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 4
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.14.7 (Tue Aug 03 2021)
 
 #### 🐛 Bug Fix
