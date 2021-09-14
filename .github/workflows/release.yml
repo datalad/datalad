@@ -35,18 +35,22 @@ jobs:
 
       - name: Create release
         run: |
+          set -x
           new_version="$(~/auto shipit --dry-run --quiet)"
           if [ -z "$new_version" ]
           then echo "Nothing to release"
                exit
           fi
+          echo "[INFO] New version: $new_version"
           changelog_version="$(perl -nle '/^# ([0-9]+\.\S*) \(.*\)/ and print $1 and exit' CHANGELOG.md)"
+          echo "[INFO] Changelog version: $changelog_version"
           opts=
           if dpkg --compare-versions "$new_version" lt "$changelog_version"
           then echo "[ERROR] New version is less than latest version in changelog"
                exit 1
           elif dpkg --compare-versions "$new_version" eq "$changelog_version"
-          then opts=--no-changelog
+          then echo '[INFO] Disabling changelog autogeneration'
+               opts=--no-changelog
           elif ! dpkg --compare-versions "$new_version" gt "$changelog_version"
           then echo "[ERROR] Could not compare new version '$new_version' to changelog version '$changelog_version'"
                exit 1
