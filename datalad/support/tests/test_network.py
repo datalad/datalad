@@ -295,9 +295,9 @@ def test_url_samples():
     _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
     _check_ri("git@host:user/proj", SSHRI, hostname="host", path="user/proj", username='git')
 
-    _check_ri('weired:/', SSHRI, hostname='weired', path='/')
+    _check_ri('weird:/', SSHRI, hostname='weird', path='/')
     # since schema is not allowing some symbols so we need to add additional check
-    _check_ri('weired_url:/', SSHRI, hostname='weired_url', path='/')
+    _check_ri('weird_url:/', SSHRI, hostname='weird_url', path='/')
     _check_ri('example.com:/', SSHRI, hostname='example.com', path='/')
     _check_ri('example.com:path/sp1', SSHRI, hostname='example.com', path='path/sp1')
     _check_ri('example.com/path/sp1\:fname', PathRI, localpath='example.com/path/sp1\:fname',
@@ -326,16 +326,16 @@ def test_url_samples():
     # actually this one is good enough to trigger a warning and I still don't know
     # what it should exactly be!?
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        weired_str = 'weired://'
-        weired_url = RI(weired_str)
-        repr(weired_url)
+        weird_str = 'weird://'
+        weird_url = RI(weird_str)
+        repr(weird_url)
         cml.assert_logged(
-            'Parsed version of SSHRI .weired:/. '
-            'differs from original .weired://.'
+            'Parsed version of SSHRI .weird:/. '
+            'differs from original .weird://.'
         )
         # but we store original str
-        eq_(str(weired_url), weired_str)
-        neq_(weired_url.as_str(), weired_str)
+        eq_(str(weird_url), weird_str)
+        neq_(weird_url.as_str(), weird_str)
 
 
     raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
@@ -425,9 +425,9 @@ def test_is_url():
     ok_(is_url('http://localhost'))
     ok_(is_url('ssh://me@localhost'))
     # in current understanding it is indeed a url but an 'ssh', implicit=True, not just
-    # a useless scheme=weired with a hope to point to a netloc
+    # a useless scheme=weird with a hope to point to a netloc
     with swallow_logs():
-        ok_(is_url('weired://'))
+        ok_(is_url('weird://'))
     nok_(is_url('relative'))
     nok_(is_url('/absolute'))
     ok_(is_url('like@sshlogin'))  # actually we do allow ssh:implicit urls ATM

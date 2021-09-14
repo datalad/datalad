@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import sys
+import unittest.mock
 
 from functools import partial
 from glob import glob
@@ -43,7 +44,11 @@ from datalad.cmd import (
     GitWitlessRunner,
     WitlessRunner as Runner,
 )
-from datalad.consts import WEB_SPECIAL_REMOTE_UUID
+from datalad.consts import (
+    DATALAD_SPECIAL_REMOTE,
+    DATALAD_SPECIAL_REMOTES_UUIDS,
+    WEB_SPECIAL_REMOTE_UUID,
+)
 from datalad.support.external_versions import external_versions
 from datalad.support import path as op
 
@@ -52,6 +57,7 @@ from datalad.support.sshconnector import get_connection_hash
 from datalad.utils import (
     chpwd,
     get_linux_distribution,
+    quote_cmdlinearg,
     on_windows,
     rmtree,
     unlink,
@@ -329,7 +335,7 @@ def test_AnnexRepo_file_has_content(batch, src, annex_path):
 
     ar.unlock(["test-annex.dat"])
     eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-        [ar.supports_unlocked_pointers])
+        [True])
     with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
         ofh.write("more")
     eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
@@ -367,7 +373,7 @@ def test_AnnexRepo_is_under_annex(batch, src, annex_path):
 
     ar.unlock(["test-annex.dat"])
     eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-        [ar.supports_unlocked_pointers])
+        [True])
     with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
         ofh.write("more")
     eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
@@ -406,6 +412,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(lfull[non_web_remote]['urls'], [])
     assert_not_in('uuid', lfull[WEB_SPECIAL_REMOTE_UUID])  # no uuid in the records
     eq_(lfull[WEB_SPECIAL_REMOTE_UUID]['urls'], [testurl])
+    assert_equal(lfull[WEB_SPECIAL_REMOTE_UUID]['description'], 'web')
 
     # --all and --key are incompatible
     assert_raises(CommandError, ar.whereis, [], options='--all', output='full', key=True)
@@ -928,7 +935,6 @@ def test_AnnexRepo_get(src, dst):
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
 
-@skip_if(external_versions['cmd:annex'] < '7.20190717', "Needs freshier git-annex")
 @with_tree(tree={'file.dat': 'content'})
 @with_tempfile
 def test_v7_detached_get(opath, path):
@@ -1089,7 +1095,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(WEB_SPECIAL_REMOTE_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 
-    # and closing the pipes now shoudn't anyhow affect things
+    # and closing the pipes now shouldn't anyhow affect things
     eq_(len(ar._batched), 1)
     ar._batched.close()
     eq_(len(ar._batched), 1)  # doesn't remove them, just closes
@@ -1129,17 +1135,24 @@ def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
 
 @with_tempfile(mkdir=True)
 def test_annex_backends(path):
-    repo = AnnexRepo(path)
-    eq_(repo.default_backends, None)
+    path = Path(path)
+    repo_default = AnnexRepo(path / "r_default")
+    eq_(repo_default.default_backends, None)
 
-    rmtree(path)
-
-    repo = AnnexRepo(path, backend='MD5E')
-    eq_(repo.default_backends, ['MD5E'])
+    repo_kw = AnnexRepo(path / "repo_kw", backend='MD5E')
+    eq_(repo_kw.default_backends, ['MD5E'])
 
     # persists
-    repo = AnnexRepo(path)
-    eq_(repo.default_backends, ['MD5E'])
+    repo_kw = AnnexRepo(path / "repo_kw")
+    eq_(repo_kw.default_backends, ['MD5E'])
+
+    repo_config = AnnexRepo(path / "repo_config")
+    repo_config.config.set("annex.backend", "MD5E", reload=True)
+    eq_(repo_config.default_backends, ["MD5E"])
+
+    repo_compat = AnnexRepo(path / "repo_compat")
+    repo_compat.config.set("annex.backends", "MD5E WORM", reload=True)
+    eq_(repo_compat.default_backends, ["MD5E", "WORM"])
 
 
 @skip_nomultiplex_ssh  # too much of "multiplex" testing
@@ -1150,13 +1163,7 @@ def test_annex_ssh(topdir):
     # older openssh version. See
     # https://git-annex.branchable.com/bugs/SSH-based_git-annex-init_hang_on_older_systems___40__Xenial__44___Jessie__41__/
     if external_versions['cmd:system-ssh'] < '7.4' and \
-       '7.20191230' < external_versions['cmd:annex'] <= '8.20200720.1':
-        raise SkipTest("Test known to hang")
-    # And, since the switch to the Docker SSH target, our cron build with
-    # 7.20190708 stalls. 7.20190819 is the first known good version, but do a
-    # minimal skip up until the next release because we don't know that
-    # 7.20190730 stalls.
-    if external_versions['cmd:annex'] < '7.20190730':
+       external_versions['cmd:annex'] <= '8.20200720.1':
         raise SkipTest("Test known to hang")
 
     topdir = Path(topdir)
@@ -1170,10 +1177,6 @@ def test_annex_ssh(topdir):
     del main_tmp
     remote_1_path = rm1.path
     remote_2_path = rm2.path
-
-    # Clear instances so that __init__() is invoked and
-    # _set_shared_connection() the next time AnnexRepo is called.
-    AnnexRepo._unique_instances.clear()
 
     from datalad import ssh_manager
 
@@ -1192,12 +1195,8 @@ def test_annex_ssh(topdir):
     gr.add_remote("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
 
     ar = AnnexRepo(repo_path, create=False)
-    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
-    ok_(all(hash_2 not in opt for opt in ar._annex_common_options))
 
-    # connection to 'datalad-test' should be known to ssh manager:
-    assert_in(socket_1, list(map(str, ssh_manager._connections)))
-    # but socket was not touched:
+    # socket was not touched:
     if datalad_test_was_open:
         ok_(exists(socket_1))
     else:
@@ -1205,33 +1204,45 @@ def test_annex_ssh(topdir):
 
     # remote interaction causes socket to be created:
     (ar.pathobj / "foo").write_text("foo")
+    (ar.pathobj / "bar").write_text("bar")
     ar.add("foo")
-    ar.commit("add foo")
+    ar.add("bar")
+    ar.commit("add files")
 
     ar.copy_to(["foo"], remote="ssh-remote-1")
+    # copy_to() opens it if needed.
+    #
+    # Note: This isn't racy because datalad-sshrun should not close this itself
+    # because the connection was either already open before this test or
+    # copy_to(), not the underlying git-annex/datalad-sshrun call, opens it.
     ok_(exists(socket_1))
 
     # add another remote:
     ar.add_remote('ssh-remote-2', "ssh://datalad-test2" + remote_2_path)
 
-    # now, this connection was requested:
-    assert_in(socket_2, list(map(str, ssh_manager._connections)))
-    ok_(any(hash_1 in opt for opt in ar._annex_common_options))
-    ok_(any(hash_2 in opt for opt in ar._annex_common_options))
-    # but socket was not touched:
+    # socket was not touched:
     if datalad_test2_was_open:
         # FIXME: occasionally(?) fails in V6:
-        if not ar.supports_unlocked_pointers:
-            ok_(exists(socket_2))
+        # ok_(exists(socket_2))
+        pass
     else:
         ok_(not exists(socket_2))
 
     # copy to the new remote:
+    #
+    # Same racy note as the copy_to() call above.
     ar.copy_to(["foo"], remote="ssh-remote-2")
 
     if not exists(socket_2):  # pragma: no cover
         # @known_failure (marked for grep)
         raise SkipTest("test_annex_ssh hit known failure (gh-4781)")
+
+    # Check that git-annex is actually using datalad-sshrun.
+    fail_cmd = quote_cmdlinearg(sys.executable) + "-c 'assert 0'"
+    with patch.dict('os.environ', {'GIT_SSH_COMMAND': fail_cmd}):
+        with assert_raises(CommandError):
+            ar.copy_to(["bar"], remote="ssh-remote-2")
+    ar.copy_to(["bar"], remote="ssh-remote-2")
 
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
@@ -1272,13 +1283,16 @@ def test_annex_remove(path):
 @with_tempfile
 @with_tempfile
 def test_repo_version(path1, path2, path3):
-    annex = AnnexRepo(path1, create=True, version=6)
-    assert_repo_status(path1, annex=True)
-    version = int(annex.config.get('annex.version'))
-    # Since git-annex 7.20181031, v6 repos upgrade to v7.
-    supported_versions = AnnexRepo.check_repository_versions()["supported"]
-    v6_lands_on = next(i for i in supported_versions if i >= 6)
-    eq_(version, v6_lands_on)
+    with swallow_logs(new_level=logging.INFO) as cm:
+        annex = AnnexRepo(path1, create=True, version=6)
+        assert_repo_status(path1, annex=True)
+        version = int(annex.config.get('annex.version'))
+        # Since git-annex 7.20181031, v6 repos upgrade to v7.
+        supported_versions = AnnexRepo.check_repository_versions()["supported"]
+        v6_lands_on = next(i for i in supported_versions if i >= 6)
+        eq_(version, v6_lands_on)
+
+        assert_in("will be upgraded to 8", cm.out)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
@@ -1297,15 +1311,6 @@ def test_repo_version(path1, path2, path3):
 @skip_if(external_versions['cmd:annex'] > '8.20210428', "Stopped showing if too quick")
 @with_tempfile
 def test_init_scanning_message(path):
-    # | begin kludge
-    # Before git-annex v7.20190912 (specifically f6fb4b8cd), the "scanning for
-    # unlocked files" won't be shown for an empty tree. We can drop this once
-    # GIT_ANNEX_MIN_VERSION is at or above that version.
-    gr = GitRepo(path, create=True)
-    (gr.pathobj / "foo").write_text("foo")
-    gr.add("foo")
-    gr.commit(msg="add foo")
-    # | end kludge
     with swallow_logs(new_level=logging.INFO) as cml:
         AnnexRepo(path, create=True, version=7)
         # somewhere around 8.20210428-186-g428c91606 git annex changed
@@ -1512,22 +1517,34 @@ def test_is_available(batch, p):
 
     # known remote but doesn't have it
     assert is_available(fname, remote=DEFAULT_REMOTE) is False
+
+    # If the 'datalad' special remote is present, it will claim fname's URL.
+    if DATALAD_SPECIAL_REMOTE in annex.get_remotes():
+        remote = DATALAD_SPECIAL_REMOTE
+        uuid = DATALAD_SPECIAL_REMOTES_UUIDS[DATALAD_SPECIAL_REMOTE]
+    else:
+        remote = "web"
+        uuid = WEB_SPECIAL_REMOTE_UUID
+
     # it is on the 'web'
-    assert is_available(fname, remote='web') is True
+    assert is_available(fname, remote=remote) is True
     # not effective somehow :-/  may be the process already running or smth
     # with swallow_logs(), swallow_outputs():  # it will complain!
     assert is_available(fname, remote='unknown') is False
     assert_false(is_available("boguskey", key=True))
 
     # remove url
-    urls = annex.get_urls(fname) #, **bkw)
+    urls = annex.whereis(fname, output="full").get(uuid, {}).get("urls", [])
+
     assert(len(urls) == 1)
-    eq_(urls, annex.get_urls(annex.get_file_key(fname), key=True))
+    eq_(urls,
+        annex.whereis(annex.get_file_key(fname), key=True, output="full")
+        .get(uuid, {}).get("urls"))
     annex.rm_url(fname, urls[0])
 
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
-    assert is_available(fname, remote='web') is False
+    assert is_available(fname, remote=remote) is False
 
 
 @with_tempfile(mkdir=True)
@@ -1550,13 +1567,6 @@ def test_annex_add_no_dotfiles(path):
     with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
         f.write('some content')
     # make sure the repo is considered dirty now
-    if ar._check_version_kludges("has-include-dotfiles"):
-        assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
-        # no file is being added, as dotfiles/directories are ignored by default
-        ar.add('.', git=False)
-        # ^ Note: No longer true as of 8.20200226, which does _not_ skip
-        # dotfiles.
-    # double check, still dirty
     assert_true(ar.dirty)  # TODO: has been more detailed assertion (untracked file)
     # now add to git, and it should work
     ar.add('.', git=True)
@@ -1835,8 +1845,7 @@ def test_AnnexRepo_dirty(path):
     # modify to be the same
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    if not repo.supports_unlocked_pointers:
-        ok_(not repo.dirty)
+    ok_(not repo.dirty)
     # modified file
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('something else')
@@ -1857,14 +1866,7 @@ def test_AnnexRepo_dirty(path):
     # commit
     repo.commit("file2.txt annexed")
 
-    try:
-        ok_(not repo.dirty)
-    except AssertionError:
-        if "7.20191024" <= external_versions['cmd:annex'] < "7.20191230":
-            raise SkipTest(
-                "Test known to trigger git-to-annex content conversion "
-                "with this git-annex version (see gh-3890)")
-        raise
+    ok_(not repo.dirty)
 
     repo.unlock("file2.txt")
     # Unlocking the file is seen as a modification when we're not already in an
@@ -2053,13 +2055,12 @@ def test_AnnexRepo_get_corresponding_branch(src_path, path):
         ar.get_corresponding_branch() or ar.get_active_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
-    if ar.supports_unlocked_pointers:
-        ar.adjust()
-        # as above, we still want to get the default branch, while being on
-        # 'adjusted/<default branch>(unlocked)'
-        eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
-            ar.get_active_branch())
-        eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
+    ar.adjust()
+    # as above, we still want to get the default branch, while being on
+    # 'adjusted/<default branch>(unlocked)'
+    eq_('adjusted/{}(unlocked)'.format(DEFAULT_BRANCH),
+        ar.get_active_branch())
+    eq_(DEFAULT_BRANCH, ar.get_corresponding_branch())
 
 
 @with_tempfile
@@ -2083,9 +2084,8 @@ def test_AnnexRepo_is_managed_branch(path):
     (ar.pathobj / 'test-annex.dat').write_text("content")
     ar.save('some')
 
-    if ar.supports_unlocked_pointers:
-        ar.adjust()
-        ok_(ar.is_managed_branch())
+    ar.adjust()
+    ok_(ar.is_managed_branch())
 
 
 @with_tempfile(mkdir=True)
@@ -2146,7 +2146,7 @@ def _test_add_under_subdir(path):
     create_tree(subdir, {'empty': ''})
     runner = Runner(cwd=subdir)
     with chpwd(subdir):
-        runner.run(['git', 'add', 'empty'])  # should add sucesfully
+        runner.run(['git', 'add', 'empty'])  # should add successfully
         # gr.commit('important') #
         runner.run(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
@@ -2314,10 +2314,7 @@ def check_commit_annex_commit_changed(unlock, path):
         , untracked=['untracked']
     )
     ok_file_under_git(path, 'alwaysbig', annexed=True)
-    # 7.20191009 included a fix to evaluate current filesize not old one.
-    # So if size got short - it will get committed to git
-    ok_file_under_git(path, 'willgetshort',
-                      annexed=external_versions['cmd:annex']<'7.20191009')
+    ok_file_under_git(path, 'willgetshort', annexed=False)
 
     ar.save("message2", untracked='no') # commit all changed
     assert_repo_status(
@@ -2454,8 +2451,12 @@ def test_ro_operations(path):
         # but should succeed if we disallow merges
         repo2.repo_info(merge_annex_branches=False)
         # and ultimately the ls which uses it
-        from datalad.interface.ls import Ls
-        Ls.__call__(repo2.path, all_=True, long_=True)
+        try:
+            from datalad.api import ls
+            ls(repo2.path, all_=True, long_=True)
+        except ImportError:
+            raise SkipTest(
+                "No `ls` command available (provided by -deprecated extension)")
     finally:
         sudochown(['-R', str(os.geteuid()), repo2.path])
 
@@ -2533,3 +2534,53 @@ def test_call_annex(path):
         ar._call_annex(['not-an-annex-command'])
     except CommandError as e:
         assert_in('Invalid argument', e.stderr)
+
+
+@with_tempfile
+def test_whereis_zero_copies(path):
+    repo = AnnexRepo(path, create=True)
+    (repo.pathobj / "foo").write_text("foo")
+    repo.save()
+    repo.drop(["foo"], options=["--force"])
+
+    for output in "full", "uuids", "descriptions":
+        res = repo.whereis(files=["foo"], output=output)
+        if output == "full":
+            assert_equal(res["foo"], {})
+        else:
+            assert_equal(res, [[]])
+
+
+@with_tempfile(mkdir=True)
+def test_whereis_batch_eqv(path):
+    path = Path(path)
+
+    repo_a = AnnexRepo(path / "a", create=True)
+    (repo_a.pathobj / "foo").write_text("foo")
+    (repo_a.pathobj / "bar").write_text("bar")
+    (repo_a.pathobj / "baz").write_text("baz")
+    repo_a.save()
+
+    repo_b = repo_a.clone(repo_a.path, str(path / "b"))
+    repo_b.drop(["bar"])
+    repo_b.drop(["baz"])
+    repo_b.drop(["baz"], options=["--from=" + DEFAULT_REMOTE, "--force"])
+
+    files = ["foo", "bar", "baz"]
+    for output in "full", "uuids", "descriptions":
+        assert_equal(repo_b.whereis(files=files, batch=False, output=output),
+                     repo_b.whereis(files=files, batch=True, output=output))
+
+    # --key= and --batch are incompatible.
+    with assert_raises(ValueError):
+        repo_b.whereis(files=files, batch=True, key=True)
+
+
+def test_done_deprecation():
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = AnnexJsonProtocol("done")
+        warn_mock.assert_called_once()
+
+    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+        _ = AnnexJsonProtocol()
+        warn_mock.assert_not_called()

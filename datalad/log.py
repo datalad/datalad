@@ -37,7 +37,7 @@ def mbasename(s):
     base = basename(s)
     if base.endswith('.py'):
         base = base[:-3]
-    if base in set(['base', '__init__']):
+    if base in set(['base', '__init__', 'utils']):
         base = basename(dirname(s)) + '.' + base
     return base
 

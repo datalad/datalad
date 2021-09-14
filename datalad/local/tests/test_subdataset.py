@@ -23,7 +23,6 @@ from datalad.api import (
 )
 from datalad.utils import (
     chpwd,
-    on_windows,
     Path,
     PurePosixPath,
 )
@@ -286,13 +285,11 @@ def test_get_subdatasets(origpath, path):
 def test_state(path):
     ds = Dataset.create(path)
     sub = ds.create('sub')
-    res = ds.subdatasets()
-    assert_result_count(res, 1, path=sub.path)
-    # by default we are not reporting any state info
-    assert_not_in('state', res[0])
+    assert_result_count(
+        ds.subdatasets(), 1, path=sub.path, state='present')
     # uninstall the subdataset
     ds.uninstall('sub')
-    # normale 'gone' is "absent"
+    # normal 'gone' is "absent"
     assert_false(sub.is_installed())
     assert_result_count(
         ds.subdatasets(), 1, path=sub.path, state='absent')

@@ -35,8 +35,6 @@ def test__version__():
     regex = re.compile(r'^# '
                        r'(?P<version>[0-9]+\.[0-9.abcrc~]+)\s+'
                        r'\((?P<date>.*)\)'
-                       r'\s+--\s+'
-                       r'(?P<codename>.+)'
                        )
     with open(CHANGELOG_filename, 'rb') as f:
         for line in f:
@@ -62,7 +60,6 @@ def test__version__():
             else:
                 # should be a "release" record
                 assert_not_in('???', regd['date'])
-                assert_not_in('will be better than ever', regd['codename'])
                 ok_startswith(__version__, changelog_version)
                 if lv__version__ != changelog_version:
                     # It was not tagged yet and Changelog has no new records

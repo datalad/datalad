@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 from collections import OrderedDict
 import logging
 import re
-from tempfile import TemporaryFile
 
 from datalad.interface.base import (
     Interface,
@@ -28,11 +27,11 @@ from datalad.interface.common_opts import (
 )
 from datalad.interface.utils import (
     eval_results,
+    render_action_summary,
 )
 from datalad.interface.results import annexjson2result
 from datalad.log import log_progress
 from datalad.support.annexrepo import (
-    AnnexJsonProtocol,
     AnnexRepo,
 )
 from datalad.support.gitrepo import GitRepo
@@ -113,7 +112,7 @@ class Push(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
-            doc="""path to contrain a push to. If given, only
+            doc="""path to constrain a push to. If given, only
             data or changes for those paths are considered for a push.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
@@ -228,7 +227,6 @@ class Push(Interface):
                     if sr
                     else 'No targets configured in dataset.'))
             return
-
         if since == '^':
             # figure out state of remote branch and set `since`
             since = _get_corresponding_remote_state(ds_repo, to)
@@ -265,6 +263,27 @@ class Push(Interface):
             for i, ds in pbars.items():
                 log_progress(lgr.info, i, 'Finished push of %s', ds)
         if not matched_anything:
+            potential_remote = False
+            if not to and len(paths) == 1:
+                # if we get a remote name without --to, provide a hint
+                sr = ds_repo.get_remotes(**get_remote_kwargs)
+                potential_remote = [
+                    p for p in ensure_list(path) if p in sr
+                ]
+            if potential_remote:
+                hint = "{} matches a sibling name and not a path. " \
+                      "Forgot --to?".format(potential_remote)
+                yield dict(
+                    res_kwargs,
+                    status='notneeded',
+                    message=hint,
+                    hints=hint,
+                    type='dataset',
+                    path=ds.path,
+                )
+                # there's no matching path and we have generated a hint on
+                # fixing the call - we can return now
+                return
             yield dict(
                 res_kwargs,
                 status='notneeded',
@@ -273,8 +292,11 @@ class Push(Interface):
                 path=ds.path,
             )
 
+    custom_result_summary_renderer_pass_summary = True
+
     @staticmethod
-    def custom_result_summary_renderer(results):  # pragma: more cover
+    def custom_result_summary_renderer(results, action_summary):  # pragma: more cover
+        render_action_summary(action_summary)
         # report on any hints at the end
         # get all unique hints
         hints = set([r.get('hints', None) for r in results])
@@ -283,12 +305,13 @@ class Push(Interface):
             from datalad.ui import ui
             from datalad.support import ansi_colors
             intro = ansi_colors.color_word(
-                "Potential hints to solve encountered errors: ",
+                "Hints: ",
                 ansi_colors.YELLOW)
             ui.message(intro)
             [ui.message("{}: {}".format(
                 ansi_colors.color_word(id + 1, ansi_colors.YELLOW), hint))
                 for id, hint in enumerate(hints)]
+
 
 
 def _datasets_since_(dataset, since, paths, recursive, recursion_limit):
@@ -826,36 +849,35 @@ def _push_data(ds, target, content, data, force, jobs, res_kwargs,
     # produce final path list. use knowledge that annex command will
     # run in the root of the dataset and compact paths to be relative
     # to this location
-    # XXX must not be a SpooledTemporaryFile -- dunno why, but doesn't work
-    # otherwise
-    with TemporaryFile() as file_list:
-        nbytes = 0
-        for c in to_transfer:
-            key = c['key']
-            if key in seen_keys:
-                repkey_paths.setdefault(key, []).append(c['path'])
-            else:
-                file_list.write(
-                    bytes(Path(c['path']).relative_to(ds.pathobj)))
-                file_list.write(b'\0')
-                nbytes += c['bytesize']
-                seen_keys.add(key)
-        lgr.debug('Counted %d bytes of annex data to transfer',
-                  nbytes)
+    file_list = b''
+    nbytes = 0
+    for c in to_transfer:
+        key = c['key']
+        if key in seen_keys:
+            repkey_paths.setdefault(key, []).append(c['path'])
+        else:
+            file_list += bytes(Path(c['path']).relative_to(ds.pathobj))
+            file_list += b'\0'
+            nbytes += c['bytesize']
+            seen_keys.add(key)
+    lgr.debug('Counted %d bytes of annex data to transfer',
+              nbytes)
 
-        # rewind stdin buffer
-        file_list.seek(0)
-
-        # and go
-        res = ds_repo._call_annex_records(
-            cmd,
-            stdin=file_list,
-            progress=True,
-            # tailor the progress protocol with the total number of files
-            # to be transferred
-            total_nbytes=nbytes)
-        for j in res:
-            yield annexjson2result(j, ds, type='file', **res_kwargs)
+    # and go
+    res = ds_repo._call_annex_records(
+        cmd,
+        git_options=[
+            "-c",
+            "annex.retry={}".format(
+                ds_repo.config.obtain("datalad.annex.retry"))]
+            if ds_repo.config.get("annex.retry") else None,
+        stdin=file_list,
+        progress=True,
+        # tailor the progress protocol with the total number of files
+        # to be transferred
+        total_nbytes=nbytes)
+    for j in res:
+        yield annexjson2result(j, ds, type='file', **res_kwargs)
 
     for annex_key, paths in repkey_paths.items():
         for path in paths:

@@ -10,6 +10,12 @@
 
 """
 
+import logging
+from pathlib import Path
+
+
+lgr = logging.getLogger('datalad.customremotes.ria_utils')
+
 
 class UnknownLayoutVersion(Exception):
     pass
@@ -173,7 +179,7 @@ def create_store(io, base_path, version):
     io.mkdir(error_logs)
 
 
-def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
+def create_ds_in_store(io, base_path, dsid, obj_version, store_version, alias=None):
     """Helper to create a dataset in a RIA store
 
     Note, that this is meant as an internal helper and part of intermediate
@@ -193,6 +199,8 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
       layout version of the store (dataset tree)
     obj_version: str
       layout version of the dataset itself (object tree)
+    alias: str, optional
+      alias for the dataset in the store
     """
 
     # TODO: Note for RF'ing, that this is about setting up a valid target
@@ -216,3 +224,15 @@ def create_ds_in_store(io, base_path, dsid, obj_version, store_version):
 
     io.mkdir(archive_dir)
     io.mkdir(dsobj_dir)
+    if alias:
+        alias_dir = base_path / "alias"
+        io.mkdir(alias_dir)
+        try:
+            # go for a relative path to keep the alias links valid
+            # when moving a store
+            io.symlink(
+                Path('..') / dsgit_dir.relative_to(base_path),
+                alias_dir / alias)
+        except FileExistsError:
+            lgr.warning("Alias %r already exists in the RIA store, not adding an "
+                        "alias.", alias)

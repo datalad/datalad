@@ -330,14 +330,58 @@
             ]
         },
         {
-            "login": "bhanuprasad14",
-            "name": "bhanuprasad14",
+            "login": "christian-monch",
+            "name": "Christian Mönch",
             "contributions": [
                 "code"
             ],
-            "profile": "https://github.com/bhanuprasad14",
+            "profile": "https://github.com/christian-monch",
             "avatar_url": [
-                "https://avatars3.githubusercontent.com/u/19843?v=4"
+                "https://avatars.githubusercontent.com/u/17925232?v=4"
+            ]
+        },
+        {
+            "login": "mattcieslak",
+            "name": "Matt Cieslak",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mattcieslak",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/170026?v=4"
+            ]
+        },
+        {
+            "login": "mikapfl",
+            "name": "Mika Pflüger",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/mikapfl",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/7226087?v=4"
+            ]
+        },
+        {
+            "login": "ypid",
+            "name": "Robin Schneider",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://me.ypid.de/",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/1301158?v=4"
+            ]
+        },
+        {
+            "login": "AKSoo",
+            "name": "Sin Kim",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://orcid.org/0000-0003-4652-3758",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/7570456?v=4"
             ]
         }
     ],

@@ -13,7 +13,6 @@
 import hashlib
 import os
 import tempfile
-from urllib.parse import unquote as urlunquote
 import string
 import random
 import logging

@@ -31,6 +31,7 @@ from ..credentials import (
     CompositeCredential,
     UserPassword,
 )
+from datalad import cfg as dlcfg
 
 
 @with_testsui(responses=[
@@ -63,7 +64,7 @@ def test_cred1_enter_new():
     assert_equal(keyring.get('name', 'password'), 'newpassword')
 
 
-@with_testsui(responses=['password1'])
+@with_testsui(responses=['password1', 'newuser', 'newpassword'])
 def test_cred1_call():
     keyring = MemoryKeyring()
     cred = UserPassword("name", keyring=keyring)
@@ -73,6 +74,13 @@ def test_cred1_call():
     assert_equal(keyring.get('name', 'user'), 'user1')
     assert_equal(cred(), {'user': 'user1', 'password': 'password1'})
     assert_equal(keyring.get('name', 'password'), 'password1')
+    # without intervention the same credentials will be reused
+    # in subsequent attempts
+    assert_equal(cred(), {'user': 'user1', 'password': 'password1'})
+    with patch.dict(dlcfg._merged_store, {'datalad.credentials.force-ask': 'yes'}):
+        assert_equal(cred(), {'user': 'newuser', 'password': 'newpassword'})
+    assert_equal(keyring.get('name', 'user'), 'newuser')
+    assert_equal(keyring.get('name', 'password'), 'newpassword')
 
 
 def test_keyring():
@@ -129,14 +137,35 @@ def test_credentials_from_env():
     assert_equal(cred.get('key_id'), None)
     assert_equal(cred.get('secret_id'), None)
 
-    with patch.dict('os.environ', {'DATALAD_test_s3_key_id': '1'}):
+    def _check1():
         assert_equal(cred.get('key_id'), '1')
         assert_false(cred.is_known)
+
+    def _check2():
+        assert_equal(cred.get('key_id'), '1')
+        assert_equal(cred.get('secret_id'), '2')
+        assert_true(cred.is_known)
+
+    # this is the old way, should still work
+    with patch.dict('os.environ', {'DATALAD_test_s3_key_id': '1'}):
+        _check1()
         with patch.dict('os.environ', {'DATALAD_test_s3_secret_id': '2'}):
-            assert_equal(cred.get('key_id'), '1')
-            assert_equal(cred.get('secret_id'), '2')
-            assert_true(cred.is_known)
+            _check2()
         assert_false(cred.is_known)  # no memory of the past
+
+    # here is the new way
+    import datalad
+    try:
+        with patch.dict('os.environ', {'DATALAD_CREDENTIAL_test__s3_key__id': '1'}):
+            datalad.cfg.reload()
+            _check1()
+            with patch.dict('os.environ', {'DATALAD_CREDENTIAL_test__s3_secret__id': '2'}):
+                datalad.cfg.reload()
+                _check2()
+            datalad.cfg.reload()
+            assert_false(cred.is_known)  # no memory of the past
+    finally:
+        datalad.cfg.reload()
 
 
 @skip_if(not external_versions['keyrings.alt'])
@@ -165,4 +194,3 @@ def test_delete_not_crashing(path):
         raise AssertionError("keyring still has our key")
     except AssertionError:
         pass
-

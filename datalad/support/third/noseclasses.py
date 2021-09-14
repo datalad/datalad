@@ -12,7 +12,6 @@ import inspect
 
 import nose
 from nose.plugins import doctests as npd
-from nose.plugins.errorclass import ErrorClass, ErrorClassPlugin
 from nose.plugins.base import Plugin
 from nose.util import src
 from .nosetester import get_package_name

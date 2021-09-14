@@ -320,7 +320,6 @@ class IPythonUI(DialogUI):
         """
         backend = kwargs.pop('backend', None)
         if self._tqdm_frontend == "unknown":
-            from .progressbars import tqdmProgressBar
             try:
                 from tqdm import tqdm_notebook  # check if available etc
                 self.__class__._tqdm_frontend = 'ipython'
