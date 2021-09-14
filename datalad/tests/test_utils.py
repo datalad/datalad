@@ -18,7 +18,6 @@ import sys
 import time
 import logging
 from unittest.mock import patch
-import builtins
 
 from operator import itemgetter
 from os.path import (
@@ -74,7 +73,6 @@ from datalad.utils import (
     path_is_subpath,
     path_startswith,
     rotree,
-    safe_print,
     setup_exceptionhook,
     split_cmdline,
     swallow_logs,
@@ -104,9 +102,6 @@ from .utils import (
     eq_,
     has_symlink_capability,
     known_failure,
-    known_failure_appveyor,
-    known_failure_v6,
-    known_failure_windows,
     nok_,
     OBSCURE_FILENAME,
     ok_,
@@ -903,22 +898,6 @@ def test_path_is_subpath():
     assert_raises(ValueError, path_is_subpath, '/a/b', 'a')
 
 
-def test_safe_print():
-    """Just to test that we are getting two attempts to print"""
-
-    called = [0]
-
-    def _print(s):
-        assert_equal(s, "bua")
-        called[0] += 1
-        if called[0] == 1:
-            raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
-
-    with patch.object(builtins, 'print', _print):
-        safe_print("bua")
-    assert_equal(called[0], 2)
-
-
 def test_probe_known_failure():
 
     # Note: we can't test the switch "datalad.tests.knownfailures.probe"
@@ -1004,32 +983,6 @@ def test_known_failure():
         failing()
     else:
         # not skipping and not probing results in the original failure:
-        assert_raises(AssertionError, failing)
-
-
-def test_known_failure_v6():
-
-    @known_failure_v6
-    def failing():
-        raise AssertionError("Failed")
-
-    v6 = dl_cfg.obtain("datalad.repo.version") == 6
-    skip = dl_cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = dl_cfg.obtain("datalad.tests.knownfailures.probe")
-
-    if v6:
-        if skip:
-            # skipping takes precedence over probing
-            failing()
-        elif probe:
-            # if we probe a known failure it's okay to fail:
-            failing()
-        else:
-            # not skipping and not probing results in the original failure:
-            assert_raises(AssertionError, failing)
-
-    else:
-        # behaves as if it wasn't decorated at all, no matter what
         assert_raises(AssertionError, failing)
 
 
@@ -1180,10 +1133,6 @@ def test_dlabspath(path):
             eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
 
 
-# OSError: [WinError 998] Invalid access to memory location:
-# '(originated from NtWow64ReadVirtualMemory64)'
-# But passes on a real win10 box -- might be server config issue
-@known_failure_appveyor
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
 def test_get_open_files(p):
     pobj = Path(p)
@@ -1205,7 +1154,7 @@ def test_get_open_files(p):
         # however, on windows get_open_files() can be very slow
         # (e.g. the first invocation in this test (above) can easily
         # take 30-50s). It is not worth slowing the tests to
-        # accomodate this issue, given we have tested proper functioning
+        # accommodate this issue, given we have tested proper functioning
         # in principle already above).
         return
 
@@ -1263,12 +1212,16 @@ def test_create_tree(path):
             # right away an obscure case where we have both 1 and 1.gz
                 ('1', content*2),
                 ('1.gz', content*3),
+                ('1.xz', content*4),
+                ('1.lzma', content*5),
             ]
         )),
     ]))
     ok_file_has_content(op.join(path, '1'), content)
     ok_file_has_content(op.join(path, 'sd', '1'), content*2)
     ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+    ok_file_has_content(op.join(path, 'sd', '1.xz'), content*4, decompress=True)
+    ok_file_has_content(op.join(path, 'sd', '1.lzma'), content*5, decompress=True)
 
 
 def test_never_fail():

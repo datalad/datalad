@@ -32,6 +32,7 @@ from ..utils import ensure_bytes
 from ..utils import unlink
 from .base import AnnexCustomRemote
 from .main import main as super_main
+from datalad.consts import ARCHIVES_SPECIAL_REMOTE
 
 
 # ####
@@ -393,8 +394,16 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 # so
                 pwd = getpwd()
                 lgr.debug(u"Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
+                was_extracted = self.cache[akey_path].is_extracted
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, path)
+                if not was_extracted and self.cache[akey_path].is_extracted:
+                    self.info("%s special remote is using an extraction cache "
+                              "under %s. Remove it with DataLad's 'clean' "
+                              "command to save disk space." %
+                              (ARCHIVES_SPECIAL_REMOTE,
+                               self.cache[akey_path].path)
+                              )
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:

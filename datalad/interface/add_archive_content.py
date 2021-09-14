@@ -14,40 +14,55 @@ from __future__ import print_function
 __docformat__ = 'restructuredtext'
 
 
-import re
 import os
+import re
 import tempfile
-
-from os.path import join as opj, curdir, exists, lexists, relpath, basename
-from os.path import commonprefix
+from os.path import (
+    basename,
+    commonprefix,
+    curdir,
+    dirname,
+    exists,
+    isabs,
+    islink,
+)
+from os.path import join as opj
+from os.path import (
+    lexists,
+    normpath,
+    relpath,
+    splitext,
+)
 from os.path import sep as opsep
-from os.path import islink
-from os.path import isabs
-from os.path import dirname
-from os.path import normpath
+
+from datalad.cmdline.helpers import get_repo_instance
+from datalad.consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.customremotes.base import init_datalad_remote
+from datalad.interface.base import build_doc
+from datalad.log import logging
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.support.param import Parameter
+from datalad.support.stats import ActivityStats
+from datalad.support.strings import apply_replacement_rules
+from datalad.utils import (
+    Path,
+    ensure_tuple_or_list,
+    file_basename,
+    get_dataset_root,
+    getpwd,
+    md5sum,
+    rmtree,
+    split_cmdline,
+)
 
 from .base import Interface
-from datalad.interface.base import build_doc
 from .common_opts import allow_dirty
-from ..consts import ARCHIVES_SPECIAL_REMOTE
-from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureNone
 
-from ..support.annexrepo import AnnexRepo
-from datalad.support.exceptions import FileNotInRepositoryError
-from ..support.strings import apply_replacement_rules
-from ..support.stats import ActivityStats
-from ..cmdline.helpers import get_repo_instance
-from ..utils import getpwd, rmtree, file_basename
-from ..utils import md5sum
-from ..utils import Path
-from ..utils import ensure_tuple_or_list
-from ..utils import get_dataset_root
-from ..utils import split_cmdline
-
-from datalad.customremotes.base import init_datalad_remote
-
-from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
 
 
@@ -286,7 +301,7 @@ class AddArchiveContent(Interface):
         if extract_rpath == curdir:
             extract_rpath = None  # no special relpath from top of the repo
 
-        # and operate from now on the key or whereever content available "canonically"
+        # and operate from now on the key or wherever content available "canonically"
         try:
             key_rpath = annex.get_contentlocation(key)  # , relative_to_top=True)
         except:
@@ -336,7 +351,8 @@ class AddArchiveContent(Interface):
             outside_stats = stats
             stats = ActivityStats()
 
-            for extracted_file in earchive.get_extracted_files():
+            extracted_files = list(earchive.get_extracted_files())
+            for extracted_file in extracted_files:
                 stats.files += 1
                 extracted_path = opj(earchive.path, extracted_file)
 
@@ -350,6 +366,16 @@ class AddArchiveContent(Interface):
 
                 # preliminary target name which might get modified by renames
                 target_file_orig = target_file = extracted_file
+
+                # stream archives would not have had the original filename information
+                # in them, so would be extracted under a name derived from their annex key.
+                # Provide ad-hoc handling for such cases
+                if (len(extracted_files) == 1 and
+                        splitext(archive)[-1] in ('.xz', '.gz', '.lzma') and
+                        basename(key_rpath).startswith(basename(extracted_file))):
+                    # take archive's name (without extension) for the filename and place
+                    # where it was originally extracted
+                    target_file = opj(dirname(extracted_file), basename(splitext(archive)[0]))
 
                 # strip leading dirs
                 target_file = target_file[leading_dir_len:]

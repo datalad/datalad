@@ -25,7 +25,6 @@ _group_dataset = (
         ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
-        ('datalad.distribution.publish', 'Publish'),
         ('datalad.core.distributed.push', 'Push', 'push'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
         ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
@@ -66,9 +65,14 @@ _group_metadata = (
 _group_misc = (
     'Miscellaneous commands',
     [
-        ('datalad.plugin.wtf', 'WTF'),
+        ('datalad.local.wtf', 'WTF'),
+        ('datalad.local.no_annex', 'NoAnnex'),
+        ('datalad.local.add_readme', 'AddReadme'),
+        ('datalad.local.addurls', 'Addurls'),
+        ('datalad.local.check_dates', 'CheckDates'),
+        ('datalad.local.export_archive', 'ExportArchive'),
+        ('datalad.distributed.export_to_figshare', 'ExportToFigshare'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),
@@ -100,6 +104,7 @@ _group_plumbing = (
 _known_extension_commands = {
     'datalad-container': ('containers-list', 'containers-remove', 'containers-add', 'containers-run'),
     'datalad-crawler': ('crawl', 'crawl-init'),
+    'datalad-deprecated': ('ls',),
     'datalad-neuroimaging': ('bids2scidata',)
 }
 

@@ -89,7 +89,9 @@ def get_status_dict(action=None, ds=None, path=None, type=None, logger=None,
     if message is not None:
         d['message'] = message
     if exception is not None:
-        d['exception_traceback'] = exc_str(exception, limit=1000, include_str=False)
+        d['exception'] = exception
+        d['exception_traceback'] = \
+            exception.format_oneline_tb(limit=1000, include_str=False)
     if kwargs:
         d.update(kwargs)
     return d
@@ -201,7 +203,7 @@ translate_annex_notes = {
 def annexjson2result(d, ds, **kwargs):
     """Helper to convert an annex JSON result to a datalad result dict
 
-    Info from annex is rather heterogenous, partly because some of it
+    Info from annex is rather heterogeneous, partly because some of it
     our support functions are faking.
 
     This helper should be extended with all needed special cases to

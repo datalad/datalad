@@ -49,14 +49,13 @@ ANNEX_TRANSFER_DIR = join('.git', 'annex', 'transfer')
 SEARCH_INDEX_DOTGITDIR = join('datalad', 'search_index')
 
 DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
-                  or "http://datasets.datalad.org/"
+                  or "https://datasets.datalad.org/"
 # safeguard
 if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
-WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')
 
 # Format to use for time stamps
 TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"

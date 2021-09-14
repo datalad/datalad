@@ -31,7 +31,6 @@ from ...tests.utils import (
     abspath,
     assert_equal,
     assert_false,
-    assert_is_instance,
     assert_not_equal,
     assert_not_in,
     assert_raises,
@@ -41,7 +40,6 @@ from ...tests.utils import (
     in_,
     known_failure_githubci_win,
     ok_,
-    ok_file_has_content,
     serve_path_via_http,
     swallow_logs,
     with_tempfile,
@@ -55,7 +53,6 @@ from datalad.cmd import (
 )
 from datalad.support.exceptions import CommandError
 from ...utils import (
-    _path_,
     unlink,
 )
 
@@ -122,7 +119,12 @@ def test_basic_scenario(d, d2):
     in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
     assert_false(annex.file_has_content(fn_extracted))
-    annex.get(fn_extracted)
+
+    with swallow_logs(new_level=logging.INFO) as cml:
+        annex.get(fn_extracted)
+        # Hint users to the extraction cache (and to datalad clean)
+        cml.assert_logged(msg="datalad-archives special remote is using an "
+                              "extraction", level="INFO", regex=False)
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
@@ -232,7 +234,7 @@ def test_interactions(tdir):
             ('VALUE dl+archive://somekey3#path', None),
             ('VALUE',
              re.compile(
-                 'TRANSFER-FAILURE RETRIEVE somekey Failed to fetch any '
+                 'TRANSFER-FAILURE RETRIEVE somekey RuntimeError\(Failed to fetch any '
                  'archive containing somekey. Tried: \[\]')
              )
         ],

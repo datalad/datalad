@@ -31,11 +31,13 @@ from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import (
     NoDatasetFound,
 )
-from datalad.support.repo import path_based_str_repr
+from datalad.dataset.repo import (
+    path_based_str_repr,
+    PathBasedFlyweight,
+)
 from datalad.support.gitrepo import (
     GitRepo,
 )
-from datalad.support.repo import PathBasedFlyweight
 from datalad.support import path as op
 
 import datalad.utils as ut
@@ -49,7 +51,6 @@ from datalad.utils import (
     Path,
     PurePath,
     ensure_list,
-    quote_cmdlinearg,
 )
 
 
@@ -188,7 +189,7 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             from datalad.interface.base import (
                 get_interface_groups, get_api_name, load_interface
             )
-            groups = get_interface_groups(True)
+            groups = get_interface_groups()
             for group, _, interfaces in groups:
                 for intfspec in interfaces:
                     # lgr.log(5, "Considering interface %s", intfspec)
@@ -403,7 +404,6 @@ class Dataset(object, metaclass=PathBasedFlyweight):
         -------
         Dataset or None
         """
-        from datalad.coreapi import subdatasets
         path = self.path
         sds_path = path if topmost else None
 
@@ -567,10 +567,14 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetFound(
-                "No dataset found at '{}'.  Specify a dataset to work with "
+                "No dataset found at '{}'{}.  Specify a dataset to work with "
                 "by providing its path via the `dataset` option, "
                 "or change the current working directory to be in a "
-                "dataset.".format(getpwd()))
+                "dataset.".format(
+                    getpwd(),
+                    " for the purpose {!r}".format(purpose) if purpose else ''
+                )
+            )
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
@@ -654,8 +658,8 @@ def resolve_path(path, ds=None, ds_resolved=None):
             # CONCEPT: do the minimal thing to catch most real-world inputs
             # ASSUMPTION: the only sane relative path input that needs
             # handling and can be handled are upward references like
-            # '../../some/that', wherease stuff like 'down/../someotherdown'
-            # are intellectual excercises
+            # '../../some/that', whereas stuff like 'down/../someotherdown'
+            # are intellectual exercises
             # ALGORITHM: match any number of leading '..' path components
             # and shorten the PWD by that number
             # NOT using ut.Path.cwd(), because it has symlinks resolved!!

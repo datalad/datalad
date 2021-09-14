@@ -26,6 +26,8 @@ help = (
                  the use of a pager for displaying the help message""")
 )
 
+# note: no longer used by the main `datalad` entry point, but could still
+# be used by downstream software, so was left in place
 version = (
     'version', ('--version',),
     dict(action='version',
@@ -48,7 +50,7 @@ pbs_runner = (
     'pbs-runner', ('--pbs-runner',),
     dict(choices=['condor'],
          default=None,
-         help="""execute command by scheduling it via available PBS.  For settings, config file will be consulted""")
+         help="""DEPRECATED, will be removed in a future release.""")
 )
 
 change_path = (

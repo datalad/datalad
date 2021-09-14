@@ -24,7 +24,7 @@ Description: Basic summary
  A text with arbitrary length and content that can span multiple
  .
  paragraphs (this is a new one)
-License: CC0
+License: CC0-1.0
  The person who associated a work with this deed has dedicated the work to the
  public domain by waiving all of his or her rights to the work worldwide under
  copyright law, including all related and neighboring rights, to the extent
@@ -57,7 +57,7 @@ def test_get_metadata(path):
   "homepage": "http://studyforrest.org",
   "issuetracker": "https://github.com/psychoinformatics-de/studyforrest-data-phase2/issues",
   "license": [
-    "CC0",
+    "CC0-1.0",
     "The person who associated a work with this deed has dedicated the work to the public domain by waiving all of his or her rights to the work worldwide under copyright law, including all related and neighboring rights, to the extent allowed by law.\\nYou can copy, modify, distribute and perform the work, even for commercial purposes, all without asking permission."
   ],
   "maintainer": [

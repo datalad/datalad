@@ -1,0 +1,170 @@
+{
+    "glalteva": {
+        "name": "glalteva",
+        "blog": "https://github.com/glalteva"
+    },
+    "adswa": {
+        "name": "Adina Svenja Wagner",
+        "blog": "https://github.com/adswa",
+        "email": "adina.wagner@t-online.de",
+        "bio": "Psychoinformagician in training \r\n:bug:",
+        "orcid": "0000-0003-2917-3450",
+        "affiliation": "Research Centre Juelich"
+    },
+    "chrhaeusler": {
+        "name": "chrhaeusler",
+        "blog": "https://github.com/chrhaeusler",
+        "email": "der.haeusler@gmx.net",
+        "bio": "PhD student in Cognitive Neuroscience at INM-7 (Brain & Behaviour) at Research Center Jülich, Jülich, Germany"
+    },
+    "soichih": {
+        "name": "soichih",
+        "blog": "https://github.com/soichih"
+    },
+    "mvdoc": {
+        "name": "mvdoc",
+        "blog": "https://github.com/mvdoc",
+        "bio": "Postdoc 🧠👨🏻‍💻 in the Gallant Lab at UC Berkeley"
+    },
+    "mih": {
+        "name": "mih",
+        "blog": "https://github.com/mih",
+        "email": "michael.hanke@gmail.com"
+    },
+    "yarikoptic": {
+        "name": "Yaroslav Halchenko",
+        "blog": "https://github.com/yarikoptic",
+        "email": "debian@onerussian.com",
+        "bio": "Cheers!",
+        "orcid": "0000-0003-3456-2493",
+        "affiliation": "Dartmouth College"
+    },
+    "loj": {
+        "name": "loj",
+        "blog": "https://github.com/loj",
+        "email": "laura@waite.eu"
+    },
+    "feilong": {
+        "name": "feilong",
+        "blog": "https://github.com/feilong"
+    },
+    "jhpoelen": {
+        "name": "jhpoelen",
+        "blog": "https://github.com/jhpoelen"
+    },
+    "andycon": {
+        "name": "andycon",
+        "blog": "https://github.com/andycon"
+    },
+    "nicholsn": {
+        "name": "nicholsn",
+        "blog": "https://github.com/nicholsn"
+    },
+    "adelavega": {
+        "name": "Alejandro de la Vega",
+        "blog": "https://github.com/adelavega",
+        "email": "delavega@utexas.edu",
+        "bio": "Research Scientist @ UT Austin. "
+    },
+    "kskyten": {
+        "name": "kskyten",
+        "blog": "https://github.com/kskyten"
+    },
+    "TheChymera": {
+        "name": "TheChymera",
+        "blog": "https://github.com/TheChymera",
+        "email": "chr@chymera.eu",
+        "bio": "I bring Reproducibility, Freedom, and Open Source to Neuroscience, Academic Publishing, Software, and Life."
+    },
+    "effigies": {
+        "name": "effigies",
+        "blog": "https://github.com/effigies",
+        "email": "effigies@gmail.com"
+    },
+    "jgors": {
+        "name": "jgors",
+        "blog": "https://github.com/jgors"
+    },
+    "debanjum": {
+        "name": "debanjum",
+        "blog": "https://github.com/debanjum"
+    },
+    "nellh": {
+        "name": "nellh",
+        "blog": "https://github.com/nellh"
+    },
+    "emdupre": {
+        "name": "emdupre",
+        "blog": "https://github.com/emdupre",
+        "bio": "Neuroscience graduate student at McGill University"
+    },
+    "aqw": {
+        "name": "aqw",
+        "blog": "https://github.com/aqw",
+        "email": "alex@waite.eu"
+    },
+    "vsoch": {
+        "name": "vsoch",
+        "blog": "https://github.com/vsoch",
+        "bio": "I'm the Vanessasaurus!"
+    },
+    "kyleam": {
+        "name": "kyleam",
+        "blog": "https://github.com/kyleam",
+        "email": "kyle@kyleam.com"
+    },
+    "driusan": {
+        "name": "driusan",
+        "blog": "https://github.com/driusan",
+        "email": "driusan@gmail.com",
+        "bio": "Professional Rubber Duck"
+    },
+    "overlake333": {
+        "name": "overlake333",
+        "blog": "https://github.com/overlake333",
+        "email": "taylor.m.olson.21@dartmouth.edu"
+    },
+    "akeshavan": {
+        "name": "akeshavan",
+        "blog": "https://github.com/akeshavan"
+    },
+    "jwodder": {
+        "name": "jwodder",
+        "blog": "https://github.com/jwodder"
+    },
+    "bpoldrack": {
+        "name": "bpoldrack",
+        "blog": "https://github.com/bpoldrack"
+    },
+    "yetanothertestuser": {
+        "name": "yetanothertestuser",
+        "blog": "https://github.com/yetanothertestuser"
+    },
+    "christian-monch": {
+        "name": "Christian Mönch",
+        "email": "christian.moench@web.de",
+        "blog": "https://github.com/christian-monch"
+    },
+    "mikapfl": {
+        "name": "Mika Pflüger",
+        "email": "mika.pflueger@pik-potsdam.de",
+        "orcid": "0000-0002-7814-8916",
+        "affiliation": "Potsdam Institute for Climate Impact Research",
+        "blog": "https://github.com/mikapfl"
+    },
+    "mattcieslak": {
+        "name": "Matt Cieslak",
+        "bio": "Senior Scientist at UPenn Brain & Behavior Lab. Diffusion imaging enthusiast.",
+        "blog": "https://github.com/mattcieslak",
+        "email": "mattcieslak@gmail.com"
+    },
+    "ypid": {
+        "name": "Robin Schneider",
+        "bio": "Working on Free Software as in Freedom.                   EDE1 371D 1B87 D28D A5E8  0515 86FD 980B BF1A 40F8",
+        "blog": "https://me.ypid.de/"
+    },
+    "AKSoo": {
+        "name": "Sin Kim",
+        "blog": "https://orcid.org/0000-0003-4652-3758"
+    }
+}

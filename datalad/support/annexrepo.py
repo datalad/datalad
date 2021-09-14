@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import warnings
 
 from itertools import chain
 from os import linesep
@@ -34,7 +35,6 @@ from weakref import (
     WeakValueDictionary
 )
 
-from datalad import ssh_manager
 from datalad.consts import WEB_SPECIAL_REMOTE_UUID
 from datalad.dochelpers import (
     exc_str,
@@ -66,7 +66,7 @@ from datalad.cmd import (
 )
 
 # imports from same module:
-from .repo import RepoInterface
+from datalad.dataset.repo import RepoInterface
 from .gitrepo import (
     GitRepo,
     normalize_path,
@@ -95,6 +95,10 @@ from .exceptions import (
 )
 
 lgr = logging.getLogger('datalad.annex')
+
+# This is a map between an auto-upgradeable version and the version that it
+# upgrades to. It should track autoUpgradeableVersions in Annex.Version.
+_AUTO_UPGRADEABLE_VERSIONS = {v: 8 for v in range(3, 8)}
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -126,7 +130,10 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180913 -- annex fixes all known to us issues for v6
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
     # 7.20190503 -- annex introduced mimeencoding support needed for our text2git
-    GIT_ANNEX_MIN_VERSION = '7.20190503'
+    #
+    # When bumping this, check whether datalad.repo.version needs to be
+    # adjusted.
+    GIT_ANNEX_MIN_VERSION = '8.20200309'
     git_annex_version = None
     supports_direct_mode = None
     repository_versions = None
@@ -235,15 +242,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         # just in case we do need to pass annex specific options, even if
         # there is no need ATM
         self._ANNEX_GIT_COMMON_OPTIONS = self._GIT_COMMON_OPTIONS[:]
-
-        # check for possible SSH URLs of the remotes in order to set up
-        # shared connections:
-        for r in self.get_remotes():
-            for url in [self.get_remote_url(r),
-                        self.get_remote_url(r, push=True)]:
-                if url is not None:
-                    self._set_shared_connection(r, url)
-
         self.always_commit = always_commit
 
         config = self.config
@@ -254,7 +252,19 @@ class AnnexRepo(GitRepo, RepoInterface):
             # '' cannot be converted to int (via Constraint as defined for
             # "datalad.repo.version" in common_cfg
             # => Allow conversion to result in None?
-            if not version:
+            if version:
+                try:
+                    version = int(version)
+                except ValueError:
+                    # Just give a warning if things look off and let
+                    # git-annex-init complain if it can't actually handle it.
+                    lgr.warning(
+                        "Expected an int for datalad.repo.version, got %s",
+                        version)
+            else:
+                # The above comment refers to an empty string case. The commit
+                # (f12eb03f40) seems to deal with direct mode, so perhaps this
+                # isn't reachable anymore.
                 version = None
 
         if do_init:
@@ -290,12 +300,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
-
-        if config.get("annex.retry") is None:
-            self._annex_common_options.extend(
-                ["-c",
-                 "annex.retry={}".format(
-                     config.obtain("datalad.annex.retry"))])
 
         # will be evaluated lazily
         self._n_auto_jobs = None
@@ -333,9 +337,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           If persistent, would add/commit to .gitattributes. If not -- would
           set within .git/config
         """
-        # TODO: 'annex.backends' actually is a space separated list.
-        # Figure out, whether we want to allow for a list here or what to
-        # do, if there is sth in that setting already
         if persistent:
             # could be set in .gitattributes or $GIT_DIR/info/attributes
             if 'annex.backend' in self.get_gitattributes('.')['.']:
@@ -344,7 +345,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
-                self.config.set('annex.backends', backend, where='local')
                 git_attributes_file = '.gitattributes'
                 self.set_gitattributes(
                     [('*', {'annex.backend': backend})],
@@ -358,7 +358,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     )
         else:
             lgr.debug("Setting annex backend to %s (in .git/config)", backend)
-            self.config.set('annex.backends', backend, where='local')
+            self.config.set('annex.backend', backend, where='local')
 
     @classmethod
     def _cleanup(cls, path, batched):
@@ -390,57 +390,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             # well as in super class __del__;
             # At least log it:
             safe__del__debug(e)
-
-    def _set_shared_connection(self, remote_name, url):
-        """Make sure a remote with SSH URL uses shared connections.
-
-        Set ssh options for annex on a per call basis, using
-        '-c remote.<name>.annex-ssh-options'.
-
-        Note
-        ----
-        There's currently no solution for using these connections, if the SSH
-        URL is just connected to a file instead of a remote
-        (`annex addurl` for example).
-
-        Parameters
-        ----------
-        remote_name: str
-        url: str
-        """
-        if not self.config.obtain('datalad.ssh.multiplex-connections'):
-            return
-
-        from datalad.support.network import is_ssh
-        # Note:
-        #
-        # before any possible invocation of git-annex
-        # Temporary approach to ssh connection sharing:
-        # Register every ssh remote with the corresponding control master.
-        # Issues:
-        # - currently overwrites existing ssh config of the remote
-        # - request SSHConnection instance and write config even if no
-        #   connection needed (but: connection is not actually created/opened)
-        # - no solution for a ssh url of a file (annex addurl)
-
-        if is_ssh(url):
-            c = ssh_manager.get_connection(url)
-            ssh_cfg_var = "remote.{0}.annex-ssh-options".format(remote_name)
-            # options to add:
-            # Note: must use -S to overload -S provided by annex itself
-            # if we provide -o ControlPath=... it is not in effect
-            # Note: ctrl_path must not contain spaces, since it seems to be
-            # impossible to anyhow guard them here
-            # http://git-annex.branchable.com/bugs/cannot___40__or_how__63____41___to_pass_socket_path_with_a_space_in_its_path_via_annex-ssh-options/
-            cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
-            # read user-defined options from .git/config:
-            cfg_string_old = self.config.get(ssh_cfg_var, None)
-            self._annex_common_options += \
-                ['-c', 'remote.{0}.annex-ssh-options={1}{2}'
-                       ''.format(remote_name,
-                                 (cfg_string_old + " ") if cfg_string_old else "",
-                                 cfg_string
-                                 )]
 
     def is_managed_branch(self, branch=None):
         """Whether `branch` is managed by git-annex.
@@ -568,9 +517,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         bool
         """
         if cls.supports_direct_mode is None:
-            if cls.git_annex_version is None:
-                cls._check_git_annex_version()
-            cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
+            warnings.warn(
+                "DataLad's minimum git-annex version is above 7.20190912, "
+                "the last version to support direct mode. "
+                "The check_direct_mode_support method "
+                "and supports_direct_mode attribute will be removed "
+                "in an upcoming release.",
+                DeprecationWarning)
+            cls.supports_direct_mode = False
         return cls.supports_direct_mode
 
     @classmethod
@@ -612,12 +566,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cls._check_git_annex_version()
 
         ver = cls.git_annex_version
-        if ver >= "7.20200202.7":
-            kludges["force-large"] = ["--force-large"]
-        else:
-            kludges["force-large"] = ["-c", "annex.largefiles=anything"]
-
-        kludges["has-include-dotfiles"] = ver < "8"
+        kludges["fromkey-supports-unlocked"] = ver > "8.20210428"
         cls._version_kludges = kludges
         return kludges[key]
 
@@ -724,12 +673,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return initialized_annex
 
-    def add_remote(self, name, url, options=None):
-        """Overrides method from GitRepo in order to set
-        remote.<name>.annex-ssh-options in case of a SSH remote."""
-        super(AnnexRepo, self).add_remote(name, url, options if options else [])
-        self._set_shared_connection(name, url)
-
     def set_remote_url(self, name, url, push=False):
         """Set the URL a remote is pointing to
 
@@ -754,7 +697,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             var = 'remote.{0}.{1}'.format(name, 'annexurl')
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
-        self._set_shared_connection(name, url)
 
     def set_remote_dead(self, name):
         """Announce to annex that remote is "dead"
@@ -865,7 +807,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # no special remotes configures
                 return {}
             else:
-                # some unforseen error
+                # some unforeseen error
                 raise e
         return srs
 
@@ -1162,7 +1104,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         #
         # So, Ben thinks we should just spit it out here, since everything
         # calling _call_annex_records is concerned with the actual results
-        # being returned. More over, this kind of response is special toi
+        # being returned. Moreover, this kind of response is special to
         # particular special remotes rather than particular annex commands.
         # So, likely there's nothing callers could do about it other than
         # spitting it out.
@@ -1352,8 +1294,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             return self.config.getint("annex", "version") >= 6
         except KeyError:
             # If annex.version isn't set (e.g., an uninitialized repo), assume
-            # that unlocked pointers aren't supported.
-            return False
+            # that unlocked pointers are supported given that they are with the
+            # minimum git-annex version.
+            return True
 
     def _init(self, version=None, description=None):
         """Initializes an annex repository.
@@ -1374,6 +1317,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if description is not None:
             opts += [description]
         if version is not None:
+            upgraded_version = _AUTO_UPGRADEABLE_VERSIONS.get(version)
+            if upgraded_version:
+                lgr.info("Annex repository version %s will be upgraded to %s",
+                         version, upgraded_version)
             opts += ['--version', '{0}'.format(version)]
 
         # TODO: RM DIRECT?  or RF at least ?
@@ -1429,6 +1376,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         options = options[:] if options else []
 
+        if self.config.get("annex.retry") is None:
+            options.extend(
+                ["-c",
+                 "annex.retry={}".format(
+                     self.config.obtain("datalad.annex.retry"))])
+
         if remote:
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(
@@ -1437,6 +1390,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     msg="Remote is not known. Known are: %s"
                     % (self.get_remotes(),)
                 )
+            self._maybe_open_ssh_connection(remote)
             options += ['--from', remote]
 
         # analyze provided files to decide which actually are needed to be
@@ -1634,7 +1588,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # if None -- leave it to annex to decide
         if git is False:
-            options.extend(self._check_version_kludges("force-large"))
+            options.append("--force-large")
 
         if git:
             # explicitly use git-add with --update instead of git-annex-add
@@ -1972,7 +1926,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def sync(self, remotes=None, push=True, pull=True, commit=True,
              content=False, all=False, fast=False):
-        """Synchronize local repository with remotes
+        """This method is deprecated, use call_annex(['sync', ...]) instead.
+
+        Synchronize local repository with remotes
 
         Use  this  command  when you want to synchronize the local repository
         with one or more of its remotes. You can specify the remotes (or
@@ -2002,6 +1958,11 @@ class AnnexRepo(GitRepo, RepoInterface):
           Only sync with the remotes with the lowest annex-cost value
           configured
         """
+        import warnings
+        warnings.warn(
+            "AnnexRepo.sync() is deprecated, use call_annex(['sync', ...]) "
+            "instead.",
+            DeprecationWarning)
         args = []
         args.extend(to_options(push=push, no_push=not push,
                                # means: '--push' if push else '--no-push'
@@ -2279,14 +2240,11 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _whereis_json_to_dict(self, j):
         """Convert json record returned by annex whereis --json to our dict representation for it
         """
-        assert (j.get('success', True) is True)
         # process 'whereis' containing list of remotes
         remotes = {remote['uuid']: {x: remote.get(x, None)
                                     for x in ('description', 'here', 'urls')
                                     }
-                   for remote in j.get('whereis')}
-        if WEB_SPECIAL_REMOTE_UUID in remotes:
-            assert(remotes[WEB_SPECIAL_REMOTE_UUID]['description'] == 'web')
+                   for remote in j['whereis']}
         return remotes
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
@@ -2328,9 +2286,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
         """
-        if batch:
-            lgr.warning("TODO: --batch mode for whereis.  Operating serially")
-
         OUTPUTS = {'descriptions', 'uuids', 'full'}
         if output not in OUTPUTS:
             raise ValueError(
@@ -2339,23 +2294,30 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
 
         options = ensure_list(options, copy=True)
-        cmd = ['whereis'] + options
-        files_arg = None
-        if key:
-            cmd = cmd + ["--key"] + files
+        if batch:
+            if key:
+                raise ValueError("batch=True is incompatible with `key`")
+            bcmd = self._batched.get('whereis', annex_options=options,
+                                     json=True, path=self.path)
+            json_objects = bcmd(files)
         else:
-            files_arg = files
+            cmd = ['whereis'] + options
+            files_arg = None
+            if key:
+                cmd = cmd + ["--key"] + files
+            else:
+                files_arg = files
 
-        try:
-            json_objects = self.call_annex_records(cmd, files=files_arg)
-        except CommandError as e:
-            if e.stderr.startswith('Invalid'):
-                # would happen when git-annex is called with incompatible options
-                raise
-            # whereis may exit non-zero when there are too few known copies
-            # callers of whereis are interested in exactly that information,
-            # which we deliver via result, not via exception
-            json_objects = e.kwargs.get('stdout_json', [])
+            try:
+                json_objects = self.call_annex_records(cmd, files=files_arg)
+            except CommandError as e:
+                if e.stderr.startswith('Invalid'):
+                    # would happen when git-annex is called with incompatible options
+                    raise
+                # whereis may exit non-zero when there are too few known copies
+                # callers of whereis are interested in exactly that information,
+                # which we deliver via result, not via exception
+                json_objects = e.kwargs.get('stdout_json', [])
 
         if output in {'descriptions', 'uuids'}:
             return [
@@ -2379,7 +2341,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             }
 
     # TODO:
-    # I think we should make interface cleaner and less ambigious for those annex
+    # I think we should make interface cleaner and less ambiguous for those annex
     # commands which could operate on globs, files, and entire repositories, separating
     # those out, e.g. annex_info_repo, annex_info_files at least.
     # If we make our calling wrappers work without relying on invoking from repo topdir,
@@ -2759,6 +2721,19 @@ class AnnexRepo(GitRepo, RepoInterface):
     @property
     def default_backends(self):
         self.config.reload()
+        # TODO: Deprecate and remove this property? It's used in the tests and
+        # datalad-crawler.
+        #
+        # git-annex used to try the list of backends in annex.backends in
+        # order. Now it takes annex.backend if set, falling back to the first
+        # value of annex.backends. See 4c1e3210f (annex.backend is the new name
+        # for what was annex.backends, 2017-05-09).
+        backend = self.get_gitattributes('.')['.'].get(
+            'annex.backend',
+            self.config.get("annex.backend", default=None))
+        if backend:
+            return [backend]
+
         backends = self.config.get("annex.backends", default=None)
         if backends:
             return backends.split()
@@ -2839,6 +2814,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of str
            files successfully copied
         """
+        warnings.warn(
+            "AnnexRepo.copy_to() is deprecated and will be removed in a "
+            "future release. Use the Dataset method push() instead.",
+            DeprecationWarning)
 
         # find --in here --not --in remote
         # TODO: full support of annex copy options would lead to `files` being
@@ -2879,6 +2858,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(copy_files) != len(files):
             lgr.debug("Actually copying %d files", len(copy_files))
 
+        self._maybe_open_ssh_connection(remote)
         annex_options = ['--to=%s' % remote]
         if options:
             annex_options.extend(split_cmdline(options))
@@ -3129,7 +3109,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             for testpath in (
                     # ATM git-annex reports hashdir in native path
                     # conventions and the actual file path `f` in
-                    # POSIX, weired...
+                    # POSIX, weird...
                     # we need to test for the actual key file, not
                     # just the containing dir, as on windows the latter
                     # may not always get cleaned up on `drop`
@@ -3150,9 +3130,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         Parameters
         ----------
-        paths : list
-          Specific paths to query info for. In none are given, info is
-          reported for all content.
+        paths : list or None
+          Specific paths to query info for. In `None`, info is reported for all
+          content.
         init : 'git' or dict-like or None
           If set to 'git' annex content info will amend the output of
           GitRepo.get_content_info(), otherwise the dict-like object
@@ -3198,6 +3178,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 paths=paths, ref=ref, **kwargs)
         else:
             info = init
+
+        if not paths and paths is not None:
+            return info
+
         # use this funny-looking option with both find and findref
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex
@@ -3242,10 +3226,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # of None/NaN etc.
                     del rec['bytesize']
             info[path] = rec
-            # TODO make annex availability checks optional and move in here
-            if not eval_availability:
-                # not desired, or not annexed
-                continue
+        # TODO make annex availability checks optional and move in here
+        if eval_availability:
             self._mark_content_availability(info)
         return info
 
@@ -3276,11 +3258,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Annex repos to decide on the behavior on a case-by-case
         # basis
         options = []
-        if self._check_version_kludges("has-include-dotfiles"):
-            options.append('--include-dotfiles')
         # if None -- leave it to annex to decide
         if git is False:
-            options.extend(self._check_version_kludges("force-large"))
+            options.append("--force-large")
         if on_windows:
             # git-annex ignores symlinks on windows
             # https://github.com/datalad/datalad/issues/2955
@@ -3327,12 +3307,61 @@ class AnnexRepo(GitRepo, RepoInterface):
                     if 'error-messages' in r else None,
                     logger=lgr)
 
-    def _save_post(self, message, status, partial_commit):
+    def _save_post(self, message, status, partial_commit,
+                   amend=False, allow_empty=False):
+
+        if amend and self.is_managed_branch() and \
+                self.format_commit("%B").strip() == "git-annex adjusted branch":
+            # We must not directly amend on an adjusted branch, but fix it
+            # up after the fact. That is if HEAD is a git-annex commit.
+            # Otherwise we still can amend-commit normally.
+            # Note, that this may involve creating an empty commit first.
+            amend = False
+            adjust_amend = True
+        else:
+            adjust_amend = False
+
         # first do standard GitRepo business
         super(AnnexRepo, self)._save_post(
-            message, status, partial_commit)
+            message, status, partial_commit, amend,
+            allow_empty=allow_empty or adjust_amend)
         # then sync potential managed branches
         self.localsync(managed_only=True)
+        if adjust_amend:
+            # We committed in an adjusted branch, but the goal is to amend in
+            # corresponding branch.
+
+            adjusted_branch = self.get_active_branch()
+            corresponding_branch = self.get_corresponding_branch()
+            old_sha = self.get_hexsha(corresponding_branch)
+
+            org_commit_pointer = corresponding_branch + "~1"
+            author_name, author_email, author_date, \
+            old_parent, old_message = self.format_commit(
+                "%an%x00%ae%x00%ad%x00%P%x00%B", org_commit_pointer).split('\0')
+            new_env = (self._git_runner.env
+                       if self._git_runner.env else os.environ).copy()
+            # `message` might be empty - we need to take it from the to be
+            # amended commit in that case:
+            msg = message or old_message
+            new_env.update({
+                'GIT_AUTHOR_NAME': author_name,
+                'GIT_AUTHOR_EMAIL': author_email,
+                'GIT_AUTHOR_DATE': author_date
+            })
+            commit_cmd = ["commit-tree",
+                          corresponding_branch + "^{tree}",
+                          "-m", msg]
+            if old_parent:
+                commit_cmd.extend(["-p", old_parent])
+            out, _ = self._call_git(commit_cmd, env=new_env, read_only=False)
+            new_sha = out.strip()
+
+            self.update_ref("refs/heads/" + corresponding_branch,
+                            new_sha, old_sha)
+            self.update_ref("refs/basis/" + adjusted_branch,
+                            new_sha, old_sha)
+            self.localsync(managed_only=True)
 
     def localsync(self, remote=None, managed_only=False):
         """Consolidate the local git-annex branch and/or managed branches.
@@ -3404,10 +3433,14 @@ class AnnexJsonProtocol(WitlessProtocol):
     proc_out = True
     proc_err = True
 
-    def __init__(self, done_future, total_nbytes=None):
+    def __init__(self, done_future=None, total_nbytes=None):
+        if done_future is not None:
+            warnings.warn("`done_future` argument is ignored "
+                          "and will be removed in a future release",
+                          DeprecationWarning)
+        super().__init__()
         # to collect parsed JSON command output
         self.json_out = []
-        super().__init__(done_future)
         self._global_pbar_id = 'annexprogress-{}'.format(id(self))
         self.total_nbytes = total_nbytes
         self._unprocessed = None
@@ -3503,11 +3536,14 @@ class AnnexJsonProtocol(WitlessProtocol):
         pbar_id = self._get_pbar_id(j)
         known_pbar = pbar_id in self._pbars
         action = j.get('action')
-        if action:
+
+        is_progress = action and 'byte-progress' in j
+        # ignore errors repeatedly reported in progress messages. Final message
+        # will contain them
+        if action and not is_progress:
             for err_msg in action.pop('error-messages', []):
                 lgr.error(err_msg)
 
-        is_progress = action and 'byte-progress' in j
         if known_pbar and (not is_progress or
                            j.get('byte-progress') == j.get('total-size')):
             # take a known pbar down, completion or broken report

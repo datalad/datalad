@@ -30,7 +30,6 @@ from datalad.interface.base import build_doc
 from datalad.interface.common_opts import (
     location_description,
 )
-from datalad.interface.results import ResultXFM
 from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
@@ -41,6 +40,7 @@ from datalad.utils import (
     getpwd,
     ensure_list,
     get_dataset_root,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -54,18 +54,11 @@ from datalad.distribution.dataset import (
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-import datalad.utils as ut
 
 
 __docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.core.local.create')
-
-
-# Used for handling the no_annex -> annex option transition
-# remove when done
-class _NoAnnexDefault(object):
-    pass
 
 
 @build_doc
@@ -168,11 +161,6 @@ class Create(Interface):
             doc="""enforce creation of a dataset in a non-empty directory""",
             action='store_true'),
         description=location_description,
-        no_annex=Parameter(
-            # hide this from the cmdline parser, replaced by `annex`
-            args=tuple(),
-            doc="""this option is deprecated, use `annex` instead""",
-            action='store_true'),
         annex=Parameter(
             args=("--no-annex",),
             dest='annex',
@@ -208,24 +196,10 @@ class Create(Interface):
             force=False,
             description=None,
             dataset=None,
-            no_annex=_NoAnnexDefault,
             annex=True,
             fake_dates=False,
             cfg_proc=None
     ):
-        # TODO: The current release of datalad-metalad (v0.2.1) still uses
-        # no_annex in its tests. Remove this compatibility kludge once a
-        # release is made, which will include 16a170e (2020-09-08).
-        if no_annex is not _NoAnnexDefault:
-            # the two mirror options do not agree and the deprecated one is
-            # not at default value
-            warnings.warn("datalad-create's `no_annex` option is deprecated "
-                          "and will be removed in a future release, "
-                          "use the reversed-sign `annex` option instead.",
-                          DeprecationWarning)
-            # honor the old option for now
-            annex = not no_annex
-
         # we only perform negative tests below
         no_annex = not annex
 
@@ -305,11 +279,11 @@ class Create(Interface):
             op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)
-            parentds_path = ut.Path(parentds_path)
+            parentds_path = Path(parentds_path)
             # we cannot get away with a simple
             # GitRepo.get_content_info(), as we need to detect
             # uninstalled/added subdatasets too
-            check_path = ut.Path(path)
+            check_path = Path(path)
             pstatus = prepo.status(
                 untracked='no',
                 # limit query to target path for a potentially massive speed-up
@@ -365,9 +339,6 @@ class Create(Interface):
             yield res
             return
 
-        # stuff that we create and want to have tracked with git (not annex)
-        add_to_git = {}
-
         if initopts is not None and isinstance(initopts, list):
             initopts = {'_from_cmdline_': initopts}
 
@@ -376,71 +347,12 @@ class Create(Interface):
         # Re-use tbrepo instance, do not use tbds.repo
 
         # create and configure desired repository
+        # also provides initial set of content to be tracked with git (not annex)
         if no_annex:
-            lgr.info("Creating a new git repo at %s", tbds.path)
-            tbrepo = GitRepo(
-                tbds.path,
-                create=True,
-                create_sanity_checks=False,
-                git_opts=initopts,
-                fake_dates=fake_dates)
-            # place a .noannex file to indicate annex to leave this repo alone
-            stamp_path = ut.Path(tbrepo.path) / '.noannex'
-            stamp_path.touch()
-            add_to_git[stamp_path] = {
-                'type': 'file',
-                'state': 'untracked'}
+            tbrepo, add_to_git = _setup_git_repo(path, initopts, fake_dates)
         else:
-            # always come with annex when created from scratch
-            lgr.info("Creating a new annex repo at %s", tbds.path)
-            tbrepo = AnnexRepo(
-                tbds.path,
-                create=True,
-                create_sanity_checks=False,
-                # do not set backend here, to avoid a dedicated commit
-                backend=None,
-                # None causes version to be taken from config
-                version=None,
-                description=description,
-                git_opts=initopts,
-                fake_dates=fake_dates
-            )
-            # set the annex backend in .gitattributes as a staged change
-            tbrepo.set_default_backend(
-                cfg.obtain('datalad.repo.backend'),
-                persistent=True, commit=False)
-            add_to_git[tbrepo.pathobj / '.gitattributes'] = {
-                'type': 'file',
-                'state': 'added'}
-            # make sure that v6 annex repos never commit content under .datalad
-            attrs_cfg = (
-                ('config', 'annex.largefiles', 'nothing'),
-                ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
-                ('metadata/objects/**', 'annex.largefiles',
-                 '({})'.format(cfg.obtain(
-                     'datalad.metadata.create-aggregate-annex-limit'))))
-            attrs = tbrepo.get_gitattributes(
-                [op.join('.datalad', i[0]) for i in attrs_cfg])
-            set_attrs = []
-            for p, k, v in attrs_cfg:
-                if not attrs.get(
-                        op.join('.datalad', p), {}).get(k, None) == v:
-                    set_attrs.append((p, {k: v}))
-            if set_attrs:
-                tbrepo.set_gitattributes(
-                    set_attrs,
-                    attrfile=op.join('.datalad', '.gitattributes'))
-
-            # prevent git annex from ever annexing .git* stuff (gh-1597)
-            attrs = tbrepo.get_gitattributes('.git')
-            if not attrs.get('.git', {}).get(
-                    'annex.largefiles', None) == 'nothing':
-                tbrepo.set_gitattributes([
-                    ('**/.git*', {'annex.largefiles': 'nothing'})])
-                # must use the repo.pathobj as this will have resolved symlinks
-                add_to_git[tbrepo.pathobj / '.gitattributes'] = {
-                    'type': 'file',
-                    'state': 'untracked'}
+            tbrepo, add_to_git = _setup_annex_repo(
+                path, initopts, fake_dates, description)
 
         # OPT: be "smart" and avoid re-resolving .repo -- expensive in DataLad
         # Note, must not happen earlier (before if) since "smart" it would not be
@@ -517,12 +429,118 @@ class Create(Interface):
         res.update({'status': 'ok'})
         yield res
 
-    @staticmethod
-    def custom_result_renderer(res, **kwargs):  # pragma: more cover
-        from datalad.ui import ui
-        if res.get('action', None) == 'create' and \
-                res.get('status', None) == 'ok' and \
-                res.get('type', None) == 'dataset':
-            ui.message("Created dataset at {}.".format(res['path']))
-        else:
-            ui.message("Nothing was created")
+
+def _setup_git_repo(path, initopts=None, fake_dates=False):
+    """Create and configure a repository at `path`
+
+    Parameters
+    ----------
+    path: str or Path
+      Path of the repository
+    initopts: dict, optional
+      Git options to be passed to the GitRepo constructor
+    fake_dates: bool, optional
+      Passed to the GitRepo constructor
+
+    Returns
+    -------
+    GitRepo, dict
+      Created repository and records for any repo component that needs to be
+      passed to git-add as a result of the setup procedure.
+    """
+    lgr.info("Creating a new git repo at %s", path)
+    tbrepo = GitRepo(
+        path,
+        create=True,
+        create_sanity_checks=False,
+        git_opts=initopts,
+        fake_dates=fake_dates)
+    # place a .noannex file to indicate annex to leave this repo alone
+    stamp_path = Path(tbrepo.path) / '.noannex'
+    stamp_path.touch()
+    add_to_git = {
+        stamp_path: {
+            'type': 'file',
+            'state': 'untracked',
+        }
+    }
+    return tbrepo, add_to_git
+
+
+def _setup_annex_repo(path, initopts=None, fake_dates=False,
+                      description=None):
+    """Create and configure a repository at `path`
+
+    This includes a default setup of annex.largefiles.
+
+    Parameters
+    ----------
+    path: str or Path
+      Path of the repository
+    initopts: dict, optional
+      Git options to be passed to the AnnexRepo constructor
+    fake_dates: bool, optional
+      Passed to the AnnexRepo constructor
+    description: str, optional
+      Passed to the AnnexRepo constructor
+
+    Returns
+    -------
+    AnnexRepo, dict
+      Created repository and records for any repo component that needs to be
+      passed to git-add as a result of the setup procedure.
+    """
+    # always come with annex when created from scratch
+    lgr.info("Creating a new annex repo at %s", path)
+    tbrepo = AnnexRepo(
+        path,
+        create=True,
+        create_sanity_checks=False,
+        # do not set backend here, to avoid a dedicated commit
+        backend=None,
+        # None causes version to be taken from config
+        version=None,
+        description=description,
+        git_opts=initopts,
+        fake_dates=fake_dates
+    )
+    # set the annex backend in .gitattributes as a staged change
+    tbrepo.set_default_backend(
+        cfg.obtain('datalad.repo.backend'),
+        persistent=True, commit=False)
+    add_to_git = {
+        tbrepo.pathobj / '.gitattributes': {
+            'type': 'file',
+            'state': 'added',
+        }
+    }
+    # make sure that v6 annex repos never commit content under .datalad
+    attrs_cfg = (
+        ('config', 'annex.largefiles', 'nothing'),
+        ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
+        ('metadata/objects/**', 'annex.largefiles',
+         '({})'.format(cfg.obtain(
+             'datalad.metadata.create-aggregate-annex-limit'))))
+    attrs = tbrepo.get_gitattributes(
+        [op.join('.datalad', i[0]) for i in attrs_cfg])
+    set_attrs = []
+    for p, k, v in attrs_cfg:
+        if not attrs.get(
+                op.join('.datalad', p), {}).get(k, None) == v:
+            set_attrs.append((p, {k: v}))
+    if set_attrs:
+        tbrepo.set_gitattributes(
+            set_attrs,
+            attrfile=op.join('.datalad', '.gitattributes'))
+
+    # prevent git annex from ever annexing .git* stuff (gh-1597)
+    attrs = tbrepo.get_gitattributes('.git')
+    if not attrs.get('.git', {}).get(
+            'annex.largefiles', None) == 'nothing':
+        tbrepo.set_gitattributes([
+            ('**/.git*', {'annex.largefiles': 'nothing'})])
+        # must use the repo.pathobj as this will have resolved symlinks
+        add_to_git[tbrepo.pathobj / '.gitattributes'] = {
+            'type': 'file',
+            'state': 'untracked'}
+    return tbrepo, add_to_git

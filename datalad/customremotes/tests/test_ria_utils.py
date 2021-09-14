@@ -5,6 +5,7 @@ from datalad.distributed.ora_remote import (
 from datalad.customremotes.ria_utils import (
     create_store,
     create_ds_in_store,
+    verify_ria_url,
     UnknownLayoutVersion
 )
 from datalad.utils import (
@@ -122,3 +123,37 @@ def test_setup_ds_in_store():
         raise SkipTest('ora_remote.SSHRemoteIO stalls on Windows')
 
     yield skip_ssh(_test_setup_ds_in_store), SSHRemoteIO, ['datalad-test']
+
+
+def test_verify_ria_url():
+    # unsupported protocol
+    assert_raises(ValueError,
+                  verify_ria_url, 'ria+ftp://localhost/tmp/this', {})
+    # bunch of caes that should work
+    cases = {
+        'ria+file:///tmp/this': (None, '/tmp/this'),
+        # no normalization
+        'ria+file:///tmp/this/': (None, '/tmp/this/'),
+        # with hosts
+        'ria+ssh://localhost/tmp/this': ('ssh://localhost', '/tmp/this'),
+        'ria+http://localhost/tmp/this': ('http://localhost', '/tmp/this'),
+        'ria+https://localhost/tmp/this': ('https://localhost', '/tmp/this'),
+        # with username
+        'ria+ssh://humbug@localhost/tmp/this':
+            ('ssh://humbug@localhost', '/tmp/this'),
+        # with port
+        'ria+ssh://humbug@localhost:2222/tmp/this':
+            ('ssh://humbug@localhost:2222', '/tmp/this'),
+        'ria+ssh://localhost:2200/tmp/this':
+            ('ssh://localhost:2200', '/tmp/this'),
+        # with password
+        'ria+https://humbug:1234@localhost:8080/tmp/this':
+            ('https://humbug:1234@localhost:8080', '/tmp/this'),
+        # document a strange (MIH thinks undesirable), but pre-existing
+        # behavior an 'ssh example.com' would end up in the user HOME,
+        # not in '/'
+        'ria+ssh://example.com': ('ssh://example.com', '/')
+    }
+    for i, o in cases.items():
+        # we are not testing the URL rewriting here
+        assert_equal(o, verify_ria_url(i, {})[:2])

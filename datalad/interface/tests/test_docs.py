@@ -73,7 +73,7 @@ demo_paramdoc = """\
     Parameters
     ----------
     dataset : Dataset or None, optional
-      something [PY: python only PY] inbetween [CMD: cmdline only CMD] appended [PY: more python PY]
+      something [PY: python only PY] in between [CMD: cmdline only CMD] appended [PY: more python PY]
       dataset is given, an attempt is made to identify the dataset based
       Dataset (e.g. a path), or value must be `None`. [Default: None]
 """
@@ -108,7 +108,7 @@ def test_alter_interface_docs_for_api():
 
     altpd = alter_interface_docs_for_api(demo_paramdoc)
     assert_in('python', altpd)
-    assert_in('inbetween', altpd)
+    assert_in('in between', altpd)
     assert_in('appended', altpd)
     assert_not_in('cmdline', altpd)
 
@@ -140,6 +140,6 @@ def test_alter_interface_docs_for_cmdline():
 
     altpd = alter_interface_docs_for_cmdline(demo_paramdoc)
     assert_not_in('python', altpd)
-    assert_in('inbetween', altpd)
+    assert_in('in between', altpd)
     assert_in('appended', altpd)
     assert_in('cmdline', altpd)
