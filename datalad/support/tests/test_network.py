@@ -8,47 +8,20 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-
 import os
 import sys
-
-from os.path import (
-    join as opj,
-    isabs,
-)
 from collections import OrderedDict
+from os.path import isabs
+from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-
-from datalad.utils import (
-    Path,
-    PurePosixPath,
-    on_windows,
-)
-
-from datalad.tests.utils import (
-    eq_,
-    neq_,
-    ok_,
-    nok_,
-    assert_raises,
-    skip_if_on_windows,
-    swallow_logs,
-    assert_in,
-    get_most_obscure_supported_name,
-    SkipTest,
-    known_failure_githubci_win,
-    with_tempfile,
-    assert_status,
-)
-
 from datalad.support.network import (
-    DataLadRI,
-    GitTransportRI,
-    PathRI,
     RI,
     SSHRI,
     URL,
+    DataLadRI,
+    GitTransportRI,
+    PathRI,
     _split_colon,
     dlurljoin,
     get_local_file_url,
@@ -61,6 +34,28 @@ from datalad.support.network import (
     iso8601_to_epoch,
     parse_url_opts,
     same_website,
+    urlquote,
+)
+from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
+    assert_in,
+    assert_raises,
+    assert_status,
+    eq_,
+    get_most_obscure_supported_name,
+    known_failure_githubci_win,
+    neq_,
+    nok_,
+    ok_,
+    skip_if_on_windows,
+    swallow_logs,
+    with_tempfile,
+)
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    on_windows,
 )
 
 
@@ -109,6 +104,8 @@ def test_get_url_straight_filename():
     yield _test_get_url_straight_filename, '?param=1&another=/'
 
 from ..network import rfc2822_to_epoch
+
+
 def test_rfc2822_to_epoch():
     eq_(rfc2822_to_epoch("Thu, 16 Oct 2014 01:16:17 EDT"), 1413436577)
 
@@ -298,9 +295,9 @@ def test_url_samples():
     _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
     _check_ri("git@host:user/proj", SSHRI, hostname="host", path="user/proj", username='git')
 
-    _check_ri('weired:/', SSHRI, hostname='weired', path='/')
+    _check_ri('weird:/', SSHRI, hostname='weird', path='/')
     # since schema is not allowing some symbols so we need to add additional check
-    _check_ri('weired_url:/', SSHRI, hostname='weired_url', path='/')
+    _check_ri('weird_url:/', SSHRI, hostname='weird_url', path='/')
     _check_ri('example.com:/', SSHRI, hostname='example.com', path='/')
     _check_ri('example.com:path/sp1', SSHRI, hostname='example.com', path='path/sp1')
     _check_ri('example.com/path/sp1\:fname', PathRI, localpath='example.com/path/sp1\:fname',
@@ -329,16 +326,16 @@ def test_url_samples():
     # actually this one is good enough to trigger a warning and I still don't know
     # what it should exactly be!?
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        weired_str = 'weired://'
-        weired_url = RI(weired_str)
-        repr(weired_url)
+        weird_str = 'weird://'
+        weird_url = RI(weird_str)
+        repr(weird_url)
         cml.assert_logged(
-            'Parsed version of SSHRI .weired:/. '
-            'differs from original .weired://.'
+            'Parsed version of SSHRI .weird:/. '
+            'differs from original .weird://.'
         )
         # but we store original str
-        eq_(str(weired_url), weired_str)
-        neq_(weired_url.as_str(), weired_str)
+        eq_(str(weird_url), weird_str)
+        neq_(weird_url.as_str(), weird_str)
 
 
     raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
@@ -428,9 +425,9 @@ def test_is_url():
     ok_(is_url('http://localhost'))
     ok_(is_url('ssh://me@localhost'))
     # in current understanding it is indeed a url but an 'ssh', implicit=True, not just
-    # a useless scheme=weired with a hope to point to a netloc
+    # a useless scheme=weird with a hope to point to a netloc
     with swallow_logs():
-        ok_(is_url('weired://'))
+        ok_(is_url('weird://'))
     nok_(is_url('relative'))
     nok_(is_url('/absolute'))
     ok_(is_url('like@sshlogin'))  # actually we do allow ssh:implicit urls ATM
@@ -461,10 +458,7 @@ def test_get_local_file_url():
             ) + (
                 ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
             ) if on_windows else (
-                # static copy of "most_obscore_name"
-                (' "\';a&b&cΔЙקم๗あ `| ',
-                 # and translation by google chrome
-                 "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
+                (OBSCURE_FILENAME, urlquote(OBSCURE_FILENAME)),
                 ('/a', 'file:///a'),
                 ('/a/b/c', 'file:///a/b/c'),
                 ('/a~', 'file:///a~'),

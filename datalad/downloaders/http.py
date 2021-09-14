@@ -124,7 +124,7 @@ def check_response_status(response, err_prefix="", session=None):
     elif response.status_code in {200}:
         pass
     elif response.status_code in {301, 302, 307}:
-        # TODO: apparently tests do not excercise this one yet
+        # TODO: apparently tests do not exercise this one yet
         if session is None:
             raise AccessFailedError(err_msg + " no session was provided")
         redirs = list(session.resolve_redirects(response, response.request))
@@ -169,7 +169,7 @@ class HTTPBaseAuthenticator(Authenticator):
         credentials = credential()
 
         # The whole thing relies on server first spitting out 401
-        # and client GETing again with 'Authentication:' header
+        # and client getting again with 'Authentication:' header
         # So we need custom handling for those, while keeping track not
         # of cookies per se, but of 'Authentication:' header which is
         # to be used in subsequent GETs
@@ -517,9 +517,20 @@ class HTTPDownloader(BaseDownloader):
     """
 
     @borrowkwargs(BaseDownloader)
-    def __init__(self, headers={}, **kwargs):
+    def __init__(self, headers=None, **kwargs):
+        """
+
+        Parameters
+        ----------
+        headers: dict, optional
+          Header fields to be provided to the session. Unless User-Agent provided, a custom
+          one, available in `DEFAULT_USER_AGENT` constant of this module will be used.
+        """
         super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
+        headers = headers.copy() if headers else {}
+        if 'user-agent' not in map(str.lower, headers):
+            headers['User-Agent'] = DEFAULT_USER_AGENT
         self._headers = headers
 
     def _establish_session(self, url, allow_old=True):
@@ -555,6 +566,7 @@ class HTTPDownloader(BaseDownloader):
 
         lgr.debug("http session: Creating brand new session")
         self._session = requests.Session()
+        self._session.headers.update(self._headers)
         if self.authenticator:
             self.authenticator.authenticate(url, self.credential, self._session)
 
@@ -572,8 +584,6 @@ class HTTPDownloader(BaseDownloader):
             headers = {}
         if 'Accept-Encoding' not in headers:
             headers['Accept-Encoding'] = ''
-        if 'user-agent' not in map(str.lower, headers):
-            headers['User-Agent'] = DEFAULT_USER_AGENT
 
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1

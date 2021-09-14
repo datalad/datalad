@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import argparse
 import os
 
-from .. import __doc__ as m__doc__, __version__ as m__version__
+from .. import __doc__ as m__doc__
 from ..log import lgr
 
 from ..cmdline import helpers
@@ -54,10 +54,7 @@ def setup_parser(backend):
     # common options
     helpers.parser_add_common_opt(parser, 'help')
     helpers.parser_add_common_opt(parser, 'log_level')
-    helpers.parser_add_common_opt(
-        parser,
-        'version',
-        version='datalad %s' % m__version__)
+    helpers.parser_add_version_opt(parser, 'datalad', include_name=True)
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',

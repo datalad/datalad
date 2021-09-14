@@ -41,7 +41,7 @@ Supported metadata sources
 
 This following sections provide an overview of included metadata extractors for
 particular types of data structures and file formats. Note that :ref:`DataLad
-extension packages <sec_extension_packages>`, such as the `neuroimaging extension
+extension packages <chap_customization>`, such as the `neuroimaging extension
 <https://github.com/datalad/datalad-neuroimaging>`_, can provide additional
 extractors for particular domains and formats.
 
@@ -68,7 +68,7 @@ metadata.  And, if you have a table or records that contain data
 sources and metadata, you can use :ref:`datalad addurls <man_datalad-addurls>`
 to quickly populate a dataset with files and associated
 git-annex metadata. (`///labs/openneurolab/metasearch
-<http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
+<https://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
 an example of such a dataset.)
 
 
@@ -122,9 +122,9 @@ Automating "non-distribution" of sensitive files
 In the `ReproIn <http://reproin.repronim.org>`_ framework for automated
 conversion of BIDS dataset and in some manually prepared datasets
 (such as
-`///labs/gobbini/famface/data <http://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
+`///labs/gobbini/famface/data <https://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
 and
-`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
+`///labs/haxby/raiders <https://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
 we annotated materials that must not be publicly shared with a git-annex
 metadata field ``distribution-restrictions``.  We used the following of values to
 describe why any particular file (content) should not be redistributed:
@@ -135,7 +135,7 @@ describe why any particular file (content) should not be redistributed:
   permissions to share (e.g., movie video files)
 
 Having annotated files this way, we could instruct git-annex
-to :ref:`publish <man_datalad-publish>` all but those restricted files to our
+to publish all but those restricted files to our
 server: ``git annex wanted datalad-public "not metadata=distribution-restrictions=*"``.
 
 .. warning::
@@ -215,7 +215,7 @@ Here is an example:
    A text with arbitrary length and content that can span multiple
    .
    paragraphs (this is a new one)
-  License: CC0
+  License: CC0-1.0
    The person who associated a work with this deed has dedicated the work to the
    public domain by waiving all of his or her rights to the work worldwide under
    copyright law, including all related and neighboring rights, to the extent
@@ -255,9 +255,11 @@ The following fields are supported:
   reports can be submitted.
 ``License``:
   A description of the license or terms of use for the dataset. The first
-  lines should contain a list of license labels (e.g. CC0, PPDL) for standard
-  licenses, if possible. Full license texts or term descriptions can be
-  included.
+  lines should be the SPDX License Identifier from the `SPDX License List <https://spdx.org/licenses/>`_
+  (e.g. "CC0-1.0" or "PPDL-1.0"). More complex licensing situation can be expressed
+  using
+  `SPDX License Expressions <https://spdx.github.io/spdx-spec/appendix-IV-SPDX-license-expressions/>`_.
+  Full license texts or term descriptions can be included.
 ``Maintainer``:
   Can be used in addition and analog to ``Author``, when authors (creators of
   the data) need to be distinguished from maintainers of the dataset.
@@ -335,7 +337,7 @@ available locally) can be aggregated into a local superdataset with all its
 metadata. In that superdataset, a DataLad user is then able to query
 information on any content of any subdataset, regardless of their actual
 availability. This principle also allows any user to install the superdataset
-from http://datasets.datalad.org and perform *local and offline* queries about
+from https://datasets.datalad.org and perform *local and offline* queries about
 any dataset available online from this server.
 
 Besides full access to all aggregated metadata by path (via the :ref:`metadata

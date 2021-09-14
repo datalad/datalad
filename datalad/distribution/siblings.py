@@ -12,70 +12,72 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-
 import os
 import os.path as op
-
 from urllib.parse import urlparse
 
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import (
-    EnsureStr,
-    EnsureChoice,
-    EnsureNone,
-    EnsureBool,
-)
-from datalad.support.param import Parameter
-from datalad.support.exceptions import (
-    CommandError,
-    InsufficientArgumentsError,
-    AccessDeniedError,
-    AccessFailedError,
-    RemoteNotAvailableError,
-    DownloadError,
-)
-from datalad.support.network import (
-    RI,
-    PathRI,
-    URL,
-)
-from datalad.support.gitrepo import GitRepo
-from datalad.interface.common_opts import (
-    recursion_flag,
-    recursion_limit,
-    as_common_datasrc,
-    publish_depends,
-    publish_by_default,
-    annex_wanted_opt,
-    annex_required_opt,
-    annex_group_opt,
-    annex_groupwanted_opt,
-    inherit_opt,
-    location_description,
-)
-from datalad.downloaders.credentials import UserPassword
+import datalad.support.ansi_colors as ac
 from datalad.distribution.dataset import (
-    require_dataset,
     Dataset,
+    require_dataset,
 )
 from datalad.distribution.update import Update
+from datalad.dochelpers import exc_str
+from datalad.downloaders.credentials import UserPassword
+from datalad.interface.base import (
+    Interface,
+    build_doc,
+)
+from datalad.interface.common_opts import (
+    annex_group_opt,
+    annex_groupwanted_opt,
+    annex_required_opt,
+    annex_wanted_opt,
+    as_common_datasrc,
+    inherit_opt,
+    location_description,
+    publish_by_default,
+    publish_depends,
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import (
+    default_result_renderer,
+    eval_results,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.support.exceptions import (
+    AccessDeniedError,
+    AccessFailedError,
+    CommandError,
+    DownloadError,
+    InsufficientArgumentsError,
+    RemoteNotAvailableError,
+)
+from datalad.support.gitrepo import GitRepo
+from datalad.support.network import (
+    RI,
+    URL,
+    PathRI,
+)
+from datalad.support.param import Parameter
 from datalad.utils import (
+    Path,
     ensure_list,
     slash_join,
-    Path,
 )
-from datalad.dochelpers import exc_str
 
 from .dataset import (
     EnsureDataset,
     datasetmethod,
 )
-import datalad.support.ansi_colors as ac
-
 
 lgr = logging.getLogger('datalad.distribution.siblings')
 
@@ -148,9 +150,8 @@ class Siblings(Interface):
         action=Parameter(
             args=('action',),
             nargs='?',
-            metavar='ACTION',
             doc="""command action selection (see general documentation)""",
-            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable') | EnsureNone()),
+            constraints=EnsureChoice('query', 'add', 'remove', 'configure', 'enable')),
         url=Parameter(
             args=('--url',),
             doc="""the URL of or path to the dataset sibling named by
@@ -177,7 +178,13 @@ class Siblings(Interface):
             args=("--fetch",),
             action="store_true",
             doc="""fetch the sibling after configuration"""),
-        as_common_datasrc=as_common_datasrc,
+        as_common_datasrc=Parameter(
+            args=("--as-common-datasrc",),
+            metavar='NAME',
+            doc="""configure a sibling as a common data source of the
+            dataset that can be automatically used by all consumers of the
+            dataset. The sibling must be a regular Git remote with a
+            configured HTTP(S) URL."""),
         publish_depends=publish_depends,
         publish_by_default=publish_by_default,
         annex_wanted=annex_wanted_opt,
@@ -239,31 +246,48 @@ class Siblings(Interface):
         # at the top-level and vice versa
         worker = action_worker_map[action]
 
-        dataset = require_dataset(
-            dataset, check_installed=False, purpose='configure sibling')
-        refds_path = dataset.path
+        ds = require_dataset(
+            dataset,
+            # it makes no sense to use this command without a dataset
+            check_installed=True,
+            purpose='configure sibling')
+        refds_path = ds.path
 
         res_kwargs = dict(refds=refds_path, logger=lgr)
 
-        ds_name = op.basename(dataset.path)
+        ds_name = op.basename(ds.path)
 
         # do not form single list of datasets (with recursion results) to
         # give fastest possible response, for the precise of a long-all
         # function call
-        ds = dataset
-        for r in worker(
-                # always copy signature to below to avoid bugs!
-                ds, name,
-                ds.repo.get_remotes(),
-                # for top-level dataset there is no layout questions
-                _mangle_urls(url, ds_name),
-                _mangle_urls(pushurl, ds_name),
-                fetch, description,
-                as_common_datasrc, publish_depends, publish_by_default,
-                annex_wanted, annex_required, annex_group, annex_groupwanted,
-                inherit, get_annex_info,
-                **res_kwargs):
-            yield r
+
+        # minimize expensive calls to .repo
+        ds_repo = ds.repo
+
+        # prepare common parameterization package for all worker calls
+        worker_kwargs = dict(
+            name=name,
+            fetch=fetch,
+            description=description,
+            as_common_datasrc=as_common_datasrc,
+            publish_depends=publish_depends,
+            publish_by_default=publish_by_default,
+            annex_wanted=annex_wanted,
+            annex_required=annex_required,
+            annex_group=annex_group,
+            annex_groupwanted=annex_groupwanted,
+            inherit=inherit,
+            get_annex_info=get_annex_info,
+            res_kwargs=res_kwargs,
+        )
+        yield from worker(
+            ds=ds,
+            repo=ds_repo,
+            known_remotes=ds_repo.get_remotes(),
+            # for top-level dataset there is no layout questions
+            url=_mangle_urls(url, ds_name),
+            pushurl=_mangle_urls(pushurl, ds_name),
+            **worker_kwargs)
         if not recursive:
             return
 
@@ -272,11 +296,12 @@ class Siblings(Interface):
         replicate_local_structure = url and "%NAME" not in url
 
         subds_pushurl = None
-        for subds in dataset.subdatasets(
+        for subds in ds.subdatasets(
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
-            subds_name = op.relpath(subds.path, start=dataset.path)
+            subds_repo = subds.repo
+            subds_name = op.relpath(subds.path, start=ds.path)
             if replicate_local_structure:
                 subds_url = slash_join(url, subds_name)
                 if pushurl:
@@ -286,23 +311,18 @@ class Siblings(Interface):
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))
                 subds_pushurl = \
                     _mangle_urls(pushurl, '/'.join([ds_name, subds_name]))
-            for r in worker(
-                    # always copy signature from above to avoid bugs
-                    subds, name,
-                    subds.repo.get_remotes(),
-                    subds_url,
-                    subds_pushurl,
-                    fetch,
-                    description,
-                    as_common_datasrc, publish_depends, publish_by_default,
-                    annex_wanted, annex_required, annex_group, annex_groupwanted,
-                    inherit, get_annex_info,
-                    **res_kwargs):
-                yield r
+            yield from worker(
+                ds=subds,
+                repo=subds_repo,
+                known_remotes=subds_repo.get_remotes(),
+                url=subds_url,
+                pushurl=subds_pushurl,
+                **worker_kwargs)
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
+
         # should we attempt to remove an unknown sibling, complain like Git does
         if res['status'] == 'notneeded' and res['action'] == 'remove-sibling':
             ui.message(
@@ -312,7 +332,7 @@ class Siblings(Interface):
             )
             return
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
-            # logging complained about this already
+            default_result_renderer(res)
             return
         path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
@@ -333,12 +353,8 @@ class Siblings(Interface):
 
 
 # always copy signature from above to avoid bugs
-def _add_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
-        as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        **res_kwargs):
+def _add_remote(ds, repo, name, known_remotes, url, pushurl, as_common_datasrc,
+                res_kwargs, **unused_kwargs):
     # TODO: allow for no url if 'inherit' and deduce from the super ds
     #       create-sibling already does it -- generalize/use
     #  Actually we could even inherit/deduce name from the super by checking
@@ -351,6 +367,11 @@ def _add_remote(
         raise InsufficientArgumentsError(
             """insufficient information to add a sibling
             (needs at least a dataset, and any URL).""")
+
+    # a pushurl should always be able to fill in for a not
+    # specified url, however, only when adding new remotes,
+    # not when configuring existing remotes (to avoid undesired
+    # overwriting of configurations), hence done here only
     if url is None:
         url = pushurl
 
@@ -379,33 +400,34 @@ def _add_remote(
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    # XXX this check better be done in configure too
+    # see https://github.com/datalad/datalad/issues/5914
+    if as_common_datasrc == name:
+        raise ValueError('Sibling name ({}) and common data source name ({}) '
+                         'can not be identical.'.format(name, as_common_datasrc))
     if isinstance(RI(url), PathRI):
         # make sure any path URL is stored in POSIX conventions for consistency
         # with git's behavior (e.g. origin configured by clone)
         url = Path(url).as_posix()
     # this remote is fresh: make it known
     # just minimalistic name and URL, the rest is coming from `configure`
-    ds.repo.add_remote(name, url)
+    repo.add_remote(name, url)
     known_remotes.append(name)
     # always copy signature from above to avoid bugs
     for r in _configure_remote(
-            ds, name, known_remotes, url, pushurl, fetch, description,
-            as_common_datasrc, publish_depends, publish_by_default,
-            annex_wanted, annex_required, annex_group, annex_groupwanted,
-            inherit, get_annex_info,
-            **res_kwargs):
+            ds=ds, repo=repo, name=name, known_remotes=known_remotes, url=url,
+            pushurl=pushurl, as_common_datasrc=as_common_datasrc,
+            res_kwargs=res_kwargs, **unused_kwargs):
         if r['action'] == 'configure-sibling':
             r['action'] = 'add-sibling'
         yield r
 
 
-# always copy signature from above to avoid bugs
 def _configure_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
+        ds, repo, name, known_remotes, url, pushurl, fetch, description,
         as_common_datasrc, publish_depends, publish_by_default,
         annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        **res_kwargs):
+        inherit, res_kwargs, **unused_kwargs):
     result_props = dict(
         action='configure-sibling',
         path=ds.path,
@@ -424,24 +446,24 @@ def _configure_remote(
         if name not in known_remotes and url:
             # this remote is fresh: make it known
             # just minimalistic name and URL, the rest is coming from `configure`
-            ds.repo.add_remote(name, url)
+            repo.add_remote(name, url)
             known_remotes.append(name)
         elif url:
             # not new, override URl if given
-            ds.repo.set_remote_url(name, url)
+            repo.set_remote_url(name, url)
 
         # make sure we have a configured fetch expression at this point
         fetchvar = 'remote.{}.fetch'.format(name)
-        if fetchvar not in ds.repo.config:
+        if fetchvar not in repo.config:
             # place default fetch refspec in config
             # same as `git remote add` would have added
-            ds.repo.config.add(
+            repo.config.add(
                 fetchvar,
                 '+refs/heads/*:refs/remotes/{}/*'.format(name),
                 where='local')
 
         if pushurl:
-            ds.repo.set_remote_url(name, pushurl, push=True)
+            repo.set_remote_url(name, pushurl, push=True)
 
         if publish_depends:
             # Check if all `deps` remotes are known to the `repo`
@@ -474,7 +496,7 @@ def _configure_remote(
                 r.update(res_kwargs)
                 yield r
 
-        delayed_super = _DelayedSuper(ds.repo)
+        delayed_super = _DelayedSuper(repo)
         if inherit and delayed_super.super is not None:
             # Adjust variables which we should inherit
             publish_depends = _inherit_config_var(
@@ -484,7 +506,7 @@ def _configure_remote(
             # Copy relevant annex settings for the sibling
             # makes sense only if current AND super are annexes, so it is
             # kinda a boomer, since then forbids having a super a pure git
-            if isinstance(ds.repo, AnnexRepo) and \
+            if isinstance(repo, AnnexRepo) and \
                     isinstance(delayed_super.repo, AnnexRepo) and \
                     name in delayed_super.repo.get_remotes():
                 if annex_wanted is None:
@@ -528,8 +550,8 @@ def _configure_remote(
                 ds.config.add(dfltvar, refspec, 'local')
             ds.config.reload()
 
-        assert isinstance(ds.repo, GitRepo)  # just against silly code
-        if isinstance(ds.repo, AnnexRepo):
+        assert isinstance(repo, GitRepo)  # just against silly code
+        if isinstance(repo, AnnexRepo):
             # we need to check if added sibling an annex, and try to enable it
             # another part of the fix for #463 and #432
             try:
@@ -539,7 +561,7 @@ def _configure_remote(
                         default=False,
                         valtype=EnsureBool(),
                         store=False):
-                    ds.repo.enable_remote(name)
+                    repo.enable_remote(name)
             except (CommandError, DownloadError) as exc:
                 # TODO yield
                 # this is unlikely to ever happen, now done for AnnexRepo
@@ -555,7 +577,11 @@ def _configure_remote(
                 lgr.debug("Exception was: %s", exc_str(exc))
 
             if as_common_datasrc:
-                ri = RI(url)
+                # we need a fully configured remote here
+                # do not re-use `url`, but ask for the remote config
+                # that git-annex will use too
+                remote_url = repo.config.get(f'remote.{name}.url')
+                ri = RI(remote_url)
                 if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
                     # XXX what if there is already a special remote
                     # of this name? Above check for remotes ignores special
@@ -564,59 +590,55 @@ def _configure_remote(
                     # XXX except it is not enough
 
                     # make special remote of type=git (see #335)
-                    ds.repo.call_annex([
+                    repo.call_annex([
                         'initremote',
                         as_common_datasrc,
                         'type=git',
-                        'location={}'.format(url),
+                        'location={}'.format(remote_url),
                         'autoenable=true'])
                 else:
                     yield dict(
                         status='impossible',
-                        name=name,
                         message='cannot configure as a common data source, '
                                 'URL protocol is not http or https',
                         **result_props)
     #
     # place configure steps that also work for 'here' below
     #
-    if isinstance(ds.repo, AnnexRepo):
+    if isinstance(repo, AnnexRepo):
         for prop, var in (('wanted', annex_wanted),
                           ('required', annex_required),
                           ('group', annex_group)):
             if var is not None:
-                ds.repo.set_preferred_content(prop, var, '.' if name =='here' else name)
+                repo.set_preferred_content(prop, var, '.' if name =='here' else name)
         if annex_groupwanted:
-            ds.repo.set_groupwanted(annex_group, annex_groupwanted)
+            repo.set_groupwanted(annex_group, annex_groupwanted)
 
     if description:
-        if not isinstance(ds.repo, AnnexRepo):
+        if not isinstance(repo, AnnexRepo):
             result_props['status'] = 'impossible'
             result_props['message'] = 'cannot set description of a plain Git repository'
             yield result_props
             return
-        ds.repo.call_annex(['describe', name, description])
+        repo.call_annex(['describe', name, description])
 
     # report all we know at once
-    info = list(_query_remotes(ds, name, known_remotes, get_annex_info=get_annex_info))[0]
+    info = list(_query_remotes(ds, repo, name, known_remotes, **unused_kwargs))[0]
     info.update(dict(status='ok', **result_props))
     yield info
 
 
-# always copy signature from above to avoid bugs
-def _query_remotes(
-        ds, name, known_remotes, url=None, pushurl=None, fetch=None, description=None,
-        as_common_datasrc=None, publish_depends=None, publish_by_default=None,
-        annex_wanted=None, annex_required=None, annex_group=None, annex_groupwanted=None,
-        inherit=None, get_annex_info=True,
-        **res_kwargs):
+def _query_remotes(ds, repo, name, known_remotes, get_annex_info=True,
+                   res_kwargs=None, **unused_kwargs):
+    res_kwargs = res_kwargs or {}
     annex_info = {}
     available_space = None
-    if get_annex_info and isinstance(ds.repo, AnnexRepo):
+    want_annex_info = get_annex_info and isinstance(repo, AnnexRepo)
+    if want_annex_info:
         # pull repo info from annex
         try:
             # need to do in safety net because of gh-1560
-            raw_info = ds.repo.repo_info(fast=True)
+            raw_info = repo.repo_info(fast=True)
         except CommandError:
             raw_info = {}
         available_space = raw_info.get('available local disk space', None)
@@ -631,6 +653,11 @@ def _query_remotes(
                 annex_info[uuid] = ainfo
     # treat the local repo as any other remote using 'here' as a label
     remotes = [name] if name else ['here'] + known_remotes
+    special_remote_info = None
+    if want_annex_info:
+        # query it once here, and inspect per-remote further down
+        special_remote_info = repo.get_special_remotes()
+
     for remote in remotes:
         info = get_status_dict(
             action='query-sibling',
@@ -669,15 +696,15 @@ def _query_remotes(
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description
-        if get_annex_info and isinstance(ds.repo, AnnexRepo):
-            if not ds.repo.is_remote_annex_ignored(remote):
+        if want_annex_info:
+            if not repo.is_remote_annex_ignored(remote):
                 try:
                     for prop in ('wanted', 'required', 'group'):
-                        var = ds.repo.get_preferred_content(
+                        var = repo.get_preferred_content(
                             prop, '.' if remote == 'here' else remote)
                         if var:
                             info['annex-{}'.format(prop)] = var
-                    groupwanted = ds.repo.get_groupwanted(remote)
+                    groupwanted = repo.get_groupwanted(remote)
                     if groupwanted:
                         info['annex-groupwanted'] = groupwanted
                 except CommandError as exc:
@@ -687,8 +714,8 @@ def _query_remotes(
                         msg = "Could not detect whether %s carries an annex. " \
                               "If %s is a pure Git remote, this is expected. " %\
                               (remote, remote)
-                        ds.repo.config.reload()
-                        if ds.repo.is_remote_annex_ignored(remote):
+                        repo.config.reload()
+                        if repo.is_remote_annex_ignored(remote):
                             msg += "Remote was marked by annex as annex-ignore. " \
                                    "Edit .git/config to reset if you think that was done by mistake due to absent connection etc"
                         lgr.warning(msg)
@@ -698,16 +725,17 @@ def _query_remotes(
             else:
                 info['annex-ignore'] = True
 
+        if special_remote_info:
+            # pull out special remote info for this remote, if there is any
+            for k, v in special_remote_info.get(
+                    info.get('annex-uuid'), {}).items():
+                info[f'annex-{k}'] = v
+
         info['status'] = 'ok'
         yield info
 
 
-def _remove_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
-        as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        **res_kwargs):
+def _remove_remote(ds, repo, name, res_kwargs, **unused_kwargs):
     if not name:
         # TODO we could do ALL instead, but that sounds dangerous
         raise InsufficientArgumentsError("no sibling name given")
@@ -719,7 +747,7 @@ def _remove_remote(
         **res_kwargs)
     try:
         # failure can happen and is OK
-        ds.repo.remove_remote(name)
+        repo.remove_remote(name)
     except RemoteNotAvailableError as e:
         yield get_status_dict(
             # result-oriented! given remote is absent already
@@ -732,13 +760,7 @@ def _remove_remote(
         **result_props)
 
 
-# always copy signature from above to avoid bugs
-def _enable_remote(
-        ds, name, known_remotes, url, pushurl, fetch, description,
-        as_common_datasrc, publish_depends, publish_by_default,
-        annex_wanted, annex_required, annex_group, annex_groupwanted,
-        inherit, get_annex_info,
-        **res_kwargs):
+def _enable_remote(ds, repo, name, res_kwargs, **unused_kwargs):
     result_props = dict(
         action='enable-sibling',
         path=ds.path,
@@ -746,7 +768,7 @@ def _enable_remote(
         name=name,
         **res_kwargs)
 
-    if not isinstance(ds.repo, AnnexRepo):
+    if not isinstance(repo, AnnexRepo):
         yield dict(
             result_props,
             status='impossible',
@@ -761,7 +783,7 @@ def _enable_remote(
         return
 
     # get info on special remote
-    sp_remotes = {v['name']: dict(v, uuid=k) for k, v in ds.repo.get_special_remotes().items()}
+    sp_remotes = {v['name']: dict(v, uuid=k) for k, v in repo.get_special_remotes().items()}
     remote_info = sp_remotes.get(name, None)
 
     if remote_info is None:
@@ -807,7 +829,7 @@ def _enable_remote(
                 WEBDAV_PASSWORD=creds['password'])
 
     try:
-        ds.repo.enable_remote(name, env=env)
+        repo.enable_remote(name, env=env)
         result_props['status'] = 'ok'
     except AccessDeniedError as e:
         # credentials are wrong, wipe them out

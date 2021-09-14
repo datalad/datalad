@@ -10,15 +10,17 @@
 """
 
 import logging
-import os
 import os.path as op
-from os.path import exists, isdir, getmtime, join as opj
-from unittest.mock import patch
+from os.path import (
+    exists,
+    getmtime,
+    isdir,
+    join as opj,
+)
 
 from datalad.tests.utils import SkipTest
 
 
-from datalad.support.external_versions import external_versions
 from datalad.utils import Path
 
 from datalad.tests.utils import (
@@ -38,7 +40,6 @@ from datalad.tests.utils import (
     with_tempfile,
     with_tree,
 )
-from datalad import cfg as dl_cfg
 from ..sshconnector import (
     SSHConnection,
     SSHManager,

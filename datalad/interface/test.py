@@ -30,8 +30,6 @@ class Test(Interface):
     It is just a thin wrapper around a call to nose, so number of
     exposed options is minimal
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         verbose=Parameter(

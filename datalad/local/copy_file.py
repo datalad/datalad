@@ -236,7 +236,7 @@ class CopyFile(Interface):
             # no specific target set, but we have to write into a dataset,
             # and one was given. It seems to make sense to use this dataset
             # as a target. it is already to reference for any path resolution.
-            # Any explicitely given destination, will take precedence over
+            # Any explicitly given destination, will take precedence over
             # a general target_dir setting nevertheless.
             target_dir = ds.pathobj
 
@@ -485,7 +485,7 @@ def _copy_file(src, dest, cache):
         paths=[rpath],
         # a simple `exists()` will not be enough (pointer files, etc...)
         eval_availability=True,
-        # if it truely is a symlink, not just an annex pointer, we would not
+        # if it truly is a symlink, not just an annex pointer, we would not
         # want to resolve it
         eval_file_type=True,
     )
@@ -516,7 +516,8 @@ def _copy_file(src, dest, cache):
         return
 
     # at this point we are copying an annexed file into an annex repo
-    if dest_repo.is_managed_branch():
+    if not dest_repo._check_version_kludges("fromkey-supports-unlocked") \
+       and dest_repo.is_managed_branch():
         res = _place_filekey_managed(
             finfo, str_src, dest, str_dest, dest_repo_rec)
     else:
@@ -557,7 +558,7 @@ def _copy_file(src, dest, cache):
                 continue
             if src_rid != '00000000-0000-0000-0000-000000000001' and \
                     src_srinfo[src_rid] not in dest_srinfo.values():
-                # this is a special remote that the destination repo doesnt know
+                # this is a special remote that the destination repo doesn't know
                 sri = src_srinfo[src_rid]
                 lgr.debug('Init additionally required special remote: %s', sri)
                 dest_repo.init_remote(

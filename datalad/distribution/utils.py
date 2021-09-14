@@ -12,15 +12,18 @@
 
 import logging
 
-from os.path import join as opj
-from os.path import isabs
-from os.path import normpath
+from os.path import (
+    isabs,
+    join as opj,
+    normpath,
+)
 import posixpath
 
-from datalad.support.network import DataLadRI
-from datalad.support.network import URL
-from datalad.support.network import RI
-from datalad.support.network import PathRI
+from datalad.support.network import (
+    PathRI,
+    RI,
+    URL,
+)
 
 
 lgr = logging.getLogger('datalad.distribution.utils')

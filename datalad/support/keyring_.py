@@ -19,13 +19,22 @@ class Keyring(object):
 
     It also delays import of keyring which takes 300ms I guess due to all plugins etc
     """
-    def __init__(self):
-        self.__keyring = None
+    def __init__(self, keyring_backend=None):
+        """
+
+        Parameters
+        ----------
+        keyring_backend: keyring.backend.KeyringBackend, optional
+          Specific keyring to use.  If not provided, the one returned by
+          `keyring.get_keyring()` is used
+        """
+        self.__keyring = keyring_backend
+        self.__keyring_mod = None
 
     @property
     def _keyring(self):
-        if self.__keyring is None:
-            # Setup logging for keyring if we are debugging, althought keyring's logging
+        if self.__keyring_mod is None:
+            # Setup logging for keyring if we are debugging, although keyring's logging
             # is quite scarce ATM
             from datalad.log import lgr
             import logging
@@ -36,8 +45,19 @@ class Keyring(object):
                 keyring_lgr.handlers = lgr.handlers
             lgr.debug("Importing keyring")
             import keyring
-            self.__keyring = keyring
+            self.__keyring_mod = keyring
 
+        if self.__keyring is None:
+            from datalad.log import lgr
+            # we use module bound interfaces whenever we were not provided a dedicated
+            # backend
+            self.__keyring = self.__keyring_mod
+            the_keyring = self.__keyring_mod.get_keyring()
+            if the_keyring.name.lower().startswith('null '):
+                lgr.warning(
+                    "Keyring module returned '%s', no credentials will be provided",
+                    the_keyring.name
+                )
         return self.__keyring
 
     @classmethod
@@ -59,7 +79,12 @@ class Keyring(object):
     def delete(self, name, field=None):
         if field is None:
             raise NotImplementedError("Deletion of all fields associated with a name")
-        return self._keyring.delete_password(self._get_service_name(name), field)
+        try:
+            return self.__keyring.delete_password(self._get_service_name(name), field)
+        except self.__keyring_mod.errors.PasswordDeleteError as exc:
+            if 'not found' in str(exc):
+                return
+            raise
 
 
 class MemoryKeyring(object):

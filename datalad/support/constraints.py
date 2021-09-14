@@ -290,7 +290,10 @@ class EnsureChoice(Constraint):
         return value
 
     def long_description(self):
-        return 'value must be one of %s' % (str(self._allowed),)
+        return 'value must be one of [CMD: %s CMD][PY: %s PY]' % (
+            str(tuple(i for i in self._allowed if i is not None)),
+            str(self._allowed)
+        )
 
     def short_description(self):
         return '{%s}' % ', '.join([repr(c) for c in self._allowed])
@@ -483,4 +486,4 @@ def expand_constraint_spec(spec):
         try:
             return constraint_spec_map[spec]
         except KeyError:
-            raise ValueError("unsupport constraint specification '%r'" % (spec,))
+            raise ValueError("unsupported constraint specification '%r'" % (spec,))
