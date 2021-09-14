@@ -87,22 +87,22 @@ def _scope_reload(obj):
 
 
 #
-# TODO: remove in/after 0.16.0
+# TODO: remove when deprecated 'where' is removed
 #
 def _where_to_scope(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         if 'where' in kwargs:
             if 'scope' in kwargs:
-                raise ValueError("Do not specify both 'scope' and DEPRECATED 'wraps'")
+                raise ValueError("Do not specify both 'scope' and DEPRECATED 'where'")
             kwargs = kwargs.copy()
             where = kwargs.pop('where')
             if where == 'dataset':
-                warnings.warn("'where=\"dataset\"' is being deprecated as of 0.15. Use 'scope=\"branch\"' instead",
+                warnings.warn("'where=\"dataset\"' is deprecated, use 'scope=\"branch\"' instead",
                               DeprecationWarning)
                 where = 'branch'
             else:
-                warnings.warn("'where' is being deprecated as of 0.15. Use 'scope' instead",
+                warnings.warn("'where' is deprecated, use 'scope' instead",
                               DeprecationWarning)
             kwargs['scope'] = where
         return func(*args, **kwargs)
@@ -147,7 +147,7 @@ def parse_gitconfig_dump(dump, cwd=None, multi_value=True):
         # line is a null-delimited chunk
         k = None
         # in anticipation of output contamination, process within a loop
-        # scope we can reject non syntax compliant pieces
+        # where we can reject non syntax compliant pieces
         while line:
             if line.startswith('file:'):
                 # origin line
@@ -403,7 +403,7 @@ class ConfigManager(object):
         # 2-step strategy:
         #   - load datalad dataset config from dataset
         #   - load git config from all supported by git sources
-        # in doing so we always stay compatible with scope Git gets its
+        # in doing so we always stay compatible with where Git gets its
         # config from, but also allow to override persistent information
         # from dataset locally or globally
 
