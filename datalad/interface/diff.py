@@ -375,7 +375,7 @@ class Diff(Interface):
                     )
                     if from_rev and from_rev == to_rev:
                         # this is a special case, where subdataset reported changes without
-                        # a change in state/commit -- this is code for uncommited changes
+                        # a change in state/commit -- this is code for uncommitted changes
                         # in the subdataset (including staged ones). In such a case, we
                         # must not provide a diff range, but only the source commit we want
                         # to diff against

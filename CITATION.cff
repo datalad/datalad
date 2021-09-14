@@ -1,0 +1,82 @@
+cff-version: 1.1.0
+message: Please cite the following works when using this software.
+authors:
+  - family-names: Halchenko
+    given-names: Yaroslav
+  - family-names: Meyer
+    given-names: Kyle
+  - family-names: Poldrack
+    given-names: Benjamin
+  - family-names: Solanky
+    given-names: Debanjum
+  - family-names: Wagner
+    given-names: Adina
+  - family-names: Gors
+    given-names: Jason
+  - family-names: MacFarlane
+    given-names: Dave
+  - family-names: Pustina
+    given-names: Dorian
+  - family-names: Sochat
+    given-names: Vanessa
+  - family-names: Ghosh
+    given-names: Satrajit
+  - family-names: Mönch
+    given-names: Christian
+  - family-names: Markiewicz
+    given-names: Christopher
+  - family-names: Waite
+    given-names: Laura
+  - family-names: Shlyakhter
+    given-names: Ilya
+  - family-names: Vega
+    given-names: Alejandro
+    name-particle: de la
+  - family-names: Hayashi
+    given-names: Soichi
+  - family-names: Häusler
+    given-names: Christian
+  - family-names: Poline
+    given-names: Jean-Baptiste
+  - family-names: Kadelka
+    given-names: Tobias
+  - family-names: Skytén
+    given-names: Kusti
+  - family-names: Jarecka
+    given-names: Dorota
+  - family-names: Kennedy
+    given-names: David
+  - family-names: Strauss
+    given-names: Ted
+  - family-names: Cieslak
+    given-names: Matt
+  - family-names: Vavra
+    given-names: Peter
+  - family-names: Ioanas
+    given-names: Horea-Ioan
+  - family-names: Schneider
+    given-names: Robin
+  - family-names: Pflüger
+    given-names: Mika
+  - family-names: Haxby
+    given-names: James
+  - family-names: Eickhoff
+    given-names: Simon
+  - family-names: Hanke
+    given-names: Michael
+doi: 10.21105/JOSS.03262
+identifiers:
+  - type: doi
+    value: 10.21105/JOSS.03262
+  - type: other
+    value: urn:issn:2475-9066
+keywords:
+  - Computational reproducibility
+  - reproducibility
+  - Python
+  - data management
+  - workflow
+title: >-
+  DataLad: distributed system for joint management of code, data, and their
+  relationship
+version: 0.14.6

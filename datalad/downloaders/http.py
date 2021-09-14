@@ -124,7 +124,7 @@ def check_response_status(response, err_prefix="", session=None):
     elif response.status_code in {200}:
         pass
     elif response.status_code in {301, 302, 307}:
-        # TODO: apparently tests do not excercise this one yet
+        # TODO: apparently tests do not exercise this one yet
         if session is None:
             raise AccessFailedError(err_msg + " no session was provided")
         redirs = list(session.resolve_redirects(response, response.request))
@@ -169,7 +169,7 @@ class HTTPBaseAuthenticator(Authenticator):
         credentials = credential()
 
         # The whole thing relies on server first spitting out 401
-        # and client GETing again with 'Authentication:' header
+        # and client getting again with 'Authentication:' header
         # So we need custom handling for those, while keeping track not
         # of cookies per se, but of 'Authentication:' header which is
         # to be used in subsequent GETs

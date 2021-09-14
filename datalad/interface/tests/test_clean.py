@@ -17,16 +17,26 @@ import logging
 from os import makedirs
 from os.path import join as opj
 from ...api import clean
-from ...consts import ARCHIVES_TEMP_DIR
-from ...consts import ANNEX_TEMP_DIR
-from ...consts import SEARCH_INDEX_DOTGITDIR
+from ...consts import (
+    ARCHIVES_TEMP_DIR,
+    ANNEX_TEMP_DIR,
+    ANNEX_TRANSFER_DIR,
+    SEARCH_INDEX_DOTGITDIR
+)
 from ...distribution.dataset import Dataset
 from ...support.annexrepo import AnnexRepo
-from ...tests.utils import with_tempfile
-from ...utils import swallow_outputs
-from ...utils import chpwd
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_status
+from ...utils import (
+    chpwd,
+    Path,
+    swallow_outputs
+)
+from ...tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_status,
+    assert_true,
+    with_tempfile
+)
 
 
 @with_tempfile(mkdir=True)
@@ -35,40 +45,96 @@ def test_clean(d):
     ds = Dataset(d)
     assert_status('notneeded', clean(dataset=ds))
 
+    archives_path = ds.pathobj / Path(ARCHIVES_TEMP_DIR)
+    annex_tmp_path = ds.pathobj / Path(ANNEX_TEMP_DIR)
+    annex_trans_path = ds.pathobj / Path(ANNEX_TRANSFER_DIR)
+    index_path = ds.repo.dot_git / Path(SEARCH_INDEX_DOTGITDIR)
+
     # if we create some temp archives directory
-    makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
+    (archives_path / 'somebogus').mkdir(parents=True)
     res = clean(dataset=ds, return_type='item-or-list',
                 result_filter=lambda x: x['status'] == 'ok')
-    assert_equal(res['path'], opj(d, ARCHIVES_TEMP_DIR))
+    assert_equal(res['path'], str(archives_path))
     assert_equal(res['message'][0] % tuple(res['message'][1:]),
                  "Removed 1 temporary archive directory: somebogus")
+    assert_false(archives_path.exists())
 
     # relative path
-    makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
-    makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus2'))
+    (archives_path / 'somebogus').mkdir(parents=True)
+    (archives_path / 'somebogus2').mkdir(parents=True)
     with chpwd(d), swallow_outputs() as cmo:
         res = clean(return_type='item-or-list',
                     result_filter=lambda x: x['status'] == 'ok')
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
-                     "Removed 2 temporary archive directories: somebogus, somebogus2")
+                     "Removed 2 temporary archive directories: somebogus, "
+                     "somebogus2")
+        assert_false(archives_path.exists())
 
     # and what about git annex temporary files?
-    makedirs(opj(d, ANNEX_TEMP_DIR))
-    open(opj(d, ANNEX_TEMP_DIR, "somebogus"), "w").write("load")
-
+    annex_tmp_path.mkdir(parents=True)
+    (annex_tmp_path / "somebogus").write_text("load")
     with chpwd(d):
         res = clean(return_type='item-or-list',
                     result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], opj(d, ANNEX_TEMP_DIR))
+        assert_equal(res['path'], str(annex_tmp_path))
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
                      "Removed 1 temporary annex file: somebogus")
+        assert_false(annex_tmp_path.exists())
 
-    # search index
-    sidir = opj(d, '.git', SEARCH_INDEX_DOTGITDIR)
-    makedirs(sidir)
-    open(opj(sidir, "MAIN_r55n3hiyvxkdf1fi.seg, _MAIN_1.toc"), "w").write("noop")
-
+    (annex_trans_path / 'somebogus').mkdir(parents=True, exist_ok=True)
     with chpwd(d):
         res = clean(return_type='item-or-list',
                     result_filter=lambda x: x['status'] == 'ok')
-        assert_equal(res['path'], sidir)
+        assert_equal(res['path'], str(annex_trans_path))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed 1 annex temporary transfer directory: somebogus")
+        assert_false(annex_trans_path.exists())
+
+    # search index
+    index_path.mkdir(parents=True)
+    (index_path / "MAIN_r55n3hiyvxkdf1fi.seg, _MAIN_1.toc").write_text("noop")
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], str(index_path))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed 1 metadata search index file: "
+                     "MAIN_r55n3hiyvxkdf1fi.seg, _MAIN_1.toc")
+        assert_false(index_path.exists())
+
+    # remove empty directories, too
+    archives_path.mkdir(parents=True)
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], str(archives_path))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed empty temporary archive directory")
+        assert_false(archives_path.exists())
+
+    annex_tmp_path.mkdir(parents=True)
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], str(annex_tmp_path))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed empty temporary annex directory")
+        assert_false(annex_tmp_path.exists())
+
+    annex_trans_path.mkdir(parents=True)
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], str(annex_trans_path))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed empty annex temporary transfer directory")
+        assert_false(annex_trans_path.exists())
+
+    index_path.mkdir(parents=True)
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], str(index_path))
+        assert_equal(res['message'][0] % tuple(res['message'][1:]),
+                     "Removed empty metadata search index directory")
+        assert_false(index_path.exists())

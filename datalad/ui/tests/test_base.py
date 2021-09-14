@@ -20,7 +20,6 @@ from ...tests.utils import (
     assert_equal, assert_not_equal,
     assert_raises,
     assert_false,
-    ok_,
     with_testsui,
 )
 

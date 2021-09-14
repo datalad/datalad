@@ -16,16 +16,14 @@ import os.path as op
 from itertools import product
 from unittest.mock import patch
 
+from ..globbedpaths import GlobbedPaths
 from datalad.tests.utils import (
     OBSCURE_FILENAME,
     assert_in,
     eq_,
-    known_failure_windows,
     swallow_logs,
     with_tree,
 )
-
-from ..globbedpaths import GlobbedPaths
 
 
 def test_globbedpaths_get_sub_patterns():

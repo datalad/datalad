@@ -31,14 +31,17 @@ See CONTRIBUTORS file for a full list of contributors.
 
 # 3rd Party Code
 
-Some code distributed within DataLad was not developed by the DataLad team,
-hence you should adhere to the copyright and license terms of respective
-authors if you are to use corresponding parts.
+Some code distributed within DataLad was not developed by the DataLad
+team, hence you should adhere to the copyright and license terms of
+respective authors if you are to use corresponding parts. PyMVPA
+authors (where mentioned) are DataLad developers, so no explicit
+mentioning in the list below:
 
-## `datalad/resources/website`
-   - [JQuery](https://code.jquery.com) - MIT License - Copyright (c) 2016-
-   - [Datatables](http://datatables.net) - MIT License - Copyright (c) 2016-
-   - [BlueImp-MD5](https://github.com/blueimp/JavaScript-MD5) - MIT License - Copyright (c) 2016-
-   - [QUnit](https://qunitjs.com/) - MIT License - Copyright (c)
-   - [Sinon-QUnit Plugin](http://sinonjs.org/qunit/) - BSD License - Copyright (c) 2010-2011
-   - [NumPy Testing](http://numpy.org) - BSD license - Copyright (c) 2005- NumPy Developers <numpy-dev@numpy.org>
+## `_datalad_build_support/{setup,formatters}.py`
+   - (parts) Python license - Copyright (c) 2014 Oz Nahum Tiram  <nahumoz@gmail.com>
+## `datalad/support/due.py`
+   - BSD-3 - 2015-2019  DueCredit developers
+## `datalad/support/{,tests/test_}gitrepo.py`
+   - (parts) BSD-3 - Copyright (C) 2008, 2009 Michael Trier and contributors
+## `datalad/utils.py:optional_args`
+   - BSD-3 - 2011-2014, Lambda Foundry, Inc. and PyData Development Team

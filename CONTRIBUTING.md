@@ -200,7 +200,6 @@ INFO:allcontrib:⭐️ Found new contributor chrhaeusler in .all-contributorsrc
 ...
 INFO:allcontrib:⭐️ Found new contributor bpoldrack in .all-contributorsrc
 INFO:allcontrib:⭐️ Found new contributor yetanothertestuser in .all-contributorsrc
-INFO:allcontrib:⭐️ Found new contributor bhanuprasad14 in .all-contributorsrc
 WARNING:tributors:allcontrib does not support updating from orcids.
 WARNING:tributors:allcontrib does not support updating from email.
 ```
@@ -550,7 +549,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 - *DATALAD_DATASETS_TOPURL*:
   Used to point to an alternative location for `///` dataset. If running
-  tests preferred to be set to http://datasets-tests.datalad.org
+  tests preferred to be set to https://datasets-tests.datalad.org
 - *DATALAD_LOG_LEVEL*:
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_LOG_NAME*:
@@ -569,8 +568,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_LOG_VMEM*:
   Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
 - *DATALAD_EXC_STR_TBLIMIT*: 
-  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
-  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+  This flag is used by datalad to cap the number of traceback steps included in exception logging and result reporting to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
 - *DATALAD_SEED*:
   To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
   those random values reproducible.  You might want also to set all the relevant git config variables

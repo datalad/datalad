@@ -292,7 +292,7 @@ class ConfigManager(object):
         self._stores = dict(
             # populated with info from git
             git=store,
-            # only populated with info from commited dataset config
+            # only populated with info from committed dataset config
             dataset=store.copy(),
         )
         # merged representation (the only one that existed pre datalad 0.14)
@@ -484,7 +484,7 @@ class ConfigManager(object):
           `text`.
         """
         # do local import, as this module is import prominently and the
-        # could theoretically import all kind of weired things for type
+        # could theoretically import all kind of weird things for type
         # conversion
         from datalad.interface.common_cfg import definitions as cfg_defs
         # fetch what we know about this variable
@@ -641,7 +641,7 @@ class ConfigManager(object):
     def get_from_source(self, source, key, default=None):
         """Like get(), but a source can be specific.
 
-        If `source` is 'dataset', only the commited configuration is queried,
+        If `source` is 'dataset', only the committed configuration is queried,
         overrides are applied. In the case of 'local', the committed
         configuration is ignored, but overrides and configuration from
         environment variables are applied as usual.
@@ -800,8 +800,8 @@ class ConfigManager(object):
             lockfile = self._repo_dot_git / 'config.dataladlock'
         else:
             # follow pattern in downloaders for lockfile location
-            lockfile = Path(self.obtain('datalad.locations.cache')) \
-                / 'locks' / 'gitconfig.lck'
+            lockfile = Path(self.obtain('datalad.locations.locks')) \
+                       / 'gitconfig.lck'
 
         with ConfigManager._run_lock, InterProcessLock(lockfile, logger=lgr):
             out = self._runner.run(self._config_cmd + args, **kwargs)

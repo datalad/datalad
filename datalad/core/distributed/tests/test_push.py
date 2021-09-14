@@ -50,6 +50,7 @@ from datalad.utils import (
     Path,
     chpwd,
     path_startswith,
+    swallow_outputs,
 )
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -329,7 +330,7 @@ def test_push_recursive(
         assert_in_results(
             res, status='ok', type='dataset', path=d.path,
             refspec=DEFAULT_REFSPEC)
-    # all correspondig branches match across all datasets
+    # all corresponding branches match across all datasets
     for s, d in zip((top, sub, subnoannex, subsub),
                     (target_top, target_sub, target_subnoannex,
                      target_subsub)):
@@ -482,7 +483,7 @@ def test_force_checkdatapresent(srcpath, dstpath):
     ok_(len(whereis_prior) < len(
         src.repo.whereis(files=['test_mod_annex_file'])[0]))
 
-    # do it yet again will do nothing, because all is uptodate
+    # do it yet again will do nothing, because all is up-to-date
     assert_status('notneeded', src.push(to='target', force=None))
     # an explicit reference point doesn't change that
     assert_status('notneeded',
@@ -969,3 +970,25 @@ def test_nested_pushclone_cycle_allplatforms(origpath, storepath, clonepath):
     assert_not_in_results(
         clone_super.status(recursive=True),
         state='modified')
+
+
+@with_tempfile
+def test_push_custom_summary(path):
+    path = Path(path)
+    ds = Dataset(path / "ds").create()
+
+    sib = mk_push_target(ds, "sib", str(path / "sib"), bare=False, annex=False)
+    (sib.pathobj / "f1").write_text("f1")
+    sib.save()
+
+    (ds.pathobj / "f2").write_text("f2")
+    ds.save()
+
+    # These options are true by default and our tests usually run with a
+    # temporary home, but set them to be sure.
+    ds.config.set("advice.pushUpdateRejected", "true", where="local")
+    ds.config.set("advice.pushFetchFirst", "true", where="local")
+    with swallow_outputs() as cmo:
+        ds.push(to="sib", result_renderer="default", on_failure="ignore")
+        assert_in("Hints:", cmo.out)
+        assert_in("action summary:", cmo.out)

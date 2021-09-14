@@ -14,6 +14,7 @@ jobs:
             datalad-neuroimaging,
             datalad-container,
             datalad-crawler,
+            datalad-deprecated,
             datalad-hirni,
         ]
     steps:

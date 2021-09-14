@@ -301,7 +301,7 @@ class AddArchiveContent(Interface):
         if extract_rpath == curdir:
             extract_rpath = None  # no special relpath from top of the repo
 
-        # and operate from now on the key or whereever content available "canonically"
+        # and operate from now on the key or wherever content available "canonically"
         try:
             key_rpath = annex.get_contentlocation(key)  # , relative_to_top=True)
         except:

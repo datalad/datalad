@@ -33,6 +33,7 @@ from datalad.utils import quote_cmdlinearg as sh_quote
 # from datalad.support.network import RI, is_ssh
 
 from datalad.support.exceptions import (
+    CapturedException,
     CommandError,
     ConnectionOpenFailedError,
 )
@@ -800,8 +801,9 @@ class MultiplexSSHManager(BaseSSHManager):
                     try:
                         f()
                     except Exception as exc:
+                        ce = CapturedException(exc)
                         lgr.debug("Failed to close a connection: "
-                                  "%s", exc_str(exc))
+                                  "%s", ce.message)
             self._connections = dict()
 
 

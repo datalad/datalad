@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Auxilary data structures"""
+"""Auxiliary data structures"""
 
 from typing import Mapping
 
