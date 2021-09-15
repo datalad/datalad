@@ -14,7 +14,7 @@ of basic options, and a list of available sub-commands.
 .. code-block:: ansi-color
 
    [1;36m~[0m % datalad
-   usage: datalad [-h] [-l LEVEL] [--pbs-runner {condor}] [-C PATH] [--version]
+   usage: datalad [-h] [-l LEVEL] [-C PATH] [--version]
                   [--dbg] [--idbg] [-c KEY=VALUE]
                   [-f {default,json,json_pp,tailored,'<template>'}]
                   [--report-status {success,failure,ok,notneeded,impossible,error}]

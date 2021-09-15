@@ -217,7 +217,6 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
 
 def parser_add_common_options(parser, version=None):
     parser_add_common_opt(parser, 'log_level')
-    parser_add_common_opt(parser, 'pbs_runner')
     parser_add_common_opt(parser, 'change_path')
     if version is not None:
         warnings.warn("Passing 'version' to parser_add_common_options "
@@ -297,7 +296,7 @@ def strip_arg_from_argv(args, value, opt_names):
     # Yarik doesn't know better
     if args is None:
         args = sys.argv
-    # remove present pbs-runner option
+    # remove present opt_names
     args_clean = []
     skip = 0
     for i, arg in enumerate(args):
@@ -311,39 +310,6 @@ def strip_arg_from_argv(args, value, opt_names):
             # we need to skip this one and next one
             skip = 1
     return args_clean
-
-
-def run_via_pbs(args, pbs):
-    warnings.warn("Job submission via --pbs-runner is deprecated."
-                  "Use something like condor_run",
-                  DeprecationWarning)
-
-    assert(pbs in ('condor',))  # for now
-
-    # TODO: RF to support multiple backends, parameters, etc, for now -- just condor, no options
-    f = NamedTemporaryFile('w', prefix='datalad-%s-' % pbs, suffix='.submit', delete=False)
-    try:
-        pwd = getpwd()
-        logs = f.name.replace('.submit', '.log')
-        exe = args[0]
-        # TODO: we might need better way to join them, escaping spaces etc.  There must be a stock helper
-        #exe_args = ' '.join(map(repr, args[1:])) if len(args) > 1 else ''
-        exe_args = ' '.join(args[1:]) if len(args) > 1 else ''
-        f.write("""\
-Executable = %(exe)s
-Initialdir = %(pwd)s
-Output = %(logs)s
-Error = %(logs)s
-getenv = True
-
-arguments = %(exe_args)s
-queue
-""" % locals())
-        f.close()
-        Runner().run(['condor_submit', f.name])
-        lgr.info("Scheduled execution via %s.  Logs will be stored under %s", pbs, logs)
-    finally:
-        unlink(f.name)
 
 
 def get_repo_instance(path=os.curdir, class_=None):

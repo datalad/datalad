@@ -46,13 +46,6 @@ log_level = (
               % ', '.join(_log_level_names))
 )
 
-pbs_runner = (
-    'pbs-runner', ('--pbs-runner',),
-    dict(choices=['condor'],
-         default=None,
-         help="""DEPRECATED, will be removed in a future release.""")
-)
-
 change_path = (
     'change-path', ('-C',),
     dict(action='append',

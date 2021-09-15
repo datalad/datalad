@@ -743,7 +743,7 @@ class Interface(object):
             # common options
             # XXX define or better get from elsewhere
             common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
-                           'help', 'log_level', 'logger', 'pbs_runner',
+                           'help', 'log_level', 'logger',
                            'result_renderer', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
