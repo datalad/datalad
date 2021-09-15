@@ -160,10 +160,10 @@ class _GitHubLike(object):
             doc="""API endpoint of the Git hosting service instance"""),
         access_protocol=Parameter(
             args=("--access-protocol",),
-            # TODO possibly extend with 'https/ssh' for hybrid push/pull
-            # access https://github.com/datalad/datalad/issues/5939
-            constraints=EnsureChoice('https', 'ssh'),
-            doc="""access protocol/URL to configure for the sibling"""),
+            constraints=EnsureChoice('https', 'ssh', 'https-ssh'),
+            doc="""access protocol/URL to configure for the sibling. With
+            'https-ssh' SSH will be used for write access, whereas HTTPS
+            is used for read access."""),
         publish_depends=publish_depends,
         private=Parameter(
             args=("--private",),
@@ -405,6 +405,8 @@ class _GitHubLike(object):
                 url=res['ssh_url']
                 if access_protocol == 'ssh'
                 else res['clone_url'],
+                pushurl=res['ssh_url']
+                if access_protocol == 'https-ssh' else None,
                 recursive=False,
                 # TODO fetch=True, maybe only if one existed already
                 publish_depends=publish_depends,
