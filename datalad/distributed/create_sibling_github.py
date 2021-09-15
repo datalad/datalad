@@ -118,7 +118,7 @@ class _GitHub(_GitHubLike):
 class CreateSiblingGithub(Interface):
     """Create dataset sibling on GitHub.org (or an enterprise deployment).
 
-    GitHub is a popular commerical solution for code hosting and collaborative
+    GitHub is a popular commercial solution for code hosting and collaborative
     development. GitHub cannot host dataset content (but see LFS,
     http://handbook.datalad.org/r.html?LFS). However, in combination with other
     data sources and siblings, publishing a dataset to GitHub can facilitate
@@ -145,7 +145,7 @@ class CreateSiblingGithub(Interface):
                  # register the storage of the public GIN repo as a data source
                  > ds.siblings('configure', name='gin', as_common_datasrc='gin-storage')
 
-                 # announce its availabilty on github
+                 # announce its availability on github
                  > ds.push(to='github')
                  """,
              code_cmd="""\
@@ -157,7 +157,7 @@ class CreateSiblingGithub(Interface):
                  # register the storage of the public GIN repo as a data source
                  % datalad siblings configure -s gin --as-common-datasrc gin-storage
 
-                 # announce its availabilty on github
+                 # announce its availability on github
                  % datalad push --to github
                  """,
              ),

@@ -240,8 +240,8 @@ class _GitHubLike(object):
                     existing):
         """Create a repository on the target platform
 
-        Returs
-        ------
+        Returns
+        -------
         dict
           Result record, with status='ok' when all is good, status='error'
           when unrecoverably broken, status='impossible' when recoverably
@@ -347,7 +347,7 @@ class _GitHubLike(object):
         """Create a series of repos on the target platform
 
         This method handles common conditions in a uniform platform-agnostic
-        fahsion, and sets local sibling configurations for created/localed
+        fashion, and sets local sibling configurations for created/located
         repositories.
 
         Yields
