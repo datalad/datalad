@@ -35,7 +35,7 @@ _group_dataset = (
         ('datalad.distribution.create_sibling',
          'CreateSibling',
          'create-sibling'),
-        ('datalad.distribution.create_sibling_github',
+        ('datalad.distributed.create_sibling_github',
          'CreateSiblingGithub',
          'create-sibling-github'),
         ('datalad.distributed.create_sibling_gitlab',
