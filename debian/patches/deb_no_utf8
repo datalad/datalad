@@ -63,7 +63,7 @@ Last-Update: 2018-06-05
      assert_true(cfg.has_section('unheard.of'))
 --- a/datalad/core/local/tests/test_run.py
 +++ b/datalad/core/local/tests/test_run.py
-@@ -155,29 +155,29 @@ def test_py2_unicode_command(path):
+@@ -154,29 +154,29 @@ def test_py2_unicode_command(path):
      touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
      cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                          touch_cmd,
@@ -100,57 +100,9 @@ Last-Update: 2018-06-05
  
  
  @with_tempfile(mkdir=True)
---- a/datalad/support/tests/test_globbedpaths.py
-+++ b/datalad/support/tests/test_globbedpaths.py
-@@ -53,7 +53,7 @@ def test_globbedpaths_get_sub_patterns()
-                  "2.dat": "",
-                  "3.txt": "",
-                  # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
--                 u"bβ.dat": "",
-+                 u"bB.dat": "",
-                  "subdir": {"1.txt": "", "2.txt": ""}})
- def test_globbedpaths(path):
-     dotdir = op.curdir + op.sep
-@@ -61,9 +61,9 @@ def test_globbedpaths(path):
-     for patterns, expected in [
-             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
-             ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
--            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
-+            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bB.dat", "3.txt"}),
-             ([dotdir + "*.txt", "*.dat"],
--             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
-+             {dotdir + "1.txt", "2.dat", u"bB.dat", dotdir + "3.txt"}),
-             ([op.join("subdir", "*.txt")],
-              {op.join("subdir", "1.txt"), op.join("subdir", "2.txt")}),
-             (["subdir" + op.sep], {"subdir" + op.sep}),
-@@ -93,12 +93,12 @@ def test_globbedpaths(path):
- 
-     # Full patterns still get returned as relative to pwd.
-     gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
--    eq_(gp.expand(), ["2.dat", u"bβ.dat"])
-+    eq_(gp.expand(), ["2.dat", u"bB.dat"])
- 
-     # "." gets special treatment.
-     gp = GlobbedPaths([".", "*.dat"], pwd=path)
--    eq_(set(gp.expand()), {"2.dat", u"bβ.dat", "."})
--    eq_(gp.expand(dot=False), ["2.dat", u"bβ.dat"])
-+    eq_(set(gp.expand()), {"2.dat", u"bB.dat", "."})
-+    eq_(gp.expand(dot=False), ["2.dat", u"bB.dat"])
-     gp = GlobbedPaths(["."], pwd=path, expand=False)
-     eq_(gp.expand(), ["."])
-     eq_(gp.paths, ["."])
-@@ -111,7 +111,7 @@ def test_globbedpaths(path):
-         eq_(gp.expand(), ["z", "b", "d", "x"])
- 
-     # glob expansion for paths property is determined by expand argument.
--    for expand, expected in [(True, ["2.dat", u"bβ.dat"]),
-+    for expand, expected in [(True, ["2.dat", u"bB.dat"]),
-                              (False, ["*.dat"])]:
-         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
-         eq_(gp.paths, expected)
 --- a/datalad/tests/utils.py
 +++ b/datalad/tests/utils.py
-@@ -1489,7 +1489,9 @@ def with_parametric_batch(t):
+@@ -1413,7 +1413,9 @@ def with_parametric_batch(t):
  OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
  # Those will be tried to be added to the base name if filesystem allows
  OBSCURE_FILENAME_PARTS = [' ', '/', '|', ';', '&', '%b5', '{}', "'", '"']
@@ -163,7 +115,7 @@ Last-Update: 2018-06-05
  # so Й might get recoded
 --- a/datalad/core/local/tests/test_diff.py
 +++ b/datalad/core/local/tests/test_diff.py
-@@ -505,9 +505,12 @@ def test_diff_rsync_syntax(path):
+@@ -504,9 +504,12 @@ def test_diff_rsync_syntax(path):
  
  @with_tempfile(mkdir=True)
  def test_diff_nonexistent_ref_unicode(path):
@@ -177,62 +129,9 @@ Last-Update: 2018-06-05
          1,
          path=ds.path,
          status="impossible")
---- a/datalad/support/tests/test_network.py
-+++ b/datalad/support/tests/test_network.py
-@@ -462,9 +462,10 @@ def test_get_local_file_url():
-                 ('C:\\Windows\\notepad.exe', 'file://C/Windows/notepad.exe'),
-             ) if on_windows else (
-                 # static copy of "most_obscore_name"
--                (' "\';a&b&cΔЙקم๗あ `| ',
--                 # and translation by google chrome
--                 "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
-+				#  Debian nd90 with python 3.5 manages to intollerate unicode
-+                #(' "\';a&b&cΔЙקم๗あ `| ',
-+                # # and translation by google chrome
-+                # "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
-                 ('/a', 'file:///a'),
-                 ('/a/b/c', 'file:///a/b/c'),
-                 ('/a~', 'file:///a~'),
---- a/datalad/distribution/tests/test_create_sibling.py
-+++ b/datalad/distribution/tests/test_create_sibling.py
-@@ -12,6 +12,7 @@
- import os
- from os import chmod
- import stat
-+import sys
- import re
- import sys
- 
-@@ -376,13 +377,19 @@ def check_target_ssh_recursive(use_ssh,
- 
-         remote_name = 'remote-' + str(flat)
-         with chpwd(source.path):
--            assert_create_sshwebserver(
--                name=remote_name,
--                sshurl=sshurl,
--                target_dir=target_dir_tpl,
--                recursive=True,
--                ui=True)
--
-+            try:
-+                assert_create_sshwebserver(
-+                    name=remote_name,
-+                    sshurl=sshurl,
-+                    target_dir=target_dir_tpl,
-+                    recursive=True,
-+                    ui=True)
-+            except UnicodeDecodeError:
-+                # 3.5 on nd90
-+                # 3.6 on nd18.04
-+                if sys.version_info < (3, 7):
-+                    raise SkipTest("unicode fiasco")
-+                raise
-         # raise if git repos were not created
-         for suffix in [sep + 'subm 1', sep + '2', '']:
-             target_dir = opj(target_path_, 'prefix' if flat else "").rstrip(os.path.sep) + suffix
 --- a/datalad/tests/test_witless_runner.py
 +++ b/datalad/tests/test_witless_runner.py
-@@ -56,7 +56,7 @@ def py2cmd(code):
+@@ -60,7 +60,7 @@ def py2cmd(code):
  @with_tempfile
  def test_runner(tempfile):
      runner = Runner()

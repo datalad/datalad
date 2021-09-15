@@ -26,10 +26,3 @@ Last-Update: 2021-04-29
  
  from datalad.support.exceptions import AccessDeniedError
  from datalad.tests.utils import (
-@@ -142,4 +146,4 @@ def test__gen_github_entity_organization
-     repos = list(org.get_repos())
-     repos_names = [r.name for r in repos]
-     assert_greater(len(repos), 3)  # we have a number of those
--    assert_in('datasets.datalad.org', repos_names)
-\ No newline at end of file
-+    assert_in('datasets.datalad.org', repos_names)
