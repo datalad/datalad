@@ -1,6 +1,8 @@
 datalad (0.15.0-1) unstable; urgency=medium
 
   * Fresh upstream release (skipped 0.14.8 from two days ago).
+  * debian/patches - added 2 patches submitted upstream
+    https://github.com/datalad/datalad/pull/5986
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 14 Sep 2021 12:37:30 -0400
 

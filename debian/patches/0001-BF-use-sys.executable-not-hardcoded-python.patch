@@ -1,0 +1,77 @@
+From 5f2707ac43a905d3436c4c94e10e8ca964227450 Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Wed, 15 Sep 2021 18:11:51 -0400
+Subject: [PATCH] BF: use sys.executable, not hardcoded "python"
+
+Detected while building Debian package .
+
+Also did isort on that tests file
+---
+ datalad/tests/test_nonasyncrunner.py | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
+
+diff --git a/datalad/tests/test_nonasyncrunner.py b/datalad/tests/test_nonasyncrunner.py
+index 834b7de77..4d9bcf3b2 100644
+--- a/datalad/tests/test_nonasyncrunner.py
++++ b/datalad/tests/test_nonasyncrunner.py
+@@ -13,17 +13,9 @@ import os
+ import queue
+ import signal
+ import subprocess
++import sys
+ from time import sleep
+ 
+-from datalad.tests.utils import (
+-    assert_false,
+-    assert_true,
+-    eq_,
+-    known_failure_windows,
+-    known_failure_osx,
+-    with_tempfile,
+-)
+-
+ from datalad.cmd import (
+     StdOutCapture,
+     WitlessProtocol,
+@@ -33,7 +25,14 @@ from datalad.nonasyncrunner import (
+     _ReaderThread,
+     run_command,
+ )
+-
++from datalad.tests.utils import (
++    assert_false,
++    assert_true,
++    eq_,
++    known_failure_osx,
++    known_failure_windows,
++    with_tempfile,
++)
+ from datalad.utils import on_windows
+ 
+ 
+@@ -109,7 +108,7 @@ def test_interactive_communication():
+                 os.write(self.process.stdin.fileno(), b"exit(0)\n")
+ 
+     result_pool = dict()
+-    result = run_command(["python", "-i"],
++    result = run_command([sys.executable, "-i"],
+                          BidirectionalProtocol,
+                          stdin=subprocess.PIPE,
+                          protocol_kwargs={
+@@ -170,10 +169,11 @@ def test_inside_async():
+ @with_tempfile
+ def test_popen_invocation(src_path, dest_path):
+     # https://github.com/ReproNim/testkraken/issues/93
+-    from datalad.distribution.dataset import Dataset
+-    from datalad.api import clone
+     from multiprocessing import Process
+ 
++    from datalad.api import clone
++    from datalad.distribution.dataset import Dataset
++
+     src = Dataset(src_path).create()
+     (src.pathobj / "file.dat").write_bytes(b"\000")
+     src.save(message="got data")
+-- 
+2.33.0
+
