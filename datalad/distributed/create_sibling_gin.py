@@ -11,20 +11,14 @@
 
 import logging
 
+from datalad.distributed.create_sibling_ghlike import _create_sibling
+from datalad.distributed.create_sibling_gogs import _GOGS
+from datalad.distribution.dataset import datasetmethod
 from datalad.interface.base import (
-    build_doc,
     Interface,
-)
-from datalad.distribution.dataset import (
-    datasetmethod,
+    build_doc,
 )
 from datalad.interface.utils import eval_results
-from datalad.distributed.create_sibling_ghlike import (
-    _create_sibling,
-)
-from datalad.distributed.create_sibling_gogs import (
-    _GOGS,
-)
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gin')
 

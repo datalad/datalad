@@ -15,27 +15,28 @@ from urllib.parse import (
     urljoin,
     urlparse,
 )
+
 import requests
 
-from datalad.ui import ui
+from datalad.distribution.dataset import (
+    EnsureDataset,
+    require_dataset,
+)
 from datalad.downloaders.credentials import Token
 from datalad.downloaders.http import DEFAULT_USER_AGENT
-from datalad.support.param import Parameter
+from datalad.interface.common_opts import (
+    publish_depends,
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.interface.results import get_status_dict
 from datalad.support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import (
-    recursion_flag,
-    recursion_limit,
-    publish_depends,
-)
-from datalad.distribution.dataset import (
-    EnsureDataset,
-    require_dataset,
-)
+from datalad.support.param import Parameter
+from datalad.ui import ui
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_ghlike')
 

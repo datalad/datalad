@@ -9,24 +9,25 @@
 
 import os
 from os.path import basename
+from unittest.mock import patch
+
 import requests
 
 from datalad.api import (
-    create_sibling_gin,
     Dataset,
+    create_sibling_gin,
 )
-from unittest.mock import patch
 from datalad.downloaders.http import DEFAULT_USER_AGENT
 from datalad.tests.utils import (
+    SkipTest,
     assert_in,
     assert_in_results,
     assert_raises,
     assert_result_count,
     assert_status,
     eq_,
-    with_tempfile,
     skip_if_no_network,
-    SkipTest,
+    with_tempfile,
 )
 
 

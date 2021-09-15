@@ -11,21 +11,19 @@ import os
 
 # this must import ok with and without gitlab
 from datalad.api import (
+    Dataset,
     create,
     create_sibling_gitlab,
-    Dataset,
-)
-from datalad.utils import (
-    chpwd,
 )
 from datalad.tests.utils import (
+    assert_raises,
     assert_repo_status,
     assert_result_count,
     assert_status,
-    assert_raises,
     eq_,
     with_tempfile,
 )
+from datalad.utils import chpwd
 
 
 def _get_nested_collections(path):

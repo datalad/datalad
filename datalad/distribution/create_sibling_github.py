@@ -13,30 +13,27 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import requests
 import warnings
+from urllib.parse import urljoin
 
-from urllib.parse import (
-    urljoin,
+import requests
+
+from datalad.distributed.create_sibling_ghlike import (
+    _create_sibling,
+    _GitHubLike,
 )
+from datalad.distribution.dataset import datasetmethod
 from datalad.interface.base import (
-    build_doc,
     Interface,
+    build_doc,
 )
 from datalad.interface.utils import eval_results
-from datalad.support.param import Parameter
 from datalad.support.constraints import (
+    EnsureChoice,
     EnsureNone,
     EnsureStr,
-    EnsureChoice,
 )
-from datalad.distribution.dataset import (
-    datasetmethod,
-)
-from datalad.distributed.create_sibling_ghlike import (
-    _GitHubLike,
-    _create_sibling,
-)
+from datalad.support.param import Parameter
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
 

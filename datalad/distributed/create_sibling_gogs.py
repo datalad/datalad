@@ -10,22 +10,18 @@
 """
 
 import logging
-from urllib.parse import (
-    urlparse,
-)
+from urllib.parse import urlparse
 
-from datalad.interface.base import (
-    build_doc,
-    Interface,
+from datalad.distributed.create_sibling_ghlike import (
+    _create_sibling,
+    _GitHubLike,
 )
-from datalad.distribution.dataset import (
-    datasetmethod,
+from datalad.distribution.dataset import datasetmethod
+from datalad.interface.base import (
+    Interface,
+    build_doc,
 )
 from datalad.interface.utils import eval_results
-from datalad.distributed.create_sibling_ghlike import (
-    _GitHubLike,
-    _create_sibling,
-)
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gogs')
 
