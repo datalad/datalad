@@ -1,73 +1,13 @@
-# API calls
-
-# base url
-#   https://try.gogs.io/api/v1/user/repos
-#   https://api.github.com
-
-# headers (uniform for both)
-#   -H "Content-Type: application/json" \
-#   -H "Authorization: token <token>" \
-
-# create user repo
-#   -d '{"name": "myrepo", "private": true, "description": "what a dummy?!"}' \
-#   BASE/user/repos
-# properties supported for GH: https://docs.github.com/en/rest/reference/repos#create-a-repository-for-the-authenticated-user
-# overlap with GOGS properties is
-# - name, description, private, auto_init
-# - given auto_init should be False always, this should be enough
-
-# create org repo
-# - GH:   BASE/orgs/<org>/repos
-# - GOGS: BASE/org/<org>/repos
-
-# congruent parts of an API response to a repo creation
-# Example response GitHub
-# {
-#   "name": "createpriv1",
-#   "full_name": "datalad/createpriv1",
-#   "private": true,
-#   "owner": {
-#     "login": "datalad",
-#   },
-#   "description": "what a dummy2?!",
-#   "fork": false,
-#   "created_at": "2021-08-30T07:42:05Z",
-#   "updated_at": "2021-08-30T07:42:05Z",
-#   "html_url": "https://github.com/datalad/createpriv1",
-#   "ssh_url": "git@github.com:datalad/createpriv1.git",
-#   "clone_url": "https://github.com/datalad/createpriv1.git",
-#   "size": 0,
-#   "default_branch": "master",
-#   "permissions": {
-#     "admin": true,
-#     "push": true,
-#     "pull": true
-#   },
-# }
-
-#  Example response GOGS
-# {
-#   "name": "createpriv2",
-#   "full_name": "dataladtesterorg/createpriv2",
-#   "private": false,
-#   "owner": {
-#     "login": "dataladtesterorg",
-#   },
-#   "description": "",
-#   "fork": false,
-#   "created_at": "0001-01-01T00:00:00Z",
-#   "updated_at": "0001-01-01T00:00:00Z",
-#   "html_url": "https://try.gogs.io/dataladtesterorg/createpriv2",
-#   "ssh_url": "git@try.gogs.io:dataladtesterorg/createpriv2.git",
-#   "clone_url": "https://try.gogs.io/dataladtesterorg/createpriv2.git",
-#   "size": 0,
-#   "default_branch": "",
-#   "permissions": {
-#     "admin": true,
-#     "push": true,
-#     "pull": true
-#   }
-# }
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Tooling for creating a publication target on Github-like systems
+"""
 
 import logging
 import re
@@ -101,17 +41,33 @@ lgr = logging.getLogger('datalad.distributed.create_sibling_ghlike')
 
 
 class _GitHubLike(object):
+    """Helper class with a platform abstraction for GitHub-like services
+    """
+    # (short) lower-case name of the target platform
     name = None
+    # (longer) name with fancy capitalization
     fullname = None
+    # all API endpoint without base URL!
+    # to create a repo in an organization
     create_org_repo_endpoint = None
+    # to create a repo under the authenticated user
     create_user_repo_endpoint = None
+    # query for props of the authenticated users
     get_authenticated_user_endpoint = None
+    # query for repository properties
     get_repo_info_endpoint = None
+    # HTTP response codes for particular events
+    # repo created successfully
     response_code_repo_created = requests.codes.created
+    # auth failure
     response_code_unauthorized = requests.codes.forbidden
 
+    # extra config settings to be used for a remote pointing to the
+    # target platform
     extra_remote_settings = {}
 
+    # to be used (in modified form) by create_sibling_*() commands that
+    # utilize this platform abstraction
     create_sibling_params = dict(
         dataset=Parameter(
             args=("--dataset", "-d",),
@@ -207,6 +163,12 @@ class _GitHubLike(object):
 
     @property
     def authenticated_user(self):
+        """Lazy query/reporting of properties for the authenticated user
+
+        Returns
+        -------
+        dict
+        """
         if self._user_info:
             return self._user_info
 
@@ -220,14 +182,16 @@ class _GitHubLike(object):
 
     # TODO what are the actual constraints?
     def normalize_reponame(self, path):
-        """Turn name (e.g. path) into a Github compliant repository name
+        """Turn name into a Github-like service compliant repository name
+
+        Useful for sanitizing directory names.
         """
         return re.sub(r'\s+', '_', re.sub(r'[/\\]+', '-', path))
 
     def get_dataset_reponame_mapping(
             self, ds, name, reponame, existing, recursive, recursion_limit,
             res_kwargs):
-        """
+        """Discover all relevant datasets locally, and build remote repo names
         """
         dss = _get_present_datasets(ds, recursive, recursion_limit)
         # check for existing remote configuration
@@ -252,6 +216,12 @@ class _GitHubLike(object):
         return toprocess, toyield
 
     def get_siblingname(self, siblingname):
+        """Generate a (default) sibling name, if none is given
+
+        Returns
+        -------
+        str
+        """
         if siblingname:
             return siblingname
 
@@ -267,10 +237,21 @@ class _GitHubLike(object):
 
     def create_repo(self, ds, reponame, organization, private, dry_run,
                     existing):
-        # status='ok' when all is good
-        # status='error' when unrecoverably broken
-        # status='impossible' when recoverably broken
-        # raise for any handled condition
+        """Create a repository on the target platform
+
+        Returs
+        ------
+        dict
+          Result record, with status='ok' when all is good, status='error'
+          when unrecoverably broken, status='impossible' when recoverably
+          broken
+
+        Raises
+        ------
+        Exception
+          Any unhandles condition (in particular unexpected non-success
+          HTTP response codes) will raise an exception.
+        """
         res = self.repo_create_request(
             reponame, organization, private, dry_run)
 
@@ -330,6 +311,13 @@ class _GitHubLike(object):
         return res
 
     def repo_get_request(self, orguser, reponame):
+        """Perform request to query for repo properties
+
+        Returns
+        -------
+        dict
+          The JSON payload of the response.
+        """
         # query information on the existing repo and use that
         # to complete the task
         r = requests.get(
@@ -345,16 +333,27 @@ class _GitHubLike(object):
         return r.json()
 
     def repo_delete_request(self, orguser, reponame):
-        """Perform request to delete a named repo on the platform"""
+        """Perform request to delete a named repo on the platform
+
+        Must be implemented in subclasses for particular target platforms.
+        """
         raise NotImplementedError
 
     def create_repos(self, dsrepo_map, siblingname, organization,
                      private, dry_run, res_kwargs,
                      existing, access_protocol,
                      publish_depends):
-        """
-        """
+        """Create a series of repos on the target platform
 
+        This method handles common conditions in a uniform platform-agnostic
+        fahsion, and sets local sibling configurations for created/localed
+        repositories.
+
+        Yields
+        ------
+        dict
+          Result record
+        """
         for d, reponame in dsrepo_map:
             res = self.create_repo(
                 d, reponame, organization, private, dry_run,
@@ -414,7 +413,14 @@ class _GitHubLike(object):
 
     def repo_create_request(self, reponame, organization, private,
                             dry_run=False):
-        """
+        """Perform a request to create a repo on the target platform
+
+        Also implements reporting of "fake" results in dry-run mode.
+
+        Returns
+        -------
+        dict
+          Result record, but see repo_create_response() for details.
         """
         endpoint = urljoin(
             self.api_url,
@@ -445,7 +451,19 @@ class _GitHubLike(object):
         return self.repo_create_response(r)
 
     def repo_create_response(self, r):
-        """
+        """Handling of repo creation request responses
+
+        Normalizes error handling and reporting.
+
+        Returns
+        -------
+        dict
+          Result record
+
+        Raises
+        ------
+        Exception
+          Raises for any unhandles HTTP error response code.
         """
         try:
             response = r.json()
@@ -481,6 +499,16 @@ class _GitHubLike(object):
 
     def normalize_repo_properties(self, response):
         """Normalize the essential response properties for the result record
+
+        Importantly, `clone_url` is a URL that DataLad can directly clone
+        from, and that should be the default preferred access method for read
+        access by the largest possible audience. Critically, a particular
+        platform, might advertise SSH as default, but DataLad might promote
+        anonymous HTTP-access as a default, if supported.
+
+        Returns
+        -------
+        dict
         """
         return dict(
             reponame=response.get('name'),
@@ -503,7 +531,15 @@ def _create_sibling(
         publish_depends=None,
         private=False,
         dry_run=False):
-    """
+    """Helper function to conduct sibling creation on a target platform
+
+    Parameters match the respective create_sibling_*() commands.
+    `platform` is an instance of a subclass of `_GitHubLike`.
+
+    Yields
+    ------
+    dict
+      Result record.
     """
 
     orgname, reponame = split_org_repo(reponame)
@@ -574,7 +610,7 @@ def split_org_repo(name):
 
 
 def _get_present_datasets(ds, recursive, recursion_limit):
-    """
+    """Return list of (sub)dataset instances for all locally present datasets
     """
     # gather datasets and essential info
     # dataset instance and mountpoint relative to the top

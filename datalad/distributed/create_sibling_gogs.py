@@ -31,12 +31,18 @@ lgr = logging.getLogger('datalad.distributed.create_sibling_gogs')
 
 
 class _GOGS(_GitHubLike):
+    """Customizations for the GOGS platform"""
     name = 'gogs'
     fullname = 'GOGS'
     create_org_repo_endpoint = 'api/v1/org/{organization}/repos'
     create_user_repo_endpoint = 'api/v1/user/repos'
     get_authenticated_user_endpoint = 'api/v1/user'
     get_repo_info_endpoint = 'api/v1/repos/{user}/{repo}'
+    extra_remote_settings = {
+        # first make sure that annex doesn't touch this one
+        # but respect any existing config
+        'annex-ignore': 'true',
+    }
 
     def __init__(self, url, credential, require_token=True):
         if not url:
@@ -48,7 +54,15 @@ class _GOGS(_GitHubLike):
 
 @build_doc
 class CreateSiblingGogs(Interface):
-    """GOGS
+    """Create a dataset sibling on a GOGS site
+
+    GOGS is a self-hosted, free and open source code hosting solution with
+    low resource demands that enable running it on inexpensive devices like
+    a Raspberry Pi, or even directly on a NAS device.
+
+    In order to be able to use this command, a personal access token has to be
+    generated on the platform
+    (Account->Your Settings->Applications->Generate New Token).
     """
 
     _params_ = _GOGS.create_sibling_params

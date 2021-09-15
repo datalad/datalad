@@ -31,9 +31,15 @@ lgr = logging.getLogger('datalad.distributed.create_sibling_gitea')
 
 
 class _Gitea(_GOGS):
+    """Customizations for the Gitea platform"""
     name = 'gitea'
     fullname = 'Gitea'
     response_code_unauthorized = 401
+    extra_remote_settings = {
+        # first make sure that annex doesn't touch this one
+        # but respect any existing config
+        'annex-ignore': 'true',
+    }
 
     def repo_create_response(self, r):
         """
@@ -79,10 +85,23 @@ class _Gitea(_GOGS):
 
 @build_doc
 class CreateSiblingGitea(Interface):
-    """Gitea
+    """Create a dataset sibling on a Gitea site
+
+    Gitea is a lightweight, free and open source code hosting solution with
+    low resource demands that enable running it on inexpensive devices like
+    a Raspberry Pi.
+
+    This command uses the main Gitea instance at https://gitea.com as the
+    default target, but other deployments can be used via the 'api'
+    parameter.
+
+    In order to be able to use this command, a personal access token has to be
+    generated on the platform (Account->Settings->Applications->Generate Token).
     """
 
     _params_ = _Gitea.create_sibling_params
+    _params_['api']._doc = """\
+        URL of the Gitea instance without a 'api/<version>' suffix"""
 
     @staticmethod
     @datasetmethod(name='create_sibling_gitea')
