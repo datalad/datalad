@@ -246,5 +246,8 @@ def run_command(cmd: Union[str, List],
     result = protocol._prepare_result()
     protocol.process_exited()
     protocol.connection_lost(None)  # TODO: check exception
+    for fd in (process.stdin, process.stdout, process.stderr):
+        if fd is not None:
+            fd.close()
 
     return result
