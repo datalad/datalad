@@ -196,13 +196,7 @@ def main(args=None):
             args_ = strip_arg_from_argv(args_, path, change_path_opt[1])
 
     ret = None
-    if cmdlineargs.pbs_runner:
-        from .helpers import run_via_pbs
-        from .common_args import pbs_runner as pbs_runner_opt
-        args_ = strip_arg_from_argv(args_, cmdlineargs.pbs_runner, pbs_runner_opt[1])
-        # run the function associated with the selected command
-        run_via_pbs(args_, cmdlineargs.pbs_runner)
-    elif has_func:
+    if has_func:
         if cmdlineargs.common_debug or cmdlineargs.common_idebug:
             # so we could see/stop clearly at the point of failure
             setup_exceptionhook(ipython=cmdlineargs.common_idebug)
