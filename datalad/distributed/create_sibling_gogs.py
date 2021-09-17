@@ -43,8 +43,6 @@ class _GOGS(_GitHubLike):
     def __init__(self, url, credential, require_token=True):
         if not url:
             raise ValueError(f'API URL required for {self.fullname}')
-        if credential is None:
-            credential = urlparse(url).netloc
         return super().__init__(url, credential, require_token=require_token)
 
 

@@ -112,7 +112,7 @@ class CreateSiblingGin(Interface):
             name='gin',
             existing='error',
             api='https://gin.g-node.org',
-            credential='gin',
+            credential=None,
             access_protocol='https-ssh',
             publish_depends=None,
             private=False,

@@ -109,7 +109,7 @@ class CreateSiblingGitea(Interface):
             name='gitea',
             existing='error',
             api='https://gitea.com',
-            credential='gitea',
+            credential=None,
             access_protocol='https',
             publish_depends=None,
             private=False,

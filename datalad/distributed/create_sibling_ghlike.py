@@ -108,7 +108,8 @@ class _GitHubLike(object):
             configuration setting 'datalad.credential.<name>.token', or
             environment variable DATALAD_CREDENTIAL_<NAME>_TOKEN, or will
             be queried from the active credential store using the provided
-            name."""),
+            name. If none is provided, the host-part of the API URL is used
+            as a name (e.g. 'https://api.github.com' -> 'api.github.com')"""),
         api=Parameter(
             args=('--api',),
             constraints=EnsureStr() | EnsureNone(),
@@ -141,6 +142,9 @@ class _GitHubLike(object):
 
         self.api_url = url
         self._user_info = None
+
+        if credential is None:
+            credential = urlparse(url).netloc
 
         try:
             # TODO platform-specific doc URL for token generation
