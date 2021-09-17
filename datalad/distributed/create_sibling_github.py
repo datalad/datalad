@@ -225,6 +225,14 @@ class CreateSiblingGithub(Interface):
                 DeprecationWarning)
             dry_run = dryrun
 
+        if api == 'https://api.github.com':
+            token_info = \
+                'Visit https://github.com/settings/tokens to create a token.'
+        else:
+            token_info = 'Log into the platform, and visit [Account->' \
+                         'Settings->Developer Settings->' \
+                         'Personal access tokens->Generate new token] ' \
+                         'to create a new token.'
         if github_login:
             warnings.warn(
                 "datalad-create-sibling-github's `github_login` option is "
@@ -239,9 +247,11 @@ class CreateSiblingGithub(Interface):
                     'os.environ',
                     {'DATALAD_CREDENTIAL_GITHUBLOGINARG_TOKEN': github_login}):
                 platform = _GitHub(
-                    api, 'githubloginarg', require_token=not dry_run)
+                    api, 'githubloginarg', require_token=not dry_run,
+                    token_info=token_info)
         else:
-            platform = _GitHub(api, credential, require_token=not dry_run)
+            platform = _GitHub(api, credential, require_token=not dry_run,
+                               token_info=token_info)
 
         if github_organization:
             warnings.warn(

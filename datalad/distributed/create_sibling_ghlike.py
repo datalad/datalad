@@ -136,7 +136,7 @@ class _GitHubLike(object):
             are reported for all relevant datasets"""),
     )
 
-    def __init__(self, url, credential, require_token=True):
+    def __init__(self, url, credential, require_token=True, token_info=None):
         if not url:
             raise ValueError(f'API URL required for {self.fullname}')
 
@@ -146,9 +146,13 @@ class _GitHubLike(object):
         if credential is None:
             credential = urlparse(url).netloc
 
+        token_instructions = f'An access token is required for {url}'
+        if token_info:
+            token_instructions += f'. {token_info}'
+
         try:
-            # TODO platform-specific doc URL for token generation
-            self.auth = Token(credential, url=url)()['token']
+            self.auth = Token(credential)(
+                instructions=token_instructions)['token']
         except Exception as e:
             lgr.debug('Token retrieval failed: %s', e)
             lgr.warning(

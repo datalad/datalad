@@ -116,7 +116,12 @@ class CreateSiblingGitea(Interface):
             dry_run=False):
 
         yield from _create_sibling(
-            platform=_Gitea(api, credential, require_token=not dry_run),
+            platform=_Gitea(
+                api,
+                credential,
+                require_token=not dry_run,
+                token_info=f'Visit {api}/user/settings/applications '
+                           'to create a token'),
             reponame=reponame,
             dataset=dataset,
             recursive=recursive,

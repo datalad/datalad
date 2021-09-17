@@ -40,10 +40,15 @@ class _GOGS(_GitHubLike):
         'annex-ignore': 'true',
     }
 
-    def __init__(self, url, credential, require_token=True):
+    def __init__(self, url, credential, require_token=True, token_info=None):
         if not url:
             raise ValueError(f'API URL required for {self.fullname}')
-        return super().__init__(url, credential, require_token=require_token)
+        return super().__init__(
+            url,
+            credential,
+            require_token=require_token,
+            token_info=f'Visit {url}/user/settings/applications '
+                       'to create a token')
 
 
 @build_doc
