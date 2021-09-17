@@ -15,7 +15,6 @@ jobs:
             datalad-container,
             datalad-crawler,
             datalad-deprecated,
-            datalad-hirni,
         ]
     steps:
     - name: Set up system
