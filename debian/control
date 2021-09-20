@@ -6,7 +6,7 @@ Section: science
 Priority: optional
 Build-Depends: debhelper (>= 11),
                dh-python,
-               git-annex (>= 7.20190503~) | git-annex-standalone (>= 7.20190503~),
+               git-annex (>= 8.20200309~) | git-annex-standalone (>= 8.20200309~),
                help2man,
                patool,
                p7zip-full,
@@ -81,7 +81,7 @@ Description: data files management and distribution platform
 Package: python3-datalad
 Architecture: all
 Section: python
-Depends: git-annex (>= 7.20190503~) | git-annex-standalone (>= 7.20190503~),
+Depends: git-annex (>= 8.20200309~) | git-annex-standalone (>= 8.20200309~),
          patool,
          p7zip-full,
          python3 (>= 3.6),

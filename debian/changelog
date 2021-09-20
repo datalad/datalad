@@ -1,3 +1,10 @@
+datalad (0.15.0-2) unstable; urgency=medium
+
+  * d/control
+    - boost minimal version of git-annex to 8.20200309 (upstream requirement)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 20 Sep 2021 09:20:23 -0400
+
 datalad (0.15.0-1) unstable; urgency=medium
 
   * Fresh upstream release (skipped 0.14.8 from two days ago).
