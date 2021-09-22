@@ -12,9 +12,9 @@ Credential management
    This specification describes the current implementation.
 
 Various components of DataLad need to be passed credentials to interact with services that require authentication. 
-This includes downloading files, but also hings like REST API usage.
+This includes downloading files, but also things like REST API usage.
 
-Supported credential types include basic user/password combinations, access okens, and a range of tailored solutions for particular services.
+Supported credential types include basic user/password combinations, access tokens, and a range of tailored solutions for particular services.
 All credential type implementations are derived from a common :class:`Credential` base class.
 
 Importantly, credentials must be identified by a name.
