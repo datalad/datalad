@@ -28,6 +28,9 @@ Dataset operations
    api.create_sibling
    api.create_sibling_github
    api.create_sibling_gitlab
+   api.create_sibling_gogs
+   api.create_sibling_gitea
+   api.create_sibling_gin
    api.drop
    api.get
    api.install

@@ -155,8 +155,15 @@ class Credential(object):
             elif not self._is_field_optional(f):
                 self._ask_and_set(f, instructions=instructions)
 
-    def __call__(self):
-        """Obtain credentials from a keyring and if any is not known -- ask"""
+    def __call__(self, instructions=None):
+        """Obtain credentials from a keyring and if any is not known -- ask
+
+        Parameters
+        ----------
+        instructions : str, optional
+          If given, the auto-generated instructions based on a login-URL are
+          replaced by the given string
+        """
         fields = {}
         # check if we shall ask for credentials, even if some are on record
         # already (but maybe they were found to need updating)
@@ -168,7 +175,7 @@ class Credential(object):
             v = None if force_reentry else self._get_field_value(f)
             if not self._is_field_optional(f):
                 while v is None:  # was not known
-                    v = self._ask_and_set(f)
+                    v = self._ask_and_set(f, instructions=instructions)
                 fields[f] = v
             elif v is not None:
                 fields[f] = v

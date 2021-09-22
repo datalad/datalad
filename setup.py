@@ -57,7 +57,6 @@ requires = {
         'requests_ftp',
     ],
     'publish': [
-        'PyGithub',          # nice to have
         'python-gitlab',     # required for create-sibling-gitlab
     ],
     'misc': [

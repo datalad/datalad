@@ -14,38 +14,35 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from datalad.support.exceptions import CapturedException
+
+from ..distribution.dataset import (
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+    resolve_path,
+)
+# bound methods
+from ..distribution.siblings import Siblings
+from ..dochelpers import exc_str
 from ..interface.base import (
-    build_doc,
     Interface,
+    build_doc,
 )
 from ..interface.common_opts import (
+    publish_depends,
     recursion_flag,
     recursion_limit,
-    publish_depends,
 )
 from ..interface.utils import eval_results
-from ..support.param import Parameter
+from ..local.subdatasets import Subdatasets
 from ..support.constraints import (
     EnsureChoice,
     EnsureNone,
     EnsureStr,
 )
-from datalad.support.exceptions import CapturedException
-from ..utils import (
-    ensure_list,
-)
-from ..distribution.dataset import (
-    datasetmethod,
-    EnsureDataset,
-    require_dataset,
-    resolve_path,
-)
-from ..dochelpers import exc_str
-
-# bound methods
-from ..distribution.siblings import Siblings
-from ..local.subdatasets import Subdatasets
-
+from ..support.param import Parameter
+from ..utils import ensure_list
 
 lgr = logging.getLogger('datalad.distributed.create_sibling_gitlab')
 
