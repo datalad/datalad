@@ -67,7 +67,8 @@ class _Gitea(_GOGS):
                 message='repository already exists',
                 preexisted=True,
             )
-        elif r.status_code == self.response_code_unauthorized:
+        elif r.status_code in (self.response_code_unauthorized,
+                               requests.codes.forbidden):
             return dict(
                 status='error',
                 message=('unauthorized: %s', response.get('message')),
