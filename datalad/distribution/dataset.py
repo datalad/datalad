@@ -189,6 +189,9 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             from datalad.interface.base import (
                 get_interface_groups, get_api_name, load_interface
             )
+            # load entire datalad.api which will also bind datasetmethods
+            # from extensions. Although adds overhead, good for UX
+            import datalad.api
             groups = get_interface_groups()
             for group, _, interfaces in groups:
                 for intfspec in interfaces:
