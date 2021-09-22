@@ -99,7 +99,7 @@ class CreateSiblingGin(Interface):
 
     _params_ = _GIN.create_sibling_params
     _params_['api']._doc = """\
-        URL of the GIN instance without a 'api/<version>' suffix"""
+        URL of the GIN instance without an 'api/<version>' suffix"""
 
     @staticmethod
     @datasetmethod(name='create_sibling_gin')

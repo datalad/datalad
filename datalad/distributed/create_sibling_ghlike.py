@@ -137,6 +137,9 @@ class _GitHubLike(object):
     )
 
     def __init__(self, url, credential, require_token=True, token_info=None):
+        if self.name is None or self.fullname is None:
+            raise NotImplementedError(
+                'GitHub-like platform must have name and fullname properties')
         if not url:
             raise ValueError(f'API URL required for {self.fullname}')
 
@@ -258,7 +261,7 @@ class _GitHubLike(object):
         Raises
         ------
         Exception
-          Any unhandles condition (in particular unexpected non-success
+          Any unhandled condition (in particular unexpected non-success
           HTTP response codes) will raise an exception.
         """
         res = self.repo_create_request(
@@ -474,7 +477,7 @@ class _GitHubLike(object):
         Raises
         ------
         Exception
-          Raises for any unhandles HTTP error response code.
+          Raises for any unhandled HTTP error response code.
         """
         try:
             response = r.json()
