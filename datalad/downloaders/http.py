@@ -350,21 +350,24 @@ class HTTPAuthAuthenticator(HTTPRequestsAuthenticator):
         authenticator = self.REQUESTS_AUTHENTICATOR(
             *[credentials[f] for f in self.REQUESTS_FIELDS])
         session.auth = authenticator
-        response = session.post(post_url, data={},
-                                auth=authenticator)
-        auth_request = response.headers.get('www-authenticate')
-        if response.status_code == 401 and auth_request:
-            if auth_request.lower().split(' ', 1)[0] == 'basic':
-                if response.url != post_url:
-                    # was instructed to authenticate elsewhere
-                    # TODO: do we need to loop may be??
-                    response2 = session.get(response.url, auth=authenticator)
-                    return response2
-            else:
-                lgr.warning(
-                    f"{self} received response with www-authenticate={auth_request!r} "
-                    "which is not Basic, and thus it cannot handle ATM.")
-        return response
+
+        # response = session.post(post_url, data={},
+        #                         auth=authenticator)
+        #
+        # auth_request = response.headers.get('www-authenticate')
+        # if response.status_code == 401 and auth_request:
+        #     if auth_request.lower().split(' ', 1)[0] == 'basic':
+        #         if response.url != post_url:
+        #             # was instructed to authenticate elsewhere
+        #             # TODO: do we need to loop may be??
+        #             response2 = session.get(response.url,
+        #                                     auth=authenticator)
+        #             return response2
+        #     else:
+        #         lgr.warning(
+        #             f"{self} received response with www-authenticate={auth_request!r} "
+        #             "which is not Basic, and thus it cannot handle ATM.")
+        # return response
 
 
 @auto_repr
