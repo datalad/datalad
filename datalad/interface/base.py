@@ -349,6 +349,8 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     doc = prefix if prefix else u''
     if len(args) > 1:
         if len(doc):
+            if not doc.endswith('\n'):
+                doc += '\n'
             doc += '\n'
         doc += "Parameters\n----------\n"
         for i, arg in enumerate(args):
