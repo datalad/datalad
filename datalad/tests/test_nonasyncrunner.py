@@ -13,16 +13,8 @@ import os
 import queue
 import signal
 import subprocess
+import sys
 from time import sleep
-
-from datalad.tests.utils import (
-    assert_false,
-    assert_true,
-    eq_,
-    known_failure_windows,
-    known_failure_osx,
-    with_tempfile,
-)
 
 from datalad.cmd import (
     StdOutCapture,
@@ -33,7 +25,14 @@ from datalad.nonasyncrunner import (
     _ReaderThread,
     run_command,
 )
-
+from datalad.tests.utils import (
+    assert_false,
+    assert_true,
+    eq_,
+    known_failure_osx,
+    known_failure_windows,
+    with_tempfile,
+)
 from datalad.utils import on_windows
 
 
@@ -109,7 +108,7 @@ def test_interactive_communication():
                 os.write(self.process.stdin.fileno(), b"exit(0)\n")
 
     result_pool = dict()
-    result = run_command(["python", "-i"],
+    result = run_command([sys.executable, "-i"],
                          BidirectionalProtocol,
                          stdin=subprocess.PIPE,
                          protocol_kwargs={
@@ -170,9 +169,10 @@ def test_inside_async():
 @with_tempfile
 def test_popen_invocation(src_path, dest_path):
     # https://github.com/ReproNim/testkraken/issues/93
-    from datalad.distribution.dataset import Dataset
-    from datalad.api import clone
     from multiprocessing import Process
+
+    from datalad.api import clone
+    from datalad.distribution.dataset import Dataset
 
     src = Dataset(src_path).create()
     (src.pathobj / "file.dat").write_bytes(b"\000")
