@@ -180,33 +180,14 @@ class Dataset(object, metaclass=PathBasedFlyweight):
             return self.pathobj == other.pathobj
 
     def __getattr__(self, attr):
-        # Assure that we are not just missing some late binding
-        # @datasetmethod . We will use interface definitions.
-        # The gotcha could be the mismatch between explicit name
-        # provided to @datasetmethod and what is defined in interfaces
-        meth = None
+        # Assure that we are not just missing some late binding @datasetmethod .
         if not attr.startswith('_'):  # do not even consider those
-            from datalad.interface.base import (
-                get_interface_groups, get_api_name, load_interface
-            )
-            groups = get_interface_groups()
-            for group, _, interfaces in groups:
-                for intfspec in interfaces:
-                    # lgr.log(5, "Considering interface %s", intfspec)
-                    name = get_api_name(intfspec)
-                    if attr == name:
-                        meth_ = load_interface(intfspec)
-                        if meth_:
-                            lgr.debug("Found matching interface %s for %s",
-                                      intfspec, name)
-                            if meth:
-                                lgr.debug(
-                                    "New match %s possibly overloaded previous one %s",
-                                    meth_, meth
-                                )
-                            meth = meth_
-            if not meth:
-                lgr.debug("Found no match among known interfaces for %r", attr)
+            lgr.debug("Importing datalad.api to possibly discover possibly not yet bound method %r", attr)
+            # load entire datalad.api which will also bind datasetmethods
+            # from extensions.
+            import datalad.api
+            # which would bind all known interfaces as well.
+            # Although adds overhead, good for UX
         return super(Dataset, self).__getattribute__(attr)
 
     def close(self):
