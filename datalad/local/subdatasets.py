@@ -38,7 +38,6 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.support.gitrepo import GitRepo
-from datalad.dochelpers import exc_str
 from datalad.utils import (
     ensure_list,
     getpwd,

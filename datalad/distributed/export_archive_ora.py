@@ -42,9 +42,6 @@ from datalad.distribution.dataset import (
     resolve_path,
 )
 from datalad.log import log_progress
-from datalad.dochelpers import (
-    exc_str,
-)
 
 lgr = logging.getLogger('datalad.customremotes.export_archive_ora')
 

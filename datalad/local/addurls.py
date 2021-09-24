@@ -26,7 +26,6 @@ from datalad.support.external_versions import external_versions
 import datalad.support.path as op
 from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import (
-    exc_str,
     single_or_plural,
 )
 from datalad.log import log_progress, with_result_progress
@@ -302,8 +301,8 @@ class AnnexKeyParser(object):
         try:
             key = self.format_fn(self.format_string, row)
         except KeyError as exc:
-            lgr.debug("Row missing fields for --key: %s",
-                      exc_str(exc))
+            ce = CapturedException(exc)
+            lgr.debug("Row missing fields for --key: %s", ce)
             return {}
 
         if key == self.empty:
@@ -399,8 +398,7 @@ def _read(stream, input_type):
             rows = json.load(stream)
         except json.decoder.JSONDecodeError as e:
             raise ValueError(
-                "Failed to read JSON from stream {}: {}"
-                .format(stream, exc_str(e)))
+                f"Failed to read JSON from stream {stream}") from e
         # For json input, we do not support indexing by position,
         # only names.
         idx_map = {}
@@ -1473,12 +1471,12 @@ class Addurls(Interface):
                         # through the same bucket(s)
                         row["url"] = get_versioned_url(url)
                     except (ValueError, NotImplementedError) as exc:
+                        ce = CapturedException(exc)
                         # We don't expect this to happen because get_versioned_url
                         # should return the original URL if it isn't an S3 bucket.
                         # It only raises exceptions if it doesn't know how to
                         # handle the scheme for what looks like an S3 bucket.
-                        lgr.warning("error getting version of %s: %s",
-                                    row["url"], exc_str(exc))
+                        lgr.warning("error getting version of %s: %s", row["url"], ce)
                     log_progress(lgr.info, "addurls_versionurls",
                                  "Versioned result for %s: %s", url, row["url"],
                                  update=1, increment=True)
