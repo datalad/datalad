@@ -13,23 +13,15 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 import logging
 import os
+import os.path as op
 import subprocess
 import sys
 import tempfile
 import warnings
 
-from .cmd_protocols import (
-    KillOutput,
-    NoCapture,
-    StdErrCapture,
-    StdOutCapture,
-    StdOutErrCapture,
-    WitlessProtocol,
-)
 from .consts import GIT_SSH_COMMAND
 from .nonasyncrunner import run_command
-from .support import path as op
-from .support.exceptions import CommandError
+from .exception import CommandError
 from .utils import (
     auto_repr,
     borrowdoc,
@@ -39,7 +31,8 @@ from .utils import (
     unlink,
 )
 
-lgr = logging.getLogger('datalad.cmd')
+
+lgr = logging.getLogger('datalad.runner.runner')
 
 # In python3 to split byte stream on newline, it must be bytes
 linesep_bytes = os.linesep.encode()
@@ -511,7 +504,7 @@ class BatchedCommand(SafeDelCloseMixin):
                 "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
-            from . import cfg
+            from datalad import cfg
             cfg_var = 'datalad.runtime.stalled-external'
             cfg_val = cfg.obtain(cfg_var)
             if cfg_val == 'wait':
@@ -543,7 +536,7 @@ class BatchedCommand(SafeDelCloseMixin):
         # It is hard to debug when something is going wrong. Hopefully logging stderr
         # if generally asked might be of help
         if lgr.isEnabledFor(5):
-            from . import cfg
+            from datalad import cfg
             log_stderr = cfg.getbool('datalad.log', 'outputs', default=False)
         else:
             log_stderr = False

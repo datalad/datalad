@@ -18,10 +18,10 @@ import threading
 import time
 from typing import Any, Dict, IO, List, Type, Union, Optional
 
-from .cmd_protocols import WitlessProtocol
+from .protocol import WitlessProtocol
 
 
-lgr = logging.getLogger("datalad.runner")
+lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 
 STDIN_FILENO = 0
 STDOUT_FILENO = 1

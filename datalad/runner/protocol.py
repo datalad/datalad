@@ -14,11 +14,11 @@ import logging
 import warnings
 from locale import getpreferredencoding
 
-from .support.exceptions import CommandError
+from .exception import CommandError
 from .utils import ensure_unicode
 
 
-lgr = logging.getLogger('datalad.cmd')
+lgr = logging.getLogger('datalad.runner.protocol')
 
 
 class WitlessProtocol(asyncio.SubprocessProtocol):
@@ -70,7 +70,7 @@ class WitlessProtocol(asyncio.SubprocessProtocol):
         self._log_outputs = False
         if lgr.isEnabledFor(5):
             try:
-                from . import cfg
+                from datalad import cfg
                 self._log_outputs = cfg.getbool('datalad.log', 'outputs', default=False)
             except ImportError:
                 pass
