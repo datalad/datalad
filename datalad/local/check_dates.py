@@ -13,7 +13,6 @@ import logging
 import os
 import time
 
-from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict

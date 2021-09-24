@@ -60,7 +60,6 @@ from datalad.support.network import (
     is_url,
 )
 from datalad.dochelpers import (
-    exc_str,
     single_or_plural,
 )
 from datalad.utils import (
@@ -536,7 +535,8 @@ def clone_dataset(
                 # this is needed to match it to any potentially incoming local
                 # source path in the 'notneeded' test below
                 track_path = str(Path(track_url))
-            except Exception:
+            except Exception as e:
+                CapturedException(e)
                 # this should never happen, because Path() will let any non-path stringification
                 # pass through unmodified, but we do not want any potential crash due to
                 # pathlib behavior changes
@@ -707,9 +707,11 @@ def clone_dataset(
             postclone_checkout_commit(dest_repo, checkout_gitsha,
                                       remote=remote)
         except Exception as e:
+            ce = CapturedException(e)
             yield get_status_dict(
                 status='error',
-                message=str(e),
+                message=str(ce),
+                exception=ce,
                 **result_props,
             )
 
@@ -768,7 +770,8 @@ def postclone_checkout_commit(repo, target_commit, remote="origin"):
     if not repo.commit_exists(target_commit):
         try:
             repo.fetch(remote=remote, refspec=target_commit)
-        except CommandError:
+        except CommandError as e:
+            CapturedException(e)
             pass
         # instead of inspecting the fetch results for possible ways
         # with which it could failed to produced the desired result
@@ -884,8 +887,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
                         store_url,
                         '/' if not store_url.endswith('/') else ''))
             except DownloadError as e:
-                lgr.debug("Failed to get config file from source:\n%s",
-                          exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Failed to get config file from source:\n%s", ce)
         elif scheme == 'ssh':
             # TODO: switch the following to proper command abstraction:
             # SSHRemoteIO ignores the path part ATM. No remote CWD! (To be
@@ -896,8 +899,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
             try:
                 config_content = op.read_file(cfg_path)
             except RIARemoteError as e:
-                lgr.debug("Failed to get config file from source: %s",
-                          exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Failed to get config file from source: %s", ce)
 
         elif scheme == 'file':
             # TODO: switch the following to proper command abstraction:
@@ -906,8 +909,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
             try:
                 config_content = op.read_file(cfg_path)
             except (RIARemoteError, OSError) as e:
-                lgr.debug("Failed to get config file from source: %s",
-                          exc_str(e))
+                ce = CapturedException(e)
+                lgr.debug("Failed to get config file from source: %s", ce)
         else:
             lgr.debug("Unknown URL-Scheme %s in %s. Can handle SSH, HTTP or "
                       "FILE scheme URLs.", scheme, props['source'])
@@ -929,9 +932,10 @@ def postclonecfg_ria(ds, props, remote="origin"):
                     )
                     uuid = result['stdout'].strip()
                 except CommandError as e:
+                    ce = CapturedException(e)
                     # doesn't contain what we are looking for
                     lgr.debug("Found no UUID for ORA special remote at "
-                              "'%s' (%s)", remote, exc_str(e))
+                              "'%s' (%s)", remote, ce)
 
         return uuid
 
@@ -1016,8 +1020,8 @@ def postclonecfg_ria(ds, props, remote="origin"):
                                    if s.get('annex-externaltype', None) ==
                                    'ora']
                 except CommandError as e:
-                    lgr.debug("Failed to reconfigure ORA special remote: %s",
-                              exc_str(e))
+                    ce = CapturedException(e)
+                    lgr.debug("Failed to reconfigure ORA special remote: %s", ce)
             else:
                 lgr.debug("Unknown ORA special remote uuid at '%s': %s",
                           remote, org_uuid)
@@ -1152,7 +1156,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
                         pass
                     elif origin_git_path.name != '.git':
                         origin_git_path /= '.git'
-                except ValueError:
+                except ValueError as e:
+                    CapturedException(e)
                     # Note, that accessing localpath on a non-local RI throws
                     # ValueError rather than resulting in an AttributeError.
                     # TODO: Warning level okay or is info level sufficient?
@@ -1191,7 +1196,8 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
         sr_autoenable = config.get('autoenable', False)
         try:
             sr_autoenable = ensure_bool(sr_autoenable)
-        except ValueError:
+        except ValueError as e:
+            CapturedException(e)
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
                 'dataset %s as bool.'
@@ -1206,8 +1212,9 @@ def postclonecfg_annexdataset(ds, reckless, description=None, remote="origin"):
             try:
                 repo.fetch(remote=sr_name)
             except CommandError as exc:
+                ce = CapturedException(exc)
                 lgr.warning("Failed to fetch type=git special remote %s: %s",
-                            sr_name, exc_str(exc))
+                            sr_name, exc)
 
         # determine whether there is a registered remote with matching UUID
         if uuid:

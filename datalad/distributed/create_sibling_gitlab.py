@@ -40,7 +40,6 @@ from ..distribution.dataset import (
     require_dataset,
     resolve_path,
 )
-from ..dochelpers import exc_str
 
 # bound methods
 from ..distribution.siblings import Siblings
