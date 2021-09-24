@@ -19,7 +19,6 @@ import sys
 import tempfile
 import warnings
 
-from .consts import GIT_SSH_COMMAND
 from .nonasyncrunner import run_command
 from .exception import CommandError
 from .utils import (
@@ -31,8 +30,10 @@ from .utils import (
     unlink,
 )
 
-
 lgr = logging.getLogger('datalad.runner.runner')
+
+# We use custom ssh runner while interacting with git
+GIT_SSH_COMMAND = "datalad sshrun"
 
 # In python3 to split byte stream on newline, it must be bytes
 linesep_bytes = os.linesep.encode()
