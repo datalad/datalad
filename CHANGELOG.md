@@ -1,3 +1,36 @@
+# 0.15.1 (Fri Sep 24 2021)
+
+#### 🐛 Bug Fix
+
+- BF: downloader - fail to download even on non-crippled FS if symlink exists [#5991](https://github.com/datalad/datalad/pull/5991) ([@yarikoptic](https://github.com/yarikoptic))
+- ENH: import datalad.api to bind extensions methods for discovery of dataset methods [#5999](https://github.com/datalad/datalad/pull/5999) ([@yarikoptic](https://github.com/yarikoptic))
+- Restructure cmdline API presentation [#5988](https://github.com/datalad/datalad/pull/5988) ([@mih](https://github.com/mih))
+- Close file descriptors after process exit [#5983](https://github.com/datalad/datalad/pull/5983) ([@mih](https://github.com/mih))
+
+#### ⚠️ Pushed to `maint`
+
+- Discontinue testing of hirni extension ([@mih](https://github.com/mih))
+
+#### 🏠 Internal
+
+- Add debugging information to release step [#5980](https://github.com/datalad/datalad/pull/5980) ([@jwodder](https://github.com/jwodder))
+
+#### 📝 Documentation
+
+- Coarse description of the credential subsystem's functionality [#5998](https://github.com/datalad/datalad/pull/5998) ([@mih](https://github.com/mih))
+
+#### 🧪 Tests
+
+- BF(TST): use sys.executable, mark test_ria_basics.test_url_keys as requiring network [#5986](https://github.com/datalad/datalad/pull/5986) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 3
+
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.15.0 (Tue Sep 14 2021) --  We miss you Kyle!
 
 #### Enhancements and new features
