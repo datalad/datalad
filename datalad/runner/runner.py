@@ -27,12 +27,12 @@ from .cmd_protocols import (
     WitlessProtocol,
 )
 from .consts import GIT_SSH_COMMAND
-from .dochelpers import borrowdoc
 from .nonasyncrunner import run_command
 from .support import path as op
 from .support.exceptions import CommandError
 from .utils import (
     auto_repr,
+    borrowdoc,
     ensure_unicode,
     generate_file_chunks,
     try_multiple,

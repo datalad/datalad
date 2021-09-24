@@ -34,7 +34,7 @@ class CommandError(RuntimeError):
         self.kwargs = kwargs
 
     def to_str(self, include_output=True):
-        from datalad.utils import (
+        from .utils import (
             ensure_unicode,
             join_cmdline,
         )
