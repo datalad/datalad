@@ -21,7 +21,7 @@ from datalad.cmd import (
     WitlessProtocol,
     WitlessRunner,
 )
-from datalad.nonasyncrunner import (
+from datalad.runner.nonasyncrunner import (
     _ReaderThread,
     run_command,
 )

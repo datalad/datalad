@@ -18,7 +18,27 @@ import sys
 import tempfile
 import warnings
 
-from .utils import (
+# start of legacy import block
+# to avoid breakage of code written before datalad.runner
+from datalad.runner.coreprotocols import (
+    KillOutput,
+    NoCapture,
+    StdErrCapture,
+    StdOutCapture,
+    StdOutErrCapture,
+)
+from datalad.runner.gitrunner import (
+    GIT_SSH_COMMAND,
+    GitRunnerBase,
+    GitWitlessRunner,
+)
+from datalad.runner.runner import WitlessRunner
+from datalad.runner.protocol import WitlessProtocol
+from datalad.runner.nonasyncrunner import run_command
+from datalad.support.exceptions import CommandError
+# end of legacy import block
+
+from datalad.utils import (
     auto_repr,
     ensure_unicode,
     try_multiple,
