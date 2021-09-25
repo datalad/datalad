@@ -74,7 +74,7 @@ environment:
     # Windows core tests
     - ID: WinP39core
       # ~35 min
-      DTS: datalad.core
+      DTS: datalad.core datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       # Python version specification is non-standard on windows
       PY: 39-x64
@@ -85,7 +85,7 @@ environment:
     # MacOS core tests
     - ID: MacP38core
       # ~25min
-      DTS: datalad.core
+      DTS: datalad.core datalad.runner
       APPVEYOR_BUILD_WORKER_IMAGE: macOS
       PY: 3.8
       # does not give a functional installation
