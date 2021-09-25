@@ -16,5 +16,7 @@ from .coreprotocols import (
     StdOutCapture,
     StdOutErrCapture,
 )
+from .exception import CommandError
 from .gitrunner import GitWitlessRunner as GitRunner
+from .protocol import WitlessProtocol as Protocol
 from .runner import WitlessRunner as Runner

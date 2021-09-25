@@ -16,15 +16,6 @@ import subprocess
 import sys
 from time import sleep
 
-from datalad.cmd import (
-    StdOutCapture,
-    WitlessProtocol,
-    WitlessRunner,
-)
-from datalad.runner.nonasyncrunner import (
-    _ReaderThread,
-    run_command,
-)
 from datalad.tests.utils import (
     assert_false,
     assert_true,
@@ -35,10 +26,20 @@ from datalad.tests.utils import (
 )
 from datalad.utils import on_windows
 
+from .. import (
+    Protocol,
+    Runner,
+    StdOutCapture,
+)
+from ..nonasyncrunner import (
+    _ReaderThread,
+    run_command,
+)
+
 
 def test_subprocess_return_code_capture():
 
-    class KillProtocol(WitlessProtocol):
+    class KillProtocol(Protocol):
 
         proc_out = True
         proc_err = True
@@ -78,7 +79,7 @@ def test_subprocess_return_code_capture():
 
 def test_interactive_communication():
 
-    class BidirectionalProtocol(WitlessProtocol):
+    class BidirectionalProtocol(Protocol):
 
         proc_out = True
         proc_err = True
@@ -151,7 +152,7 @@ def test_thread_exit():
 
 def test_inside_async():
     async def main():
-        runner = WitlessRunner()
+        runner = Runner()
         return runner.run(
             (["cmd.exe", "/c"] if on_windows else []) + ["echo", "abc"],
             StdOutCapture)

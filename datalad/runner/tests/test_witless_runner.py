@@ -20,14 +20,6 @@ from time import (
 
 from nose.tools import timed
 
-from datalad.cmd import (
-    StdOutCapture,
-    StdOutErrCapture,
-    WitlessProtocol,
-)
-from datalad.cmd import WitlessRunner as Runner
-from datalad.cmd import readline_rstripped
-from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
     OBSCURE_FILENAME,
     SkipTest,
@@ -43,6 +35,14 @@ from datalad.tests.utils import (
 from datalad.utils import (
     Path,
     on_windows,
+)
+
+from .. import (
+    CommandError,
+    Protocol,
+    Runner,
+    StdOutCapture,
+    StdOutErrCapture,
 )
 
 
@@ -275,21 +275,12 @@ def test_asyncio_forked(temp):
 
 def test_done_deprecation():
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
-        _ = WitlessProtocol("done")
+        _ = Protocol("done")
         warn_mock.assert_called_once()
 
     with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
-        _ = WitlessProtocol()
+        _ = Protocol()
         warn_mock.assert_not_called()
-
-
-def test_readline_rstripped_deprecation():
-    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
-        class StdoutMock:
-            def readline(self):
-                return "abc\n"
-        readline_rstripped(StdoutMock())
-        warn_mock.assert_called_once()
 
 
 def test_faulty_poll_detection():
@@ -300,6 +291,6 @@ def test_faulty_poll_detection():
         def poll(self):
             return None
 
-    protocol = WitlessProtocol()
+    protocol = Protocol()
     protocol.process = PopenMock()
     assert_raises(CommandError, protocol._prepare_result)
