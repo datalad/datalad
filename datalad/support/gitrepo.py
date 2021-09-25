@@ -70,6 +70,7 @@ from datalad.utils import (
 # imports from same module:
 from .external_versions import external_versions
 from .exceptions import (
+    CapturedException,
     CommandError,
     FileNotInRepositoryError,
     InvalidGitReferenceError,
@@ -3846,3 +3847,27 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
                opj(subds_dotgit, dot_git_entry))
     assert not listdir(src_dotgit)
     rmdir(src_dotgit)
+
+
+# try retro-fitting GitRepo with deprecated functionality
+# must be done last in this file
+try:
+    from datalad_deprecated.gitrepo import DeprecatedGitRepoMethods
+    for symbol in dir(DeprecatedGitRepoMethods):
+        if symbol.startswith('__'):
+            # ignore Python internals
+            continue
+        if hasattr(GitRepo, symbol):
+            lgr.debug(
+                'Not retro-fitted GitRepo with deprecated %s, '
+                'name-space conflict', symbol)
+            # do not override existing symbols
+            continue
+        # assign deprecated symbol to GitRepo
+        setattr(GitRepo, symbol, getattr(DeprecatedGitRepoMethods, symbol))
+        lgr.debug('Retro-fitted GitRepo with deprecated %s', symbol)
+except ImportError as e:
+    ce = CapturedException(e)
+    lgr.debug(
+        'Not retro-fitting GitRepo with deprecated symbols, '
+        'datalad-deprecated package not found')
