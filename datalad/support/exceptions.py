@@ -152,35 +152,6 @@ class CapturedException(object):
         return self.format_oneline_tb(limit=None, include_str=True)
 
 
-def _format_json_error_messages(recs):
-    # there could be many, condense
-    msgs = {}
-    for r in recs:
-        if r.get('success'):
-            continue
-        msg = '{}{}'.format(
-            ' {}\n'.format(r['note']) if r.get('note') else '',
-            '\n'.join(r.get('error-messages', [])),
-        )
-        if 'file' in r or 'key' in r:
-            occur = msgs.get(msg, 0)
-            occur += 1
-            msgs[msg] = occur
-
-    if not msgs:
-        return ''
-
-    return '\n>{}'.format(
-        '\n> '.join(
-            '{}{}'.format(
-                m,
-                ' [{} times]'.format(n) if n > 1 else '',
-            )
-            for m, n in msgs.items()
-        )
-    )
-
-
 class MissingExternalDependency(RuntimeError):
     """External dependency is missing error"""
 
