@@ -13,7 +13,6 @@ import logging
 
 from .protocol import WitlessProtocol
 
-
 lgr = logging.getLogger('datalad.runner.coreprotocols')
 
 

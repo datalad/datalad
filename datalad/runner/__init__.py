@@ -16,5 +16,5 @@ from .coreprotocols import (
     StdOutCapture,
     StdOutErrCapture,
 )
-from .runner import WitlessRunner as Runner
 from .gitrunner import GitWitlessRunner as GitRunner
+from .runner import WitlessRunner as Runner

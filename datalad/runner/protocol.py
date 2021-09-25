@@ -17,7 +17,6 @@ from locale import getpreferredencoding
 from .exception import CommandError
 from .utils import ensure_unicode
 
-
 lgr = logging.getLogger('datalad.runner.protocol')
 
 

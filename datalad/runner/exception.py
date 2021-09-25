@@ -11,7 +11,6 @@
 
 import logging
 
-
 lgr = logging.getLogger('datalad.runner.exception')
 
 

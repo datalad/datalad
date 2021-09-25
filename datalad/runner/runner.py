@@ -15,11 +15,9 @@ import subprocess
 import tempfile
 import warnings
 
-from .coreprotocols import (
-    NoCapture,
-)
-from .nonasyncrunner import run_command
+from .coreprotocols import NoCapture
 from .exception import CommandError
+from .nonasyncrunner import run_command
 from .utils import (
     auto_repr,
     ensure_unicode,

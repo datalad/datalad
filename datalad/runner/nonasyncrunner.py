@@ -16,10 +16,17 @@ import queue
 import subprocess
 import threading
 import time
-from typing import Any, Dict, IO, List, Type, Union, Optional
+from typing import (
+    IO,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Type,
+    Union,
+)
 
 from .protocol import WitlessProtocol
-
 
 lgr = logging.getLogger("datalad.runner.nonasyncrunner")
 

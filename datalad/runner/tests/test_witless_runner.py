@@ -13,38 +13,37 @@ import os
 import signal
 import sys
 import unittest.mock
-
 from time import (
     sleep,
     time,
 )
+
 from nose.tools import timed
 
-
+from datalad.cmd import (
+    StdOutCapture,
+    StdOutErrCapture,
+    WitlessProtocol,
+)
+from datalad.cmd import WitlessRunner as Runner
+from datalad.cmd import readline_rstripped
+from datalad.support.exceptions import CommandError
 from datalad.tests.utils import (
+    OBSCURE_FILENAME,
+    SkipTest,
     assert_cwd_unchanged,
     assert_in,
     assert_raises,
     eq_,
     integration,
-    OBSCURE_FILENAME,
     ok_,
     ok_file_has_content,
-    SkipTest,
     with_tempfile,
 )
-from datalad.cmd import (
-    readline_rstripped,
-    StdOutCapture,
-    StdOutErrCapture,
-    WitlessProtocol,
-    WitlessRunner as Runner,
-)
 from datalad.utils import (
-    on_windows,
     Path,
+    on_windows,
 )
-from datalad.support.exceptions import CommandError
 
 
 def py2cmd(code):

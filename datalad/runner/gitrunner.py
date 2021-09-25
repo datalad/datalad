@@ -44,6 +44,7 @@ class GitRunnerBase(object):
         """
         if GitRunnerBase._GIT_PATH is None:
             from distutils.spawn import find_executable
+
             # with all the nesting of config and this runner, cannot use our
             # cfg here, so will resort to dark magic of environment options
             if (os.environ.get('DATALAD_USE_DEFAULT_GIT', '0').lower()
