@@ -104,8 +104,47 @@ STATE_COLOR_MAP = {
 }
 
 
-def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
-                  eval_submodule_state, eval_filetype, cache):
+def yield_dataset_status(ds, paths, annexinfo, untracked, recursion_limit,
+                         queried, eval_submodule_state, eval_filetype, cache,
+                         reporting_order):
+    """Internal helper to obtain status information on a dataset
+
+    Parameters
+    ----------
+    dataset : Dataset
+      Dataset to get the status of.
+    path : Path-like, optional
+      Paths to constrain the status to (see main status() command).
+    annexinfo : str
+      Annex information reporting mode (see main status() command).
+    untracked : str, optional
+      Reporting mode for untracked content (see main status() command).
+    recursion_limit : int, optional
+    queried : set
+      Will be populated with a Path instance for each queried dataset.
+    eval_submodule_state : str
+      Submodule evaluation mode setting for Repo.diffstatus().
+    eval_file_type : bool, optional
+      Whether to perform file type discrimination between real symlinks
+      and symlinks representing annex'ed files. This can be expensive
+      in datasets with many files.
+    cache : dict
+      Cache to be passed on to all Repo.diffstatus() calls to avoid duplicate
+      queries.
+    reporting_order : {'depth-first', 'breadth-first'}, optional
+      By default, subdataset content records are reported after the record
+      on the subdataset's submodule in a superdataset (depth-first).
+      Alternatively, report all superdataset records first, before reporting
+      any subdataset content records (breadth-first).
+
+    Yields
+    ------
+    dict
+      DataLad result records.
+    """
+    if reporting_order not in ('depth-first', 'breadth-first'):
+        raise ValueError('Unknown reporting order: {}'.format(reporting_order))
+
     # take the dataset that went in first
     repo = ds.repo
     repo_path = repo.pathobj
@@ -128,6 +167,9 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=None)
+    # potentially collect subdataset status call specs for the end
+    # (if order == 'breadth-first')
+    subds_statuscalls = []
     for path, props in status.items():
         cpath = ds.pathobj / path.relative_to(repo_path)
         yield dict(
@@ -147,17 +189,28 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
                 continue
             subds = Dataset(str(cpath))
             if subds.is_installed():
-                for r in _yield_status(
-                        subds,
-                        None,
-                        annexinfo,
-                        untracked,
-                        recursion_limit - 1,
-                        queried,
-                        eval_submodule_state,
-                        eval_filetype,
-                        cache):
-                    yield r
+                call_args = (
+                    subds,
+                    None,
+                    annexinfo,
+                    untracked,
+                    recursion_limit - 1,
+                    queried,
+                    eval_submodule_state,
+                    eval_filetype,
+                    cache,
+                )
+                call_kwargs = dict(
+                    reporting_order='depth-first',
+                )
+                if reporting_order == 'depth-first':
+                    yield from yield_dataset_status(*call_args, **call_kwargs)
+                else:
+                    subds_statuscalls.append((call_args, call_kwargs))
+
+    # deal with staged subdataset status calls
+    for call_args, call_kwargs in subds_statuscalls:
+        yield from yield_dataset_status(*call_args, **call_kwargs)
 
 
 @build_doc
@@ -416,7 +469,7 @@ class Status(Interface):
                 # do not report on a single dataset twice
                 continue
             qds = Dataset(str(qdspath))
-            for r in _yield_status(
+            for r in yield_dataset_status(
                     qds,
                     qpaths,
                     annex,
@@ -427,7 +480,8 @@ class Status(Interface):
                     queried,
                     eval_subdataset_state,
                     report_filetype == 'eval',
-                    content_info_cache):
+                    content_info_cache,
+                    reporting_order='depth-first'):
                 yield dict(
                     r,
                     refds=ds_path,
