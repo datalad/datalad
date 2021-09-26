@@ -3533,6 +3533,11 @@ class GitRepo(CoreGitRepo):
         Parameters
         ----------
         paths : list(Path)
+
+        Yields
+        ------
+        dict
+          Result records
         """
         from datalad.interface.results import get_status_dict
 

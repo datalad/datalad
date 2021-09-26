@@ -321,6 +321,6 @@ def test_parent_on_unborn_branch(path):
     subrepo = GitRepo(opj(path, "sub"), create=True)
     subrepo.commit(msg="c", options=["--allow-empty"])
 
-    ds.repo.add_submodule(path="sub")
+    ds.repo.save(path="sub")
     eq_(ds.subdatasets(result_xfm='relpaths'),
         ["sub"])
