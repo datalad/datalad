@@ -320,22 +320,42 @@ def test_fake_gitlab(path):
             res, 1, action='configure-sibling', path=path, name='dummy',
             url='http://example.com', status='ok')
 
-    # try recreation, the sibling is already configured, same setup, no error
+    # test sibling name conflicts
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _ExistingProjectGitLab):
-        res = ds.create_sibling_gitlab(path=ds.path, site='dummy', project='here')
-        assert_result_count(res, 2)
+        res = ds.create_sibling_gitlab(path=ds.path, site='dummy',
+                                       project='here', existing='skip')
+        assert_result_count(res, 1)
         assert_result_count(
-            res, 1, action='create_sibling_gitlab', path=path,
-            site='dummy', sibling='dummy', project='here',
-            project_attributes={
-                'http_url_to_repo': 'http://example.com',
-                'ssh_url_to_repo': 'example.com'
-            },
-            status='notneeded')
+            res, 0, action='create_sibling_gitlab',
+            message=['already has a configured sibling "%s"', "dummy"],
+            path=path,
+            refds=path,
+            site='dummy', sibling='dummy',
+            status='notneeded',
+            type='dataset'
+            )
+    # sibling name conflict with existing='error' should yiel error
+    with patch("datalad.distributed.create_sibling_gitlab.GitLabSite", _ExistingProjectGitLab):
+        res = ds.create_sibling_gitlab(path=ds.path, site='dummy',
+                                       project='here', existing='skip')
+        assert_result_count(res, 1)
         assert_result_count(
-            res, 1, action='configure-sibling', path=path, name='dummy',
-            url='http://example.com', status='ok')
-
+            res, 0, action='create_sibling_gitlab',
+            message=['already has a configured sibling "%s"', "dummy"],
+            path=path,
+            refds=path,
+            site='dummy', sibling='dummy',
+            status='error',
+            type='dataset'
+            )
+    # try recreation, the sibling is already configured, same setup, no error
+    with patch("datalad.distributed.create_sibling_gitlab.GitLabSite",
+               _ExistingProjectGitLab):
+        res = ds.create_sibling_gitlab(path=ds.path, site='dummy',
+                                       project='here', existing='reconfigure')
+        assert_result_count(
+        res, 1, action='configure-sibling', path=path, name='dummy',
+        url='http://example.com', status='ok')
         # but error when the name differs
         res = ds.create_sibling_gitlab(
             site='dummy', project='here', name='othername', on_failure='ignore')
@@ -375,16 +395,24 @@ def test_fake_gitlab(path):
     with patch("datalad.distributed.create_sibling_gitlab.GitLabSite",
                _ExistingProjectOtherURLGitLab):
         res = ds.create_sibling_gitlab(site='sshsite', project='here',
-                                       access='ssh', on_failure='ignore')
+                                       access='ssh', on_failure='ignore',
+                                       name='sshsite2')
         assert_result_count(res, 1)
         assert_result_count(
-            res, 1, action='create_sibling_gitlab', path=path,
-            site='sshsite', sibling='sshsite', project='here',
+            res, 0, action='create_sibling_gitlab',
+            message=["There is already a project at '%s' on site '%s', "
+                     "but no sibling with name '%s' is configured, "
+                     "maybe use --existing=reconfigure", "here", "sshsite",
+                     "sshsite2"],
+            path=path,
+            refds=path,
+            site='sshsite', sibling='sshsite2', project='here',
             project_attributes={
                 'http_url_to_repo': 'http://example2.com',
                 'ssh_url_to_repo': 'example2.com'
             },
-            status='error')
+            status='error',
+            type='dataset')
         # same goes for switching the access type without --reconfigure
         assert_status(
             'error',
