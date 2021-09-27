@@ -142,7 +142,7 @@ class CreateSiblingGitlab(Interface):
             doc="""name of the GitLab site to create a sibling at. Must match an
             existing python-gitlab configuration section with location and
             authentication settings (see
-            https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration).
+            https://python-gitlab.readthedocs.io/en/stable/cli-usage.html#configuration).
             By default the dataset configuration is consulted.
             """,
             constraints=EnsureNone() | EnsureStr()),
