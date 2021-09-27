@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+import warnings
 
 from datalad.support.exceptions import CapturedException
 
@@ -190,14 +191,17 @@ class CreateSiblingGitlab(Interface):
             site)""",
             constraints=EnsureStr() | EnsureNone()),
         publish_depends=publish_depends,
+        dry_run=Parameter(
+            args=("--dry-run",),
+            action="store_true",
+            doc="""if set, no repository will be created, only tests for
+            name collisions will be performed, and would-be repository names
+            are reported for all relevant datasets"""),
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
-            doc="""If this flag is set, no communication with GitLab is
-            performed, and no repositories will be created. Instead
-            would-be repository names and configurations are reported for all
-            relevant datasets
-            """),
+            doc="""Deprecated. Use the renamed
+            [CMD: --dry-run CMD][PY: `dry_run` PY] parameter""")
     )
 
     @staticmethod
@@ -216,7 +220,16 @@ class CreateSiblingGitlab(Interface):
             access=None,
             publish_depends=None,
             description=None,
-            dryrun=False):
+            dryrun=False,
+            dry_run=False):
+        if dryrun and not dry_run:
+            # the old one is used, and not in agreement with the new one
+            warnings.warn(
+                "datalad-create-sibling-github's `dryrun` option is "
+                "deprecated and will be removed in a future release, "
+                "use the renamed `dry_run/--dry-run` option instead.",
+                DeprecationWarning)
+            dry_run = dryrun
         path = resolve_path(ensure_list(path), ds=dataset) \
             if path else None
 
@@ -239,7 +252,7 @@ class CreateSiblingGitlab(Interface):
             for r in _proc_dataset(
                     ds, ds,
                     site, project, name, layout, existing, access,
-                    dryrun, siteobjs, publish_depends, description):
+                    dry_run, siteobjs, publish_depends, description):
                 yield r
         # we need to find a subdataset when recursing, or when there is a path that
         # could point to one, we have to exclude the parent dataset in this test
@@ -259,14 +272,14 @@ class CreateSiblingGitlab(Interface):
                 for r in _proc_dataset(
                         ds, subds,
                         site, project, name, layout, existing, access,
-                        dryrun, siteobjs, publish_depends, description):
+                        dry_run, siteobjs, publish_depends, description):
                     yield r
 
         return
 
 
 def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
-                  access, dryrun, siteobjs, depends, description):
+                  access, dry_run, siteobjs, depends, description):
     # basic result setup
     res_kwargs = dict(
         action='create_sibling_gitlab',
@@ -393,7 +406,7 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
 
     res_kwargs['project'] = project
 
-    if dryrun:
+    if dry_run:
         # this is as far as we can get without talking to GitLab
         yield dict(
             res_kwargs,

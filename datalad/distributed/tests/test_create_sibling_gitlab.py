@@ -65,7 +65,7 @@ def test_dryrun(path):
         site='site', project='one', path=['one', 'two'])
     # explicit cite, no path constraints, fails for lack of project path config
     res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
+        dry_run=True, on_failure='ignore',
         site='dummy',
     )
     assert_result_count(res, 1)
@@ -76,7 +76,7 @@ def test_dryrun(path):
     # now a working, fully manual call
     for p in (None, ctlg['root'].path):
         res = ctlg['root'].create_sibling_gitlab(
-            dryrun=True, on_failure='ignore',
+            dry_run=True, on_failure='ignore',
             site='dummy', project='here',
             path=p,
         )
@@ -91,7 +91,7 @@ def test_dryrun(path):
     # we don't need to specify one anymore, but we can still customize
     # the sibling name
     res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
+        dry_run=True, on_failure='ignore',
         name='ursula', project='here',
     )
     assert_result_count(res, 1)
@@ -105,7 +105,7 @@ def test_dryrun(path):
     ctlg['root'].config.set('datalad.gitlab-otherone-siblingname', 'ulf')
     # no need to specific 'name' anymore
     res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
+        dry_run=True, on_failure='ignore',
         project='here',
     )
     assert_result_count(
@@ -114,7 +114,7 @@ def test_dryrun(path):
     )
     # properly switches the name based on site
     res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
+        dry_run=True, on_failure='ignore',
         site='otherone', project='here',
     )
     assert_result_count(
@@ -124,7 +124,7 @@ def test_dryrun(path):
     # reports notneeded on existing='skip' with an existing remote
     ctlg['root'].repo.add_remote('dieter', 'http://example.com')
     res = ctlg['root'].create_sibling_gitlab(
-        dryrun=True, on_failure='ignore',
+        dry_run=True, on_failure='ignore',
         project='here', existing='skip',
     )
     assert_result_count(
@@ -136,14 +136,14 @@ def test_dryrun(path):
     # lastly, configure a project path
     ctlg['root'].config.set('datalad.gitlab-theone-project', 'secret')
     # now we can drive it blind
-    res = ctlg['root'].create_sibling_gitlab(dryrun=True)
+    res = ctlg['root'].create_sibling_gitlab(dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
         site='theone', sibling='dieter', project='secret',
     )
     # we can make use of the config in the base dataset to drive
     # calls on subdatasets: use -d plus a path
-    res = ctlg['root'].create_sibling_gitlab(path='subdir', dryrun=True)
+    res = ctlg['root'].create_sibling_gitlab(path='subdir', dry_run=True)
     # only a single result, doesn't touch the parent
     assert_result_count(res, 1)
     assert_result_count(
@@ -159,12 +159,12 @@ def test_dryrun(path):
     )
     # we get the same result with an explicit layout request
     expl_res = ctlg['root'].create_sibling_gitlab(
-        path='subdir', layout='hierarchy', dryrun=True)
+        path='subdir', layout='hierarchy', dry_run=True)
     eq_(res, expl_res)
     # layout can be configured too, "collection" is "flat" in a group
     ctlg['root'].config.set('datalad.gitlab-theone-layout', 'collection')
     res = ctlg['root'].create_sibling_gitlab(
-        path='subdir', dryrun=True)
+        path='subdir', dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
         # http://site/group/dir--dir--dir--name.git
@@ -174,14 +174,14 @@ def test_dryrun(path):
     )
     # make sure the reference dataset does not conflict with its group in this
     # case
-    res = ctlg['root'].create_sibling_gitlab(dryrun=True)
+    res = ctlg['root'].create_sibling_gitlab(dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['root'].path, type='dataset', status='ok',
         project='secret/_repo_')
     # "flat" does GitHub-style
     ctlg['root'].config.set('datalad.gitlab-theone-layout', 'flat')
     res = ctlg['root'].create_sibling_gitlab(
-        path='subdir', dryrun=True)
+        path='subdir', dry_run=True)
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
         # http://site/base--dir--dir--dir--name.git
@@ -193,23 +193,23 @@ def test_dryrun(path):
     # the results do not depend on explicitly given datasets, if we just enter
     # the parent dataset we get the same results
     with chpwd(str(ctlg['root'].pathobj / 'subdir')):
-        rel_res = create_sibling_gitlab(path=os.curdir, dryrun=True)
+        rel_res = create_sibling_gitlab(path=os.curdir, dry_run=True)
         eq_(res, rel_res)
     # and again the same results if we are in a subdataset and point to a parent
     # dataset as a reference and config provider
     with chpwd(ctlg['c1'].path):
         rel_res = create_sibling_gitlab(
-            dataset=ctlg['root'].path, path=os.curdir, dryrun=True)
+            dataset=ctlg['root'].path, path=os.curdir, dry_run=True)
         eq_(res, rel_res)
 
     # blows on unknown layout
     ctlg['root'].config.unset('datalad.gitlab-theone-layout')
     assert_raises(
         ValueError,
-        ctlg['root'].create_sibling_gitlab, layout='funny', dryrun=True)
+        ctlg['root'].create_sibling_gitlab, layout='funny', dry_run=True)
 
     # and finally recursion
-    res = ctlg['root'].create_sibling_gitlab(recursive=True, dryrun=True)
+    res = ctlg['root'].create_sibling_gitlab(recursive=True, dry_run=True)
     # one result per dataset
     assert_result_count(res, len(ctlg))
     # verbose check of target layout (easier to see target pattern for humans)
@@ -227,7 +227,7 @@ def test_dryrun(path):
         ]
     )
     res = ctlg['root'].create_sibling_gitlab(
-        recursive=True, layout='collection', dryrun=True)
+        recursive=True, layout='collection', dry_run=True)
     assert_result_count(res, len(ctlg))
     eq_(
         sorted(r['project'] for r in res),
@@ -242,7 +242,7 @@ def test_dryrun(path):
         ],
     )
     res = ctlg['root'].create_sibling_gitlab(
-        recursive=True, layout='flat', dryrun=True)
+        recursive=True, layout='flat', dry_run=True)
     assert_result_count(res, len(ctlg))
     eq_(
         sorted(r['project'] for r in res),
