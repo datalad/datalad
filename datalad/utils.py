@@ -538,7 +538,7 @@ if _assert_no_open_files_cfg:
     def assert_no_open_files(path):
         files = get_open_files(path, log_open=40)
         if _assert_no_open_files_cfg == 'assert':
-            assert not files
+            assert not files, "Got following files still open: %s" % ','.join(files)
         elif files:
             if _assert_no_open_files_cfg == 'pdb':
                 import pdb
