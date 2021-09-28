@@ -319,17 +319,14 @@ def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
             recursive=False,
             result_renderer='disabled')
     }
-    if existing == 'skip' and remotename in dremotes:
-        # we have a conflict of target remote and the
-        # set of existing remotes
+    if remotename in dremotes and existing not in ['replace', 'reconfigure']:
+        # we already know a sibling with this name
         yield dict(
             res_kwargs,
-            status='notneeded',
-        )
+            status='error' if existing == 'error' else 'notneeded',
+            message=('already has a configured sibling "%s"', remotename),
+            )
         return
-    # TODO for existing == error, check against would be gitlab URL
-    # cannot be done in, needs an idea of the project path config
-    # and an API call to gitlab
 
     if layout is None:
         # figure out the layout of projects on the site
