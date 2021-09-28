@@ -48,6 +48,7 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
+from datalad.support.exceptions import CapturedException
 from datalad.utils import (
     get_encoding_info,
     get_envvars_info,
@@ -248,8 +249,8 @@ def teardown_package():
         print("Obscure filename: str=%s repr=%r"
                 % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
     except UnicodeEncodeError as exc:
-        from .dochelpers import exc_str
-        print("Obscure filename failed to print: %s" % exc_str(exc))
+        ce = CapturedException(exc)
+        print("Obscure filename failed to print: %s" % ce)
     def print_dict(d):
         return " ".join("%s=%r" % v for v in d.items())
     print("Encodings: %s" % print_dict(get_encoding_info()))
