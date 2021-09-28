@@ -32,6 +32,7 @@ from datalad.support import ansi_colors as colors
 from datalad.tests.utils import (
     assert_equal,
     assert_in,
+    assert_no_open_files,
     assert_not_in,
     assert_re_in,
     known_failure_githubci_win,
@@ -86,6 +87,7 @@ def test_logging_to_a_file(dst):
     # Close all handlers so windows is happy -- apparently not closed fast enough
     for handler in lgr.handlers:
         handler.close()
+    assert_no_open_files(dst)
 
 
 @with_tempfile
