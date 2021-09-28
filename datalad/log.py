@@ -210,6 +210,11 @@ class ProgressHandler(logging.Handler):
         self._other_handler = other_handler
         self.pbars = {}
 
+    def close(self):
+        if self._other_handler:
+            self._other_handler.close()
+        super().close()
+
     def emit(self, record):
         from datalad.ui import ui
         if not hasattr(record, 'dlm_progress'):

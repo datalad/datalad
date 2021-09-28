@@ -25,7 +25,6 @@ from datalad.utils import (
     unlink,
     Path,
 )
-from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
     CapturedException,
@@ -61,7 +60,6 @@ def get_max_path_length(top_path=None, maxl=1000):
         top_path = getpwd()
     import random
     from datalad import lgr
-    from datalad.dochelpers import exc_str
     from datalad.support import path
     prefix = path.join(top_path, "dl%d" % random.randint(1 ,100000))
     # some smart folks could implement binary search for this
@@ -73,9 +71,10 @@ def get_max_path_length(top_path=None, maxl=1000):
             with open(filename, 'w') as f:
                 max_path_length = path_length
         except Exception as exc:
+            ce = CapturedException(exc)
             lgr.debug(
                 "Failed to create sample file for length %d. Last succeeded was %s. Exception: %s",
-                path_length, max_path_length, exc_str(exc))
+                path_length, max_path_length, ce)
             break
         unlink(filename)
     return max_path_length
@@ -125,7 +124,8 @@ def _describe_system():
     try:
         dist = get_linux_distribution()
     except Exception as exc:
-        lgr.warning("Failed to get distribution information: %s", exc_str(exc))
+        ce = CapturedException(exc)
+        lgr.warning("Failed to get distribution information: %s", ce)
         dist = tuple()
 
     return {

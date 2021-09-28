@@ -26,7 +26,6 @@ from tempfile import mkdtemp
 from datalad.core.local.save import Save
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
-from datalad.dochelpers import exc_str
 from datalad.interface.unlock import Unlock
 
 from datalad.interface.base import Interface

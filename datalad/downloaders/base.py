@@ -436,9 +436,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
         else:
             filepath = downloader_session.filename
 
-        existed = exists(filepath)
+        existed = op.lexists(filepath)
         if existed and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
+            raise DownloadError("Path %s already exists" % filepath)
 
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
