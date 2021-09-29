@@ -507,6 +507,11 @@ class _GitHubLike(object):
                 status='error',
                 message=('unauthorized: %s', response.get('message')),
             )
+        elif r.status_code == requests.codes.internal_server_error:
+            return dict(
+                status='error',
+                message=response.get('message', '').strip() or 'Server returned error code %d without any further information' % requests.codes.internal_server_error,
+            )
         # make sure any error-like situation causes noise
         r.raise_for_status()
         # catch-all
