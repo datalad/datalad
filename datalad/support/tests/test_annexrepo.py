@@ -1798,29 +1798,6 @@ def test_AnnexRepo_get_toppath(repo, tempdir, repo2):
     eq_(AnnexRepo.get_toppath(tempdir), None)
 
 
-@skip_if_adjusted_branch
-@with_tempfile
-@with_tempfile
-def test_AnnexRepo_add_submodule(source_path, path):
-    source = AnnexRepo(source_path, create=True)
-    (source.pathobj / 'test-annex.dat').write_text("content")
-    source.save('some')
-
-    top_repo = AnnexRepo(path, create=True)
-
-    top_repo.add_submodule('sub', name='sub', url=source_path)
-    top_repo.commit('submodule added')
-    eq_([s["gitmodule_name"] for s in top_repo.get_submodules_()],
-        ['sub'])
-
-    assert_repo_status(top_repo, annex=True)
-    assert_repo_status(opj(path, 'sub'), annex=False)
-
-
-def test_AnnexRepo_update_submodule():
-    raise SkipTest("TODO")
-
-
 def test_AnnexRepo_get_submodules():
     raise SkipTest("TODO")
 
