@@ -192,6 +192,7 @@ before_install:
   - travis_retry sudo apt-get update -qq
   - travis_retry sudo apt-get install eatmydata  # to speedup some installations
   - tools/ci/prep-travis-forssh.sh
+  - tools/ci/debians_disable_outdated_ssl_cert
   # Install various basic depedencies
   - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   # needed for tests of patool compression fall-back solution

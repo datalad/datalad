@@ -241,6 +241,8 @@ install:
   # use of python/pip executables below
   - sh: "[ \"x$PY\" != x ] && . ${HOME}/venv${PY}/bin/activate || virtualenv -p 3 ${HOME}/dlvenv && . ${HOME}/dlvenv/bin/activate; ln -s \"$VIRTUAL_ENV\" \"${HOME}/VENV\""
   - cmd: "set PATH=C:\\Python%PY%;C:\\Python%PY%\\Scripts;%PATH%"
+  # Workaround on older/buggy debian/ubuntus having outdated certificate
+  - sh: tools/ci/debians_disable_outdated_ssl_cert
   # deploy the datalad installer, override version via DATALAD_INSTALLER_VERSION
   - cmd:
       IF DEFINED DATALAD_INSTALLER_VERSION (
