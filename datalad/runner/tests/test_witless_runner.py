@@ -13,6 +13,8 @@ import os
 import signal
 import sys
 import unittest.mock
+import warnings
+
 from time import (
     sleep,
     time,
@@ -274,11 +276,11 @@ def test_asyncio_forked(temp):
 
 
 def test_done_deprecation():
-    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+    with unittest.mock.patch("warnings.warn") as warn_mock:
         _ = Protocol("done")
         warn_mock.assert_called_once()
 
-    with unittest.mock.patch("datalad.cmd.warnings.warn") as warn_mock:
+    with unittest.mock.patch("warnings.warn") as warn_mock:
         _ = Protocol()
         warn_mock.assert_not_called()
 

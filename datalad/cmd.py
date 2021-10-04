@@ -16,7 +16,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import warnings
 
 # start of legacy import block
 # to avoid breakage of code written before datalad.runner
@@ -62,9 +61,6 @@ _MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
 
 def readline_rstripped(stdout):
-    warnings.warn("the function `readline_rstripped()` is deprecated "
-                  "and will be removed in a future release",
-                  DeprecationWarning)
     return stdout.readline().rstrip()
 
 
