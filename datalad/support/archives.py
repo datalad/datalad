@@ -47,12 +47,10 @@ from datalad.utils import (
 from datalad import cfg
 from datalad.config import anything2bool
 
-# fall back on patool, if a functional implementation is available
-# (i.e. not on windows), it is requested, or 7z is not found
-if not on_windows and (
-        cfg.obtain(
-            'datalad.runtime.use-patool', default=False,
-            valtype=anything2bool) or not external_versions['cmd:7z']):
+# fall back on patool, if requested, or 7z is not found
+if (cfg.obtain('datalad.runtime.use-patool', default=False,
+               valtype=anything2bool)
+        or not external_versions['cmd:7z']):
     from datalad.support.archive_utils_patool import (
         decompress_file as _decompress_file,
         # other code expects this to be here
