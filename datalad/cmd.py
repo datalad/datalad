@@ -65,6 +65,11 @@ def readline_rstripped(stdout):
     warnings.warn("the function `readline_rstripped()` is deprecated "
                   "and will be removed in a future release",
                   DeprecationWarning)
+    return _readline_rstripped(stdout)
+
+
+def _readline_rstripped(stdout):
+    """Internal helper for BatchedCommand"""
     return stdout.readline().rstrip()
 
 
@@ -93,7 +98,7 @@ class BatchedCommand(SafeDelCloseMixin):
             cmd = [cmd]
         self.cmd = cmd
         self.path = path
-        self.output_proc = output_proc if output_proc else readline_rstripped
+        self.output_proc = output_proc if output_proc else _readline_rstripped
         self._process = None
         self._stderr_out = None
         self._stderr_out_fname = None
