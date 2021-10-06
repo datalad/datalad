@@ -229,6 +229,12 @@ class CreateSiblingRia(Interface):
             repository be forcefully re-initialized, and the sibling
             (re-)configured ('reconfigure'), or the command be instructed to
             fail ('error').""", ),
+        construct_store=Parameter(
+            args=("--construct-store",),
+            action='store_true',
+            doc="""When set, a new store will be created. Otherwise, a sibling
+            will only be created if the url points to an existing RIA store.""",
+        ),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         trust_level=Parameter(
@@ -260,6 +266,7 @@ class CreateSiblingRia(Interface):
                  group=None,
                  storage_sibling=True,
                  existing='error',
+                 construct_store=False,
                  trust_level=None,
                  recursive=False,
                  recursion_limit=None,
@@ -394,7 +401,29 @@ class CreateSiblingRia(Interface):
         #       - more generally consider store creation a dedicated command or
         #         option
 
-        create_store(SSHRemoteIO(ssh_host) if ssh_host else LocalIO(),
+        io = SSHRemoteIO(ssh_host) if ssh_host else LocalIO()
+        try:
+            # determine the existence of a store by trying to read its layout.
+            # Because this raises a FileNotFound error if non-existent, we need
+            # to catch it
+            io.read_file(Path(base_path) / 'ria-layout-version')
+        except FileNotFoundError as e:
+            if not construct_store:
+                # we're instructed to only act in case of an existing RIA store
+                res = get_status_dict(
+                    status='error',
+                    message="No store found at '{}'. Forgot "
+                            "--construct-store?".format(
+                        Path(base_path), **res_kwargs),
+                    )
+                yield res
+                return
+
+        log_progress(
+            lgr.info, 'create-sibling-ria',
+            'Creating a new RIA store at %s', Path(base_path),
+        )
+        create_store(io,
                      Path(base_path),
                      '1')
 
