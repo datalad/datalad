@@ -266,8 +266,10 @@ install:
 
 
 build_script:
-  - python -m pip install ".[tests]"
-  - python -m pip install ".[devel-utils]"
+  #- python -m pip install ".[tests]"
+  #- python -m pip install ".[devel-utils]"
+  # make comprehensive approach used by travis setup
+  - pip install -r requirements-devel.txt
 
 
 #after_build:
