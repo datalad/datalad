@@ -642,6 +642,7 @@ def test_url_keys(dspath, storepath):
         name='ria',
         url='ria+file://{}'.format(storepath),
         storage_sibling='only',
+        construct_store=True
     )
     ds.get(filename)
     repo.call_annex(['copy', '--to', 'ria', filename])

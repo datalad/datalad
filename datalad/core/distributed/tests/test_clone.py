@@ -1066,7 +1066,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
     url2 = "ria+{}".format(get_local_file_url(str(storepath2)))
     for d in (ds, subds, subgit):
         create_ds_in_store(io, storepath2, d.id, '2', '1')
-        d.create_sibling_ria(url2, "anotherstore")
+        d.create_sibling_ria(url2, "anotherstore", construct_store=True)
         d.push('.', to='anotherstore', data='nothing')
         store2_loc, _, _ = get_layout_locations(1, storepath2, d.id)
         Runner(cwd=str(store2_loc)).run(['git', 'update-server-info'])
@@ -1084,7 +1084,7 @@ def _postclonetest_prepare(lcl, storepath, storepath2, link):
         # TODO: create-sibling-ria required for config! => adapt to RF'd
         #       creation (missed on rebase?)
         create_ds_in_store(io, storepath, d.id, '2', '1')
-        d.create_sibling_ria(upl_url, "store")
+        d.create_sibling_ria(upl_url, "store", construct_store=True)
 
         if d is not subgit:
             # Now, simulate the problem by reconfiguring the special remote to
@@ -1171,7 +1171,8 @@ def test_no_ria_postclonecfg(dspath, storepath, clonepath):
     file_url = "ria+{}".format(get_local_file_url(str(storepath)))
     ssh_url = "ria+ssh://datalad-test:{}".format(storepath.as_posix())
     ds.create_sibling_ria(file_url, "teststore",
-                          push_url=ssh_url, alias="testds")
+                          push_url=ssh_url, alias="testds",
+                          construct_store=True)
     ds.push('.', to='teststore')
 
     # Now clone via SSH. Should not reconfigure although `url` doesn't match the
@@ -1230,7 +1231,7 @@ def test_ria_postclone_noannex(dspath, storepath, clonepath):
     create_store(io, storepath, '1')
     lcl_url = "ria+{}".format(get_local_file_url(str(storepath)))
     create_ds_in_store(io, storepath, ds.id, '2', '1')
-    ds.create_sibling_ria(lcl_url, "store")
+    ds.create_sibling_ria(lcl_url, "store", construct_store=True)
     ds.push('.', to='store')
 
 
