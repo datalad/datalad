@@ -139,8 +139,13 @@ reckless_opt = Parameter(
     EnsureChoice(None, True, False, 'auto', 'ephemeral') | \
     EnsureStrPrefix('shared-'),
     metavar='auto|ephemeral|shared-...',
-    doc="""set up the dataset in a potentially unsafe way for performance,
-    or access reasons -- use with care, any dataset is marked as 'untrusted'.
+    doc="""Use this parameter with a command that clones a dataset
+    [PY: (`clone(<source>, reckless=True)`) PY]
+    [CMD: ('clone <source> --reckless') CMD]
+    or subdataset [PY: (`dl.get(<subds>, reckless=True)`) PY]
+    [CMD: ('datalad get <subds> --reckless') CMD]
+    to set up the dataset in a potentially unsafe way for performance, or
+    access reasons. Use with care, any dataset is marked as 'untrusted'.
     The reckless mode is stored in a dataset's local configuration under
     'datalad.clone.reckless', and will be inherited to any of its subdatasets.
     Supported modes are:
@@ -151,10 +156,8 @@ reckless_opt = Parameter(
     w/o git-annex being aware of it. In case of a change in origin you need to
     update the clone before you're able to save new content on your end.
     Alternative to 'auto' when hardlinks are not an option, or number of consumed
-    inodes needs to be minimized. Please note, that this is meant to be used
-    with either non-bare repositories or a RIA store as origin! Do not come up
-    with your own usecase unless you are absolutely sure you know your git-annex 
-    internals very well!
+    inodes needs to be minimized. Note that this is meant to be used
+    with either non-bare repositories or a RIA store as origin.
     ['shared-<mode>']: set up repository and annex permission to enable multi-user
     access. This disables the standard write protection of annex'ed files.
     <mode> can be any value support by 'git init --shared=', such as 'group', or
