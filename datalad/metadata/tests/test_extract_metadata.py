@@ -46,8 +46,8 @@ def test_ds_extraction(path):
     from datalad.tests.utils import SkipTest
     try:
         import libxmp
-    except ImportError:
-        raise SkipTest
+    except Exception as e:
+        raise SkipTest('Cannot import libxmp: {}'.format(e))
 
     ds = Dataset(path).create()
     copy(testpath, path)
@@ -86,8 +86,8 @@ def test_file_extraction(path):
     from datalad.tests.utils import SkipTest
     try:
         import libxmp
-    except ImportError:
-        raise SkipTest
+    except Exception as e:
+        raise SkipTest('Cannot import libxmp: {}'.format(e))
 
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
