@@ -2,8 +2,71 @@
 
 Change log
 **********
+0.15.2 (Wed Oct 06 2021)
+========================
+
+Bug Fix
+-------
+
+-  BF: Don’t suppress datalad subdatasets output
+   `#6035 <https://github.com/datalad/datalad/pull/6035>`__
+   (`@DisasterMo <https://github.com/DisasterMo>`__
+   `@mih <https://github.com/mih>`__)
+-  Honor datalad.runtime.use-patool if set regardless of OS (was Windows
+   only) `#6033 <https://github.com/datalad/datalad/pull/6033>`__
+   (`@mih <https://github.com/mih>`__)
+-  Discontinue usage of deprecated (public) helper
+   `#6032 <https://github.com/datalad/datalad/pull/6032>`__
+   (`@mih <https://github.com/mih>`__)
+-  BF: ProgressHandler - close the other handler if was specified
+   `#6020 <https://github.com/datalad/datalad/pull/6020>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  UX: Report GitLab weburl of freshly created projects in the result
+   `#6017 <https://github.com/datalad/datalad/pull/6017>`__
+   (`@adswa <https://github.com/adswa>`__)
+-  Ensure there’s a blank line between the class ``__doc__`` and
+   “Parameters” in ``build_doc`` docstrings
+   `#6004 <https://github.com/datalad/datalad/pull/6004>`__
+   (`@jwodder <https://github.com/jwodder>`__)
+-  Large code-reorganization of everything runner-related
+   `#6008 <https://github.com/datalad/datalad/pull/6008>`__
+   (`@mih <https://github.com/mih>`__)
+-  Discontinue exc_str() in all modern parts of the code base
+   `#6007 <https://github.com/datalad/datalad/pull/6007>`__
+   (`@mih <https://github.com/mih>`__)
+
+Tests
+-----
+
+-  TST: Add test to ensure functionality with subdatasets starting with
+   a hyphen (-) `#6042 <https://github.com/datalad/datalad/pull/6042>`__
+   (`@DisasterMo <https://github.com/DisasterMo>`__)
+-  BF(TST): filter away warning from coverage from analysis of stderr of
+   –help `#6028 <https://github.com/datalad/datalad/pull/6028>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: disable outdated SSL root certificate breaking chain on
+   older/buggy clients
+   `#6027 <https://github.com/datalad/datalad/pull/6027>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+-  BF: start global test_http_server only if not running already
+   `#6023 <https://github.com/datalad/datalad/pull/6023>`__
+   (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+Authors: 5
+----------
+
+-  Adina Wagner (`@adswa <https://github.com/adswa>`__)
+-  John T. Wodder II (`@jwodder <https://github.com/jwodder>`__)
+-  Michael Burgardt (`@DisasterMo <https://github.com/DisasterMo>`__)
+-  Michael Hanke (`@mih <https://github.com/mih>`__)
+-  Yaroslav Halchenko (`@yarikoptic <https://github.com/yarikoptic>`__)
+
+--------------
+
 0.15.1 (Fri Sep 24 2021)
 ========================
+
+.. _bug-fix-1:
 
 Bug Fix
 -------
@@ -41,6 +104,8 @@ Documentation
 -  Coarse description of the credential subsystem’s functionality
    `#5998 <https://github.com/datalad/datalad/pull/5998>`__
    (`@mih <https://github.com/mih>`__)
+
+.. _tests-1:
 
 Tests
 -----
@@ -390,7 +455,7 @@ Fixes
    ``annex get`` and ``annex copy`` calls.
    (`#5904 <https://github.com/datalad/datalad/issues/5904>`__)
 
-.. _tests-1:
+.. _tests-2:
 
 Tests
 -----
@@ -404,7 +469,7 @@ Tests
 0.14.8 (Sun Sep 12 2021)
 ========================
 
-.. _bug-fix-1:
+.. _bug-fix-2:
 
 Bug Fix
 -------
@@ -482,7 +547,7 @@ Internal
    (`@adswa <https://github.com/adswa>`__
    `@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-2:
+.. _tests-3:
 
 Tests
 -----
@@ -510,7 +575,7 @@ Authors: 4
 0.14.7 (Tue Aug 03 2021)
 ========================
 
-.. _bug-fix-2:
+.. _bug-fix-3:
 
 Bug Fix
 -------
@@ -561,7 +626,7 @@ Internal
    available `#5818 <https://github.com/datalad/datalad/pull/5818>`__
    (`@yarikoptic <https://github.com/yarikoptic>`__)
 
-.. _tests-3:
+.. _tests-4:
 
 Tests
 -----
@@ -610,7 +675,7 @@ Authors: 2
 0.14.5 (Mon Jun 21 2021)
 ========================
 
-.. _bug-fix-3:
+.. _bug-fix-4:
 
 Bug Fix
 -------
@@ -711,7 +776,7 @@ Internal
    `#5649 <https://github.com/datalad/datalad/pull/5649>`__
    (`@kyleam <https://github.com/kyleam>`__)
 
-.. _tests-4:
+.. _tests-5:
 
 Tests
 -----
