@@ -27,6 +27,7 @@ from datalad.utils import (
     PurePosixPath,
 )
 from datalad.tests.utils import (
+    assert_true,
     assert_false,
     assert_in,
     assert_not_in,
@@ -324,3 +325,36 @@ def test_parent_on_unborn_branch(path):
     ds.repo.save(path="sub")
     eq_(ds.subdatasets(result_xfm='relpaths'),
         ["sub"])
+
+
+@with_tempfile
+@with_tempfile
+def test_name_starts_with_hyphen(origpath, path):
+    ds = Dataset.create(origpath)
+    # create
+    dash_sub = ds.create('-sub')
+    assert_true(dash_sub.is_installed())
+    assert_result_count(
+        ds.subdatasets(), 1, path=dash_sub.path, state='present')
+
+    # clone
+    ds_clone = Dataset.create(path)
+    dash_clone = clone(source=dash_sub.path, path=os.path.join(path, '-clone'))
+    ds_clone.save(recursive=True)
+    assert_true(dash_clone.is_installed())
+    assert_result_count(
+        ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
+
+    # uninstall
+    ds_clone.uninstall('-clone')
+    assert_false(dash_clone.is_installed())
+    assert_result_count(
+        ds_clone.subdatasets(), 1, path=dash_clone.path, state='absent')
+
+    # get
+    ds_clone.get('-clone')
+    assert_true(dash_clone.is_installed())
+    assert_result_count(
+        ds_clone.subdatasets(), 1, path=dash_clone.path, state='present')
+
+    assert_repo_status(ds.path)

@@ -1,3 +1,33 @@
+# 0.15.2 (Wed Oct 06 2021)
+
+#### 🐛 Bug Fix
+
+- BF: Don't suppress datalad subdatasets output [#6035](https://github.com/datalad/datalad/pull/6035) ([@DisasterMo](https://github.com/DisasterMo) [@mih](https://github.com/mih))
+- Honor datalad.runtime.use-patool if set regardless of OS (was Windows only) [#6033](https://github.com/datalad/datalad/pull/6033) ([@mih](https://github.com/mih))
+- Discontinue usage of deprecated (public) helper [#6032](https://github.com/datalad/datalad/pull/6032) ([@mih](https://github.com/mih))
+- BF: ProgressHandler - close the other handler if was specified [#6020](https://github.com/datalad/datalad/pull/6020) ([@yarikoptic](https://github.com/yarikoptic))
+- UX: Report GitLab weburl of freshly created projects in the result [#6017](https://github.com/datalad/datalad/pull/6017) ([@adswa](https://github.com/adswa))
+- Ensure there's a blank line between the class `__doc__` and "Parameters" in `build_doc` docstrings [#6004](https://github.com/datalad/datalad/pull/6004) ([@jwodder](https://github.com/jwodder))
+- Large code-reorganization of everything runner-related [#6008](https://github.com/datalad/datalad/pull/6008) ([@mih](https://github.com/mih))
+- Discontinue exc_str() in all modern parts of the code base [#6007](https://github.com/datalad/datalad/pull/6007) ([@mih](https://github.com/mih))
+
+#### 🧪 Tests
+
+- TST: Add test to ensure functionality with subdatasets starting with a hyphen (-) [#6042](https://github.com/datalad/datalad/pull/6042) ([@DisasterMo](https://github.com/DisasterMo))
+- BF(TST): filter away warning from coverage from analysis of stderr of --help [#6028](https://github.com/datalad/datalad/pull/6028) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: disable outdated SSL root certificate breaking chain on older/buggy clients [#6027](https://github.com/datalad/datalad/pull/6027) ([@yarikoptic](https://github.com/yarikoptic))
+- BF: start global test_http_server only if not running already [#6023](https://github.com/datalad/datalad/pull/6023) ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 5
+
+- Adina Wagner ([@adswa](https://github.com/adswa))
+- John T. Wodder II ([@jwodder](https://github.com/jwodder))
+- Michael Burgardt ([@DisasterMo](https://github.com/DisasterMo))
+- Michael Hanke ([@mih](https://github.com/mih))
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.15.1 (Fri Sep 24 2021)
 
 #### 🐛 Bug Fix
