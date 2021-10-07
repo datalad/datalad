@@ -383,6 +383,17 @@
             "avatar_url": [
                 "https://avatars.githubusercontent.com/u/7570456?v=4"
             ]
+        },
+        {
+            "login": "DisasterMo",
+            "name": "Michael Burgardt",
+            "contributions": [
+                "code"
+            ],
+            "profile": "https://github.com/DisasterMo",
+            "avatar_url": [
+                "https://avatars.githubusercontent.com/u/49207524?v=4"
+            ]
         }
     ],
     "contributorsPerLine": 7
