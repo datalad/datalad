@@ -747,10 +747,3 @@ def test_missing_path_handling(path):
 
         # Check for guarded access in error results
         ds.get("foo")
-
-        # Check for for assertion that "path" exists in non-error result dicts
-        get_target_path.return_value = [{
-            "status": "ok"
-        }]
-        assert_raises(Exception, ds.get, "foo")
-

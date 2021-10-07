@@ -953,14 +953,7 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
-                if 'path' not in res:
-                    assert res['status'] != 'ok', f'Missing "path"-key in ' \
-                                                  f'result record with ' \
-                                                  f'status {res["status"]}: ' \
-                                                  f'{res}'
+                if 'path' not in res or res['path'] not in content_by_ds:
+                    # we had reports on datasets and subdatasets already
+                    # before the annex stage
                     yield res
-                else:
-                    if res['path'] not in content_by_ds:
-                        # we had reports on datasets and subdatasets already
-                        # before the annex stage
-                        yield res
