@@ -107,6 +107,7 @@ script:
     DATALAD_LOG_LEVEL=5
     DATALAD_LOG_OUTPUTS=1
     DATALAD_LOG_TIMESTAMP=1
+    DATALAD_ASSERT_NO_OPEN_FILES=assert
     PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER python -m nose "${NOSE_OPTS[@]}"
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION) and not(turtle)"
