@@ -93,7 +93,17 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
             for f in subdirs_ + files_:
                 os.rename(opj(subdir, f), opj(dir_, f))
-            rmdir(widow_dir)
+            import sys
+            try:
+                rmdir(widow_dir)
+            except Exception as exc:
+                sys.stderr.write("Caught exception\n")
+                files = os.listdir(widow_dir)
+                if files:
+                    sys.stderr.write("Files present: %s\n" % str(files))
+                from datalad.utils import assert_no_open_files
+                assert_no_open_files(widow_dir)
+                raise
     elif leading_directories is None:
         pass   # really do nothing
     else:
