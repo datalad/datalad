@@ -12,6 +12,8 @@ import os.path as op
 
 import logging
 
+from mock import MagicMock
+from pkg_resources import EntryPoint
 from unittest.mock import patch
 
 from ..providers import Provider
@@ -255,3 +257,30 @@ def test_providers_badre(path):
     with swallow_logs(logging.WARNING) as msg:
         the_chosen_one = providers.get_provider('https://foo.org/data')
         assert_in("Invalid regex", msg.out)
+
+
+def test_external_downloader():
+
+    class DarkMatterDownloader:
+        pass
+
+    class MockedEntryPoint(EntryPoint):
+
+        def __init__(self):
+            super().__init__('darkmatter', 'datalad')
+
+        def load(self, *args):
+            return DarkMatterDownloader()
+
+    def _mocked_iter_entry_points(group):
+        assert group == 'datalad.downloaders'
+        yield MockedEntryPoint()
+
+    provider = Provider("name", ".*")
+    assert "darkmatter" not in Provider.DOWNLOADERS
+    # TODO: mock out _extended_from_entry_points and set to False since otherwise it would not redo it
+    # if did already before (triggered by other tests etc)
+
+    with patch('pkg_resources.iter_entry_points',
+               MagicMock(side_effect=_mocked_iter_entry_points)):
+        downloader = provider.get_downloader("darkmatter://tomorrow")

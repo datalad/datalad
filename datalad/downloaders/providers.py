@@ -103,6 +103,7 @@ class Provider(object):
         for ep in iter_entry_points('datalad.downloaders'):
             # TODO: might need to be able to pass 'externals', as attribute or some "extras"?
             downloader = {'class': ep.resolve()}
+            import pdb; pdb.set_trace()
             if ep.name in cls.DOWNLOADERS:
                 lgr.debug(
                     "Overloading already known downloader %s for %s with a new one %s",
